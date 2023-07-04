@@ -157,7 +157,7 @@ class CountPosts(BasicProcessor):
 		if not parent_dataset:
 			return options
 	
-		if parent_dataset.parameters.get("datasource") in ("4chan", "8kun", "8chan", "parliaments", "usenet", "breitbart"):
+		if parent_dataset.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun"):
 			options["add_relative"] = {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,

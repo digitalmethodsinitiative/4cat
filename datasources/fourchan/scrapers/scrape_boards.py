@@ -101,7 +101,7 @@ class BoardScraper4chan(BasicJSONScraper):
 			self.db.insert("threads_" + self.prefix, thread_data)
 
 		replacements = [self.init_time, thread.get("last_modified", 0)]
-		if "4chan" in self.type:
+		if "fourchan" in self.type:
 			# update timestamps and position, but only for 4chan
 			# other chans have different strategies and often have "infinite"
 			# threads which would rapidly bloat the database with an infinite

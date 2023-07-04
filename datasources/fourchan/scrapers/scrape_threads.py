@@ -80,7 +80,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		# determine OP id (8chan sequential threads are an exception here)
 		first_post = data["posts"][0]
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 
 		# check if OP has all the required data
 		missing = set(self.required_fields_op) - set(first_post.keys())
@@ -175,7 +175,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			"body": post.get("com", ""),
 			"author": post.get("name", ""),
 			"author_trip": post.get("trip", ""),
-			"author_type": post["id"] if "id" in post and self.type == "4chan-thread" else "",
+			"author_type": post["id"] if "id" in post and self.type == "fourchan-thread" else "",
 			"author_type_id": post.get("capcode", ""),
 			"country_code": post.get("country", "") if "board_flag" not in post else "t_" + post["board_flag"],
 			"country_name": post.get("country_name", "") if "flag_name" not in post else post["flag_name"],
@@ -269,7 +269,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# we need the following to check whether the thread has changed since the last scrape
 		# 8chan doesn't always include this, in which case "-1" is as good a placeholder as any
 		# account for 8chan-style cyclical ID
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 		thread = self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,))
 		
 		if not thread:
@@ -298,7 +298,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		:param int num_replies:  Number of posts in thread (including OP)
 		:return: Thread data (dict), updated, or `None` if no further work is needed
 		"""
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 
 		# first post has useful metadata for the *thread*
 		# 8chan uses "bumplocked" but otherwise it's the same
@@ -339,7 +339,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		"""
 
 		# account for 8chan-style cyclical threads
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 
 		self.db.insert("threads_" + self.prefix, {
 			"id": thread_db_id,

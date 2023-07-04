@@ -32,7 +32,7 @@ class QuoteNetworkGrapher(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.parameters.get("datasource") in ("4chan", "8chan", "8kun")
+		return module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
 		
 	def process(self):
 		"""
