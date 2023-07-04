@@ -61,7 +61,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
@@ -71,10 +71,10 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         :param module: Module to determine compatibility with
         """
         return module.type == "convert-ndjson-for-tcat" and \
-            config.get('tcat-auto-upload.server_url') and \
-            config.get('tcat-auto-upload.token') and \
-            config.get('tcat-auto-upload.username') and \
-            config.get('tcat-auto-upload.password')
+            config.get('tcat-auto-upload.server_url', user=user) and \
+            config.get('tcat-auto-upload.token', user=user) and \
+            config.get('tcat-auto-upload.username', user=user) and \
+            config.get('tcat-auto-upload.password', user=user)
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

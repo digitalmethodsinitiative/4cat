@@ -58,12 +58,12 @@ class VideoFrames(BasicProcessor):
 	followups = ["video-timelines"]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on tiktok-search only for dev
 		"""
 		return module.type.startswith("video-downloader") and \
-			   config.get("video-downloader.ffmpeg_path") and \
+			   config.get("video-downloader.ffmpeg_path", user=user) and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):

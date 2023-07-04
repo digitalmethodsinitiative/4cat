@@ -52,17 +52,17 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
             return {}
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
         :param module: Dataset or processor to determine compatibility with
         """
         return module.type == "twitterv2-search" and \
-               config.get('tcat-auto-upload.server_url') and \
-               config.get('tcat-auto-upload.token') and \
-               config.get('tcat-auto-upload.username') and \
-               config.get('tcat-auto-upload.password')
+               config.get('tcat-auto-upload.server_url', user=user) and \
+               config.get('tcat-auto-upload.token', user=user) and \
+               config.get('tcat-auto-upload.username', user=user) and \
+               config.get('tcat-auto-upload.password', user=user)
 
     def get_processor_pipeline(self):
         """

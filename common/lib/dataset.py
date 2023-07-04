@@ -1220,7 +1220,7 @@ class DataSet(FourcatModule):
 			genealogy.append(self.key)
 			return ",".join(genealogy)
 
-	def get_compatible_processors(self):
+	def get_compatible_processors(self, user=None):
 		"""
 		Get list of processors compatible with this dataset
 
@@ -1228,6 +1228,9 @@ class DataSet(FourcatModule):
 		by the processor, for each known type: if the processor does not
 		specify accepted types (via the `is_compatible_with` method), it is
 		assumed it accepts any top-level datasets
+
+		:param str|User|None user:  User to get compatibility for. If set,
+		use the user-specific config settings where available.
 
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
@@ -1242,7 +1245,7 @@ class DataSet(FourcatModule):
 			# method returns True *or* if it has no explicit compatibility
 			# check and this dataset is top-level (i.e. has no parent)
 			if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
-					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self)):
+					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, user=user)):
 				available[processor_type] = processor
 
 		return available
@@ -1257,7 +1260,7 @@ class DataSet(FourcatModule):
 		return backend.all_modules.processors.get(processor_type)
 
 
-	def get_available_processors(self):
+	def get_available_processors(self, user=None):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1266,12 +1269,15 @@ class DataSet(FourcatModule):
 		run but have options are included so they may be run again with a
 		different configuration
 
+		:param str|User|None user:  User to get compatibility for. If set,
+		use the user-specific config settings where available.
+
 		:return dict:  Available processors, `name => properties` mapping
 		"""
 		if self.available_processors:
 			return self.available_processors
 
-		processors = self.get_compatible_processors()
+		processors = self.get_compatible_processors(user=user)
 
 		for analysis in self.children:
 			if analysis.type not in processors:

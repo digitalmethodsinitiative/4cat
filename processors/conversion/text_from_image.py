@@ -81,13 +81,13 @@ class ImageTextDetector(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on image sets
 
         :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader") and config.get('text-from-images.server_url', False)
+        return module.type.startswith("image-downloader") and config.get('text-from-images.server_url', False, user=user)
 
     def process(self):
         """

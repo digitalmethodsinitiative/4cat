@@ -13,7 +13,7 @@ from json import JSONDecodeError
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
-import common.config_manager as config
+from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -72,12 +72,12 @@ class CategorizeImagesCLIP(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow on image archives if enabled in Control Panel
         """
-        return config.get("dmi_service_manager.clip_enabled", False) and \
-               config.get("dmi_service_manager.server_address", False) and \
+        return config.get("dmi_service_manager.clip_enabled", False, user=user) and \
+               config.get("dmi_service_manager.server_address", False, user=user) and \
                module.type.startswith("image-downloader")
 
     @classmethod

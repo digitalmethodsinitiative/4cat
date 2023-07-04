@@ -157,7 +157,7 @@
         </ol>
     </section>
 
-    {% if current_user.is_authenticated and __user_config("privileges.can_run_processors") and dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and dataset.is_accessible_by(current_user, role="owner") %}
+    {% if current_user.is_authenticated and __user_config("privileges.can_run_processors") and dataset.num_rows > 0 and dataset.get_available_processors(user=current_user)|length > 0 and dataset.is_accessible_by(current_user, role="owner") %}
         <section class="analysis-gallery available-processors">
 
             <h3 class="blocktitle section-subheader">

@@ -30,7 +30,7 @@ class TopImageCounter(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         All top-level datasets, excluding Telegram, which has a different image logic
 

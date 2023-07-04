@@ -20,7 +20,7 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     extension = "svg"
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine compatibility
 
@@ -31,7 +31,7 @@ class VideoSceneTimelineCreator(ProcessorPreset):
         :return bool:
         """
         return module.type.startswith("video-downloader") and \
-               config.get("video-downloader.ffmpeg_path") and \
+               config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_pipeline(self):

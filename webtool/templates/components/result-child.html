@@ -1,5 +1,5 @@
 {% set item = child %}
-{% set can_process = (current_user.is_authenticated and item.get_available_processors()) %}
+{% set can_process = (current_user.is_authenticated and item.get_available_processors(user=current_user)) %}
 {% set deprecated = (item.type not in processors) %}
 {% set is_filtered = (not deprecated and processors[item.type].is_filter()) %}
 

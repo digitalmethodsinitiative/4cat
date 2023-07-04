@@ -25,7 +25,7 @@ class BaseFilter(BasicProcessor):
     description = "This should not be available."
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         This is meant to be inherited by other child classes
 

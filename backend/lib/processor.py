@@ -33,14 +33,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	useful is another question).
 
 	To determine whether a processor can process a given dataset, you can
-	define a `is_compatible_with(FourcatModule module=None):) -> bool` class
+	define a `is_compatible_with(FourcatModule module=None, str user=None):) -> bool` class
 	method which takes a dataset as argument and returns a bool that determines
 	if this processor is considered compatible with that dataset. For example:
 
 	.. code-block:: python
 
         @classmethod
-        def is_compatible_with(cls, module=None):
+        def is_compatible_with(cls, module=None, user=None):
             return module.type == "linguistic-features"
 
 
@@ -239,7 +239,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
 			try:
-				available_processors = self.dataset.get_available_processors()
+				available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
 			except ValueError:
 				self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
 				break

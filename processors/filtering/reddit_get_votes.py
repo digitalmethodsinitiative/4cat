@@ -46,13 +46,13 @@ class RedditVoteChecker(BasicProcessor):
 		}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor if dataset is a Reddit dataset
 
 		:param module: Module to determine compatibility with
 		"""
-		if config.get('api.reddit.client_id', False) and config.get('api.reddit.secret', False):
+		if config.get('api.reddit.client_id', False, user=user) and config.get('api.reddit.secret', False, user=user):
 			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
 		return False
 

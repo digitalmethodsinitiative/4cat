@@ -34,12 +34,12 @@ class AudioExtractor(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on tiktok-search only for dev
 		"""
 		return module.type.startswith("video-downloader") and \
-			   config.get("video-downloader.ffmpeg_path") and \
+			   config.get("video-downloader.ffmpeg_path", user=user) and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	@classmethod

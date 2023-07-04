@@ -25,7 +25,7 @@ class MakeWordCloud(BasicProcessor):
 	extension = "svg"
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on rankable items
 

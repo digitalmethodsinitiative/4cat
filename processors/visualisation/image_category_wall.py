@@ -12,7 +12,7 @@ from svgwrite.text import Text
 from PIL import Image
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -54,7 +54,7 @@ class ImageWallGenerator(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on CLIP dataset only
 		TODO: allow on other categories! Could grab data from original dataset such as tags?

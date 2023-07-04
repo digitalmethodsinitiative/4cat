@@ -31,7 +31,7 @@ class RandomFilter(BaseFilter):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on NDJSON and CSV files
 

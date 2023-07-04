@@ -35,7 +35,7 @@ class VideoHasherPreset(ProcessorPreset):
     extension = "csv"
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine compatibility
 
@@ -46,7 +46,7 @@ class VideoHasherPreset(ProcessorPreset):
         :return bool:
         """
         return module.type.startswith("video-downloader") and \
-               config.get("video-downloader.ffmpeg_path") and \
+               config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_pipeline(self):
@@ -106,7 +106,7 @@ class VideoHasher(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on videos only
 		"""
@@ -253,7 +253,7 @@ class VideoHasherTwo(BasicProcessor):
 	]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on videos only
 		"""

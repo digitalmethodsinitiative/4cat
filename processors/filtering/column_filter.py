@@ -73,7 +73,7 @@ class ColumnFilter(BaseFilter):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on top datasets.
 
@@ -259,7 +259,7 @@ class ColumnProcessorFilter(ColumnFilter):
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. "
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on top datasets.
 

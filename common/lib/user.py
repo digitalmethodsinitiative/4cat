@@ -481,7 +481,7 @@ class User:
                     dataset = DataSet(key=dataset["key"], db=self.db)
                 except (ValueError, TypeError):
                     # dataset already deleted?
-                    pass
+                    continue
 
                 if len(dataset.get_owners()) == 1 and also_datasets:
                     dataset.delete(commit=False)

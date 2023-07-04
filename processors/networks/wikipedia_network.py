@@ -16,7 +16,7 @@ __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-class URLCoLinker(BasicProcessor):
+class WikiURLCoLinker(BasicProcessor):
 	"""
 	Generate URL co-link network
 	"""

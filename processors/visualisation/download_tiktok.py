@@ -66,7 +66,7 @@ class TikTokVideoDownloader(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor TikTok datasets
 
@@ -179,7 +179,7 @@ class TikTokImageDownloader(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor TikTok datasets
 

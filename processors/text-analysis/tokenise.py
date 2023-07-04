@@ -44,7 +44,7 @@ class Tokenise(BasicProcessor):
 	]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow CSV and NDJSON datasets
 		"""
