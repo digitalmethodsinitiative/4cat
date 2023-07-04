@@ -535,6 +535,8 @@ class DataSet(FourcatModule):
 		# delete from drive
 		try:
 			self.get_results_path().unlink()
+			if self.get_results_path().with_suffix(".log").exists():
+				self.get_results_path().with_suffix(".log").unlink()
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass

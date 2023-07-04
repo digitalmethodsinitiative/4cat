@@ -3,7 +3,7 @@
     <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-private">This dataset is private and can only be viewed by your user and instance maintainers</span>
 {% endif %}
 
-{% if expiring and dataset.key in expiring %}
+{% if expiring and dataset.key in expiring and not dataset.parameters.keep %}
     <i class="fa fa-trash tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-expires"></i> <span class="sr-only">This dataset will be deleted automatically in the future</span>
     <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-expires">This dataset will be deleted automatically in the future</span>
 {% endif %}

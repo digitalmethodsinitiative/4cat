@@ -56,15 +56,13 @@ class ThingExpirer(BasicWorker):
 		# first get datasets for which the data source specifies that they need
 		# to be deleted after a certain amount of time
 		for datasource_id in self.all_modules.datasources:
-			datasource = self.all_modules.datasources[datasource_id]
-
 			# default = never expire
-			if not expiration.get(datasource_id):
+			if not expiration.get(datasource_id) or not expiration.get(datasource_id).get("timeout"):
 				continue
 
 			cutoff = time.time() - int(expiration[datasource_id].get("timeout"))
 			datasets += self.db.fetchall(
-				"SELECT key FROM datasets WHERE key_parent = '' AND parameters::json->>'datasource' = %s AND timestamp < %s",
+				"SELECT key FROM datasets WHERE (key_parent = '' OR key_parent IS NULL) AND parameters::json->>'datasource' = %s AND timestamp < %s AND parameters::json->>'keep' IS NULL",
 				(datasource_id, cutoff))
 
 		# and now find datasets that have their expiration date set

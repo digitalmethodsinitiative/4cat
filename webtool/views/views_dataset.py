@@ -353,15 +353,15 @@ def show_result(key):
                            datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
                    and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
 
-    if datasource_expiration and datasource_expiration.get("timeout"):
-        timestamp_expires = dataset.timestamp + int(datasource_expiration.get("timeout"))
-        expires_datasource = True
+    timestamp_expires = None
+    if not dataset.parameters.get("keep"):
+        if datasource_expiration and datasource_expiration.get("timeout"):
+            timestamp_expires = dataset.timestamp + int(datasource_expiration.get("timeout"))
+            expires_datasource = True
 
-    elif dataset.parameters.get("expires-after"):
-        timestamp_expires = dataset.parameters.get("expires-after")
+        elif dataset.parameters.get("expires-after"):
+            timestamp_expires = dataset.parameters.get("expires-after")
 
-    else:
-        timestamp_expires = None
 
     # if the dataset has parameters with credentials, give user the option to
     # erase them
@@ -480,5 +480,6 @@ def keep_dataset(key):
                                            "deletion. This cannot be overridden." % datasource), 403
 
     dataset.delete_parameter("expires-after")
+    dataset.keep = True
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
     return redirect(url_for("show_result", key=key))

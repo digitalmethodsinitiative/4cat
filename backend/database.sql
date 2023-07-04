@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   id                SERIAL PRIMARY KEY,
   key               text,
   type              text DEFAULT 'search',
-  key_parent        text DEFAULT '',
+  key_parent        text DEFAULT '' NOT NULL,
   query             text,
   job               integer DEFAULT 0,
   parameters        text,
