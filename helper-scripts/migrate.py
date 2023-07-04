@@ -161,6 +161,10 @@ if not current_version_file.exists():
 # ---------------------------------------------
 interpreter = sys.executable
 
+# this sleep is here to give anything automating migrate the chance to keep up
+time.sleep(2)
+
+
 logger.info("\nWARNING: Migration can take quite a while. 4CAT will not be available during migration.")
 logger.info("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
 
