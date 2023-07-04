@@ -27,8 +27,8 @@ class CategorizeImagesCLIP(BasicProcessor):
     """
     type = "image-to-categories"  # job type ID
     category = "Visual"  # category
-    title = "CLIP: Categorize Images"  # title displayed in UI
-    description = "Use [OpenAI's CLIP](https://openai.com/research/clip) model to categorize images"  # description displayed in UI
+    title = "Categorize Images using OpenAI's CLIP models"  # title displayed in UI
+    description = "Given a list of categories, the CLIP model will estimate likelihood an image is to belong to each (total of all categories per image will be 100%)."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     references = [
@@ -134,9 +134,17 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         This takes a zipped set of image files and uses a CLIP docker image to categorize them.
         """
+        categories = [cat.strip() for cat in self.parameters.get('categories').split(',')]
+        model = self.parameters.get("model")
         if self.source_dataset.num_rows <= 1:
             # 1 because there is always a metadata file
             self.dataset.finish_with_error("No images found.")
+            return
+        elif not categories:
+            self.dataset.finish_with_error("No categories provided.")
+            return
+        elif not model:
+            self.dataset.finish_with_error("No model provided.")
             return
 
         local_or_remote = config.get("dmi_service_manager.local_or_remote")
@@ -219,8 +227,8 @@ class CategorizeImagesCLIP(BasicProcessor):
 
         # CLIP args
         data = {"args": ['--output_dir', f"data/{mounted_output_dir}",
-                         "--model", self.parameters.get("model"),
-                         "--categories", f"{','.join([cat.strip() for cat in self.parameters.get('categories').split(',')])}",
+                         "--model", model,
+                         "--categories", f"{','.join(categories)}",
                          "--images"]
                 }
 
