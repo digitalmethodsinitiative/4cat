@@ -44,6 +44,9 @@ fi
 # If backend did gracefully shutdown, PID lockfile remains; Remove lockfile
 rm -f ./backend/4cat.pid
 
+# add working directory to python path
+export PYTHONPATH=/usr/src/app:$PYTHONPATH
+
 # Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
 python3 helper-scripts/migrate.py -y
 
