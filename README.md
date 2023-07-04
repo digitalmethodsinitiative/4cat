@@ -38,7 +38,7 @@ actively and can be used to collect data with 4CAT:
 The following platforms are supported through other tools, with which you can
 collect data to import data into 4CAT for analysis:
 
-* Instagram, TikTok, 9gag, Imgur, LinkedIn, Parler (via
+* Instagram, TikTok, 9gag, Imgur, LinkedIn, Parler, Douyin and Twitter (via
   [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer))
 * Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) exports)
 
