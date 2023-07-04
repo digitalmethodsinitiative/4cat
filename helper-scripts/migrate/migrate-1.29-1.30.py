@@ -7,6 +7,7 @@ import configparser
 import subprocess
 import shutil
 import shlex
+import json
 import sys
 import os
 
@@ -18,15 +19,47 @@ from common.lib.logger import Logger
 from common.lib.helpers import add_notification
 
 log = Logger(output=True)
-from common.config_manager import config
 
-db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'),
-              host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
+import configparser
+ini = configparser.ConfigParser()
+ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
+db_config = ini["DATABASE"]
+
+db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
+              host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
+
+def config_get(attribute, default=None):
+    """
+    Get config value
+
+    We can't use config_get() here because in a later version it will become
+    incompatible with the 1.29 database structure.
+
+    :param attribute:
+    :return:
+    """
+    v = db.fetchone("SELECT value FROM settings WHERE name = %s", (attribute, ))
+    return v["value"] if v else default
+
+def config_set(attribute, value):
+    """
+    Set config value
+
+    We can't use config_set() here because in a later version it will become
+    incompatible with the 1.29 database structure.
+
+    :param attribute:
+    :return:
+    """
+    return db.update("settings", where={"name": attribute}, data={"value": json.dumps(value)})
+
+def delete_setting(attribute):
+    return db.delete("settings", where={"name": attribute})
 
 # ---------------------------------------------
 #     New format for data source settings
 # ---------------------------------------------
-datasources = config.get("DATASOURCES")
+datasources = config_get("DATASOURCES")
 if type(datasources) is dict:
     print("  Migrating data source settings")
     new_datasources = list(datasources.keys())
@@ -38,14 +71,14 @@ if type(datasources) is dict:
 
     if "custom" in new_datasources:
         print("  - Disabling and deleting obsolete 'custom' datasource")
-        folder = Path(config.get("PATH_ROOT"), "datasources/custom")
+        folder = Path(config_get("PATH_ROOT"), "datasources/custom")
         if folder.exists():
             shutil.rmtree(folder)
         new_datasources.remove("custom")
 
     if "customimport" in new_datasources:
         print("  - Disabling and deleting obsolete 'customimport' datasource")
-        folder = Path(config.get("PATH_ROOT"), "datasources/customimport")
+        folder = Path(config_get("PATH_ROOT"), "datasources/customimport")
         if folder.exists():
             shutil.rmtree(folder)
         new_datasources.remove("customimport")
@@ -55,35 +88,35 @@ if type(datasources) is dict:
         for setting in ("boards", "no_scrape", "autoscrape", "interval"):
             if platform in datasources and datasources[platform].get(setting):
                 print(f"  - Migrating setting {platform}.{setting}...")
-                config.set(platform.replace("4", "four").replace("8", "eight") + "." + setting,
+                config_set(platform.replace("4", "four").replace("8", "eight") + "." + setting,
                            datasources[platform][setting])
 
     for platform in ("dmi-tcat", "dmi-tcatv2"):
         for setting in ("instances",):
             if platform in datasources and datasources[platform].get(setting):
                 print(f"  - Migrating setting {platform}.{setting}...")
-                config.set(platform + "." + setting, datasources[platform][setting])
+                config_set(platform + "." + setting, datasources[platform][setting])
 
     print(f"  - Migrating data source-specific expiration settings...")
     expiration = {datasource: {"timeout": info["expire-datasets"], "allow_optout": False} for datasource, info in
                   datasources.items() if "expire-datasets" in info}
-    config.set("expire.datasources", expiration)
+    config_set("expire.datasources", expiration)
 
     print("  - Updating DATASOURCES setting...")
-    config.set("4cat.datasources", new_datasources)
-    config.delete_setting("DATASOURCES")
+    config_set("4cat.datasources", new_datasources)
+    delete_setting("DATASOURCES")
 
 print("  Deleting and migrating deprecated settings...")
-config.set("4cat.phone_home_asked", False)
-if config.get("IMAGE_INTERVAL"):
+config_set("4cat.phone_home_asked", False)
+if config_get("IMAGE_INTERVAL"):
     print("  - IMAGE_INTERVAL -> fourchan.image_interval")
-    config.set("fourchan.image_interval", config.get("IMAGE_INTERVAL", 60))
-    config.delete_setting("IMAGE_INTERVAL")
+    config_set("fourchan.image_interval", config_get("IMAGE_INTERVAL", 60))
+    delete_setting("IMAGE_INTERVAL")
 
 print("  - WARN_EMAILS, WARN_INTERVAL, image_downloader_telegram.MAX_NUMBER_IMAGES -> removed")
-config.delete_setting("WARN_EMAILS")
-config.delete_setting("WARN_INTERVAL")
-config.delete_setting("image_downloader_telegram.MAX_NUMBER_IMAGES")
+delete_setting("WARN_EMAILS")
+delete_setting("WARN_INTERVAL")
+delete_setting("image_downloader_telegram.MAX_NUMBER_IMAGES")
 
 
 # ---------------------------------------------
@@ -118,23 +151,23 @@ if config_path.exists():
 # if it can't be installed, 4CAT can still run and migrate can continue
 # but the user will need to manually install it later
 print("  Looking for ffmpeg executable...")
-current_ffmpeg = config.get("video_downloader.ffmpeg-path", None)
+current_ffmpeg = config_get("video_downloader.ffmpeg-path", None)
 if current_ffmpeg and shutil.which(current_ffmpeg):
     print(f"  - ffmpeg configured and found at {current_ffmpeg}, nothing to configure")
 else:
     print("  - Checking if we are in Docker... ", end="")
     print("yes" if in_docker else "no")
 
-    ffmpeg = shutil.which(config.get("video_downloader.ffmpeg-path", "ffmpeg"))
+    ffmpeg = shutil.which(config_get("video_downloader.ffmpeg-path", "ffmpeg"))
     if ffmpeg:
         print(f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path")
-        config.set("video_downloader.ffmpeg-path", ffmpeg)
+        config_set("video_downloader.ffmpeg-path", ffmpeg)
     elif in_docker:
         print("  - ffmpeg not found, detected Docker environment, installing via apt")
         ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if ffmpeg_install.returncode == 0:
             print("  - ffmpeg intalled with apt!")
-            config.set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"))
+            config_set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"))
         else:
             print(f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video")
             print("    processors will be unavailable until you rebuild the Docker containers.")
