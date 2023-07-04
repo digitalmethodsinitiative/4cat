@@ -529,6 +529,8 @@ class DataSet(FourcatModule):
 
 		# delete from database
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
+		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
+		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
 		# delete from drive
 		try:
