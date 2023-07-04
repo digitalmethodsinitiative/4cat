@@ -84,6 +84,7 @@ app.config.from_mapping({
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
     "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
+    "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http"
 })
 login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
 login_manager.init_app(app)
