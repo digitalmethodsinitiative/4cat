@@ -1,10 +1,9 @@
 {
 	"ndjson": {
-		"post_id": "",
-		"external_url": "https://www.tiktok.com/@{{ author }}/video/{{ id }}",
-		"body": "<a href='https://www.tiktok.com/@{{ author }}/video/{{ id }}' target='_blank'><img class='preview' src='{{ video.cover }}'></a><br>{{ desc }}",
+		"tiktok-user": "<a href='https://www.tiktok.com/@{{ author.uniqueId }}' target='__blank'>@{{ author.uniqueId }}</a>",
+		"external_url": "https://www.tiktok.com/@{{ author.uniqueId }}/video/{{ id }}",
+		"body": "<a href='https://www.tiktok.com/@{{ author.uniqueId }}/video/{{ id }}' target='_blank'><img class='preview' src='{{ video.cover }}'></a><br>{{ desc }}",
 		"author": "{{ nickname }}",
-		"musicname": "{{ 'music_name': post['music']['title'] }}",
 		"created": "{{ createTime | datetime }}",
 		"plays": "<i class='fa-solid fa-play'></i> {{ stats.playCount | numberify }}",
 		"likes": "<i class='fa-solid fa-heart'></i> {{ stats.diggCount | numberify }}",
@@ -19,6 +18,26 @@
 			{
 				"key": "timestamp",
 				"label": "New to old",
+				"descending": true
+			},
+			{
+				"key": "stats.playCount",
+				"label": "Plays",
+				"descending": true
+			},
+			{
+				"key": "stats.diggCount",
+				"label": "Likes",
+				"descending": true
+			},
+			{
+				"key": "stats.commentCount",
+				"label": "Comments",
+				"descending": true
+			},
+			{
+				"key": "stats.shareCount",
+				"label": "Shares",
 				"descending": true
 			}
 		]		
