@@ -95,8 +95,8 @@ import webtool.views.views_admin
 import webtool.views.views_restart
 import webtool.views.views_user
 
-import webtool.views.views_misc
 import webtool.views.views_dataset
+import webtool.views.views_misc
 
 import webtool.views.api_explorer
 import webtool.views.api_standalone

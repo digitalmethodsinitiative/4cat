@@ -37,7 +37,7 @@
 	<nav class="main-nav">
 		<ul>
             {% if __user_config("privileges.can_create_dataset") %}
-			    <li{% if navigation.current == "create-dataset" %} class="current"{% endif %}><a href="{{ url_for('show_index') }}">Create dataset</a></li>
+			    <li{% if navigation.current == "create-dataset" %} class="current"{% endif %}><a href="{{ url_for('create_dataset') }}">Create dataset</a></li>
             {% endif %}
 			<li{% if navigation.current == "dataset" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}">Datasets</a></li>
             <li{% if navigation.current == "datasources" %} class="current"{% endif %}><a href="{{ url_for('data_overview') }}">Data sources</a></li>
@@ -47,8 +47,12 @@
             {% if __user_cp_access %}
                 <li{% if navigation.current == "control-panel" %} class="current"{% endif %}><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
             {% endif %}
-            <li{% if navigation.current == "faq" %} class="current"{% endif %}><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
-			<li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('show_frontpage') }}">About</a></li>
+            <li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('show_about') }}">About</a></li>
+            {% for page in __user_config("visual.nav_pages") %}
+            <li{% if navigation.current == page %} class="current"{% endif %}>
+                <a href="{{ url_for("show_page", page=page) }}">{% if page == "faq" %}<abbr title="Frequently Asked Questions">FAQ</abbr>{% else %}{{ page|title }}{% endif %}</a>
+            </li>
+            {% endfor %}
 		</ul>
     {% block subnavigation %}
     {% endblock %}

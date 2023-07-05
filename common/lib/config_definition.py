@@ -411,6 +411,41 @@ config_definition = {
             "remote": "Remote",
         },
         "global": True
+    },
+    # visual settings
+    # this configures what the site looks like
+    "visual.homepage": {
+        "type": UserInput.OPTION_CHOICE,
+        "options": {
+            "about": "'About' page",
+            "create-dataset": "'Create dataset' page",
+            "datasets": "Dataset overview"
+        },
+        "help": "4CAT home page",
+        "default": "about"
+    },
+    "visual.inline_preview": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Show inline preview",
+        "default": False,
+        "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
+    },
+    "visual.show_datasource": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Show data source",
+        "default": True,
+        "tooltip": "Show data source for each dataset. Can be useful to disable if only one data source is enabled."
+    },
+    "visual.nav_pages": {
+        "type": UserInput.OPTION_MULTI_SELECT,
+        "help": "Pages in navigation",
+        "options": {
+            "faq": "FAQ",
+            "data-policy": "Data Policy",
+            "citing": "How to cite"
+        },
+        "default": ["faq", "about"],
+        "tooltip": "These pages will be included in the navigation bar at the top of the interface."
     }
 }
 
@@ -427,5 +462,6 @@ categories = {
     "logging": "Logging",
     "path": "File paths",
     "privileges": "User privileges",
-    "dmi-service-manager": "DMI Service Manager"
+    "dmi-service-manager": "DMI Service Manager",
+    "visual": "User interface"
 }

@@ -14,7 +14,7 @@ from flask import render_template, request, redirect, send_from_directory, flash
 from flask_login import login_required, current_user
 
 from webtool import app, db, log, config
-from webtool.lib.helpers import Pagination, error
+from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset, \
     erase_credentials
 
@@ -24,13 +24,23 @@ from common.lib.queue import JobQueue
 from common.lib.user import User
 
 from common.config_manager import ConfigWrapper
+
 config = ConfigWrapper(config, user=current_user)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
-"""
-Results overview
-"""
+@app.route('/create-dataset/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def create_dataset():
+    """
+    Main tool frontend
+    """
+    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get(
+                       "datasources.enabled", {})}
+
+    return render_template('create-dataset.html', datasources=datasources)
 
 
 @app.route('/results/', defaults={'page': 1})
@@ -95,7 +105,8 @@ def show_results(page):
 
     # hide private datasets for non-owners and non-admins
     if not config.get("privileges.can_view_private_datasets"):
-        where.append("(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key))")
+        where.append(
+            "(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key))")
         replacements.append(owner_match)
 
     # empty datasets could just have no results, or be failures. we make no
@@ -142,7 +153,8 @@ def show_results(page):
     for dataset in datasets:
         dataset = DataSet(key=dataset["key"], db=db)
         datasource = dataset.parameters.get("datasource", "")
-        if dataset.parameters.get("expires-after") or config.get("datasources.expiration", {}).get(datasource, {}).get("timeout"):
+        if dataset.parameters.get("expires-after") or config.get("datasources.expiration", {}).get(datasource, {}).get(
+                "timeout"):
             expiring_datasets.add(dataset.key)
 
         filtered.append(dataset)
@@ -160,6 +172,8 @@ def show_results(page):
 """
 Downloading results
 """
+
+
 @app.route('/result/<string:query_file>')
 def get_result(query_file):
     """
@@ -190,7 +204,8 @@ def get_mapped_result(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     if dataset.get_extension() == ".csv":
@@ -241,7 +256,8 @@ def view_log(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     logfile = dataset.get_log_path()
@@ -270,7 +286,8 @@ def preview_items(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     preview_size = 1000
@@ -283,7 +300,7 @@ def preview_items(key):
     if dataset.get_extension() == "gexf":
         hostname = config.get("flask.server_name").split(":")[0]
         in_localhost = hostname in ("localhost", "127.0.0.1") or hostname.endswith(".local") or \
-            hostname.endswith(".localhost")
+                       hostname.endswith(".localhost")
         return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
 
     elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp"):
@@ -349,8 +366,9 @@ def show_result(key):
     datasources = backend.all_modules.datasources
     datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
-    can_unexpire = ((config.get('expire.allow_optout') and  \
-                           datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
+    can_unexpire = ((config.get('expire.allow_optout') and \
+                     datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout",
+                                                                                                   False)) \
                    and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
 
     timestamp_expires = None
@@ -361,7 +379,6 @@ def show_result(key):
 
         elif dataset.parameters.get("expires-after"):
             timestamp_expires = dataset.parameters.get("expires-after")
-
 
     # if the dataset has parameters with credentials, give user the option to
     # erase them
@@ -374,7 +391,8 @@ def show_result(key):
 
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
-                           is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
+                           is_favourite=is_favourite, timestamp_expires=timestamp_expires,
+                           has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
 
 
@@ -452,6 +470,7 @@ def toggle_private_interactive(key):
     else:
         return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
 
+
 @app.route("/results/<string:key>/keep/", methods=["GET"])
 @login_required
 def keep_dataset(key):
@@ -474,7 +493,8 @@ def keep_dataset(key):
         # cannot reset this
         datasource = dataset.parameters.get("datasource")
         datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
-        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get("expire.allow_optout"):
+        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get(
+                "expire.allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
                                    message="All datasets of this data source (%s) are scheduled for automatic "
                                            "deletion. This cannot be overridden." % datasource), 403
