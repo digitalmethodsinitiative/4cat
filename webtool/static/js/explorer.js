@@ -113,6 +113,13 @@ const annotations = {
 			}
 		});
 
+		$("#save-to-dataset").on("click", function(){
+			if (!$(this).hasClass("invalid")) {
+				annotations.saveAnnotations();
+				annotations.writeAnnotations();
+			}
+		});
+
 		// Ask whether the next page should be opened without saving annotations
 		$('a > .page').click(function(){
 			if (!$("#save-annotations").prop('disabled')) {
@@ -686,31 +693,22 @@ const annotations = {
 				if (response == 'success') {
 					code = response
 
-					let alert_message = "Annotations saved"
-
-					// Also start the Write annotations processor if indicated
-					if ($("#save-to-dataset").is(":checked")) {
-						annotations.writeAnnotations();
-						alert_message += ".\nCurrently writing annotations to the dataset."
-					}
-
 					annotations.enableSaving();
-					$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations")
+					$("#save-annotations").html("<i class='fas fa-save'></i> Annotations saved");
 					$("#save-annotations").addClass("invalid").prop("disabled", true);
-					$("#save-to-dataset").prop("checked", false);
 					old_annotation_fields = $("#annotation-fields").html();
 					// alert(alert_message);
 				}
 				else {
 					annotations.enableSaving();
-					$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations")
+					$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
 					alert("Could't save annotations");
-					console.log(response)
+					console.log(response);
 				}
 			},
 			error: function (error) {
 				annotations.enableSaving();
-				$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations")
+				$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
 				alert("Could't save annotations");
 				console.log(error)
 			}
@@ -748,18 +746,19 @@ const annotations = {
 		// So we just need to check whether they're there.
 
 		if (Object.keys(annotation_fields).length < 1) {
-				$("#toggle-annotations").addClass("invalid");
-				return false;
-			}
-			else {
-				$("#toggle-annotations").removeClass("invalid");
-				return true;
-			}
+			$("#toggle-annotations").addClass("invalid");
+			return false;
+		}
+		else {
+			$("#toggle-annotations").removeClass("invalid");
+			return true;
+		}
 	},
 
 	enableSaving: function(){
 		// Enable saving annotations to the database
 		$("#save-annotations, #save-to-dataset").removeClass("invalid").removeAttr("disabled");
+		$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
 	},
 
 	disableSaving: function(){
