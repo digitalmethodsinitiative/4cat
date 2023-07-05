@@ -658,11 +658,17 @@ def delete_dataset(key=None):
 		return error(500,
 					 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
+	# do we have a parent?
+	parent_dataset = DataSet(key=dataset.key_parent, db=db) if dataset.key_parent else None
+
 	# and delete the dataset and child datasets
 	dataset.delete()
 
 	if request.args.get("redirect") is not None:
-		return redirect(url_for("show_results"))
+		if parent_dataset:
+			return redirect(url_for("show_result", key=parent_dataset.key))
+		else:
+			return redirect(url_for("show_results"))
 	else:
 		return jsonify({"status": "success", "key": dataset.key})
 
