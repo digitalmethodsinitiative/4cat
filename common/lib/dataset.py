@@ -506,6 +506,9 @@ class DataSet(FourcatModule):
 		if self.is_finished():
 			copy.finish(self.num_rows)
 
+		# make sure ownership is also copied
+		copy.copy_ownership_from(self)
+
 		return copy
 
 	def delete(self, commit=True):
@@ -690,22 +693,8 @@ class DataSet(FourcatModule):
 		# make sure children's owners remain in sync
 		for child in self.children:
 			child.add_owner(username, role)
-
-	def refresh_owners(self):
-		# retrieve owners
-		self.owners = {owner["name"]: owner for owner in self.db.fetchall("SELECT * FROM datasets_owners WHERE key = %s", (self.key,))}
-
-		# determine which users (if any) are owners of the dataset by having a
-		# tag that is listed as an owner
-		owner_tags = [name[4:] for name in self.owners if name.startswith("tag:")]
-		if owner_tags:
-			tagged_owners = self.db.fetchall("SELECT name, tags FROM users WHERE tags ?| %s ", (owner_tags,))
-			self.tagged_owners = {
-				owner_tag: [user["name"] for user in tagged_owners if owner_tag in user["tags"]]
-				for owner_tag in owner_tags
-			}
-		else:
-			self.tagged_owners = {}
+			# not recursive, since we're calling it from recursive code!
+			child.copy_ownership_from(self, recursive=False)
 
 	def remove_owner(self, username):
 		"""
@@ -735,6 +724,51 @@ class DataSet(FourcatModule):
 		# make sure children's owners remain in sync
 		for child in self.children:
 			child.remove_owner(username)
+			# not recursive, since we're calling it from recursive code!
+			child.copy_ownership_from(self, recursive=False)
+
+	def refresh_owners(self):
+		"""
+		Update internal owner cache
+
+		This makes sure that the list of *users* and *tags* which can access the
+		dataset is up to date.
+		"""
+		self.owners = {owner["name"]: owner for owner in self.db.fetchall("SELECT * FROM datasets_owners WHERE key = %s", (self.key,))}
+
+		# determine which users (if any) are owners of the dataset by having a
+		# tag that is listed as an owner
+		owner_tags = [name[4:] for name in self.owners if name.startswith("tag:")]
+		if owner_tags:
+			tagged_owners = self.db.fetchall("SELECT name, tags FROM users WHERE tags ?| %s ", (owner_tags,))
+			self.tagged_owners = {
+				owner_tag: [user["name"] for user in tagged_owners if owner_tag in user["tags"]]
+				for owner_tag in owner_tags
+			}
+		else:
+			self.tagged_owners = {}
+
+	def copy_ownership_from(self, dataset, recursive=True):
+		"""
+		Copy ownership
+
+		This is useful to e.g. make sure a dataset's ownership stays in sync
+		with its parent
+
+		:param Dataset dataset:  Parent to copy from
+		:return:
+		"""
+		self.db.delete("datasets_owners", where={"key": self.key}, commit=False)
+		print(f"Copying owners from {dataset.key} to {self.key}")
+		for role in ("owner", "viewer"):
+			owners = dataset.get_owners(role=role)
+			for owner in owners:
+				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False)
+
+		self.db.commit()
+		if recursive:
+			for child in self.children:
+				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
 		"""

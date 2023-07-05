@@ -1036,6 +1036,9 @@ def queue_processor(key=None, processor=None):
 					   owner=current_user.get_id()
 	)
 
+	# give same ownership as parent dataset
+	analysis.copy_ownership_from(dataset)
+
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
 		queue.add_job(jobtype=processor, remote_id=analysis.key)
