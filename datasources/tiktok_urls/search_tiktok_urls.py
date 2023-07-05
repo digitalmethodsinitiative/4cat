@@ -72,7 +72,7 @@ class SearchTikTokByID(Search):
 
         :param dict query:  Search query parameters
         """
-        tiktok_scraper = TikTokScraper(processor=self)
+        tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
         return loop.run_until_complete(tiktok_scraper.request_metadata(query["urls"].split(",")))
 
