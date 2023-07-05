@@ -20,7 +20,7 @@
 
 	<!-- Possible annotation fields -->
 	<script type="text/javascript">
-	var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% endif %}
+	var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %}
 	</script>
 
 	<!-- Include datasource-specific css if it exists -->
