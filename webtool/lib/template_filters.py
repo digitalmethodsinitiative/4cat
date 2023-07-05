@@ -15,11 +15,17 @@ from flask_login import current_user
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
-
 	if isinstance(date, str):
-		date = int(date)
+		try:
+			date = int(date)
+		except ValueError:
+			return date
 
-	date = datetime.datetime.utcfromtimestamp(date)
+	try:
+		date = datetime.datetime.utcfromtimestamp(date)
+	except (ValueError, OverflowError):
+		return date
+
 	format = "%d %b %Y" if not fmt else fmt
 	formatted = date.strftime(format)
 
