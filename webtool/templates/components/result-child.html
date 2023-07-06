@@ -180,7 +180,7 @@
         </ol>
 
         {# Possible further analyses #}
-        {% if __user_config("privileges.can_run_processors") and item.is_accessible_by(current_user, role="owner") %}
+        {% if __user_config("privileges.can_run_processors") and (__user_config("privileges.admin.can_manipulate_all_datasets") or item.is_accessible_by(current_user, role="owner")) %}
         <ol class="children-processors">
             {% for processor in item.get_available_processors().values() %}
 
