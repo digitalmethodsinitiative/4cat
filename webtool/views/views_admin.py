@@ -5,6 +5,7 @@ import itertools
 import markdown2
 import datetime
 import psycopg2
+import tailer
 import smtplib
 import time
 import json
@@ -641,3 +642,41 @@ def delete_notification(notification_id):
     return redirect(redirect_url)
 
 
+@app.route("/logs/")
+@login_required
+@setting_required("privileges.admin.can_view_status")
+def view_logs():
+    """
+    Log file overview
+
+    :return:
+    """
+    return render_template("controlpanel/logs.html")
+
+
+@app.route("/logs/<string:logfile>/")
+@login_required
+@setting_required("privileges.admin.can_view_status")
+def get_log(logfile):
+    """
+    Get last lines of log file
+
+    Returns the tail end of a log file.
+
+    :param str logfile: 'backend' or 'stderr'
+    :return:
+    """
+    if logfile not in ("stderr", "backend"):
+        return "Not Found", 404
+
+    if logfile == "backend":
+        filename = "4cat.log" if not config.get("USING_DOCKER") else "backend_4cat.log"
+    else:
+        filename = "4cat.stderr"
+
+    log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), filename)
+    if log_file.exists():
+        with log_file.open() as infile:
+            return "\n".join(tailer.tail(infile, 250))
+    else:
+        return ""

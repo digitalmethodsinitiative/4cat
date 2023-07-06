@@ -9,4 +9,4 @@ from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
 DATASOURCE = "tiktok-urls"
-NAME = "TikTok (video URLs)"
+NAME = "TikTok (via URLs)"

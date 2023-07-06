@@ -78,7 +78,15 @@ def show_results(page):
         depth = "own"
 
     owner_match = tuple([current_user.get_id(), *[f"tag:{t}" for t in current_user.tags]])
-    if depth == "own":
+
+    # the user filter is only exposed to admins
+    if filters["user"]:
+        if config.get("privileges.can_view_all_datasets"):
+            where.append("key IN ( SELECT key FROM datasets_owners WHERE name LIKE %s AND key = datasets.key)")
+            replacements.append(filters["user"].replace("*", "%"))
+        else:
+            return error(403, error="You cannot use this filter.")
+    elif depth == "own":
         where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
         replacements.append(owner_match)
 
@@ -102,16 +110,6 @@ def show_results(page):
     # distinction here
     if filters["hide_empty"]:
         where.append("num_rows > 0")
-
-    # the user filter is only exposed to admins
-    if filters["user"]:
-        if config.get("privileges.can_view_all_datasets"):
-            target_user = User.get_by_name(db, filters["user"])
-            tags = [] if target_user is None else target_user.tags
-            where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
-            replacements.append(owner_match)
-        else:
-            return error(403, error="You cannot use this filter.")
 
     # not all datasets have a datsource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
@@ -373,7 +371,7 @@ def show_result(key):
     expires_datasource = False
     can_unexpire = ((config.get('expire.allow_optout') and  \
                            datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
-                   and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
+                   and (config.get("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner"))
 
     timestamp_expires = None
     if not dataset.parameters.get("keep"):

@@ -467,7 +467,7 @@ def edit_dataset_label(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.is_accessible_by(current_user, "owner"):
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, message="Not allowed")
 
 	dataset.update_label(label)
@@ -632,7 +632,7 @@ def delete_dataset(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.is_accessible_by(current_user, "owner"):
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, message="Not allowed")
 
 	# if there is an active or queued job for some child dataset, cancel and
@@ -702,7 +702,7 @@ def erase_credentials(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.is_accessible_by(current_user, "owner"):
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, message="Not allowed")
 
 	for field in dataset.parameters:
@@ -788,7 +788,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.is_accessible_by(current_user, "owner"):
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, message="Not allowed")
 
 	new_owner = User.get_by_name(db, username)
@@ -846,7 +846,7 @@ def remove_dataset_owner(key=None, username=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.is_accessible_by(current_user, "owner"):
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, error="Not allowed")
 
 	if username == current_user.get_id():
@@ -942,7 +942,7 @@ def toggle_private(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not dataset.is_accessible_by(current_user, "owner") and not current_user.is_admin:
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, error="This dataset is private")
 
 	# apply status to dataset and all children
@@ -1018,7 +1018,7 @@ def queue_processor(key=None, processor=None):
 	except TypeError:
 		return error(404, error="Not a valid dataset key.")
 
-	if not current_user.can_access_dataset(dataset):
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not current_user.can_access_dataset(dataset):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
