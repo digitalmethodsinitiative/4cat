@@ -87,7 +87,6 @@ CREATE TABLE IF NOT EXISTS metrics (
 CREATE TABLE IF NOT EXISTS users (
   name               TEXT UNIQUE PRIMARY KEY,
   password           TEXT,
-  is_admin           BOOLEAN DEFAULT FALSE,
   register_token     TEXT DEFAULT '',
   timestamp_created  INTEGER DEFAULT 0,
   timestamp_token    INTEGER DEFAULT 0,
@@ -157,9 +156,9 @@ INSERT INTO settings (name, value, tag) VALUES
   ('privileges.admin.can_view_status', 'true', 'admin'),
   ('privileges.admin.can_manage_users', 'true', 'admin'),
   ('privileges.admin.can_manage_settings', 'true', 'admin'),
-  ('privileges.admin.can_manage_datasources', 'true', 'admin'),
   ('privileges.admin.can_manage_notifications', 'true', 'admin'),
   ('privileges.admin.can_manage_tags', 'true', 'admin'),
   ('privileges.admin.can_restart', 'true', 'admin'),
+  ('privileges.admin.can_manipulate_all_datasets', 'true', 'admin'),
   ('privileges.can_view_all_datasets', 'true', 'admin'),
   ('privileges.can_view_private_datasets', 'true', 'admin');

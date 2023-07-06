@@ -351,7 +351,7 @@ def show_result(key):
     expires_datasource = False
     can_unexpire = ((config.get('expire.allow_optout') and  \
                            datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
-                   and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
+                   and (config.get("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner"))
 
     timestamp_expires = None
     if not dataset.parameters.get("keep"):

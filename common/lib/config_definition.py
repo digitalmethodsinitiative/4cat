@@ -84,7 +84,7 @@ config_definition = {
     "privileges.can_view_private_datasets": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can view global dataset index",
+        "help": "Can view private datasets",
         "tooltip": "Controls whether users can see the datasets made private by their owners."
     },
     "privileges.can_create_api_token": {
@@ -108,7 +108,7 @@ config_definition = {
     "privileges.admin.can_manage_notifications": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can manage users",
+        "help": "Can manage notifications",
         "tooltip": "Controls whether users can add, edit and delete notifications via the Control Panel"
     },
     "privileges.admin.can_manage_settings": {
@@ -117,11 +117,12 @@ config_definition = {
         "help": "Can manage settings",
         "tooltip": "Controls whether users can manipulate 4CAT settings via the Control Panel"
     },
-    "privileges.admin.can_manage_datasources": {
+    "privileges.admin.can_manipulate_all_datasets": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can manage data sources",
-        "tooltip": "Controls whether users can manipulate data source availability via the Control Panel"
+        "help": "Can manipulate datasets",
+        "tooltip": "Controls whether users can manipulate all datasets as if they were an owner, e.g. sharing it with "
+                   "others, running processors, et cetera."
     },
     "privileges.admin.can_restart": {
         "type": UserInput.OPTION_TOGGLE,
