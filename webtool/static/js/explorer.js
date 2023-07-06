@@ -605,7 +605,7 @@ const annotations = {
 
 				// If the query is accepted by the server.
 				else {
-					annotations.warnEditor("Could't save annotation fields");
+					annotations.warnEditor("Couldn't save annotation fields");
 				}
 			},
 			error: function (error) {
