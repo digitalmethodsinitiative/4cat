@@ -108,14 +108,9 @@ def explorer_dataset(key, page):
 
 	first_post = False
 
-
 	for post in iterate_items(results_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
 
 		count += 1
-
-		# Use an offset if we're showing a page beyond the first.
-		if count <= offset:
-			continue
 
 		# Use an offset if we're showing a page beyond the first.
 		if count <= offset:

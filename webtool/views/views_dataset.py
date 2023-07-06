@@ -201,6 +201,13 @@ def get_mapped_result(key):
 
     mapper = dataset.get_own_processor().map_item
 
+    # Also add possibly added annotation items.
+    # These cannot be added to the static `map_item` function.
+    annotation_labels = None
+    annotation_fields = dataset.get_annotation_fields()
+    if annotation_fields:
+        annotation_labels = ["annotation_" + v["label"] for v in annotation_fields.values()]
+
     def map_response():
         """
         Yield a CSV file line by line
@@ -213,9 +220,24 @@ def get_mapped_result(key):
         buffer = io.StringIO()
         with dataset.get_results_path().open() as infile:
             for line in infile:
-                mapped_item = mapper(json.loads(line))
+                item = json.loads(line)
+                mapped_item = mapper(item)
+
+                # Add possible annotation items
+                if annotation_fields:
+                    for label in annotation_labels:
+                        mapped_item[label] = item[label]
+
                 if not writer:
-                    writer = csv.DictWriter(buffer, fieldnames=tuple(mapped_item.keys()))
+                    fieldnames = mapped_item.keys()
+
+                    # Add possible annotation headers
+                    if annotation_labels:
+                        for label in annotation_labels:
+                            if label not in fieldnames:
+                                fieldnames.append(label)
+
+                    writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
                     writer.writeheader()
                     yield buffer.getvalue()
                     buffer.truncate(0)
