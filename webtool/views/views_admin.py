@@ -507,10 +507,6 @@ def manipulate_settings():
                     if global_value == value and global_value is not None:
                         config.delete_for_tag(setting, tag)
                         continue
-                    else:
-                        print(f"{repr(global_value)} ({type(global_value)}) <> {repr(value)} ({type(value)})")
-                        print(f"same: {global_value == value}")
-                        print(f"global is not None: {global_value is not None}")
 
                 valid = config.set(setting, value, tag=tag)
 
@@ -556,6 +552,13 @@ def manipulate_settings():
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
+    # 'data sources' is one setting but we want to be able to indicate
+    # overrides per sub-item
+    expire_override = []
+    if all_settings.get("datasources.expiration") and global_settings.get("datasources.expiration"):
+        expire_override = [datasource for datasource, settings in all_settings["datasources.expiration"].items() if
+                           settings != global_settings["datasources.expiration"].get(datasource)]
+
     datasources = {
         datasource: {
             **info,
@@ -566,7 +569,8 @@ def manipulate_settings():
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
-                           datasources_config=datasources, changed=changed_categories)
+                           datasources_config=datasources, changed=changed_categories,
+                           expire_override=expire_override)
 
 @app.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required

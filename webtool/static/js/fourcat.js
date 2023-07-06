@@ -1423,6 +1423,9 @@ const ui_helpers = {
         //tabbed interfaces
         $(document).on('click', '.tabbed .tab-controls a', ui_helpers.tabs);
 
+        //table controls
+        $(document).on('input', '.copy-from', ui_helpers.table_control);
+
         // Controls to change which results show up in overview
         $('.view-controls button').hide();
         $('.view-controls input, .view-controls select, .view-controls textarea').on('change', function () {
@@ -1691,6 +1694,23 @@ const ui_helpers = {
             current_tab = controls.parentNode.querySelector('input[name="current-tab"]');
         }
         current_tab.value = target_id.replace(/^tab-/, '');
+    },
+
+    table_control: function(e) {
+        let control = e.target;
+        let value = control.getAttribute('type') === 'checkbox' ? control.checked : control.value;
+        let table = $(control).parents('table');
+        let class_match = [...e.target.classList].filter((e) => e.indexOf('d-') === 0);
+        table[0].querySelectorAll('.copy-to.' + class_match).forEach((element) => {
+            if($(element).parents('.d-ignore').length > 0) {
+                return;
+            }
+            if(element.getAttribute('type') === 'checkbox') {
+                element.checked = value;
+            } else {
+                element.value = value;
+            }
+        })
     }
 }
 

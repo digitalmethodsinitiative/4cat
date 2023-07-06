@@ -117,21 +117,27 @@
                             <th>Expiration <button class="tooltip-trigger" aria-controls="tooltip-setting-timeout" aria-label="Extended help for option">?</button></th>
                             <th>Opt-out? <button class="tooltip-trigger" aria-controls="tooltip-setting-optout" aria-label="Extended help for option">?</button></th>
                         </tr>
+                        <tr class="table-controls">
+                            <td><input type="checkbox" class="copy-from d-enabled"></td>
+                            <td class="italic">(change all)</td>
+                            <td><input type="text" class="copy-from d-timeout"></td>
+                            <td><input type="checkbox" class="copy-from d-optout"></td>
+                        </tr>
                     </thead>
                     <tbody>
             {% for datasource, datasource_config in datasources_config.items() %}
-                        <tr>
+                        <tr{% if expire_override and datasource in expire_override %} class="is-changed d-ignore tooltip-trigger" aria-controls="tooltip-setting-changed"{% endif %}>
                             <td>
-                                <input type="checkbox" name="option-{{ option }}-enable-{{ datasource }}" id="forminput-{{ option }}-{{ datasource }}"{% if datasource_config.enabled %} checked{% endif %}>
+                                <input class="copy-to d-enabled" type="checkbox" name="option-{{ option }}-enable-{{ datasource }}" id="forminput-{{ option }}-{{ datasource }}"{% if datasource_config.enabled %} checked{% endif %}>
                             </td>
                             <td>
                                 <label for="forminput-{{ option }}-{{ datasource }}">{{ datasource_config.name }}</label>
                             </td>
                             <td>
-                                <input type="text" name="option-{{ option }}-timeout-{{ datasource }}" value="{{ datasource_config.expires.timeout }}">
+                                <input class="copy-to d-timeout" type="text" name="option-{{ option }}-timeout-{{ datasource }}" value="{{ datasource_config.expires.timeout }}">
                             </td>
                             <td>
-                                <input type="checkbox" name="option-{{ option }}-optout-{{ datasource }}"{% if datasource_config.expires.allow_optout %} checked{% endif %}>
+                                <input class="copy-to d-optout" type="checkbox" name="option-{{ option }}-optout-{{ datasource }}"{% if datasource_config.expires.allow_optout %} checked{% endif %}>
                             </td>
                         </tr>
             {% endfor %}
