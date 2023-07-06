@@ -16,7 +16,7 @@
 				"label": "Old to new"
 			},
 			{
-				"key": "timestamp",
+				"key": "createTime",
 				"label": "New to old",
 				"descending": true
 			},

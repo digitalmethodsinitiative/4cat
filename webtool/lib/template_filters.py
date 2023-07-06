@@ -243,7 +243,7 @@ def _jinja2_filter_post_field(field, post):
 
 		original_key = key
 
-		# Remove possible slice stings so we get the original key
+		# Remove possible slice strings so we get the original key
 		string_slice = None
 		if "[" in original_key and "]" in original_key:
 			string_slice = re.search(r"\[(.*?)\]", original_key)
@@ -309,6 +309,10 @@ def _jinja2_filter_post_field(field, post):
 
 		if string_slice:
 			val = val[string_slice]
+
+		# Extract single list item
+		if isinstance(val, list) and len(val) == 1:
+			val = val[0]
 
 		formatted_field = formatted_field.replace("{{" + original_key + "}}", str(val))
 
