@@ -1,8 +1,4 @@
-# Add some privileges that should be enabled by default for admins
-import configparser
-import subprocess
-import shutil
-import shlex
+# Fix privileges and expiration
 import json
 import sys
 import os
@@ -50,16 +46,41 @@ if any(warning_expires, warning_datasets):
     print("  /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ ")
     print("                        WARNING!                      ")
     if warning_datasets:
-        print("  Some datasets were explicitly marked for "
-              "  deletion. Because it cannot unambiguously be determined "
-              "  whether these should be deleted, they have been "
-              "  unmarked (i.e. they will not automatically be deleted). "
-              "  Use the data source expiration settings to make sure "
-              "  they expire correctly.")
+        print("  Some datasets were explicitly marked for deletion. Because"
+              "  it cannot unambiguously be determined whether these should"
+              "  be deleted, they have been unmarked (i.e. they will not "
+              "  automatically be deleted). Use the data source expiration "
+              "  settings to make sure they expire correctly.")
     if warning_expires:
-        print("  It is no longer possible to set global expiration "
-              "  timeouts. Instead, these need to be configured per "
-              "  data source. You can do this in the settings panel.")
+        print("  It is no longer possible to set global expiration timeouts. "
+              "  Instead, these need to be configured per data source. You "
+              "  can do this in the settings panel.")
+    print("")
+    print("  For this reason, all expiration settings have been reset."
+          "  Please re-configure via the settings panel in the web "
+          "  interface.")
+    print("")
     print("  See the release notes for version 1.35 for more "
           "  information.")
     print("  /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ ")
+
+    # reset timeouts for all current expiration settings, for all tags
+    db.delete("settings", where={"name": "datasources.expiration"})
+    datasources = db.fetchall("SELECT * FROM settings WHERE name = 'datasources.enabled'")
+    for setting in datasources:
+        db.delete("settings", where=setting)
+        try:
+            # reset timeouts
+            enabled = json.loads(setting["value"])
+            db.insert("settings", data={"name": "datasources.expiration", "value": json.dumps({
+                datasource: {
+                    "enabled": True,
+                    "timeout": 0,
+                    "allow_optout": False
+                } for datasource in enabled
+            }), "tag": setting["tag"]})
+        except json.JSONDecodeError:
+            # invalid setting, deleting is enough
+            pass
+
+
