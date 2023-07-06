@@ -756,7 +756,7 @@ class DataSet(FourcatModule):
 		:return:
 		"""
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=False)
-		print(f"Copying owners from {dataset.key} to {self.key}")
+
 		for role in ("owner", "viewer"):
 			owners = dataset.get_owners(role=role)
 			for owner in owners:
@@ -1443,7 +1443,6 @@ class DataSet(FourcatModule):
 		# is the data source configured to have its datasets expire?
 		expiration = config.get("datasources.expiration", {}, user=user)
 		if not expiration.get(self.parameters.get("datasource")):
-			print(f"No expiration for {self.parameters.get('datasource')}")
 			return False
 
 		# is the dataset older than the set timeout?
