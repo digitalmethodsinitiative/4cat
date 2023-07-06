@@ -14,7 +14,7 @@ from pathlib import Path
 import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
+from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -102,9 +102,6 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
-			if config.get('expire.timeout') and not parent:
-				parameters["expires-after"] = int(time.time() + config.get('expire.timeout'))
-
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
@@ -1392,6 +1389,68 @@ class DataSet(FourcatModule):
 		if self.key_parent:
 			return False
 		return True
+
+	def is_expiring(self, user=None):
+		"""
+		Determine if dataset is set to expire
+
+		Similar to `is_expired`, but checks if the dataset will be deleted in
+		the future, not if it should be deleted right now.
+
+		:param user:  User to use for configuration context. Provide to make
+		sure configuration overrides for this user are taken into account.
+		:return bool|int:  `False`, or the expiration date as a Unix timestamp.
+		"""
+		# has someone opted out of deleting this?
+		if self.parameters.get("keep"):
+			return False
+
+		# is this dataset explicitly marked as expiring after a certain time?
+		if self.parameters.get("expires-after"):
+			return self.parameters.get("expires-after")
+
+		# is the data source configured to have its datasets expire?
+		expiration = config.get("datasources.expiration", {}, user=user)
+		if not expiration.get(self.parameters.get("datasource")):
+			return False
+
+		# is there a timeout for this data source?
+		if expiration.get(self.parameters.get("datasource")).get("timeout"):
+			return self.timestamp + expiration.get(self.parameters.get("datasource")).get("timeout")
+
+		return False
+
+	def is_expired(self, user=None):
+		"""
+		Determine if dataset should be deleted
+
+		Datasets can be set to expire, but when they should be deleted depends
+		on a number of factor. This checks them all.
+
+		:param user:  User to use for configuration context. Provide to make
+		sure configuration overrides for this user are taken into account.
+		:return bool:
+		"""
+		# has someone opted out of deleting this?
+		if not self.is_expiring():
+			return False
+
+		# is this dataset explicitly marked as expiring after a certain time?
+		future = time.time() + 3600  # ensure we don't delete datasets with invalid expiration times
+		if self.parameters.get("expires-after") and convert_to_int(self.parameters["expires-after"], future) < time.time():
+			return True
+
+		# is the data source configured to have its datasets expire?
+		expiration = config.get("datasources.expiration", {}, user=user)
+		if not expiration.get(self.parameters.get("datasource")):
+			print(f"No expiration for {self.parameters.get('datasource')}")
+			return False
+
+		# is the dataset older than the set timeout?
+		if expiration.get(self.parameters.get("datasource")).get("timeout"):
+			return self.timestamp < time.time() - expiration[self.parameters.get("datasource")]["timeout"]
+
+		return False
 
 	def is_from_collector(self):
 		"""

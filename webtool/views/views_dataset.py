@@ -136,13 +136,9 @@ def show_results(page):
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
 
-    expiring_datasets = set()
     for dataset in datasets:
         dataset = DataSet(key=dataset["key"], db=db)
         datasource = dataset.parameters.get("datasource", "")
-        if dataset.parameters.get("expires-after") or config.get("datasources.expiration", {}).get(datasource, {}).get("timeout"):
-            expiring_datasets.add(dataset.key)
-
         filtered.append(dataset)
 
     favourites = [row["key"] for row in
@@ -152,7 +148,7 @@ def show_results(page):
                    metadata["has_worker"] and metadata["has_options"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites, expiring=expiring_datasets)
+                           datasets=filtered, pagination=pagination, favourites=favourites)
 
 
 """
@@ -368,20 +364,9 @@ def show_result(key):
     datasource = dataset.parameters.get("datasource", "")
     datasources = backend.all_modules.datasources
     datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
-    expires_datasource = False
-    can_unexpire = ((config.get('expire.allow_optout') and  \
-                           datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
-                   and (config.get("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner"))
-
-    timestamp_expires = None
-    if not dataset.parameters.get("keep"):
-        if datasource_expiration and datasource_expiration.get("timeout"):
-            timestamp_expires = dataset.timestamp + int(datasource_expiration.get("timeout"))
-            expires_datasource = True
-
-        elif dataset.parameters.get("expires-after"):
-            timestamp_expires = dataset.parameters.get("expires-after")
-
+    can_unexpire = datasource_expiration.get("allow_optout", False) and (
+                config.get("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user,
+                                                                                                       "owner"))
 
     # if the dataset has parameters with credentials, give user the option to
     # erase them
@@ -394,8 +379,8 @@ def show_result(key):
 
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
-                           is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
+                           is_favourite=is_favourite, has_credentials=has_credentials,can_unexpire=can_unexpire,
+                           datasources=datasources)
 
 
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
@@ -499,7 +484,9 @@ def keep_dataset(key):
                                    message="All datasets of this data source (%s) are scheduled for automatic "
                                            "deletion. This cannot be overridden." % datasource), 403
 
-    dataset.delete_parameter("expires-after")
-    dataset.keep = True
+    if dataset.is_expiring(user=current_user):
+        dataset.delete_parameter("expires-after")
+        dataset.keep = True
+
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
     return redirect(url_for("show_result", key=key))
