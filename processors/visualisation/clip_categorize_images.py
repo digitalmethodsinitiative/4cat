@@ -246,8 +246,8 @@ class CategorizeImagesCLIP(BasicProcessor):
                                            is_final=True)
                 break
 
-            # Send request to check status every 60 seconds
-            if int(time.time() - start_time) % 60 == 0:
+            # Send request to check status every 10 seconds; with GPU, CLIP should be able to process smaller (<200 images) datasets in 10 seconds
+            if int(time.time() - start_time) % 10 == 0:
                 # Update progress
                 if local_or_remote == "local":
                     num_completed = self.count_result_files(output_dir)
@@ -273,7 +273,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                     if num_completed > 0:
                         # Some data collected...
                         self.dataset.update_status("CLIP Error; check logs; Processing successful CLIP results...", is_final=True)
-                        error_message = "CLIP Error: " + str(result.json())
+                        error_message = f"CLIP Error (dataset {self.dataset.key}): {str(result.json())}"
                         self.log.error(error_message)
                         self.dataset.log(error_message)
                         break
