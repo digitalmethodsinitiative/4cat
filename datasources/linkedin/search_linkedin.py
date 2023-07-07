@@ -67,9 +67,6 @@ class SearchLinkedIn(Search):
         time_ago = post["actor"]["subDescription"]["text"] if post["actor"].get("subDescription") else ""
         timestamp = int(time_collected - SearchLinkedIn.parse_time_ago(time_ago))
 
-        # extract username from profile URL link
-        username = post["actor"]["navigationContext"]["actionTarget"].split("linkedin.com/").pop().split("?")[0]
-
         # images are stored in some convoluted way
         # there are multiple URLs for various thumbnails, use the one for the
         # largest version of the image
@@ -104,6 +101,7 @@ class SearchLinkedIn(Search):
             "hashtags": ",".join([tag["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]) if post["commentary"] else "",
             "image_urls": ",".join(images),
             "post_url": "https://www.linkedin.com/feed/update/" + urn,
+            "link_url": post["content"]["navigationContext"].get("actionTarget", "") if (post.get("content") and post["content"].get("navigationContext")) else "",
             "likes": post["*socialDetail"]["likes"]["paging"]["total"],
             "comments": post["*socialDetail"]["comments"]["paging"]["total"],
             "shares": post["*socialDetail"]["totalShares"],
