@@ -57,8 +57,8 @@ if any(warning_expires, warning_datasets):
               "  can do this in the settings panel.")
     print("")
     print("  For this reason, all expiration settings have been reset."
-          "  Please re-configure via the settings panel in the web "
-          "  interface.")
+          "  Please re-configure via the settings panel and the new "
+          "  dataset bulk management interface in the web interface.")
     print("")
     print("  See the release notes for version 1.35 for more "
           "  information.")

@@ -30,13 +30,16 @@ from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
 from common.config_manager import ConfigWrapper
+
 config = ConfigWrapper(config, user=current_user)
+
 
 @app.route("/admin/")
 @login_required
 def admin_frontpage():
     # can be viewed if user has any admin privileges
-    admin_privileges = config.get([key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
+    admin_privileges = config.get(
+        [key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
 
     if not any(admin_privileges.values()):
         return render_template("error.html", message="You cannot view this page."), 403
@@ -45,7 +48,8 @@ def admin_frontpage():
     now = time.time()
     num_items = {
         "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
-        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
+        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))[
+            "num"],
         "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets")["num"]
     }
 
@@ -61,11 +65,13 @@ def admin_frontpage():
         "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
     }
 
-    upgrade_available = not not db.fetchone("SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+    upgrade_available = not not db.fetchone(
+        "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
 
-    return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats = {
+    return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
         "captured": num_items, "datasets": num_datasets, "disk": disk_stats
     }, upgrade_available=upgrade_available)
+
 
 @app.route("/admin/users/", defaults={"page": 1})
 @app.route("/admin/users/page/<int:page>/")
@@ -115,6 +121,7 @@ def list_users(page):
                            filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
+
 @app.route("/admin/worker-status/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
@@ -161,7 +168,8 @@ def add_user():
     else:
         username = email
         try:
-            db.insert("users", data={"name": username, "timestamp_token": int(time.time()), "timestamp_created": int(time.time())})
+            db.insert("users", data={"name": username, "timestamp_token": int(time.time()),
+                                     "timestamp_created": int(time.time())})
 
             user = User.get_by_name(db, username)
             if user is None:
@@ -173,7 +181,7 @@ def add_user():
                     response = {**response, **{
                         "message": "An e-mail containing a link through which the registration can be completed has "
                                    "been sent to %s.\n\nTheir registration link is [%s](%s)" % (
-                                   username, token, token)}}
+                                       username, token, token)}}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
@@ -197,7 +205,7 @@ def add_user():
                     response["success"] = True
                     response = {**response, **{
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
-                        username, url, url)}}
+                            username, url, url)}}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
@@ -208,7 +216,7 @@ def add_user():
             return redirect(url_for("manipulate_user", values={"name": username}))
         else:
             return render_template("error.html", message=response["message"],
-                               title=("New account created" if response["success"] else "Error"))
+                                   title=("New account created" if response["success"] else "Error"))
     else:
         return jsonify(response)
 
@@ -360,7 +368,7 @@ def manipulate_user(mode):
                         token = user.generate_token(None, regenerate=True)
                         link = url_for("reset_password", _external=True) + "?token=%s" % token
                         flash('User created. %s can set a password via<br><a href="%s">%s</a>.' % (
-                        user_data["name"], link, link))
+                            user_data["name"], link, link))
 
                     # show the edit form for the user next
                     mode = "edit"
@@ -396,6 +404,7 @@ def manipulate_user(mode):
 
     return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(),
                            mode=mode)
+
 
 @app.route("/admin/user-tags/", methods=["GET", "POST"])
 @login_required
@@ -454,6 +463,7 @@ def manipulate_tags():
 
     return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
 
+
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
@@ -467,7 +477,8 @@ def manipulate_settings():
     categories = config_definition.categories
 
     modules = {
-        **{datasource + "-search": definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
+        **{datasource + "-search": definition["name"] for datasource, definition in
+           backend.all_modules.datasources.items()},
         **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
            backend.all_modules.processors.values()}
     }
@@ -572,6 +583,7 @@ def manipulate_settings():
                            datasources_config=datasources, changed=changed_categories,
                            expire_override=expire_override)
 
+
 @app.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_notifications")
@@ -607,10 +619,10 @@ def manipulate_notifications():
             expires = None
 
         notification = {
-                "username": params.get("username"),
-                "notification": params.get("notification"),
-                "timestamp_expires": int(time.time() + expires) if expires else None,
-                "allow_dismiss": not not params.get("allow_dismiss")
+            "username": params.get("username"),
+            "notification": params.get("notification"),
+            "timestamp_expires": int(time.time() + expires) if expires else None,
+            "allow_dismiss": not not params.get("allow_dismiss")
         }
 
         if not incomplete:

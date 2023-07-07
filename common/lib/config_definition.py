@@ -23,6 +23,12 @@ config_definition = {
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
+    "datasources._intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
+                "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
+                "expiration status of existing datasets."
+    },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": False, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
@@ -206,27 +212,6 @@ config_definition = {
         "help": "Allow access requests",
         "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
                    "provided e-mail settings are configured."
-    },
-    # These settings control whether top-level datasets (i.e. those created via the
-    # "Create dataset" page) are deleted automatically, and if so, after how much
-    # time. You can also allow users to cancel this (i.e. opt out). Note that if
-    # users are allowed to opt out, data sources can still force the expiration of
-    # datasets created through that data source. This cannot be overridden by the
-    # user.
-    "expire.timeout": {
-        "type": UserInput.OPTION_TEXT,
-        "default": 0,
-        "coerce_type": int,
-        "help": "Expiration timeout",
-        "tooltip": "Top Level datasets automatically deleted after a period of time. 0 will not expire",
-    },
-    "expire.allow_optout": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Allow opt-out",
-        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data "
-                   "sources can still force the expiration of datasets created through that data source. This cannot "
-                   "be overridden by the user.",
     },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
