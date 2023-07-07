@@ -20,7 +20,7 @@
                 {% endfor %}
 
                 <div class="form-element{% if "filter_name" in incomplete %} missing{% endif %}">
-                    <label for="forminput-filter-name">Username</label>
+                    <label for="forminput-filter-name">Owner</label>
                     <div>
 
                         <input name="filter_name" id="forminput-filter-name" type="text" value="{{ form.filter_name }}">
@@ -29,7 +29,7 @@
                                 aria-label="Extended help for option">?
                         </button>
                         <p role="tooltip" id="tooltip-option-filter-name">
-                            Can contain wildcards. If multiple users match, all will be added.
+                            Can be a username or a <code>tag:example</code>. Can contain wildcards. If multiple users match, all will be added.
                         </p>
                     </div>
                 </div>

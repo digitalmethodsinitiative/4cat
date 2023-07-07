@@ -169,6 +169,10 @@ select, input {
     max-width: 15em;
 }
 
+select[multiple] {
+    min-width: 8em;
+}
+
 input[type=date] {
     max-width: 10em;
 }
@@ -262,6 +266,10 @@ article.small .form-element {
 
 article.small .form-element input:not([type=radio], [type=checkbox]), article.small .form-element select, article.small .form-element textarea {
     min-width: 5em;
+}
+
+article.small .form-element select[multiple] {
+    min-width: 20em;
 }
 
 .form-element label {
