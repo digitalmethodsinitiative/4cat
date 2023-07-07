@@ -237,6 +237,10 @@ article.small .form-element {
     max-width: none;
 }
 
+.form-element > div {
+    width: 100%;
+}
+
 .form-element > *:not(input, select, button) {
     min-width: 11em;
     max-width: 75%;
@@ -249,6 +253,11 @@ article.small .form-element {
 
 .form-element textarea.code {
     font-family: monospace;
+}
+
+.form-element .with-tail {
+    display: grid;
+    grid-template-columns: 1.5em auto;
 }
 
 article.small .form-element input:not([type=radio], [type=checkbox]), article.small .form-element select, article.small .form-element textarea {
@@ -278,6 +287,10 @@ article.small .form-element input:not([type=radio], [type=checkbox]), article.sm
 
 .datasource-extra-input {
     overflow: hidden;
+}
+
+.datasource-explain-wrap {
+    display: inline-block;
 }
 
 .submit-container {

@@ -6,7 +6,7 @@
     {% else %}
         <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}>
             <label for="forminput-{{ option }}">{{ settings.help }}</label>
-            <div>
+            <div{% if settings.type == "toggle" %} class="with-tail"{% endif %}>
         {% if settings.type == "toggle" %}
             <input name="option-{{ option }}" id="forminput-{{ option }}" type="checkbox" {% if settings.default %} checked{% endif %}>
             {% if "tooltip" in settings %}<p class="option-help">{{ settings.tooltip }}</p>{% endif %}

@@ -739,13 +739,13 @@ const query = {
 
         let dense_toggle = (scope === 'dense-threads');
         $('#query-form #forminput-scope_density').prop('disabled', !dense_toggle);
-        $('#query-form #forminput-scope_density').parent().toggle(dense_toggle);
+        $('#query-form #forminput-scope_density').parent().parent().toggle(dense_toggle);
         $('#query-form #forminput-scope_length').prop('disabled', !dense_toggle);
-        $('#query-form #forminput-scope_length').parent().toggle(dense_toggle);
+        $('#query-form #forminput-scope_length').parent().parent().toggle(dense_toggle);
 
         let ids_toggle = (scope === 'match-ids')
         $('#query-form #forminput-valid_ids').prop('disabled', !ids_toggle);
-        $('#query-form #forminput-valid_ids').parent().toggle(ids_toggle);
+        $('#query-form #forminput-valid_ids').parent().parent().toggle(ids_toggle);
     },
 
     custom_board_options: function () {
