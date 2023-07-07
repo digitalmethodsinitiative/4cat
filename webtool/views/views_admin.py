@@ -9,7 +9,8 @@ import tailer
 import smtplib
 import time
 import json
-import os
+import csv
+import io
 import re
 
 from pathlib import Path
@@ -18,12 +19,13 @@ import backend
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect
+from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response
 from flask_login import current_user, login_required
 
 from webtool import app, db, config
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
+from common.lib.dataset import DataSet
 
 from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
@@ -696,3 +698,136 @@ def get_log(logfile):
             return "\n".join(tailer.tail(infile, 250))
     else:
         return ""
+
+
+@app.route("/dataset-bulk/", methods=["GET", "POST"])
+@login_required
+@setting_required("privileges.admin.can_manipulate_all_datasets")
+def dataset_bulk():
+    """
+    Manipulate many datasets at once
+
+    Useful to e.g. make sure datasets will not expire, or to make all datasets
+    eligible for expiration.
+    """
+    incomplete = []
+    forminput = {}
+    datasources = {datasource: meta["name"] for datasource, meta in backend.all_modules.datasources.items()}
+
+    if request.method == "POST":
+        # action depends on which button was clicked
+        action = [key for key in request.form if key.startswith("action-")]
+        if not action:
+            flash("Invalid action")
+            incomplete.append("action")
+        else:
+            action = action[0].split("-")[-1]
+
+        where = []
+        replacements = []
+        forminput = request.form.to_dict()
+
+        # convert date range to timestamps
+        try:
+            forminput["filter_date_from"] = datetime.datetime.strptime(forminput["filter_date_from"], "%Y-%m-%d") if forminput.get("filter_date_from") else None
+            forminput["filter_date_to"] = datetime.datetime.strptime(forminput["filter_date_to"], "%Y-%m-%d") if forminput.get("filter_date_to") else None
+        except (TypeError, ValueError):
+            flash("When filtering by date, dates should be in YYYY-mm-dd format.")
+            incomplete.append("filter-date")
+
+        # construct SQL filter for datasets
+        if forminput.get("filter_name"):
+            where.append("key IN ( SELECT key FROM datasets_owners WHERE name LIKE %s AND key = datasets.key)")
+            replacements.append(forminput.get("filter_name").replace("*", "%"))
+
+        if forminput.get("filter_date_from"):
+            where.append("timestamp >= %s")
+            replacements.append(forminput.get("filter_date_from"))
+
+        if forminput.get("filter_date_to"):
+            where.append("timestamp < %s")
+            replacements.append(forminput.get("filter_date_to"))
+
+        if forminput.get("filter_datasource"):
+            forminput["filter_datasource"] = request.form.getlist("filter_datasource")
+            where.append("parameters::json->>'datasource' IS NOT NULL AND parameters::json->>'datasource' IN %s")
+            replacements.append(tuple(forminput["filter_datasource"]))
+
+        datasets_meta = db.fetchall(f"SELECT * FROM datasets {'WHERE' if where else ''} {' AND '.join(where)}",
+                                    tuple(replacements))
+
+        if not datasets_meta:
+            flash("No datasets match these criteria")
+            incomplete.append("filter")
+
+        if action == "owner":
+            # this one is a bit special because we need to figure out if the
+            # owners are legitimate (tags are not checked)
+            bulk_owner = request.form.get("bulk-owner").replace("*", "%")
+            if not bulk_owner:
+                flash("Please enter a user or tag to add as owner")
+                incomplete.append("bulk-owner")
+
+            if not bulk_owner.startswith("tag:"):
+                users = db.fetchall("SELECT name AS num FROM users WHERE name LIKE %s", (bulk_owner,))
+                if not users:
+                    flash("No users match that username")
+                    incomplete.append("bulk-owner")
+                else:
+                    bulk_owner = [user["name"] for user in users]
+            else:
+                bulk_owner = [bulk_owner]
+
+            flash(f"{len(bulk_owner):,} new owner(s) were added to the datasets.")
+
+        if not incomplete:
+            datasets = [DataSet(data=dataset, db=db) for dataset in datasets_meta]
+            flash(f"{len(datasets):,} dataset(s) updated.")
+
+            if action == "export":
+                # export dataset metadata as a CSV file, basically a dataset
+                # table dump
+                def generate_csv(data):
+                    """
+                    Stream a CSV as a Flask response
+                    """
+                    buffer = io.StringIO()
+                    writer = None
+                    for item in data:
+                        if not writer:
+                            writer = csv.DictWriter(buffer, fieldnames=item.keys())
+                            writer.writeheader()
+                        writer.writerow(item)
+                        buffer.seek(0)
+                        yield buffer.read()
+                        buffer.truncate(0)
+                        buffer.seek(0)
+
+                response = Response(generate_csv(datasets_meta), mimetype="text/csv")
+                exporttime = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+                response.headers["Content-Disposition"] = f"attachment; filename=dataset-export-{exporttime}.csv"
+                return response
+
+            else:
+                for dataset in datasets:
+                    if action == "keep":
+                        dataset.keep = True
+
+                    if action == "unkeep":
+                        dataset.delete_parameter("keep")
+
+                    if action == "delete":
+                        dataset.delete()
+
+                    if action == "public":
+                        dataset.is_private = False
+
+                    if action == "private":
+                        dataset.is_private = True
+
+                    if action == "owner":
+                        for user_or_tag in bulk_owner:
+                            dataset.add_owner(user_or_tag)
+
+    return render_template("controlpanel/dataset-bulk.html", flashes=get_flashed_messages(),
+                           incomplete=incomplete, form=forminput, datasources=datasources)

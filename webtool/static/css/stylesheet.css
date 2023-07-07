@@ -242,16 +242,16 @@ article.small .form-element {
     max-width: 75%;
 }
 
-.form-element > textarea {
+.form-element textarea {
     min-width: 25em;
     min-height: 6em;
 }
 
-.form-element > textarea.code {
+.form-element textarea.code {
     font-family: monospace;
 }
 
-article.small .form-element > *:not([type=radio], [type=checkbox]) {
+article.small .form-element input:not([type=radio], [type=checkbox]), article.small .form-element select, article.small .form-element textarea {
     min-width: 5em;
 }
 

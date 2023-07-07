@@ -1561,7 +1561,11 @@ const ui_helpers = {
 
             e.preventDefault();
             popup.confirm(message, 'Please confirm', () => {
-                form.submit();
+                // we trigger a click, because else the BUTTON name is not
+                // sent with the form
+                $(this).removeClass('confirm-first');
+                $(this).click();
+                $(this).addClass('confirm-first');
             })
         }
     },

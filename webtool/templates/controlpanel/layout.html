@@ -16,5 +16,7 @@
         <li{% if navigation.sub == "notifications" %} class="current"{% endif %}><a href="{{ url_for("manipulate_notifications") }}">Notifications</a></li>{% endif %}
     {% if __user_config("privileges.admin.can_view_status") %}
         <li{% if navigation.sub == "logs" %} class="current"{% endif %}><a href="{{ url_for("view_logs") }}">View logs</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_manipulate_all_datasets") %}
+        <li{% if navigation.sub == "dataset-bulk" %} class="current"{% endif %}><a href="{{ url_for("dataset_bulk") }}">Dataset bulk management</a></li>{% endif %}
 </ul>
 {% endblock %}
