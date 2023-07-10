@@ -58,6 +58,11 @@ def load_user_from_request(request):
     token = request.args.get("access-token")
 
     if not token:
+        token = request.headers.get("Authentication")
+
+    if not token:
+        # this was a mistake, but was being checked for a long time, so we're
+        # keeping it for legacy support
         token = request.headers.get("Authorization")
 
     if not token:

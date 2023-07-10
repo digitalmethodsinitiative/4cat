@@ -1,0 +1,67 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}{% if mode == "edit" %}Edit user '{{ user.name }}'{% else %}Create user{% endif %}{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "user" %}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Bulk user creation</span></h2>
+
+            <p>Create users in bulk, importing the usernames from a file. The file will be read as a plain text file
+                containing one username per line. Each username should preferably be an e-mail address. If you do not
+                set a common password, users will need to set their own password using their unique registration
+                link. You can have an e-mail with the link sent to every user if you have configured an e-mail
+                server.</p>
+
+            <form action="{{ url_for("bulk_user") }}" method="POST" class="wide">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                <div class="form-element{% if "name" in incomplete %} missing{% endif %}">
+                    <label for="user-name">Names (e-mails)</label>
+                    <input type="file" name="name" id="user-names">
+                </div>
+                <div class="form-element{% if "tags" in incomplete %} missing{% endif %}">
+                    <label for="user-tags">Tags</label>
+                    <div>
+                    <input type="text" id="user-tags" name="tags" value="{{ ", ".join(user.tags|fromjson) }}">
+                    <button class="tooltip-trigger" aria-controls="tooltip-tags-label" aria-label="Extended help for option">?</button>
+                    <p role="tooltip" id="tooltip-tags-label" class="force-width">Tags can be used to override 4CAT settings, for example to allow certain features only for certain users. Case-insensitive. Separate with commas.</p>
+                        </div>
+                </div>
+                <div class="form-element{% if "password" in incomplete %} missing{% endif %}">
+                    <label for="user-password">Password</label>
+                    <input type="file" name="password" id="user-password">
+                    <button class="tooltip-trigger" aria-controls="tooltip-password-label" aria-label="Extended help for option">?</button>
+                    <p role="tooltip" id="tooltip-password-label" class="force-width">Leave empty to make users set their own password. You can also enter '%%USERNAME%%' which will make</div>
+                </div>
+                <div class="form-element">
+                    <label for="user-email">Send e-mail?</label>
+                    <input type="checkbox" id="user-email" name="send_email" checked>
+                </div>
+                <div class="form-element">
+                    <label for="user-autodelete">Delete after</label>
+                    <div>
+                        <input type="text" placeholder="YYYY-MM-DD hh:mm" {% if user.get_value and user.get_value("delete-after") %} value="{{ user.get_value("delete-after")|datetime("%Y-%m-%d %H:%M", wrap=False) }}"{% endif %} id="user-autodelete" name="autodelete">
+                        <button class="tooltip-trigger" aria-controls="tooltip-autodelete-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-autodelete-label" class="force-width">Automatically delete the user at this time. They will see a warning in the interface starting one week before.</div>
+                    </div>
+                </div>
+                <div class="form-element">
+                    <label for="user-notes">Notes</label>
+                    <div>
+                        <textarea name="notes" id="user-notes">{% if user.get_value %}{{ user.get_value("notes", "") }}{% endif %}</textarea>
+                        <button class="tooltip-trigger" aria-controls="tooltip-notes-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-notes-label" class="force-width">Notes for this user. This is for your own convenience and not used by 4CAT.</div>
+                    </div>
+                </div>
+                <div class="submit-container">
+                    <input type="hidden" name="current-name" value="{{ user.name }}">
+                    <button><i class="fa fa-user-plus" aria-hidden="true"></i> Create</button>
+                </div>
+            </form>
+        </section>
+    </article>
+{% endblock %}

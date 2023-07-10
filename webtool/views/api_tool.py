@@ -1169,3 +1169,46 @@ def request_token():
 	else:
 		# show JSON response (by default)
 		return jsonify(token)
+
+@app.route("/api/export-packed-dataset/<string:key>/<string:component>/")
+@login_required
+@setting_required("privileges.can_export_datasets")
+def export_packed_dataset(key=None, component=None):
+	"""
+	Export dataset for importing in another 4CAT instance
+
+	:param key:
+	:param component:
+	:return:
+	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except (TypeError,):
+		return error(404, error="Dataset not found.")
+
+	if not current_user.can_access_dataset(role="owner"):
+		raise error(403, error="You cannot export this dataset.")
+
+	if component == "metadata":
+		metadata = db.fetchone("SELECT * FROM datasets WHERE key = %s", (dataset.key))
+		return jsonify(dict(metadata))
+
+	elif component == "children":
+		children = [d["key"] for d in db.fetchall("SELECT key FROM datasets WHERE key_parent = %s", (dataset.key,))]
+		return jsonify(children)
+
+	elif component in ("data", "log"):
+		def stream_data_content(datafile):
+			while True:
+				line = datafile.readline()
+				if line == "":
+					break
+				yield line
+
+
+		filepath = dataset.get_results_path() if component == "data" else dataset.get_results_path().with_suffix(".log")
+		with filepath.open() as outfile:
+			return stream_data_content(outfile)
+
+	else:
+		return error(406, error="Dataset component unknown")
