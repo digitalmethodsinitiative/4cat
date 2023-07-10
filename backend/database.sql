@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   key               text,
   type              text DEFAULT 'search',
   key_parent        text DEFAULT '' NOT NULL,
+  creator           VARCHAR DEFAULT 'anonymous',
   query             text,
   job               integer DEFAULT 0,
   parameters        text,
