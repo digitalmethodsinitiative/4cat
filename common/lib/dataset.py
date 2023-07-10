@@ -51,7 +51,7 @@ class DataSet(FourcatModule):
 	no_status_updates = False
 	staging_areas = None
 
-	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension=None,
+	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent='', extension=None,
 				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
@@ -129,7 +129,7 @@ class DataSet(FourcatModule):
 			if extension is None:
 				own_processor = self.get_own_processor()
 				if own_processor:
-					extension = own_processor.get_extension(parent_dataset=parent)
+					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
 				# Still no extension, default to 'csv'
 				if not extension:
 					extension = "csv"
