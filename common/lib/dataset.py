@@ -1447,7 +1447,7 @@ class DataSet(FourcatModule):
 
 		# is the dataset older than the set timeout?
 		if expiration.get(self.parameters.get("datasource")).get("timeout"):
-			return self.timestamp < time.time() - expiration[self.parameters.get("datasource")]["timeout"]
+			return self.timestamp + expiration[self.parameters.get("datasource")]["timeout"] < time.time()
 
 		return False
 
