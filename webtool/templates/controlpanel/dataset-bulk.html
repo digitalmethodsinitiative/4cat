@@ -65,7 +65,7 @@
 
                 <hr>
                 <button name="action-keep" class="action-button confirm-first"><i class="fa f-fw fa-check" aria-hidden="true"></i> Keep all (never expire)</button>
-                <button name="action-unkeep" class="action-button confirm-first"><i class="fa f-fw fa-clock" aria-hidden="true"></i> Unkeep all (clear 'keep' status)</button>
+                <button name="action-unkeep" class="action-button confirm-first" data-confirm-action="make all datasets eligible for deletion? If their data source is configured to expire datasets, and the datasets are older than the configured timeout, they will be deleted immediately. Can you bear this responsibility"><i class="fa f-fw fa-clock" aria-hidden="true"></i> Unkeep all (clear 'keep' status)</button>
 
                 <hr>
                 <div class="form-element{% if "bulk_owner" in incomplete %} missing{% endif %}">
