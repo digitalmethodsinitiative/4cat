@@ -23,7 +23,7 @@ config_definition = {
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
-    "datasources._intro": {
+    "datasources._intro2": {
         "type": UserInput.OPTION_INFO,
         "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
                 "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
