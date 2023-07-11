@@ -58,63 +58,84 @@ class PixPlotGenerator(BasicProcessor):
             'help': 'PixPlot Server Address/URL',
             'tooltip': "",
         },
+        "pix-plot.max_images": {
+            "type": UserInput.OPTION_TEXT,
+            "coerce_type": int,
+            "default": 10000,
+            "help": "Max images to upload",
+            "tooltip": "Only allow uploading up to this many images per plot. Increasing this can easily lead to "
+                       "very long-running processors and large datasets. 0 allows as many images as available."
+        }
     }
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of images (max 1000)",
-            "default": 1000,
-            "min": 0,
-            "max": 10000,
-            "tooltip": "'0' uses as many images as available in the source image archive (up to 10000)"
-        },
-        "intro-plot-options": {
-            "type": UserInput.OPTION_INFO,
-            "help": "The below options will help configure your plot. Note that full images are always available by "
-                    "clicking on the thumbnails (you will also find metadata related to the source of the image "
-                    "there). Large datasets run better with smaller thumbnails."
-        },
-        "image_size": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Thumbnail Size",
-            "options": {
-                "10": "10px tiny",
-                "32": "32px small",
-                "64": "64px normal",
-                "128": "128px large",
-                "256": "256px X-large",
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        # Update the amount max and help from config
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of images",
+                "default": 1000,
+                "tooltip": "Increasing this can easily lead to very long-running processors."
             },
-            "default": "64"
-        },
-        "intro-plot-neighbours": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Nearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
-                    "create a more global shape. Large datasets may benefit from have higher values (think how many "
-                    "alike pictures could make up a cluster)."
-        },
-        "n_neighbors": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Nearest Neighbors",
-            "tooltip": "Larger datasets may benefit from a larger value",
-            "min": 2,
-            "max": 200,
-            "default": 15
-        },
-        "intro-plot-mindist": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Minimum Distance (min_dist): determines how tightly packed images can be with one and other "
-                    "(i.e., small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) disperse."
-        },
-        "min_dist": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Minimum Distance between images",
-            "tooltip": "Small values often work best",
-            "min": 0.0001,
-            "max": 0.99,
-            "default": 0.01
-        },
-    }
+            "intro-plot-options": {
+                "type": UserInput.OPTION_INFO,
+                "help": "The below options will help configure your plot. Note that full images are always available by "
+                        "clicking on the thumbnails (you will also find metadata related to the source of the image "
+                        "there). Large datasets run better with smaller thumbnails."
+            },
+            "image_size": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Thumbnail Size",
+                "options": {
+                    "10": "10px tiny",
+                    "32": "32px small",
+                    "64": "64px normal",
+                    "128": "128px large",
+                    "256": "256px X-large",
+                },
+                "default": "64"
+            },
+            "intro-plot-neighbours": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Nearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
+                        "create a more global shape. Large datasets may benefit from have higher values (think how many "
+                        "alike pictures could make up a cluster)."
+            },
+            "n_neighbors": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Nearest Neighbors",
+                "tooltip": "Larger datasets may benefit from a larger value",
+                "min": 2,
+                "max": 200,
+                "default": 15
+            },
+            "intro-plot-mindist": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Minimum Distance (min_dist): determines how tightly packed images can be with one and other "
+                        "(i.e., small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) disperse."
+            },
+            "min_dist": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Minimum Distance between images",
+                "tooltip": "Small values often work best",
+                "min": 0.0001,
+                "max": 0.99,
+                "default": 0.01
+            },
+        }
+
+        max_number_images = int(config.get("pix-plot.max_images", 10000, user=user))
+        if max_number_images == 0:
+            options["amount"]["help"] = options["amount"]["help"] + " (max: all available)"
+            options["amount"]["min"] = 0
+            options["amount"]["tooltip"] = options["amount"]["tooltip"] + " 0 allows as many images as available."
+        else:
+            options["amount"]["help"] = options["amount"]["help"] + f" (max: {max_number_images})"
+            options["amount"]["min"] = 1
+            options["amount"]["max"] = max_number_images
+
+        return options
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
@@ -140,9 +161,9 @@ class PixPlotGenerator(BasicProcessor):
             return
 
         # 0 = use as many images as in the archive, up to the max
-        max_images = convert_to_int(self.parameters.get("amount"), 100)
+        max_images = convert_to_int(self.parameters.get("amount"), 1000)
         if max_images == 0:
-            max_images = self.get_options()["amount"]["max"]
+            max_images = None
 
         # Get labels to send PixPlot server
         date = datetime.now().strftime("%Y-%m-%d-%H%M%S")
@@ -207,7 +228,7 @@ class PixPlotGenerator(BasicProcessor):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading images.")
 
-            if i > max_images:
+            if max_images is not None and i > max_images:
                 break
             with open(os.path.join(staging_area, filename), 'rb') as image:
                 response = requests.post(upload_url, files={'image': image}, data=data, timeout=120)
