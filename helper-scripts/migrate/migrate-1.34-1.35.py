@@ -19,6 +19,14 @@ db_config = ini["DATABASE"]
 db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
               host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
 
+# Hot fix for missing database initialization column in 1.34
+creator_column_check = db.fetchone(
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'creator'")
+if creator_column_check["num"] == 0:
+    print("  Adding missing 'creator' column to 'datasets' table...")
+    db.execute("ALTER TABLE datasets ADD COLUMN creator VARCHAR DEFAULT 'anonymous'")
+    db.commit()
+
 print("  Adding default privileges for the 'admin' tag...")
 privileges = ("privileges.admin.can_manipulate_all_datasets", "privileges.admin.can_manipulate_notifications")
 for privilege in privileges:
@@ -88,5 +96,3 @@ if any([warning_expires, warning_datasets]):
         except json.JSONDecodeError:
             # invalid setting, deleting is enough
             pass
-
-
