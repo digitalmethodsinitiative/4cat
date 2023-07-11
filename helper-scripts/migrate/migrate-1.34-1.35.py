@@ -33,40 +33,41 @@ warning_expires = False
 datasets = db.fetchall("""
     SELECT * FROM datasets 
      WHERE parameters::json->>'expires-after' IS NOT NULL 
-       AND parameters::json->>'expires-after' > 0 
+       AND (parameters::json->>'expires-after')::int > 0 
        AND parameters::json->>'keep' IS NULL
 """)
 if datasets:
     warning_datasets = True
 
-expires = ("SELECT * FROM settings WHERE name = 'expires.timeout'")["value"]
-try:
-    expires = int(expires)
-except (TypeError, ValueError):
-    expires = 0
+expires = ("SELECT * FROM settings WHERE name = 'expires.timeout'")
 if expires:
+    try:
+        expires = int(expires["value"])
+    except (TypeError, ValueError):
+        expires = 0
+
     warning_expires = True
 
-if any(warning_expires, warning_datasets):
+if any([warning_expires, warning_datasets]):
     print("  /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ ")
     print("                        WARNING!                      ")
     if warning_datasets:
-        print("  Some datasets were explicitly marked for deletion. Because"
-              "  it cannot unambiguously be determined whether these should"
-              "  be deleted, they have been unmarked (i.e. they will not "
-              "  automatically be deleted). Use the data source expiration "
-              "  settings to make sure they expire correctly.")
+        print("  Some datasets were explicitly marked for deletion. Because")
+        print("  it cannot unambiguously be determined whether these should")
+        print("  be deleted, they have been unmarked (i.e. they will not")
+        print("  automatically be deleted). Use the data source expiration")
+        print("  settings to make sure they expire correctly.")
     if warning_expires:
-        print("  It is no longer possible to set global expiration timeouts. "
-              "  Instead, these need to be configured per data source. You "
-              "  can do this in the settings panel.")
+        print("  It is no longer possible to set global expiration timeouts.")
+        print("  Instead, these need to be configured per data source. You")
+        print("  can do this in the settings panel.")
     print("")
-    print("  For this reason, all expiration settings have been reset."
-          "  Please re-configure via the settings panel and the new "
-          "  dataset bulk management interface in the web interface.")
+    print("  For this reason, all expiration settings have been reset.")
+    print("  Please re-configure via the settings panel and the new")
+    print("  dataset bulk management interface in the web interface.")
     print("")
-    print("  See the release notes for version 1.35 for more "
-          "  information.")
+    print("  See the release notes for version 1.35 for more")
+    print("  information.")
     print("  /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ ")
 
     # reset timeouts for all current expiration settings, for all tags
