@@ -39,7 +39,7 @@ datasets = db.fetchall("""
 if datasets:
     warning_datasets = True
 
-expires = ("SELECT * FROM settings WHERE name = 'expires.timeout'")
+expires = db.fetchone("SELECT * FROM settings WHERE name = 'expires.timeout'")
 if expires:
     try:
         expires = int(expires["value"])
