@@ -30,7 +30,12 @@ for privilege in privileges:
 print("  Harmonising dataset expiration dates...")
 warning_datasets = False
 warning_expires = False
-datasets = db.fetchall("SELECT * FROM datasets where parameters::json->>'expires-after' > 0 AND parameters::json->>'keep' IS NULL")
+datasets = db.fetchall("""
+    SELECT * FROM datasets 
+     WHERE parameters::json->>'expires-after' IS NOT NULL 
+       AND parameters::json->>'expires-after' > 0 
+       AND parameters::json->>'keep' IS NULL
+""")
 if datasets:
     warning_datasets = True
 
