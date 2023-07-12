@@ -57,7 +57,6 @@ class SearchTwitterViaZeeschuimer(Search):
             if "tweet" in retweet["result"]:
                 retweet["result"] = retweet["result"]["tweet"]
 
-            print(json.dumps(retweet))
             if retweet["result"].get("legacy", {}).get("withheld_scope"):
                 withheld = True
                 tweet["legacy"]["full_text"] = retweet["result"]["legacy"]["full_text"]
@@ -92,7 +91,8 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_retweet": "yes" if retweet else "no",
             "retweeted_user": retweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if retweet else "",
             "is_quote_tweet": "yes" if quote_tweet else "no",
-            "quoted_user": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if quote_tweet else "",
+            "quoted_user": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if (quote_tweet and "tombstone" not in quote_tweet["result"]) else "",
+            "is_quote_withheld": "yes" if (quote_tweet and "tombstone" in quote_tweet["result"]) else "no",
             "is_reply": "yes" if str(tweet["legacy"]["conversation_id_str"]) != str(tweet["rest_id"]) else "no",
             "replied_user": tweet["legacy"].get("in_reply_to_screen_name", ""),
             "is_withheld": "yes" if withheld else "no",
