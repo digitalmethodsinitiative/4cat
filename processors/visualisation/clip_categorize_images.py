@@ -39,13 +39,19 @@ class CategorizeImagesCLIP(BasicProcessor):
         ]
 
     config = {
-        "image-to-categories.clip_enabled": {
+        "dmi-service-manager.ca_divider-1": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "dmi-service-manager.cb_clip-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "OpenAI's CLIP model estimates the probability an image belongs to each of a list of user defined categories. Ensure the DMI Service Manager is running and has a [prebuilt CLIP image](https://github.com/digitalmethodsinitiative/dmi_dockerized_services/tree/main/openai_clip#dmi-implementation-of-openai-clip-image-categorization-tool).",
+        },
+        "dmi-service-manager.cc_clip_enabled": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Enable CLIP Image Categorization",
-            "tooltip": "Must have access to DMI Service Manager server"
         },
-        "image-to-categories.clip_num_files": {
+        "dmi-service-manager.cd_clip_num_files": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
             "default": 0,
@@ -59,8 +65,8 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         Allow on image archives if enabled in Control Panel
         """
-        return config.get("image-to-categories.clip_enabled", False, user=user) and \
-               config.get("dmi-service-manager.server_address", False, user=user) and \
+        return config.get("dmi-service-manager.cc_clip_enabled", False, user=user) and \
+               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
                module.type.startswith("image-downloader")
 
     @classmethod
@@ -99,7 +105,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("image-to-categories.clip_num_files", 100, user=user))
+        max_number_images = int(config.get("image-to-categories.cd_clip_num_files", 100, user=user))
         if max_number_images == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of images"
             options["amount"]["default"] = 100
@@ -130,7 +136,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error("No model provided.")
             return
 
-        local_or_remote = self.config.get("dmi-service-manager.local_or_remote")
+        local_or_remote = self.config.get("dmi-service-manager.ac_local_or_remote")
 
         # Unpack the image files into a staging_area
         self.dataset.update_status("Unzipping image files")
@@ -171,7 +177,7 @@ class CategorizeImagesCLIP(BasicProcessor):
 
             # Check if image files have already been sent
             self.dataset.update_status("Connecting to DMI Service Manager...")
-            filename_url = self.config.get("dmi-service-manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
+            filename_url = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
             filename_response = requests.get(filename_url, timeout=30)
 
             # Check if 4CAT has access to this PixPlot server
@@ -190,7 +196,7 @@ class CategorizeImagesCLIP(BasicProcessor):
 
             if len(to_upload_filenames) > 0 or texts_folder not in filename_response.json():
                 # TODO: perhaps upload one at a time?
-                api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/send_files"
+                api_upload_endpoint = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + "/api/send_files"
                 # TODO: don't create a silly empty file just to trick the service manager into creating a new folder
                 with open(staging_area.joinpath("blank.txt"), 'w') as file:
                     file.write('')
@@ -219,7 +225,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         data["args"].extend([f"data/{mounted_staging_area.joinpath(filename)}" for filename in image_filenames])
 
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")
-        api_url = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/" + api_endpoint
+        api_url = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + "/api/" + api_endpoint
         resp = requests.post(api_url, json=data, timeout=30)
         if resp.status_code == 202:
             # New request successful
@@ -299,7 +305,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             result_files = filename_response.json().get(texts_folder, [])
 
             # Download the result files
-            api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/uploads/"
+            api_upload_endpoint = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + "/api/uploads/"
             for filename in result_files:
                 file_response = requests.get(api_upload_endpoint + f"{folder_name}/{texts_folder}/{filename}", timeout=30)
                 self.dataset.log(f"Downloading {filename}...")

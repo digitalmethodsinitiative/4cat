@@ -38,13 +38,19 @@ class AudioToText(BasicProcessor):
         ]
 
     config = {
-        "audio-to-text.whisper_enabled": {
+        "dmi-service-manager.ba_divider-1": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "dmi-service-manager.bb_whisper-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Whisper converts speech in audio to text. Ensure the DMI Service Manager is running and has a [prebuilt Whisper image](https://github.com/digitalmethodsinitiative/dmi_dockerized_services/tree/main/openai_whisper#dmi-implementation-of-whisper-audio-transcription-tool).",
+        },
+        "dmi-service-manager.bc_whisper_enabled": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Enable Whisper Speech to Text",
-            "tooltip": "Docker must be installed and the Whisper image downloaded/built."
         },
-        "audio-to-text.whisper_num_files": {
+        "dmi-service-manager.bd_whisper_num_files": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
             "default": 0,
@@ -58,8 +64,8 @@ class AudioToText(BasicProcessor):
         """
         Allow on audio archives if enabled in Control Panel
         """
-        return config.get("audio-to-text.whisper_enabled", False, user=user) and \
-               config.get("dmi-service-manager.server_address", False, user=user) and \
+        return config.get("dmi-service-manager.bc_whisper_enabled", False, user=user) and \
+               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
                module.type.startswith("audio-extractor")
 
     @classmethod
@@ -111,7 +117,7 @@ class AudioToText(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_audio_files = int(config.get("audio-to-text.whisper_num_files", 100, user=user))
+        max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100, user=user))
         if max_number_audio_files == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of audio files"
             options["amount"]["default"] = 100
@@ -143,7 +149,7 @@ class AudioToText(BasicProcessor):
                 self.dataset.finish_with_error("Unable to parse Advanced settings. Please format as JSON.")
                 return
 
-        local_or_remote = self.config.get("dmi-service-manager.local_or_remote")
+        local_or_remote = self.config.get("dmi-service-manager.ac_local_or_remote")
 
         # Unpack the audio files into a staging_area
         self.dataset.update_status("Unzipping audio files")
@@ -184,7 +190,7 @@ class AudioToText(BasicProcessor):
 
             # Check if audio files have already been sent
             self.dataset.update_status("Connecting to DMI Service Manager...")
-            filename_url = self.config.get("dmi-service-manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
+            filename_url = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
             filename_response = requests.get(filename_url, timeout=30)
 
             # Check if 4CAT has access to this PixPlot server
@@ -203,7 +209,7 @@ class AudioToText(BasicProcessor):
 
             if len(to_upload_filenames) > 0 or texts_folder not in filename_response.json():
                 # TODO: perhaps upload one at a time?
-                api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/send_files"
+                api_upload_endpoint = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + "/api/send_files"
                 # TODO: don't create a silly empty file just to trick the service manager into creating a new folder
                 with open(staging_area.joinpath("blank.txt"), 'w') as file:
                     file.write('')
@@ -241,7 +247,7 @@ class AudioToText(BasicProcessor):
         data["args"].extend([f"data/{mounted_staging_area.joinpath(filename)}" for filename in audio_filenames])
 
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")
-        api_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/" + whisper_endpoint
+        api_endpoint = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + "/api/" + whisper_endpoint
         resp = requests.post(api_endpoint, json=data, timeout=30)
         if resp.status_code == 202:
             # New request successful
@@ -321,7 +327,7 @@ class AudioToText(BasicProcessor):
             result_files = filename_response.json().get(texts_folder, [])
 
             # Download the result files
-            api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/uploads/"
+            api_upload_endpoint = self.config.get("dmi-service-manager.ab_server_address").rstrip("/") + "/api/uploads/"
             for filename in result_files:
                 file_response = requests.get(api_upload_endpoint + f"{folder_name}/{texts_folder}/{filename}", timeout=30)
                 self.dataset.log(f"Downloading {filename}...")
