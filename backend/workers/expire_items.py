@@ -58,7 +58,7 @@ class ThingExpirer(BasicWorker):
 			dataset = DataSet(key=dataset["key"], db=self.db)
 			if dataset.is_expired():
 				self.log.info(f"Deleting dataset {dataset.key} (expired)")
-				# dataset.delete()
+				dataset.delete()
 
 	def expire_users(self):
 		"""
