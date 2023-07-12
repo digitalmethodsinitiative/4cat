@@ -81,6 +81,9 @@ class ThingExpirer(BasicWorker):
 
 			# parse expiration date if available
 			delete_after = user.get_value("delete-after")
+			if not delete_after:
+				continue
+
 			if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", str(delete_after)):
 				expires_at = datetime.datetime.strptime(delete_after, "%Y-%m-%d")
 			elif re.match(r"^[0-9]+$", str(delete_after)):
