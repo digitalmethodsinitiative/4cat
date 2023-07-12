@@ -39,9 +39,6 @@ class CategorizeImagesCLIP(BasicProcessor):
         ]
 
     config = {
-        "dmi-service-manager.ca_divider-1": {
-            "type": UserInput.OPTION_DIVIDER
-        },
         "dmi-service-manager.cb_clip-intro-1": {
             "type": UserInput.OPTION_INFO,
             "help": "OpenAI's CLIP model estimates the probability an image belongs to each of a list of user defined categories. Ensure the DMI Service Manager is running and has a [prebuilt CLIP image](https://github.com/digitalmethodsinitiative/dmi_dockerized_services/tree/main/openai_clip#dmi-implementation-of-openai-clip-image-categorization-tool).",

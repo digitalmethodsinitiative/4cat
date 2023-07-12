@@ -38,9 +38,6 @@ class AudioToText(BasicProcessor):
         ]
 
     config = {
-        "dmi-service-manager.ba_divider-1": {
-            "type": UserInput.OPTION_DIVIDER
-        },
         "dmi-service-manager.bb_whisper-intro-1": {
             "type": UserInput.OPTION_INFO,
             "help": "Whisper converts speech in audio to text. Ensure the DMI Service Manager is running and has a [prebuilt Whisper image](https://github.com/digitalmethodsinitiative/dmi_dockerized_services/tree/main/openai_whisper#dmi-implementation-of-whisper-audio-transcription-tool).",
