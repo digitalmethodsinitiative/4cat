@@ -82,7 +82,7 @@ class SearchDouyin(Search):
             "prevent_download": ("yes" if post["prevent_download"] else "no") if "prevent_download" in post else None,
             "video_url": videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else "",
             # This URL seems to work depending on the referrer (i.e., cut and paste into a browser will work, but not as a link)
-            "video_duration": post["duration"] if "duration" in post else post["video"].get("duration"),
+            "video_duration": post["duration"] if "duration" in post else post.get("video", {}).get("duration", "Unknown"),
             # Video stats
             "collect_count": post["statistics"].get("collect_count", 0) if "statistics" in post else "Unknown",
             "comment_count": post["statistics"].get("comment_count", 0) if "statistics" in post else "Unknown",
