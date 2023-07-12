@@ -71,7 +71,7 @@ class Tokenise(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Column(s) to tokenise",
 				"default": "body",
-				"tooltip": "Each enabled column will be treated as a separate item to tokenise."
+				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
 			},
 			"docs_per": {
 				"type": UserInput.OPTION_CHOICE,
@@ -169,7 +169,9 @@ class Tokenise(BasicProcessor):
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["inline"] = True
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = {v: v for v in columns if v in ["body", "text", "subject"]}
+			default_options = [default for default in ["body", "text", "subject"] if default in columns]
+			if default_options:
+				options["columns"]["default"] = default_options.pop()
 
 		return options
 
