@@ -28,7 +28,7 @@ if creator_column_check["num"] == 0:
     db.commit()
 
 print("  Adding default privileges for the 'admin' tag...")
-privileges = ("privileges.admin.can_manipulate_all_datasets", "privileges.admin.can_manipulate_notifications")
+privileges = ("privileges.admin.can_manipulate_all_datasets", "privileges.admin.can_manage_notifications")
 for privilege in privileges:
     print(f"  ...{privilege}")
     db.insert("settings", data={"name": privilege, "value": "true", "tag": "admin"}, safe=True)
