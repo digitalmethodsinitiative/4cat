@@ -729,8 +729,8 @@ def dataset_bulk():
 
         # convert date range to timestamps
         try:
-            forminput["filter_date_from"] = datetime.datetime.strptime(forminput["filter_date_from"], "%Y-%m-%d") if forminput.get("filter_date_from") else None
-            forminput["filter_date_to"] = datetime.datetime.strptime(forminput["filter_date_to"], "%Y-%m-%d") if forminput.get("filter_date_to") else None
+            forminput["filter_date_from"] = datetime.datetime.strptime(forminput["filter_date_from"], "%Y-%m-%d").timestamp() if forminput.get("filter_date_from") else None
+            forminput["filter_date_to"] = datetime.datetime.strptime(forminput["filter_date_to"], "%Y-%m-%d").timestamp() if forminput.get("filter_date_to") else None
         except (TypeError, ValueError):
             flash("When filtering by date, dates should be in YYYY-mm-dd format.")
             incomplete.append("filter-date")
