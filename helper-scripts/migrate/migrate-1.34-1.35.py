@@ -46,6 +46,11 @@ datasets = db.fetchall("""
 """)
 if datasets:
     warning_datasets = True
+    for dataset in datasets:
+        parameters = json.loads(dataset["parameters"])
+        if "expires-after" in parameters:
+            del parameters["expires-after"]
+            db.update("datasets", where={"key": dataset["key"]}, data={"parameters": json.dumps(parameters)})
 
 expires = db.fetchone("SELECT * FROM settings WHERE name = 'expires.timeout'")
 if expires:
