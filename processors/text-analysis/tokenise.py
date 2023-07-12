@@ -70,7 +70,6 @@ class Tokenise(BasicProcessor):
 			"columns": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Column(s) to tokenise",
-				"default": "body",
 				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
 			},
 			"docs_per": {
