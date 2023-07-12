@@ -2,6 +2,7 @@
 Import scraped Douyin data
 """
 import urllib
+import json
 from datetime import datetime
 
 from backend.lib.search import Search
@@ -37,12 +38,22 @@ class SearchDouyin(Search):
     def map_item(post):
         """
         """
-        post_timestamp = datetime.fromtimestamp(post["create_time"])
+        if post.get("rawdata"):
+            # These are odd items we're picking up and need to explore further
+            # Possibly streams of some kind
+            #TODO investigate further to identify item type or return blank dict when map_item catch PR is merged to properly warn
+            rawdata = json.loads(post.get("rawdata"))
+            post_timestamp = datetime.fromtimestamp(rawdata["create_time"])
+            videos = [{'play_addr': {"url_list": ["unknown"]}}]
+            video_description = rawdata.get("title")
+
+        else:
+            post_timestamp = datetime.fromtimestamp(post["create_time"])
+            videos = sorted([vid for vid in post["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
+                            reverse=True)
+            video_description = post["desc"]
 
         metadata = post.get("__import_meta")
-
-        videos = sorted([vid for vid in post["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
-                        reverse=True)
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
         displayed = True
@@ -52,28 +63,36 @@ class SearchDouyin(Search):
         return {
             "id": post["aweme_id"],
             "thread_id": post["group_id"],
-            "subject": "",
-            "body": post["desc"],
+            "subject": "Unknown Post Type" if post.get("rawdata") else "",
+            "body": video_description,
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),  # Adding this as different Douyin pages contain different data
+            "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),
+            # Adding this as different Douyin pages contain different data
             "post_url": f"https://www.douyin.com/video/{post['aweme_id']}",
             "region": post.get("region"),
-            "hashtags": ",".join([item["hashtag_name"] for item in (post["text_extra"] if post["text_extra"] is not None else []) if "hashtag_name" in item]),
-            "mentions": ",".join([f"https://www.douyin.com/user/{item['sec_uid']}" for item in (post["text_extra"] if post["text_extra"] is not None else []) if "sec_uid" in item]),  # Actual username does not appear in object, but the sec_uid can be used to form a link to their profile
-            "video_tags": ",".join([item["tag_name"] for item in (post["video_tag"] if post["video_tag"] is not None else []) if "tag_name" in item]),  # unsure exactly what this is, but some videos have them
+            "hashtags": ",".join(
+                [item["hashtag_name"] for item in (post["text_extra"] if post["text_extra"] is not None else []) if
+                 "hashtag_name" in item]),
+            "mentions": ",".join([f"https://www.douyin.com/user/{item['sec_uid']}" for item in
+                                  (post["text_extra"] if post["text_extra"] is not None else []) if "sec_uid" in item]),
+            # Actual username does not appear in object, but the sec_uid can be used to form a link to their profile
+            "video_tags": ",".join(
+                [item["tag_name"] for item in (post["video_tag"] if post["video_tag"] is not None else []) if
+                 "tag_name" in item]),  # unsure exactly what this is, but some videos have them
             "prevent_download": ("yes" if post["prevent_download"] else "no") if "prevent_download" in post else None,
-            "video_url": videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else "",  # This URL seems to work depending on the referrer (i.e., cut and paste into a browser will work, but not as a link)
+            "video_url": videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else "",
+            # This URL seems to work depending on the referrer (i.e., cut and paste into a browser will work, but not as a link)
             "video_duration": post["duration"] if "duration" in post else post["video"].get("duration"),
             # Video stats
-            "collect_count": post["statistics"].get("collect_count", 0),
-            "comment_count": post["statistics"].get("comment_count", 0),
-            "digg_count": post["statistics"].get("digg_count", 0),
-            "download_count": post["statistics"].get("download_count", 0),
-            "forward_count": post["statistics"].get("forward_count", 0),
-            "play_count": post["statistics"].get("play_count", 0),
-            "share_count": post["statistics"].get("share_count", 0),
+            "collect_count": post["statistics"].get("collect_count", 0) if "statistics" in post else "Unknown",
+            "comment_count": post["statistics"].get("comment_count", 0) if "statistics" in post else "Unknown",
+            "digg_count": post["statistics"].get("digg_count", 0) if "statistics" in post else "Unknown",
+            "download_count": post["statistics"].get("download_count", 0) if "statistics" in post else "Unknown",
+            "forward_count": post["statistics"].get("forward_count", 0) if "statistics" in post else "Unknown",
+            "play_count": post["statistics"].get("play_count", 0) if "statistics" in post else "Unknown",
+            "share_count": post["statistics"].get("share_count", 0) if "statistics" in post else "Unknown",
             # Author data
-            "author_user_id": post["author_user_id"],
+            "author_user_id": post["author_user_id"] if "author_user_id" in post else post["author"]["uid"],
             "author_nickname": post["author"]["nickname"],
             "author_profile_url": f"https://www.douyin.com/user/{post['author']['sec_uid']}",
             "author_thumbnail_url": post["author"]["avatar_thumb"].get("url_list", [''])[0],
@@ -81,7 +100,8 @@ class SearchDouyin(Search):
             "author_is_ad_fake": post["author"].get("is_ad_fake"),
             # Collection/Mix
             "part_of_collection": "yes" if "mix_info" in post else "no",
-            "4CAT_first_video_displayed": "yes" if displayed else "no", # other videos may have been viewed, but this is unknown to us
+            "4CAT_first_video_displayed": "yes" if displayed else "no",
+            # other videos may have been viewed, but this is unknown to us
             "collection_id": post.get("mix_info", {}).get("mix_id", "N/A"),
             "collection_name": post.get("mix_info", {}).get("mix_name", "N/A"),
             "place_in_collection": post.get("mix_info", {}).get("statis", {}).get("current_episode", "N/A"),
