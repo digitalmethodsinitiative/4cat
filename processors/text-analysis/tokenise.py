@@ -169,7 +169,7 @@ class Tokenise(BasicProcessor):
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["inline"] = True
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = ["body"]
+			options["columns"]["default"] = {v: v for v in columns if v in ["body", "text", "subject"]}
 
 		return options
 
@@ -205,6 +205,11 @@ class Tokenise(BasicProcessor):
 		The result is valid JSON, written in chunks.
 		"""
 		columns = self.parameters.get("columns")
+		if not columns:
+			self.dataset.update_status("No columns selected, aborting.", is_final=True)
+			self.dataset.update_status(0)
+			return
+
 		if type(columns) is not list:
 			columns = [columns]
 
