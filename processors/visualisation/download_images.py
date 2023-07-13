@@ -358,7 +358,7 @@ class ImageDownloader(BasicProcessor):
 		self.dataset.log('Downloaded %i images.' % downloaded_images)
 		# finish up
 		self.dataset.update_status("Compressing images")
-		self.write_archive_and_finish(results_path)
+		self.write_archive_and_finish(results_path, len([x for x in metadata.values() if x.get("success")]))
 
 	def get_image(self, url):
 		"""
