@@ -49,10 +49,10 @@ def admin_frontpage():
     # collect some stats
     now = time.time()
     num_items = {
-        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
-        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))[
+        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')", (now - 86400,))["num"],
+        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')", (now - (86400 * 7),))[
             "num"],
-        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets")["num"]
+        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')")["num"]
     }
 
     num_datasets = {
