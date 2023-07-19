@@ -213,6 +213,13 @@ config_definition = {
         "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
                    "provided e-mail settings are configured."
     },
+    "4cat.sphinx_host": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "localhost",
+        "help": "Sphinx host",
+        "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
+        "global": True
+    },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
