@@ -44,7 +44,7 @@ class Search4Chan(SearchWithScope):
 		"intro": {
 			"type": UserInput.OPTION_INFO,
 			"help": "Results are limited to 5 million items maximum. Be sure to read the [query "
-					"syntax](/data-overview/4chan#query-syntax) for local data sources first - your query design will "
+					"syntax](/data-overview/fourchan#query-syntax) for local data sources first - your query design will "
 					"significantly impact the results. Note that large queries can take a long time to complete!"
 		},
 		"board": {

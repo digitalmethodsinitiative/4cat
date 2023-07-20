@@ -6,6 +6,15 @@ store 4chan data.
 
 Please follow the [installation instructions for local data sources](https://github.com/digitalmethodsinitiative/4cat/wiki/Enabling-local-data-sources) on the 4CAT GitHub to enable this data source.
 
+## Scraping data
+The scraper requires very little configuration; you only need to set the boards
+to scrape. This can be done in the 4CAT settings panel.
+
+## Full-text search
+This data source also requires a full-text search engine to allow for keyword
+search. 4CAT is currently compatible with the [Sphinx](https://sphinxsearch.com)
+full-text search engine. See the [installation instructions for local data sources](https://github.com/digitalmethodsinitiative/4cat/wiki/Enabling-local-data-sources).
+
 ## Importing 4chan data from elsewhere
 If you want to import 4chan data from elsewhere rather than (or in addition to)
 scraping it yourself, various scripts in `/helper-scripts` allow to import external data:
