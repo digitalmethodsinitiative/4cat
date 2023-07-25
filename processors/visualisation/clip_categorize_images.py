@@ -11,7 +11,7 @@ from json import JSONDecodeError
 
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -150,6 +150,13 @@ class CategorizeImagesCLIP(BasicProcessor):
         # Initialize DMI Service Manager
         dmi_service_manager = DmiServiceManager(processor=self)
 
+        # Check GPU memory available
+        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("whisper")
+        if not gpu_memory or int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+            self.dataset.finish_with_error(
+                "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
+            return
+
         # Results should be unique to this dataset
         results_folder_name = f"texts_{self.dataset.key}"
         # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
@@ -173,6 +180,10 @@ class CategorizeImagesCLIP(BasicProcessor):
         api_endpoint = "clip"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30)
+        except DsmOutOfMemory:
+            self.dataset.finish_with_error(
+                "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
+            return
         except DmiServiceManagerException as e:
             self.dataset.finish_with_error(str(e))
             return

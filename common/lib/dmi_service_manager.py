@@ -22,6 +22,12 @@ class DmiServiceManagerException(Exception):
     """
     pass
 
+class DsmOutOfMemory(DmiServiceManagerException):
+    """
+    Raised when there is a problem with the configuration settings.
+    """
+    pass
+
 
 class DmiServiceManager:
     """
@@ -41,6 +47,21 @@ class DmiServiceManager:
         self.server_results_folder_name = None
         self.path_to_files = None
         self.path_to_results = None
+
+    def check_gpu_memory_available(self, service_endpoint):
+        """
+        Returns tuple with True if server has some memory available and  False otherwise as well as the JSON response
+        from server containing the memory information.
+        """
+        api_endpoint = self.server_address + "check_gpu_mem/" + service_endpoint
+        resp = requests.get(api_endpoint, timeout=30)
+        if resp.status_code == 200:
+            return True, resp.json()
+        elif resp.status_code in [400, 500, 503]:
+            return False, resp.json()
+        else:
+            self.processor.log.warning("Unknown response from DMI Service Manager: %s" % resp.text)
+            return False, None
 
     def process_files(self, input_file_dir, filenames, output_file_dir, server_file_collection_name, server_results_folder_name):
         """
@@ -136,6 +157,17 @@ class DmiServiceManager:
                     self.processor.dataset.update_status(f"Completed {service_endpoint}!")
                     success = True
                     break
+
+                elif 'returncode' in result.json().keys() and int(result.json()['returncode']) == 1:
+                    # Error
+                    if 'error' in result.json().keys():
+                        error = result.json()['error']
+                        if "CUDA error: out of memory" in error:
+                            raise DmiServiceManagerException("DMI Service Manager server ran out of memory; try reducing the number of files processed at once or waiting until the server is less busy.")
+                        else:
+                            raise DmiServiceManagerException(f"Error {service_endpoint}: " + error)
+                    else:
+                        raise DmiServiceManagerException(f"Error {service_endpoint}: " + str(result.json()))
                 else:
                     # Something botched
                     raise DmiServiceManagerException(f"Error {service_endpoint}: " + str(result.json()))
