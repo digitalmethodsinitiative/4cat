@@ -133,7 +133,6 @@ class DatasourceMetrics(BasicWorker):
 							WHERE %s AND %s
 							GROUP BY metric, datasource, board, date;
 							""" % (database_db_id, posts_table, board_sql, time_sql)
-						self.log.info("Metrics query: %s" % query)
 						# Add to metrics table
 						rows = [dict(row) for row in self.db.fetchall(query)]
 

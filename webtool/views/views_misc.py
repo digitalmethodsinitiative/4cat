@@ -158,7 +158,6 @@ def data_overview(datasource=None):
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":
 
-            app.logger.info("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (database_db_id,))
             total_counts = db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (database_db_id,))
 
             if total_counts:
@@ -169,7 +168,6 @@ def data_overview(datasource=None):
                 
                 # Fetch date counts per board from the database
                 db_counts = db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (database_db_id,))
-                app.logger.info("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (database_db_id,))
 
                 # Get the first and last days for padding
                 all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
