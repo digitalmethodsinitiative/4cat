@@ -94,7 +94,7 @@ class ImageWallGenerator(BasicProcessor):
 			}
 			default_options = [default for default in ["top_categories", "impression_count", "category", "type"] if default in parent_columns]
 			if default_options:
-				options["category"]["default"] = default_options.pop()
+				options["category"]["default"] = default_options.pop(0)
 
 		return options
 
