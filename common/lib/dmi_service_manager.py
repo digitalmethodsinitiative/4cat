@@ -92,7 +92,7 @@ class DmiServiceManager:
 
     def check_progress(self):
         if self.local_or_remote == "local":
-            current_completed = self.count_local_files(self.path_to_results)
+            current_completed = self.count_local_files(self.processor.config.get("PATH_DATA").joinpath(self.path_to_results))
         elif self.local_or_remote == "remote":
             existing_files = self.request_folder_files(self.server_file_collection_name)
             current_completed = len(existing_files.get(self.server_results_folder_name, []))
@@ -127,7 +127,11 @@ class DmiServiceManager:
         else:
             try:
                 resp_json = resp.json()
-                raise DmiServiceManagerException(f"DMI Service Manager error: {str(resp.status_code)}: {str(resp_json)}")
+                if resp.status_code == 400 and 'key' in resp_json and 'error' in resp_json and resp_json['error'] == f"future_key {resp_json['key']} already exists":
+                    # Request already exists
+                    results_url = api_endpoint + "?key=" + resp_json['key']
+                else:
+                    raise DmiServiceManagerException(f"DMI Service Manager error: {str(resp.status_code)}: {str(resp_json)}")
             except JSONDecodeError:
                 # Unexpected Error
                 raise DmiServiceManagerException(f"DMI Service Manager error: {str(resp.status_code)}: {str(resp.text)}")
