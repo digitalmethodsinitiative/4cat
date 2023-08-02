@@ -57,7 +57,7 @@ class DmiServiceManager:
         resp = requests.get(api_endpoint, timeout=30)
         if resp.status_code == 200:
             return True, resp.json()
-        elif resp.status_code in [400, 500, 503]:
+        elif resp.status_code in [400, 404, 500, 503]:
             return False, resp.json()
         else:
             self.processor.log.warning("Unknown response from DMI Service Manager: %s" % resp.text)
