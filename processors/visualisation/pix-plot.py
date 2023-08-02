@@ -156,11 +156,6 @@ class PixPlotGenerator(BasicProcessor):
             self.dataset.finish(0)
             return
 
-        # 0 = use as many images as in the archive, up to the max
-        max_images = convert_to_int(self.parameters.get("amount"), 1000)
-        if max_images == 0:
-            max_images = None
-
         # Unpack the images into a staging_area
         self.dataset.update_status("Unzipping images")
         staging_area = self.unpack_archive_contents(self.source_file)
