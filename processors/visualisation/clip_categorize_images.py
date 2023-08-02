@@ -151,11 +151,14 @@ class CategorizeImagesCLIP(BasicProcessor):
         dmi_service_manager = DmiServiceManager(processor=self)
 
         # Check GPU memory available
-        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("whisper")
-        if not gpu_memory or int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
-            self.dataset.finish_with_error(
-                "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
-            return
+        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("clip")
+        if not gpu_memory:
+            if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
+                self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
+            elif int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+                self.dataset.finish_with_error(
+                    "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
+                return
 
         # Results should be unique to this dataset
         results_folder_name = f"texts_{self.dataset.key}"
