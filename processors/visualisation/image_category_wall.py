@@ -259,7 +259,14 @@ class ImageWallGenerator(BasicProcessor):
 		# Drop categories with no images (ranges may have no images)
 		categories = {cat: images for cat, images in categories.items() if images}
 		self.dataset.log(f"Found {len(categories)} categories")
+		# TODO: this is semi arbitrary; max_images is only ever hit if each category is evenly sized
+		# If we break, when max_images is hit, categories are not representative and the last categories will be empty
+		# Instead, we could calculate each category's proportional size and then use that to determine how many images
+		# to take from each category while remaining under max_images
 		images_per_category = max(max_images // len(categories), 1)
+		# Could do something like this, but it also appears to cut smaller categories off uncessarily
+		# total_images = sum([len(images) for images in categories.values()])
+		# max_images_per_categories = {cat: max(math.ceil((len(images)/total_images) * max_images), 1) for cat, images in categories.items()}
 
 		# Create SVG with categories and images
 		base_height = self.parameters.get("height", 100)
@@ -280,7 +287,18 @@ class ImageWallGenerator(BasicProcessor):
 			offset_w = 0
 
 			for i, image in enumerate(images):
-				if i > images_per_category:
+				if i >= images_per_category:
+					remaining = f"+ {len(images) - images_per_category} more images"
+					footersize = (fontsize * (len(remaining) + 2) * 0.5925, fontsize * 2)
+					footer_shape = SVG(insert=(offset_w, base_height/2 - footersize[1]), size=footersize)
+					footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
+					label_element = Text(insert=("50%", "50%"), text=remaining, dominant_baseline="middle",
+										 text_anchor="middle", fill="#FFF", style="font-size:%ipx" % fontsize)
+					footer_shape.add(label_element)
+					category_image.add(footer_shape)
+					offset_w += footersize[0]
+
+					category_widths[category] += footersize[0]
 					break
 
 				image_filename = filename_map.get(image.get("id"))
