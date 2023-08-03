@@ -1,15 +1,11 @@
 """
 Whisper convert speech in audio to text
 """
-import datetime
 import os
 import json
-import time
-import requests
-from pathlib import Path
-from json import JSONDecodeError
 
 from backend.lib.processor import BasicProcessor
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -38,13 +34,16 @@ class AudioToText(BasicProcessor):
         ]
 
     config = {
-        "audio-to-text.whisper_enabled": {
+        "dmi-service-manager.bb_whisper-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Whisper converts speech in audio to text. Ensure the DMI Service Manager is running and has a [prebuilt Whisper image](https://github.com/digitalmethodsinitiative/dmi_dockerized_services/tree/main/openai_whisper#dmi-implementation-of-whisper-audio-transcription-tool).",
+        },
+        "dmi-service-manager.bc_whisper_enabled": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Enable Whisper Speech to Text",
-            "tooltip": "Docker must be installed and the Whisper image downloaded/built."
         },
-        "audio-to-text.whisper_num_files": {
+        "dmi-service-manager.bd_whisper_num_files": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
             "default": 0,
@@ -58,8 +57,8 @@ class AudioToText(BasicProcessor):
         """
         Allow on audio archives if enabled in Control Panel
         """
-        return config.get("audio-to-text.whisper_enabled", False, user=user) and \
-               config.get("dmi-service-manager.server_address", False, user=user) and \
+        return config.get("dmi-service-manager.bc_whisper_enabled", False, user=user) and \
+               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
                module.type.startswith("audio-extractor")
 
     @classmethod
@@ -111,7 +110,7 @@ class AudioToText(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_audio_files = int(config.get("audio-to-text.whisper_num_files", 100, user=user))
+        max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100, user=user))
         if max_number_audio_files == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of audio files"
             options["amount"]["default"] = 100
@@ -129,6 +128,7 @@ class AudioToText(BasicProcessor):
         """
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text.
         """
+        audio_files_extracted = 0
         if self.source_dataset.num_rows <= 1:
             # 1 because there is always a metadata file
             self.dataset.finish_with_error("No audio files found.")
@@ -143,11 +143,11 @@ class AudioToText(BasicProcessor):
                 self.dataset.finish_with_error("Unable to parse Advanced settings. Please format as JSON.")
                 return
 
-        local_or_remote = self.config.get("dmi-service-manager.local_or_remote")
-
         # Unpack the audio files into a staging_area
         self.dataset.update_status("Unzipping audio files")
         staging_area = self.unpack_archive_contents(self.source_file)
+        # Prepare output dir
+        output_dir = self.dataset.get_staging_area()
 
         # Collect filenames (skip .json metadata files)
         audio_filenames = [filename for filename in os.listdir(staging_area) if filename.split('.')[-1] not in ["json", "log"]]
@@ -155,74 +155,29 @@ class AudioToText(BasicProcessor):
             audio_filenames = audio_filenames[:self.parameters.get("amount", 100)]
         total_audio_files = len(audio_filenames)
 
-        # Make output dir
-        output_dir = self.dataset.get_staging_area()
+        # Initialize DMI Service Manager
+        dmi_service_manager = DmiServiceManager(processor=self)
 
-        # Send Request
-        if local_or_remote == "local":
-            # Whisper has direct access to files
-            whisper_endpoint = "whisper_local"
-
-            # Relative to PATH_DATA which should be where Docker mounts the whisper container volume
-            # TODO: path is just the staging_area name, but what if we move staging areas? DMI Service manager needs to know...
-            mounted_staging_area = staging_area.absolute().relative_to(self.config.get("PATH_DATA").absolute())
-            mounted_output_dir = output_dir.absolute().relative_to(self.config.get("PATH_DATA").absolute())
-
-        elif local_or_remote == "remote":
-            # Upload files to whisper
-            whisper_endpoint = "whisper_remote"
-
-            texts_folder = f"texts_{self.dataset.key}"
-
-            # Get labels to send server
-            top_dataset = self.dataset.top_parent()
-            folder_name = datetime.datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + \
-                          ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label()) + '-' + \
-                          str(top_dataset.key)
-
-            data = {'folder_name': folder_name}
-
-            # Check if audio files have already been sent
-            self.dataset.update_status("Connecting to DMI Service Manager...")
-            filename_url = self.config.get("dmi-service-manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
-            filename_response = requests.get(filename_url, timeout=30)
-
-            # Check if 4CAT has access to this PixPlot server
-            if filename_response.status_code == 403:
-                self.dataset.update_status("403: 4CAT does not have permission to use the DMI Service Manager server",
-                                           is_final=True)
-                self.dataset.finish(0)
+        # Check GPU memory available
+        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("whisper")
+        if not gpu_memory:
+            if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
+                self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
+            elif int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+                self.dataset.finish_with_error("DMI Service Manager currently busy; no GPU memory available. Please try again later.")
                 return
 
-            uploaded_audio_files = filename_response.json().get('audio', [])
-            if len(uploaded_audio_files) > 0:
-                self.dataset.update_status("Found %i audio files previously uploaded" % (len(uploaded_audio_files)))
+        # Provide audio files to DMI Service Manager
+        # Results should be unique to this dataset
+        results_folder_name = f"texts_{self.dataset.key}"
+        # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
+        file_collection_name = dmi_service_manager.get_folder_name(self.source_dataset)
 
-            # Compare audio files with previously uploaded
-            to_upload_filenames = [filename for filename in audio_filenames if filename not in uploaded_audio_files]
-
-            if len(to_upload_filenames) > 0 or texts_folder not in filename_response.json():
-                # TODO: perhaps upload one at a time?
-                api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/send_files"
-                # TODO: don't create a silly empty file just to trick the service manager into creating a new folder
-                with open(staging_area.joinpath("blank.txt"), 'w') as file:
-                    file.write('')
-                self.dataset.update_status(f"Uploading {len(to_upload_filenames)} audio files")
-                response = requests.post(api_upload_endpoint, files=[('audio', open(staging_area.joinpath(file), 'rb')) for file in to_upload_filenames] + [(texts_folder, open(staging_area.joinpath("blank.txt"), 'rb'))], data=data, timeout=120)
-                if response.status_code == 200:
-                    self.dataset.update_status(f"Audio files uploaded: {len(to_upload_filenames)}")
-                else:
-                    self.dataset.update_status(f"Unable to upload {len(to_upload_filenames)} files!")
-                    self.log.error(f"Whisper upload error: {response.status_code} - {response.reason}")
-
-            mounted_staging_area = Path(folder_name).joinpath("audio")
-            mounted_output_dir = Path(folder_name).joinpath(texts_folder)
-
-        else:
-            raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+        path_to_files, path_to_results = dmi_service_manager.process_files(staging_area, audio_filenames, output_dir, file_collection_name, results_folder_name)
 
         # Whisper args
-        data = {"args": ['--output_dir', f"data/{mounted_output_dir}",
+        whisper_endpoint = "whisper"
+        data = {"args": ['--output_dir', f"data/{path_to_results}",
                          "--verbose", "False",
                          '--output_format', "json",
                          "--model", self.parameters.get("model")],
@@ -238,71 +193,19 @@ class AudioToText(BasicProcessor):
                 setting = setting if setting[:2] == "--" else "--" + setting.lstrip("-")
                 data["args"].extend([setting, str(value)])
         # Finally, add audio files to args
-        data["args"].extend([f"data/{mounted_staging_area.joinpath(filename)}" for filename in audio_filenames])
+        data["args"].extend([f"data/{path_to_files.joinpath(filename)}" for filename in audio_filenames])
 
+        # Send request to DMI Service Manager
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")
-        api_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/" + whisper_endpoint
-        resp = requests.post(api_endpoint, json=data, timeout=30)
-        if resp.status_code == 202:
-            # New request successful
-            results_url = api_endpoint + "?key=" + resp.json()['key']
-        else:
-            try:
-                resp_json = resp.json()
-                self.log.error('DMI Service Manager error: ' + str(resp.status_code) + ': ' + str(resp_json))
-                raise ProcessorException("DMI Service Manager unable to process request; contact admins")
-            except JSONDecodeError:
-                # Unexpected Error
-                self.log.error('DMI Service Manager error: ' + str(resp.status_code) + ': ' + str(resp.text))
-                raise ProcessorException("DMI Service Manager unable to process request; contact admins")
-
-        # Wait for Whisper to convert audio to text
-        self.dataset.update_status(f"Whisper generating results for {total_audio_files} audio files{'; this may take quite a while...' if total_audio_files > 25 else ''}")
-        start_time = time.time()
-        prev_completed = 0
-        while True:
-            time.sleep(1)
-            # If interrupted is called, attempt to finish dataset while Whisper server still running
-            if self.interrupted:
-                self.dataset.update_status("4CAT interrupted; Processing successful Whisper results...",
-                                           is_final=True)
-                break
-
-            # Send request to check status every 60 seconds
-            if int(time.time() - start_time) % 60 == 0:
-                # Update progress
-                if local_or_remote == "local":
-                    num_completed = self.count_result_files(output_dir)
-                    if num_completed != prev_completed:
-                        self.dataset.update_status(f"Collected text from {num_completed} of {total_audio_files} audio files")
-                        self.dataset.update_progress(num_completed / total_audio_files)
-                        prev_completed = num_completed
-                elif local_or_remote == "remote":
-                    # TODO could check API endpoint if desired...
-                    num_completed = 1 # in case.... yeah, unsure yet, but do not want to kill a dataset that may have results
-                    pass
-
-                result = requests.get(results_url, timeout=30)
-                if 'status' in result.json().keys() and result.json()['status'] == 'running':
-                    # Still running
-                    continue
-                elif 'report' in result.json().keys() and result.json()['returncode'] == 0:
-                    # Complete without error
-                    self.dataset.update_status("Whisper Completed!")
-                    break
-                else:
-                    # Something botched
-                    if num_completed > 0:
-                        # Some data collected...
-                        self.dataset.update_status("Whisper Error; check logs; Processing successful Whisper results...", is_final=True)
-                        error_message = "Whisper Error: " + str(result.json())
-                        self.log.error(error_message)
-                        self.dataset.log(error_message)
-                        break
-                    else:
-                        self.dataset.finish_with_error("Whisper Error; unable to process request")
-                        self.log.error("Whisper Error: " + str(result.json()))
-                        return
+        try:
+            dmi_service_manager.send_request_and_wait_for_results(whisper_endpoint, data, wait_period=30)
+        except DsmOutOfMemory:
+            self.dataset.finish_with_error(
+                "DMI Service Manager ran out of memory; Try decreasing the number of audio files or try again or try again later.")
+            return
+        except DmiServiceManagerException as e:
+            self.dataset.finish_with_error(str(e))
+            return
 
         # Load the video metadata if available
         video_metadata = None
@@ -312,24 +215,9 @@ class AudioToText(BasicProcessor):
                 self.dataset.log("Found and loaded video metadata")
 
         self.dataset.update_status("Processing Whisper results...")
-        if local_or_remote == "local":
-            # Output files are local
-            pass
-        elif local_or_remote == "remote":
-            # Update list of uploaded files
-            filename_response = requests.get(filename_url, timeout=30)
-            result_files = filename_response.json().get(texts_folder, [])
 
-            # Download the result files
-            api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/uploads/"
-            for filename in result_files:
-                file_response = requests.get(api_upload_endpoint + f"{folder_name}/{texts_folder}/{filename}", timeout=30)
-                self.dataset.log(f"Downloading {filename}...")
-                with open(output_dir.joinpath(filename), 'wb') as file:
-                    file.write(file_response.content)
-        else:
-            # This should have raised already...
-            raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+        # Download the result files
+        dmi_service_manager.process_results(output_dir)
 
         # Save files as NDJSON, then use map_item for 4CAT to interact
         processed = 0
@@ -354,7 +242,7 @@ class AudioToText(BasicProcessor):
 
         self.dataset.update_status(f"Detected speech in {processed} of {total_audio_files} audio files")
         self.dataset.finish(processed)
-
+            
     @staticmethod
     def map_item(item):
         """
@@ -374,10 +262,3 @@ class AudioToText(BasicProcessor):
             "post_ids": ", ".join(audio_metadata.get("post_ids", [])),
             "from_dataset": audio_metadata.get("from_dataset", "")
         }
-
-    @staticmethod
-    def count_result_files(directory):
-        """
-        Get number of files in directory
-        """
-        return len(os.listdir(directory))

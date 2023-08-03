@@ -73,10 +73,14 @@ class ModuleCollector:
         # but that requires importing the classes themselves, which leads to
         # circular imports
         # todo: fix this because this sucks
+        # agreed - Dale
         parent_classes = {"BasicWorker", "BasicProcessor", "Search", "SearchWithScope", "Search4Chan",
-                          "ProcessorPreset", "TwitterStatsBase", "BaseFilter", "TwitterAggregatedStats", "ColumnFilter"}
+                          "ProcessorPreset", "TwitterStatsBase", "BaseFilter", "TwitterAggregatedStats", "ColumnFilter",
+                          "BasicJSONScraper", "BoardScraper4chan", "ThreadScraper4chan"}
         if only_processors:
-            parent_classes.remove("BasicWorker")
+            # only allow processors
+            for worker_only_class in ["BasicWorker", "BasicJSONScraper", "BoardScraper4chan", "ThreadScraper4chan"]:
+                parent_classes.remove(worker_only_class)
 
         return inspect.isclass(object) and \
                parent_classes & set([f.__name__ for f in object.__bases__]) and \

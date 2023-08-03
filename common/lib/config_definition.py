@@ -23,7 +23,7 @@ config_definition = {
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
-    "datasources._intro": {
+    "datasources._intro2": {
         "type": UserInput.OPTION_INFO,
         "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
                 "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
@@ -213,6 +213,13 @@ config_definition = {
         "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
                    "provided e-mail settings are configured."
     },
+    "4cat.sphinx_host": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "localhost",
+        "help": "Sphinx host",
+        "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
+        "global": True
+    },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
@@ -380,14 +387,18 @@ config_definition = {
     # service manager
     # this is a service that 4CAT can connect to to run e.g. ML models
     # it is used by a number of processors
-    "dmi-service-manager.server_address": {
+    "dmi-service-manager.aa_DSM-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager#start-dmi-service-manager) is a support tool used to run some advanced processors. These processors generally require high CPU usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also possible for multiple 4CAT instances to use the same service manager. Please see the link for instructions on setting up your own instance of the DMI Service Manager.",
+        },
+    "dmi-service-manager.ab_server_address": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "DMI Service Manager server/URL",
-        "tooltip": "https://github.com/digitalmethodsinitiative/dmi_service_manager",
+        "tooltip": "The URL of the DMI Service Manager server, e.g. http://localhost:5000",
         "global": True
     },
-    "dmi-service-manager.local_or_remote": {
+    "dmi-service-manager.ac_local_or_remote": {
         "type": UserInput.OPTION_CHOICE,
         "default": 0,
         "help": "DMI Services Local or Remote",

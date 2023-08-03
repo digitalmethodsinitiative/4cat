@@ -362,10 +362,18 @@ class TikTokScraper:
                     continue
 
                 for video in self.reformat_metadata(metadata):
+                    if not video.get("stats") or video.get("createTime") == "0":
+                        # sometimes there are empty videos? which seems to
+                        # indicate a login wall
+                        self.processor.dataset.log(
+                            f"Empty metadata returned for video {url} ({video['id']}), skipping. This likely means that the post requires logging in to view.")
+                        continue
+                    else:
+                        results.append(video)
+
                     self.processor.dataset.update_status("Processed %s of %s TikTok URLs" %
                                                ("{:,}".format(finished), "{:,}".format(num_urls)))
                     self.processor.dataset.update_progress(finished / num_urls)
-                    results.append(video)
 
         notes = []
         if failed:

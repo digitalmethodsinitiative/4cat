@@ -101,6 +101,8 @@ class WorkerManager:
 					except JobClaimedException:
 						# it's fine
 						pass
+			else:
+				self.log.error("Unknown job type: %s" % jobtype)
 
 		time.sleep(1)
 

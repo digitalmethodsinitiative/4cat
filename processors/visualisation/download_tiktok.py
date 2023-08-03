@@ -36,7 +36,8 @@ class TikTokVideoDownloader(BasicProcessor):
             "help": "No. of videos (max 1000)",
             "default": 100,
             "min": 0,
-            "max": 1000
+            "max": 1000,
+            "tooltip": "Due to simultaneous downloads, you may end up with a few extra videos."
         },
     }
 
@@ -103,7 +104,7 @@ class TikTokVideoDownloader(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
 
-        self.write_archive_and_finish(results_path, len(results))
+        self.write_archive_and_finish(results_path, len([True for result in results.values() if result.get("success")]))
 
     @staticmethod
     def map_metadata(video_id, data):

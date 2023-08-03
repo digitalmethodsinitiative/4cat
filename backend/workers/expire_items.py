@@ -58,7 +58,7 @@ class ThingExpirer(BasicWorker):
 			dataset = DataSet(key=dataset["key"], db=self.db)
 			if dataset.is_expired():
 				self.log.info(f"Deleting dataset {dataset.key} (expired)")
-				# dataset.delete()
+				dataset.delete()
 
 	def expire_users(self):
 		"""
@@ -81,6 +81,9 @@ class ThingExpirer(BasicWorker):
 
 			# parse expiration date if available
 			delete_after = user.get_value("delete-after")
+			if not delete_after:
+				continue
+
 			if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", str(delete_after)):
 				expires_at = datetime.datetime.strptime(delete_after, "%Y-%m-%d")
 			elif re.match(r"^[0-9]+$", str(delete_after)):
@@ -94,11 +97,8 @@ class ThingExpirer(BasicWorker):
 				self.log.info(f"User {username} expired - deleting user and datasets")
 				user.delete()
 			else:
-				# and if not, add notification if expiring soon
-				delta = expires_at - now
-				if delta.days < 7:
-					warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%Y-%m-%d %H:%M')}</time>. Make sure to back up your data before then."
-					user.add_notification(warning_notification)
+				warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%Y-%m-%d %H:%M')}</time>. Make sure to back up your data before then."
+				user.add_notification(warning_notification)
 
 	def expire_notifications(self):
 		"""

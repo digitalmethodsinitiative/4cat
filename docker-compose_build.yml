@@ -3,7 +3,7 @@ version: '3.6'
 services:
   db:
     container_name: 4cat_db
-    image: postgres:latest
+    image: postgres:${POSTGRES_TAG}
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -11,6 +11,11 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
       - 4cat_db:/var/lib/postgresql/data/
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     image: 4cat
@@ -21,7 +26,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - ${PUBLIC_API_PORT}:4444
     volumes:

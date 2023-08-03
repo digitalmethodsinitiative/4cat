@@ -33,7 +33,7 @@
             <p>{% if in_progress %}
                     A restart or upgrade is currently in progress.
                 {% elif can_upgrade %}
-                    You can upgrade 4CAT.
+                    You can upgrade 4CAT{% if release_notes %}. Make sure to read the <a href="{{ release_notes }}">release notes</a> before you do{% endif %}.
                 {% else %}
                     No upgrades are currently available.
                 {% endif %}</p>

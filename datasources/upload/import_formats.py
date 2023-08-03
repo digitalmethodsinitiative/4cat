@@ -88,7 +88,10 @@ def import_crowdtangle_facebook(reader, columns, dataset, parameters):
     overperforming_column = None
     for item in reader:
         hashtags = hashtag.findall(item["Message"])
-        date = datetime.datetime.strptime(" ".join(item["Post Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
+        try:
+            date = datetime.datetime.strptime(" ".join(item["Post Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            yield InvalidImportedItem(reason=f"Cannot parse date/time '{item['Post Created']}'; skipping post")
 
         is_from_elsewhere = item["Link"].find("https://www.facebook.com/" + item["User Name"]) < 0
         shared_page = item["Link"].split("/")[3] if is_from_elsewhere and item["Link"].find(

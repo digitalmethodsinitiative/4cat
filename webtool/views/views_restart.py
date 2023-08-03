@@ -54,9 +54,12 @@ def trigger_restart():
 
     code_version = Path(config.get("PATH_ROOT"), "VERSION").open().readline().strip()
     try:
-        github_version = get_github_version()[0]
+        github_version = get_github_version()
+        release_notes = github_version[1]
+        github_version = github_version[0]
     except (json.JSONDecodeError, requests.RequestException):
         github_version = "unknown"
+        release_notes = None
 
     # upgrade is available if we have all info and the release is newer than
     # the currently checked out code
@@ -95,7 +98,8 @@ def trigger_restart():
         flash("%s initiated. Check process log for progress." % mode.title())
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
-                           can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
+                           can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
+                           release_notes=release_notes)
 
 
 @app.route("/admin/trigger-frontend-upgrade/", methods=["POST"])

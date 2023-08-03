@@ -174,6 +174,16 @@ class DataSet(FourcatModule):
 		"""
 		return self.folder.joinpath(self.data["result_file"])
 
+	def get_results_folder_path(self):
+		"""
+		Get path to folder containing accompanying results
+
+		Returns a path that may not yet be created
+
+		:return Path:  A path to the results file
+		"""
+		return self.folder.joinpath("folder_" + self.key)
+
 	def get_log_path(self):
 		"""
 		Get path to dataset log file
@@ -537,6 +547,8 @@ class DataSet(FourcatModule):
 			self.get_results_path().unlink()
 			if self.get_results_path().with_suffix(".log").exists():
 				self.get_results_path().with_suffix(".log").unlink()
+			if self.get_results_folder_path().exists():
+				shutil.rmtree(self.get_results_folder_path())
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
@@ -1447,7 +1459,7 @@ class DataSet(FourcatModule):
 
 		# is the dataset older than the set timeout?
 		if expiration.get(self.parameters.get("datasource")).get("timeout"):
-			return self.timestamp < time.time() - expiration[self.parameters.get("datasource")]["timeout"]
+			return self.timestamp + expiration[self.parameters.get("datasource")]["timeout"] < time.time()
 
 		return False
 
