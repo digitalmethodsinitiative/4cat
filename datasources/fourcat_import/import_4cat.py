@@ -11,7 +11,7 @@ from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, FourcatException, ProcessorInterruptedException
-from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
+from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache, get_software_version
 from common.lib.dataset import DataSet
 
 from common.config_manager import config
@@ -162,9 +162,7 @@ class SearchImportFromFourcat(BasicProcessor):
         except ValueError:
             raise QueryParametersException(f"Unexpected response when trying to fetch metadata for dataset {keys[0]}.")
 
-        version_file = config.get("PATH_ROOT", user=user).joinpath("config/.current-version")
-        with version_file.open() as infile:
-            version = infile.readline().strip()
+        version = get_software_version()
 
         if metadata.get("current_4CAT_version") != version:
             raise QueryParametersException(f"This 4CAT server is running a different version of 4CAT ({version}) than "
