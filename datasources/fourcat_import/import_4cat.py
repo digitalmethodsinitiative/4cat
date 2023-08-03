@@ -22,12 +22,12 @@ class FourcatImportException(FourcatException):
 
 
 class SearchImportFromFourcat(BasicProcessor):
-    type = "import-4cat-search"  # job ID
+    type = "import_4cat-search"  # job ID
     category = "Search"  # category
     title = "Import from 4CAT"  # title displayed in UI
     description = "Import a dataset from another 4CAT instance"  # description displayed in UI
     is_local = False  # Whether this datasource is locally scraped
-    is_static = True  # Whether this datasource is still updated
+    is_static = False  # Whether this datasource is still updated
 
     max_workers = 1
     options = {
@@ -92,9 +92,10 @@ class SearchImportFromFourcat(BasicProcessor):
             except ValueError:
                 log_buffer.append(f"Could not read metadata for dataset {dataset_key}")
                 continue
-
-            self.db.insert("datasets", data=metadata["data"])
-            new_dataset = DataSet(key=metadata["data"]["key"], db=self.db)
+            metadata.pop("current_4CAT_version")
+            self.db.insert("datasets", data=metadata)
+            # TODO: any chance keys are not unique?
+            new_dataset = DataSet(key=metadata["key"], db=self.db)
             imported_keys.append(new_dataset.key)
 
             # then, the log
@@ -165,9 +166,9 @@ class SearchImportFromFourcat(BasicProcessor):
         with version_file.open() as infile:
             version = infile.readline().strip()
 
-        if metadata.get("version") != version:
-            raise QueryParametersException("This 4CAT server is running a different version of 4CAT ({version}) than "
-                                           "the one you are trying to import from ({metadata.get('version')}). Make "
+        if metadata.get("current_4CAT_version") != version:
+            raise QueryParametersException(f"This 4CAT server is running a different version of 4CAT ({version}) than "
+                                           f"the one you are trying to import from ({metadata.get('version')}). Make "
                                            "sure both are running the same version of 4CAT and try again.")
 
         # OK, we can import at least one dataset

@@ -1186,12 +1186,22 @@ def export_packed_dataset(key=None, component=None):
 	except (TypeError,):
 		return error(404, error="Dataset not found.")
 
-	if not current_user.can_access_dataset(role="owner"):
-		raise error(403, error="You cannot export this dataset.")
+	if not current_user.can_access_dataset(dataset=dataset, role="owner"):
+		raise error(403, error=f"You cannot export this dataset. {current_user}")
 
 	if component == "metadata":
-		metadata = db.fetchone("SELECT * FROM datasets WHERE key = %s", (dataset.key))
-		return jsonify(dict(metadata))
+		metadata = db.fetchone("SELECT * FROM datasets WHERE key = %s", (dataset.key,))
+
+		# get 4CAT version (presumably to ensure export is compatible with import)
+		version_file = config.get("PATH_ROOT", user=current_user).joinpath("config/.current-version")
+		with version_file.open() as infile:
+			version = infile.readline().strip()
+		metadata = dict(metadata)
+		metadata["current_4CAT_version"] = version
+
+		print(metadata)
+
+		return jsonify(metadata)
 
 	elif component == "children":
 		children = [d["key"] for d in db.fetchall("SELECT key FROM datasets WHERE key_parent = %s", (dataset.key,))]
