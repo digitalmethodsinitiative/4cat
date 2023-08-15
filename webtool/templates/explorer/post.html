@@ -33,7 +33,7 @@
 		{% if 'thread_id' in post %}
 			<span title="Thread ID" class="thread_id">{% if is_local %}<a href="/explorer/thread/{{ datasource }}/{{ board }}/{{ post.thread_id }}">{{ post.thread_id }}</a>{% else %}{{ post.thread_id }}{% endif %}</span>
 		{% endif %}
-		<span title="Post ID" class="post_id">{{ post.id }}</span>
+		<!-- <span title="Post ID" class="post_id">{{ post.id }}</span> -->
 		{% if 'timestamp' in post %}
 			{% if post.timestamp is integer %}
 				<span title="Date" class="datetime">{{ post.timestamp|datetime('%Y-%m-%d %H:%M')|safe }}</span>
