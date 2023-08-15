@@ -1,0 +1,33 @@
+{
+	"ndjson": {
+		"author": "{{ user.full_name }}",
+		"body": "{{ caption.text }}",
+		"image": "retrieve:{{ image_versions2.candidates.url }}",
+		"likes": "<b>{{ like_count }} likes</b>",
+		"comments": "<span class='alt'><a href='https://www.instagram.com/p/{{ code }}'>{{ comment_count }} comments</a></span>",
+		"date": "<span class='alt'>{{ taken_at | datetime }}</span>",
+		"external_url": "https://instagram.com/p/{{ code }}",
+		"type": "<span class='alt'>{{ product_type }}</a>",
+		"sort_options": [
+				{
+					"key": "taken_at",
+					"label": "Old to new"
+				},
+				{
+					"key": "taken_at",
+					"label": "New to old",
+					"descending": true
+				},
+				{
+					"key": "like_count",
+					"label": "Likes",
+					"descending": true
+				},
+				{
+					"key": "stats.commentCount",
+					"label": "Comments",
+					"descending": true
+				}
+			]
+	}
+}
