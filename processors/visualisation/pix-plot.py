@@ -287,6 +287,10 @@ class PixPlotGenerator(BasicProcessor):
                     ids = data.get('post_ids')
                     # dmi_pix_plot API uses sercure_filename while pixplot.py (in PixPlot library) uses clean_filename
                     # Ensure our metadata filenames match results
+                    if data.get('filename') is None:
+                        # Bad metadata; file was not actually downloaded, fixed in 9b603cd1ecdf97fd92c3e1c6200e4b6700dc1e37
+                        continue
+
                     filename = self.clean_filename(secure_filename(data.get('filename')))
                     for post_id in ids:
                         # Add to key
