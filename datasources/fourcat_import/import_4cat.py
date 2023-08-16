@@ -70,9 +70,10 @@ class SearchImportFromFourcat(BasicProcessor):
         api_key = self.parameters.get("api-key")
         file_paths = []
         imported_keys = []
-        log_buffer = []
+        dataset_imported = {}
 
-        for dataset_key in keys:
+        while keys:
+            dataset_key = keys.pop()
             if self.interrupted:
                 for path in file_paths:
                     # clean up partially implemented datasets and delete imported datasets
@@ -81,24 +82,91 @@ class SearchImportFromFourcat(BasicProcessor):
                     self.db.delete("datasets_owners", where={"key": tuple(imported_keys)})
 
                 raise ProcessorInterruptedException()
+            dataset_imported[dataset_key] = {
+                "id": dataset_key,
+                "thread_id": dataset_key,
+                "author": "",
+                "body": "",
+                "timestamp": "",
+                "link": "",
+                "metadata_imported": False,
+                "log_imported": False,
+                "results_imported": False,
+                "children": "",
+            }
 
             # first, metadata!
             try:
                 metadata = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "metadata")
                 metadata = metadata.json()
             except FourcatImportException as e:
-                log_buffer.append(str(e))
+                self.dataset.log(str(e))
                 continue
             except ValueError:
-                log_buffer.append(f"Could not read metadata for dataset {dataset_key}")
+                self.dataset.log(f"Could not read metadata for dataset {dataset_key}")
                 continue
             metadata.pop("current_4CAT_version")
+            metadata.pop("id")  # remove the unique database ID
+            self.dataset.log(metadata)
             self.db.insert("datasets", data=metadata)
             # TODO: any chance keys are not unique?
             new_dataset = DataSet(key=metadata["key"], db=self.db)
             imported_keys.append(new_dataset.key)
+            self.dataset.update_status(f"Imported dataset {new_dataset.key}")
+
+            # Update dataset metadata
+            dataset_imported[dataset_key]["thread_id"] = metadata.get("key_parent") if metadata.get("key_parent") else metadata.get("key")
+            dataset_imported[dataset_key]["timestamp"] = metadata.get("timestamp")
+            dataset_imported[dataset_key]["author"] = metadata.get("creater")
+            dataset_imported[dataset_key]["body"] = metadata.get("type")
+            dataset_imported[dataset_key]["link"] = ('https://' if config.get("flask.https") else 'http://') + config.get("flask.server_name") + '/results/' + metadata.get("key")
+            dataset_imported[dataset_key]["metadata_imported"] = True
 
             # then, the log
+            try:
+                log = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "log")
+                filepath = new_dataset.get_results_path().with_suffix(".log")
+                with filepath.open("wb") as outfile:
+                    outfile.write(log.content)
+            except FourcatImportException as e:
+                self.dataset.log(str(e))
+                continue
+            except ValueError:
+                self.dataset.log(f"Could not read log for dataset {dataset_key}")
+                continue
+            dataset_imported[dataset_key]["log_imported"] = True
+
+            # then, the results
+            try:
+                data = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "data")
+                filepath = new_dataset.get_results_path()
+                with filepath.open("wb") as outfile:
+                    outfile.write(data.content)
+            except FourcatImportException as e:
+                self.dataset.log(str(e))
+                continue
+            except ValueError:
+                self.dataset.log(f"Could not read log for dataset {dataset_key}")
+                continue
+            dataset_imported[dataset_key]["results_imported"] = True
+
+            # finally, the kids
+            try:
+                children = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "children")
+                children = children.json()
+            except FourcatImportException as e:
+                self.dataset.log(str(e))
+                continue
+            except ValueError:
+                self.dataset.log(f"Could not read log for dataset {dataset_key}")
+                continue
+            for child in children:
+                keys.append(child)
+                self.dataset.log(f"Adding child dataset {child} to import queue")
+            dataset_imported[dataset_key]["children"] = ",".join(children)
+
+        # Not really sure what we do now...
+        self.write_csv_items_and_finish(list(dataset_imported.values()))
 
     @staticmethod
     def fetch_from_4cat(base, dataset_key, api_key, component):
@@ -124,7 +192,7 @@ class SearchImportFromFourcat(BasicProcessor):
                 f"dataset and are using the correct API key.")
         elif response.status_code != 200:
             raise FourcatImportException(
-                f"Unexpected error while trying to import dataset {dataset_key} from server {base}: {response.text}")
+                f"Unexpected error while requesting {component} for dataset {dataset_key} from server {base}: {response.text}")
 
         return response
 
@@ -166,7 +234,7 @@ class SearchImportFromFourcat(BasicProcessor):
 
         if metadata.get("current_4CAT_version") != version:
             raise QueryParametersException(f"This 4CAT server is running a different version of 4CAT ({version}) than "
-                                           f"the one you are trying to import from ({metadata.get('version')}). Make "
+                                           f"the one you are trying to import from ({metadata.get('current_4CAT_version')}). Make "
                                            "sure both are running the same version of 4CAT and try again.")
 
         # OK, we can import at least one dataset

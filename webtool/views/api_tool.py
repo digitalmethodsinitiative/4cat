@@ -1205,16 +1205,18 @@ def export_packed_dataset(key=None, component=None):
 
 	elif component in ("data", "log"):
 		def stream_data_content(datafile):
-			while True:
-				line = datafile.readline()
-				if line == "":
-					break
-				yield line
-
+			with datafile.open() as outfile:
+				while True:
+					line = outfile.readline()
+					if line == "":
+						break
+					yield line
 
 		filepath = dataset.get_results_path() if component == "data" else dataset.get_results_path().with_suffix(".log")
-		with filepath.open() as outfile:
-			return stream_data_content(outfile)
+		if not filepath.exists():
+			return error(404, error=f"File for {component} not found")
+		else:
+			return stream_data_content(filepath)
 
 	else:
 		return error(406, error="Dataset component unknown")
