@@ -2,16 +2,10 @@
 Custom data upload to create bespoke datasets
 """
 import requests
-import time
-
-import datasources.upload.import_formats as import_formats
-
-from dateutil.parser import parse as parse_datetime
-from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, FourcatException, ProcessorInterruptedException
-from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache, get_software_version
+from common.lib.helpers import UserInput, get_software_version
 from common.lib.dataset import DataSet
 
 from common.config_manager import config
@@ -82,6 +76,8 @@ class SearchImportFromFourcat(BasicProcessor):
                     self.db.delete("datasets_owners", where={"key": tuple(imported_keys)})
 
                 raise ProcessorInterruptedException()
+
+            # Creating metadata for this import dataset; may remove if we link directly to imported dataset
             dataset_imported[dataset_key] = {
                 "id": dataset_key,
                 "thread_id": dataset_key,
@@ -100,16 +96,16 @@ class SearchImportFromFourcat(BasicProcessor):
                 metadata = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "metadata")
                 metadata = metadata.json()
             except FourcatImportException as e:
-                self.dataset.log(str(e))
+                self.dataset.log(f"Error retrieving record for dataset {dataset_key}: {e}")
                 continue
             except ValueError:
                 self.dataset.log(f"Could not read metadata for dataset {dataset_key}")
                 continue
-            metadata.pop("current_4CAT_version")
-            metadata.pop("id")  # remove the unique database ID
+            metadata.pop("current_4CAT_version")  # remove the version number of the 4CAT instance we're importing from; dataset has unique software version from time of creation
+            metadata.pop("id")  # remove the unique database ID; new one will be generated
             self.dataset.log(metadata)
             self.db.insert("datasets", data=metadata)
-            # TODO: any chance keys are not unique?
+            # TODO: any chance dataset keys are not unique? (yes, but probably super rare?)
             new_dataset = DataSet(key=metadata["key"], db=self.db)
             imported_keys.append(new_dataset.key)
             self.dataset.update_status(f"Imported dataset {new_dataset.key}")
@@ -129,7 +125,7 @@ class SearchImportFromFourcat(BasicProcessor):
                 with filepath.open("wb") as outfile:
                     outfile.write(log.content)
             except FourcatImportException as e:
-                self.dataset.log(str(e))
+                self.dataset.log(f"Error retrieving log: {e}")
                 continue
             except ValueError:
                 self.dataset.log(f"Could not read log for dataset {dataset_key}")
@@ -143,10 +139,10 @@ class SearchImportFromFourcat(BasicProcessor):
                 with filepath.open("wb") as outfile:
                     outfile.write(data.content)
             except FourcatImportException as e:
-                self.dataset.log(str(e))
+                self.dataset.log(f"Error retrieving results: {e}")
                 continue
             except ValueError:
-                self.dataset.log(f"Could not read log for dataset {dataset_key}")
+                self.dataset.log(f"Could not read results for dataset {dataset_key}")
                 continue
             dataset_imported[dataset_key]["results_imported"] = True
 
@@ -155,17 +151,18 @@ class SearchImportFromFourcat(BasicProcessor):
                 children = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "children")
                 children = children.json()
             except FourcatImportException as e:
-                self.dataset.log(str(e))
+                self.dataset.log(f"Error retrieving children: {e}")
                 continue
             except ValueError:
-                self.dataset.log(f"Could not read log for dataset {dataset_key}")
+                self.dataset.log(f"Could not collect children for dataset {dataset_key}")
                 continue
             for child in children:
                 keys.append(child)
                 self.dataset.log(f"Adding child dataset {child} to import queue")
             dataset_imported[dataset_key]["children"] = ",".join(children)
 
-        # Not really sure what we do now...
+        # Writing metadata to dataset result CSV
+        # TODO: may be cleaner to link directly to imported dataset... maybe something like what we do when creating a standalone dataset?
         self.write_csv_items_and_finish(list(dataset_imported.values()))
 
     @staticmethod

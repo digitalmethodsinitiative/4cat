@@ -14,7 +14,7 @@ from pathlib import Path
 import backend
 
 from flask import jsonify, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
-	get_flashed_messages
+	get_flashed_messages, send_from_directory
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
@@ -1194,9 +1194,6 @@ def export_packed_dataset(key=None, component=None):
 
 		# get 4CAT version (presumably to ensure export is compatible with import)
 		metadata["current_4CAT_version"] = get_software_version()
-
-		print(metadata)
-
 		return jsonify(metadata)
 
 	elif component == "children":
@@ -1204,19 +1201,11 @@ def export_packed_dataset(key=None, component=None):
 		return jsonify(children)
 
 	elif component in ("data", "log"):
-		def stream_data_content(datafile):
-			with datafile.open() as outfile:
-				while True:
-					line = outfile.readline()
-					if line == "":
-						break
-					yield line
-
 		filepath = dataset.get_results_path() if component == "data" else dataset.get_results_path().with_suffix(".log")
-		if not filepath.exists():
+		if not filepath.exists():		# def stream_data_content(datafile):
 			return error(404, error=f"File for {component} not found")
 		else:
-			return stream_data_content(filepath)
+			return send_from_directory(directory=filepath.parent, path=filepath.name)
 
 	else:
 		return error(406, error="Dataset component unknown")
