@@ -76,12 +76,17 @@ for conf in confs:
 	defined_sources = regex_source.findall(confsrc)
 
 	# parse found sources into index definitions
-	prefix = ""
+	# this is to ensure index names conform given the change to datasource names
+	prefixes = {"fourchan": "4chan", "eightchan": "8chan", "eightkun": "8kun"}
+	if datasource in prefixes:
+		prefix = prefixes[datasource]
+	else:
+		prefix = datasource
 	for source in defined_sources:
 		print("...adding one Sphinx source for data source %s" % datasource_id)
 		sources.append("source %s : 4cat {%s}" % source)
 		name = source[0]
-		index_name = datasource + "_posts" if "posts" in name else datasource + "_threads" if "threads" in name else False
+		index_name = prefix + "_posts" if "posts" in name else prefix + "_threads" if "threads" in name else False
 		if not index_name:
 			# we only know how to deal with post and thread sources
 			print("Unrecognized data source %s. Skipping." % name)

@@ -170,7 +170,7 @@ class Tokenise(BasicProcessor):
 			options["columns"]["options"] = {v: v for v in columns}
 			default_options = [default for default in ["body", "text", "subject"] if default in columns]
 			if default_options:
-				options["columns"]["default"] = default_options.pop()
+				options["columns"]["default"] = default_options.pop(0)
 
 		return options
 

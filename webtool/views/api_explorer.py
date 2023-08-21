@@ -666,9 +666,6 @@ def get_custom_fields(datasource, filetype=None):
 		datasource_dir = datasource.replace("4", "four")
 	elif datasource.startswith("8"):
 		datasource_dir = datasource.replace("8", "eight")
-	elif "facebook" in datasource or "instagram" in datasource:
-		datasource_dir = "import-from-tool"
-		datasource = "import-from-tool"
 	elif datasource == "twitter":
 		datasource_dir = "twitter-import"
 		datasource = "twitter-import"

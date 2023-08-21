@@ -11,7 +11,7 @@ from json import JSONDecodeError
 
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -150,6 +150,16 @@ class CategorizeImagesCLIP(BasicProcessor):
         # Initialize DMI Service Manager
         dmi_service_manager = DmiServiceManager(processor=self)
 
+        # Check GPU memory available
+        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("clip")
+        if not gpu_memory:
+            if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
+                self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
+            elif int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+                self.dataset.finish_with_error(
+                    "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
+                return
+
         # Results should be unique to this dataset
         results_folder_name = f"texts_{self.dataset.key}"
         # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
@@ -173,16 +183,25 @@ class CategorizeImagesCLIP(BasicProcessor):
         api_endpoint = "clip"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30)
+        except DsmOutOfMemory:
+            self.dataset.finish_with_error(
+                "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
+            return
         except DmiServiceManagerException as e:
             self.dataset.finish_with_error(str(e))
             return
 
         # Load the video metadata if available
-        image_metadata = None
+        image_metadata = {}
         if staging_area.joinpath(".metadata.json").is_file():
             with open(staging_area.joinpath(".metadata.json")) as file:
-                image_metadata = json.load(file)
+                image_data = json.load(file)
                 self.dataset.log("Found and loaded image metadata")
+                for url, data in image_data.items():
+                    if data.get('success'):
+                        data.update({"url": url})
+                        # using the filename without extension as the key; since that is how the results form their filename
+                        image_metadata[".".join(data['filename'].split(".")[:-1])] = data
 
         self.dataset.update_status("Processing CLIP results...")
         # Download the result files
@@ -202,7 +221,6 @@ class CategorizeImagesCLIP(BasicProcessor):
                     data = {
                         "id": image_name,
                         "categories": result_data,
-                        # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
                         "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
                     }
                     outfile.write(json.dumps(data) + "\n")
@@ -232,7 +250,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),
             "original_url": image_metadata.get("url", ""),
             "image_filename": image_metadata.get("filename", ""),
-            "post_ids": ", ".join(image_metadata.get("post_ids", [])),
+            "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
             **all_cats
         }

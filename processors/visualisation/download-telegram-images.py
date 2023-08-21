@@ -222,3 +222,21 @@ class TelegramImageDownloader(BasicProcessor):
         told they need to re-authenticate via 4CAT.
         """
         raise RuntimeError("Connection cancelled")
+
+    @staticmethod
+    def map_metadata(filename, data):
+        """
+        Iterator to yield modified metadata for CSV
+
+        :param str url:  string that may contain URLs
+        :param dict data:  dictionary with metadata collected previously
+        :yield dict:  	  iterator containing reformated metadata
+        """
+        row = {
+            "number_of_posts_with_image": len(data.get("post_ids", [])),
+            "post_ids": ", ".join(data.get("post_ids", [])),
+            "filename": filename,
+            "download_successful": data.get('success', "")
+        }
+
+        yield row

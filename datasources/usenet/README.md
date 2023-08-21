@@ -2,6 +2,8 @@
 
 This data source allows importing and searching archived Usenet messages.
 
+To enable this data source, please follow the [installation instructions for local data sources](https://github.com/digitalmethodsinitiative/4cat/wiki/Enabling-local-data-sources).
+
 One way of acquiring data is available out of the box - with the script 
 `import_usenet_posts.py` in `helper-scripts` in the 4CAT root folder you can
 import any message databases created with 

@@ -1,14 +1,7 @@
 """
 Create an PixPlot of downloaded images
-
-Use http://host.docker.internal:4000 to connect to docker hosted PixPlot on
-same server (assuming that container is exposing port 4000).
 """
 import shutil
-from json import JSONDecodeError
-
-import requests
-import time
 import json
 from datetime import datetime
 import csv
@@ -17,7 +10,7 @@ from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 
 from common.config_manager import config
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 
@@ -50,23 +43,24 @@ class PixPlotGenerator(BasicProcessor):
     min_photos_needed = 12
 
     config = {
-        # If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
-        # downloaded images into a PixPlot there
-        'pix-plot.server_url': {
-            'type': UserInput.OPTION_TEXT,
-            'default': "",
-            'help': 'PixPlot Server Address/URL',
-            'tooltip': "",
+        "dmi-service-manager.da_pixplot-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Explore images with [Yale Digital Humanities Lab Team's PixPlot](https://github.com/digitalmethodsinitiative/dmi_pix_plot).",
         },
-        "pix-plot.max_images": {
+        "dmi-service-manager.db_pixplot_enabled": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Enable PixPlot Image Viewer",
+        },
+        "dmi-service-manager.dc_pixplot_num_files": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
-            "default": 10000,
-            "help": "Max images to upload",
-            "tooltip": "Only allow uploading up to this many images per plot. Increasing this can easily lead to "
-                       "very long-running processors and large datasets. 0 allows as many images as available."
-        }
+            "default": 0,
+            "help": "PixPlot max number of images",
+            "tooltip": "Use '0' to allow unlimited number"
+        },
     }
+
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -125,7 +119,7 @@ class PixPlotGenerator(BasicProcessor):
             },
         }
 
-        max_number_images = int(config.get("pix-plot.max_images", 10000, user=user))
+        max_number_images = int(config.get("dmi-service-manager.dc_pixplot_num_files", 10000, user=user))
         if max_number_images == 0:
             options["amount"]["help"] = options["amount"]["help"] + " (max: all available)"
             options["amount"]["min"] = 0
@@ -145,7 +139,9 @@ class PixPlotGenerator(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type.startswith("image-downloader") and config.get('pix-plot.server_url')
+        return config.get("dmi-service-manager.db_pixplot_enabled", False, user=user) and \
+               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+               module.type.startswith("image-downloader")
 
     def process(self):
         """
@@ -160,50 +156,19 @@ class PixPlotGenerator(BasicProcessor):
             self.dataset.finish(0)
             return
 
-        # 0 = use as many images as in the archive, up to the max
-        max_images = convert_to_int(self.parameters.get("amount"), 1000)
-        if max_images == 0:
-            max_images = None
-
-        # Get labels to send PixPlot server
-        date = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        top_dataset = self.dataset.top_parent()
-        label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
-        image_label = datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + label_formated + '-' + str(top_dataset.key)
-        plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
-        pixplot_server = self.config.get('pix-plot.server_url').rstrip("/")
-
-        # Folder name is PixPlot identifier and set at dataset key
-        data = {'folder_name': image_label}
-
-        # Check if images have already been sent
-        filename_url = pixplot_server + '/api/list_filenames?folder_name=' + image_label
-        filename_response = requests.get(filename_url, timeout=30)
-
-        # Check if 4CAT has access to this PixPlot server
-        if filename_response.status_code == 403:
-            self.dataset.update_status("403: 4CAT does not have permission to use this PixPlot server", is_final=True)
-            self.dataset.finish(0)
-            return
-
-        uploaded_files = filename_response.json().get('filenames', [])
-        if len(uploaded_files) > 0:
-            self.dataset.update_status("Found %i images previously uploaded" % (len(uploaded_files)))
-
-        # Images
         # Unpack the images into a staging_area
         self.dataset.update_status("Unzipping images")
         staging_area = self.unpack_archive_contents(self.source_file)
-        self.log.info('PixPlot image staging area created: ' + str(staging_area))
-        filenames = os.listdir(staging_area)
 
-        # Compare photos with upload images
-        filenames = [filename for filename in filenames if
-                     filename not in uploaded_files + ['.metadata.json', 'metadata.csv']]
-        total_images = len(filenames) + len(uploaded_files)
+        # Collect filenames (skip .json metadata files)
+        image_filenames = [filename for filename in os.listdir(staging_area) if
+                           filename.split('.')[-1] not in ["json", "log"]]
+        if self.parameters.get("amount", 100) != 0:
+            image_filenames = image_filenames[:self.parameters.get("amount", 100)]
+        total_image_files = len(image_filenames)
 
         # Check to ensure enough photos will be uploaded to create a PixPlot
-        if total_images < self.min_photos_needed:
+        if total_image_files < self.min_photos_needed:
             self.dataset.update_status(
                 "Minimum of %i photos needed for a PixPlot to be created" % self.min_photos_needed, is_final=True)
             self.dataset.finish(0)
@@ -212,116 +177,56 @@ class PixPlotGenerator(BasicProcessor):
         # Gather metadata
         self.dataset.update_status("Collecting metadata")
         metadata_file_path = self.format_metadata(staging_area)
-        # Metadata
-        upload_url = pixplot_server + '/api/send_metadata'
-        metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data, timeout=120)
 
-        # Now send photos to PixPlot
-        self.dataset.update_status("Uploading images to PixPlot")
-        # Configure upload photo url
-        upload_url = pixplot_server + '/api/send_photo'
-        images_uploaded = 0
-        estimated_num_images = len(filenames)
-        self.dataset.update_status("Uploading %i images" % (estimated_num_images))
-        # Begin looping through photos
-        for i, filename in enumerate(filenames):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while downloading images.")
+        # Make output dir
+        output_dir = self.dataset.get_results_folder_path()
+        output_dir.mkdir(exist_ok=True)
 
-            if max_images is not None and i > max_images:
-                break
-            with open(os.path.join(staging_area, filename), 'rb') as image:
-                response = requests.post(upload_url, files={'image': image}, data=data, timeout=120)
+        # Initialize DMI Service Manager
+        dmi_service_manager = DmiServiceManager(processor=self)
 
-            if response.status_code == 200:
-                image_response = response
-                images_uploaded += 1
-                if images_uploaded % 100 == 0:
-                    self.dataset.update_status("Images uploaded: %i of %i" % (i, estimated_num_images))
-            else:
-                self.dataset.update_status(
-                    "Error with image %s: %i - %s" % (filename, response.status_code, response.reason))
+        # Results should be unique to this dataset
+        server_results_folder_name = f"4cat_results_{self.dataset.key}"
+        # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
+        file_collection_name = dmi_service_manager.get_folder_name(self.source_dataset)
 
-            self.dataset.update_progress(i / self.source_dataset.num_rows)
+        path_to_files, path_to_results = dmi_service_manager.process_files(staging_area, image_filenames + [metadata_file_path], output_dir,
+                                                                           file_collection_name, server_results_folder_name)
 
-        # Request PixPlot server create PixPlot
-        self.dataset.update_status("Sending create PixPlot request")
-        create_plot_url = pixplot_server + '/api/pixplot'
-        # Gather info from PixPlot server response
-        create_pixplot_post_info = metadata_response.json()['create_pixplot_post_info']
+        # PixPlot
         # Create json package for creation request
-        json_data = {'args': ['--images', create_pixplot_post_info.get('images_folder') + "/*",
-                              '--out_dir', create_pixplot_post_info.get('plot_folder_root') + '/' + plot_label,
-                              '--metadata', create_pixplot_post_info.get('metadata_filepath')]}
+        data = {'args': ['--images', f"data/{path_to_files}/*",
+                         '--out_dir', f"data/{path_to_results}",
+                         '--metadata', f"data/{path_to_files}/{metadata_file_path.name}"]}
 
         # Additional options for PixPlot
         cell_size = self.parameters.get('image_size')
         n_neighbors = self.parameters.get('n_neighbors')
         min_dist = self.parameters.get('min_dist')
-        json_data['args'] += ['--cell_size', str(cell_size), '--n_neighbors', str(n_neighbors), '--min_dist',
-                              str(min_dist)]
+        data['args'] += ['--cell_size', str(cell_size), '--n_neighbors', str(n_neighbors), '--min_dist', str(min_dist)]
 
         # Increase timeout (default is 3600 seconds)
-        json_data['timeout'] = 21600
+        data['timeout'] = 21600
 
-        # Send; receives response that process has started
-        resp = requests.post(create_plot_url, json=json_data, timeout=30)
-        if resp.status_code == 202:
-            # new request
-            new_request = True
-            results_url = self.config.get('pix-plot.server_url').rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
-        else:
-            try:
-                resp_json = resp.json()
-            except JSONDecodeError as e:
-                # Unexpected Error
-                self.log.error('PixPlot create response: ' + str(resp.status_code) + ': ' + str(resp.text))
-                if staging_area:
-                    shutil.rmtree(staging_area)
-                raise RuntimeError("PixPlot unable to process request")
+        # Send request to DMI Service Manager
+        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        api_endpoint = "pixplot"
+        try:
+            dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30, check_process=False)
+        except DsmOutOfMemory:
+            self.dataset.finish_with_error(
+                "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
+            return
+        except DmiServiceManagerException as e:
+            self.dataset.finish_with_error(str(e))
+            return
 
-        if resp.status_code == 202:
-            # new request
-            new_request = True
-            results_url = pixplot_server + '/api/pixplot?key=' + resp.json()['key']
-        elif 'already exists' in resp.json()['error']:
-            # repeat request
-            new_request = False
-        else:
-            self.log.error('PixPlot create response: ' + str(resp.status_code) + ': ' + str(resp.text))
-            if staging_area:
-                shutil.rmtree(staging_area)
-            raise RuntimeError("PixPlot unable to process request")
+        self.dataset.update_status("Processing PixPlot results...")
+        # Download the result files
+        dmi_service_manager.process_results(output_dir)
 
-        # Wait for PixPlot to complete
-        self.dataset.update_status("PixPlot generating results")
-        start_time = time.time()
-        while new_request:
-            time.sleep(1)
-            # If interrupted is called, attempt to finish dataset while PixPlot server still running
-            if self.interrupted:
-                break
-
-            # Send request to check status every 60 seconds
-            if int(time.time() - start_time) % 60 == 0:
-                result = requests.get(results_url, timeout=30)
-                self.log.debug(str(result.json()))
-                if 'status' in result.json().keys() and result.json()['status'] == 'running':
-                    # Still running
-                    continue
-                elif 'report' in result.json().keys() and result.json()['report'][-6:-1] == 'Done!':
-                    # Complete without error
-                    self.dataset.update_status("PixPlot Completed!")
-                    self.log.info('PixPlot saved on : ' + pixplot_server)
-                    break
-                else:
-                    # Something botched
-                    self.dataset.finish_with_error("PixPlot Error on creation")
-                    self.log.error("PixPlot Error: " + str(result.json()))
-                    return
-
-        # Create HTML file
-        plot_url = pixplot_server + '/plots/' + plot_label + '/index.html'
+        # Results HTML file redirects to output_dir/index.html
+        plot_url = ('https://' if config.get("flask.https") else 'http://') + config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
         html_file = self.get_html_page(plot_url)
 
         # Write HTML file
@@ -382,6 +287,10 @@ class PixPlotGenerator(BasicProcessor):
                     ids = data.get('post_ids')
                     # dmi_pix_plot API uses sercure_filename while pixplot.py (in PixPlot library) uses clean_filename
                     # Ensure our metadata filenames match results
+                    if data.get('filename') is None:
+                        # Bad metadata; file was not actually downloaded, fixed in 9b603cd1ecdf97fd92c3e1c6200e4b6700dc1e37
+                        continue
+
                     filename = self.clean_filename(secure_filename(data.get('filename')))
                     for post_id in ids:
                         # Add to key

@@ -58,6 +58,9 @@ class DatasourceMetrics(BasicWorker):
 			if not datasource:
 				continue
 
+			# Database IDs may be different from the Datasource ID (e.g. the datasource "4chan" became "fourchan" but the database ID remained "4chan")
+			database_db_id = datasource.prefix if hasattr(datasource, "prefix") else datasource_id
+
 			is_local = True if hasattr(datasource, "is_local") and datasource.is_local else False
 			is_static = True if hasattr(datasource, "is_static") and datasource.is_static else False
 
@@ -85,7 +88,7 @@ class DatasourceMetrics(BasicWorker):
 					# -------------------------
 
 					# Get the name of the posts table for this datasource
-					posts_table = datasource_id if "posts_" + datasource_id not in all_tables else "posts_" + datasource_id
+					posts_table = datasource_id if "posts_" + database_db_id not in all_tables else "posts_" + database_db_id
 
 					# Count and update for every board individually
 					for board in boards:
@@ -104,8 +107,7 @@ class DatasourceMetrics(BasicWorker):
 						# If the datasource is dynamic, we also only update days
 						# that haven't been added yet - these are heavy queries.
 						if not is_static:
-
-							days_added = self.db.fetchall("SELECT date FROM metrics WHERE datasource = '%s' AND board = '%s' AND metric = 'posts_per_day';" % (datasource_id, board))
+							days_added = self.db.fetchall("SELECT date FROM metrics WHERE datasource = '%s' AND board = '%s' AND metric = 'posts_per_day';" % (database_db_id, board))
 
 							if days_added:
 
@@ -130,8 +132,7 @@ class DatasourceMetrics(BasicWorker):
 							FROM %s
 							WHERE %s AND %s
 							GROUP BY metric, datasource, board, date;
-							""" % (datasource_id, posts_table, board_sql, time_sql)
-
+							""" % (database_db_id, posts_table, board_sql, time_sql)
 						# Add to metrics table
 						rows = [dict(row) for row in self.db.fetchall(query)]
 
