@@ -11,7 +11,7 @@ from datetime import datetime
 
 import backend
 
-from flask import render_template, jsonify, Response
+from flask import request, render_template, jsonify, Response
 from flask_login import login_required, current_user
 
 from webtool import app, db, config
