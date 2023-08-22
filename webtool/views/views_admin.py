@@ -492,7 +492,7 @@ def manipulate_settings():
         try:
             # this gives us the parsed values, as Python variables, i.e. before
             # potentially encoding them as JSON
-            new_settings = UserInput.parse_all(definition, request.form.to_dict(),
+            new_settings = UserInput.parse_all(definition, request.form,
                                                silently_correct=False)
 
             for setting, value in new_settings.items():

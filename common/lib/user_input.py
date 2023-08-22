@@ -1,5 +1,6 @@
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import QueryParametersException
+from werkzeug.datastructures import ImmutableMultiDict
 import json
 
 import re
@@ -53,6 +54,18 @@ class UserInput:
         """
         from common.lib.helpers import convert_to_int
         parsed_input = {}
+
+        if type(input) is not dict and type(input) is not ImmutableMultiDict:
+            raise TypeError("input must be a dictionary or ImmutableMultiDict")
+
+        if type(input) is ImmutableMultiDict:
+            # we are not using to_dict, because that messes up multi-selects
+            input = {key: input.getlist(key) for key in input}
+            for key, value in input.items():
+                if type(value) is list and len(value) == 1:
+                    input[key] = value[0]
+
+        print(input)
 
         # all parameters are submitted as option-[parameter ID], this is an 
         # artifact of how the web interface works and we can simply remove the
@@ -187,8 +200,13 @@ class UserInput:
             if not choice:
                 return settings.get("default", [])
 
-            chosen = choice.split(",")
-            return [item for item in chosen if item in settings.get("options", [])]
+            if type(choice) is str:
+                # should be a list if the form control was actually a multiselect
+                # but we have some client side UI helpers that may produce a string
+                # instead
+                choice = choice.split(",")
+
+            return [item for item in choice if item in settings.get("options", [])]
 
         elif input_type == UserInput.OPTION_CHOICE:
             # select box
