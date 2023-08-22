@@ -243,9 +243,9 @@ class DmiServiceManager:
 
         # Compare files with previously uploaded
         to_upload_filenames = [filename for filename in files_to_upload if filename not in uploaded_files]
+        total_files_to_upload = len(to_upload_filenames)
 
-        if len(to_upload_filenames) > 0 or results_name not in existing_files:
-            # TODO: perhaps upload one at a time?
+        if total_files_to_upload > 0 or results_name not in existing_files:
             api_upload_endpoint = f"{self.server_address}send_files"
 
             # Create a blank file to upload into results folder
@@ -253,21 +253,35 @@ class DmiServiceManager:
             with open(dir_with_files.joinpath(empty_placeholder), 'w') as file:
                 file.write('')
 
-            self.processor.dataset.update_status(f"Uploading {len(to_upload_filenames)} files")
-            response = requests.post(api_upload_endpoint,
-                                     files=[('4cat_uploads', open(dir_with_files.joinpath(file), 'rb')) for file in
-                                            to_upload_filenames] + [
-                                               (results_name, open(dir_with_files.joinpath(empty_placeholder), 'rb'))],
-                                     data=data, timeout=120)
+            self.processor.dataset.update_status(f"Uploading {total_files_to_upload} files")
+            files_uploaded = 0
+            while to_upload_filenames:
+                # Upload files
+                if files_uploaded == 0:
+                    upload_file = empty_placeholder
+                    # Upload a blank file to create the results folder
+                    response = requests.post(api_upload_endpoint,
+                                             files=[(results_name, open(dir_with_files.joinpath(empty_placeholder), 'rb'))],
+                                             data=data, timeout=120)
+                else:
+                    upload_file = to_upload_filenames.pop()
+                    response = requests.post(api_upload_endpoint,
+                                             files=[('4cat_uploads', open(dir_with_files.joinpath(upload_file), 'rb'))],
+                                             data=data, timeout=120)
 
-            if response.status_code == 200:
-                self.processor.dataset.update_status(f"Files uploaded: {len(to_upload_filenames)}")
-            elif response.status_code == 403:
-                raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
-            elif response.status_code == 405:
-                raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
-            else:
-                self.processor.dataset.update_status(f"Unable to upload {len(to_upload_filenames)} files!")
+                if response.status_code == 200:
+                    files_uploaded += 1
+                    if files_uploaded % 1000 == 0:
+                        self.processor.dataset.update_status(f"Uploaded {files_uploaded} of {total_files_to_upload} files!")
+                    self.processor.dataset.update_progress(files_uploaded / total_files_to_upload)
+                elif response.status_code == 403:
+                    raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
+                elif response.status_code == 405:
+                    raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
+                else:
+                    self.processor.dataset.log(f"Unable to upload file ({response.status_code - response.reason}): {upload_file}")
+
+            self.processor.dataset.update_status(f"Uploaded {files_uploaded} files!")
 
         server_path_to_files = Path(file_collection_name).joinpath("4cat_uploads")
         server_path_to_results = Path(file_collection_name).joinpath(results_name)
