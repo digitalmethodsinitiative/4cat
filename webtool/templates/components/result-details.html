@@ -55,7 +55,7 @@
 
             <div class="card-content">
                 <dl class="metadata-wrapper">
-                {% if __user_config("visual.show_datasource") %}
+                {% if __user_config("ui.show_datasource") %}
                     <div class="fullwidth">
                         <dt>Data source</dt>
                         <dd>
@@ -159,7 +159,7 @@
         </ol>
     </section>
 
-    {% if __user_config("visual.inline_preview") and (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) %}
+    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) %}
         <section class="inline-preview">
             <h2 class="blocktitle section-subheader">
                 <span>Preview</span>

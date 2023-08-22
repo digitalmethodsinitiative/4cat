@@ -32,7 +32,7 @@ def show_frontpage():
 
     :return:
     """
-    page = config.get("visual.homepage")
+    page = config.get("ui.homepage")
     if page == "create-dataset":
         return create_dataset()
     elif page == "datasets":

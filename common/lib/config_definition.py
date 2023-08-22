@@ -409,9 +409,9 @@ config_definition = {
         },
         "global": True
     },
-    # visual settings
+    # UI settings
     # this configures what the site looks like
-    "visual.homepage": {
+    "ui.homepage": {
         "type": UserInput.OPTION_CHOICE,
         "options": {
             "about": "'About' page",
@@ -421,19 +421,19 @@ config_definition = {
         "help": "4CAT home page",
         "default": "about"
     },
-    "visual.inline_preview": {
+    "ui.inline_preview": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Show inline preview",
         "default": False,
         "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
     },
-    "visual.show_datasource": {
+    "ui.show_datasource": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Show data source",
         "default": True,
         "tooltip": "Show data source for each dataset. Can be useful to disable if only one data source is enabled."
     },
-    "visual.nav_pages": {
+    "ui.nav_pages": {
         "type": UserInput.OPTION_MULTI_SELECT,
         "help": "Pages in navigation",
         "options": {
@@ -445,7 +445,7 @@ config_definition = {
         "default": ["faq", "about"],
         "tooltip": "These pages will be included in the navigation bar at the top of the interface."
     },
-    "visual.prefer_mapped_preview": {
+    "ui.prefer_mapped_preview": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Prefer mapped preview",
         "default": True,
@@ -468,5 +468,5 @@ categories = {
     "path": "File paths",
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
-    "visual": "User interface"
+    "ui": "User interface"
 }

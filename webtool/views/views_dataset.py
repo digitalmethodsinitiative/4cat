@@ -311,7 +311,7 @@ def preview_items(key):
     # json and ndjson can use mapped data for the preview or the raw json;
     # this depends on 4CAT settings
     has_mapper = hasattr(processor, "map_item")
-    use_mapper = has_mapper and config.get("visual.prefer_mapped_preview")
+    use_mapper = has_mapper and config.get("ui.prefer_mapped_preview")
 
     if dataset.get_extension() == "gexf":
         # network files
