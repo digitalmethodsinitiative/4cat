@@ -676,24 +676,19 @@ class SearchTelegram(Search):
                 mapped_obj[item] = value.timestamp()
             elif type(value).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
                 mapped_obj[item] = SearchTelegram.serialize_obj(value)
-                if type(obj[item]) is not dict:
-                    mapped_obj[item]["_type"] = type(value).__name__
             elif type(value) is list:
                 mapped_obj[item] = [SearchTelegram.serialize_obj(item) for item in value]
-            elif type(value).__module__[0:8] == "telethon":
-                # some type of internal telethon struct
-                continue
             elif type(value) is bytes:
                 mapped_obj[item] = value.hex()
             elif type(value) not in scalars and value is not None:
                 # type we can't make sense of here
                 continue
-            elif type(value) is dict:
-                for key, vvalue in value:
-                    mapped_obj[item][key] = SearchTelegram.serialize_obj(vvalue)
             else:
                 mapped_obj[item] = value
 
+        # Add the _type if the original object was a telethon type
+        if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
+            mapped_obj["_type"] = type(input_obj).__name__
         return mapped_obj
 
     @staticmethod
