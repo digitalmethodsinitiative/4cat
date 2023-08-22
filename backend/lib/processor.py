@@ -308,6 +308,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# Remove the results file that was created
 		if self.dataset.get_results_path().exists():
 			self.dataset.get_results_path().unlink()
+		if self.dataset.get_results_folder_path().exists():
+			shutil.rmtree(self.dataset.get_results_folder_path())
 
 		# Remove any staging areas with temporary data
 		self.dataset.remove_staging_areas()
