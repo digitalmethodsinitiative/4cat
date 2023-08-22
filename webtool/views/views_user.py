@@ -26,7 +26,7 @@ from common.lib.helpers import send_email, get_software_version
 from pathlib import Path
 
 from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 
 @login_manager.user_loader
 def load_user(user_name):

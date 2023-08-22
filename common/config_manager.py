@@ -1,5 +1,6 @@
-import json
 import pickle
+import json
+import os
 
 from pathlib import Path
 from common.lib.database import Database
@@ -197,6 +198,10 @@ class ConfigManager:
         elif type(tags) is str:
             tags = [tags]
 
+        if os.environ.get("FOURCAT_CONFIG_TAG"):
+            # insert at end, i.e. least imnportant
+            tags += os.environ.get("FOURCAT_CONFIG_TAG").split(",")
+
         # can provide either a string or user object
         if type(user) is not str:
             if hasattr(user, "get_id"):
@@ -342,17 +347,35 @@ class ConfigWrapper:
     Allows setting a default set of tags or user, so that all subsequent calls
     to `get()` are done for those tags or that user.
     """
-    def __init__(self, config, user=None, tags=None):
+    def __init__(self, config, user=None, tags=None, request=None):
         """
         Initialise config wrapper
 
         :param ConfigManager config:  Initialised config manager
         :param user:  User to get settings for
         :param tags:  Tags to get settings for
+        :param request:  Request to get headers from. This can be used to set
+        a particular tag based on the HTTP headers of the request, e.g. to
+        serve 4CAT with a different configuration based on the proxy server
+        used.
         """
         self.config = config
         self.user = user
         self.tags = tags
+
+        if request and request.headers.get("X-4CAT-Config-Tag") and \
+            config.get("flask.proxy_secret") and \
+            request.headers.get("X-4CAT-Config-Via-Proxy") == config.get("flask.proxy_secret"):
+            # need to ensure not just anyone can add this header to their
+            # request!
+            # to this end, the second header must be set to the secret value;
+            # if it is not set, assume the headers are not being configured by
+            # the proxy server
+            if not self.tags:
+                self.tags = []
+
+            self.tags += request.headers.get("X-4CAT-Config-Tag").split(",")
+
 
     def set(self, *args, **kwargs):
         """

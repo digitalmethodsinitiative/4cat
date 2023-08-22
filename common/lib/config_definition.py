@@ -363,6 +363,14 @@ config_definition = {
         "tooltip": "User tag priority order. It is recommended to manipulate this with the 'User tags' panel instead of directly.",
         "global": True
     },
+    "flask.proxy_secret": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Proxy secret",
+        "tooltip": "Secret value to authenticate proxy headers. If the value of the X-4CAT-Config-Via-Proxy header "
+                   "matches this value, the X-4CAT-Config-Tag header can be used to enable a given configuration tag. "
+                   "Leave empty to disable this functionality."
+    },
     # YouTube variables to use for processors
     "api.youtube.name": {
         "type": UserInput.OPTION_TEXT,

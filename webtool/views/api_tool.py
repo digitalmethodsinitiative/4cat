@@ -31,7 +31,7 @@ from common.lib.user import User
 from backend.lib.worker import BasicWorker
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 
 API_SUCCESS = 200
 API_FAIL = 404

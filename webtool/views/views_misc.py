@@ -19,7 +19,7 @@ from webtool.lib.helpers import pad_interval, error, setting_required
 from webtool.views.views_dataset import create_dataset, show_results
 
 from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 

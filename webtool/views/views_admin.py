@@ -33,7 +33,7 @@ import common.lib.config_definition as config_definition
 
 from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 
 
 @app.route("/admin/")

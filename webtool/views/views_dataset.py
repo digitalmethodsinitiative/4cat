@@ -3,7 +3,6 @@
 """
 import json
 import csv
-import sys
 import io
 
 import flask
@@ -12,19 +11,16 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, config
+from webtool import app, db, config
 from webtool.lib.helpers import Pagination, error, setting_required
-from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset, \
-    erase_credentials
+from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
 import backend
 from common.lib.dataset import DataSet
-from common.lib.queue import JobQueue
-from common.lib.user import User
 
 from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
