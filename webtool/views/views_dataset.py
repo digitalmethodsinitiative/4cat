@@ -3,12 +3,11 @@
 """
 import json
 import csv
+import sys
 import io
-import os
-import re
 
 import flask
-import markdown
+import json_stream
 from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
     url_for, stream_with_context
 from flask_login import login_required, current_user
@@ -28,6 +27,7 @@ from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user)
 
 csv.field_size_limit(1024 * 1024 * 1024)
+
 
 @app.route('/create-dataset/')
 @login_required
@@ -145,16 +145,7 @@ def show_results(page):
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = []
-
-    for dataset in datasets:
-        dataset = DataSet(key=dataset["key"], db=db)
-        datasource = dataset.parameters.get("datasource", "")
-        if dataset.parameters.get("expires-after") or config.get("datasources.expiration", {}).get(datasource, {}).get(
-                "timeout"):
-            expiring_datasets.add(dataset.key)
-
-        filtered.append(dataset)
+    filtered = [DataSet(key=dataset["key"], db=db) for dataset in datasets]
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
@@ -292,7 +283,7 @@ def view_log(key):
 @app.route("/preview/<string:key>/")
 def preview_items(key):
     """
-    Preview a CSV file
+    Preview a dataset file
 
     Simply passes the first 25 rows of a dataset's csv result file to the
     template renderer.
@@ -310,22 +301,34 @@ def preview_items(key):
         return error(403, error="This dataset is private.")
 
     preview_size = 1000
+    preview_bytes = (1024 * 1024 * 1)  # 1MB
 
     processor = dataset.get_own_processor()
     if not processor:
         return render_template("components/error_message.html", title="Preview not available",
                                message="No preview is available for this file.")
 
+    # json and ndjson can use mapped data for the preview or the raw json;
+    # this depends on 4CAT settings
+    has_mapper = hasattr(processor, "map_item")
+    use_mapper = has_mapper and config.get("visual.prefer_mapped_preview")
+
     if dataset.get_extension() == "gexf":
+        # network files
+        # use GEXF preview panel which loads full data file client-side
         hostname = config.get("flask.server_name").split(":")[0]
         in_localhost = hostname in ("localhost", "127.0.0.1") or hostname.endswith(".local") or \
                        hostname.endswith(".localhost")
         return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
 
     elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp"):
+        # image file
+        # just show image in an empty page
         return render_template("preview/image.html", dataset=dataset)
 
-    else:
+    elif dataset.get_extension() not in ("json", "ndjson") or use_mapper:
+        # iterable data, which we use iterate_items() for, which in turn will
+        # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
             for row in dataset.iterate_items():
@@ -343,12 +346,63 @@ def preview_items(key):
         return render_template("preview/csv.html", rows=rows, max_items=preview_size,
                                dataset=dataset)
 
+    elif dataset.get_extension() == "json":
+        # JSON file
+        # show formatted json data, or a subset if possible
+        datafile = dataset.get_results_path()
+        truncated = False
+        if datafile.stat().st_size > preview_bytes:
+            # larger than 3MB
+            # is this a list?
+            with datafile.open() as infile:
+                if infile.read(1) == "[":
+                    # it's a list! use json_stream to stream the first items
+                    infile.seek(0)
+                    stream = json_stream.load(infile)
+                    data = []
+                    while infile.tell() < preview_bytes:
+                        # read up to 3 MB
+                        for row in stream:
+                            data.append(row)
+
+                    if infile.read(1) != "":
+                        # not EOF
+                        truncated = len(data)
+
+                else:
+                    data = "Data file too large; cannot preview"
+        else:
+            with datafile.open() as infile:
+                data = infile.read()
+
+        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+
+    elif dataset.get_extension() == "ndjson":
+        # mostly similar to JSON preview, but we don't have to stream the file
+        # as json, we can simply read line by line until we've reached the
+        # size limit
+        datafile = dataset.get_results_path()
+        truncated = False
+        data = []
+
+        with datafile.open() as infile:
+            while infile.tell() < preview_bytes:
+                line = infile.readline()
+                if line == "":
+                    break
+
+                data.append(json.loads(line.strip()))
+
+            if infile.read(1) != "":
+                # not EOF
+                truncated = len(data)
+
+        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+
 
 """
 Individual result pages
 """
-
-
 @app.route('/results/<string:key>/processors/')
 @app.route('/results/<string:key>/')
 def show_result(key):

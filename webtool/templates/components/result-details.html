@@ -163,7 +163,13 @@
         <section class="inline-preview">
             <h2 class="blocktitle section-subheader">
                 <span>Preview</span>
+                <button
+                    data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
+                    aria-controls="popup-preview-{{ dataset.key }}">
+                    <i class="fa fa-maximize" aria-hidden="true"></i> <span class="sr-only">Open in popup</span>
+                </button>
             </h2>
+            <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
             <iframe src="{{ url_for('preview_items', key=dataset.key) }}"></iframe>
         </section>
     {% endif %}

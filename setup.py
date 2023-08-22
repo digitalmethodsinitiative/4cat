@@ -26,6 +26,7 @@ packages = [
 	"html2text==2020.*",
 	"ImageHash~=4.2.0",
 	"jieba~=0.42",
+	"json_stream",
 	"lxml~=4.9.0",
 	"markdown==3.0.1",
 	"markdown2==2.4.2",

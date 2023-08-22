@@ -639,7 +639,7 @@ embed.details-only {
     border-top: 1px solid var(--gray-light);
 }
 
-.csv-preview .warning {
+.csv-preview .warning, .json-preview .warning {
     width: 100%;
     background: var(--gray-light);
     text-align: center;

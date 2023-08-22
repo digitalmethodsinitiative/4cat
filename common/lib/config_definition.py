@@ -439,10 +439,18 @@ config_definition = {
         "options": {
             "faq": "FAQ",
             "data-policy": "Data Policy",
-            "citing": "How to cite"
+            "citing": "How to cite",
+            "about": "About",
         },
         "default": ["faq", "about"],
         "tooltip": "These pages will be included in the navigation bar at the top of the interface."
+    },
+    "visual.prefer_mapped_preview": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Prefer mapped preview",
+        "default": True,
+        "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
+                   "of the underlying JSON."
     }
 }
 
