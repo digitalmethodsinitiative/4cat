@@ -22,7 +22,7 @@ class Search4Chan(SearchWithScope):
 	"""
 	type = "fourchan-search"  # job ID
 	title = "4chan search"
-	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
+	sphinx_index = "4chan"  # sphinx index name; this should match the index name in sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
 	is_local = True  # Whether this datasource is locally scraped
 	is_static = False  # Whether this datasource is still updated
@@ -44,7 +44,7 @@ class Search4Chan(SearchWithScope):
 		"intro": {
 			"type": UserInput.OPTION_INFO,
 			"help": "Results are limited to 5 million items maximum. Be sure to read the [query "
-					"syntax](/data-overview/4chan#query-syntax) for local data sources first - your query design will "
+					"syntax](/data-overview/fourchan#query-syntax) for local data sources first - your query design will "
 					"significantly impact the results. Note that large queries can take a long time to complete!"
 		},
 		"board": {
@@ -400,11 +400,18 @@ class Search4Chan(SearchWithScope):
 	}
 
 	config = {
+		"fourchan-search.autoscrape": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Enable collecting",
+			"tooltip": "Toggle to automatically collect new boards and threads",
+			"global": True
+		},
 		"fourchan-search.boards": {
 			"type": UserInput.OPTION_TEXT_JSON,
 			"help": "Boards to index",
 			"tooltip": "These boards will be scraped and made available for searching. Provide as a JSON-formatted "
-					   "list of strings, e.g. ['pol', 'v'].",
+					   "list of strings, e.g. [\"pol\", \"v\"].",
 			"default": [""],
 			"global": True
 		},
@@ -435,7 +442,7 @@ class Search4Chan(SearchWithScope):
 			"help": "Can query without keyword",
 			"default": False,
 			"tooltip": "Allows users to query the 4chan data without specifying a keyword. This can lead to HUGE datasets!"
-		}
+		},
 	}
 
 	def get_items_simple(self, query):
@@ -706,7 +713,7 @@ class Search4Chan(SearchWithScope):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post data")
 
-		query = "SELECT " + columns + " FROM posts_" + self.prefix + " " + join + " WHERE " + " AND ".join(
+		query = "SELECT " + columns + " FROM posts_" + self.sphinx_index + " " + join + " WHERE " + " AND ".join(
 			where) + " ORDER BY id ASC"
 
 		return self.db.fetchall_interruptable(self.queue, query, replacements)
@@ -801,7 +808,7 @@ class Search4Chan(SearchWithScope):
 		:return MySQLDatabase:
 		"""
 		return MySQLDatabase(
-			host="localhost",
+			host=config.get("4cat.sphinx_host"),
 			user=config.get('DB_USER'),
 			password=config.get('DB_PASSWORD'),
 			port=9306,

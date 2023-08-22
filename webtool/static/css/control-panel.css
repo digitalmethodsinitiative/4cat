@@ -200,3 +200,16 @@ article .stats-container h3:not(.blocktitle) {
 .stats-container dl div:not(:last-child) {
     border-bottom: 1px dotted var(--contrast-dark);
 }
+
+/**
+ ** Bulk dataset management
+ */
+.dataset-bulk {
+    padding-bottom: 1em;
+}
+
+.dataset-bulk .action-button {
+    width: fit-content;
+    display: block;
+    margin: 1em auto;
+}

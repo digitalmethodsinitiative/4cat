@@ -82,11 +82,18 @@ class Search8Kun(Search4Chan):
 	}
 
 	config = {
+		"eightkun-search.autoscrape": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Enable collecting",
+			"tooltip": "Toggle to automatically collect new boards and threads",
+			"global": True
+		},
 		"eightkun-search.boards": {
 			"type": UserInput.OPTION_TEXT_JSON,
 			"help": "Boards to index",
 			"tooltip": "These boards will be scraped and made available for searching. Provide as a JSON-formatted "
-					   "list of strings, e.g. ['pol', 'v'].",
+					   "list of strings, e.g. [\"pol\", \"v\"].",
 			"default": [""],
 			"global": True
 		},

@@ -15,11 +15,17 @@ from flask_login import current_user
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
-
 	if isinstance(date, str):
-		date = int(date)
+		try:
+			date = int(date)
+		except ValueError:
+			return date
 
-	date = datetime.datetime.utcfromtimestamp(date)
+	try:
+		date = datetime.datetime.utcfromtimestamp(date)
+	except (ValueError, OverflowError):
+		return date
+
 	format = "%d %b %Y" if not fmt else fmt
 	formatted = date.strftime(format)
 
@@ -237,7 +243,7 @@ def _jinja2_filter_post_field(field, post):
 
 		original_key = key
 
-		# Remove possible slice stings so we get the original key
+		# Remove possible slice strings so we get the original key
 		string_slice = None
 		if "[" in original_key and "]" in original_key:
 			string_slice = re.search(r"\[(.*?)\]", original_key)
@@ -303,6 +309,10 @@ def _jinja2_filter_post_field(field, post):
 
 		if string_slice:
 			val = val[string_slice]
+
+		# Extract single list item
+		if isinstance(val, list) and len(val) == 1:
+			val = val[0]
 
 		formatted_field = formatted_field.replace("{{" + original_key + "}}", str(val))
 

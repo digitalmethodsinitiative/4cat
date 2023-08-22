@@ -46,36 +46,19 @@ class ThingExpirer(BasicWorker):
 	def expire_datasets(self):
 		"""
 		Delete expired datasets
-
-		Go through all datasources, and if it is configured to automatically
-		delete old datasets, do so for all qualifying datasets.
 		"""
-		datasets = []
-		expiration = config.get("datasources.expiration", {})
+		# find candidates
+		# todo: make this better - this can be a lot of datasets!
+		datasets = self.db.fetchall("""
+			SELECT key FROM datasets
+			 WHERE parameters::json->>'keep' IS NULL
+		""")
 
-		# first get datasets for which the data source specifies that they need
-		# to be deleted after a certain amount of time
-		for datasource_id in self.all_modules.datasources:
-			# default = never expire
-			if not expiration.get(datasource_id) or not expiration.get(datasource_id).get("timeout"):
-				continue
-
-			cutoff = time.time() - int(expiration[datasource_id].get("timeout"))
-			datasets += self.db.fetchall(
-				"SELECT key FROM datasets WHERE (key_parent = '' OR key_parent IS NULL) AND parameters::json->>'datasource' = %s AND timestamp < %s AND parameters::json->>'keep' IS NULL",
-				(datasource_id, cutoff))
-
-		# and now find datasets that have their expiration date set
-		# individually
-		cutoff = int(time.time())
-		datasets += self.db.fetchall("SELECT key FROM datasets WHERE parameters::json->>'expires-after' IS NOT NULL AND (parameters::json->>'expires-after')::int < %s", (cutoff,))
-
-		# we instantiate the dataset, because its delete() method does all
-		# the work (e.g. deleting child datasets) for us
 		for dataset in datasets:
 			dataset = DataSet(key=dataset["key"], db=self.db)
-			dataset.delete()
-			self.log.info(f"Deleting dataset {dataset.parameters.get('datasource', 'unknown')}/{dataset.key} (expired per configuration)")
+			if dataset.is_expired():
+				self.log.info(f"Deleting dataset {dataset.key} (expired)")
+				dataset.delete()
 
 	def expire_users(self):
 		"""
@@ -98,8 +81,11 @@ class ThingExpirer(BasicWorker):
 
 			# parse expiration date if available
 			delete_after = user.get_value("delete-after")
+			if not delete_after:
+				continue
+
 			if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", str(delete_after)):
-				expires_at = datetime.datetime.strptime("%Y-%m-%d", delete_after)
+				expires_at = datetime.datetime.strptime(delete_after, "%Y-%m-%d")
 			elif re.match(r"^[0-9]+$", str(delete_after)):
 				expires_at = datetime.datetime.fromtimestamp(int(delete_after))
 			else:
@@ -111,11 +97,8 @@ class ThingExpirer(BasicWorker):
 				self.log.info(f"User {username} expired - deleting user and datasets")
 				user.delete()
 			else:
-				# and if not, add notification if expiring soon
-				delta = expires_at - now
-				if delta.days < 7:
-					warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%Y-%m-%d %H:%M')}</time>. Make sure to back up your data before then."
-					user.add_notification(warning_notification)
+				warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%-d %B %Y %H:%M')}</time>. Make sure to back up your data before then."
+				user.add_notification(warning_notification)
 
 	def expire_notifications(self):
 		"""

@@ -28,6 +28,8 @@ class UserInput:
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
 
+    OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
+
     @staticmethod
     def parse_all(options, input, silently_correct=True):
         """
@@ -63,7 +65,7 @@ class UserInput:
                 # settings
                 continue
 
-            if settings.get("type") in (UserInput.OPTION_DIVIDER, UserInput.OPTION_INFO):
+            if settings.get("type") in UserInput.OPTIONS_COSMETIC:
                 # these are structural form elements and never have a value
                 continue
 
@@ -140,7 +142,7 @@ class UserInput:
         :return:  Validated and parsed input
         """
         input_type = settings.get("type", "")
-        if input_type in (UserInput.OPTION_INFO, UserInput.OPTION_DIVIDER):
+        if input_type in UserInput.OPTIONS_COSMETIC:
             # these are structural form elements and can never return a value
             return None
 

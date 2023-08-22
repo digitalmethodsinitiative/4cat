@@ -11,6 +11,7 @@ from json import JSONDecodeError
 
 
 from backend.lib.processor import BasicProcessor
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -39,30 +40,16 @@ class CategorizeImagesCLIP(BasicProcessor):
         ]
 
     config = {
-        # "host.docker.internal" if 4CAT Dockerized
-        "dmi_service_manager.server_address": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "DMI Service Manager server/URL",
-            "tooltip": "https://github.com/digitalmethodsinitiative/dmi_service_manager"
+        "dmi-service-manager.cb_clip-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "OpenAI's CLIP model estimates the probability an image belongs to each of a list of user defined categories. Ensure the DMI Service Manager is running and has a [prebuilt CLIP image](https://github.com/digitalmethodsinitiative/dmi_dockerized_services/tree/main/openai_clip#dmi-implementation-of-openai-clip-image-categorization-tool).",
         },
-        "dmi_service_manager.local_or_remote": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": 0,
-            "help": "DMI Services Local or Remote",
-            "tooltip": "Services have local access to 4CAT files or must be transferred from remote via DMI Service Manager",
-            "options": {
-                "local": "Local",
-                "remote": "Remote",
-            },
-        },
-        "dmi_service_manager.clip_enabled": {
+        "dmi-service-manager.cc_clip_enabled": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Enable CLIP Image Categorization",
-            "tooltip": "Must have access to DMI Service Manager server"
         },
-        "dmi_service_manager.clip_num_files": {
+        "dmi-service-manager.cd_clip_num_files": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
             "default": 0,
@@ -76,8 +63,8 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         Allow on image archives if enabled in Control Panel
         """
-        return config.get("dmi_service_manager.clip_enabled", False, user=user) and \
-               config.get("dmi_service_manager.server_address", False, user=user) and \
+        return config.get("dmi-service-manager.cc_clip_enabled", False, user=user) and \
+               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
                module.type.startswith("image-downloader")
 
     @classmethod
@@ -116,7 +103,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("dmi_service_manager.clip_num_files", 100, user=user))
+        max_number_images = int(config.get("image-to-categories.cd_clip_num_files", 100, user=user))
         if max_number_images == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of images"
             options["amount"]["default"] = 100
@@ -147,8 +134,6 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error("No model provided.")
             return
 
-        local_or_remote = self.config.get("dmi_service_manager.local_or_remote")
-
         # Unpack the image files into a staging_area
         self.dataset.update_status("Unzipping image files")
         staging_area = self.unpack_archive_contents(self.source_file)
@@ -162,169 +147,65 @@ class CategorizeImagesCLIP(BasicProcessor):
         # Make output dir
         output_dir = self.dataset.get_staging_area()
 
-        # Send Request
-        if local_or_remote == "local":
-            # DMI Service Manager has direct access to files
-            api_endpoint = "clip_local"
+        # Initialize DMI Service Manager
+        dmi_service_manager = DmiServiceManager(processor=self)
 
-            # Relative to PATH_DATA which should be where Docker mounts the container volume
-            # TODO: path is just the staging_area name, but what if we move staging areas? DMI Service manager needs to know...
-            mounted_staging_area = staging_area.absolute().relative_to(self.config.get("PATH_DATA").absolute())
-            mounted_output_dir = output_dir.absolute().relative_to(self.config.get("PATH_DATA").absolute())
-
-        elif local_or_remote == "remote":
-            # Upload files
-            api_endpoint = "clip_remote"
-
-            texts_folder = f"texts_{self.dataset.key}"
-
-            # Get labels to send server
-            top_dataset = self.dataset.top_parent()
-            folder_name = datetime.datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + \
-                          ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label()) + '-' + \
-                          str(top_dataset.key)
-
-            data = {'folder_name': folder_name}
-
-            # Check if image files have already been sent
-            self.dataset.update_status("Connecting to DMI Service Manager...")
-            filename_url = self.config.get("dmi_service_manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
-            filename_response = requests.get(filename_url, timeout=30)
-
-            # Check if 4CAT has access to this PixPlot server
-            if filename_response.status_code == 403:
-                self.dataset.update_status("403: 4CAT does not have permission to use the DMI Service Manager server",
-                                           is_final=True)
-                self.dataset.finish(0)
+        # Check GPU memory available
+        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("clip")
+        if not gpu_memory:
+            if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
+                self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
+            elif int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+                self.dataset.finish_with_error(
+                    "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
                 return
 
-            uploaded_image_files = filename_response.json().get('images', [])
-            if len(uploaded_image_files) > 0:
-                self.dataset.update_status("Found %i image files previously uploaded" % (len(uploaded_image_files)))
+        # Results should be unique to this dataset
+        results_folder_name = f"texts_{self.dataset.key}"
+        # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
+        file_collection_name = dmi_service_manager.get_folder_name(self.source_dataset)
 
-            # Compare image files with previously uploaded
-            to_upload_filenames = [filename for filename in image_filenames if filename not in uploaded_image_files]
-
-            if len(to_upload_filenames) > 0 or texts_folder not in filename_response.json():
-                # TODO: perhaps upload one at a time?
-                api_upload_endpoint = self.config.get("dmi_service_manager.server_address").rstrip("/") + "/api/send_files"
-                # TODO: don't create a silly empty file just to trick the service manager into creating a new folder
-                with open(staging_area.joinpath("blank.txt"), 'w') as file:
-                    file.write('')
-                self.dataset.update_status(f"Uploading {len(to_upload_filenames)} image files")
-                response = requests.post(api_upload_endpoint, files=[('images', open(staging_area.joinpath(file), 'rb')) for file in to_upload_filenames] + [(texts_folder, open(staging_area.joinpath("blank.txt"), 'rb'))], data=data, timeout=120)
-                if response.status_code == 200:
-                    self.dataset.update_status(f"Image files uploaded: {len(to_upload_filenames)}")
-                else:
-                    self.dataset.update_status(f"Unable to upload {len(to_upload_filenames)} files!")
-                    self.log.error(f"DMI Service Manager upload error: {response.status_code} - {response.reason}")
-
-            mounted_staging_area = Path(folder_name).joinpath("images")
-            mounted_output_dir = Path(folder_name).joinpath(texts_folder)
-
-        else:
-            raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+        path_to_files, path_to_results = dmi_service_manager.process_files(staging_area, image_filenames, output_dir,
+                                                                           file_collection_name, results_folder_name)
 
         # CLIP args
-        data = {"args": ['--output_dir', f"data/{mounted_output_dir}",
+        data = {"args": ['--output_dir', f"data/{path_to_results}",
                          "--model", model,
                          "--categories", f"{','.join(categories)}",
                          "--images"]
                 }
 
         # Finally, add image files to args
-        data["args"].extend([f"data/{mounted_staging_area.joinpath(filename)}" for filename in image_filenames])
+        data["args"].extend([f"data/{path_to_files.joinpath(filename)}" for filename in image_filenames])
 
+        # Send request to DMI Service Manager
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")
-        api_url = self.config.get("dmi_service_manager.server_address").rstrip("/") + "/api/" + api_endpoint
-        resp = requests.post(api_url, json=data, timeout=30)
-        if resp.status_code == 202:
-            # New request successful
-            results_url = api_url + "?key=" + resp.json()['key']
-        else:
-            try:
-                resp_json = resp.json()
-                self.log.error('DMI Service Manager error: ' + str(resp.status_code) + ': ' + str(resp_json))
-                raise ProcessorException("DMI Service Manager unable to process request; contact admins")
-            except JSONDecodeError:
-                # Unexpected Error
-                self.log.error('DMI Service Manager error: ' + str(resp.status_code) + ': ' + str(resp.text))
-                raise ProcessorException("DMI Service Manager unable to process request; contact admins")
-
-        # Wait for CLIP to complete
-        self.dataset.update_status(f"CLIP generating results for {total_image_files} images{'; this may take quite a while...' if total_image_files > 1000 else ''}")
-        start_time = time.time()
-        prev_completed = 0
-        while True:
-            time.sleep(1)
-            # If interrupted is called, attempt to finish dataset while CLIP server still running (unsure how to kill it; need new DMI Service Manager API endpoint)
-            if self.interrupted:
-                self.dataset.update_status("4CAT interrupted; Processing successful CLIP results...",
-                                           is_final=True)
-                break
-
-            # Send request to check status every 60 seconds
-            if int(time.time() - start_time) % 60 == 0:
-                # Update progress
-                if local_or_remote == "local":
-                    num_completed = self.count_result_files(output_dir)
-                    if num_completed != prev_completed:
-                        self.dataset.update_status(f"Collected categories from {num_completed} of {total_image_files} images")
-                        self.dataset.update_progress(num_completed / total_image_files)
-                        prev_completed = num_completed
-                elif local_or_remote == "remote":
-                    # TODO could check API endpoint if desired...
-                    num_completed = 1 # in case.... yeah, unsure yet, but do not want to kill a dataset that may have results
-                    pass
-
-                result = requests.get(results_url, timeout=30)
-                if 'status' in result.json().keys() and result.json()['status'] == 'running':
-                    # Still running
-                    continue
-                elif 'report' in result.json().keys() and result.json()['returncode'] == 0:
-                    # Complete without error
-                    self.dataset.update_status("CLIP Completed!")
-                    break
-                else:
-                    # Something botched
-                    if num_completed > 0:
-                        # Some data collected...
-                        self.dataset.update_status("CLIP Error; check logs; Processing successful CLIP results...", is_final=True)
-                        error_message = "CLIP Error: " + str(result.json())
-                        self.log.error(error_message)
-                        self.dataset.log(error_message)
-                        break
-                    else:
-                        self.dataset.finish_with_error("CLIP Error; unable to process request")
-                        self.log.error("CLIP Error: " + str(result.json()))
-                        return
+        api_endpoint = "clip"
+        try:
+            dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30)
+        except DsmOutOfMemory:
+            self.dataset.finish_with_error(
+                "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
+            return
+        except DmiServiceManagerException as e:
+            self.dataset.finish_with_error(str(e))
+            return
 
         # Load the video metadata if available
-        image_metadata = None
+        image_metadata = {}
         if staging_area.joinpath(".metadata.json").is_file():
             with open(staging_area.joinpath(".metadata.json")) as file:
-                image_metadata = json.load(file)
+                image_data = json.load(file)
                 self.dataset.log("Found and loaded image metadata")
+                for url, data in image_data.items():
+                    if data.get('success'):
+                        data.update({"url": url})
+                        # using the filename without extension as the key; since that is how the results form their filename
+                        image_metadata[".".join(data['filename'].split(".")[:-1])] = data
 
         self.dataset.update_status("Processing CLIP results...")
-        if local_or_remote == "local":
-            # Output files are local
-            pass
-        elif local_or_remote == "remote":
-            # Update list of uploaded files
-            filename_response = requests.get(filename_url, timeout=30)
-            result_files = filename_response.json().get(texts_folder, [])
-
-            # Download the result files
-            api_upload_endpoint = self.config.get("dmi_service_manager.server_address").rstrip("/") + "/api/uploads/"
-            for filename in result_files:
-                file_response = requests.get(api_upload_endpoint + f"{folder_name}/{texts_folder}/{filename}", timeout=30)
-                self.dataset.log(f"Downloading {filename}...")
-                with open(output_dir.joinpath(filename), 'wb') as file:
-                    file.write(file_response.content)
-        else:
-            # This should have raised already...
-            raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+        # Download the result files
+        dmi_service_manager.process_results(output_dir)
 
         # Save files as NDJSON, then use map_item for 4CAT to interact
         processed = 0
@@ -340,7 +221,6 @@ class CategorizeImagesCLIP(BasicProcessor):
                     data = {
                         "id": image_name,
                         "categories": result_data,
-                        # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
                         "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
                     }
                     outfile.write(json.dumps(data) + "\n")
@@ -370,7 +250,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),
             "original_url": image_metadata.get("url", ""),
             "image_filename": image_metadata.get("filename", ""),
-            "post_ids": ", ".join(image_metadata.get("post_ids", [])),
+            "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
             **all_cats
         }

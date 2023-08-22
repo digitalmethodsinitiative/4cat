@@ -25,8 +25,8 @@ class SearchTikTokByID(Search):
     """
     type = "tiktok-urls-search"  # job ID
     category = "Search"  # category
-    title = "Search TikTok by video URL"  # title displayed in UI
-    description = "Retrieve metadata for TikTok video URLs."  # description displayed in UI
+    title = "Search TikTok by post URL"  # title displayed in UI
+    description = "Retrieve metadata for TikTok post URLs."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
@@ -52,16 +52,16 @@ class SearchTikTokByID(Search):
     options = {
         "intro": {
             "type": UserInput.OPTION_INFO,
-            "help": "This data source can retrieve metadata for TikTok videos based on a list of URLs for those "
-                    "videos.\n\nEnter a list of TikTok video URLs. Metadata for each video will be extracted from "
-                    "each video's page in the browser interface "
+            "help": "This data source can retrieve metadata for TikTok posts based on a list of URLs for those "
+                    "posts.\n\nEnter a list of TikTok post URLs. Metadata for each post will be extracted from "
+                    "each post's page in the browser interface "
                     "([example](https://www.tiktok.com/@willsmith/video/7079929224945093934)). This includes a lot of "
-                    "details about the post itself as well as the first 20 comments on the video. The comments and "
-                    "much of the metadata is only directly available when downloading the results as an .ndjson file."
+                    "details about the post itself such as likes, tags and stickers. Note that some of the metadata is "
+                    "only directly available when downloading the results as an .ndjson file."
         },
         "urls": {
             "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Video URLs",
+            "help": "Post URLs",
             "tooltip": "Separate by commas or new lines."
         }
     }
@@ -72,7 +72,7 @@ class SearchTikTokByID(Search):
 
         :param dict query:  Search query parameters
         """
-        tiktok_scraper = TikTokScraper(processor=self)
+        tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
         return loop.run_until_complete(tiktok_scraper.request_metadata(query["urls"].split(",")))
 
@@ -353,8 +353,13 @@ class TikTokScraper:
                 try:
                     if sigil.text:
                         metadata = json.loads(sigil.text)
-                    else:
+                    elif sigil.contents and len(sigil.contents) > 0:
                         metadata = json.loads(sigil.contents[0])
+                    else:
+                        failed += 1
+                        self.processor.dataset.log(
+                            "Embedded metadata was found for video %s, but it could not be parsed, skipping" % url)
+                        continue
                 except json.JSONDecodeError:
                     failed += 1
                     self.processor.dataset.log(
@@ -362,10 +367,18 @@ class TikTokScraper:
                     continue
 
                 for video in self.reformat_metadata(metadata):
+                    if not video.get("stats") or video.get("createTime") == "0":
+                        # sometimes there are empty videos? which seems to
+                        # indicate a login wall
+                        self.processor.dataset.log(
+                            f"Empty metadata returned for video {url} ({video['id']}), skipping. This likely means that the post requires logging in to view.")
+                        continue
+                    else:
+                        results.append(video)
+
                     self.processor.dataset.update_status("Processed %s of %s TikTok URLs" %
                                                ("{:,}".format(finished), "{:,}".format(num_urls)))
                     self.processor.dataset.update_progress(finished / num_urls)
-                    results.append(video)
 
         notes = []
         if failed:

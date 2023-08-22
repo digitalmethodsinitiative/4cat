@@ -147,7 +147,7 @@ class BoardScraper4chan(BasicJSONScraper):
 				# which also updates its deleted/archived status 
 				try:
 					# Add a new thread job if it isn't in the jobs table anymore
-					jobtype = self.prefix + "-thread"
+					jobtype = self.type.replace("-board", "-thread")
 					query = "SELECT remote_id FROM jobs WHERE remote_id = '%s' AND details = '%s';" % (str(thread["id"]), json.dumps({"board": board_id}))
 					remote_id = self.db.fetchone(query)
 					

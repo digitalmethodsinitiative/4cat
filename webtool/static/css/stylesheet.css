@@ -91,7 +91,7 @@ hr {
     border-top: 1px dotted var(--contrast-dark);
 }
 
-i {
+i, .italic {
     font-style: italic;
 }
 
@@ -140,6 +140,11 @@ table th {
     padding: 0 1em;
 }
 
+table .table-controls td, .table .table-controls th {
+    background: var(--accent-alternate);
+    color: var(--contrast-bright);
+}
+
 *[aria-expanded=false] {
     height: 0;
     overflow: hidden;
@@ -162,6 +167,10 @@ select, input, textarea {
 
 select, input {
     max-width: 15em;
+}
+
+select[multiple] {
+    min-width: 8em;
 }
 
 input[type=date] {
@@ -232,22 +241,35 @@ article.small .form-element {
     max-width: none;
 }
 
+.form-element > div {
+    width: 100%;
+}
+
 .form-element > *:not(input, select, button) {
     min-width: 11em;
     max-width: 75%;
 }
 
-.form-element > textarea {
+.form-element textarea {
     min-width: 25em;
     min-height: 6em;
 }
 
-.form-element > textarea.code {
+.form-element textarea.code {
     font-family: monospace;
 }
 
-article.small .form-element > *:not([type=radio], [type=checkbox]) {
+.form-element .with-tail {
+    display: grid;
+    grid-template-columns: 1.5em auto;
+}
+
+article.small .form-element input:not([type=radio], [type=checkbox]), article.small .form-element select, article.small .form-element textarea {
     min-width: 5em;
+}
+
+article.small .form-element select[multiple] {
+    min-width: 20em;
 }
 
 .form-element label {
@@ -273,6 +295,10 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
 
 .datasource-extra-input {
     overflow: hidden;
+}
+
+.datasource-explain-wrap {
+    display: inline-block;
 }
 
 .submit-container {

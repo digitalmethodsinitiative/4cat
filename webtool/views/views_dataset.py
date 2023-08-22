@@ -88,7 +88,15 @@ def show_results(page):
         depth = "own"
 
     owner_match = tuple([current_user.get_id(), *[f"tag:{t}" for t in current_user.tags]])
-    if depth == "own":
+
+    # the user filter is only exposed to admins
+    if filters["user"]:
+        if config.get("privileges.can_view_all_datasets"):
+            where.append("key IN ( SELECT key FROM datasets_owners WHERE name LIKE %s AND key = datasets.key)")
+            replacements.append(filters["user"].replace("*", "%"))
+        else:
+            return error(403, error="You cannot use this filter.")
+    elif depth == "own":
         where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
         replacements.append(owner_match)
 
@@ -113,16 +121,6 @@ def show_results(page):
     # distinction here
     if filters["hide_empty"]:
         where.append("num_rows > 0")
-
-    # the user filter is only exposed to admins
-    if filters["user"]:
-        if config.get("privileges.can_view_all_datasets"):
-            target_user = User.get_by_name(db, filters["user"])
-            tags = [] if target_user is None else target_user.tags
-            where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
-            replacements.append(owner_match)
-        else:
-            return error(403, error="You cannot use this filter.")
 
     # not all datasets have a datsource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
@@ -149,7 +147,6 @@ def show_results(page):
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
 
-    expiring_datasets = set()
     for dataset in datasets:
         dataset = DataSet(key=dataset["key"], db=db)
         datasource = dataset.parameters.get("datasource", "")
@@ -166,7 +163,7 @@ def show_results(page):
                    metadata["has_worker"] and metadata["has_options"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites, expiring=expiring_datasets)
+                           datasets=filtered, pagination=pagination, favourites=favourites)
 
 
 """
@@ -183,8 +180,8 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    directory = str(config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')))
-    return send_from_directory(directory=directory, path=query_file)
+    path = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')).joinpath(query_file)
+    return send_from_directory(directory=path.parent, path=path.name)
 
 
 @app.route('/mapped-result/<string:key>/')
@@ -218,6 +215,13 @@ def get_mapped_result(key):
 
     mapper = dataset.get_own_processor().map_item
 
+    # Also add possibly added annotation items.
+    # These cannot be added to the static `map_item` function.
+    annotation_labels = None
+    annotation_fields = dataset.get_annotation_fields()
+    if annotation_fields:
+        annotation_labels = ["annotation_" + v["label"] for v in annotation_fields.values()]
+
     def map_response():
         """
         Yield a CSV file line by line
@@ -230,9 +234,24 @@ def get_mapped_result(key):
         buffer = io.StringIO()
         with dataset.get_results_path().open() as infile:
             for line in infile:
-                mapped_item = mapper(json.loads(line))
+                item = json.loads(line)
+                mapped_item = mapper(item)
+
+                # Add possible annotation items
+                if annotation_fields:
+                    for label in annotation_labels:
+                        mapped_item[label] = item[label]
+
                 if not writer:
-                    writer = csv.DictWriter(buffer, fieldnames=tuple(mapped_item.keys()))
+                    fieldnames = mapped_item.keys()
+
+                    # Add possible annotation headers
+                    if annotation_labels:
+                        for label in annotation_labels:
+                            if label not in fieldnames:
+                                fieldnames.append(label)
+
+                    writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
                     writer.writeheader()
                     yield buffer.getvalue()
                     buffer.truncate(0)
@@ -499,7 +518,9 @@ def keep_dataset(key):
                                    message="All datasets of this data source (%s) are scheduled for automatic "
                                            "deletion. This cannot be overridden." % datasource), 403
 
-    dataset.delete_parameter("expires-after")
-    dataset.keep = True
+    if dataset.is_expiring(user=current_user):
+        dataset.delete_parameter("expires-after")
+        dataset.keep = True
+
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
     return redirect(url_for("show_result", key=key))

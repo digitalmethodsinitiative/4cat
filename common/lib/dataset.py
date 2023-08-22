@@ -14,7 +14,7 @@ from pathlib import Path
 import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
+from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -51,7 +51,7 @@ class DataSet(FourcatModule):
 	no_status_updates = False
 	staging_areas = None
 
-	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension=None,
+	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent='', extension=None,
 				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
@@ -102,9 +102,6 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
-			if config.get('expire.timeout') and not parent:
-				parameters["expires-after"] = int(time.time() + config.get('expire.timeout'))
-
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
@@ -132,7 +129,7 @@ class DataSet(FourcatModule):
 			if extension is None:
 				own_processor = self.get_own_processor()
 				if own_processor:
-					extension = own_processor.get_extension(parent_dataset=parent)
+					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
 				# Still no extension, default to 'csv'
 				if not extension:
 					extension = "csv"
@@ -176,6 +173,16 @@ class DataSet(FourcatModule):
 		:return Path:  A path to the results file
 		"""
 		return self.folder.joinpath(self.data["result_file"])
+
+	def get_results_folder_path(self):
+		"""
+		Get path to folder containing accompanying results
+
+		Returns a path that may not yet be created
+
+		:return Path:  A path to the results file
+		"""
+		return self.folder.joinpath("folder_" + self.key)
 
 	def get_log_path(self):
 		"""
@@ -506,6 +513,9 @@ class DataSet(FourcatModule):
 		if self.is_finished():
 			copy.finish(self.num_rows)
 
+		# make sure ownership is also copied
+		copy.copy_ownership_from(self)
+
 		return copy
 
 	def delete(self, commit=True):
@@ -537,6 +547,8 @@ class DataSet(FourcatModule):
 			self.get_results_path().unlink()
 			if self.get_results_path().with_suffix(".log").exists():
 				self.get_results_path().with_suffix(".log").unlink()
+			if self.get_results_folder_path().exists():
+				shutil.rmtree(self.get_results_folder_path())
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
@@ -690,22 +702,8 @@ class DataSet(FourcatModule):
 		# make sure children's owners remain in sync
 		for child in self.children:
 			child.add_owner(username, role)
-
-	def refresh_owners(self):
-		# retrieve owners
-		self.owners = {owner["name"]: owner for owner in self.db.fetchall("SELECT * FROM datasets_owners WHERE key = %s", (self.key,))}
-
-		# determine which users (if any) are owners of the dataset by having a
-		# tag that is listed as an owner
-		owner_tags = [name[4:] for name in self.owners if name.startswith("tag:")]
-		if owner_tags:
-			tagged_owners = self.db.fetchall("SELECT name, tags FROM users WHERE tags ?| %s ", (owner_tags,))
-			self.tagged_owners = {
-				owner_tag: [user["name"] for user in tagged_owners if owner_tag in user["tags"]]
-				for owner_tag in owner_tags
-			}
-		else:
-			self.tagged_owners = {}
+			# not recursive, since we're calling it from recursive code!
+			child.copy_ownership_from(self, recursive=False)
 
 	def remove_owner(self, username):
 		"""
@@ -735,6 +733,51 @@ class DataSet(FourcatModule):
 		# make sure children's owners remain in sync
 		for child in self.children:
 			child.remove_owner(username)
+			# not recursive, since we're calling it from recursive code!
+			child.copy_ownership_from(self, recursive=False)
+
+	def refresh_owners(self):
+		"""
+		Update internal owner cache
+
+		This makes sure that the list of *users* and *tags* which can access the
+		dataset is up to date.
+		"""
+		self.owners = {owner["name"]: owner for owner in self.db.fetchall("SELECT * FROM datasets_owners WHERE key = %s", (self.key,))}
+
+		# determine which users (if any) are owners of the dataset by having a
+		# tag that is listed as an owner
+		owner_tags = [name[4:] for name in self.owners if name.startswith("tag:")]
+		if owner_tags:
+			tagged_owners = self.db.fetchall("SELECT name, tags FROM users WHERE tags ?| %s ", (owner_tags,))
+			self.tagged_owners = {
+				owner_tag: [user["name"] for user in tagged_owners if owner_tag in user["tags"]]
+				for owner_tag in owner_tags
+			}
+		else:
+			self.tagged_owners = {}
+
+	def copy_ownership_from(self, dataset, recursive=True):
+		"""
+		Copy ownership
+
+		This is useful to e.g. make sure a dataset's ownership stays in sync
+		with its parent
+
+		:param Dataset dataset:  Parent to copy from
+		:return:
+		"""
+		self.db.delete("datasets_owners", where={"key": self.key}, commit=False)
+
+		for role in ("owner", "viewer"):
+			owners = dataset.get_owners(role=role)
+			for owner in owners:
+				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False)
+
+		self.db.commit()
+		if recursive:
+			for child in self.children:
+				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
 		"""
@@ -802,9 +845,11 @@ class DataSet(FourcatModule):
 		"""
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
-
+		
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
+		else:
+			annotation_fields = {}
 
 		return annotation_fields
 
@@ -1356,6 +1401,67 @@ class DataSet(FourcatModule):
 		if self.key_parent:
 			return False
 		return True
+
+	def is_expiring(self, user=None):
+		"""
+		Determine if dataset is set to expire
+
+		Similar to `is_expired`, but checks if the dataset will be deleted in
+		the future, not if it should be deleted right now.
+
+		:param user:  User to use for configuration context. Provide to make
+		sure configuration overrides for this user are taken into account.
+		:return bool|int:  `False`, or the expiration date as a Unix timestamp.
+		"""
+		# has someone opted out of deleting this?
+		if self.parameters.get("keep"):
+			return False
+
+		# is this dataset explicitly marked as expiring after a certain time?
+		if self.parameters.get("expires-after"):
+			return self.parameters.get("expires-after")
+
+		# is the data source configured to have its datasets expire?
+		expiration = config.get("datasources.expiration", {}, user=user)
+		if not expiration.get(self.parameters.get("datasource")):
+			return False
+
+		# is there a timeout for this data source?
+		if expiration.get(self.parameters.get("datasource")).get("timeout"):
+			return self.timestamp + expiration.get(self.parameters.get("datasource")).get("timeout")
+
+		return False
+
+	def is_expired(self, user=None):
+		"""
+		Determine if dataset should be deleted
+
+		Datasets can be set to expire, but when they should be deleted depends
+		on a number of factor. This checks them all.
+
+		:param user:  User to use for configuration context. Provide to make
+		sure configuration overrides for this user are taken into account.
+		:return bool:
+		"""
+		# has someone opted out of deleting this?
+		if not self.is_expiring():
+			return False
+
+		# is this dataset explicitly marked as expiring after a certain time?
+		future = time.time() + 3600  # ensure we don't delete datasets with invalid expiration times
+		if self.parameters.get("expires-after") and convert_to_int(self.parameters["expires-after"], future) < time.time():
+			return True
+
+		# is the data source configured to have its datasets expire?
+		expiration = config.get("datasources.expiration", {}, user=user)
+		if not expiration.get(self.parameters.get("datasource")):
+			return False
+
+		# is the dataset older than the set timeout?
+		if expiration.get(self.parameters.get("datasource")).get("timeout"):
+			return self.timestamp + expiration[self.parameters.get("datasource")]["timeout"] < time.time()
+
+		return False
 
 	def is_from_collector(self):
 		"""

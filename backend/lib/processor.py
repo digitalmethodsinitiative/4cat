@@ -333,7 +333,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	def add_field_to_parent(self, field_name, new_data, which_parent=source_dataset, update_existing=False):
 		"""
 		This function adds a new field to the parent dataset. Expects a list of data points, one for each item
-		in the parent dataset. Processes csv and ndjson. If udpate_existing is set to True, this can be used
+		in the parent dataset. Processes csv and ndjson. If update_existing is set to True, this can be used
 		to overwrite an existing field.
 
 		TODO: could be improved by accepting different types of data depending on csv or ndjson.

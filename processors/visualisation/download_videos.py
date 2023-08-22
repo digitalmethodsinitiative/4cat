@@ -510,7 +510,7 @@ class VideoDownloaderPlus(BasicProcessor):
         self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos" +
                                    (f"; videos copied from {copied_videos} previous downloads" if copied_videos > 0 else "") +
                                    (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""), is_final=True)
-        self.write_archive_and_finish(results_path)
+        self.write_archive_and_finish(results_path, len([x for x in urls.values() if x.get('success')]))
 
     def yt_dlp_monitor(self, d):
         """

@@ -347,7 +347,7 @@ class ImageDownloader(BasicProcessor):
 		metadata = {
 			url: {
 				"filename": url_file_map.get(url),
-				"success": not url_file_map.get(url) is None and url not in failures, # skipped and fails are NOT success
+				"success": not url_file_map.get(url) is None and url not in failures,  # skipped and fails are NOT success
 				"from_dataset": self.source_dataset.key,
 				"post_ids": urls[url]
 			} for url in urls
@@ -358,7 +358,7 @@ class ImageDownloader(BasicProcessor):
 		self.dataset.log('Downloaded %i images.' % downloaded_images)
 		# finish up
 		self.dataset.update_status("Compressing images")
-		self.write_archive_and_finish(results_path)
+		self.write_archive_and_finish(results_path, len([x for x in metadata.values() if x.get("success")]))
 
 	def get_image(self, url):
 		"""
@@ -575,3 +575,22 @@ class ImageDownloader(BasicProcessor):
 			raise FileNotFoundError()
 
 		return response
+
+	@staticmethod
+	def map_metadata(url, data):
+		"""
+		Iterator to yield modified metadata for CSV
+
+		:param str url:  string that may contain URLs
+		:param dict data:  dictionary with metadata collected previously
+		:yield dict:  	  iterator containing reformated metadata
+		"""
+		row = {
+			"url": url,
+			"number_of_posts_with_url": len(data.get("post_ids", [])),
+			"post_ids": ", ".join(data.get("post_ids", [])),
+			"filename": data.get("filename"),
+			"download_successful": data.get('success', "")
+		}
+
+		yield row

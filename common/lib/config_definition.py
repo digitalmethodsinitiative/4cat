@@ -23,6 +23,12 @@ config_definition = {
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
+    "datasources._intro2": {
+        "type": UserInput.OPTION_INFO,
+        "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
+                "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
+                "expiration status of existing datasets."
+    },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": False, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
@@ -84,7 +90,7 @@ config_definition = {
     "privileges.can_view_private_datasets": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can view global dataset index",
+        "help": "Can view private datasets",
         "tooltip": "Controls whether users can see the datasets made private by their owners."
     },
     "privileges.can_create_api_token": {
@@ -108,7 +114,7 @@ config_definition = {
     "privileges.admin.can_manage_notifications": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can manage users",
+        "help": "Can manage notifications",
         "tooltip": "Controls whether users can add, edit and delete notifications via the Control Panel"
     },
     "privileges.admin.can_manage_settings": {
@@ -117,11 +123,12 @@ config_definition = {
         "help": "Can manage settings",
         "tooltip": "Controls whether users can manipulate 4CAT settings via the Control Panel"
     },
-    "privileges.admin.can_manage_datasources": {
+    "privileges.admin.can_manipulate_all_datasets": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can manage data sources",
-        "tooltip": "Controls whether users can manipulate data source availability via the Control Panel"
+        "help": "Can manipulate datasets",
+        "tooltip": "Controls whether users can manipulate all datasets as if they were an owner, e.g. sharing it with "
+                   "others, running processors, et cetera."
     },
     "privileges.admin.can_restart": {
         "type": UserInput.OPTION_TOGGLE,
@@ -206,26 +213,12 @@ config_definition = {
         "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
                    "provided e-mail settings are configured."
     },
-    # These settings control whether top-level datasets (i.e. those created via the
-    # "Create dataset" page) are deleted automatically, and if so, after how much
-    # time. You can also allow users to cancel this (i.e. opt out). Note that if
-    # users are allowed to opt out, data sources can still force the expiration of
-    # datasets created through that data source. This cannot be overridden by the
-    # user.
-    "expire.timeout": {
+    "4cat.sphinx_host": {
         "type": UserInput.OPTION_TEXT,
-        "default": 0,
-        "coerce_type": int,
-        "help": "Expiration timeout",
-        "tooltip": "Top Level datasets automatically deleted after a period of time. 0 will not expire",
-    },
-    "expire.allow_optout": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Allow opt-out",
-        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data "
-                   "sources can still force the expiration of datasets created through that data source. This cannot "
-                   "be overridden by the user.",
+        "default": "localhost",
+        "help": "Sphinx host",
+        "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
+        "global": True
     },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
@@ -394,14 +387,18 @@ config_definition = {
     # service manager
     # this is a service that 4CAT can connect to to run e.g. ML models
     # it is used by a number of processors
-    "dmi-service-manager.server_address": {
+    "dmi-service-manager.aa_DSM-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager#start-dmi-service-manager) is a support tool used to run some advanced processors. These processors generally require high CPU usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also possible for multiple 4CAT instances to use the same service manager. Please see the link for instructions on setting up your own instance of the DMI Service Manager.",
+        },
+    "dmi-service-manager.ab_server_address": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "DMI Service Manager server/URL",
-        "tooltip": "https://github.com/digitalmethodsinitiative/dmi_service_manager",
+        "tooltip": "The URL of the DMI Service Manager server, e.g. http://localhost:5000",
         "global": True
     },
-    "dmi-service-manager.local_or_remote": {
+    "dmi-service-manager.ac_local_or_remote": {
         "type": UserInput.OPTION_CHOICE,
         "default": 0,
         "help": "DMI Services Local or Remote",

@@ -23,6 +23,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 
 	log_level = "warning"
 	_logger_method = None
+	category = "Collector"
 
 	def __init__(self, job, logger=None, manager=None, modules=None):
 		"""
@@ -30,6 +31,13 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		super().__init__(logger=logger, manager=manager, job=job, modules=modules)
 		self.prefix = self.type.split("-")[0]
+		# Names were updated to be more consistent with the rest of the codebase, but we still need to support the old database
+		# TODO: update database.sql names and create migrate script, then remove this
+		self.prefix = {
+			"fourchan": "4chan",
+			"eightkun": "8kun",
+			"eightchan": "8chan",
+		}[self.prefix]
 
 		if not hasattr(logger, self.log_level):
 			self.log_level = "warning"
@@ -67,7 +75,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 			try:
 				# see if any proxies were configured that would work for this URL
 				protocol = url.split(":")[0]
-				if protocol in config.get('SCRAPE_PROXIES') and config.get('SCRAPE_PROXIES')[protocol]:
+				if protocol in config.get('SCRAPE_PROXIES', []) and config.get('SCRAPE_PROXIES')[protocol]:
 					proxies = {protocol: random.choice(config.get('SCRAPE_PROXIES')[protocol])}
 				else:
 					proxies = None

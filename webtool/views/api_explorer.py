@@ -108,14 +108,9 @@ def explorer_dataset(key, page):
 
 	first_post = False
 
-
 	for post in iterate_items(results_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
 
 		count += 1
-
-		# Use an offset if we're showing a page beyond the first.
-		if count <= offset:
-			continue
 
 		# Use an offset if we're showing a page beyond the first.
 		if count <= offset:
@@ -671,9 +666,6 @@ def get_custom_fields(datasource, filetype=None):
 		datasource_dir = datasource.replace("4", "four")
 	elif datasource.startswith("8"):
 		datasource_dir = datasource.replace("8", "eight")
-	elif "facebook" in datasource or "instagram" in datasource:
-		datasource_dir = "import-from-tool"
-		datasource = "import-from-tool"
 	elif datasource == "twitter":
 		datasource_dir = "twitter-import"
 		datasource = "twitter-import"

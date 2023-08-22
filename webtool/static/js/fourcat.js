@@ -739,13 +739,13 @@ const query = {
 
         let dense_toggle = (scope === 'dense-threads');
         $('#query-form #forminput-scope_density').prop('disabled', !dense_toggle);
-        $('#query-form #forminput-scope_density').parent().toggle(dense_toggle);
+        $('#query-form #forminput-scope_density').parent().parent().toggle(dense_toggle);
         $('#query-form #forminput-scope_length').prop('disabled', !dense_toggle);
-        $('#query-form #forminput-scope_length').parent().toggle(dense_toggle);
+        $('#query-form #forminput-scope_length').parent().parent().toggle(dense_toggle);
 
         let ids_toggle = (scope === 'match-ids')
         $('#query-form #forminput-valid_ids').prop('disabled', !ids_toggle);
-        $('#query-form #forminput-valid_ids').parent().toggle(ids_toggle);
+        $('#query-form #forminput-valid_ids').parent().parent().toggle(ids_toggle);
     },
 
     custom_board_options: function () {
@@ -1423,6 +1423,9 @@ const ui_helpers = {
         //tabbed interfaces
         $(document).on('click', '.tabbed .tab-controls a', ui_helpers.tabs);
 
+        //table controls
+        $(document).on('input', '.copy-from', ui_helpers.table_control);
+
         // Controls to change which results show up in overview
         $('.view-controls button').hide();
         $('.view-controls input, .view-controls select, .view-controls textarea').on('change', function () {
@@ -1558,7 +1561,11 @@ const ui_helpers = {
 
             e.preventDefault();
             popup.confirm(message, 'Please confirm', () => {
-                form.submit();
+                // we trigger a click, because else the BUTTON name is not
+                // sent with the form
+                $(this).removeClass('confirm-first');
+                $(this).click();
+                $(this).addClass('confirm-first');
             })
         }
     },
@@ -1691,6 +1698,23 @@ const ui_helpers = {
             current_tab = controls.parentNode.querySelector('input[name="current-tab"]');
         }
         current_tab.value = target_id.replace(/^tab-/, '');
+    },
+
+    table_control: function(e) {
+        let control = e.target;
+        let value = control.getAttribute('type') === 'checkbox' ? control.checked : control.value;
+        let table = $(control).parents('table');
+        let class_match = [...e.target.classList].filter((e) => e.indexOf('d-') === 0);
+        table[0].querySelectorAll('.copy-to.' + class_match).forEach((element) => {
+            if($(element).parents('.d-ignore').length > 0) {
+                return;
+            }
+            if(element.getAttribute('type') === 'checkbox') {
+                element.checked = value;
+            } else {
+                element.value = value;
+            }
+        })
     }
 }
 

@@ -5,10 +5,12 @@ import itertools
 import markdown2
 import datetime
 import psycopg2
+import tailer
 import smtplib
 import time
 import json
-import os
+import csv
+import io
 import re
 
 from pathlib import Path
@@ -17,25 +19,29 @@ import backend
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect
+from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response
 from flask_login import current_user, login_required
 
 from webtool import app, db, config
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
+from common.lib.dataset import DataSet
 
 from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
 from common.config_manager import ConfigWrapper
+
 config = ConfigWrapper(config, user=current_user)
+
 
 @app.route("/admin/")
 @login_required
 def admin_frontpage():
     # can be viewed if user has any admin privileges
-    admin_privileges = config.get([key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
+    admin_privileges = config.get(
+        [key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
 
     if not any(admin_privileges.values()):
         return render_template("error.html", message="You cannot view this page."), 403
@@ -43,9 +49,10 @@ def admin_frontpage():
     # collect some stats
     now = time.time()
     num_items = {
-        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
-        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
-        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets")["num"]
+        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')", (now - 86400,))["num"],
+        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')", (now - (86400 * 7),))[
+            "num"],
+        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')")["num"]
     }
 
     num_datasets = {
@@ -60,11 +67,13 @@ def admin_frontpage():
         "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
     }
 
-    upgrade_available = not not db.fetchone("SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+    upgrade_available = not not db.fetchone(
+        "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
 
-    return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats = {
+    return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
         "captured": num_items, "datasets": num_datasets, "disk": disk_stats
     }, upgrade_available=upgrade_available)
+
 
 @app.route("/admin/users/", defaults={"page": 1})
 @app.route("/admin/users/page/<int:page>/")
@@ -114,6 +123,7 @@ def list_users(page):
                            filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
+
 @app.route("/admin/worker-status/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
@@ -160,7 +170,8 @@ def add_user():
     else:
         username = email
         try:
-            db.insert("users", data={"name": username, "timestamp_token": int(time.time()), "timestamp_created": int(time.time())})
+            db.insert("users", data={"name": username, "timestamp_token": int(time.time()),
+                                     "timestamp_created": int(time.time())})
 
             user = User.get_by_name(db, username)
             if user is None:
@@ -172,7 +183,7 @@ def add_user():
                     response = {**response, **{
                         "message": "An e-mail containing a link through which the registration can be completed has "
                                    "been sent to %s.\n\nTheir registration link is [%s](%s)" % (
-                                   username, token, token)}}
+                                       username, token, token)}}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
@@ -196,7 +207,7 @@ def add_user():
                     response["success"] = True
                     response = {**response, **{
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
-                        username, url, url)}}
+                            username, url, url)}}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
@@ -207,7 +218,7 @@ def add_user():
             return redirect(url_for("manipulate_user", values={"name": username}))
         else:
             return render_template("error.html", message=response["message"],
-                               title=("New account created" if response["success"] else "Error"))
+                                   title=("New account created" if response["success"] else "Error"))
     else:
         return jsonify(response)
 
@@ -359,7 +370,7 @@ def manipulate_user(mode):
                         token = user.generate_token(None, regenerate=True)
                         link = url_for("reset_password", _external=True) + "?token=%s" % token
                         flash('User created. %s can set a password via<br><a href="%s">%s</a>.' % (
-                        user_data["name"], link, link))
+                            user_data["name"], link, link))
 
                     # show the edit form for the user next
                     mode = "edit"
@@ -395,6 +406,7 @@ def manipulate_user(mode):
 
     return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(),
                            mode=mode)
+
 
 @app.route("/admin/user-tags/", methods=["GET", "POST"])
 @login_required
@@ -453,6 +465,7 @@ def manipulate_tags():
 
     return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
 
+
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
@@ -466,7 +479,8 @@ def manipulate_settings():
     categories = config_definition.categories
 
     modules = {
-        **{datasource + "-search": definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
+        **{datasource + "-search": definition["name"] for datasource, definition in
+           backend.all_modules.datasources.items()},
         **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
            backend.all_modules.processors.values()}
     }
@@ -506,10 +520,6 @@ def manipulate_settings():
                     if global_value == value and global_value is not None:
                         config.delete_for_tag(setting, tag)
                         continue
-                    else:
-                        print(f"{repr(global_value)} ({type(global_value)}) <> {repr(value)} ({type(value)})")
-                        print(f"same: {global_value == value}")
-                        print(f"global is not None: {global_value is not None}")
 
                 valid = config.set(setting, value, tag=tag)
 
@@ -555,6 +565,13 @@ def manipulate_settings():
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
+    # 'data sources' is one setting but we want to be able to indicate
+    # overrides per sub-item
+    expire_override = []
+    if all_settings.get("datasources.expiration") and global_settings.get("datasources.expiration"):
+        expire_override = [datasource for datasource, settings in all_settings["datasources.expiration"].items() if
+                           settings != global_settings["datasources.expiration"].get(datasource)]
+
     datasources = {
         datasource: {
             **info,
@@ -565,7 +582,9 @@ def manipulate_settings():
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
-                           datasources_config=datasources, changed=changed_categories)
+                           datasources_config=datasources, changed=changed_categories,
+                           expire_override=expire_override)
+
 
 @app.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required
@@ -602,10 +621,10 @@ def manipulate_notifications():
             expires = None
 
         notification = {
-                "username": params.get("username"),
-                "notification": params.get("notification"),
-                "timestamp_expires": int(time.time() + expires) if expires else None,
-                "allow_dismiss": not not params.get("allow_dismiss")
+            "username": params.get("username"),
+            "notification": params.get("notification"),
+            "timestamp_expires": int(time.time() + expires) if expires else None,
+            "allow_dismiss": not not params.get("allow_dismiss")
         }
 
         if not incomplete:
@@ -641,3 +660,174 @@ def delete_notification(notification_id):
     return redirect(redirect_url)
 
 
+@app.route("/logs/")
+@login_required
+@setting_required("privileges.admin.can_view_status")
+def view_logs():
+    """
+    Log file overview
+
+    :return:
+    """
+    return render_template("controlpanel/logs.html")
+
+
+@app.route("/logs/<string:logfile>/")
+@login_required
+@setting_required("privileges.admin.can_view_status")
+def get_log(logfile):
+    """
+    Get last lines of log file
+
+    Returns the tail end of a log file.
+
+    :param str logfile: 'backend' or 'stderr'
+    :return:
+    """
+    if logfile not in ("stderr", "backend"):
+        return "Not Found", 404
+
+    if logfile == "backend":
+        filename = "4cat.log" if not config.get("USING_DOCKER") else "backend_4cat.log"
+    else:
+        filename = "4cat.stderr"
+
+    log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), filename)
+    if log_file.exists():
+        with log_file.open() as infile:
+            return "\n".join(tailer.tail(infile, 250))
+    else:
+        return ""
+
+
+@app.route("/dataset-bulk/", methods=["GET", "POST"])
+@login_required
+@setting_required("privileges.admin.can_manipulate_all_datasets")
+def dataset_bulk():
+    """
+    Manipulate many datasets at once
+
+    Useful to e.g. make sure datasets will not expire, or to make all datasets
+    eligible for expiration.
+    """
+    incomplete = []
+    forminput = {}
+    datasources = {datasource: meta["name"] for datasource, meta in backend.all_modules.datasources.items()}
+
+    if request.method == "POST":
+        # action depends on which button was clicked
+        action = [key for key in request.form if key.startswith("action-")]
+        if not action:
+            flash("Invalid action")
+            incomplete.append("action")
+        else:
+            action = action[0].split("-")[-1]
+
+        where = []
+        replacements = []
+        forminput = request.form.to_dict()
+
+        # convert date range to timestamps
+        try:
+            forminput["filter_date_from"] = datetime.datetime.strptime(forminput["filter_date_from"], "%Y-%m-%d").timestamp() if forminput.get("filter_date_from") else None
+            forminput["filter_date_to"] = datetime.datetime.strptime(forminput["filter_date_to"], "%Y-%m-%d").timestamp() if forminput.get("filter_date_to") else None
+        except (TypeError, ValueError):
+            flash("When filtering by date, dates should be in YYYY-mm-dd format.")
+            incomplete.append("filter-date")
+
+        # construct SQL filter for datasets
+        if forminput.get("filter_name"):
+            where.append("key IN ( SELECT key FROM datasets_owners WHERE name LIKE %s AND key = datasets.key)")
+            replacements.append(forminput.get("filter_name").replace("*", "%"))
+
+        if forminput.get("filter_date_from"):
+            where.append("timestamp >= %s")
+            replacements.append(forminput.get("filter_date_from"))
+
+        if forminput.get("filter_date_to"):
+            where.append("timestamp < %s")
+            replacements.append(forminput.get("filter_date_to"))
+
+        if forminput.get("filter_datasource"):
+            forminput["filter_datasource"] = request.form.getlist("filter_datasource")
+            where.append("parameters::json->>'datasource' IS NOT NULL AND parameters::json->>'datasource' IN %s")
+            replacements.append(tuple(forminput["filter_datasource"]))
+
+        datasets_meta = db.fetchall(f"SELECT * FROM datasets {'WHERE' if where else ''} {' AND '.join(where)}",
+                                    tuple(replacements))
+
+        if not datasets_meta:
+            flash("No datasets match these criteria")
+            incomplete.append("filter")
+
+        if action == "owner":
+            # this one is a bit special because we need to figure out if the
+            # owners are legitimate (tags are not checked)
+            bulk_owner = request.form.get("bulk-owner").replace("*", "%")
+            if not bulk_owner:
+                flash("Please enter a user or tag to add as owner")
+                incomplete.append("bulk-owner")
+
+            if not bulk_owner.startswith("tag:"):
+                users = db.fetchall("SELECT name AS num FROM users WHERE name LIKE %s", (bulk_owner,))
+                if not users:
+                    flash("No users match that username")
+                    incomplete.append("bulk-owner")
+                else:
+                    bulk_owner = [user["name"] for user in users]
+            else:
+                bulk_owner = [bulk_owner]
+
+            flash(f"{len(bulk_owner):,} new owner(s) were added to the datasets.")
+
+        if not incomplete:
+            datasets = [DataSet(data=dataset, db=db) for dataset in datasets_meta]
+            flash(f"{len(datasets):,} dataset(s) updated.")
+
+            if action == "export":
+                # export dataset metadata as a CSV file, basically a dataset
+                # table dump
+                def generate_csv(data):
+                    """
+                    Stream a CSV as a Flask response
+                    """
+                    buffer = io.StringIO()
+                    writer = None
+                    for item in data:
+                        if not writer:
+                            writer = csv.DictWriter(buffer, fieldnames=item.keys())
+                            writer.writeheader()
+                        writer.writerow(item)
+                        buffer.seek(0)
+                        yield buffer.read()
+                        buffer.truncate(0)
+                        buffer.seek(0)
+
+                response = Response(generate_csv(datasets_meta), mimetype="text/csv")
+                exporttime = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+                response.headers["Content-Disposition"] = f"attachment; filename=dataset-export-{exporttime}.csv"
+                return response
+
+            else:
+                for dataset in datasets:
+                    if action == "keep":
+                        dataset.keep = True
+
+                    if action == "unkeep":
+                        dataset.delete_parameter("keep")
+
+                    if action == "delete":
+                        dataset.delete()
+
+                    if action == "public":
+                        dataset.is_private = False
+
+                    if action == "private":
+                        dataset.is_private = True
+
+                    if action == "owner":
+                        for user_or_tag in bulk_owner:
+                            dataset.add_owner(user_or_tag)
+
+    return render_template("controlpanel/dataset-bulk.html", flashes=get_flashed_messages(),
+                           incomplete=incomplete, form=forminput, datasources=datasources)
