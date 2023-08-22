@@ -362,19 +362,7 @@ class ConfigWrapper:
         self.config = config
         self.user = user
         self.tags = tags
-
-        if request and request.headers.get("X-4CAT-Config-Tag") and \
-            config.get("flask.proxy_secret") and \
-            request.headers.get("X-4CAT-Config-Via-Proxy") == config.get("flask.proxy_secret"):
-            # need to ensure not just anyone can add this header to their
-            # request!
-            # to this end, the second header must be set to the secret value;
-            # if it is not set, assume the headers are not being configured by
-            # the proxy server
-            if not self.tags:
-                self.tags = []
-
-            self.tags += request.headers.get("X-4CAT-Config-Tag").split(",")
+        self.request = request
 
 
     def set(self, *args, **kwargs):
@@ -405,6 +393,8 @@ class ConfigWrapper:
         if "tags" not in kwargs and self.tags:
             kwargs["tags"] = self.tags
 
+        kwargs["tags"] = self.request_override(kwargs["tags"])
+
         return self.config.get_all(*args, **kwargs)
 
     def get(self, *args, **kwargs):
@@ -421,7 +411,28 @@ class ConfigWrapper:
         if "tags" not in kwargs:
             kwargs["tags"] = self.tags
 
+        kwargs["tags"] = self.request_override(kwargs["tags"])
+
         return self.config.get(*args, **kwargs)
+
+    def request_override(self, tags):
+        if type(tags) is str:
+            tags = [tags]
+
+        if self.request and self.request.headers.get("X-4CAT-Config-Tag") and \
+            self.config.get("flask.proxy_secret") and \
+            self.request.headers.get("X-4CAT-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
+            # need to ensure not just anyone can add this header to their
+            # request!
+            # to this end, the second header must be set to the secret value;
+            # if it is not set, assume the headers are not being configured by
+            # the proxy server
+            if not tags:
+                tags = []
+
+            tags += self.request.headers.get("X-4CAT-Config-Tag").split(",")
+
+        return tags
 
     def __getattr__(self, item):
         """
