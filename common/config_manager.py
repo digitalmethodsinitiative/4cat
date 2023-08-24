@@ -340,7 +340,8 @@ class ConfigWrapper:
     Wrapper for the config manager
 
     Allows setting a default set of tags or user, so that all subsequent calls
-    to `get()` are done for those tags or that user.
+    to `get()` are done for those tags or that user. Can also adjust tags based
+    on the HTTP request, if used in a Flask context.
     """
     def __init__(self, config, user=None, tags=None, request=None):
         """
@@ -411,12 +412,26 @@ class ConfigWrapper:
         return self.config.get(*args, **kwargs)
 
     def request_override(self, tags):
+        """
+        Force tag via HTTP request headers
+
+        To facilitate loading different configurations based on the HTTP
+        request, the request object can be passed to the ConfigWrapper and
+        if a certain request header is set, the value of that header will be
+        added to the list of tags to consider when retrieving settings.
+
+        See the flask.proxy_secret config setting; this is used to prevent
+        users from changing configuration by forging the header.
+
+        :param list|str tags:  List of tags to extend based on request
+        :return list:  Amended list of tags
+        """
         if type(tags) is str:
             tags = [tags]
 
-        if self.request and self.request.headers.get("X-4CAT-Config-Tag") and \
+        if self.request and self.request.headers.get("X-4Cat-Config-Tag") and \
             self.config.get("flask.proxy_secret") and \
-            self.request.headers.get("X-4CAT-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
+            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
             # need to ensure not just anyone can add this header to their
             # request!
             # to this end, the second header must be set to the secret value;
@@ -425,7 +440,9 @@ class ConfigWrapper:
             if not tags:
                 tags = []
 
-            tags += self.request.headers.get("X-4CAT-Config-Tag").split(",")
+            # can never set admin tag via headers (should always be user-based)
+            forbidden_overrides = ("admin",)
+            tags += [tag for tag in self.request.headers.get("X-4Cat-Config-Tag").split(",") if tag not in forbidden_overrides]
 
         return tags
 
