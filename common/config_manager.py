@@ -1,6 +1,5 @@
 import pickle
 import json
-import os
 
 from pathlib import Path
 from common.lib.database import Database
@@ -197,10 +196,6 @@ class ConfigManager:
             tags = []
         elif type(tags) is str:
             tags = [tags]
-
-        if os.environ.get("FOURCAT_CONFIG_TAG"):
-            # insert at end, i.e. least imnportant
-            tags += os.environ.get("FOURCAT_CONFIG_TAG").split(",")
 
         # can provide either a string or user object
         if type(user) is not str:
