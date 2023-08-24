@@ -288,21 +288,26 @@ class DmiServiceManager:
 
         return server_path_to_files, server_path_to_results
 
-    def download_results(self, filenames_to_download, folder_name, local_output_dir):
+    def download_results(self, filenames_to_download, folder_name, local_output_dir, timeout=30):
         """
         Download results from the DMI Service Manager server.
 
         :param list filenames_to_download:  List of filenames to download
-        :param str file_collection_name:    Name of collection where files were uploaded and results stored
         :param str folder_name:             Name of subfolder where files are localed (e.g. "results_name" or "files")
         :param Path local_output_dir:       Local Path to download files to
-        :param Dataset dataset:             Dataset object for status updates
+        :param int timeout:                 Number of seconds to wait for a response from the server
         """
         # Download the result files
         api_upload_endpoint = f"{self.server_address}download/"
-        self.processor.dataset.update_status(f"Downloading {len(filenames_to_download)} from {folder_name}...")
+        total_files_to_download = len(filenames_to_download)
+        files_downloaded = 0
+        self.processor.dataset.update_status(f"Downloading {total_files_to_download} files from {folder_name}...")
         for filename in filenames_to_download:
-            file_response = requests.get(api_upload_endpoint + f"{folder_name}/{filename}", timeout=30)
+            file_response = requests.get(api_upload_endpoint + f"{folder_name}/{filename}", timeout=timeout)
+            files_downloaded += 1
+            if files_downloaded % 1000 == 0:
+                self.processor.dataset.update_status(f"Downloaded {files_downloaded} of {total_files_to_download} files")
+            self.processor.dataset.update_progress(files_downloaded / total_files_to_download)
 
             with open(local_output_dir.joinpath(filename), 'wb') as file:
                 file.write(file_response.content)
