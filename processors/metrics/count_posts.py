@@ -59,7 +59,7 @@ class CountPosts(BasicProcessor):
 				try:
 					date = get_interval_descriptor(post, timeframe)
 				except ValueError as e:
-					self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+					self.dataset.update_status(f"{e}, cannot count posts per {timeframe}", is_final=True)
 					self.dataset.update_status(0)
 					return
 
@@ -76,7 +76,7 @@ class CountPosts(BasicProcessor):
 				counter += 1
 
 				if counter % 2500 == 0:
-					self.dataset.update_status("Counted through " + str(counter) + " posts.")
+					self.dataset.update_status(f"Counted {counter:,} of {self.source_dataset.num_rows:,} items.")
 					self.dataset.update_progress(counter / self.source_dataset.num_rows)
 
 			# pad interval if needed, this is useful if the result is to be
