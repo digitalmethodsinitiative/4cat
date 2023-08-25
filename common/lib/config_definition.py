@@ -194,7 +194,8 @@ config_definition = {
         "value": 81,
         "min": 0,
         "max": 360,
-        "coerce_type": int
+        "coerce_type": int,
+        "global": True
     },
     "4cat.layout_hue_secondary": {
         "type": UserInput.OPTION_HUE,
@@ -204,7 +205,8 @@ config_definition = {
         "value": 90,
         "min": 0,
         "max": 360,
-        "coerce_type": int
+        "coerce_type": int,
+        "global": True
     },
     "4cat.allow_access_request": {
         "type": UserInput.OPTION_TOGGLE,

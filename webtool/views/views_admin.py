@@ -416,7 +416,10 @@ def manipulate_tags():
 
     # explicit tags are already ordered; implicit tags have not been given a
     # place in the order yet, but are used for at least one user
-    all_tags = set.union(*[set(user["tags"]) for user in db.fetchall("SELECT tags FROM users")])
+    all_tags = set.union(
+        *[set(user["tags"]) for user in db.fetchall("SELECT tags FROM users")],
+        set([setting["tag"] for setting in db.fetchall("SELECT DISTINCT tag FROM settings") if setting["tag"]]))
+
     tags = [{"tag": tag, "explicit": True} for tag in tag_priority]
     tags.extend([{"tag": tag, "explicit": False} for tag in all_tags if tag not in tag_priority])
 

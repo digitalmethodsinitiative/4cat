@@ -379,6 +379,10 @@ class ConfigWrapper:
         """
         Wrap `get_all()`
 
+        Takes the `user`, `tags` and `request` given when initialised into
+        account. If `tags` is set explicitly, the HTTP header-based override
+        is not applied.
+
         :param args:
         :param kwargs:
         :return:
@@ -386,16 +390,19 @@ class ConfigWrapper:
         if "user" not in kwargs and self.user:
             kwargs["user"] = self.user
 
-        if "tags" not in kwargs and self.tags:
-            kwargs["tags"] = self.tags
-
-        kwargs["tags"] = self.request_override(kwargs["tags"])
+        if "tags" not in kwargs:
+            kwargs["tags"] = self.tags if self.tags else []
+            kwargs["tags"] = self.request_override(kwargs["tags"])
 
         return self.config.get_all(*args, **kwargs)
 
     def get(self, *args, **kwargs):
         """
         Wrap `get()`
+
+        Takes the `user`, `tags` and `request` given when initialised into
+        account. If `tags` is set explicitly, the HTTP header-based override
+        is not applied.
 
         :param args:
         :param kwargs:
@@ -405,9 +412,8 @@ class ConfigWrapper:
             kwargs["user"] = self.user
 
         if "tags" not in kwargs:
-            kwargs["tags"] = self.tags
-
-        kwargs["tags"] = self.request_override(kwargs["tags"])
+            kwargs["tags"] = self.tags if self.tags else []
+            kwargs["tags"] = self.request_override(kwargs["tags"])
 
         return self.config.get(*args, **kwargs)
 
