@@ -33,7 +33,7 @@ import common.lib.config_definition as config_definition
 
 from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 
 
 @app.route("/admin/")
@@ -49,10 +49,10 @@ def admin_frontpage():
     # collect some stats
     now = time.time()
     num_items = {
-        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')", (now - 86400,))["num"],
-        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')", (now - (86400 * 7),))[
+        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')", (now - 86400,))["num"],
+        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')", (now - (86400 * 7),))[
             "num"],
-        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets AND key_parent = '' AND (type LIKE '%-search' OR type LIKE '%-import')")["num"]
+        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')")["num"]
     }
 
     num_datasets = {
@@ -492,7 +492,7 @@ def manipulate_settings():
         try:
             # this gives us the parsed values, as Python variables, i.e. before
             # potentially encoding them as JSON
-            new_settings = UserInput.parse_all(definition, request.form.to_dict(),
+            new_settings = UserInput.parse_all(definition, request.form,
                                                silently_correct=False)
 
             for setting, value in new_settings.items():

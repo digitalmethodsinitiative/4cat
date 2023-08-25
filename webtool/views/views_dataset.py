@@ -4,33 +4,39 @@
 import json
 import csv
 import io
-import os
-import re
 
 import flask
-import markdown
+import json_stream
 from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, config
-from webtool.lib.helpers import Pagination, error
-from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset, \
-    erase_credentials
+from webtool import app, db, config
+from webtool.lib.helpers import Pagination, error, setting_required
+from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
 import backend
 from common.lib.dataset import DataSet
-from common.lib.queue import JobQueue
-from common.lib.user import User
 
 from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user)
+
+config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
-"""
-Results overview
-"""
+
+@app.route('/create-dataset/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def create_dataset():
+    """
+    Main tool frontend
+    """
+    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get(
+                       "datasources.enabled", {})}
+
+    return render_template('create-dataset.html', datasources=datasources)
 
 
 @app.route('/results/', defaults={'page': 1})
@@ -103,7 +109,8 @@ def show_results(page):
 
     # hide private datasets for non-owners and non-admins
     if not config.get("privileges.can_view_private_datasets"):
-        where.append("(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key))")
+        where.append(
+            "(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key))")
         replacements.append(owner_match)
 
     # empty datasets could just have no results, or be failures. we make no
@@ -134,12 +141,7 @@ def show_results(page):
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = []
-
-    for dataset in datasets:
-        dataset = DataSet(key=dataset["key"], db=db)
-        datasource = dataset.parameters.get("datasource", "")
-        filtered.append(dataset)
+    filtered = [DataSet(key=dataset["key"], db=db) for dataset in datasets]
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
@@ -154,7 +156,9 @@ def show_results(page):
 """
 Downloading results
 """
-@app.route('/result/<path:query_file>')
+
+
+@app.route('/result/<string:query_file>')
 def get_result(query_file):
     """
     Get dataset result file
@@ -184,7 +188,8 @@ def get_mapped_result(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     if dataset.get_extension() == ".csv":
@@ -257,7 +262,8 @@ def view_log(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     logfile = dataset.get_log_path()
@@ -273,7 +279,7 @@ def view_log(key):
 @app.route("/preview/<string:key>/")
 def preview_items(key):
     """
-    Preview a CSV file
+    Preview a dataset file
 
     Simply passes the first 25 rows of a dataset's csv result file to the
     template renderer.
@@ -286,26 +292,39 @@ def preview_items(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     preview_size = 1000
+    preview_bytes = (1024 * 1024 * 1)  # 1MB
 
     processor = dataset.get_own_processor()
     if not processor:
         return render_template("components/error_message.html", title="Preview not available",
                                message="No preview is available for this file.")
 
+    # json and ndjson can use mapped data for the preview or the raw json;
+    # this depends on 4CAT settings
+    has_mapper = hasattr(processor, "map_item")
+    use_mapper = has_mapper and config.get("ui.prefer_mapped_preview")
+
     if dataset.get_extension() == "gexf":
+        # network files
+        # use GEXF preview panel which loads full data file client-side
         hostname = config.get("flask.server_name").split(":")[0]
         in_localhost = hostname in ("localhost", "127.0.0.1") or hostname.endswith(".local") or \
-            hostname.endswith(".localhost")
+                       hostname.endswith(".localhost")
         return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
 
     elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp"):
+        # image file
+        # just show image in an empty page
         return render_template("preview/image.html", dataset=dataset)
 
-    else:
+    elif dataset.get_extension() not in ("json", "ndjson") or use_mapper:
+        # iterable data, which we use iterate_items() for, which in turn will
+        # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
             for row in dataset.iterate_items():
@@ -323,12 +342,63 @@ def preview_items(key):
         return render_template("preview/csv.html", rows=rows, max_items=preview_size,
                                dataset=dataset)
 
+    elif dataset.get_extension() == "json":
+        # JSON file
+        # show formatted json data, or a subset if possible
+        datafile = dataset.get_results_path()
+        truncated = False
+        if datafile.stat().st_size > preview_bytes:
+            # larger than 3MB
+            # is this a list?
+            with datafile.open() as infile:
+                if infile.read(1) == "[":
+                    # it's a list! use json_stream to stream the first items
+                    infile.seek(0)
+                    stream = json_stream.load(infile)
+                    data = []
+                    while infile.tell() < preview_bytes:
+                        # read up to 3 MB
+                        for row in stream:
+                            data.append(row)
+
+                    if infile.read(1) != "":
+                        # not EOF
+                        truncated = len(data)
+
+                else:
+                    data = "Data file too large; cannot preview"
+        else:
+            with datafile.open() as infile:
+                data = infile.read()
+
+        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+
+    elif dataset.get_extension() == "ndjson":
+        # mostly similar to JSON preview, but we don't have to stream the file
+        # as json, we can simply read line by line until we've reached the
+        # size limit
+        datafile = dataset.get_results_path()
+        truncated = False
+        data = []
+
+        with datafile.open() as infile:
+            while infile.tell() < preview_bytes:
+                line = infile.readline()
+                if line == "":
+                    break
+
+                data.append(json.loads(line.strip()))
+
+            if infile.read(1) != "":
+                # not EOF
+                truncated = len(data)
+
+        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+
 
 """
 Individual result pages
 """
-
-
 @app.route('/results/<string:key>/processors/')
 @app.route('/results/<string:key>/')
 def show_result(key):
@@ -364,9 +434,20 @@ def show_result(key):
     datasource = dataset.parameters.get("datasource", "")
     datasources = backend.all_modules.datasources
     datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
-    can_unexpire = datasource_expiration.get("allow_optout", False) and (
-                config.get("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user,
-                                                                                                       "owner"))
+    expires_datasource = False
+    can_unexpire = ((config.get('expire.allow_optout') and \
+                     datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout",
+                                                                                                   False)) \
+                   and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
+
+    timestamp_expires = None
+    if not dataset.parameters.get("keep"):
+        if datasource_expiration and datasource_expiration.get("timeout"):
+            timestamp_expires = dataset.timestamp + int(datasource_expiration.get("timeout"))
+            expires_datasource = True
+
+        elif dataset.parameters.get("expires-after"):
+            timestamp_expires = dataset.parameters.get("expires-after")
 
     # if the dataset has parameters with credentials, give user the option to
     # erase them
@@ -379,8 +460,9 @@ def show_result(key):
 
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
-                           is_favourite=is_favourite, has_credentials=has_credentials,can_unexpire=can_unexpire,
-                           datasources=datasources)
+                           is_favourite=is_favourite, timestamp_expires=timestamp_expires,
+                           has_credentials=has_credentials,
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
 
 
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
@@ -457,6 +539,7 @@ def toggle_private_interactive(key):
     else:
         return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
 
+
 @app.route("/results/<string:key>/keep/", methods=["GET"])
 @login_required
 def keep_dataset(key):
@@ -479,7 +562,8 @@ def keep_dataset(key):
         # cannot reset this
         datasource = dataset.parameters.get("datasource")
         datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
-        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get("expire.allow_optout"):
+        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get(
+                "expire.allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
                                    message="All datasets of this data source (%s) are scheduled for automatic "
                                            "deletion. This cannot be overridden." % datasource), 403

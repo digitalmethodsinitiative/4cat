@@ -26,8 +26,7 @@ from common.lib.helpers import send_email, get_software_version
 from pathlib import Path
 
 from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user)
-
+config = ConfigWrapper(config, user=current_user, request=request)
 
 @login_manager.user_loader
 def load_user(user_name):
@@ -312,7 +311,7 @@ def show_login():
     :return: Redirect to either the URL form, or the index (if logged in)
     """
     if current_user.is_authenticated:
-        return redirect(url_for("show_index"))
+        return redirect(url_for("show_frontpage"))
 
     has_admin_user = db.fetchone("SELECT * FROM users WHERE tags @> '[\"admin\"]'")
     if not has_admin_user:
@@ -332,7 +331,7 @@ def show_login():
 
     login_user(registered_user, remember=True)
 
-    return redirect(url_for("show_index"))
+    return redirect(url_for("show_frontpage"))
 
 
 @app.route("/logout")

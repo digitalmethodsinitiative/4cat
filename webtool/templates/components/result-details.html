@@ -55,6 +55,7 @@
 
             <div class="card-content">
                 <dl class="metadata-wrapper">
+                {% if __user_config("ui.show_datasource") %}
                     <div class="fullwidth">
                         <dt>Data source</dt>
                         <dd>
@@ -72,6 +73,7 @@
                         {% endif %}
                         </dd>
                     </div>
+                {% endif %}
 
                     <div class="onequarter">
                         <dt>Created</dt>
@@ -156,6 +158,21 @@
             {% endfor %}
         </ol>
     </section>
+
+    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) %}
+        <section class="inline-preview">
+            <h2 class="blocktitle section-subheader">
+                <span>Preview</span>
+                <button
+                    data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
+                    aria-controls="popup-preview-{{ dataset.key }}">
+                    <i class="fa fa-maximize" aria-hidden="true"></i> <span class="sr-only">Open in popup</span>
+                </button>
+            </h2>
+            <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
+            <iframe src="{{ url_for('preview_items', key=dataset.key) }}"></iframe>
+        </section>
+    {% endif %}
 
     {% if current_user.is_authenticated and __user_config("privileges.can_run_processors") and dataset.num_rows > 0 and dataset.get_available_processors(user=current_user)|length > 0 and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, role="owner")) %}
         <section class="analysis-gallery available-processors">

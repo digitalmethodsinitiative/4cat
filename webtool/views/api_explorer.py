@@ -23,7 +23,7 @@ from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
 
 from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 @app.route('/explorer/dataset/<string:key>/', defaults={'page': 0})

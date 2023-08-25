@@ -1,5 +1,5 @@
-import json
 import pickle
+import json
 
 from pathlib import Path
 from common.lib.database import Database
@@ -340,19 +340,26 @@ class ConfigWrapper:
     Wrapper for the config manager
 
     Allows setting a default set of tags or user, so that all subsequent calls
-    to `get()` are done for those tags or that user.
+    to `get()` are done for those tags or that user. Can also adjust tags based
+    on the HTTP request, if used in a Flask context.
     """
-    def __init__(self, config, user=None, tags=None):
+    def __init__(self, config, user=None, tags=None, request=None):
         """
         Initialise config wrapper
 
         :param ConfigManager config:  Initialised config manager
         :param user:  User to get settings for
         :param tags:  Tags to get settings for
+        :param request:  Request to get headers from. This can be used to set
+        a particular tag based on the HTTP headers of the request, e.g. to
+        serve 4CAT with a different configuration based on the proxy server
+        used.
         """
         self.config = config
         self.user = user
         self.tags = tags
+        self.request = request
+
 
     def set(self, *args, **kwargs):
         """
@@ -382,6 +389,8 @@ class ConfigWrapper:
         if "tags" not in kwargs and self.tags:
             kwargs["tags"] = self.tags
 
+        kwargs["tags"] = self.request_override(kwargs["tags"])
+
         return self.config.get_all(*args, **kwargs)
 
     def get(self, *args, **kwargs):
@@ -398,7 +407,44 @@ class ConfigWrapper:
         if "tags" not in kwargs:
             kwargs["tags"] = self.tags
 
+        kwargs["tags"] = self.request_override(kwargs["tags"])
+
         return self.config.get(*args, **kwargs)
+
+    def request_override(self, tags):
+        """
+        Force tag via HTTP request headers
+
+        To facilitate loading different configurations based on the HTTP
+        request, the request object can be passed to the ConfigWrapper and
+        if a certain request header is set, the value of that header will be
+        added to the list of tags to consider when retrieving settings.
+
+        See the flask.proxy_secret config setting; this is used to prevent
+        users from changing configuration by forging the header.
+
+        :param list|str tags:  List of tags to extend based on request
+        :return list:  Amended list of tags
+        """
+        if type(tags) is str:
+            tags = [tags]
+
+        if self.request and self.request.headers.get("X-4Cat-Config-Tag") and \
+            self.config.get("flask.proxy_secret") and \
+            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
+            # need to ensure not just anyone can add this header to their
+            # request!
+            # to this end, the second header must be set to the secret value;
+            # if it is not set, assume the headers are not being configured by
+            # the proxy server
+            if not tags:
+                tags = []
+
+            # can never set admin tag via headers (should always be user-based)
+            forbidden_overrides = ("admin",)
+            tags += [tag for tag in self.request.headers.get("X-4Cat-Config-Tag").split(",") if tag not in forbidden_overrides]
+
+        return tags
 
     def __getattr__(self, item):
         """

@@ -363,6 +363,14 @@ config_definition = {
         "tooltip": "User tag priority order. It is recommended to manipulate this with the 'User tags' panel instead of directly.",
         "global": True
     },
+    "flask.proxy_secret": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Proxy secret",
+        "tooltip": "Secret value to authenticate proxy headers. If the value of the X-4CAT-Config-Via-Proxy header "
+                   "matches this value, the X-4CAT-Config-Tag header can be used to enable a given configuration tag. "
+                   "Leave empty to disable this functionality."
+    },
     # YouTube variables to use for processors
     "api.youtube.name": {
         "type": UserInput.OPTION_TEXT,
@@ -408,6 +416,49 @@ config_definition = {
             "remote": "Remote",
         },
         "global": True
+    },
+    # UI settings
+    # this configures what the site looks like
+    "ui.homepage": {
+        "type": UserInput.OPTION_CHOICE,
+        "options": {
+            "about": "'About' page",
+            "create-dataset": "'Create dataset' page",
+            "datasets": "Dataset overview"
+        },
+        "help": "4CAT home page",
+        "default": "about"
+    },
+    "ui.inline_preview": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Show inline preview",
+        "default": False,
+        "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
+    },
+    "ui.show_datasource": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Show data source",
+        "default": True,
+        "tooltip": "Show data source for each dataset. Can be useful to disable if only one data source is enabled."
+    },
+    "ui.nav_pages": {
+        "type": UserInput.OPTION_MULTI_SELECT,
+        "help": "Pages in navigation",
+        "options": {
+            "faq": "FAQ",
+            "data-policy": "Data Policy",
+            "citing": "How to cite",
+            "about": "About",
+        },
+        "default": ["faq", "about"],
+        "tooltip": "These pages will be included in the navigation bar at the top of the interface."
+    },
+    "ui.prefer_mapped_preview": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Prefer mapped preview",
+        "default": True,
+        "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
+                   "of the underlying JSON."
     }
 }
 
@@ -424,5 +475,6 @@ categories = {
     "logging": "Logging",
     "path": "File paths",
     "privileges": "User privileges",
-    "dmi-service-manager": "DMI Service Manager"
+    "dmi-service-manager": "DMI Service Manager",
+    "ui": "User interface"
 }

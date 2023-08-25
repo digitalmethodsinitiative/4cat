@@ -31,7 +31,7 @@ from common.lib.user import User
 from backend.lib.worker import BasicWorker
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
-config = ConfigWrapper(config, user=current_user)
+config = ConfigWrapper(config, user=current_user, request=request)
 
 API_SUCCESS = 200
 API_FAIL = 404
@@ -294,7 +294,7 @@ def queue_dataset():
 		# just in case
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(None, current_user), request.form.to_dict(), silently_correct=False)
+			sanitised_query = UserInput.parse_all(search_worker.get_options(None, current_user), request.form, silently_correct=False)
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
@@ -1028,7 +1028,7 @@ def queue_processor(key=None, processor=None):
 
 	# create a dataset now
 	try:
-		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form.to_dict(), silently_correct=False)
+		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form, silently_correct=False)
 	except QueryParametersException as e:
 		return error(400, error=str(e))
 
