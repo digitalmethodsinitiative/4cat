@@ -480,7 +480,7 @@ button.tooltip-trigger {
     max-height: 1.75em;
 }
 
-button.tooltip-trigger, button.popup-trigger {
+button.tooltip-trigger {
 	font-size: 0.8em;
 	position: relative;
 	top: -0.1em;
@@ -610,6 +610,12 @@ button.tooltip-trigger, button.popup-trigger {
     height: 98%;
     position: relative;
     top: 1%;
+}
+
+.inline-preview iframe {
+    width: 100%;
+    height: fit-content;
+    max-height: 35em;
 }
 
 .csv-preview {

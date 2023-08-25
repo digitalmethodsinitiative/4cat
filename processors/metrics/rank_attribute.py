@@ -164,7 +164,7 @@ class AttributeRanker(BasicProcessor):
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)
 			except ValueError as e:
-				self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+				self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
 				self.dataset.update_status(0)
 				return
 
@@ -218,7 +218,7 @@ class AttributeRanker(BasicProcessor):
 		if rows:
 			self.write_csv_items_and_finish(rows)
 		else:
-			self.dataset.update_status("No posts contain the requested attributes.")
+			self.dataset.update_status("No items contain the requested attributes.")
 			self.dataset.finish(0)
 
 	def get_values(self, post, attributes, filter, split_comma, extract):

@@ -43,7 +43,7 @@ class ViewMetadata(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.type.startswith("video-downloader")
+		return module.type.startswith("video-downloader") or module.type.startswith("image-downloader")
 
 	def process(self):
 		"""

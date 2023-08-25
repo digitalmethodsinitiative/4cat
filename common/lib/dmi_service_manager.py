@@ -243,9 +243,9 @@ class DmiServiceManager:
 
         # Compare files with previously uploaded
         to_upload_filenames = [filename for filename in files_to_upload if filename not in uploaded_files]
+        total_files_to_upload = len(to_upload_filenames)
 
-        if len(to_upload_filenames) > 0 or results_name not in existing_files:
-            # TODO: perhaps upload one at a time?
+        if total_files_to_upload > 0 or results_name not in existing_files:
             api_upload_endpoint = f"{self.server_address}send_files"
 
             # Create a blank file to upload into results folder
@@ -253,42 +253,61 @@ class DmiServiceManager:
             with open(dir_with_files.joinpath(empty_placeholder), 'w') as file:
                 file.write('')
 
-            self.processor.dataset.update_status(f"Uploading {len(to_upload_filenames)} files")
-            response = requests.post(api_upload_endpoint,
-                                     files=[('4cat_uploads', open(dir_with_files.joinpath(file), 'rb')) for file in
-                                            to_upload_filenames] + [
-                                               (results_name, open(dir_with_files.joinpath(empty_placeholder), 'rb'))],
-                                     data=data, timeout=120)
+            self.processor.dataset.update_status(f"Uploading {total_files_to_upload} files")
+            files_uploaded = 0
+            while to_upload_filenames:
+                # Upload files
+                if files_uploaded == 0:
+                    upload_file = empty_placeholder
+                    # Upload a blank file to create the results folder
+                    response = requests.post(api_upload_endpoint,
+                                             files=[(results_name, open(dir_with_files.joinpath(empty_placeholder), 'rb'))],
+                                             data=data, timeout=120)
+                else:
+                    upload_file = to_upload_filenames.pop()
+                    response = requests.post(api_upload_endpoint,
+                                             files=[('4cat_uploads', open(dir_with_files.joinpath(upload_file), 'rb'))],
+                                             data=data, timeout=120)
 
-            if response.status_code == 200:
-                self.processor.dataset.update_status(f"Files uploaded: {len(to_upload_filenames)}")
-            elif response.status_code == 403:
-                raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
-            elif response.status_code == 405:
-                raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
-            else:
-                self.processor.dataset.update_status(f"Unable to upload {len(to_upload_filenames)} files!")
+                if response.status_code == 200:
+                    files_uploaded += 1
+                    if files_uploaded % 1000 == 0:
+                        self.processor.dataset.update_status(f"Uploaded {files_uploaded} of {total_files_to_upload} files!")
+                    self.processor.dataset.update_progress(files_uploaded / total_files_to_upload)
+                elif response.status_code == 403:
+                    raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
+                elif response.status_code == 405:
+                    raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
+                else:
+                    self.processor.dataset.log(f"Unable to upload file ({response.status_code - response.reason}): {upload_file}")
+
+            self.processor.dataset.update_status(f"Uploaded {files_uploaded} files!")
 
         server_path_to_files = Path(file_collection_name).joinpath("4cat_uploads")
         server_path_to_results = Path(file_collection_name).joinpath(results_name)
 
         return server_path_to_files, server_path_to_results
 
-    def download_results(self, filenames_to_download, folder_name, local_output_dir):
+    def download_results(self, filenames_to_download, folder_name, local_output_dir, timeout=30):
         """
         Download results from the DMI Service Manager server.
 
         :param list filenames_to_download:  List of filenames to download
-        :param str file_collection_name:    Name of collection where files were uploaded and results stored
         :param str folder_name:             Name of subfolder where files are localed (e.g. "results_name" or "files")
         :param Path local_output_dir:       Local Path to download files to
-        :param Dataset dataset:             Dataset object for status updates
+        :param int timeout:                 Number of seconds to wait for a response from the server
         """
         # Download the result files
         api_upload_endpoint = f"{self.server_address}download/"
-        self.processor.dataset.update_status(f"Downloading {len(filenames_to_download)} from {folder_name}...")
+        total_files_to_download = len(filenames_to_download)
+        files_downloaded = 0
+        self.processor.dataset.update_status(f"Downloading {total_files_to_download} files from {folder_name}...")
         for filename in filenames_to_download:
-            file_response = requests.get(api_upload_endpoint + f"{folder_name}/{filename}", timeout=30)
+            file_response = requests.get(api_upload_endpoint + f"{folder_name}/{filename}", timeout=timeout)
+            files_downloaded += 1
+            if files_downloaded % 1000 == 0:
+                self.processor.dataset.update_status(f"Downloaded {files_downloaded} of {total_files_to_download} files")
+            self.processor.dataset.update_progress(files_downloaded / total_files_to_download)
 
             with open(local_output_dir.joinpath(filename), 'wb') as file:
                 file.write(file_response.content)

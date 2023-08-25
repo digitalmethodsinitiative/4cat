@@ -392,3 +392,22 @@ class TikTokImageDownloader(BasicProcessor):
         extension = response.headers["Content-Type"].split("/")[-1]
 
         return picture, extension
+
+    @staticmethod
+    def map_metadata(url, data):
+        """
+        Iterator to yield modified metadata for CSV
+
+        :param str url:  string that may contain URLs
+        :param dict data:  dictionary with metadata collected previously
+        :yield dict:  	  iterator containing reformated metadata
+        """
+        row = {
+            "url": url,
+            "number_of_posts_with_url": len(data.get("post_ids", [])),
+            "post_ids": ", ".join(data.get("post_ids", [])),
+            "filename": data.get("filename"),
+            "download_successful": data.get('success', "")
+        }
+
+        yield row

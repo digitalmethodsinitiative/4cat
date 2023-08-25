@@ -30,7 +30,7 @@
         </a>
         </li>
     {% endif %}
-    {% if dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item %}
+    {% if (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
         <li>
         <a href="{{ url_for('preview_items', key=dataset.key) }}"
            data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"

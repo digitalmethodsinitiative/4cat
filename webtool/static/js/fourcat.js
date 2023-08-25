@@ -1426,6 +1426,9 @@ const ui_helpers = {
         //table controls
         $(document).on('input', '.copy-from', ui_helpers.table_control);
 
+        //iframe flexible sizing
+        $('iframe').on('load', ui_helpers.fit_iframe);
+
         // Controls to change which results show up in overview
         $('.view-controls button').hide();
         $('.view-controls input, .view-controls select, .view-controls textarea').on('change', function () {
@@ -1706,15 +1709,27 @@ const ui_helpers = {
         let table = $(control).parents('table');
         let class_match = [...e.target.classList].filter((e) => e.indexOf('d-') === 0);
         table[0].querySelectorAll('.copy-to.' + class_match).forEach((element) => {
-            if($(element).parents('.d-ignore').length > 0) {
+            if ($(element).parents('.d-ignore').length > 0) {
                 return;
             }
-            if(element.getAttribute('type') === 'checkbox') {
+            if (element.getAttribute('type') === 'checkbox') {
                 element.checked = value;
             } else {
                 element.value = value;
             }
         })
+    },
+
+    /**
+     * Fit an iframe to its content's offsetHeight
+     *
+     * Use max-height on iframe element to add an upper limit!
+     *
+     * @param e
+     */
+    fit_iframe: function(e) {
+        let iframe_height = e.target.contentWindow.document.documentElement.offsetHeight;
+        e.target.style.height = iframe_height + 'px';
     }
 }
 

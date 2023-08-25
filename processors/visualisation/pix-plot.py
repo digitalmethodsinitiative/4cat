@@ -268,6 +268,82 @@ class PixPlotGenerator(BasicProcessor):
 
         with open(os.path.join(temp_path, '.metadata.json')) as file:
             image_data = json.load(file)
+
+        # Images can belong to multiple posts, so we must build this file as we go
+        images = {}
+
+        # Reformat image_data to access by filename and begin metadata
+        post_id_image_dictionary = {}
+        successful_image_count = 0
+        for url, data in image_data.items():
+            # Check if image successfully downloaded for image
+            if data.get('success') and data.get('filename') is not None and data.get('post_ids'):
+                successful_image_count += 1
+                # if no filename, bad metadata; file was not actually downloaded, fixed in 9b603cd1ecdf97fd92c3e1c6200e4b6700dc1e37
+
+                # dmi_pix_plot API uses secure_filename while pixplot.py (in PixPlot library) uses clean_filename
+                filename = self.clean_filename(secure_filename(data.get('filename')))
+
+                for post_id in data.get('post_ids'):
+                    # Add key to post ID dictionary
+                    if post_id in post_id_image_dictionary.keys():
+                        post_id_image_dictionary[post_id].append(url)
+                    else:
+                        post_id_image_dictionary[post_id] = [url]
+
+                # Add to metadata
+                images[filename] = {'filename': filename,
+                                    'permalink': url,
+                                    'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(data.get('post_ids'))),
+                                    'tags': '',
+                                    'number_of_posts': 0,
+                                    }
+
+        self.dataset.log(f"Metadata for {successful_image_count} images collected from {len(post_id_image_dictionary)} posts")
+
+        # Loop through source file
+        posts_with_images = 0
+        for post in self.dataset.top_parent().iterate_items(self):
+            # Check if post contains one of the downloaded images
+            if post['id'] in post_id_image_dictionary.keys():
+                posts_with_images += 1
+                for img_name in post_id_image_dictionary[post['id']]:
+                    image = images[img_name]
+
+                    # Update description
+                    image['number_of_posts'] += 1
+                    image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
+                    # Order of Description elements
+                    ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
+                    for detail in ordered_descriptions:
+                        if post.get(detail):
+                            image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
+                    for key, value in post.items():
+                        if key not in ordered_descriptions:
+                            image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
+
+                    # Add tags or hashtags
+                    if image['tags']:
+                        image['tags'] += '|'
+                    if 'tags' in post.keys():
+                        if type(post['tags']) == list:
+                            image['tags'] += '|'.join(post['tags'])
+                        else:
+                            image['tags'] += '|'.join(post['tags'].split(','))
+                    elif 'hashtags' in post.keys():
+                        if type(post['hashtags']) == list:
+                            image['tags'] += '|'.join(post['hashtags'])
+                        else:
+                            image['tags'] += '|'.join(post['hashtags'].split(','))
+
+                    # Category could perhaps be a user chosen column...
+
+                    # If images repeat this will overwrite prior value
+                    # I really dislike that the download images is not a one to one with posts...
+                    if 'timestamp' in post.keys():
+                        image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+        self.dataset.log(f"Image metadata added to {posts_with_images} posts")
+
         # Get path for metadata file
         metadata_file_path = temp_path.joinpath('metadata.csv')
         # Set fieldnames for metadata file
@@ -275,91 +351,13 @@ class PixPlotGenerator(BasicProcessor):
 
         # Open metadata file and iterate through source file
         with metadata_file_path.open("w", encoding="utf-8", newline="") as output:
-            # Our to-be metadata
-            images = {}
-
-            # Reformat image_data to access by filename and begin metadata
-            post_id_image_dictionary = {}
-            for url, data in image_data.items():
-
-                # Check if image successfully downloaded for image
-                if data.get('success'):
-                    ids = data.get('post_ids')
-                    # dmi_pix_plot API uses sercure_filename while pixplot.py (in PixPlot library) uses clean_filename
-                    # Ensure our metadata filenames match results
-                    filename = self.clean_filename(secure_filename(data.get('filename')))
-                    for post_id in ids:
-                        # Add to key
-                        if post_id in post_id_image_dictionary.keys():
-                            post_id_image_dictionary[post_id].append(filename)
-                        else:
-                            post_id_image_dictionary[post_id] = [filename]
-
-                    # Add to metadata
-                    images[filename] = {'filename': filename,
-                                        'permalink': url,
-                                        'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(ids)),
-                                        'tags': '',
-                                        'number_of_posts': 0,
-                                        }
-
-            self.dataset.log(f"Metadata for {len(images)} images collected from {len(post_id_image_dictionary)} posts")
-            # Loop through source file
-            posts_with_images = 0
-            for post in self.dataset.top_parent().iterate_items(self):
-                # Check if post contains one of the downloaded images
-                if post['id'] in post_id_image_dictionary.keys():
-                    posts_with_images += 1
-                    for img_name in post_id_image_dictionary[post['id']]:
-                        image = images[img_name]
-
-                        # Update description
-                        image['number_of_posts'] += 1
-                        image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
-                        # Order of Description elements
-                        ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
-                        for detail in ordered_descriptions:
-                            if post.get(detail):
-                                image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
-                        for key, value in post.items():
-                            if key not in ordered_descriptions:
-                                image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
-
-                        # PixPlot has a field limit of 131072
-                        # TODO: PixPlot (dmi version) has been updated and this likely is no longer needed
-                        # test first as displaying long descriptions still may have issues
-                        image['description'] = image['description'][:131072]
-
-                        # Add tags or hashtags
-                        if image['tags']:
-                            image['tags'] += '|'
-                        if 'tags' in post.keys():
-                            if type(post['tags']) == list:
-                                image['tags'] += '|'.join(post['tags'])
-                            else:
-                                image['tags'] += '|'.join(post['tags'].split(','))
-                        elif 'hashtags' in post.keys():
-                            if type(post['hashtags']) == list:
-                                image['tags'] += '|'.join(post['hashtags'])
-                            else:
-                                image['tags'] += '|'.join(post['hashtags'].split(','))
-
-                        # Category could perhaps be a user inputed column...
-
-                        # If images repeat this will overwrite prior value
-                        # I really dislike that the download images is not a one to one with posts...
-                        if 'timestamp' in post.keys():
-                            image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
-            self.dataset.log(f"Image metadata added to {posts_with_images} posts")
-
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()
-
             # Finally, write images to metadata.csv
             rows_written = 0
-            for image in images:
+            for image in images.values():
                 rows_written += 1
-                writer.writerow(images[image])
+                writer.writerow(image)
 
         self.dataset.update_status("Metadata.csv created")
         return metadata_file_path if rows_written != 0 else False

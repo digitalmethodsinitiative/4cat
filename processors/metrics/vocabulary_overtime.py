@@ -136,7 +136,7 @@ class OvertimeAnalysis(BasicProcessor):
 				post["body"] = ""
 				
 			if processed % 2500 == 0:
-				self.dataset.update_status("Processed %i posts" % processed)
+				self.dataset.update_status(f"Processed {processed:,} items")
 				self.dataset.update_progress(processed / self.source_dataset.num_rows)
 				
 			# if 'partition' is false, there will just be one combined

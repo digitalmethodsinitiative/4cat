@@ -353,8 +353,13 @@ class TikTokScraper:
                 try:
                     if sigil.text:
                         metadata = json.loads(sigil.text)
-                    else:
+                    elif sigil.contents and len(sigil.contents) > 0:
                         metadata = json.loads(sigil.contents[0])
+                    else:
+                        failed += 1
+                        self.processor.dataset.log(
+                            "Embedded metadata was found for video %s, but it could not be parsed, skipping" % url)
+                        continue
                 except json.JSONDecodeError:
                     failed += 1
                     self.processor.dataset.log(
