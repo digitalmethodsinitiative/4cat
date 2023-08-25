@@ -123,7 +123,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)
 			except ValueError as e:
-				self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+				self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
 				self.dataset.update_status(0)
 				return
 

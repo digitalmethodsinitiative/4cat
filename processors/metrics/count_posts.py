@@ -16,8 +16,8 @@ class CountPosts(BasicProcessor):
 	"""
 	type = "count-posts"  # job type ID
 	category = "Post metrics" # category
-	title = "Count posts"  # title displayed in UI
-	description = "Counts how many posts are in the dataset (overall or per timeframe)."  # description displayed in UI
+	title = "Count items"  # title displayed in UI
+	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	options = {
@@ -31,7 +31,7 @@ class CountPosts(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Include dates where the count is zero",
-			"tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
+			"tooltip": "Makes the counts continuous. For example, if there are items from May and July but not June, June will be included with 0 items."
 		}
 	}
 
@@ -51,7 +51,7 @@ class CountPosts(BasicProcessor):
 		first_interval = "9999"
 		last_interval = "0000"
 
-		self.dataset.update_status("Processing posts")
+		self.dataset.update_status("Processing items")
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
 
@@ -59,7 +59,7 @@ class CountPosts(BasicProcessor):
 				try:
 					date = get_interval_descriptor(post, timeframe)
 				except ValueError as e:
-					self.dataset.update_status(f"{e}, cannot count posts per {timeframe}", is_final=True)
+					self.dataset.update_status(f"{e}, cannot count items per {timeframe}", is_final=True)
 					self.dataset.update_status(0)
 					return
 
@@ -162,7 +162,7 @@ class CountPosts(BasicProcessor):
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
 				"help": "Add relative counts",
-				"tooltip": "Divides the absolute count by the total amount of posts for this timeframe."
+				"tooltip": "Divides the absolute count by the total amount of items for this timeframe."
 			}
 		
 		return options
