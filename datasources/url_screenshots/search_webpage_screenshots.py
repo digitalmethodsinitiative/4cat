@@ -20,7 +20,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
     """
     Get HTML via the Selenium webdriver and Firefox browser
     """
-    type = "url_screenshots-search"  # job ID
+    type = "image-downloader-screenshots-search"  # job ID
     extension = "zip"
     max_workers = 1
 

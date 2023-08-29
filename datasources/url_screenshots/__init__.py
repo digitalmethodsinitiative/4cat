@@ -8,5 +8,5 @@ Initialize Selenium Url Scraper data source for screenshots
 from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "url_screenshots"
+DATASOURCE = "image-downloader-screenshots"
 NAME = "Screenshot Generator"
