@@ -6,7 +6,7 @@ NOTE: expects a file called bugs.json to be located in common\assets\
 import os
 import csv
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 import common.config_manager as config
 

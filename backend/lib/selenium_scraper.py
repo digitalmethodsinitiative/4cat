@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import ProcessorException
 import common.config_manager as config
 

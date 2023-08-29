@@ -7,8 +7,7 @@ from urllib.parse import urlparse
 import datetime
 import random
 
-from backend.abstract.selenium_scraper import SeleniumScraper
-from selenium.common.exceptions import TimeoutException
+from backend.lib.selenium_scraper import SeleniumScraper
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput

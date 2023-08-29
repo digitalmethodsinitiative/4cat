@@ -1,11 +1,10 @@
 """
 Screenshot URLs w/ Selenium
 """
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, extract_urls_from_string
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
-from backend.abstract.selenium_scraper import SeleniumWrapper
-import common.config_manager as config
+from backend.lib.selenium_scraper import SeleniumWrapper
 
 import os
 import json

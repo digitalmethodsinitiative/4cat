@@ -10,7 +10,7 @@ import time
 import os
 import re
 
-from backend.abstract.selenium_scraper import SeleniumScraper
+from backend.lib.selenium_scraper import SeleniumScraper
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import convert_to_int
