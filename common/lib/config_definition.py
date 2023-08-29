@@ -487,7 +487,19 @@ config_definition = {
         "default": True,
         "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
                    "of the underlying JSON."
-    }
+    },
+    "ui.offer_hashing": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer pseudonymisation",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
+    },
+    "ui.offer_private": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer create as private",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
+    },
 }
 
 # These are used in the web interface for more readable names
