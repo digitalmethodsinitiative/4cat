@@ -57,7 +57,7 @@ class AnnotateImages(ProcessorPreset):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor to run on all csv and NDJSON datasets
 

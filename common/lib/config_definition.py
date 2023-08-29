@@ -222,18 +222,6 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
-    "expire.offer_hashing": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Offer pseudonymisation",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
-    },
-    "expire.offer_private": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Offer create as private",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
-    },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
@@ -515,7 +503,6 @@ categories = {
     "logging": "Logging",
     "path": "File paths",
     "selenium": "Selenium Scraper settings",
-    'text_from_images': 'OCR: Extract text from images (https://github.com/digitalmethodsinitiative/ocr_server)',
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
     "ui": "User interface"

@@ -562,13 +562,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 			files = files.glob("*")
 
-		print("Files: %s" % repr(files))
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")
 		done = 0
 		with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zip:
 			for output_path in files:
-				print("Compressing %s" % output_path)
 				zip.write(output_path, output_path.name)
 				output_path.unlink()
 				done += 1

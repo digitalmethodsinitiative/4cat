@@ -74,11 +74,11 @@ class Search(BasicProcessor, ABC):
 		except WorkerInterruptedException:
 			raise ProcessorInterruptedException("Interrupted while collecting data, trying again later.")
 
-		# Write posts to csv and update the DataBase status to finished
+		# Write items to file and update the DataBase status to finished
 		num_items = 0
 		if items:
-			self.dataset.update_status("Writing posts to result file")
-			if not hasattr(self, "extension") or self.extension == "csv":
+			self.dataset.update_status("Writing collected data to dataset file")
+			if self.extension == "csv":
 				num_items = self.items_to_csv(items, results_file)
 			elif self.extension == "ndjson":
 				num_items = self.items_to_ndjson(items, results_file)
@@ -395,10 +395,10 @@ class SearchWithScope(Search, ABC):
 		# handle the various search scope options after retrieving initial item
 		# list
 		if query.get("search_scope", None) == "dense-threads":
-			# dense threads - all posts in all threads in which the requested
-			# proportion of posts matches
-			# first, get amount of posts for all threads in which matching
-			# posts occur and that are long enough
+			# dense threads - all items in all threads in which the requested
+			# proportion of items matches
+			# first, get amount of items for all threads in which matching
+			# items occur and that are long enough
 			thread_ids = tuple([item["thread_id"] for item in items])
 			self.dataset.update_status("Retrieving thread metadata for %i threads" % len(thread_ids))
 			try:
