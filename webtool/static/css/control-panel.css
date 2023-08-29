@@ -180,6 +180,7 @@ ol#tag-order li:nth-child(2n) {
     min-width: 17.5em;
     background: var(--gray);
     margin-bottom: 2em;
+    max-width: 45%;
 }
 
 article .stats-container h3:not(.blocktitle) {
