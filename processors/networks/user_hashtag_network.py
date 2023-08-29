@@ -2,6 +2,8 @@
 Generate bipartite user-hashtag graph of posts
 """
 from backend.lib.preset import ProcessorPreset
+from common.lib.user_input import UserInput
+
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -18,6 +20,17 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     title = "Bipartite Author-tag Network"  # title displayed in UI
     description = "Produces a bipartite graph based on co-occurence of (hash)tags and people. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link. Tag nodes are weighed on how often they occur. User nodes are weighed on how many posts they've made."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        return {
+            "to-lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Convert values to lowercase",
+                "tooltip": "Merges values with varying cases"
+                }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
@@ -58,7 +71,8 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
                     "directed": False,
                     "split-comma": True,
                     "categorise": True,
-                    "allow-loops": False
+                    "allow-loops": False,
+                    "to-lowercase": self.parameters.get("to-lowercase", False),
                 }
             }
         ]
