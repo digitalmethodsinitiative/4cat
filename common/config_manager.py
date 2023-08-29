@@ -191,31 +191,8 @@ class ConfigManager:
         if not self.db:
             self.with_db()
 
-        # be flexible about the input types here
-        if tags is None:
-            tags = []
-        elif type(tags) is str:
-            tags = [tags]
-
-        # can provide either a string or user object
-        if type(user) is not str:
-            if hasattr(user, "get_id"):
-                user = user.get_id()
-            elif user is not None:
-                raise TypeError("get() expects None, a User object or a string for argument 'user'")
-
-        # user-specific settings are just a special type of tag (which takes
-        # precedence), same goes for user groups
-        if user:
-            user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
-            if user_tags:
-                try:
-                    tags.extend(user_tags["tags"])
-                except (TypeError, ValueError):
-                    # should be a JSON list, but isn't
-                    pass
-
-            tags.insert(0, f"user:{user}")
+        # get tags to look for
+        tags = self.get_active_tags(user, tags)
 
         # query database for any values within the required tags
         tags.append("")  # empty tag = default value
@@ -263,6 +240,49 @@ class ConfigManager:
             return list(final_settings.values())[0]
         else:
             return final_settings
+
+    def get_active_tags(self, user=None, tags=None):
+        """
+        Get active tags for given user/tag list
+
+        Used internally to harmonize tag setting for various methods, but can
+        also be called directly to verify tag activation.
+
+        :param user:  User object or name. Adds a tag `user:[username]` in
+        front of the tag list.
+        :param tags:  Tag or tags for the required setting. If a tag is
+        provided, the method checks if a special value for the setting exists
+        with the given tag, and returns that if one exists. First matching tag
+        wins.
+        :return list:  List of tags
+        """
+        # be flexible about the input types here
+        if tags is None:
+            tags = []
+        elif type(tags) is str:
+            tags = [tags]
+
+        # can provide either a string or user object
+        if type(user) is not str:
+            if hasattr(user, "get_id"):
+                user = user.get_id()
+            elif user is not None:
+                raise TypeError("get() expects None, a User object or a string for argument 'user'")
+
+        # user-specific settings are just a special type of tag (which takes
+        # precedence), same goes for user groups
+        if user:
+            user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
+            if user_tags:
+                try:
+                    tags.extend(user_tags["tags"])
+                except (TypeError, ValueError):
+                    # should be a JSON list, but isn't
+                    pass
+
+            tags.insert(0, f"user:{user}")
+
+        return tags
 
     def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True):
         """
@@ -416,6 +436,24 @@ class ConfigWrapper:
             kwargs["tags"] = self.request_override(kwargs["tags"])
 
         return self.config.get(*args, **kwargs)
+
+    def get_active_tags(self, user=None, tags=None):
+        """
+        Wrap `get_active_tags()`
+
+        Takes the `user`, `tags` and `request` given when initialised into
+        account. If `tags` is set explicitly, the HTTP header-based override
+        is not applied.
+
+        :param user:
+        :param tags:
+        :return list:
+        """
+        active_tags = self.config.get_active_tags(user, tags)
+        if not tags:
+            active_tags = self.request_override(active_tags)
+
+        return active_tags
 
     def request_override(self, tags):
         """

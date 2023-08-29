@@ -201,6 +201,21 @@ article .stats-container h3:not(.blocktitle) {
     border-bottom: 1px dotted var(--contrast-dark);
 }
 
+.stats-container div.tag-list {
+    display: block;
+}
+
+.stats-container div.tag-list dt {
+    float: left;
+    display: block;
+    width: 60%;
+    margin-bottom: 0.25em;
+}
+
+.stats-container .property-badge {
+    margin-right: 0.5em;
+}
+
 /**
  ** Bulk dataset management
  */
