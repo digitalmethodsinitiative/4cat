@@ -6,7 +6,7 @@ Only supports bit based hashes currently (e.g., 101010101110110011)
 import networkx as nx
 import numpy as np
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
@@ -69,7 +69,7 @@ class HashSimilarityNetworker(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Currently only allowed on video-hashes, but technically any row of bit hashes will work. Could check for "hash"
         in columns, but... how to make that a check as a classmethod?

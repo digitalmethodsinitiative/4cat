@@ -8,7 +8,7 @@ import pandas as pd
 import itertools
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import TfidfModel
@@ -89,11 +89,11 @@ class TfIdf(BasicProcessor):
 	]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on token sets
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "tokenise-posts"
 
@@ -254,17 +254,17 @@ class TfIdf(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		feature_array = np.array(tfidf_vectorizer.get_feature_names())
+		feature_array = np.array(tfidf_vectorizer.get_feature_names_out())
 		tfidf_sorting = np.argsort(tfidf_matrix.toarray()).flatten()[::-1]
 
 		# Print and store top n highest scoring tf-idf scores
 		top_words = feature_array[tfidf_sorting[:top_n]]
 		weights = np.asarray(tfidf_matrix.mean(axis=0)).ravel().tolist()
-		df_weights = pd.DataFrame({"term": tfidf_vectorizer.get_feature_names(), "weight": weights})
+		df_weights = pd.DataFrame({"term": tfidf_vectorizer.get_feature_names_out(), "weight": weights})
 		df_weights = df_weights.sort_values(by="weight", ascending=False).head(100)
 
 		self.dataset.update_status("Writing tf-idf vector to csv")
-		df_matrix = pd.DataFrame(tfidf_matrix.toarray(), columns=tfidf_vectorizer.get_feature_names())
+		df_matrix = pd.DataFrame(tfidf_matrix.toarray(), columns=tfidf_vectorizer.get_feature_names_out())
 
 		# Turn the dataframe 90 degrees
 		df_matrix = df_matrix.transpose()

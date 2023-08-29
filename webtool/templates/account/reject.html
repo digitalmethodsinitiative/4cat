@@ -7,7 +7,7 @@
     <article class="small">
         <section>
             <h2><span>Reject account request</span></h2>
-            <p>Use this form to send a rejection to an account request for {{ __tool_name }}.</p>
+            <p>Use this form to send a rejection to an account request for {{ __user_config("4cat.name") }}.</p>
 
             <form action="/admin/reject-user/" method="POST" class="wide">
                 {% for notice in flashes %}
@@ -30,7 +30,7 @@
                 </div>
             </form>
 
-            {% include "form-footer.html" %}
+            {% include "components/form-footer.html" %}
         </section>
     </article>
 {% endblock %}

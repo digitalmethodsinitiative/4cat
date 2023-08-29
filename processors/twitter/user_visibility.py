@@ -1,12 +1,11 @@
 """
 Twitter APIv2 base stats class
 """
-import abc
 import datetime
 
-from common.lib.helpers import pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
+from common.lib.helpers import get_interval_descriptor
+from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -36,7 +35,7 @@ class TwitterUserVisibility(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
@@ -68,9 +67,7 @@ class TwitterUserVisibility(BasicProcessor):
                 post["timestamp"] = tweet_time.strftime("%Y-%m-%d %H:%M:%S")
                 date = get_interval_descriptor(post, timeframe)
             except ValueError as e:
-                self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
-                self.dataset.update_status(0)
-                return
+                return self.dataset.finish_with_error("%s, cannot count posts per %s" % (str(e), timeframe))
 
             if date not in intervals:
                 intervals[date] = {}
@@ -78,7 +75,7 @@ class TwitterUserVisibility(BasicProcessor):
             # Add author
             author = post.get("author_user").get("username")
             if author == 'REDACTED':
-                raise ProcessorException("Author information has been removed; cannot calculate frequencies")
+                return self.dataset.finish_with_error("Author information has been removed; cannot calculate frequencies")
 
             if author not in intervals[date]:
                 intervals[date][author] = {

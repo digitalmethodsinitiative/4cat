@@ -6,10 +6,10 @@ due to its aggressive rate limiting and login wall. Instead, import data
 collected elsewhere.
 """
 import datetime
-import json
+import time
 import re
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 
 
 class SearchLinkedIn(Search):
@@ -53,17 +53,19 @@ class SearchLinkedIn(Search):
         # annoyingly, posts don't come with a timestamp
         # approximate it by using the time of collection and the "time ago"
         # included with the post (e.g. 'published 18h ago')
-        post = node["data"]
+        post = node
 
         if not post.get("actor"):
             return {}
 
-        time_collected = int(node["timestamp_collected"] / 1000)  # milliseconds
+        if "__import_meta" in node:
+            time_collected = int(node["__import_meta"]["timestamp_collected"] / 1000)  # milliseconds
+        else:
+            # best we got
+            time_collected = int(time.time())
+
         time_ago = post["actor"]["subDescription"]["text"] if post["actor"].get("subDescription") else ""
         timestamp = int(time_collected - SearchLinkedIn.parse_time_ago(time_ago))
-
-        # extact username from profile URL link
-        username = post["actor"]["navigationContext"]["actionTarget"].split("linkedin.com/").pop().split("?")[0]
 
         # images are stored in some convoluted way
         # there are multiple URLs for various thumbnails, use the one for the
@@ -99,6 +101,7 @@ class SearchLinkedIn(Search):
             "hashtags": ",".join([tag["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]) if post["commentary"] else "",
             "image_urls": ",".join(images),
             "post_url": "https://www.linkedin.com/feed/update/" + urn,
+            "link_url": post["content"]["navigationContext"].get("actionTarget", "") if (post.get("content") and post["content"].get("navigationContext")) else "",
             "likes": post["*socialDetail"]["likes"]["paging"]["total"],
             "comments": post["*socialDetail"]["comments"]["paging"]["total"],
             "shares": post["*socialDetail"]["totalShares"],

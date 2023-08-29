@@ -5,7 +5,7 @@ import abc
 import datetime
 
 from common.lib.helpers import pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -28,7 +28,7 @@ class TwitterStatsBase(BasicProcessor):
 
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 

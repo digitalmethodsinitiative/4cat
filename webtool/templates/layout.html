@@ -1,15 +1,17 @@
+{% set navigation = namespace(current="") %}{% block breadcrumbs %}{% endblock %}{% block subbreadcrumbs %}{% endblock %}
 <!DOCTYPE html>
 <head>
-	<title>{% block title %}{{ __tool_name_long }}{% endblock %} &bull; {{ __tool_name }}</title>
+	<title>{% block title %}{{ __user_config("4cat.name_long") }}{% endblock %} &bull; {{ __user_config("4cat.name") }}</title>
 
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
     <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
-        <link href="{{ url_for("static", filename="fontawesome/css/fontawesome.css") }}" rel="stylesheet">
-        <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
-        <link href="{{ url_for("static", filename="fontawesome/css/solid.css") }}" rel="stylesheet">
-        <link href="{{ url_for("static", filename="fontawesome/css/brands.css") }}" rel="stylesheet">
+    <link href="{{ url_for("static", filename="fontawesome/css/fontawesome.css") }}" rel="stylesheet">
+    <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
+    <link href="{{ url_for("static", filename="fontawesome/css/solid.css") }}" rel="stylesheet">
+    <link href="{{ url_for("static", filename="fontawesome/css/brands.css") }}" rel="stylesheet">
 
-	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.3.1.min.js')}}"></script>
+	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.6.3.min.js')}}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='js/jquery-ui.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/svg-pan-zoom.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/fourcat.js')}}"></script>
 
@@ -27,21 +29,32 @@
 
 </head>
 <body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}" data-url-root="{{ url_for("show_frontpage") }}">
-	<h1><span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __tool_name_long }}{% endblock %}</a></span></h1>
+	<h1>
+        <img src="{{ url_for("static", filename="img/4cat-heads.svg") }}">
+        <span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __user_config("4cat.name_long") }}{% endblock %}</a></span>
+    </h1>
 	<nav class="main-nav">
 		<ul>
-			<li><a href="{{ url_for('show_index') }}">Create dataset</a></li>
-			<li><a href="{{ url_for('show_results') }}">Datasets</a></li>
-            <li><a href="{{ url_for('data_overview') }}">Data sources</a></li>
-            {% if current_user.is_authenticated and not current_user.is_special %}
-                <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
+            {% if __user_config("privileges.can_create_dataset") %}
+			    <li{% if navigation.current == "create-dataset" %} class="current"{% endif %}><a href="{{ url_for('create_dataset') }}">Create dataset</a></li>
             {% endif %}
-            {% if current_user.is_authenticated and current_user.is_admin %}
-                <li><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
+			<li{% if navigation.current == "dataset" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}">Datasets</a></li>
+            <li{% if navigation.current == "datasources" %} class="current"{% endif %}><a href="{{ url_for('data_overview') }}">Data sources</a></li>
+            {% if current_user.is_authenticated and not current_user.is_special and __user_config("privileges.can_create_api_token") %}
+                <li{% if navigation.current == "api-access" %} class="current"{% endif %}><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}
-            <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
-			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
+            {% if __user_cp_access %}
+                <li{% if navigation.current == "control-panel" %} class="current"{% endif %}><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
+            {% endif %}
+            <li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('show_about') }}">About</a></li>
+            {% for page in __user_config("ui.nav_pages") %}
+            <li{% if navigation.current == page %} class="current"{% endif %}>
+                <a href="{{ url_for("show_page", page=page) }}">{% if page == "faq" %}<abbr title="Frequently Asked Questions">FAQ</abbr>{% else %}{{ page|title }}{% endif %}</a>
+            </li>
+            {% endfor %}
 		</ul>
+    {% block subnavigation %}
+    {% endblock %}
     {% for notification in __notifications %}
         <div class="site-announcement">
             {{ notification.notification|markdown|safe }}
@@ -51,6 +64,9 @@
         </div>
     {% endfor %}
 	</nav>
+
+    {% block pre_body %}
+    {% endblock %}
 
 	{% block body %}
 		<p>Welcome.</p>
@@ -64,6 +80,7 @@
 		{% endif %}
 		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
 		  <li><a href="{{ url_for('show_page', page='issues') }}">Report issues</a></li>
+          <li><abbr title="Version">v</abbr>{{ __version }}</li>
 		  <li><a href="https://www.oilab.eu">OILab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
 	</nav>

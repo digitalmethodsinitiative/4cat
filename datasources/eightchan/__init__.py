@@ -2,5 +2,5 @@
 from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "8chan"
+DATASOURCE = "eightchan"
 NAME = "8chan"

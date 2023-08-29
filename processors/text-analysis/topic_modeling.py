@@ -3,12 +3,11 @@ Create topic clusters based on datasets
 """
 
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 import json, pickle
 import shutil
-import numpy as np
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
@@ -74,11 +73,11 @@ class TopicModeler(BasicProcessor):
     ]
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on token sets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "tokenise-posts"
 
@@ -128,7 +127,7 @@ class TopicModeler(BasicProcessor):
                 self.dataset.finish(0)
                 return
 
-            features = vectoriser.get_feature_names()
+            features = vectoriser.get_feature_names_out()
 
             self.dataset.update_status("Fitting token clusters for token set '%s'" % token_file.stem)
             if self.interrupted:

@@ -38,7 +38,7 @@ actively and can be used to collect data with 4CAT:
 The following platforms are supported through other tools, with which you can
 collect data to import data into 4CAT for analysis:
 
-* Instagram, TikTok, 9gag, Imgur, LinkedIn, Parler (via
+* Instagram, TikTok, 9gag, Imgur, LinkedIn, Parler, Douyin and Twitter (via
   [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer))
 * Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) exports)
 
@@ -65,6 +65,9 @@ Currently scraping of 4chan, 8chan, and 8kun require additional steps; please se
 Please check our
 [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create
 one if you experience any problems (pull requests are also very welcome).
+
+### Upgrading 4CAT
+Instructions on upgrading 4CAT from previous versions [can be found in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Upgrading-4CAT).
 
 ## Modules
 4CAT is a modular tool and easy to extend. The following two folders in the 

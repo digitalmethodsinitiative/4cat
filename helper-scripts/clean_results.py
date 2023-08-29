@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.dataset import DataSet
-import common.config_manager as config
+from common.config_manager import config
 logger = Logger()
 database = Database(logger=logger, appname="result-cleaner")
 
@@ -22,4 +22,4 @@ for file in files:
 		query = DataSet(key=key, db=database)
 	except TypeError:
 		print("Not linked to a query: %s" % file)
-		os.unlink(config.get('PATH_DATA') + "/" + file)
+		os.unlink(config.get('PATH_DATA').joinpath(file))

@@ -2,11 +2,9 @@
 Extracts topics per model and top associated words
 """
 
-from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import ProcessorInterruptedException
 
-import csv
 import json
 import zipfile
 
@@ -27,11 +25,11 @@ class TopicModelWordExtractor(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on topic models
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "topic-modeller"
 
@@ -46,6 +44,14 @@ class TopicModelWordExtractor(BasicProcessor):
         staging_area = self.dataset.get_staging_area()
         # Unzip archived files
         with zipfile.ZipFile(self.source_file, "r") as archive_file:
+            zip_filenames = archive_file.namelist()
+            if any([filename not in zip_filenames for filename in ['.token_metadata.json', '.model_metadata.json']]):
+                self.dataset.update_status(
+                    "Metadata files not found; cannot perform analysis (if Tolenise is from previous 4CAT version; try running previous analysis again)",
+                    is_final=True)
+                self.dataset.update_status(0)
+                return
+
             # Extract our metadata files
             archive_file.extract('.token_metadata.json', staging_area)
             archive_file.extract('.model_metadata.json', staging_area)
@@ -54,11 +60,6 @@ class TopicModelWordExtractor(BasicProcessor):
                 token_metadata = json.load(metadata_file)
             with staging_area.joinpath('.model_metadata.json').open("rb") as metadata_file:
                 model_metadata = json.load(metadata_file)
-
-        if token_metadata is None or model_metadata is None:
-            self.dataset.update_status("Metadata files not found; cannot perform analysis (if Tolenise is from previous 4CAT version; try starting over from there again)", is_final=True)
-            self.dataset.update_status(0)
-            return
 
         # Grab the parameters from out metadata files
         token_metadata_parameters = token_metadata.pop('parameters')

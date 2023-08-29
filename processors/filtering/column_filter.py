@@ -4,6 +4,7 @@ Filter posts by a given column
 import re
 import datetime
 
+from backend.lib.processor import BasicProcessor
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput, convert_to_int
 
@@ -50,7 +51,7 @@ class ColumnFilter(BaseFilter):
             "help": "Match with",
             "default": "",
             "tooltip": "If you want to match with multiple values, separate with commas. Items matching any of the "
-                       "provided values will be retained."
+                       "provided values will be retained. Dates in 2023-03-25 08:30:00 format."
         },
         "match-multiple": {
             "type": UserInput.OPTION_CHOICE,
@@ -63,17 +64,21 @@ class ColumnFilter(BaseFilter):
             "tooltip": "When matching on multiple values, you can choose to retain items if all provided values "
                        "match, or if any single one matches. Ignored when matching on a single value or selecting top "
                        "results."
+        },
+        "lowercase": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Convert all text to lowercase for comparison",
+            "default": False
         }
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on top datasets.
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
-        # TODO: could run on any ndjson or csv IF adjustments were made to `get_options()`
         return module.is_top_dataset()
 
     @classmethod
@@ -103,9 +108,11 @@ class ColumnFilter(BaseFilter):
         :return generator:
         """
         self.dataset.update_status("Searching for matching posts")
+        # User Parameters
+        force_lowercase = self.parameters.get("lowercase", False)
         # Get match column parameters
         column = self.parameters.get("column", "")
-        match_values = [value.strip() for value in self.parameters.get("match-value").split(",")]
+        match_values = [value.strip().lower() if force_lowercase else value.strip() for value in self.parameters.get("match-value").split(",")]
         match_style = self.parameters.get("match-style", "")
         match_multiple = self.parameters.get("match-multiple")
         match_function = any if match_multiple == "any" else all
@@ -118,7 +125,7 @@ class ColumnFilter(BaseFilter):
                 self.dataset.finish(0)
                 return
 
-        elif match_style in("top", "bottom"):
+        elif match_style in ("top", "bottom"):
             for item in self.filter_top(column, match_values[0], (match_style=="bottom")):
                 yield item
 
@@ -133,15 +140,13 @@ class ColumnFilter(BaseFilter):
                 try:
                     match_values = [int(value) for value in match_values]
                 except (ValueError, TypeError):
-                    self.dataset.update_status("Cannot do '%s' comparison with value(s) that are not dates",
+                    self.dataset.update_status("Cannot do '%s' comparison with value(s) that are not dates" % match_style,
                                                is_final=True)
                     self.dataset.finish(0)
                     return
             else:
                 match_values = [datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S").timestamp() for value in
                                 match_values]
-
-        # self.dataset.log('Criteria: column - %s, style - %s, multiple - %s, function - %s, values - %s' % (str(column), str(match_style), str(match_multiple), str(match_function), ' & '.join(match_values)))
 
         matching_items = 0
         processed_items = 0
@@ -157,6 +162,7 @@ class ColumnFilter(BaseFilter):
             # comparing dates, do some pre-processing to make sure we can
             # actually compare the value properly.
             if match_style in ("before", "after"):
+                # Dates
                 if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", mapped_item.get(column)):
                     date_compare = datetime.datetime.strptime(mapped_item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
                 else:
@@ -168,20 +174,32 @@ class ColumnFilter(BaseFilter):
                             is_final=True)
                         self.dataset.finish(0)
                         return
+            elif match_style in ["exact", "exact-not", "contains", "contains-not"]:
+                if type(mapped_item.get(column)) == str:
+                    # Text
+                    column_value = mapped_item.get(column).lower() if force_lowercase else mapped_item.get(column)
+                else:
+                    # Int/Float/Date
+                    # If date, user may not be aware we normally store dates as timestamps
+                    column_value = mapped_item.get(column)
+                    # TODO: in order to use these match_styles on numerical data (e.g. "views == 1") we need to attempt to convert the match_values from strings
+            else:
+                # Numerical
+                pass
 
             # depending on match type, mark as matching or not one way or
             # another. This could be greatly optimised for some cases, e.g.
             # when there is only a single value to compare to, and
             # short-circuiting for 'any' matches - not clear if worth it.
             matches = False
-            if match_style == "exact" and match_function([mapped_item.get(column) == value for value in match_values]):
+            if match_style == "exact" and match_function([column_value == value for value in match_values]):
                 matches = True
-            elif match_style == "exact-not" and match_function([mapped_item.get(column) != value for value in match_values]):
+            elif match_style == "exact-not" and match_function([column_value != value for value in match_values]):
                 matches = True
-            elif match_style == "contains" and match_function([value in mapped_item.get(column) for value in match_values]):
+            elif match_style == "contains" and match_function([value in column_value for value in match_values]):
                 matches = True
             elif match_style == "contains-not" and match_function(
-                    [value not in mapped_item.get(column) for value in match_values]):
+                    [value not in column_value for value in match_values]):
                 matches = True
             elif match_style == "after" and match_function([value <= date_compare for value in match_values]):
                 matches = True
@@ -229,3 +247,32 @@ class ColumnFilter(BaseFilter):
 
             if ranked_items >= top_n:
                 return
+
+
+class ColumnProcessorFilter(ColumnFilter):
+    """
+    Retain only posts where a given column matches a given value
+    """
+    type = "column-processor-filter"  # job type ID
+    category = "Filtering"  # category
+    title = "Filter by value"  # title displayed in UI
+    description = "A generic filter that checks whether a value in a selected column matches a custom requirement. "
+
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
+        Allow processor on top datasets.
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.get_extension() in ("csv", "ndjson") and not module.is_top_dataset()
+
+    @classmethod
+    def is_filter(cls):
+        """
+        I'm a filter! And so are my children.
+        """
+        return False
+
+    def after_process(self):
+        BasicProcessor.after_process(self)

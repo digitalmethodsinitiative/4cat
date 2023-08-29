@@ -1,7 +1,7 @@
 """
 Annotate top images
 """
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 from common.lib.helpers import UserInput, convert_to_int
 
@@ -94,6 +94,7 @@ class AnnotateImages(ProcessorPreset):
                 "type": "image-downloader",
                 "parameters": {
                     "amount": amount,
+                    "columns": "item",
                     "overwrite": False
                 }
             },

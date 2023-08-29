@@ -1,4 +1,6 @@
 @import url('reset.css');
+@import url('colours.css');
+
 @import url('dataset-page.css');
 @import url('control-panel.css');
 
@@ -37,28 +39,6 @@
     src: url("../fonts/fsex300-webfont.woff")
 }
 
-/** --------------------- *
-      Colour definitions
-  * --------------------- */
-:root {
-    --accent: #CE1B28;
-    --highlight: #FF2231;
-    --accent-alternate: #19B0A3;
-    --accent-okay: #26b018;
-    --accent-okay-light: #bee0ba;
-    --accent-warning: #b05d13;
-    --accent-error: #ff2231;
-    --gray-dark: #DFDFDF;
-    --gray-darker: #6C6C6C;
-    --gray: #E9E9E9;
-    --gray-light: #EEE;
-    --contrast-bright: #F5F5F5;
-    --contrast-dark: #21202E;
-    --always-white: #FFF;
-    --text: #37373C;
-    --warning: var(--accent);
-}
-
 
 /** --------------------- *
      Basic HTML elements
@@ -84,7 +64,7 @@ a:hover {
     text-decoration: underline;
 }
 
-code {
+code, samp {
     color: var(--accent-alternate);
     font-weight: bold;
 }
@@ -98,11 +78,20 @@ pre {
     padding: 0.5em;
 }
 
+samp {
+    font-family: monospace;
+}
+
 em, strong {
     font-weight: bold;
 }
 
-i {
+hr {
+    border: 0;
+    border-top: 1px dotted var(--contrast-dark);
+}
+
+i, .italic {
     font-style: italic;
 }
 
@@ -120,6 +109,10 @@ i.scroll {
 
 .flash-once {
     animation: flash-once 1 0.5s linear;
+}
+
+.flash-once-error {
+    animation: flash-once-error 1 0.5s linear;
 }
 
 table {
@@ -147,6 +140,11 @@ table th {
     padding: 0 1em;
 }
 
+table .table-controls td, .table .table-controls th {
+    background: var(--accent-alternate);
+    color: var(--contrast-bright);
+}
+
 *[aria-expanded=false] {
     height: 0;
     overflow: hidden;
@@ -169,6 +167,10 @@ select, input, textarea {
 
 select, input {
     max-width: 15em;
+}
+
+select[multiple] {
+    min-width: 8em;
 }
 
 input[type=date] {
@@ -204,6 +206,11 @@ p.form-notice {
     padding: 0 0.5em;
 }
 
+.form-element.disabled, .form-element.disabled *, .disabled > .form-element, .disabled > .form-element * {
+    color: darkgray;
+    cursor: not-allowed;
+}
+
 .optional-form-element {
     transition: 0.25s;
     max-height: 10em;
@@ -234,22 +241,35 @@ article.small .form-element {
     max-width: none;
 }
 
+.form-element > div {
+    width: 100%;
+}
+
 .form-element > *:not(input, select, button) {
     min-width: 11em;
     max-width: 75%;
 }
 
-.form-element > textarea {
+.form-element textarea {
     min-width: 25em;
     min-height: 6em;
 }
 
-.form-element > textarea.code {
+.form-element textarea.code {
     font-family: monospace;
 }
 
-article.small .form-element > *:not([type=radio], [type=checkbox]) {
+.form-element .with-tail {
+    display: grid;
+    grid-template-columns: 1.5em auto;
+}
+
+article.small .form-element input:not([type=radio], [type=checkbox]), article.small .form-element select, article.small .form-element textarea {
     min-width: 5em;
+}
+
+article.small .form-element select[multiple] {
+    min-width: 20em;
 }
 
 .form-element label {
@@ -277,9 +297,25 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
     overflow: hidden;
 }
 
+.datasource-explain-wrap {
+    display: inline-block;
+}
+
 .submit-container {
     text-align: center;
     padding: 1em;
+}
+
+.colour-example {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 1px solid var(--contrast-dark);
+    background: var(--accent);
+    min-width: auto;
+    max-width: none;
+    position: relative;
+    top: -0.4em;
 }
 
 .data-overview-link {
@@ -327,6 +363,7 @@ button:hover, .button-like:not(.inactive):hover {
 
 .button-container li {
     display: inline-block;
+    margin: 0.5em 0;
 }
 
 .form-intro {
@@ -355,6 +392,25 @@ h3 button, h2 button, legend button {
 h2 button {
     padding: calc(0.5em + 1px);
     font-size: 0.8em;
+}
+
+h2 .inline-search, h3 .inline-search {
+    border: 0;
+    border-radius: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    margin: 0;
+    height: 100%;
+}
+
+h2 .inline-search {
+    font-size: 0.6em;
+}
+
+h2 .inline-search input, h3 .inline-search input {
+    height: 100%;
+    box-sizing: border-box;
 }
 
 /** --------------------- *
@@ -424,13 +480,53 @@ button.tooltip-trigger {
     max-height: 1.75em;
 }
 
-button.tooltip-trigger, button.popup-trigger {
+button.tooltip-trigger {
 	font-size: 0.8em;
 	position: relative;
 	top: -0.1em;
     padding: 0 0.5em;
     border-width: 1px;
     border-color: var(--gray-dark);
+}
+
+
+/** --------------------- *
+          Tab containers
+  * --------------------- */
+.tabbed {
+    display: grid;
+    grid-template-columns: 25% 75%;
+}
+
+.tab-controls {
+    border-right: 2px solid var(--contrast-dark);
+}
+
+.tab-controls ul {
+    list-style: none;
+    margin: 0;
+}
+
+.tab-controls li {
+    border-bottom: 1px dotted var(--contrast-dark);
+}
+
+.tab-controls li a {
+    padding: 1em;
+    display: block;
+}
+
+.tab-controls .highlighted, .tab-controls li:hover{
+    background: var(--accent);
+    color: var(--contrast-bright);
+}
+
+.tab-controls li a {
+    color: inherit;
+}
+
+.tab-container > .tab-content:not([aria-expanded=true]) {
+    display: none;
 }
 
 /** --------------------- *
@@ -467,14 +563,14 @@ button.tooltip-trigger, button.popup-trigger {
     max-width: 90%;
 }
 
-#popup.alert, #popup.confirm {
+#popup.alert, #popup.confirm, #popup.dialog {
     padding: 0;
     width: auto;
     height: auto;
     min-width: 20em;
 }
 
-#popup.confirm h2, #popup.alert h2 {
+#popup.confirm h2, #popup.alert h2, #popup.dialog h2 {
     background: var(--contrast-dark);
     color: var(--contrast-bright);
     text-align: center;
@@ -482,7 +578,7 @@ button.tooltip-trigger, button.popup-trigger {
     padding: 0.5em;
 }
 
-#popup.confirm .controls, #popup.alert .controls {
+#popup.confirm .controls, #popup.alert .controls, #popup.dialog .controls {
     display: flex;
     column-gap: 1em;
     justify-content: center;
@@ -514,6 +610,12 @@ button.tooltip-trigger, button.popup-trigger {
     height: 98%;
     position: relative;
     top: 1%;
+}
+
+.inline-preview iframe {
+    width: 100%;
+    height: fit-content;
+    max-height: 35em;
 }
 
 .csv-preview {
@@ -559,6 +661,26 @@ button.tooltip-trigger, button.popup-trigger {
     display: none;
 }
 
+#popup-dialog {
+    min-height: 14em;
+    padding: 1em;
+    text-align: center;
+    max-width: 30em;
+}
+
+#popup-dialog label {
+    display: block;
+    margin-bottom: 0.5em;
+}
+
+#popup-dialog p {
+    margin-bottom: 1em;
+}
+
+#popup-dialog select, #popup-dialog textarea, #popup-dialog input[type=text] {
+    background: var(--contrast-bright);
+}
+
 /** --------------------- *
          Site header
   * --------------------- */
@@ -576,21 +698,33 @@ h1 a {
     text-decoration: none;
 }
 
+h1 img {
+    height: 1em;
+    display: inline-block;
+    position: relative;
+    top: 0.1em;
+}
+
 .main-nav {
     background: var(--contrast-dark);
     margin-bottom: 2em;
     color: var(--contrast-bright);
     box-shadow: 0 5px 10px #888;
-    border: 1em solid var(--contrast-dark);
-    border-width: 0.4em 0 0 0;
 }
 
 .main-nav ul {
     list-style: none;
     text-align: center;
-    margin: 0.25em 0 0 0;
-    padding-bottom: 0.5em;
+    padding: 0.5em 0;
     background: var(--contrast-dark);
+}
+
+.main-nav li.current a {
+    text-decoration: underline;
+}
+
+.main-nav > *:not(:first-child) {
+    border-top: 1px dotted var(--contrast-bright);
 }
 
 .main-nav li {
@@ -599,7 +733,7 @@ h1 a {
 
 .main-nav li:not(:last-child):after {
     content: '\02022';
-    margin-left: 0.5em;
+    margin-left: 0.3em;
 }
 
 .main-nav li a {
@@ -623,7 +757,7 @@ h1 a {
 }
 
 .site-announcement p::before {
-    font-family: 'Font Awesome 5 Pro', 'Font Awesome 5 Free';
+    font-family: 'Font Awesome 6 Pro', 'Font Awesome 6 Free';
     content: '\f0f3';
     margin-right: 0.5em;
     font-weight: bold;
@@ -753,7 +887,7 @@ article p {
     margin: 0 1em 0.5em 1em;
 }
 
-p.banner {
+p.banner, footer.banner {
     text-align: center;
     padding: 1em;
 }
@@ -906,6 +1040,18 @@ article section.data-overview .description {
     }
     0% {
         background: var(--accent)
+    }
+    100% {
+        background: transparent;
+    }
+}
+
+@keyframes flash-once-error {
+    100% {
+        background: transparent;
+    }
+    0% {
+        background: var(--accent-error);
     }
     100% {
         background: transparent;

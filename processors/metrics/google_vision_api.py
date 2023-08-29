@@ -9,7 +9,7 @@ import csv
 from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
@@ -40,11 +40,11 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     ]
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on image sets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type.startswith("image-downloader")
 
@@ -93,8 +93,12 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         features = [{"type": feature} for feature in features]
 
         if not api_key:
-            self.dataset.update_status("You need to provide a valid API key", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("You need to provide a valid API key")
+            return
+
+        # is there anything for us to download?
+        if self.source_dataset.num_rows == 0:
+            self.dataset.finish_with_error("No images to download.")
             return
 
         max_images = convert_to_int(self.parameters.get("amount", 0), 100)

@@ -1,7 +1,7 @@
 """
 Extract neologisms
 """
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 
 class MonthlyHistogramCreator(ProcessorPreset):
@@ -11,7 +11,7 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	type = "preset-histogram"  # job type ID
 	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
 	title = "Monthly histogram"  # title displayed in UI
-	description = "Generates a histogram with the number of posts per month."  # description displayed in UI
+	description = "Generates a histogram with the number of items per month."  # description displayed in UI
 	extension = "svg"
 
 	@classmethod
@@ -30,9 +30,9 @@ class MonthlyHistogramCreator(ProcessorPreset):
 		activity.
 		"""
 
-		header = "'" + self.source_dataset.data["query"] + "': Posts per month"
+		header = "'" + self.source_dataset.data["query"] + "': Items per month"
 		if len(header) > 40:
-			header = "Posts per month"
+			header = "Items per month"
 
 		pipeline = [
 			# first, count activity per month

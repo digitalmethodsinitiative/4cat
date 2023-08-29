@@ -1,0 +1,52 @@
+<div id="dataset-{{ dataset.key }}-status" class="full-block dataset-status" {% if dataset.is_finished() %}data-num-results="{{ dataset.num_rows }}"{% endif %}>
+  <div class="result-row">
+    <div class="result-status">
+        {% include "components/result-status.html" %}
+    </div>
+    {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+        <div class="result-log">
+            <a href="{{ url_for('view_log', key=dataset.key) }}"
+               data-load-from="{{ url_for('view_log', key=dataset.key) }}"
+               class="popup-trigger" aria-controls="popup-log-{{ dataset.key }}">
+                <i class="fa fa-clipboard-list" aria-hidden="true"></i> Log file
+            </a>
+            <div role="dialog" id="popup-log-{{ dataset.key }}"></div>
+        </div>
+    {% endif %}
+    </div>
+  {% if dataset.is_finished() and dataset.num_rows > 0 %}
+    <ul class="dataset-actions">
+    <li>
+    <a href="{{ url_for('get_result', query_file=dataset.result_file) }}">
+        <i class="fas fa-download" aria-hidden="true"></i>
+        {{ dataset.result_file.split(".")[-1] }} ({{ dataset.get_results_path()|filesize }})
+    </a>
+    </li>
+    {% if dataset.get_extension() != "csv" and dataset.get_own_processor().map_item %}
+        <li>
+        <a href="{{ url_for('get_mapped_result', key=dataset.key) }}">
+            <i class="fas fa-download" aria-hidden="true"></i>
+            csv
+        </a>
+        </li>
+    {% endif %}
+    {% if (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
+        <li>
+        <a href="{{ url_for('preview_items', key=dataset.key) }}"
+           data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
+           aria-controls="popup-preview-{{ dataset.key }}">
+            <i class="fa fa-eye" aria-hidden="true"></i> Preview
+        </a>
+        <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
+        </li>
+    {% endif %}
+    <li>
+    {% if __user_config("privileges.can_use_explorer") %}
+    <a href="{{ url_for('explorer_dataset', key=dataset.key) }}">
+        <i class="fa fa-binoculars" aria-hidden="true"></i> Explore
+    </a>
+    {% endif %}
+    </li>
+    </ul>
+  {% endif %}
+</div>

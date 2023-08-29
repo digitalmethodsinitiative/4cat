@@ -8,10 +8,10 @@ import time
 import json
 import re
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
-import common.config_manager as config
+from common.config_manager import config
 
 
 class SearchWithTwitterAPIv2(Search):
@@ -74,9 +74,9 @@ class SearchWithTwitterAPIv2(Search):
         error_report = []
         # this is pretty sensitive so delete it immediately after storing in
         # memory
-        have_api_key = config.get("twitterv2-search.academic_api_key")
+        have_api_key = self.config.get("twitterv2-search.academic_api_key")
         bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
-        api_type = query.get("api_type") if not have_api_key else "all"
+        api_type = query.get("api_type", "all") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
         expected_tweets = query.get("expected-tweets", "unknown")
 
@@ -108,7 +108,7 @@ class SearchWithTwitterAPIv2(Search):
             "media.fields": ",".join(media_fields),
         }
 
-        if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
+        if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
             endpoint = "https://api.twitter.com/2/tweets"
 
             tweet_ids = self.parameters.get("query", []).split(',')
@@ -317,7 +317,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     yield tweet
 
-                if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
+                if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
                     # If id_lookup return errors in collecting tweets
                     for tweet_error in api_response.get("errors", []):
                         tweet_id = str(tweet_error.get('resource_id'))
@@ -469,8 +469,8 @@ class SearchWithTwitterAPIv2(Search):
         :param user:  User to provide options for
         :return dict:  Data source options
         """
-        have_api_key = config.get("twitterv2-search.academic_api_key")
-        max_tweets = config.get("twitterv2-search.max_tweets")
+        have_api_key = config.get("twitterv2-search.academic_api_key", user=user)
+        max_tweets = config.get("twitterv2-search.max_tweets", user=user)
 
         if have_api_key:
             intro_text = ("This data source uses the full-archive search endpoint of the Twitter API (v2) to retrieve "
@@ -489,9 +489,7 @@ class SearchWithTwitterAPIv2(Search):
         intro_text += ("\n\nPlease refer to the [Twitter API documentation]("
                           "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
                           "documentation for more information about this API endpoint and the syntax you can use in your "
-                          "search query. You can also test queries with Twitter's [Query "
-                          "Builder](https://developer.twitter.com/apitools/query?query=). Retweets are included by default; "
-                          "add `-is:retweet` to exclude them.")
+                          "search query. Retweets are included by default; add `-is:retweet` to exclude them.")
 
         options = {
             "intro-1": {
@@ -519,7 +517,7 @@ class SearchWithTwitterAPIv2(Search):
                 },
             })
 
-        if config.get("twitterv2.id_lookup"):
+        if config.get("twitterv2.id_lookup", user=user):
             options.update({
                 "query_type": {
                     "type": UserInput.OPTION_CHOICE,
@@ -580,8 +578,8 @@ class SearchWithTwitterAPIv2(Search):
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
-        have_api_key = config.get("twitterv2-search.academic_api_key")
-        max_tweets = config.get("twitterv2-search.max_tweets", 10_000_000)
+        have_api_key = config.get("twitterv2-search.academic_api_key", user=user)
+        max_tweets = config.get("twitterv2-search.max_tweets", 10_000_000, user=user)
 
         # this is the bare minimum, else we can't narrow down the full data set
         if not query.get("query", None):
@@ -594,7 +592,7 @@ class SearchWithTwitterAPIv2(Search):
         if len(query.get("query")) > 1024 and query.get("query_type", "query") != "id_lookup":
             raise QueryParametersException("Twitter API queries cannot be longer than 1024 characters.")
 
-        if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
+        if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup", user=user):
             # reformat queries to be a comma-separated list with no wrapping
             # whitespace
             whitespace = re.compile(r"\s+")
@@ -614,7 +612,7 @@ class SearchWithTwitterAPIv2(Search):
         params = {
             "query": twitter_query,
             "api_bearer_token": query.get("api_bearer_token"),
-            "api_type": query.get("api_type"),
+            "api_type": query.get("api_type", "all"),
             "query_type": query.get("query_type", "query"),
             "min_date": after,
             "max_date": before
@@ -630,7 +628,7 @@ class SearchWithTwitterAPIv2(Search):
         # figure out how many tweets we expect to get back - we can use this
         # to dissuade users from running huge queries that will take forever
         # to process
-        if params["query_type"] == "query" and (params["api_type"] == "all" or have_api_key):
+        if params["query_type"] == "query" and (params.get("api_type") == "all" or have_api_key):
             count_url = "https://api.twitter.com/2/tweets/counts/all"
             count_params = {
                 "granularity": "day",
@@ -674,7 +672,9 @@ class SearchWithTwitterAPIv2(Search):
                 elif response.status_code == 400:
                     raise QueryParametersException("Your query is invalid. Please make sure the date range does not "
                                                    "extend into the future, or to before Twitter's founding, and that "
-                                                   "your query is shorter than 1024 characters.")
+                                                   "your query is shorter than 1024 characters. Using AND in the query "
+                                                   "is not possible (AND is implied; OR can be used). Use \"and\" to "
+                                                   "search for the literal word.")
 
                 else:
                     # we can still continue without the expected tweets
@@ -732,6 +732,7 @@ class SearchWithTwitterAPIv2(Search):
         # For backward compatibility
         author_username = tweet["author_user"]["username"] if tweet.get("author_user") else tweet["author_username"]
         author_fullname = tweet["author_user"]["name"] if tweet.get("author_user") else tweet["author_fullname"]
+        author_followers = tweet["author_user"]["public_metrics"]["followers_count"] if tweet.get("author_user") else ""
 
         hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
         mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
@@ -788,6 +789,7 @@ class SearchWithTwitterAPIv2(Search):
             "author": author_username,
             "author_fullname": author_fullname,
             "author_id": tweet["author_id"],
+            "author_followers": author_followers,
             "source": tweet.get("source"),
             "language_guess": tweet.get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",

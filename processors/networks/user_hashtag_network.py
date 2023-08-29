@@ -1,9 +1,9 @@
 """
 Generate bipartite user-hashtag graph of posts
 """
-import csv
+from backend.lib.preset import ProcessorPreset
+from common.lib.user_input import UserInput
 
-from backend.abstract.preset import ProcessorPreset
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -22,26 +22,26 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     extension = "gexf"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def get_options(cls, parent_dataset=None, user=None):
+        return {
+            "to-lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Convert values to lowercase",
+                "tooltip": "Merges values with varying cases"
+                }
+        }
+
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on datasets containing a tags column
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
-        if module.type == "twitterv2-search":
-            # ndjson, difficult to sniff
-            return True
-        elif module.is_dataset():
-            if module.get_extension() == "csv":
-                # csv can just be sniffed for the presence of a column
-                with module.get_results_path().open(encoding="utf-8") as infile:
-                    reader = csv.DictReader(infile)
-                    try:
-                        return bool(set(reader.fieldnames) & {"tags", "hashtags", "groups"})
-                    except (TypeError, ValueError):
-                        return False
-        else:
-            return False
+        usable_columns = {"tags", "hashtags", "groups"}
+        columns = module.get_columns()
+        return bool(set(columns) & usable_columns) if columns else False
 
     def get_processor_pipeline(self):
         """
@@ -71,7 +71,8 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
                     "directed": False,
                     "split-comma": True,
                     "categorise": True,
-                    "allow-loops": False
+                    "allow-loops": False,
+                    "to-lowercase": self.parameters.get("to-lowercase", False),
                 }
             }
         ]

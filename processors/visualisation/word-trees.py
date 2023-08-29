@@ -2,9 +2,10 @@
 Generate word tree from dataset
 """
 import string
+import jieba
 import re
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int
 
 from nltk.tokenize import word_tokenize
@@ -78,6 +79,18 @@ class MakeWordtree(BasicProcessor):
 				"top": "Top",
 			},
 			"help": "Visual alignment"
+		},
+		"tokeniser_type": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "regular",
+			"options": {
+				"regular": "nltk word_tokenize",
+				"jieba-cut": "jieba (for Chinese text; accurate mode, recommended)",
+				"jieba-cut-all": "jieba (for Chinese text; full mode)",
+				"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+			},
+			"help": "Tokeniser",
+			"tooltip": "What heuristic to use to split up the text into separate words."
 		},
 		"strip-urls": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -153,6 +166,20 @@ class MakeWordtree(BasicProcessor):
 		window = min(window, self.get_options()["window"]["max"] + 1)
 		window = max(1, window)
 
+		# determine what tokenisation strategy to use
+		tokeniser_args = {}
+		if self.parameters.get("tokeniser_type") == "jieba-cut":
+			tokeniser = jieba.cut
+			tokeniser_args = {"cut_all": False}
+		elif self.parameters.get("tokeniser_type") == "jieba-cut-all":
+			tokeniser = jieba.cut
+			tokeniser_args = {"cut_all": True}
+		elif self.parameters.get("tokeniser_type") == "jieba-search":
+			tokeniser = jieba.cut_for_search
+			tokeniser_args = {}
+		else:
+			tokeniser = word_tokenize
+
 		# find matching posts
 		processed = 0
 		punkt_replace = re.compile(r"[" + re.escape(string.punctuation) + "]")
@@ -170,7 +197,11 @@ class MakeWordtree(BasicProcessor):
 			if strip_symbols:
 				body = punkt_replace.sub("", body)
 
-			body = word_tokenize(body)
+			body = tokeniser(body, **tokeniser_args)
+			if type(body) != list:
+				# Convert generator to list
+				body = list(body)
+
 			positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
 
 			# get lists of tokens for both the left and right side of the tree
@@ -198,7 +229,7 @@ class MakeWordtree(BasicProcessor):
 		tokens_right = []
 
 		# for each "level" (each branching point representing a level), turn
-		# tokens into nodes, record the max amount of occurences for any
+		# tokens into nodes, record the max amount of occurrences for any
 		# token in that level, and keep track of what nodes are in which level.
 		# The latter is needed because a token may occur multiple times, at
 		# different points in the graph. Do this for both the left and right
@@ -271,6 +302,8 @@ class MakeWordtree(BasicProcessor):
 
 			filtered_tokens_left.append(token)
 
+		self.dataset.log(f"Collected {len(filtered_tokens_left)} left tokens and {len(filtered_tokens_right)} right tokens")
+
 		# now we know which nodes are left, and can therefore determine how
 		# large the canvas needs to be - this is based on the max number of
 		# branches found on any level of the tree, in other words, the number
@@ -284,6 +317,7 @@ class MakeWordtree(BasicProcessor):
 				self.dataset.finish(0)
 				return None
 			elif sides == "both":
+				self.dataset.log("No data available to the left of the query")
 				sides = "right"
 				breadths_left = [0]
 
@@ -293,6 +327,7 @@ class MakeWordtree(BasicProcessor):
 				self.dataset.finish(0)
 				return None
 			elif sides == "both":
+				self.dataset.log("No data available to the right of the query")
 				sides = "left"
 				breadths_right = [0]
 
@@ -315,10 +350,12 @@ class MakeWordtree(BasicProcessor):
 
 		self.dataset.update_status("Rendering tree to SVG file")
 		if sides != "right":
+			self.dataset.update_status("Adding left side of tree to SVG file")
 			wrapper = self.render(wrapper, [token for token in filtered_tokens_left if token.is_root and token.children],
 								  height=height, side=self.SIDE_LEFT)
 
 		if sides != "left":
+			self.dataset.update_status("Adding right side of tree to SVG file")
 			wrapper = self.render(wrapper, [token for token in filtered_tokens_right if token.is_root and token.children],
 								  height=height, side=self.SIDE_RIGHT)
 

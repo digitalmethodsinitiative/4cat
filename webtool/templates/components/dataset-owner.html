@@ -1,0 +1,16 @@
+<li id="owner-{{ owner }}" data-owner="{{ owner }}" data-role="{{ role }}">
+    <i class="tooltip-trigger fa fa-{% if role == "viewer" %}eye{% else %}user-shield{% endif %}" aria-controls="tooltip-{{ role }}"></i><span class="sr-only">{% if role == "viewer" %}Viewer{% else %}Owner{% endif %}</span>
+    {% if current_user.is_authenticated and __user_config("privileges.admin.can_manage_users") and not owner[:4] == "tag:" %}
+        <a href="{{ url_for("manipulate_user", mode="edit") }}?name={{ owner }}">{{ owner }}</a>
+    {% else %}
+        {% if owner[:4] == "tag:" %}
+            <span class="owner-tag">tag:</span>{{ owner[4:] }}
+        {% else %}
+            {{ owner }}
+        {% endif %}
+    {% endif %}
+    {% if dataset.get_owners()|length > 0 and dataset.is_accessible_by(current_user, role="owner") and owner != current_user.get_id() %}
+        <a class="button-like-small remove-dataset-owner" href="{{ url_for("remove_dataset_owner") }}"><i class="fa fa-times" aria-hidden="true"></i><span
+                class="sr-only">Remove owner</span></a>
+    {% endif %}
+</li>

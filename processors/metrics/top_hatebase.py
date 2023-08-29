@@ -3,7 +3,7 @@ Generate ranking per hateful word
 """
 import datetime
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Stijn Peeters"
@@ -27,11 +27,11 @@ class HatebaseRanker(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on previous Hatebase analyses
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "hatebase-data"
 

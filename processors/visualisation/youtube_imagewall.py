@@ -6,13 +6,13 @@ import shutil
 import pandas as pd
 import math
 
-import common.config_manager as config
 from pathlib import Path
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int
+from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Partha Das"]
@@ -47,7 +47,7 @@ class YouTubeImageWall(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on YouTube thumbnail sets
 
@@ -215,7 +215,7 @@ class YouTubeImageWall(BasicProcessor):
 			wall.paste(wall_old, box=(0,0))
 			# Draw the category on the side
 			# Get a font
-			font = ImageFont.truetype(config.get('PATH_ROOT') + "/common/assets/Inconsolata-Bold.ttf", 50)
+			font = ImageFont.truetype(str(config.get('PATH_ROOT').joinpath("common/assets/Inconsolata-Bold.ttf")), 50)
 			# Get a drawing context
 			draw = ImageDraw.Draw(wall)
 

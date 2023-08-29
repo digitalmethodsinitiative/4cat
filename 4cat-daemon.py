@@ -59,7 +59,7 @@ if not args.no_version_check:
 # we can only import this here, because the version check above needs to be
 # done first, as it may detect that the user needs to migrate first before
 # the config manager can be run properly
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import call_api
 # ---------------------------------------------
 #     Check validity of configuration file
@@ -96,8 +96,7 @@ else:
     import daemon
 
 # determine PID file
-pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
-
+pidfile = config.get('PATH_ROOT').joinpath(config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
 
 # ---------------------------------------------
 #   These functions start and stop the daemon

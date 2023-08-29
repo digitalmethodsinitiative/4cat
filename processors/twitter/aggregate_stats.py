@@ -6,7 +6,7 @@ import numpy as np
 from scipy import stats
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
 
 __author__ = "Dale Wahl"
@@ -57,7 +57,7 @@ class TwitterAggregatedStats(BasicProcessor):
 
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 

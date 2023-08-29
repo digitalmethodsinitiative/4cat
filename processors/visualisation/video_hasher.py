@@ -12,11 +12,11 @@ import zipfile
 from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound
 
-from backend.abstract.processor import BasicProcessor
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.processor import BasicProcessor
+from backend.lib.preset import ProcessorPreset
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-import common.config_manager as config
+from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -35,7 +35,7 @@ class VideoHasherPreset(ProcessorPreset):
     extension = "csv"
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine compatibility
 
@@ -45,9 +45,9 @@ class VideoHasherPreset(ProcessorPreset):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type in ["video-downloader"] and \
-               config.get("video_downloader.ffmpeg-path") and \
-               shutil.which(config.get("video_downloader.ffmpeg-path"))
+        return module.type.startswith("video-downloader") and \
+               config.get("video-downloader.ffmpeg_path", user=user) and \
+               shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_pipeline(self):
         """
@@ -106,11 +106,11 @@ class VideoHasher(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on videos only
 		"""
-		return module.type in ["video-downloader"]
+		return module.type.startswith("video-downloader")
 
 	def process(self):
 		"""
@@ -253,7 +253,7 @@ class VideoHasherTwo(BasicProcessor):
 	]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on videos only
 		"""

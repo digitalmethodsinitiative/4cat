@@ -1,0 +1,50 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}Manage user tags{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "tags" %}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Manage configuration tags</span></h2>
+
+            <p>Order tags by dragging them upwards or downwards. Tags are evaluated from top to bottom, so for a given
+            setting, the first tag a user has that that setting is overridden for is used.</p>
+
+            <p>For example: a user has tags <span class="property-badge">admin</span> and
+                <span class="property-badge">teacher</span>, and <span class="property-badge">admin</span>
+                is ordered higher than <span class="property-badge">teacher</span>. Setting A is overridden for both
+                tags; setting B for neither; setting C is only overridden for
+                <span class="property-badge">teacher</span>. For this user, setting A has the value for the
+                <span class="property-badge">admin</span> tag; setting B has the global value; and setting C has the
+                value for <span class="property-badge">teacher</span>.</p>
+
+            <p>Note that user tags (e.g. <span class="property-badge">user:name@example.com</span>) always have
+                precedence.</p>
+
+            <p>The <span class="property-badge">admin</span> tag is always the first in the list, and the global
+                configuration always has the least priority.</p>
+
+            <ol id="tag-order" data-url="{{ url_for("manipulate_tags") }}">
+                <li data-tag="admin">
+                    <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
+                    admin (<a href="{{ url_for("manipulate_settings") }}?tag=admin">settings</a>)
+                </li>
+                {% for tag in tags %}{% if tag.tag != "admin" %}
+                <li class="{% if tag.explicit %}ex{% else %}im{% endif %}plicit" data-tag="{{ tag.tag }}">
+                    <i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
+                    <a class="button-like confirm remove-tag" data-confirm-action="delete this tag from all users" href="{{ url_for("remove_tag") }}?redirect&amp;tag={{ tag.tag }}"><i class="fa fa-fw fa-times" aria-hidden="true"></i><span class="sr-only"> Remove tag from all users</span></a>
+                    {% if tag.tag %}
+                        {{ tag.tag }} (<a href="{{ url_for("manipulate_settings") }}?tag={{ tag.tag }}">settings</a>)
+                    {% endif %}
+                </li>
+                {% endif %}{% endfor %}
+                <li>
+                    <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
+                    (<a href="{{ url_for("manipulate_settings") }}">global configuration</a>)
+                </li>
+            </ol>
+        </section>
+    </article>
+{% endblock %}

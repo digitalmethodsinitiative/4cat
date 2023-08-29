@@ -3,8 +3,7 @@ Convert a Twitter NDJSON file to be importable by TCAT's import-jsondump.php
 """
 import json
 
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -22,11 +21,11 @@ class ConvertNDJSONToJSON(BasicProcessor):
     extension = "json"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "twitterv2-search"
 

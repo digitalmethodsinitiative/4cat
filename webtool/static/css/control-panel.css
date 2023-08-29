@@ -1,3 +1,12 @@
+.admin-nav .button-container {
+    padding-top: 0;
+    padding-bottom: 2em;
+}
+
+.admin-nav .button-container li {
+    margin: 0;
+}
+
 .worker-list li > * {
     display: inline-block
 }
@@ -29,7 +38,8 @@ table.cp-table td {
 }
 
 table.cp-table .actions {
-    width: 8em;
+    width: 12em;
+    vertical-align: middle;
 }
 
 table td[colspan] {
@@ -54,11 +64,15 @@ table td[colspan] {
     text-align: left;
 }
 
+.user-byline {
+    font-size: 0.8em;
+}
+
 .settings fieldset {
     border: 0;
 }
 
-.settings article {
+.settings article:not(.fullsize) {
     max-width: 50%;
 }
 
@@ -66,16 +80,136 @@ table td[colspan] {
     min-width: 15em;
 }
 
-.settings input[type=text] {
+.settings .tab-container input[type=text] {
     width: 25em;
     max-width: 25em;
 }
 
-.datasource-toggle-form .form-element {
-    min-height: auto;
+.settings .datasource-toggle-form table {
+    position: relative;
+    left: -15em;
+    background: var(--always-white);
+    width: calc(100% + 12em);
 }
 
-.datasource-toggle-form fieldset {
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
+.settings .datasource-toggle-form input[type=text] {
+    width: 5em;
+}
+
+.user-controls > div, .user-controls > form > * {
+    margin: 1em auto;
+}
+
+.user-controls > form > * {
+    display: block;
+}
+
+.user-controls > div {
+    text-align: center;
+}
+
+.tab-container > div {
+    padding-top: 1em;
+}
+
+.tab-controls .matching {
+    border-right: 5px solid var(--accent-alternate);
+}
+
+.tab-controls .changed {
+    color: var(--accent-alternate)
+}
+
+.config-tag-info {
+    text-align: center;
+    border-bottom: 2px solid var(--contrast-dark);
+    padding: 1em;
+}
+
+.is-changed input, .is-changed select, .is-changed textarea {
+    border-color: var(--accent);
+}
+
+.is-changed label {
+    color: var(--accent);
+}
+
+#tag-order i.handle, #tag-order i.semi-handle {
+    border: 2px solid var(--contrast-dark);
+    background: var(--contrast-bright);
+    color: var(--text);
+    display: inline-block;
+    border-radius: 0.2em;
+    padding: 0.1em 0;
+}
+
+#tag-order .button-like {
+    display: inline-block;
+    border-radius: 0.2em;
+    padding: 0;
+    line-height: 1.25em;
+}
+
+#tag-order i.handle, #tag-order i.semi-handle {
+    cursor: ns-resize;
+}
+
+ol#tag-order li:nth-child(2n) {
+    background: inherit;
+}
+
+#tag-order li:not(:last-child) {
+    border-bottom: 1px dotted var(--contrast-dark)
+}
+
+#tag-order li:first-child {
+    border-top: 1px dotted var(--contrast-dark)
+}
+
+.stats-container {
+    list-style: none;
+    display: flex;
+    justify-content: space-evenly;
+    margin-top: 2em;
+    column-gap: 1em;
+    flex-wrap: wrap;
+    margin-left: 0;
+}
+
+.stats-container > div {
+    min-width: 17.5em;
+    background: var(--gray);
+    margin-bottom: 2em;
+}
+
+article .stats-container h3:not(.blocktitle) {
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
+    margin: 0;
+    font-size: 1em;
+    text-align: center;
+    padding: 0.5em 0;
+}
+
+.stats-container dl div {
+    display: grid;
+    grid-template-columns: 60% 40%;
+    padding: 0.5em;
+}
+
+.stats-container dl div:not(:last-child) {
+    border-bottom: 1px dotted var(--contrast-dark);
+}
+
+/**
+ ** Bulk dataset management
+ */
+.dataset-bulk {
+    padding-bottom: 1em;
+}
+
+.dataset-bulk .action-button {
+    width: fit-content;
+    display: block;
+    margin: 1em auto;
 }

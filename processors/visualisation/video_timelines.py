@@ -13,7 +13,7 @@ from svgwrite.image import Image as ImageElement
 
 from ural import is_url
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
@@ -52,7 +52,7 @@ class VideoTimelines(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine compatibility
 
@@ -201,9 +201,9 @@ class VideoTimelines(BasicProcessor):
                 for filename in [f["filename"] for f in data["files"]]:
                     filename = ".".join(filename.split(".")[:-1])
                     mapping_ids[filename] = data["post_ids"]
-                    if data["from_dataset"] not in mapping_dataset:
-                        mapping_dataset[data["from_dataset"]] = []
-                    mapping_dataset[data["from_dataset"]].append(filename)
+                    if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:
+                        mapping_dataset[data.get("from_dataset", data.get("source_dataset"))] = []
+                    mapping_dataset[data.get("from_dataset", data.get("source_dataset"))].append(filename)
                     labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():
@@ -213,6 +213,8 @@ class VideoTimelines(BasicProcessor):
             # is this the right place? should it be in the datasource?
             if dataset.type == "tiktok-search":
                 mapper = lambda item: item.get("tiktok_url")
+            elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
+                mapper = lambda item: item.get("youtube_url")
             else:
                 mapper = lambda item: item.get("id")
 

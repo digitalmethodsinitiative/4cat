@@ -4,7 +4,7 @@ Detect scenes in videos
 import json
 from scenedetect import open_video, SceneManager, VideoOpenFailure
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -140,11 +140,11 @@ class VideoSceneDetector(BasicProcessor):
 	followups = ["video-scene-frames", "video-timelines"]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on videos
 		"""
-		return module.type in ["video-downloader", "video-downloader-plus"]
+		return module.type.startswith("video-downloader")
 
 	def process(self):
 		"""
@@ -152,7 +152,8 @@ class VideoSceneDetector(BasicProcessor):
 		videos
 		"""
 		# Check processor able to run
-		if self.source_dataset.num_rows == 0:
+		if self.source_dataset.num_rows <= 1:
+			# 1 because there is always a metadata file
 			self.dataset.update_status("No videos from which to extract scenes.", is_final=True)
 			self.dataset.finish(0)
 			return
@@ -267,9 +268,13 @@ class VideoSceneDetector(BasicProcessor):
 							})
 							num_posts += 1
 
-		self.dataset.update_status(
-			'Detected %i scenes in %i videos' % (num_posts, processed_videos))
-		self.write_csv_items_and_finish(rows)
+		if rows:
+			self.dataset.update_status(
+				'Detected %i scenes in %i videos' % (num_posts, processed_videos))
+			self.write_csv_items_and_finish(rows)
+		else:
+			return self.dataset.finish_with_error("No distinct scenes could be detected in the videos. The videos may "
+												  "be too short for scenes to be detected.")
 
 	def get_new_scene_manager(self):
 		"""

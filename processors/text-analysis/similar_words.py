@@ -6,7 +6,7 @@ import shutil
 from gensim.models import KeyedVectors
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
@@ -24,6 +24,8 @@ class SimilarWord2VecWords(BasicProcessor):
 	title = "Extract similar words"  # title displayed in UI
 	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	flawless = True
 
 	options = {
 		"words": {
@@ -53,11 +55,11 @@ class SimilarWord2VecWords(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on word embedding models
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "generate-embeddings"
 
@@ -115,17 +117,30 @@ class SimilarWord2VecWords(BasicProcessor):
 					except KeyError:
 						continue
 
+					# Some words may have been excluded from the embedding model due to thresholds
+					excluded_words = set()
 					for similar_word in similar_words:
 						if similar_word[1] < threshold:
 							continue
+
+						try:
+							input_occurrences = model.get_vecattr(word, "count")
+						except KeyError:
+							if word not in excluded_words:
+								excluded_words.add(word)
+								self.dataset.log(f"'{word}' outside thresholds used for embedding model {model_file.name}; no occurrences")
+							input_occurrences = 0
+							self.flawless = False
+
+						item_occurrences = model.get_vecattr(similar_word[0], "count")
 
 						result.append({
 							"date": interval,
 							"input": word,
 							"item": similar_word[0],
 							"value": similar_word[1],
-							"input_occurences": model.get_vecattr(word, "count"),
-							"item_occurences": model.get_vecattr(similar_word[0], "count"),
+							"input_occurrences": input_occurrences,
+							"item_occurrences": item_occurrences,
 							"depth": level
 						})
 
@@ -147,4 +162,7 @@ class SimilarWord2VecWords(BasicProcessor):
 			self.dataset.update_status("None of the words were found in the word embedding model.", is_final=True)
 			self.dataset.finish(0)
 		else:
+			if not self.flawless:
+				self.dataset.update_status(
+					"Dataset complete, but some input words were not found in the embedding models (0 occurances in model due to chosen thresholds). Similar words are still identified; check log for specifics.", is_final=True)
 			self.write_csv_items_and_finish(result)

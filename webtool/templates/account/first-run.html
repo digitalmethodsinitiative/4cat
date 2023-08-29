@@ -31,6 +31,24 @@
             </div>
         </fieldset>
 
+        <fieldset>
+            <p><br>Customise this 4CAT:</p>
+            <div class="form-element{% if "4cat_name" in incomplete %} missing{% endif %}">
+                <label for="request-4cat_name">4CAT name</label>
+                <input type="text" name="4cat_name" id="request-4cat_name"
+                       value="My {{ adjective }} 4CAT Capture & Analysis Toolkit">
+            </div>
+            <div class="form-element{% if "interface_hue" in incomplete %} missing{% endif %}">
+                <label for="request-interface_hue">Interface accent colour</label>
+                <div>
+                    <input type="range" min="0" max="360" step="1" name="interface_hue" id="request-interface_hue"
+                           class="hue-picker" value="{{ (interface_hue * 360)|int }}" data-saturation="87"
+                           data-value="81" data-update-layout="true" data-update-background="#colour-example">
+                    <span class="colour-example" id="colour-example"></span>
+                </div>
+            </div>
+        </fieldset>
+
         {% if phone_home_url %}
         {% include "account/pingback-form.html" %}
         {% endif %}

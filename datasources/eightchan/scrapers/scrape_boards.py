@@ -11,7 +11,7 @@ class BoardScraper8chan(BoardScraper4chan):
 	8chan's API is compatible with 4chan's, so we extend the 4chan board scraper to
 	work with the 8chan API instead
 	"""
-	type = "8chan-board"
+	type = "eightchan-board"
 	datasource = "8chan"
 	max_workers = 4
 

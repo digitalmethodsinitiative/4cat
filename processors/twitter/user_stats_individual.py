@@ -42,7 +42,7 @@ class TwitterStats(TwitterStatsBase):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 

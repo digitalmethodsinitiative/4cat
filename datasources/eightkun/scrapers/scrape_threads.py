@@ -13,7 +13,7 @@ class ThreadScraper8kun(ThreadScraper4chan):
 	8kun's API is compatible with 4chan's, so we extend the 4chan thread scraper to
 	work with the 8kun API instead
 	"""
-	type = "8kun-thread"
+	type = "eightkun-thread"
 	max_workers = 4
 	log_level="info"
 

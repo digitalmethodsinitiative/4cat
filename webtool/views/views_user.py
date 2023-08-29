@@ -6,6 +6,7 @@ import requests
 import smtplib
 import fnmatch
 import socket
+import random
 import time
 import sys
 import os
@@ -14,17 +15,18 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-import common.config_manager as config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
-from webtool import app, login_manager, db
+from webtool import app, login_manager, db, config
 from webtool.views.api_tool import limiter
-from webtool.lib.user import User
-from webtool.lib.helpers import error
+from common.lib.user import User
+from webtool.lib.helpers import error, generate_css_colours, setting_required
 from common.lib.helpers import send_email, get_software_version
 
 from pathlib import Path
 
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user, request=request)
 
 @login_manager.user_loader
 def load_user(user_name):
@@ -70,6 +72,19 @@ def load_user_from_request(request):
         user.authenticate()
         return user
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    """
+    Handle unauthorized requests
+
+    Shows an error message, or if the user is not logged in yet redirects them
+    to the login page.
+    """
+    if current_user.is_authenticated:
+        return render_template("error.html", message="You cannot view this page."), 403
+    else:
+        return redirect(url_for("show_login"))
+
 
 @app.before_request
 def reroute_requests():
@@ -80,9 +95,9 @@ def reroute_requests():
     # Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
     if current_user and current_user.is_authenticated and current_user.is_deactivated:
         message = "Your 4CAT account has been deactivated and you can no longer access this page."
-        if current_user.get_attribute("deactivated.reason"):
+        if current_user.get_value("deactivated.reason"):
             message += "\n\nThe following reason was recorded for your account's deactivation: *"
-            message += current_user.get_attribute("deactivated.reason") + "*"
+            message += current_user.get_value("deactivated.reason") + "*"
 
         return render_template("error.html", title="Your account has been deactivated", message=message), 403
 
@@ -172,7 +187,7 @@ def first_run_dialog():
 
     :return:
     """
-    has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE is_admin = True")["amount"]
+    has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'")["amount"]
     wants_phone_home = not config.get("4cat.phone_home_asked", False)
 
     version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
@@ -186,14 +201,30 @@ def first_run_dialog():
     if has_admin_user and not wants_phone_home:
         return error(403, message="The 'first run' page is not available")
 
+    # choose a random adjective to differentiate this 4CAT instance (this can
+    # be edited by the user)
+    adjective_file = Path(config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
+    if not adjective_file.exists():
+        adjectives = ["Awesome"]
+    else:
+        with adjective_file.open() as infile:
+            adjectives = [line.strip().title() for line in infile.readlines()]
+    adjective = random.choice(adjectives)
+
+    # choose a random accent colour (this can also be edited)
+    interface_hue = random.random()
+
     phone_home_url = config.get("4cat.phone_home_url")
     if request.method == 'GET':
         template = "account/first-run.html" if not has_admin_user else "account/first-run-after-update.html"
-        return render_template(template, incomplete=missing, form=request.form, phone_home_url=phone_home_url, version=version)
+        return render_template(template, incomplete=missing, form=request.form, phone_home_url=phone_home_url,
+                               version=version, adjective=adjective, interface_hue=interface_hue)
 
     if not has_admin_user:
         username = request.form.get("username").strip()
         password = request.form.get("password").strip()
+        instance_name = request.form.get("4cat_name").strip()
+        interface_hue = request.form.get("interface_hue").strip()
         confirm_password = request.form.get("confirm_password").strip()
 
         if not username:
@@ -211,17 +242,35 @@ def first_run_dialog():
             missing.append("password")
             missing.append("confirm_password")
 
+        if not instance_name:
+            missing.append("4cat_name")
+
         if missing:
             flash("Please make sure all fields are complete")
             return render_template("account/first-run.html", form=request.form, incomplete=missing,
-                                   flashes=get_flashed_messages(), phone_home_url=phone_home_url)
+                                   flashes=get_flashed_messages(), phone_home_url=phone_home_url,
+                                   adjective=adjective, interface_hue=interface_hue)
 
-        db.insert("users", data={"name": username})
+        db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
         db.commit()
         user = User.get_by_name(db=db, name=username)
         user.set_password(password)
+        user.add_tag("admin")  # first user is always admin
 
-        db.update("users", where={"name": username}, data={"is_admin": True, "is_deactivated": False})
+        config.set("4cat.name_long", instance_name)
+
+        # handle hue colour
+        try:
+            interface_hue = int(interface_hue)
+            interface_hue = interface_hue if 0 <= interface_hue <= 360 else random.randrange(0, 360)
+        except (ValueError, TypeError):
+            interface_hue = random.randrange(0, 360)
+
+        config.set("4cat.layout_hue", interface_hue)
+        generate_css_colours(force=True)
+
+        # make user an admin
+        db.update("users", where={"name": username}, data={"is_deactivated": False})
         db.commit()
 
         flash("The admin user '%s' was created, you can now use it to log in." % username)
@@ -245,7 +294,7 @@ def first_run_dialog():
             flash("Could not send install ping to 4CAT developers")
 
     # don't ask phone home again until next update
-    config.set_or_create_setting("4cat.phone_home_asked", True, raw=False)
+    config.set("4cat.phone_home_asked", True)
 
     redirect_path = "show_login" if not has_admin_user else "show_frontpage"
     return redirect(url_for(redirect_path))
@@ -262,9 +311,9 @@ def show_login():
     :return: Redirect to either the URL form, or the index (if logged in)
     """
     if current_user.is_authenticated:
-        return redirect(url_for("show_index"))
+        return redirect(url_for("show_frontpage"))
 
-    has_admin_user = db.fetchone("SELECT * FROM users WHERE is_admin = True")
+    has_admin_user = db.fetchone("SELECT * FROM users WHERE tags @> '[\"admin\"]'")
     if not has_admin_user:
         return redirect(url_for("first_run_dialog"))
 
@@ -282,7 +331,7 @@ def show_login():
 
     login_user(registered_user, remember=True)
 
-    return redirect(url_for("show_index"))
+    return redirect(url_for("show_frontpage"))
 
 
 @app.route("/logout")
@@ -299,6 +348,7 @@ def logout():
 
 
 @app.route("/request-access/", methods=["GET", "POST"])
+@setting_required("4cat.allow_access_request")
 def request_access():
     """
     Request a 4CAT Account
