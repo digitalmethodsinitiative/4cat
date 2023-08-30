@@ -103,7 +103,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("image-to-categories.cd_clip_num_files", 100, user=user))
+        max_number_images = int(config.get("dmi-service-manager.cd_clip_num_files", 100, user=user))
         if max_number_images == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of images"
             options["amount"]["default"] = 100
