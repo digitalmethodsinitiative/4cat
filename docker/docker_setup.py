@@ -45,6 +45,7 @@ if __name__ == "__main__":
     import configparser
     import bcrypt
     from pathlib import Path
+    import sys
 
     # Configuration file location
     CONFIG_FILE = 'config/config.ini'
@@ -155,8 +156,8 @@ if __name__ == "__main__":
             print(result.stderr.decode("ascii"))
             exit(1)
         else:
-            config.set_or_create_setting('selenium.installed', True, raw=False)
-            config.set_or_create_setting('selenium.selenium_executable_path', "/usr/local/bin/geckodriver", raw=False)
+            config.set('selenium.installed', True)
+            config.set('selenium.selenium_executable_path', "/usr/local/bin/geckodriver")
 
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"

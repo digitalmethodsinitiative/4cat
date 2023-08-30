@@ -7,7 +7,7 @@ from bs4.element import Comment
 
 from backend.lib.search import Search
 from common.lib.exceptions import ProcessorException
-import common.config_manager as config
+from common.config_manager import config
 
 if config.get('selenium.browser') and config.get('selenium.selenium_executable_path'):
     from selenium import webdriver

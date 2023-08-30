@@ -79,12 +79,12 @@ class ScreenshotWithSelenium(SeleniumScraper):
             "min": 0,
             "max": 15,
         },
-        #"ignore-cookies": {
-        #    "type": UserInput.OPTION_TOGGLE,
-        #    "help": "Attempt to ignore cookie walls",
-        #    "default": False,
-        #    "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically.'
-        #},
+        "ignore-cookies": {
+           "type": UserInput.OPTION_TOGGLE,
+           "help": "Attempt to ignore cookie walls",
+           "default": False,
+           "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically.'
+        },
     }
 
     def get_items(self, query):

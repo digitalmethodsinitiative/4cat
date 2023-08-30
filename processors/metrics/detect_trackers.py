@@ -8,7 +8,7 @@ import csv
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-import common.config_manager as config
+from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -49,7 +49,7 @@ class DetectTrackers(BasicProcessor):
     tracker_file = os.path.join(config.get('PATH_ROOT'), 'common/assets/bugs.json')
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on datasets.
 

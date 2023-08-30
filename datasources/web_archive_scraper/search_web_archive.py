@@ -14,7 +14,7 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
 from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput
 
-import common.config_manager as config
+from common.config_manager import config
 
 class SearchWebArchiveWithSelenium(SeleniumScraper):
     """

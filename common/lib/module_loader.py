@@ -76,7 +76,7 @@ class ModuleCollector:
         # agreed - Dale
         parent_classes = {"BasicWorker", "BasicProcessor", "Search", "SearchWithScope", "Search4Chan",
                           "ProcessorPreset", "TwitterStatsBase", "BaseFilter", "TwitterAggregatedStats", "ColumnFilter",
-                          "BasicJSONScraper", "BoardScraper4chan", "ThreadScraper4chan"}
+                          "BasicJSONScraper", "BoardScraper4chan", "ThreadScraper4chan", "SeleniumScraper"}
         if only_processors:
             # only allow processors
             for worker_only_class in ["BasicWorker", "BasicJSONScraper", "BoardScraper4chan", "ThreadScraper4chan"]:
