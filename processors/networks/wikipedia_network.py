@@ -16,6 +16,9 @@ __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+from common.lib.exceptions import ProcessorInterruptedException
+
+
 class WikiURLCoLinker(BasicProcessor):
 	"""
 	Generate URL co-link network
@@ -25,6 +28,15 @@ class WikiURLCoLinker(BasicProcessor):
 	title = "Wikipedia category network"  # title displayed in UI
 	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
+
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+        Allow processor to run on chan datasets
+
+        :param module: Module to determine compatibility with
+        """
+		return module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
