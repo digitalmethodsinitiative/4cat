@@ -180,6 +180,7 @@ ol#tag-order li:nth-child(2n) {
     min-width: 17.5em;
     background: var(--gray);
     margin-bottom: 2em;
+    max-width: 45%;
 }
 
 article .stats-container h3:not(.blocktitle) {
@@ -199,6 +200,21 @@ article .stats-container h3:not(.blocktitle) {
 
 .stats-container dl div:not(:last-child) {
     border-bottom: 1px dotted var(--contrast-dark);
+}
+
+.stats-container div.tag-list {
+    display: block;
+}
+
+.stats-container div.tag-list dt {
+    float: left;
+    display: block;
+    width: 60%;
+    margin-bottom: 0.25em;
+}
+
+.stats-container .property-badge {
+    margin-right: 0.5em;
 }
 
 /**

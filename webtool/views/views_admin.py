@@ -70,9 +70,10 @@ def admin_frontpage():
     upgrade_available = not not db.fetchone(
         "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
 
+    tags = config.get_active_tags(current_user)
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
         "captured": num_items, "datasets": num_datasets, "disk": disk_stats
-    }, upgrade_available=upgrade_available)
+    }, upgrade_available=upgrade_available, tags=tags)
 
 
 @app.route("/admin/users/", defaults={"page": 1})
