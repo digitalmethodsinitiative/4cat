@@ -91,6 +91,8 @@ class ScreenshotWithSelenium(SeleniumScraper):
                "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically.'
             }
 
+        return options
+
     def get_items(self, query):
         """
         Separate and check urls, then loop through each and take screenshots.
