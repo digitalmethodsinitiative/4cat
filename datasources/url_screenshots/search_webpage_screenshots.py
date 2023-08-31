@@ -14,6 +14,7 @@ from backend.lib.selenium_scraper import SeleniumScraper
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import convert_to_int
+from common.config_manager import config
 
 
 class ScreenshotWithSelenium(SeleniumScraper):
@@ -26,66 +27,69 @@ class ScreenshotWithSelenium(SeleniumScraper):
 
     eager_selenium = True
 
-    options = {
-        "intro-1": {
-            "type": UserInput.OPTION_INFO,
-            "help": "The given URLs are opened (remotely) in a Firefox browser and screenshots are then taken "
-                    "according to the given parameters. The screenshots can then be downloaded as a .zip archive.\n\n"
-                    "Please enter a list of urls, one per line. Invalid URLs will be ignored and duplicate URLs will "
-                    "be skipped. URLs need to include a protocol, i.e. they need to start with `http://` or `https://`."
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "List of URLs"
-        },
-        "capture": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Capture region",
-            "options": {
-                "viewport": "Capture only browser window (viewport)",
-                "all": "Capture entire page"
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        options = {
+            "intro-1": {
+                "type": UserInput.OPTION_INFO,
+                "help": "The given URLs are opened (remotely) in a Firefox browser and screenshots are then taken "
+                        "according to the given parameters. The screenshots can then be downloaded as a .zip archive.\n\n"
+                        "Please enter a list of urls, one per line. Invalid URLs will be ignored and duplicate URLs will "
+                        "be skipped. URLs need to include a protocol, i.e. they need to start with `http://` or `https://`."
             },
-            "default": "viewport"
-        },
-        "resolution": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Window size",
-            "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). "
-                       "Screenshots will be slightly smaller than the selected size as they do not include the "
-                       "interface. Only effective when capturing the browser viewport.",
-            "options": {
-                "1024x786": "1024x786",
-                "1280x720": "1280x720 (720p)",
-                "1920x1080": "1920x1080 (1080p)",
-                "1440x900": "1440x900",
+            "query": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "List of URLs"
             },
-            "default": "1280x720"
-        },
-        "wait-time": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Load time",
-            "tooltip": "Wait this many seconds before taking the screenshot, to allow the page to finish loading "
-                       "first. If the page finishes loading earlier, the screenshot is taken immediately.",
-            "default": 6,
-            "min": 0,
-            "max": 60,
-        },
-        "pause-time": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Pause time",
-            "tooltip": "After each screenshot, wait this many seconds before taking the next one. Increasing this can "
-                       "help if a site seems to be blocking the screenshot generator due to repeat requests.",
-            "default": 0,
-            "min": 0,
-            "max": 15,
-        },
-        "ignore-cookies": {
-           "type": UserInput.OPTION_TOGGLE,
-           "help": "Attempt to ignore cookie walls",
-           "default": False,
-           "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically.'
-        },
-    }
+            "capture": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Capture region",
+                "options": {
+                    "viewport": "Capture only browser window (viewport)",
+                    "all": "Capture entire page"
+                },
+                "default": "viewport"
+            },
+            "resolution": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Window size",
+                "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). "
+                           "Screenshots will be slightly smaller than the selected size as they do not include the "
+                           "interface. Only effective when capturing the browser viewport.",
+                "options": {
+                    "1024x786": "1024x786",
+                    "1280x720": "1280x720 (720p)",
+                    "1920x1080": "1920x1080 (1080p)",
+                    "1440x900": "1440x900",
+                },
+                "default": "1280x720"
+            },
+            "wait-time": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Load time",
+                "tooltip": "Wait this many seconds before taking the screenshot, to allow the page to finish loading "
+                           "first. If the page finishes loading earlier, the screenshot is taken immediately.",
+                "default": 6,
+                "min": 0,
+                "max": 60,
+            },
+            "pause-time": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Pause time",
+                "tooltip": "After each screenshot, wait this many seconds before taking the next one. Increasing this can "
+                           "help if a site seems to be blocking the screenshot generator due to repeat requests.",
+                "default": 0,
+                "min": 0,
+                "max": 15,
+            },
+        }
+        if config.get('selenium.firefox_extensions', user=user) and config.get('selenium.firefox_extensions', user=user).get('i_dont_care_about_cookies', {}).get('path'):
+            options["ignore-cookies"] = {
+               "type": UserInput.OPTION_TOGGLE,
+               "help": "Attempt to ignore cookie walls",
+               "default": False,
+               "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically.'
+            }
 
     def get_items(self, query):
         """
@@ -111,8 +115,8 @@ class ScreenshotWithSelenium(SeleniumScraper):
 
         # Enable Firefox extension: i don't care about cookies
         if ignore_cookies:
-            # TODO: fix this up to use our config and error handle a shitty extension
-            self.enable_firefox_extension('/usr/src/app/jid1-KKzOGWgsW3Ao4Q@jetpack.xpi')
+            self.enable_firefox_extension(self.config.get('selenium.firefox_extensions').get('i_dont_care_about_cookies', {}).get('path'))
+            self.dataset.update_status("Enabled Firefox extension: i don't care about cookies")
 
         screenshots = 0
         done = 0

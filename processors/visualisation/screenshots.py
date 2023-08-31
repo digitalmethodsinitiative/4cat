@@ -5,6 +5,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, extract_urls_from_string
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from backend.lib.selenium_scraper import SeleniumWrapper
+from common.config_manager import config
 
 import os
 import json
@@ -26,41 +27,33 @@ class ScreenshotURLs(BasicProcessor):
     description = "Use a Selenium based crawler to request each url and take a screenshot image of the webpage"
     extension = "zip"  # extension of result file, used internally and in UI
 
-    options = {
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column(s) to extract URLs",
-            "default": "body",
-            "tooltip": "URLs will be extracted from each enabled column."
-            },
-        "wait-time": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Time in seconds to wait for page to load",
-            "default": 2,
-            "min": 0,
-            "max": 5,
-            },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Split column values by comma?",
-            "default": False,
-            "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-            "separately"
-            },
-        "ignore-cookies": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Attempt to ignore cookie requests",
-            "default": False,
-            "tooltip": "If enabled, a firefox extension [i don't care about cookies](https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies/) will be used"
-            },
-        }
-
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
         Update columns field with actual columns
         """
-        options = cls.options
+        options = {
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column(s) to extract URLs",
+                "default": "body",
+                "tooltip": "URLs will be extracted from each enabled column."
+            },
+            "wait-time": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Time in seconds to wait for page to load",
+                "default": 2,
+                "min": 0,
+                "max": 5,
+            },
+            "split-comma": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Split column values by comma?",
+                "default": False,
+                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+                           "separately"
+            },
+        }
 
         if parent_dataset and parent_dataset.get_columns():
             columns = parent_dataset.get_columns()
@@ -73,15 +66,13 @@ class ScreenshotURLs(BasicProcessor):
                     options["columns"]["default"] = [default]
                     break
 
-
-        # extensions = config.get('selenium.firefox_extensions')
-        # if 'i_dont_care_about_cookies' in extensions and extensions['extensions'].get('path'):
-        #     options['ignore-cookies'] = {
-        #         "type": UserInput.OPTION_TOGGLE,
-        #         "help": "Attempt to ignore cookie requests",
-        #         "default": False,
-        #         "tooltip": "If enabled, a firefox extension [i don't care about cookies](https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies/) will be used"
-        #     }
+        if config.get('selenium.firefox_extensions', user=user) and config.get('selenium.firefox_extensions', user=user).get('i_dont_care_about_cookies', {}).get('path'):
+            options['ignore-cookies'] = {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Attempt to ignore cookie requests",
+                "default": False,
+                "tooltip": "If enabled, a firefox extension [i don't care about cookies](https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies/) will be used"
+            }
 
         return options
 
@@ -153,7 +144,9 @@ class ScreenshotURLs(BasicProcessor):
         try:
             webdriver.start_selenium()
             if ignore_cookies:
-                webdriver.enable_firefox_extension('/usr/src/app/jid1-KKzOGWgsW3Ao4Q@jetpack.xpi')
+                webdriver.enable_firefox_extension(
+                    self.config.get('selenium.firefox_extensions').get('i_dont_care_about_cookies', {}).get('path'))
+                self.dataset.update_status("Enabled Firefox extension: i don't care about cookies")
         except ProcessorException as e:
             self.dataset.log("Error starting Selenium: %s" % str(e))
             self.dataset.update_status("Error starting Selenium; contact admin.", is_final=True)

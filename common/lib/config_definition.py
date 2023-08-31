@@ -408,9 +408,9 @@ config_definition = {
     },
     "selenium.firefox_extensions": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": json.dumps({
+        "default": {
             "i_dont_care_about_cookies": {"path": "", "always_enabled": False},
-            }),
+            },
         "help": "Firefox Extensions",
         "tooltip": "Can be used by certain processors and datasources",
     },
