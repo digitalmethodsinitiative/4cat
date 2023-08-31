@@ -21,7 +21,7 @@ class ScreenshotURLs(BasicProcessor):
     """
     Screenshot URLs w/ Selenium
     """
-    type = "screenshot-urls"  # job type ID
+    type = "image-downloader-screenshot-urls"  # job type ID
     category = "Visual"  # category
     title = "Collect Screenshots of URLs"  # title displayed in UI
     description = "Use a Selenium based crawler to request each url and take a screenshot image of the webpage"
