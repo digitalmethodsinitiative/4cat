@@ -9,8 +9,10 @@ import requests
 import random
 import time
 
+from dateutil.relativedelta import relativedelta
+
 from backend.lib.selenium_scraper import SeleniumScraper
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput
 
@@ -54,9 +56,10 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             "tooltip": "Default 'First Available' scrapes the first available result after start date",
             "options": {
                 "first": "First Available",
+                "monthly": "Monthly",
                 "yearly": "Yearly"
             },
-            "default": "selenium_only"
+            "default": "first"
         },
         "daterange": {
             "type": UserInput.OPTION_DATERANGE,
@@ -344,14 +347,14 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         """
         web_archive_url = 'https://web.archive.org/web/'
         min_date = datetime.datetime.fromtimestamp(int(start_date))
+        max_date = datetime.datetime.fromtimestamp(int(end_date))
 
         # if already formated, return as is
         if web_archive_url == url[:len(web_archive_url)]:
             return [{'base_url': url, 'year': min_date.year, 'url': url}]
 
         if frequency == 'yearly':
-            max_date = datetime.datetime.fromtimestamp(int(end_date))
-            years = [year for year in range(min_date.year, max_date.year)]
+            years = [year for year in range(min_date.year, max_date.year+1)]
 
             return  [
                      {
@@ -360,6 +363,24 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                      'url': web_archive_url + str(year) + min_date.strftime('%m%d') + '/' + url,
                      }
                     for year in years]
+
+        elif frequency in ('monthly', 'weekly'):
+            dates_needed = []
+            current = min_date
+            while current <= max_date:
+                dates_needed.append({
+                     'base_url': url,
+                     'year': current.year,
+                     'url': web_archive_url + current.strftime('%Y%m%d') + '/' + url,
+                     })
+                if frequency == 'weekly':
+                    current += relativedelta(weeks=1)
+                elif frequency == 'monthly':
+                    current += relativedelta(months=1)
+                else:
+                    raise ProcessorException("Frequency %s not implemented!" % frequency)
+
+            return dates_needed
 
         elif frequency == 'first':
             return [{'base_url': url, 'year': min_date.year, 'url': web_archive_url + min_date.strftime('%Y%m%d') + '/' + url}]
