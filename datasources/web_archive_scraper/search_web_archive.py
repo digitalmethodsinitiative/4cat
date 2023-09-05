@@ -57,6 +57,8 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             "options": {
                 "first": "First Available",
                 "monthly": "Monthly",
+                "weekly": "Weekly",
+                "daily": "Daily",
                 "yearly": "Yearly"
             },
             "default": "first"
@@ -128,6 +130,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
             attempts = 0
             success = False
+            scraped_page = None
             while attempts < 2:
                 attempts += 1
                 try:
@@ -364,7 +367,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                      }
                     for year in years]
 
-        elif frequency in ('monthly', 'weekly'):
+        elif frequency in ('monthly', 'weekly', 'daily'):
             dates_needed = []
             current = min_date
             while current <= max_date:
@@ -377,6 +380,8 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     current += relativedelta(weeks=1)
                 elif frequency == 'monthly':
                     current += relativedelta(months=1)
+                elif frequency == 'daily':
+                    current += relativedelta(days=1)
                 else:
                     raise ProcessorException("Frequency %s not implemented!" % frequency)
 
