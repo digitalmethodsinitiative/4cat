@@ -15,7 +15,7 @@ from pathlib import Path, PurePath
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version, remove_nuls
+from common.lib.helpers import get_software_version, remove_nuls, send_email
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 from common.config_manager import config, ConfigWrapper
 
@@ -299,6 +299,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.dataset.key, self.parameters["attach_to"]))
 
 		self.job.finish()
+
+		if self.dataset.get_parameters().get("email-complete", False):
+			for owner in self.dataset.get_owners_users():
+				# Absolute the minimum here
+				if "@" in owner:
+					self.log.info("Sending email to %s" % owner)
+					send_email(owner, f"4CAT Dataset completed: {self.dataset.get_label()}\n\nYou can view the results at {('https://' if config.get('flask.https') else 'http://')}{config.get('flask.server_name')}/results/{self.dataset.key}")
+
 
 	def remove_files(self):
 		"""

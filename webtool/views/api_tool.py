@@ -333,6 +333,8 @@ def queue_dataset():
 	if request.form.to_dict().get("pseudonymise") in ("pseudonymise", "anonymise"):
 		sanitised_query["pseudonymise"] = request.form.to_dict().get("pseudonymise")
 
+	sanitised_query["email-complete"] = request.form.to_dict().get("email-complete", False)
+
 	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
 	is_private = bool(request.form.get("make-private", False))
 

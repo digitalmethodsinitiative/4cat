@@ -61,6 +61,16 @@
                         <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and server administrators will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
                     </div>
                     <div class="form-element">
+                        <label for="data-email-complete">Make private:</label>
+                        <div class="filter-parameters">
+                            <label><input type="checkbox" name="email-complete" id="data-email-complete" checked="checked"> Receive email when dataset is complete</label>
+                            <button class="tooltip-trigger" aria-controls="tooltip-dataset-email" aria-label="Extended help for option">?</button>
+                        </div>
+
+
+                        <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
+                    </div>
+                    <div class="form-element">
                         <label for="dataset-label">Dataset name:</label>
                         <input id="dataset-label" name="label">
 
