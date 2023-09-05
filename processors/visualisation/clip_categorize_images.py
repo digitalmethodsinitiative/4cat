@@ -1,18 +1,13 @@
 """
 OpenAI CLIP categorize images
 """
-import datetime
 import os
 import json
-import time
-import requests
-from pathlib import Path
-from json import JSONDecodeError
 
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
 
@@ -151,7 +146,11 @@ class CategorizeImagesCLIP(BasicProcessor):
         dmi_service_manager = DmiServiceManager(processor=self)
 
         # Check GPU memory available
-        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("clip")
+        try:
+            gpu_memory, info = dmi_service_manager.check_gpu_memory_available("clip")
+        except DmiServiceManagerException as e:
+            self.dataset.finish_with_error(str(e))
+            return
         if not gpu_memory:
             if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
                 self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
@@ -176,7 +175,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                 }
 
         # Finally, add image files to args
-        data["args"].extend([f"data/{path_to_files.joinpath(filename)}" for filename in image_filenames])
+        data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
 
         # Send request to DMI Service Manager
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")

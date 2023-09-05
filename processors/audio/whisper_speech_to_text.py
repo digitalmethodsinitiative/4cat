@@ -193,7 +193,7 @@ class AudioToText(BasicProcessor):
                 setting = setting if setting[:2] == "--" else "--" + setting.lstrip("-")
                 data["args"].extend([setting, str(value)])
         # Finally, add audio files to args
-        data["args"].extend([f"data/{path_to_files.joinpath(filename)}" for filename in audio_filenames])
+        data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in audio_filenames])
 
         # Send request to DMI Service Manager
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")

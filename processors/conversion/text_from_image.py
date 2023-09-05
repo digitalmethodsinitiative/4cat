@@ -136,7 +136,7 @@ class ImageTextDetector(BasicProcessor):
         data = {'args': ['--model', self.parameters.get("model_type"),
                          '--output_dir', f"data/{path_to_results}",
                          '--images']}
-        data["args"].extend([f"data/{path_to_files.joinpath(filename)}" for filename in image_filenames])
+        data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
 
         # Send request to DMI Service Manager
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")
