@@ -78,8 +78,9 @@ class ScreenshotWithSelenium(SeleniumScraper):
             "pause-time": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Pause time",
-                "tooltip": "After each screenshot, wait this many seconds before taking the next one. Increasing this can "
-                           "help if a site seems to be blocking the screenshot generator due to repeat requests.",
+                "tooltip": "Before each screenshot, wait this many seconds before taking the screenshot. This can help "
+                           "with images loading or if a site seems to be blocking the screenshot generator due to "
+                           "repeat requests.",
                 "default": 0,
                 "min": 0,
                 "max": 15,
@@ -179,6 +180,9 @@ class ScreenshotWithSelenium(SeleniumScraper):
                 self.dataset.log("Page load time: %s" % (time.time() - start_time))
 
                 if self.check_for_movement():
+                    if pause:
+                        time.sleep(pause)
+
                     try:
                         self.save_screenshot(results_path.joinpath(filename), width=width, height=height, viewport_only=(capture == "viewport"))
                     except Exception as e:
@@ -206,9 +210,6 @@ class ScreenshotWithSelenium(SeleniumScraper):
                 # Update result and yield it
                 result['final_url'] = self.driver.current_url
                 result['subject'] = self.driver.title
-
-            if pause:
-                time.sleep(pause)
 
             # Record result data
             metadata[url] = result

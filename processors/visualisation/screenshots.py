@@ -78,8 +78,9 @@ class ScreenshotURLs(BasicProcessor):
             "pause-time": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Pause time",
-                "tooltip": "After each screenshot, wait this many seconds before taking the next one. Increasing this can "
-                           "help if a site seems to be blocking the screenshot generator due to repeat requests.",
+                "tooltip": "Before each screenshot, wait this many seconds before taking the screenshot. This can help "
+                           "with images loading or if a site seems to be blocking the screenshot generator due to "
+                           "repeat requests.",
                 "default": 0,
                 "min": 0,
                 "max": 15,
@@ -256,6 +257,9 @@ class ScreenshotURLs(BasicProcessor):
                 self.dataset.log("Page load time: %s" % (time.time() - start_time))
 
                 if webdriver.check_for_movement():
+                    if pause:
+                        time.sleep(pause)
+
                     try:
                         webdriver.save_screenshot(results_path.joinpath(filename), width=width, height=height,
                                              viewport_only=(capture == "viewport"))
@@ -284,9 +288,6 @@ class ScreenshotURLs(BasicProcessor):
                 # Update result and yield it
                 result['final_url'] = webdriver.driver.current_url
                 result['subject'] = webdriver.driver.title
-
-            if pause:
-                time.sleep(pause)
 
             # Record result data
             metadata[url] = result
