@@ -1,8 +1,12 @@
 """
 Screenshot URLs w/ Selenium
 """
+import datetime
+import re
+import time
+
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, extract_urls_from_string
+from common.lib.helpers import UserInput, extract_urls_from_string, convert_to_int
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from backend.lib.selenium_scraper import SeleniumWrapper
 from common.config_manager import config
@@ -39,12 +43,46 @@ class ScreenshotURLs(BasicProcessor):
                 "default": "body",
                 "tooltip": "URLs will be extracted from each enabled column."
             },
+            "capture": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Capture region",
+                "options": {
+                    "viewport": "Capture only browser window (viewport)",
+                    "all": "Capture entire page"
+                },
+                "default": "viewport"
+            },
+            "resolution": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Window size",
+                "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). "
+                           "Screenshots will be slightly smaller than the selected size as they do not include the "
+                           "interface. Only effective when capturing the browser viewport.",
+                "options": {
+                    "1024x786": "1024x786",
+                    "1280x720": "1280x720 (720p)",
+                    "1920x1080": "1920x1080 (1080p)",
+                    "1440x900": "1440x900",
+                },
+                "default": "1280x720"
+            },
             "wait-time": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Time in seconds to wait for page to load",
-                "default": 2,
+                "help": "Load time",
+                "tooltip": "Wait this many seconds before taking the screenshot, to allow the page to finish loading "
+                           "first. If the page finishes loading earlier, the screenshot is taken immediately.",
+                "default": 6,
                 "min": 0,
-                "max": 5,
+                "max": 60,
+            },
+            "pause-time": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Pause time",
+                "tooltip": "After each screenshot, wait this many seconds before taking the next one. Increasing this can "
+                           "help if a site seems to be blocking the screenshot generator due to repeat requests.",
+                "default": 0,
+                "min": 0,
+                "max": 15,
             },
             "split-comma": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -61,7 +99,7 @@ class ScreenshotURLs(BasicProcessor):
             options["columns"]["inline"] = True
             options["columns"]["options"] = {v: v for v in columns}
             options["columns"]["default"] = ['body']
-            for default in ['url', 'urls', 'links']:
+            for default in ['final_url', 'url', 'urls', 'links']:
                 if default in columns:
                     options["columns"]["default"] = [default]
                     break
@@ -94,17 +132,13 @@ class ScreenshotURLs(BasicProcessor):
             self.dataset.finish(0)
             return
 
-        ignore_cookies = self.parameters.get("ignore-cookies")
-        wait = self.parameters.get("wait-time")
+        # Collect URLs from parent dataset
         split_comma = self.parameters.get("split-comma")
         columns = self.parameters.get("columns")
         if not columns:
             self.dataset.update_status("No columns selected; no screenshots taken.", is_final=True)
             self.dataset.finish(0)
             return
-
-        results_path = self.dataset.get_staging_area()
-        self.dataset.log('Staging directory location: %s' % results_path)
 
         urls = {}
         self.dataset.update_status("Reading source file and extracting URLs")
@@ -128,9 +162,9 @@ class ScreenshotURLs(BasicProcessor):
 
             for post_url in post_urls:
                 if post_url not in urls:
-                    urls[post_url] = {'ids': {post.get('id', 0)}}
+                    urls[post_url] = {'ids': {str(post.get('id', 0))}}
                 else:
-                    urls[post_url]['ids'].add(post.get('id', 0))
+                    urls[post_url]['ids'].add(str(post.get('id', 0)))
 
         if not urls:
             self.dataset.update_status("No urls identified.", is_final=True)
@@ -138,6 +172,20 @@ class ScreenshotURLs(BasicProcessor):
             return
         else:
             self.dataset.log('Collected %i urls.' % len(urls))
+
+        # Create results folder
+        results_path = self.dataset.get_staging_area()
+        self.dataset.log('Staging directory location: %s' % results_path)
+
+        # Start Selenium
+        ignore_cookies = False  # self.parameters.get("ignore-cookies")
+        capture = self.parameters.get("capture")
+        resolution = self.parameters.get("resolution", "1024x786")
+        pause = self.parameters.get("pause-time")
+        wait = self.parameters.get("wait-time")
+
+        width = convert_to_int(resolution.split("x")[0], 1024)
+        height = convert_to_int(resolution.split("x").pop(), 786) if capture == "viewport" else None
 
         self.dataset.update_status("Starting Selenium Webdriver.")
         webdriver = SeleniumWrapper()
@@ -155,52 +203,106 @@ class ScreenshotURLs(BasicProcessor):
             return
 
         screenshots = 0
-        processed_urls = 0
+        done = 0
         total_urls = len(urls)
-        for url in urls:
+        # Do not scrape the same site twice
+        scraped_urls = set()
+        metadata = {}
+        for url, post_ids in urls.items():
             # Stop processing if worker has been asked to stop
             if self.interrupted:
                 webdriver.quit_selenium()
                 raise ProcessorInterruptedException("Interrupted while downloading images.")
 
-            processed_urls += 1
-            if processed_urls % 50:
-                self.dataset.update_status("processed %i/%i urls with %i screenshots taken" % (processed_urls, total_urls, screenshots))
-                self.dataset.update_progress(processed_urls / total_urls)
+            # Remove Archive.org toolbar
+            if re.findall(r"archive\.org/web/[0-9]+/", url):
+                url = re.sub(r"archive\.org/web/([0-9]+)/", "archive.org/web/\\1if_/", url)
 
-            webdriver.reset_current_page()
-            try:
-                webdriver.driver.get(url)
-            except Exception as e:
-                # TODO: This is way too broad and should be handled in the SeleniumWrapper
-                self.dataset.log("Error collectiong %s: %s" % (url, str(e)))
-                urls[url]['error'] = str(e)
-                continue
+            scraped_urls.add(url)
+            filename = re.sub(r"[^0-9a-z]+", "_", url.lower()) + ".png"
+            result = {
+                "url": url,
+                "filename": filename,
+                "timestamp": None,
+                "error": [],
+                "final_url": None,
+                "subject": None,
+                "post_ids": ", ".join(list(post_ids['ids'])),
+            }
 
-            if webdriver.check_for_movement():
-                hash = sha256(url.encode()).hexdigest()[:13]
-                filename = f'{hash}.png'
+            attempts = 0
+            success = False
+            while attempts < 2:
+                attempts += 1
+                webdriver.reset_current_page()
                 try:
-                    webdriver.save_screenshot(results_path.joinpath(filename))
+                    webdriver.driver.get(url)
                 except Exception as e:
-                    self.dataset.log("Error saving screenshot for %s: %s" % (url, str(e)))
-                    urls[url]['error'] = str(e)
+                    # TODO: This is way too broad and should be handled in the SeleniumWrapper
+                    self.dataset.log("Error collecting screenshot for %s: %s" % (url, str(e)))
+                    result['error'].append("Attempt %i: %s" % (attempts, str(e)))
                     continue
-                urls[url]['filename'] = filename
-                # Update file attribute with url
-                os.setxattr(results_path.joinpath(filename), 'user.url', url.encode())
-                screenshots += 1
-            else:
-                # No page was reached...
-                urls[url]['error'] = "Driver was not able to go to page"
+
+                start_time = time.time()
+                if capture == "all":
+                    # Scroll down to load all content until wait time exceeded
+                    webdriver.scroll_down_page_to_load(max_time=wait)
+                else:
+                    # Wait for page to load with no scrolling
+                    while time.time() < start_time + wait:
+                        if webdriver.driver.execute_script("return (document.readyState == 'complete');"):
+                            break
+                        time.sleep(0.1)
+                self.dataset.log("Page load time: %s" % (time.time() - start_time))
+
+                if webdriver.check_for_movement():
+                    try:
+                        webdriver.save_screenshot(results_path.joinpath(filename), width=width, height=height,
+                                             viewport_only=(capture == "viewport"))
+                    except Exception as e:
+                        self.dataset.log("Error saving screenshot for %s: %s" % (url, str(e)))
+                        result['error'].append("Attempt %i: %s" % (attempts, str(e)))
+                        continue
+
+                    result['filename'] = filename
+
+                    # Update file attribute with url if supported
+                    if hasattr(os, "setxattr"):
+                        os.setxattr(results_path.joinpath(filename), 'user.url', url.encode())
+
+                    screenshots += 1
+                    success = True
+                    break
+                else:
+                    # No page was reached...
+                    result['error'].append("Driver was not able to navigate to page")
+
+            result['timestamp'] = int(datetime.datetime.now().timestamp())
+            result['error'] = ', '.join(result['error'])
+            if success:
+                self.dataset.log('Collected: %s' % url)
+                # Update result and yield it
+                result['final_url'] = webdriver.driver.current_url
+                result['subject'] = webdriver.driver.title
+
+            if pause:
+                time.sleep(pause)
+
+            # Record result data
+            metadata[url] = result
+            done += 1
+
+            if done % 50:
+                self.dataset.update_status(
+                    "processed %i/%i urls with %i screenshots taken" % (done, total_urls, screenshots))
+                self.dataset.update_progress(done / total_urls)
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
-            # Reformat sets
-            for url, data in urls.items():
-                data['ids'] = list(data['ids'])
-            json.dump(urls, outfile)
+            json.dump(metadata, outfile)
 
         self.dataset.log('Screenshots taken: %i' % screenshots)
+        if screenshots != done:
+            self.dataset.log("%i URLs could not be screenshotted" % (done - screenshots)) # this can also happens if two provided urls are the same
         # finish up
         self.dataset.update_status("Compressing images")
         self.write_archive_and_finish(results_path)

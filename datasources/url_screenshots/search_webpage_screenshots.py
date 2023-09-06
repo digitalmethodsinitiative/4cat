@@ -10,6 +10,8 @@ import time
 import os
 import re
 
+from selenium.common import TimeoutException
+
 from backend.lib.selenium_scraper import SeleniumScraper
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -165,10 +167,16 @@ class ScreenshotWithSelenium(SeleniumScraper):
                     continue
 
                 start_time = time.time()
-                while time.time() < start_time + wait:
-                    if self.driver.execute_script("return (document.readyState == 'complete');"):
-                        break
-                    time.sleep(0.1)
+                if capture == "all":
+                    # Scroll down to load all content until wait time exceeded
+                    self.scroll_down_page_to_load(max_time=wait)
+                else:
+                    # Wait for page to load with no scrolling
+                    while time.time() < start_time + wait:
+                        if self.driver.execute_script("return (document.readyState == 'complete');"):
+                            break
+                        time.sleep(0.1)
+                self.dataset.log("Page load time: %s" % (time.time() - start_time))
 
                 if self.check_for_movement():
                     try:
@@ -177,7 +185,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
                         self.dataset.log("Error saving screenshot for %s: %s" % (url, str(e)))
                         result['error'].append("Attempt %i: %s" % (attempts, str(e)))
                         continue
-
+                    self.dataset.log("Page load time with screenshot: %s" % (time.time() - start_time))
                     result['filename'] = filename
 
                     # Update file attribute with url if supported

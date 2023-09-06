@@ -4,6 +4,7 @@ import os
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from bs4.element import Comment
+from textwrap import dedent
 
 from backend.lib.search import Search
 from common.lib.exceptions import ProcessorException
@@ -14,7 +15,8 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException
+    from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException, \
+    TimeoutException
     from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
     if config.get('selenium.browser') == 'chrome':
@@ -394,6 +396,30 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             for iframe in iframes:
                 iframe_links.append(iframe.get('src'))
         return iframe_links
+
+    def scroll_down_page_to_load(self, max_time=None):
+        """
+        Scroll down page until it is fully loaded. Returns top of window at end.
+        """
+        start_time = time.time()
+        last_bottom = self.driver.execute_script('return window.scrollY')
+        while True:
+            if max_time is not None:
+                if time.time() - start_time > max_time:
+                    # Stop if max_time exceeded
+                    return last_bottom
+            self.driver.execute_script("window.scrollTo(0, window.scrollY + window.innerHeight);")
+            try:
+                WebDriverWait(self.driver, max_time).until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
+            except TimeoutException:
+                # Stop if timeout
+                return last_bottom
+            current_bottom = self.driver.execute_script('return window.scrollY')
+            time.sleep(.2)
+            if last_bottom == current_bottom:
+                # We've reached the bottom of the page
+                return current_bottom
+            last_bottom = current_bottom
 
 
 class SeleniumScraper(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
