@@ -215,6 +215,9 @@ class CategorizeImagesCLIP(BasicProcessor):
 
                 self.dataset.log(f"Writing {result_filename}...")
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
+                    if not result_filename.endswith(".json"):
+                        self.dataset.log(f"Skipping {result_filename} (not a JSON results file)")
+                        continue
                     result_data = json.loads(''.join(result_file))
                     image_name = ".".join(result_filename.split(".")[:-1])
                     data = {

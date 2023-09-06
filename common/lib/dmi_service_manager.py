@@ -209,7 +209,7 @@ class DmiServiceManager:
         filename_url = f"{self.server_address}list_filenames/{folder_name}"
         filename_response = requests.get(filename_url, timeout=30)
 
-        # Check if 4CAT has access to this PixPlot server
+        # Check if 4CAT has access to this server
         if filename_response.status_code == 403:
             raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
         elif filename_response.status_code in [400, 405]:
