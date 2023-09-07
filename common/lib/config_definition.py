@@ -246,7 +246,7 @@ config_definition = {
     },
     "mail.server": {
         "type": UserInput.OPTION_TEXT,
-        "default": "localhost",
+        "default": "",
         "help": "SMTP server",
         "tooltip": "SMTP server to connect to for sending e-mail alerts.",
         "global": True
