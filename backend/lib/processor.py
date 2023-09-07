@@ -304,8 +304,34 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			for owner in self.dataset.get_owners_users():
 				# Absolute the minimum here
 				if "@" in owner:
+					from email.mime.multipart import MIMEMultipart
+					from email.mime.text import MIMEText
+					from smtplib import SMTPException
+					import socket
+					import html2text
+
 					self.log.info("Sending email to %s" % owner)
-					send_email(owner, f"4CAT Dataset completed: {self.dataset.get_label()}\n\nYou can view the results at {('https://' if config.get('flask.https') else 'http://')}{config.get('flask.server_name')}/results/{self.dataset.key}")
+					dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get('flask.server_name') + '/results/' + self.dataset.key
+					sender = config.get('mail.noreply')
+					message = MIMEMultipart("alternative")
+					message["From"] = sender
+					message["To"] = owner
+					message["Subject"] = "4CAT dataset completed: %s" % self.dataset.get_label()
+					mail = """
+						<p>Hello %s,</p>
+						<p>4CAT has finished collecting your dataset labeled: %s</p>
+						<p>You can view your dataset via the following link:</p>
+						<p><a href="%s">%s</a></p> 
+						<p>Sincerely,</p>
+						<p>Your 4CAT admins</p>
+						""" % (owner, self.dataset.get_label(), dataset_url, dataset_url)
+					html_parser = html2text.HTML2Text()
+					message.attach(MIMEText(html_parser.handle(mail), "plain"))
+					message.attach(MIMEText(mail, "html"))
+					try:
+						send_email([owner], message)
+					except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
+						self.log.error("Sending email to %s" % owner)
 
 
 	def remove_files(self):
@@ -549,7 +575,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
 
-	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED):
+	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
 		"""
 		Archive a bunch of files into a zip archive and finish processing
 
@@ -586,7 +612,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if num_items is None:
 			num_items = done
 
-		self.dataset.finish(num_items)
+		if finish:
+			self.dataset.finish(num_items)
 
 	def create_standalone(self):
 		"""
