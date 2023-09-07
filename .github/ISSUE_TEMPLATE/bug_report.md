@@ -21,7 +21,7 @@ Steps to reproduce the behavior:
 A clear and concise description of what you expected to happen.
 
 **4CAT Environment**
- - How are you accessing 4CAT? [e.g. 4cat.oilab.nl or your own server/desktop]
+ - How are you accessing 4CAT? If possible, include the 4CAT web interface URL. Otherwise, explain if you are running 4CAT on your own device or accessing it remotely.
  - What version of 4CAT are you using? Find the version here:
    - In the latest versions of 4CAT, the version number is visible at the bottom of the interface
    - If you don't see the version there, that in itself is useful information
