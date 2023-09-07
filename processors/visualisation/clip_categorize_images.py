@@ -213,7 +213,6 @@ class CategorizeImagesCLIP(BasicProcessor):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while writing results to file")
 
-                self.dataset.log(f"Writing {result_filename}...")
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
                     if not result_filename.endswith(".json"):
                         self.dataset.log(f"Skipping {result_filename} (not a JSON results file)")
