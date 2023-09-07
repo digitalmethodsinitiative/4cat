@@ -60,15 +60,14 @@
 
                         <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and server administrators will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
                     </div>
-                    {% if __user_config("mail.server") and '@' in current_user.get_name() %}
+                    {% if __user_config("mail.server") %}
                     <div class="form-element">
-                        <label for="data-email-complete">Make private:</label>
+                        <label for="data-email-complete">Receive email on completion:</label>
                         <div class="filter-parameters">
-                            <label><input type="checkbox" name="email-complete" id="data-email-complete" checked="checked"> Receive email when dataset is complete</label>
+                            <label><input type="checkbox" name="email-complete" id="data-email-complete" checked=""></label>
+                            <label><input id="data-email-user" type="email" name="email-user" value={{ current_user.get_name() }}></label>
                             <button class="tooltip-trigger" aria-controls="tooltip-dataset-email" aria-label="Extended help for option">?</button>
                         </div>
-
-
                         <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
                     </div>
                     {% endif %}

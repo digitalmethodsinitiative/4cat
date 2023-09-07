@@ -302,37 +302,37 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.job.finish()
 
 		if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
-			for owner in self.dataset.get_owners_users():
-				# Check that username is email address
-				if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
-					from email.mime.multipart import MIMEMultipart
-					from email.mime.text import MIMEText
-					from smtplib import SMTPException
-					import socket
-					import html2text
+			owner = self.dataset.get_parameters().get("email-complete", False)
+			# Check that username is email address
+			if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+				from email.mime.multipart import MIMEMultipart
+				from email.mime.text import MIMEText
+				from smtplib import SMTPException
+				import socket
+				import html2text
 
-					self.log.info("Sending email to %s" % owner)
-					dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get('flask.server_name') + '/results/' + self.dataset.key
-					sender = config.get('mail.noreply')
-					message = MIMEMultipart("alternative")
-					message["From"] = sender
-					message["To"] = owner
-					message["Subject"] = "4CAT dataset completed: %s" % self.dataset.get_label()
-					mail = """
-						<p>Hello %s,</p>
-						<p>4CAT has finished collecting your dataset labeled: %s</p>
-						<p>You can view your dataset via the following link:</p>
-						<p><a href="%s">%s</a></p> 
-						<p>Sincerely,</p>
-						<p>Your 4CAT admins</p>
-						""" % (owner, self.dataset.get_label(), dataset_url, dataset_url)
-					html_parser = html2text.HTML2Text()
-					message.attach(MIMEText(html_parser.handle(mail), "plain"))
-					message.attach(MIMEText(mail, "html"))
-					try:
-						send_email([owner], message)
-					except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
-						self.log.error("Sending email to %s" % owner)
+				self.log.info("Sending email to %s" % owner)
+				dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get('flask.server_name') + '/results/' + self.dataset.key
+				sender = config.get('mail.noreply')
+				message = MIMEMultipart("alternative")
+				message["From"] = sender
+				message["To"] = owner
+				message["Subject"] = "4CAT dataset completed: %s" % self.dataset.get_label()
+				mail = """
+					<p>Hello %s,</p>
+					<p>4CAT has finished collecting your dataset labeled: %s</p>
+					<p>You can view your dataset via the following link:</p>
+					<p><a href="%s">%s</a></p> 
+					<p>Sincerely,</p>
+					<p>Your friendly neighborhood 4CAT admin</p>
+					""" % (owner, self.dataset.get_label(), dataset_url, dataset_url)
+				html_parser = html2text.HTML2Text()
+				message.attach(MIMEText(html_parser.handle(mail), "plain"))
+				message.attach(MIMEText(mail, "html"))
+				try:
+					send_email([owner], message)
+				except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
+					self.log.error("Sending email to %s" % owner)
 
 
 	def remove_files(self):

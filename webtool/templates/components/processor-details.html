@@ -61,6 +61,12 @@
                 {% for option in processor_options %}
                     {% include "components/processor-option.html" %}
                 {% endfor %}
+            {% if __user_config("mail.server") and '@' in current_user.get_name() %}
+                <div class="processor-option">
+                    <label for="email">Email address</label>
+                    <input type="email" name="email" id="email" value="{{ current_user.get_name() }}" placeholder="Email address">
+                </div>
+            {% endif %}
             </fieldset>
         </div>
         {% endif %}
