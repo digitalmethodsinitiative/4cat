@@ -1,6 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+import re
 import traceback
 import zipfile
 import typing
@@ -300,10 +301,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.job.finish()
 
-		if self.dataset.get_parameters().get("email-complete", False):
+		if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
 			for owner in self.dataset.get_owners_users():
-				# Absolute the minimum here
-				if "@" in owner:
+				# Check that username is email address
+				if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
 					from email.mime.multipart import MIMEMultipart
 					from email.mime.text import MIMEText
 					from smtplib import SMTPException
