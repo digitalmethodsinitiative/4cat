@@ -61,10 +61,15 @@
                 {% for option in processor_options %}
                     {% include "components/processor-option.html" %}
                 {% endfor %}
-            {% if __user_config("mail.server") and '@' in current_user.get_name() %}
-                <div class="processor-option">
-                    <label for="email">Email address</label>
-                    <input type="email" name="email" id="email" value="{{ current_user.get_name() }}" placeholder="Email address">
+            {% if __user_config("mail.server") %}
+                <div class="form-element">
+                    <label for="data-email-complete">Receive email on completion:</label>
+                    <div class="filter-parameters">
+                        <label><input type="checkbox" name="email-complete" id="data-email-complete"></label>
+                        <label><input id="data-email-user" type="email" name="email-user" value={{ current_user.get_name() }}></label>
+                        <button class="tooltip-trigger" aria-controls="tooltip-dataset-email" aria-label="Extended help for option">?</button>
+                    </div>
+                    <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
                 </div>
             {% endif %}
             </fieldset>

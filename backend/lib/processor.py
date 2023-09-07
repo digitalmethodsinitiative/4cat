@@ -332,8 +332,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				try:
 					send_email([owner], message)
 				except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
-					self.log.error("Sending email to %s" % owner)
-
+					self.log.error("Error sending email to %s" % owner)
 
 	def remove_files(self):
 		"""
