@@ -31,61 +31,68 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
     # Web Archive will load and then redirect after a few seconds; check for new page to load
     redirect_text = ['Got an HTTP 302 response at crawl time', 'Got an HTTP 301 response at crawl time']
 
-    options = {
-        "intro-1": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
-                    "a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux "
-                    "to scrape the HTML source code. "
-                    "\n"
-                    "By mimicing a person using an actual browser, this method results in source code that closer "
-                    "resembles the source code an actual user receives when compared with simple HTML requests. It "
-                    "will also render JavaScript that starts as soon as a url is retrieved by a browser. "
-        },
-        "query-info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Please enter a list of urls one per line."
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "List of urls"
-        },
-        "frequency": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Frequency over time period",
-            "tooltip": "Default 'First Available' scrapes the first available result after start date",
-            "options": {
-                "first": "First Available",
-                "monthly": "Monthly",
-                "weekly": "Weekly",
-                "daily": "Daily",
-                "yearly": "Yearly"
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        options = {
+            "intro-1": {
+                "type": UserInput.OPTION_INFO,
+                "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
+                        "a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux "
+                        "to scrape the HTML source code. "
+                        "\n"
+                        "By mimicing a person using an actual browser, this method results in source code that closer "
+                        "resembles the source code an actual user receives when compared with simple HTML requests. It "
+                        "will also render JavaScript that starts as soon as a url is retrieved by a browser. "
             },
-            "default": "first"
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "tooltip": "Scrapes first available page after start date; Uses start and end date for frequency",
-            "help": "Date range"
-        },
-        "subpages": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Crawl additional host links/subpages",
-            "min": 0,
-            "max": 5,
-            "default": 0
-        },
-        "http_request": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "HTTP or Selenium request",
-            "tooltip": "HTTP request added to body field; HTTP request not parsed for text",
-            "options": {
-                "both": "Both HTTP request and Selenium WebDriver",
-                "selenium_only": "Only use Selenium WebDriver",
+            "query-info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Please enter a list of urls one per line."
             },
-            "default": "selenium_only"
-        },
-    }
+            "query": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "List of urls"
+            },
+            "frequency": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Frequency over time period",
+                "tooltip": "Default 'First Available' scrapes the first available result after start date",
+                "options": {
+                    "first": "First Available",
+                    "monthly": "Monthly",
+                    "weekly": "Weekly",
+                    "daily": "Daily",
+                    "yearly": "Yearly"
+                },
+                "default": "first"
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "tooltip": "Scrapes first available page after start date; Uses start and end date for frequency",
+                "help": "Date range"
+            },
+        }
+
+        if config.get("selenium.display_advanced_options", False, user=user):
+            options["subpages"] = {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Crawl additional links/subpages",
+                "min": 0,
+                "max": 5,
+                "default": 0,
+                "tooltip": "If enabled, the scraper will also crawl and collect random links found on the provided page."
+            }
+            options["http_request"] = {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "HTTP or Selenium request",
+                "tooltip": "Scrape data with HTTP (python request library) and/or Selenium (automated browser to better imitate a real user); HTTP response is added to body field, but not currently parsed to extract text",
+                "options": {
+                    "both": "Both HTTP request and Selenium WebDriver",
+                    "selenium_only": "Only use Selenium WebDriver",
+                },
+                "default": "selenium_only"
+            }
+
+        return options
 
     def get_items(self, query):
         """

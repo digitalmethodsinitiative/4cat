@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import datetime
 import random
 
+from common.config_manager import config
 from backend.lib.selenium_scraper import SeleniumScraper
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import validate_url
@@ -20,33 +21,49 @@ class SearchWithSelenium(SeleniumScraper):
     extension = "ndjson"
     max_workers = 1
 
-    options = {
-        "intro-1": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
-                    "a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux "
-                    "to scrape the HTML source code. "
-                    "\n"
-                    "By mimicing a person using an actual browser, this method results in source code that closer "
-                    "resembles the source code an actual user receives when compared with simple HTML requests. It "
-                    "will also render JavaScript that starts as soon as a url is retrieved by a browser. "
-        },
-        "query-info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Please enter a list of urls one per line."
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "List of urls"
-        },
-        "subpages": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Crawl additional host links/subpages",
-            "min": 0,
-            "max": 5,
-            "default": 0
-        },
-    }
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        options = {
+            "intro-1": {
+                "type": UserInput.OPTION_INFO,
+                "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
+                        "a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux "
+                        "to scrape the HTML source code. "
+                        "\n"
+                        "By mimicing a person using an actual browser, this method results in source code that closer "
+                        "resembles the source code an actual user receives when compared with simple HTML requests. It "
+                        "will also render JavaScript that starts as soon as a url is retrieved by a browser. "
+            },
+            "query-info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Please enter a list of urls one per line."
+            },
+            "query": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "List of urls"
+            },
+
+        }
+        if config.get("selenium.display_advanced_options", False, user=user):
+            options["subpages"] = {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Crawl additional links/subpages",
+                "min": 0,
+                "max": 5,
+                "default": 0,
+                "tooltip": "If enabled, the scraper will also crawl and collect random links found on the provided page."
+            }
+
+        return options
+
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
+        Allow processor on image sets
+
+        :param module: Module to determine compatibility with
+        """
+        return config.get('selenium.installed', False, user=user)
 
     def get_items(self, query):
         """

@@ -414,6 +414,12 @@ config_definition = {
         "help": "Firefox Extensions",
         "tooltip": "Can be used by certain processors and datasources",
     },
+    "selenium.display_advanced_options": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Show advanced options",
+        "tooltip": "Show advanced options for Selenium processors",
+    },
     "selenium.installed": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
