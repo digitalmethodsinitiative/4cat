@@ -124,7 +124,11 @@ class DmiServiceManager:
             raise DmiServiceManagerException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
 
         api_endpoint = self.server_address + service_endpoint
-        resp = requests.post(api_endpoint, json=data, timeout=30)
+        try:
+            resp = requests.post(api_endpoint, json=data, timeout=30)
+        except requests.exceptions.ConnectionError as e :
+            raise DmiServiceManagerException(f"Unable to connect to DMI Service Manager server: {str(e)}")
+
         if resp.status_code == 202:
             # New request successful
             results_url = api_endpoint + "?key=" + resp.json()['key']
