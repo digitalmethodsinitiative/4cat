@@ -74,12 +74,14 @@ class SearchWithSelenium(SeleniumScraper):
         """
         self.dataset.log('Query: %s' % str(query))
         self.dataset.log('Parameters: %s' % str(self.parameters))
-        scrape_additional_subpages = self.parameters.get("subpages")
+        scrape_additional_subpages = self.parameters.get("subpages", 0)
         urls_to_scrape = [{'url':url, 'base_url':url, 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in query.get('urls')]
 
         # Do not scrape the same site twice
         scraped_urls = set()
         num_urls = len(urls_to_scrape)
+        if scrape_additional_subpages:
+            num_urls = num_urls * scrape_additional_subpages
         done = 0
 
         while urls_to_scrape:
@@ -185,6 +187,7 @@ class SearchWithSelenium(SeleniumScraper):
                 while iframe_links:
                     link = iframe_links.pop(0)
                     if self.check_exclude_link(link, scraped_urls):
+                        num_urls += 1
                         # Add it to be scraped next
                         urls_to_scrape.insert(0, {
                             'url': link,

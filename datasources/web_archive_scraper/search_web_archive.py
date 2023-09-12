@@ -102,18 +102,20 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         :return:
         """
         self.dataset.log('query: ' + str(query))
-        http_request = self.parameters.get("http_request") == 'both'
+        http_request = self.parameters.get("http_request", "selenium_only") == 'both'
         if http_request:
             self.dataset.update_status('Scraping Web Archives with Selenium %s and HTTP Requests' % config.get('selenium.browser'))
         else:
             self.dataset.update_status('Scraping Web Archives with Selenium %s' % config.get('selenium.browser'))
-        scrape_additional_subpages = self.parameters.get("subpages")
+        scrape_additional_subpages = self.parameters.get("subpages", 0)
 
         urls_to_scrape = [{'url':url['url'], 'base_url':url['base_url'], 'year':url['year'], 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in query.get('preprocessed_urls')]
 
         # Do not scrape the same site twice
         scraped_urls = set()
         num_urls = len(urls_to_scrape)
+        if scrape_additional_subpages:
+            num_urls = num_urls * scrape_additional_subpages
         done = 0
 
         while urls_to_scrape:
