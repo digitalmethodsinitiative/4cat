@@ -850,7 +850,7 @@ def sets_to_lists(d: MutableMapping):
     return dict(_sets_to_lists_gen(d))
 
 
-def url_to_hash(url, remove_scheme=True, remove_www=True, logger=None):
+def url_to_hash(url, remove_scheme=True, remove_www=True):
     """
     Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
     rest of the URL.
@@ -863,9 +863,6 @@ def url_to_hash(url, remove_scheme=True, remove_www=True, logger=None):
             netloc = re.sub(r"^www\.", "", parsed_url.netloc)
             parsed_url = parsed_url._replace(netloc=netloc)
 
-        if logger:
-            logger.log("Original URL: %s" % url)
-            logger.log("Parsed URL: %s" % urlunparse(parsed_url).strip("/"))
         url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
     else:
         # Unable to parse URL; use regex
