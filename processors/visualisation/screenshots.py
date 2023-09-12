@@ -6,7 +6,7 @@ import re
 import time
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, extract_urls_from_string, convert_to_int
+from common.lib.helpers import UserInput, extract_urls_from_string, convert_to_int, url_to_hash
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from backend.lib.selenium_scraper import SeleniumWrapper
 from common.config_manager import config
@@ -220,7 +220,7 @@ class ScreenshotURLs(BasicProcessor):
                 url = re.sub(r"archive\.org/web/([0-9]+)/", "archive.org/web/\\1if_/", url)
 
             scraped_urls.add(url)
-            filename = re.sub(r"[^0-9a-z]+", "_", url.lower()) + ".png"
+            filename = url_to_hash(url) + ".png"
             result = {
                 "url": url,
                 "filename": filename,

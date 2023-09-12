@@ -15,7 +15,7 @@ from selenium.common import TimeoutException
 from backend.lib.selenium_scraper import SeleniumScraper
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from common.lib.helpers import convert_to_int
+from common.lib.helpers import convert_to_int, url_to_hash
 from common.config_manager import config
 
 
@@ -144,7 +144,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
             self.dataset.update_status("Capturing screenshot %i of %i" % (done + 1, total_urls))
 
             scraped_urls.add(url)
-            filename = re.sub(r"[^0-9a-z]+", "_", url.lower()) + ".png"
+            filename = url_to_hash(url) + ".png"
             result = {
                 "url": url,
                 "filename": filename,
@@ -190,7 +190,6 @@ class ScreenshotWithSelenium(SeleniumScraper):
                         result['error'].append("Attempt %i: %s" % (attempts, str(e)))
                         continue
                     self.dataset.log("Page load time with screenshot: %s" % (time.time() - start_time))
-                    result['filename'] = filename
 
                     # Update file attribute with url if supported
                     if hasattr(os, "setxattr"):
