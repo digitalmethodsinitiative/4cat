@@ -116,7 +116,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         :return bool:                       True if link should NOT be excluded else False
         """
         if link and link not in previously_used_links and \
-            not any([bad_url in link[:10] for bad_url in bad_url_list]):
+            not any([bad_url in link[:len(bad_url)] for bad_url in bad_url_list]):
                 if base_url is None:
                     return True
                 elif base_url in link:

@@ -81,7 +81,7 @@ class SearchWithSelenium(SeleniumScraper):
         scraped_urls = set()
         num_urls = len(urls_to_scrape)
         if scrape_additional_subpages:
-            num_urls = num_urls * scrape_additional_subpages
+            num_urls = num_urls * (scrape_additional_subpages + 1)
         done = 0
 
         while urls_to_scrape:
