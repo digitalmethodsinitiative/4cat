@@ -296,7 +296,7 @@ class ScreenshotURLs(BasicProcessor):
             if done % 50:
                 self.dataset.update_status(
                     "processed %i/%i urls with %i screenshots taken" % (done, total_urls, screenshots))
-                self.dataset.update_progress(done / total_urls)
+            self.dataset.update_progress(done / total_urls)
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)

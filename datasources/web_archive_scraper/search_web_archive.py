@@ -113,10 +113,15 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
         # Do not scrape the same site twice
         scraped_urls = set()
+        num_urls = len(urls_to_scrape)
+        done = 0
 
         while urls_to_scrape:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while scraping urls from the Web Archive")
+
+            self.dataset.update_progress(done / num_urls)
+            self.dataset.update_status("Captured %i of %i possible URLs" % (done, num_urls))
 
             # Grab first url
             url_obj = urls_to_scrape.pop(0)
@@ -204,6 +209,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
             if success:
                 self.dataset.log('Collected: %s' % url)
+                done += 1
                 result['final_url'] = scraped_page.get('final_url')
                 result['body'] = scraped_page.get('text')
                 result['subject'] = scraped_page.get('page_title')
@@ -277,6 +283,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 else:
                     # missing error...
                     result['error'] += 'Unable to scrape'
+
                 yield result
 
     def check_exclude_link(self, link, previously_used_links, base_url=None):
