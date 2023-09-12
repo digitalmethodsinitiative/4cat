@@ -430,11 +430,13 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         if not validated_urls:
             raise QueryParametersException("No Urls detected!")
 
-        if not query.get("http_request"):
-            raise QueryParametersException("Selenium/HTTP option must exist!")
-
         # the dates need to make sense as a range to search within
         query["min_date"], query["max_date"] = query.get("daterange")
+        if query["max_date"] is None:
+            query["max_date"] = int(datetime.datetime.now().timestamp())
+        if query["max_date"] < query["min_date"]:
+            raise QueryParametersException("End date must be after start date.")
+
         preprocessed_urls = []
         for url in validated_urls:
             url_group = SearchWebArchiveWithSelenium.create_web_archive_urls(url, query["min_date"], query["max_date"], query.get('frequency'))
@@ -442,7 +444,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
         return {
             "query": query.get("query"),
+            "min_date": query.get("min_date"),
+            "max_date": query.get("max_date"),
             "preprocessed_urls": preprocessed_urls,
             "subpages": query.get("subpages", 0),
-            'http_request': query.get("http_request"),
+            'http_request': query.get("http_request", "selenium_only"),
             }
