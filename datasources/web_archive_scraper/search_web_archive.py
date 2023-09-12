@@ -139,6 +139,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 "subject": None,
                 "body": None,
                 "html": None,
+                "http_html": None,
                 "detected_404": None,
                 "timestamp": None,
                 "error": '',
@@ -256,9 +257,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     try:
                         http_response = self.request_get_w_error_handling(scraped_page.get('final_url'), timeout=120)
                         self.dataset.log('Collected HTTP response: %s' % scraped_page.get('final_url'))
-                        result['html'] = 'SELENIUM RESPONSE:\n' + str(result['html']) + '\nHTTP RESPONSE:\n' + http_response.text
+                        result['http_html'] = http_response.text
                     except Exception as e:
-                        result['html'] = 'SELENIUM RESPONSE:\n' + str(result['html']) + '\nHTTP RESPONSE:\nNone'
+                        result['http_html'] = None
                         http_error = '\nHTTP ERROR:\n' + str(e)
                         result['error'] = 'SELENIUM ERROR:\n' + str(result['error']) + http_error
 
