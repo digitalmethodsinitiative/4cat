@@ -243,6 +243,7 @@ class ScreenshotURLs(BasicProcessor):
                 except Exception as e:
                     # TODO: This is way too broad and should be handled in the SeleniumWrapper
                     self.dataset.log("Error collecting screenshot for %s: %s" % (url, str(e)))
+                    webdriver.restart_selenium()
                     result['error'].append("Attempt %i: %s" % (attempts, str(e)))
                     continue
 
