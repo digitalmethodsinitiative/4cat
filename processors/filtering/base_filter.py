@@ -5,7 +5,7 @@ import abc
 import csv
 import json
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -25,11 +25,11 @@ class BaseFilter(BasicProcessor):
     description = "This should not be available."
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         This is meant to be inherited by other child classes
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return False
 

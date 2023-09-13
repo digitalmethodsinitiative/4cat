@@ -1,7 +1,7 @@
 """
 Write annotations to a dataset
 """
-from processors.filtering.base_filter import BaseFilter
+from processors.filtering.base_filter import BasicProcessor
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -10,7 +10,7 @@ __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
 
-class WriteAnnotations(BaseFilter):
+class WriteAnnotations(BasicProcessor):
 	"""
 	Write annotated data from the Explorer to a dataset.
 	"""
@@ -28,15 +28,15 @@ class WriteAnnotations(BaseFilter):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on CSV files
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.is_top_dataset()
 
-	def filter_items(self):
+	def process(self):
 		"""
 		Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
 		`for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
@@ -63,40 +63,45 @@ class WriteAnnotations(BaseFilter):
 		to_lowercase = self.parameters.get("to-lowercase", False)
 		annotated_posts = set(annotations.keys())
 		post_count = 0
-		# iterate through posts and check if they appear in the annotations
-		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+		
+		# We first need to get a list of post IDs to create a list of new data.
+		# This is somewhat redundant since we'll have to loop through the dataset
+		# multiple times.
+
+		# Create dictionary with annotation labels as keys and lists of data as values
+		new_data = {annotation_label: [] for annotation_label in annotation_labels}
+
+		for item in self.source_dataset.iterate_items(self):
 			post_count += 1
 
-			# Write the annotations to this row if they're present
-			if mapped_item["id"] in annotated_posts:
-				post_annotations = annotations[mapped_item["id"]]
+			# Do some loops so we have empty data for all annotation fields
+			if str(item["id"]) in annotations:
 
-				# We're adding (empty) values for every field
-				for field in annotation_labels:
-
-					if field in post_annotations:
-
-						val = post_annotations[field]
+				for label in annotation_labels:
+					if label in annotations[item["id"]]:
+						annotation = annotations[item["id"]][label]
 
 						# We join lists (checkboxes)
-						if isinstance(val, list):
-							val = ", ".join(val)
+						if isinstance(annotation, list):
+							annotation = ", ".join(annotation)
 						# Convert to lowercase if indicated
 						if to_lowercase:
-							val = val.lower()
+							annotation = annotation.lower()
 
-						# TODO: writting to ndjson is not visible in map_item/frontend
-						original_item[field] = val
+						new_data[label].append(annotation)
 					else:
-						original_item[field] = ""
-
-			# Write empty values if this post has not been annotated
+						new_data[label].append("")
 			else:
-				for field in annotation_labels:
-					original_item[field] = ""
-
-			yield original_item
+				for label in annotation_labels:
+					new_data[label].append("")
 
 			if post_count % 2500 == 0:
 				self.dataset.update_status("Processed %i posts" % post_count)
 				self.dataset.update_progress(post_count / self.source_dataset.num_rows)
+
+		# Write to top dataset
+		for label, values in new_data.items():
+			self.add_field_to_parent("annotation_" + label, values, which_parent=self.source_dataset, update_existing=True)
+		
+		self.dataset.update_status("Annotations written to parent dataset.")
+		self.dataset.finish(self.source_dataset.num_rows)

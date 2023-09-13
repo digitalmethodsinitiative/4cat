@@ -5,11 +5,9 @@ It's prohibitively difficult to scrape data from Instagram within 4CAT itself
 due to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
 import datetime
-from pathlib import Path
-import json
 import re
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException, MapItemException
 

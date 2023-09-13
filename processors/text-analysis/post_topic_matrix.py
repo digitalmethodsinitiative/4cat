@@ -3,8 +3,8 @@ Extracts topics per model and top associated words
 """
 
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import ProcessorInterruptedException
 
 import csv
 import json
@@ -71,11 +71,11 @@ class TopicModelWordExtractor(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on topic models
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "topic-modeller"
 

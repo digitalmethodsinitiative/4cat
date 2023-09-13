@@ -10,10 +10,9 @@ import shutil
 import subprocess
 import shlex
 
-import common.config_manager as config
+from common.config_manager import config
 
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 
 __author__ = "Stijn Peeters"
@@ -51,7 +50,7 @@ class VideoSceneFrames(BasicProcessor):
     followups = ["video-timelines"]
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine compatibility
 
@@ -61,8 +60,8 @@ class VideoSceneFrames(BasicProcessor):
         :return bool:
         """
         return module.type in ["video-scene-detector"] and \
-               config.get("video_downloader.ffmpeg-path") and \
-               shutil.which(config.get("video_downloader.ffmpeg-path"))
+               config.get("video-downloader.ffmpeg_path") and \
+               shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def process(self):
         """
@@ -118,7 +117,7 @@ class VideoSceneFrames(BasicProcessor):
                 scene_index = scene["id"].split("_").pop()
                 scene_filename = video.stem + "_scene_" + str(scene_index) + ".jpeg"
                 command = [
-                    shutil.which(config.get("video_downloader.ffmpeg-path")),
+                    shutil.which(self.config.get("video-downloader.ffmpeg_path")),
                     "-i", shlex.quote(str(video)),
                     "-vf", "select='eq(n\\," + scene["start_frame"] + ")'",
                     "-vframes", "1",
@@ -135,7 +134,7 @@ class VideoSceneFrames(BasicProcessor):
                 if result.returncode != 0:
                     self.dataset.log(
                         f"Error extracting frame for scene {scene_index} of video file {video.name}, skipping.")
-                    print(result.stderr)
+
                     errors += 1
 
                 processed_frames += 1

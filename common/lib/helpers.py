@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
-import common.config_manager as config
+from common.config_manager import config
 
 
 def init_datasource(database, logger, queue, name):

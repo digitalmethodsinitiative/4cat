@@ -5,7 +5,7 @@ import csv
 import json
 
 from common.lib.helpers import flatten_dict
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -27,11 +27,11 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Determine if processor is compatible with dataset
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.get_extension() == "ndjson"
 

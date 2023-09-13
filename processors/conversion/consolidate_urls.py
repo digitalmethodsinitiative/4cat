@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urlunparse
 
 from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
@@ -238,13 +238,13 @@ class ConsolidateURLs(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         This is meant to be inherited by other child classes
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
-        return module.is_dataset() and module.get_extension() in ["csv", "ndjson"]
+        return module.get_extension() in ["csv", "ndjson"]
 
     def process(self):
         method = self.parameters.get("method", False)
@@ -339,7 +339,7 @@ class ConsolidateURLs(BasicProcessor):
         if remove_scheme:
             parsed_url = parsed_url._replace(scheme="")
         if remove_domain:
-            parsed_url = parsed_url._replace(domain="")
+            parsed_url = parsed_url._replace(netloc="")
         if remove_path:
             parsed_url = parsed_url._replace(path="")
         if remove_query:

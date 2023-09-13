@@ -6,7 +6,7 @@ Designed to work with any processor that has a 'map_metadata' method
 import json
 import zipfile
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -37,12 +37,13 @@ class ViewMetadata(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow on only
+		Determine if processor is compatible with dataset
+
+		:param module: Module to determine compatibility with
 		"""
-		# return (module.is_dataset() and hasattr(module.get_own_processor(), "map_metadata")) or (not module.is_dataset() and hasattr(module, "map_metadata"))
-		return module.type.startswith("video-downloader")
+		return module.type.startswith("video-downloader") or module.type.startswith("image-downloader")
 
 	def process(self):
 		"""

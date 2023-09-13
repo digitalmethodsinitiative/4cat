@@ -163,13 +163,13 @@
 </div>
 
 <!-- Where the network graph will be -->
-<div id="graph-container" data-source="{{ url_for('get_result', query_file=dataset.result_file)[:-1] }}">
+<div id="graph-container" data-source="{{ url_for('get_result', query_file=dataset.result_file) }}">
 </div>
 
 <div id="loading">Loading...</div>
 
 {% if with_gephi_lite %}
-<a class="gephi-link" target="_blank" href="https://gephi.org/gephi-lite/?gexf={{ url_for('get_result', query_file=dataset.result_file, _external=True)[:-1] }}">
+<a class="gephi-link" target="_blank" href="https://gephi.org/gephi-lite/?gexf={{ url_for('get_result', query_file=dataset.result_file, _external=True) }}">
     <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Gephi Lite
 </a>
 {% endif %}

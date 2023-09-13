@@ -2,8 +2,12 @@
 Generate co-link network of URLs in posts
 """
 import re
+import time
 
-from backend.abstract.processor import BasicProcessor
+import psutil
+
+from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 
 import networkx as nx
@@ -53,23 +57,28 @@ class URLCoLinker(BasicProcessor):
 		with all posts containing the original query exactly, ignoring any
 		* or " in the query
 		"""
-
+		start_time = time.time()
 		# we use these to extract URLs and host names if needed
 		link_regex = re.compile(r"https?://[^\s\]()]+")
 		www_regex = re.compile(r"^www\.")
 		trailing_dot = re.compile(r"[.,)]$")
 
 		self.dataset.update_status("Reading source file")
+		update_on_item = int(self.source_dataset.num_rows / 100)
 
 		links = {}
 		processed = 0
+		# create an undirected network
 		network = nx.Graph()
 
 		for post in self.source_dataset.iterate_items(self):
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while collecting links")
+
 			processed += 1
-			if processed % 50 == 0:
+			if processed % update_on_item == 0:
 				self.dataset.update_status("Extracting URLs from item %i" % processed)
-				self.dataset.update_progress(processed / self.source_dataset.num_rows)
+				self.dataset.update_progress(processed / (self.source_dataset.num_rows * 2))
 
 			if not post["body"]:
 				continue
@@ -112,28 +121,39 @@ class URLCoLinker(BasicProcessor):
 
 		# create co-link pairs from all links per co-link unit (thread or post)
 		self.dataset.update_status("Finding common URLs")
-		for unit_id in links:
-			post_links = links[unit_id]
+		# self.dataset.log("LIST Comprehension")
+		# # This is faster than the below for loop, but apparently uses more memory (crashing on giant datasets where the for loop does not), plus we're only talking about seconds per million edges
+		# [network.add_edge(from_link, to_link) for post_links in links.values() if len(post_links) > 1 for i, from_link in enumerate(post_links) for to_link in post_links[i + 1:]]
+
+		# self.dataset.log("FOR LOOP")
+		update_on_item = int(len(links) / 100)
+		for i, post_links in enumerate(links.values()):
+			if i % update_on_item == 0:
+				self.dataset.update_status("Collecting URL links from item %i" % i)
+				self.dataset.update_progress((self.source_dataset.num_rows + i) / (self.source_dataset.num_rows * 2))
 
 			# ignore single links (which, of course, are not co-linked with
 			# any other links)
 			if len(post_links) <= 1:
 				continue
 
-			# create co-link pairs from link sets
-			pairs = set()
-			for from_link in post_links:
-				# keep track of all URLs so we can easily write the node
-				# list later
-				if from_link not in network.nodes():
-					network.add_node(from_link)
+			while post_links:
+				from_link = post_links.pop()
 
 				for to_link in post_links:
-					if to_link not in network.nodes():
-						network.add_node(to_link)
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while creating network edges")
 
 					network.add_edge(from_link, to_link)
 
+		self.dataset.update_status(f"Network has {len(network.nodes)} and {len(network.edges)} edges")
+		self.dataset.log(f"time elapsed: {time.time() - start_time:.2f} seconds")
 		self.dataset.update_status("Writing network file")
+		if psutil.virtual_memory().percent > 95:
+			self.dataset.update_status("WARNING: memory usage about 95%; network may fail...")
+			self.log.warning(f"Memory usage above 95%: network dataset {self.dataset.key}")
+			#TODO: add perhaps kill the processor? It's frustrating that we can collect the data but not write it!
 		nx.write_gexf(network, self.dataset.get_results_path())
+		self.dataset.log(f"time to complete: {time.time() - start_time:.2f} seconds")
 		self.dataset.finish(len(network.nodes))
+

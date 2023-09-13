@@ -3,7 +3,6 @@
 """
 
 import datetime
-import common.config_manager as config
 import json
 import csv
 import re
@@ -13,22 +12,25 @@ import markdown2
 
 from backend import all_modules
 
-from collections import OrderedDict
 from pathlib import Path
 
 from flask import jsonify, abort, send_file, request, render_template
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, openapi, limiter
-from webtool.lib.helpers import format_chan_post, error
+from webtool import app, db, openapi, limiter, config
+from webtool.lib.helpers import format_chan_post, error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
 
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 @app.route('/explorer/dataset/<string:key>/', defaults={'page': 0})
 @app.route('/explorer/dataset/<string:key>/<int:page>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_dataset(key, page):
 	"""
@@ -47,7 +49,7 @@ def explorer_dataset(key, page):
 	except TypeError:
 		return error(404, error="Dataset not found.")
 
-	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:
@@ -76,6 +78,7 @@ def explorer_dataset(key, page):
 	# If the dataset is local, we can add some more features
 	# (like the ability to navigate to threads)
 	is_local = False
+
 	if datasource in list(all_modules.datasources.keys()):
 		is_local = True if all_modules.datasources[datasource].get("is_local") else False
 
@@ -105,14 +108,9 @@ def explorer_dataset(key, page):
 
 	first_post = False
 
-
 	for post in iterate_items(results_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
 
 		count += 1
-
-		# Use an offset if we're showing a page beyond the first.
-		if count <= offset:
-			continue
 
 		# Use an offset if we're showing a page beyond the first.
 		if count <= offset:
@@ -165,6 +163,8 @@ def explorer_dataset(key, page):
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_thread(datasource, board, thread_id):
 	"""
@@ -179,7 +179,7 @@ def explorer_thread(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.get('4cat.datasources'):
+	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -210,6 +210,8 @@ def explorer_thread(datasource, board, thread_id):
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_post(datasource, board, thread_id):
 	"""
@@ -224,7 +226,7 @@ def explorer_post(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.get('4cat.datasources'):
+	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -249,6 +251,9 @@ def explorer_post(datasource, board, thread_id):
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def save_annotation_fields(key):
 	"""
@@ -418,6 +423,9 @@ def save_annotation_fields(key):
 
 @app.route("/explorer/save_annotations/<string:key>", methods=["POST"])
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def save_annotations(key):
 	"""
@@ -465,6 +473,8 @@ def save_annotations(key):
 
 @app.route('/api/<datasource>/boards.json')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("data")
 def get_boards(datasource):
 	"""
@@ -482,7 +492,7 @@ def get_boards(datasource):
 
 	:return-error 404: If the datasource does not exist.
 	"""
-	if datasource not in config.get('4cat.datasources'):
+	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
 
 	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + datasource)
@@ -490,6 +500,8 @@ def get_boards(datasource):
 
 @app.route('/api/image/<img_file>')
 @app.route('/api/imagefile/<img_file>')
+@login_required
+@setting_required("privileges.can_use_explorer")
 def get_image_file(img_file, limit=0):
 	"""
 	Returns an image based on filename
@@ -603,21 +615,33 @@ def get_custom_css(datasource):
 	"""
 
 	# Set the directory name of this datasource.
-	# Do some conversion for some imageboard names (4chan, 8chan).
+	# Some naming inconsistensies are caught here
 	if datasource.startswith("4"):
 		datasource_dir = datasource.replace("4", "four")
 	elif datasource.startswith("8"):
 		datasource_dir = datasource.replace("8", "eight")
+	elif datasource == "twitter":
+		datasource_dir = "twitter-import"
+		datasource = "twitter-import"
 	else:
 		datasource_dir = datasource
 
 	css_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+	read = False
 	if css_path.exists():
+		read = True
+	else:
+		# Allow both hypens and underscores in datasource name (to avoid some legacy issues)
+		css_path = re.sub(datasource, datasource.replace("-", "_"), str(css_path.absolute()))
+		if Path(css_path).exists():
+			read = True
+
+	# Read the css file if it exists
+	if read:
 		with open(css_path, "r", encoding="utf-8") as css:
 			css = css.read()
 	else:
 		css = None
-		#css = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
 
 	return css
 
@@ -642,14 +666,24 @@ def get_custom_fields(datasource, filetype=None):
 		datasource_dir = datasource.replace("4", "four")
 	elif datasource.startswith("8"):
 		datasource_dir = datasource.replace("8", "eight")
-	elif "facebook" in datasource or "instagram" in datasource:
-		datasource_dir = "import-from-tool"
-		datasource = "import-from-tool"
+	elif datasource == "twitter":
+		datasource_dir = "twitter-import"
+		datasource = "twitter-import"
 	else:
 		datasource_dir = datasource
 
 	json_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
+	read = False
+
 	if json_path.exists():
+		read = True
+	else:
+		# Allow both hypens and underscores in datasource name (to avoid some legacy issues)
+		json_path = re.sub(datasource, datasource.replace("-", "_"), str(json_path.absolute()))
+		if Path(json_path).exists():
+			read = True
+	
+	if read:
 		with open(json_path, "r", encoding="utf-8") as json_file:
 			try:
 				custom_fields = json.load(json_file)
@@ -664,7 +698,7 @@ def get_custom_fields(datasource, filetype=None):
 			custom_fields = custom_fields[filetype]
 	else:
 		custom_fields = None
-
+		
 	return custom_fields
 
 def get_nested_value(di, keys):

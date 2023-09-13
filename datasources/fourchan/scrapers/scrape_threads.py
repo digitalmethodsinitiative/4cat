@@ -29,13 +29,10 @@ import json
 import time
 import six
 
-from pathlib import Path
-
-from backend.abstract.scraper import BasicJSONScraper
+from backend.lib.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 from common.lib.helpers import strip_tags
-
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.user_input import UserInput
 
 
@@ -49,7 +46,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 	only a few lines of extra code and eliminates replicating the full class in the
 	8chan scraper.
 	"""
-	type = "4chan-thread"
+	type = "fourchan-thread"
 	max_workers = 4
 
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
@@ -63,15 +60,6 @@ class ThreadScraper4chan(BasicJSONScraper):
 	# these fields should be present for every single post, and if they're not something weird is going on
 	required_fields = ["no", "resto", "now", "time"]
 	required_fields_op = ["no", "resto", "now", "time", "replies", "images"]
-
-	config = {
-		"4chan-thread.save_images": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Save 4chan Images",
-			"tooltip": "Saves images to path_images."
-		}
-	}
 
 	def process(self, data):
 		"""
@@ -92,7 +80,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		# determine OP id (8chan sequential threads are an exception here)
 		first_post = data["posts"][0]
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 
 		# check if OP has all the required data
 		missing = set(self.required_fields_op) - set(first_post.keys())
@@ -187,7 +175,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			"body": post.get("com", ""),
 			"author": post.get("name", ""),
 			"author_trip": post.get("trip", ""),
-			"author_type": post["id"] if "id" in post and self.type == "4chan-thread" else "",
+			"author_type": post["id"] if "id" in post and self.type == "fourchan-thread" else "",
 			"author_type_id": post.get("capcode", ""),
 			"country_code": post.get("country", "") if "board_flag" not in post else "t_" + post["board_flag"],
 			"country_name": post.get("country_name", "") if "flag_name" not in post else post["flag_name"],
@@ -200,42 +188,6 @@ class ThreadScraper4chan(BasicJSONScraper):
 			"unsorted_data": json.dumps(
 				{field: post[field] for field in post.keys() if field not in self.known_fields})
 		}
-
-		# this is mostly unsupported, feel free to ignore
-		if config.get('HIGHLIGHT_SLACKHOOK') and config.get('HIGHLIGHT_MATCH') and self.type == "4chan-thread":
-			for highlight in config.get('HIGHLIGHT_MATCH'):
-				attachments = []
-				if highlight.lower() in post_data["body"].lower():
-					if not post_data["country_code"]:
-						country_flag = " (%s)" % post_data["country_name"] if post_data["country_name"] else ""
-					else:
-						pattern = " :%s:" % post_data["country_code"]
-						country_flag = flag.flagize(pattern)
-						if country_flag == pattern:
-							country_flag = " (%s)" % post_data["country_code"]
-						else:
-							print(repr(country_flag))
-
-					subject = first_post.get("sub", first_post["no"])
-					attachments.append({
-						"title": "%s%s in '%s''" % (post_data["author"], country_flag, subject),
-						"title_link": "https://boards.4chan.org/%s/thread/%s#pc%s" % (thread["board"], thread["id"], post_data["id"]),
-						"text": strip_tags(post_data["body"], convert_newlines=True).replace(highlight, "*%s*" % highlight),
-						"mrkdwn_in": ["text", "pretext"],
-						"color": "#73ad34"
-					})
-
-				if not attachments:
-					continue
-
-				try:
-					requests.post(config.get('HIGHLIGHT_SLACKHOOK'), json.dumps({
-						"text": "A post mentioning '%s' was just scraped from %s/%s/:" % (highlight, self.datasource, thread["board"]),
-						"attachments": attachments
-					}))
-				except requests.RequestException as e:
-					self.log.warning("Could not send highlight alerts to Slack webhook (%s)" % e)
-
 
 		# now insert the post into the database
 		return_value = True
@@ -263,7 +215,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
 
 		# Download images (exclude .webm files)
-		if "filename" in post and post["ext"] != ".webm" and config.get("4chan-thread.save_images"):
+		if "filename" in post and post["ext"] != ".webm" and config.get("fourchan-search.save_images"):
 			self.queue_image(post, thread)
 
 		return return_value
@@ -288,10 +240,10 @@ class ThreadScraper4chan(BasicJSONScraper):
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
 		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
-			claimtime = int(time.time()) + int(config.get("fourchan.image_interval"))
+			claimtime = int(time.time()) + int(config.get("fourchan-search.image_interval"))
 
 			try:
-				self.queue.add_job("4chan-image", remote_id=post["md5"], claim_after=claimtime, details={
+				self.queue.add_job("fourchan-image", remote_id=post["md5"], claim_after=claimtime, details={
 					"board": thread["board"],
 					"ext": post["ext"],
 					"tim": post["tim"],
@@ -317,7 +269,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# we need the following to check whether the thread has changed since the last scrape
 		# 8chan doesn't always include this, in which case "-1" is as good a placeholder as any
 		# account for 8chan-style cyclical ID
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 		thread = self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,))
 		
 		if not thread:
@@ -346,7 +298,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		:param int num_replies:  Number of posts in thread (including OP)
 		:return: Thread data (dict), updated, or `None` if no further work is needed
 		"""
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 
 		# first post has useful metadata for the *thread*
 		# 8chan uses "bumplocked" but otherwise it's the same
@@ -387,7 +339,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		"""
 
 		# account for 8chan-style cyclical threads
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
 
 		self.db.insert("threads_" + self.prefix, {
 			"id": thread_db_id,
