@@ -252,7 +252,7 @@ class DataSet(FourcatModule):
 				logmsg = ":".join(line.split(":")[1:])
 				yield (logtime, logmsg)
 
-	def iterate_items(self, processor=None, bypass_map_item=False):
+	def iterate_items(self, processor=None, bypass_map_item=False, warn_unmappable=True):
 		"""
 		A generator that iterates through a CSV or NDJSON file
 
@@ -307,7 +307,8 @@ class DataSet(FourcatModule):
 						try:
 							item = own_processor.get_mapped_item(item)
 						except MapItemException as e:
-							self.warn_unmappable_item(i, processor, e)
+							if warn_unmappable:
+								self.warn_unmappable_item(i, processor, e)
 							continue
 
 					yield item
@@ -325,7 +326,8 @@ class DataSet(FourcatModule):
 						try:
 							item = own_processor.get_mapped_item(item)
 						except MapItemException as e:
-							self.warn_unmappable_item(i, processor, e)
+							if warn_unmappable:
+								self.warn_unmappable_item(i, processor, e)
 							continue
 
 					yield item
@@ -333,7 +335,7 @@ class DataSet(FourcatModule):
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_items(self, processor=None):
+	def iterate_mapped_items(self, processor=None, warn_unmappable=True):
 		"""
 		Wrapper for iterate_items that returns both the original item and the mapped item (or else the same identical item).
 		No extension check is performed here as the point is to be able to handle the original object and save as an appropriate
@@ -359,7 +361,8 @@ class DataSet(FourcatModule):
 				try:
 					mapped_item = own_processor.get_mapped_item(item)
 				except MapItemException as e:
-					self.warn_unmappable_item(i, processor, e)
+					if warn_unmappable:
+						self.warn_unmappable_item(i, processor, e)
 					continue
 			else:
 				mapped_item = original_item
@@ -382,7 +385,7 @@ class DataSet(FourcatModule):
 		  dataset
 		"""
 
-		items = self.iterate_items(processor)
+		items = self.iterate_items(processor, warn_unmappable=False)
 		try:
 			keys = list(items.__next__().keys())
 		except StopIteration:
@@ -1487,10 +1490,10 @@ class DataSet(FourcatModule):
 		Log an item that is unable to be mapped and warn administrators.
 
 		:param int item_count:			Item index
-		:param Processor processor:		Processor calling function
+		:param Processor processor:		Processor calling function8
 		"""
 		dataset_error_message = f"MapItemException (item {item_count}): {'is unable to be mapped! Check raw datafile.' if error_message is None else error_message}"
-		if processor is not None:
+		if processor is not None and processor.dataset is not None:
 			# Log to dataset that is using map_item
 			processor.dataset.log(dataset_error_message)
 		else:
