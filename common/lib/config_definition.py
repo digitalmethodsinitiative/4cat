@@ -396,7 +396,7 @@ config_definition = {
     },
     "selenium.browser": {
         "type": UserInput.OPTION_TEXT,
-        "default": "",
+        "default": "firefox",
         "help": "Browser type ('firefox' or 'chrome')",
         "tooltip": "This must corespond to the installed webdriver; Docker installs firefox when backend container restarts if this is set to 'firefox'",
     },
