@@ -246,6 +246,10 @@ class ScreenshotWithSelenium(SeleniumScraper):
         urls = [url.strip() for url in query.get("query", "").replace("\n", ",").split(',')]
         preprocessed_urls = [url for url in urls if ural.is_url(url, require_protocol=True, tld_aware=True, only_http_https=True, allow_spaces_in_path=False)]
 
+        quick_max = 120
+        if len(preprocessed_urls) > quick_max:
+            raise QueryParametersException(f"You cannot collect more than {quick_max} screenshots per dataset. If you have more URLs, consider limiting your dataset first by either decreasing the resolution (i.e. fewer screenshots per year) or the length of the dataset (i.e. covering a shorter period of time).")
+
         # wayback machine toolbar remover
         # temporary inclusion to make student life easier
         detoolbarred_urls = []
