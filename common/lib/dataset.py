@@ -287,7 +287,7 @@ class DataSet(FourcatModule):
 		# instead of the processor...
 		item_mapper = False
 		own_processor = self.get_own_processor()
-		if not bypass_map_item:
+		if not bypass_map_item and own_processor is not None:
 			if own_processor.map_item_method_available(dataset=self):
 				item_mapper = True
 
