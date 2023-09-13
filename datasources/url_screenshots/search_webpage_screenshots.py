@@ -276,11 +276,11 @@ class ScreenshotWithSelenium(SeleniumScraper):
         domain = ural.get_domain_name(url)
 
         # Special cases
-        timestamp = None
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         if "web.archive.org/web/" in url:
-            # We know where the timestamp is
+            # Extract archived timestamp
             timestamp = url.split("web.archive.org/web/")[1].split("/")[0].replace("if_", "")
-            # We can also extract the archived domain
+            # Extract archived domain
             domain = url.split("web.archive.org/web/")[1].split("://")[1].split("/")[0].strip("/") + "-archived"
 
-        return f"{domain}-{timestamp + '-' if timestamp else ''}{url_hash}"
+        return f"{domain}-{timestamp}-{url_hash}"
