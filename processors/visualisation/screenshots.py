@@ -20,6 +20,8 @@ __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
+from datasources.url_screenshots.search_webpage_screenshots import ScreenshotWithSelenium
+
 
 class ScreenshotURLs(BasicProcessor):
     """
@@ -220,7 +222,7 @@ class ScreenshotURLs(BasicProcessor):
                 url = re.sub(r"archive\.org/web/([0-9]+)/", "archive.org/web/\\1if_/", url)
 
             scraped_urls.add(url)
-            filename = url_to_hash(url) + ".png"
+            filename = ScreenshotWithSelenium.filename_from_url(url) + ".png"
             result = {
                 "url": url,
                 "filename": filename,

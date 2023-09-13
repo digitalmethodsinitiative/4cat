@@ -144,7 +144,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
             self.dataset.update_status("Capturing screenshot %i of %i" % (done + 1, total_urls))
 
             scraped_urls.add(url)
-            filename = url_to_hash(url) + ".png"
+            filename = self.filename_from_url(url) + ".png"
             result = {
                 "url": url,
                 "filename": filename,
@@ -263,3 +263,24 @@ class ScreenshotWithSelenium(SeleniumScraper):
             **query,
             "query": preprocessed_urls
         }
+
+    @staticmethod
+    def filename_from_url(url):
+        """
+        Return a name for a given url.
+
+        :param str url:  URL
+        :return str:  Name
+        """
+        url_hash = url_to_hash(url)
+        domain = ural.get_domain_name(url)
+
+        # Special cases
+        timestamp = None
+        if "web.archive.org/web/" in url:
+            # We know where the timestamp is
+            timestamp = url.split("web.archive.org/web/")[1].split("/")[0].replace("if_", "")
+            # We can also extract the archived domain
+            domain = url.split("web.archive.org/web/")[1].split("://")[1].split("/")[0].strip("/") + "-archived"
+
+        return f"{domain}-{timestamp + '-' if timestamp else ''}{url_hash}"
