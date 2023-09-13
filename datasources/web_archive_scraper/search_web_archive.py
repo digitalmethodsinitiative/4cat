@@ -103,7 +103,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         :param query:
         :return:
         """
-        self.dataset.log('query: ' + str(query))
+
         http_request = self.parameters.get("http_request", "selenium_only") == 'both'
         if http_request:
             self.dataset.update_status('Scraping Web Archives with Selenium %s and HTTP Requests' % config.get('selenium.browser'))
@@ -111,7 +111,12 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             self.dataset.update_status('Scraping Web Archives with Selenium %s' % config.get('selenium.browser'))
         scrape_additional_subpages = self.parameters.get("subpages", 0)
 
-        urls_to_scrape = [{'url':url['url'], 'base_url':url['base_url'], 'year':url['year'], 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in query.get('preprocessed_urls')]
+        preprocessed_urls = []
+        for url in query.get('preprocessed_urls'):
+            url_group = SearchWebArchiveWithSelenium.create_web_archive_urls(url, query["min_date"], query["max_date"],
+                                                                             query.get('frequency'))
+            [preprocessed_urls.append(new_url) for new_url in url_group]
+        urls_to_scrape = [{'url':url['url'], 'base_url':url['base_url'], 'year':url['year'], 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in preprocessed_urls]
 
         # Do not scrape the same site twice
         scraped_urls = set()
@@ -425,16 +430,11 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         if query["max_date"] < query["min_date"]:
             raise QueryParametersException("End date must be after start date.")
 
-        preprocessed_urls = []
-        for url in validated_urls:
-            url_group = SearchWebArchiveWithSelenium.create_web_archive_urls(url, query["min_date"], query["max_date"], query.get('frequency'))
-            [preprocessed_urls.append(new_url) for new_url in url_group]
-
         return {
             "query": query.get("query"),
             "min_date": query.get("min_date"),
             "max_date": query.get("max_date"),
-            "preprocessed_urls": preprocessed_urls,
+            "validated_urls": validated_urls,
             "subpages": query.get("subpages", 0),
             'http_request': query.get("http_request", "selenium_only"),
             }
