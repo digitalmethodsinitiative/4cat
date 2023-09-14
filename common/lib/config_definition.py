@@ -400,6 +400,13 @@ config_definition = {
         "help": "Browser type ('firefox' or 'chrome')",
         "tooltip": "This must corespond to the installed webdriver; Docker installs firefox when backend container restarts if this is set to 'firefox'",
     },
+    "selenium.max_sites": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 120,
+        "help": "Posts per page",
+        "coerce_type": int,
+        "tooltip": "Posts to display per page"
+    },
     "selenium.selenium_executable_path": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
