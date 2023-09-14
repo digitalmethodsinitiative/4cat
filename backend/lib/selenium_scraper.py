@@ -1,3 +1,4 @@
+import subprocess
 import time
 import abc
 import os
@@ -41,6 +42,53 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
     driver = None
     last_scraped_url = None
     browser = None
+
+    consecutive_errors = 0
+
+    def get_with_error_handling(self, url, max_attempts=1, wait=0, restart_browser=False):
+        """
+        Attempts to call driver.get(url) with error handling. Will attempt to restart Selenium if it fails and can
+        attempt to kill Firefox (and allow Selenium to restart) itself if allowed.
+
+        Returns a tuple containing a bool (True if successful, False if not) and a list of the errors raised.
+        """
+        # Start clean
+        self.reset_current_page()
+
+        success = False
+        attempts = 0
+        errors = []
+        while attempts < max_attempts:
+            attempts += 1
+            try:
+                self.driver.get(url)
+                success = True
+                self.consecutive_errors = 0
+            except Exception as e:
+                errors.append(e)
+                
+                # Check consecutive errors
+                if self.consecutive_errors > 3:
+                    # First kill browser
+                    if restart_browser:
+                        self.kill_browser(self.browser)
+                    
+                    # Then restart Selenium
+                    self.restart_selenium()
+
+            if success:
+                # Check for movement
+                if self.check_for_movement():
+                    # True success
+                    break
+                else:
+                    success = False
+                    errors.append(f"Failed to navigate to new page (current URL: {self.last_scraped_url}); check url is not the same as previous url")
+
+            if attempts < max_attempts:
+                time.sleep(wait)
+
+        return success, errors
 
     def simple_scrape_page(self, url, extract_links=False, title_404_strings='default'):
         """
@@ -104,17 +152,24 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         elems = self.driver.find_elements(By.XPATH, "//a[@href]")
         return [elem.get_attribute("href") for elem in elems]
 
-    def check_exclude_link(self, link, previously_used_links, base_url=None, bad_url_list=['mailto:', 'javascript']):
+    @staticmethod
+    def check_exclude_link(link, previously_used_links, base_url=None, bad_url_list=None):
         """
         Check if a link should not be used. Returns True if link not in previously_used_links
         and not in bad_url_list. If a base_url is included, the link string MUST include the
         base_url as a substring (this can be used to ensure a url contains a particular domain).
 
+        If bad_url_lists is None, the default list (['mailto:', 'javascript']) is used.
+
         :param str link:                    link to check
         :param set previously_used_links:   set of links to exclude
         :param str base_url:                substring to ensure is part of link
+        :param list bad_url_list:           list of substrings to exclude
         :return bool:                       True if link should NOT be excluded else False
         """
+        if bad_url_list is None:
+            bad_url_list = ['mailto:', 'javascript']
+
         if link and link not in previously_used_links and \
             not any([bad_url in link[:len(bad_url)] for bad_url in bad_url_list]):
                 if base_url is None:
@@ -130,7 +185,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         """
         Start a headless browser
 
-        :param bool:  Eager loading?
+        :param bool eager:  Eager loading?
         """
         self.browser = config.get('selenium.browser')
         # TODO review and compare Chrome vs Firefox options
@@ -173,8 +228,9 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         """
         try:
             self.driver.quit()
-        except:
-            pass
+        except Exception as e:
+            # TODO: log this if possible, but we do not want 4CAT to hang if it cannot quit so that datasets are interrupted correctly
+            print(e)
 
     def restart_selenium(self):
         """
@@ -205,12 +261,20 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             current_url = self.driver.current_url
         except UnexpectedAlertPresentException:
             # attempt to dismiss random alert
-            self.driver.switch_to.alert.dismiss()
+            self.dismiss_alert()
             current_url = self.driver.current_url
         if current_url == self.last_scraped_url:
             return False
         else:
             return True
+
+    def dismiss_alert(self):
+        """
+        Dismiss any alert that may be present
+        """
+        current_window_handle = self.driver.current_window_handle
+        self.driver.switch_to.alert.dismiss()
+        self.driver.switch_to.window(current_window_handle)
 
     def reset_current_page(self):
         """
@@ -420,6 +484,17 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
                 # We've reached the bottom of the page
                 return current_bottom
             last_bottom = current_bottom
+
+    @staticmethod
+    def kill_browser(browser):
+        if browser == "firefox":
+            print('4CAT is killing Firefox...')
+            subprocess.check_call(['pkill', 'firefox'])
+        elif browser == "chrome":
+            print('4CAT is killing Chrome...')
+            subprocess.check_call(['pkill', 'chrome'])
+        else:
+            raise Exception('Cannot kill unknown browser: %s' % browser)
 
 
 class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
