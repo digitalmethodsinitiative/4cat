@@ -17,7 +17,9 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException, \
-    TimeoutException
+    TimeoutException, JavascriptException
+    from selenium.webdriver.common.action_chains import ActionChains
+    from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
     if config.get('selenium.browser') == 'chrome':
@@ -467,23 +469,37 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         """
         start_time = time.time()
         last_bottom = self.driver.execute_script('return window.scrollY')
+        action = None
         while True:
             if max_time is not None:
                 if time.time() - start_time > max_time:
                     # Stop if max_time exceeded
                     return last_bottom
-            self.driver.execute_script("window.scrollTo(0, window.scrollY + window.innerHeight);")
+
+            # Scroll down
+            try:
+                self.driver.execute_script("window.scrollTo(0, window.scrollY + window.innerHeight);")
+            except JavascriptException as e:
+                # Apparently no window.scrollTo?
+                if action is None:
+                    action = ActionChains(self.driver)
+                    action.send_keys(Keys.PAGE_DOWN)
+                action.perform()
+
+            # Wait for anything to load
             try:
                 WebDriverWait(self.driver, max_time).until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
             except TimeoutException:
                 # Stop if timeout
                 return last_bottom
+
             current_bottom = self.driver.execute_script('return window.scrollY')
-            time.sleep(.2)
             if last_bottom == current_bottom:
                 # We've reached the bottom of the page
                 return current_bottom
+
             last_bottom = current_bottom
+            time.sleep(.2)
 
     @staticmethod
     def kill_browser(browser):
