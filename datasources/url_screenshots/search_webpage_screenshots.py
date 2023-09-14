@@ -156,14 +156,13 @@ class ScreenshotWithSelenium(SeleniumSearch):
             success = False
             while attempts < 2:
                 attempts += 1
-                self.reset_current_page()
-                try:
-                    self.driver.get(url)
-                except Exception as e:
-                    # TODO: This is way too broad and should be handled in the SeleniumWrapper
-                    self.dataset.log("Error collecting screenshot for %s: %s" % (url, str(e)))
-                    self.restart_selenium()
-                    result['error'].append("Attempt %i: %s" % (attempts, str(e)))
+                get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=wait, restart_browser=True)
+                if errors:
+                    # Even if success, it is possible to have errors on earlier attempts
+                    [result['error'].append("Attempt %i: %s" % (attempts + i, error)) for i, error in enumerate(errors)]
+                if not get_success:
+                    # Try again
+                    self.dataset.log("Error collecting screenshot for %s: %s" % (url, ', '.join(errors)))
                     continue
 
                 start_time = time.time()
@@ -176,30 +175,25 @@ class ScreenshotWithSelenium(SeleniumSearch):
                         if self.driver.execute_script("return (document.readyState == 'complete');"):
                             break
                         time.sleep(0.1)
-                self.dataset.log("Page load time: %s" % (time.time() - start_time))
 
-                if self.check_for_movement():
-                    if pause:
-                        time.sleep(pause)
+                if pause:
+                    time.sleep(pause)
 
-                    try:
-                        self.save_screenshot(results_path.joinpath(filename), width=width, height=height, viewport_only=(capture == "viewport"))
-                    except Exception as e:
-                        self.dataset.log("Error saving screenshot for %s: %s" % (url, str(e)))
-                        result['error'].append("Attempt %i: %s" % (attempts, str(e)))
-                        continue
-                    self.dataset.log("Page load time with screenshot: %s" % (time.time() - start_time))
+                try:
+                    self.save_screenshot(results_path.joinpath(filename), width=width, height=height, viewport_only=(capture == "viewport"))
+                except Exception as e:
+                    self.dataset.log("Error saving screenshot for %s: %s" % (url, str(e)))
+                    result['error'].append("Attempt %i: %s" % (attempts, str(e)))
+                    continue
+                self.dataset.log("Page load time with screenshot: %s" % (time.time() - start_time))
 
-                    # Update file attribute with url if supported
-                    if hasattr(os, "setxattr"):
-                        os.setxattr(results_path.joinpath(filename), 'user.url', url.encode())
+                # Update file attribute with url if supported
+                if hasattr(os, "setxattr"):
+                    os.setxattr(results_path.joinpath(filename), 'user.url', url.encode())
 
-                    screenshots += 1
-                    success = True
-                    break
-                else:
-                    # No page was reached...
-                    result['error'].append("Driver was not able to navigate to page")
+                screenshots += 1
+                success = True
+                break
 
             result['timestamp'] = int(datetime.datetime.now().timestamp())
             result['error'] = ', '.join(result['error'])
