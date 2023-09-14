@@ -305,3 +305,6 @@ class ScreenshotURLs(BasicProcessor):
         # finish up
         self.dataset.update_status("Compressing images")
         self.write_archive_and_finish(results_path)
+
+        # Quit Selenium
+        webdriver.quit_selenium()
