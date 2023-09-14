@@ -139,7 +139,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 continue
 
             self.dataset.update_progress(done / total_urls)
-            self.dataset.update_status("Capturing screenshot %i of %i" % (done + 1, total_urls))
+            self.dataset.log("Capturing screenshot %i of %i: %s" % (done + 1, total_urls, url))
 
             scraped_urls.add(url)
             filename = self.filename_from_url(url) + ".png"
@@ -198,8 +198,8 @@ class ScreenshotWithSelenium(SeleniumSearch):
             result['timestamp'] = int(datetime.datetime.now().timestamp())
             result['error'] = ', '.join(result['error'])
             if success:
-                self.dataset.log('Collected: %s' % url)
-                # Update result and yield it
+                self.dataset.update_status("Captured screenshot %i of %i" % (done + 1, total_urls))
+                # Update result
                 result['final_url'] = self.driver.current_url
                 result['subject'] = self.driver.title
 
