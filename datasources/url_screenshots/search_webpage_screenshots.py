@@ -101,7 +101,6 @@ class ScreenshotWithSelenium(SeleniumSearch):
         :param query:
         :return:
         """
-        self.dataset.log('Query: %s' % str(query))
         urls_to_scrape = query.get('query')
         ignore_cookies = self.parameters.get("ignore-cookies")
         capture = self.parameters.get("capture")
@@ -198,7 +197,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
             result['timestamp'] = int(datetime.datetime.now().timestamp())
             result['error'] = ', '.join(result['error'])
             if success:
-                self.dataset.update_status("Captured screenshot %i of %i" % (done + 1, total_urls))
+                self.dataset.update_status("Processed %i/%i URL(s) with %i screenshot(s) taken" % (done + 1, total_urls, screenshots))
                 # Update result
                 result['final_url'] = self.driver.current_url
                 result['subject'] = self.driver.title
