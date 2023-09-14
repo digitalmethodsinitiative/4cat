@@ -130,7 +130,7 @@ class ImageWallGenerator(BasicProcessor):
 			return
 
 		category_column = self.parameters.get("category")
-		if category_column is None:
+		if not category_column:
 			self.dataset.finish_with_error("No category provided.")
 			return
 
