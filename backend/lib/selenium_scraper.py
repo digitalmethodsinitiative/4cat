@@ -536,7 +536,7 @@ class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
         self.start_selenium(eager=(hasattr(self, "eager_selenium") and self.eager_selenium))
         # Returns to default position; i.e., 'data:,'
         self.reset_current_page()
-        # Sets timeout to 60
+        # Sets timeout to 60; can be updated later if desired
         self.set_page_load_timeout()
 
         # Normal Search function to be used To be implemented by descending classes!

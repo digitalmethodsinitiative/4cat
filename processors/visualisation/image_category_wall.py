@@ -44,7 +44,8 @@ class ImageWallGenerator(BasicProcessor):
 		
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type.startswith("image-to-categories") or module.type.startswith("image-downloader")
+		# TODO: cannot run on image-downloader-screenshots-search as it does not have a category column!
+		return module.type.startswith("image-to-categories") or (module.type.startswith("image-downloader") and not module.type not in ["image-downloader-screenshots-search"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
