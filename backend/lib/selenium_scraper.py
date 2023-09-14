@@ -422,7 +422,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             last_bottom = current_bottom
 
 
-class SeleniumScraper(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
+class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
     """
     Selenium Scraper class
 

@@ -10,16 +10,14 @@ import time
 import os
 import re
 
-from selenium.common import TimeoutException
-
-from backend.lib.selenium_scraper import SeleniumScraper
+from backend.lib.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import convert_to_int, url_to_hash
 from common.config_manager import config
 
 
-class ScreenshotWithSelenium(SeleniumScraper):
+class ScreenshotWithSelenium(SeleniumSearch):
     """
     Get HTML via the Selenium webdriver and Firefox browser
     """
@@ -105,7 +103,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
         """
         self.dataset.log('Query: %s' % str(query))
         urls_to_scrape = query.get('query')
-        ignore_cookies = False  # self.parameters.get("ignore-cookies")
+        ignore_cookies = self.parameters.get("ignore-cookies")
         capture = self.parameters.get("capture")
         resolution = self.parameters.get("resolution", "1024x786")
         pause = self.parameters.get("pause-time")

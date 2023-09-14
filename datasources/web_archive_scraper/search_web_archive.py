@@ -11,14 +11,14 @@ import time
 
 from dateutil.relativedelta import relativedelta
 
-from backend.lib.selenium_scraper import SeleniumScraper
+from backend.lib.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput
 
 from common.config_manager import config
 
-class SearchWebArchiveWithSelenium(SeleniumScraper):
+class SearchWebArchiveWithSelenium(SeleniumSearch):
     """
     Get HTML page source from Web Archive (web.archive.org) via the Selenium webdriver and Firefox browser
     """

@@ -8,12 +8,12 @@ import datetime
 import random
 
 from common.config_manager import config
-from backend.lib.selenium_scraper import SeleniumScraper
+from backend.lib.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput
 
-class SearchWithSelenium(SeleniumScraper):
+class SearchWithSelenium(SeleniumSearch):
     """
     Get HTML via the Selenium webdriver and Firefox browser
     """
