@@ -158,10 +158,10 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=wait, restart_browser=True)
                 if errors:
                     # Even if success, it is possible to have errors on earlier attempts
-                    [result['error'].append("Attempt %i: %s" % (attempts + i, error)) for i, error in enumerate(errors)]
+                    [result['error'].append("Attempt %i: %s" % (attempts + i, str(error))) for i, error in enumerate(errors)]
                 if not get_success:
                     # Try again
-                    self.dataset.log("Error collecting screenshot for %s: %s" % (url, ', '.join(errors)))
+                    self.dataset.log("Error collecting screenshot for %s: %s" % (url, ', '.join([str(error) for error in errors])))
                     continue
 
                 start_time = time.time()
