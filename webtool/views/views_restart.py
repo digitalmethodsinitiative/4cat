@@ -54,7 +54,7 @@ def trigger_restart():
 
     code_version = Path(config.get("PATH_ROOT"), "VERSION").open().readline().strip()
     try:
-        github_version = get_github_version()
+        github_version = get_github_version(timeout=5)
         release_notes = github_version[1]
         github_version = github_version[0]
     except (json.JSONDecodeError, requests.RequestException):
