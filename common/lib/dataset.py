@@ -280,6 +280,7 @@ class DataSet(FourcatModule):
 		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
+		unmapped_items = False
 		path = self.get_results_path()
 
 		# see if an item mapping function has been defined
@@ -308,7 +309,8 @@ class DataSet(FourcatModule):
 							item = own_processor.get_mapped_item(item)
 						except MapItemException as e:
 							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e)
+								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
+								unmapped_items = True
 							continue
 
 					yield item
@@ -327,7 +329,8 @@ class DataSet(FourcatModule):
 							item = own_processor.get_mapped_item(item)
 						except MapItemException as e:
 							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e)
+								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
+								unmapped_items = True
 							continue
 
 					yield item
@@ -345,6 +348,7 @@ class DataSet(FourcatModule):
 		iterating the dataset.
 		:return generator:  A generator that yields a tuple with the unmapped item followed by the mapped item
 		"""
+		unmapped_items = False
 		# Collect item_mapper for use with filter
 		item_mapper = False
 		own_processor = self.get_own_processor()
@@ -362,7 +366,8 @@ class DataSet(FourcatModule):
 					mapped_item = own_processor.get_mapped_item(item)
 				except MapItemException as e:
 					if warn_unmappable:
-						self.warn_unmappable_item(i, processor, e)
+						self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
+						unmapped_items = True
 					continue
 			else:
 				mapped_item = original_item
@@ -1485,7 +1490,7 @@ class DataSet(FourcatModule):
 						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
-	def warn_unmappable_item(self, item_count, processor=None, error_message=None):
+	def warn_unmappable_item(self, item_count, processor=None, error_message=None, warn_admins=True):
 		"""
 		Log an item that is unable to be mapped and warn administrators.
 
@@ -1493,18 +1498,20 @@ class DataSet(FourcatModule):
 		:param Processor processor:		Processor calling function8
 		"""
 		dataset_error_message = f"MapItemException (item {item_count}): {'is unable to be mapped! Check raw datafile.' if error_message is None else error_message}"
-		if processor is not None and processor.dataset is not None:
-			# Log to dataset that is using map_item
-			processor.dataset.log(dataset_error_message)
-		else:
-			# Log to this dataset
-			self.log(dataset_error_message)
 
-		if hasattr(self.db, "log"):
-			self.db.log.warning(f"Processor {processor.type if processor is not None else self.get_own_processor().type} unable to map item {item_count} for dataset {self.key}.")
-		else:
-			# No other log available
-			raise DataSetException(f"Unable to map item {item_count} and properly warn")
+		# Use processing dataset if available, otherwise use original dataset (which likely already has this error message)
+		closest_dataset = processor.dataset if processor is not None and processor.dataset is not None else self
+		# Log error to dataset log
+		closest_dataset.log(dataset_error_message)
+
+		if warn_admins:
+			if processor is not None:
+				processor.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
+			elif hasattr(self.db, "log"):
+				self.db.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
+			else:
+				# No other log available
+				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
 
 	def __getattr__(self, attr):
 		"""

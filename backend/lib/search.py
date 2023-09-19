@@ -186,6 +186,7 @@ class Search(BasicProcessor, ABC):
 				f"Processor {self.type} importing item without map_item method for Dataset {self.dataset.type} - {self.dataset.key}")
 
 		with path.open(encoding="utf-8") as infile:
+			unmapped_items = False
 			for i, line in enumerate(infile):
 				if self.interrupted:
 					raise WorkerInterruptedException()
@@ -205,7 +206,8 @@ class Search(BasicProcessor, ABC):
 					except MapItemException:
 						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
 						self.flawless = False
-						self.dataset.warn_unmappable_item(i, processor=self)
+						self.dataset.warn_unmappable_item(i, processor=self, warn_admins=unmapped_items is False)
+						unmapped_items = True
 
 				yield new_item
 
