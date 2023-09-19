@@ -133,9 +133,6 @@ class ScreenshotWithSelenium(SeleniumSearch):
         self.set_page_load_timeout(30)
 
         while urls_to_scrape:
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while making screenshots")
-
             # Grab first url
             url = urls_to_scrape.pop(0)
             if url in scraped_urls:
@@ -159,6 +156,9 @@ class ScreenshotWithSelenium(SeleniumSearch):
             attempts = 0
             success = False
             while attempts < 2:
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while making screenshots")
+
                 attempts += 1
                 get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=wait, restart_browser=True)
                 if errors:

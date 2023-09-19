@@ -217,11 +217,6 @@ class ScreenshotURLs(BasicProcessor):
         scraped_urls = set()
         metadata = {}
         for url, post_ids in urls.items():
-            # Stop processing if worker has been asked to stop
-            if self.interrupted:
-                webdriver.quit_selenium()
-                raise ProcessorInterruptedException("Interrupted while downloading images.")
-
             # Remove Archive.org toolbar
             if re.findall(r"archive\.org/web/[0-9]+/", url):
                 url = re.sub(r"archive\.org/web/([0-9]+)/", "archive.org/web/\\1if_/", url)
@@ -241,6 +236,11 @@ class ScreenshotURLs(BasicProcessor):
             attempts = 0
             success = False
             while attempts < 2:
+                # Stop processing if worker has been asked to stop
+                if self.interrupted:
+                    webdriver.quit_selenium()
+                    raise ProcessorInterruptedException("Interrupted while collecting screenshots.")
+
                 attempts += 1
                 get_success, errors = webdriver.get_with_error_handling(url, max_attempts=1, wait=wait, restart_browser=True)
                 if errors:
