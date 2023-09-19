@@ -207,6 +207,9 @@ class ScreenshotURLs(BasicProcessor):
             webdriver.quit_selenium()
             return
 
+        # Set timeout for driver.get(); Web archives in particular can take a while to load
+        webdriver.set_page_load_timeout(30)
+
         screenshots = 0
         done = 0
         total_urls = len(urls)

@@ -129,6 +129,9 @@ class ScreenshotWithSelenium(SeleniumSearch):
         total_urls = len(urls_to_scrape)
         metadata = {}
 
+        # Set timeout for driver.get(); Web archives in particular can take a while to load
+        self.set_page_load_timeout(30)
+
         while urls_to_scrape:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while making screenshots")
