@@ -17,7 +17,7 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException, \
-    TimeoutException, JavascriptException
+    TimeoutException, JavascriptException, NoAlertPresentException
     from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
@@ -275,7 +275,12 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         Dismiss any alert that may be present
         """
         current_window_handle = self.driver.current_window_handle
-        self.driver.switch_to.alert.dismiss()
+        try:
+            alert = self.driver.switch_to.alert
+            if alert:
+                alert.dismiss()
+        except NoAlertPresentException:
+            pass
         self.driver.switch_to.window(current_window_handle)
 
     def reset_current_page(self):
