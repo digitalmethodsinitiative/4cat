@@ -5,6 +5,7 @@ import datetime
 import os
 import time
 from json import JSONDecodeError
+from werkzeug.utils import secure_filename
 
 import requests
 from pathlib import Path
@@ -31,7 +32,10 @@ class DsmOutOfMemory(DmiServiceManagerException):
 
 class DmiServiceManager:
     """
+    Class to manage interactions with a DMI Service Manager server.
 
+    Found here:
+    https://github.com/digitalmethodsinitiative/dmi_service_manager
     """
     def __init__(self, processor):
         """
@@ -120,7 +124,11 @@ class DmiServiceManager:
             raise DmiServiceManagerException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
 
         api_endpoint = self.server_address + service_endpoint
-        resp = requests.post(api_endpoint, json=data, timeout=30)
+        try:
+            resp = requests.post(api_endpoint, json=data, timeout=30)
+        except requests.exceptions.ConnectionError as e :
+            raise DmiServiceManagerException(f"Unable to connect to DMI Service Manager server: {str(e)}")
+
         if resp.status_code == 202:
             # New request successful
             results_url = api_endpoint + "?key=" + resp.json()['key']
@@ -205,7 +213,7 @@ class DmiServiceManager:
         filename_url = f"{self.server_address}list_filenames/{folder_name}"
         filename_response = requests.get(filename_url, timeout=30)
 
-        # Check if 4CAT has access to this PixPlot server
+        # Check if 4CAT has access to this server
         if filename_response.status_code == 403:
             raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
         elif filename_response.status_code in [400, 405]:
@@ -245,26 +253,30 @@ class DmiServiceManager:
         to_upload_filenames = [filename for filename in files_to_upload if filename not in uploaded_files]
         total_files_to_upload = len(to_upload_filenames)
 
-        if total_files_to_upload > 0 or results_name not in existing_files:
-            api_upload_endpoint = f"{self.server_address}send_files"
-
+        # Check if results folder exists
+        if results_name not in existing_files:
+            total_files_to_upload += 1
             # Create a blank file to upload into results folder
             empty_placeholder = f"4CAT_{results_name}_blank.txt"
             with open(dir_with_files.joinpath(empty_placeholder), 'w') as file:
                 file.write('')
+            to_upload_filenames = [empty_placeholder] + to_upload_filenames
+
+        if total_files_to_upload > 0:
+            api_upload_endpoint = f"{self.server_address}send_files"
 
             self.processor.dataset.update_status(f"Uploading {total_files_to_upload} files")
             files_uploaded = 0
             while to_upload_filenames:
+                upload_file = to_upload_filenames.pop()
                 # Upload files
                 if files_uploaded == 0:
-                    upload_file = empty_placeholder
-                    # Upload a blank file to create the results folder
+                    # Upload a blank results file to results folder
                     response = requests.post(api_upload_endpoint,
-                                             files=[(results_name, open(dir_with_files.joinpath(empty_placeholder), 'rb'))],
+                                             files=[(results_name, open(dir_with_files.joinpath(upload_file), 'rb'))],
                                              data=data, timeout=120)
                 else:
-                    upload_file = to_upload_filenames.pop()
+                    # All other files uploading to general upload folder belonging to parent dataset collection
                     response = requests.post(api_upload_endpoint,
                                              files=[('4cat_uploads', open(dir_with_files.joinpath(upload_file), 'rb'))],
                                              data=data, timeout=120)
@@ -311,6 +323,18 @@ class DmiServiceManager:
 
             with open(local_output_dir.joinpath(filename), 'wb') as file:
                 file.write(file_response.content)
+
+    def sanitize_filenames(self, filename):
+        """
+        If source is local, no sanitization needed. If source is remote, the server sanitizes and as such, we need to
+        ensure our filenames match what the server expects.
+        """
+        if self.local_or_remote == "local":
+            return filename
+        elif self.local_or_remote == "remote":
+            return secure_filename(filename)
+        else:
+            raise DmiServiceManagerException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
 
     @staticmethod
     def get_folder_name(dataset):

@@ -216,7 +216,7 @@ def add_user():
     if fmt == "html":
         if redirect_to_page:
             flash(response["message"])
-            return redirect(url_for("manipulate_user", values={"name": username}))
+            return redirect(url_for("manipulate_user", mode="edit", name=username))
         else:
             return render_template("error.html", message=response["message"],
                                    title=("New account created" if response["success"] else "Error"))
