@@ -219,7 +219,7 @@ def get_mapped_result(key):
         """
         writer = None
         buffer = io.StringIO()
-        for mapped_item in dataset.iterate_items(processor=dataset.get_own_processor()):
+        for mapped_item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
                 fieldnames = mapped_item.keys()
                 if annotation_labels:
@@ -320,7 +320,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_items():
+            for row in dataset.iterate_items(warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 
