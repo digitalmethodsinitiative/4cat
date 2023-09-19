@@ -10,6 +10,8 @@ import time
 import os
 import re
 
+from selenium.common import UnexpectedAlertPresentException
+
 from backend.lib.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -171,7 +173,13 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 else:
                     # Wait for page to load with no scrolling
                     while time.time() < start_time + wait:
-                        if self.driver.execute_script("return (document.readyState == 'complete');"):
+                        try:
+                            load_complete = self.driver.execute_script("return (document.readyState == 'complete');")
+                        except UnexpectedAlertPresentException:
+                            # attempt to dismiss random alert
+                            self.dismiss_alert()
+                            load_complete = self.driver.execute_script("return (document.readyState == 'complete');")
+                        if load_complete:
                             break
                         time.sleep(0.1)
 

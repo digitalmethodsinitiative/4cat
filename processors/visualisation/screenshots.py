@@ -5,6 +5,8 @@ import datetime
 import re
 import time
 
+from selenium.common import UnexpectedAlertPresentException
+
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, extract_urls_from_string, convert_to_int, url_to_hash
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
@@ -253,7 +255,13 @@ class ScreenshotURLs(BasicProcessor):
                 else:
                     # Wait for page to load with no scrolling
                     while time.time() < start_time + wait:
-                        if webdriver.driver.execute_script("return (document.readyState == 'complete');"):
+                        try:
+                            load_complete = webdriver.driver.execute_script("return (document.readyState == 'complete');")
+                        except UnexpectedAlertPresentException:
+                            # attempt to dismiss random alert
+                            webdriver.dismiss_alert()
+                            load_complete = webdriver.driver.execute_script("return (document.readyState == 'complete');")
+                        if load_complete:
                             break
                         time.sleep(0.1)
                 self.dataset.log("Page load time: %s" % (time.time() - start_time))
