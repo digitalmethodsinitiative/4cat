@@ -1035,7 +1035,8 @@ def queue_processor(key=None, processor=None):
 	except QueryParametersException as e:
 		return error(400, error=str(e))
 
-	#TODO: add options['email-complete'] to options... based on something from request.form?
+	if request.form.to_dict().get("email-complete", False):
+		options["email-complete"] = request.form.to_dict().get("email-user", False)
 
 	# private or not is inherited from parent dataset
 	analysis = DataSet(parent=dataset.key,

@@ -461,7 +461,13 @@ config_definition = {
         "default": True,
         "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
                    "of the underlying JSON."
-    }
+    },
+    "ui.option_email": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Show email when complete option",
+        "default": True,
+        "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
+    },
 }
 
 # These are used in the web interface for more readable names
