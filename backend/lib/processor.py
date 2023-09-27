@@ -16,8 +16,9 @@ from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version, remove_nuls
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException, MapItemException
 from common.config_manager import config, ConfigWrapper
+
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -626,6 +627,42 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		shutil.copy(self.dataset.get_log_path(), standalone.get_log_path())
 
 		return standalone
+
+	@classmethod
+	def map_item_method_available(cls, dataset):
+		"""
+		Checks if map_item method exists and is compatible with dataset. If dataset does not have an extension,
+		returns False
+
+		:param BasicProcessor processor:	The BasicProcessor subclass object with which to use map_item
+		:param DataSet dataset:				The DataSet object with which to use map_item
+		"""
+		# only run item mapper if extension of processor == extension of
+		# data file, for the scenario where a csv file was uploaded and
+		# converted to an ndjson-based data source, for example
+		# todo: this is kind of ugly, and a better fix may be possible
+		dataset_extension = dataset.get_extension()
+		if not dataset_extension:
+			# DataSet results file does not exist or has no extension, use expected extension
+			if hasattr(dataset, "extension"):
+				dataset_extension = dataset.extension
+			else:
+				# No known DataSet extension; cannot determine if map_item method compatible
+				return False
+
+		return hasattr(cls, "map_item") and cls.extension == dataset_extension
+
+	@classmethod
+	def get_mapped_item(cls, item):
+		"""
+		Get the mapped item using a processors map_item method.
+
+		Ensure map_item method is compatible with a dataset by checking map_item_method_available first.
+		"""
+		mapped_item = cls.map_item(item)
+		if not mapped_item:
+			raise MapItemException("Unable to map item!")
+		return mapped_item
 
 	@classmethod
 	def is_filter(cls):
