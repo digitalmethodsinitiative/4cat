@@ -221,7 +221,8 @@ class DmiServiceManager:
         elif filename_response.status_code == 404:
             # Folder not found; no files
             return {}
-
+        elif filename_response.status_code != 200:
+            raise DmiServiceManagerException(f"Unknown response from DMI Service Manager: {filename_response.status_code} - {filename_response.reason}")
         return filename_response.json()
 
     def send_files(self, file_collection_name, results_name, files_to_upload, dir_with_files):
