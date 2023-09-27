@@ -69,8 +69,9 @@ class ScreenshotWithSelenium(SeleniumSearch):
             "wait-time": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Load time",
-                "tooltip": "Wait this many seconds before taking the screenshot, to allow the page to finish loading "
-                           "first. If the page finishes loading earlier, the screenshot is taken immediately.",
+                "tooltip": "Maximum seconds to wait and allow the page to finish loading. If the page finishes loading "
+                           "earlier, the screenshot is taken immediately. Note: images may still take time to load after"
+                           " the page itself has finished loading.",
                 "default": 6,
                 "min": 0,
                 "max": 60,
@@ -80,7 +81,8 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 "help": "Pause time",
                 "tooltip": "Before each screenshot, wait this many seconds before taking the screenshot. This can help "
                            "with images loading or if a site seems to be blocking the screenshot generator due to "
-                           "repeat requests.",
+                           "repeat requests. Wayback Machine captures and other slow sites often require longer waits "
+                           "(suggest 15 seconds).",
                 "default": 0,
                 "min": 0,
                 "max": 15,
