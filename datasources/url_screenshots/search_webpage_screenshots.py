@@ -85,7 +85,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                            "(suggest 15 seconds).",
                 "default": 0,
                 "min": 0,
-                "max": 15,
+                "max": 30,
             },
         }
         if config.get('selenium.firefox_extensions', user=user) and config.get('selenium.firefox_extensions', user=user).get('i_dont_care_about_cookies', {}).get('path'):
