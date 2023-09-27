@@ -282,7 +282,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             if alert:
                 alert.dismiss()
         except NoAlertPresentException:
-            pass
+            return
         self.driver.switch_to.window(current_window_handle)
 
     def reset_current_page(self):
