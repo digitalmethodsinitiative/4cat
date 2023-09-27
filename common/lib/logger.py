@@ -180,9 +180,6 @@ class Logger:
 
         :param bool output:  Whether to print logs to output
         """
-        # if self.logger:
-        #     return
-
         self.print_logs = output
         log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
         if not log_folder.exists():
