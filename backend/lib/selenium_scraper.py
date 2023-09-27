@@ -554,6 +554,7 @@ class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
     to initialize that browser and navigate it as needed. It replaces search to allow you to utilize the Selenium driver
     and ensure the webdriver and browser are properly closed out upon completion.
     """
+    max_workers = 3
 
     def search(self, query):
         """

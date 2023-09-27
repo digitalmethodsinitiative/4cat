@@ -19,7 +19,6 @@ class SearchWithSelenium(SeleniumSearch):
     """
     type = "url_scraper-search"  # job ID
     extension = "ndjson"
-    max_workers = 1
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

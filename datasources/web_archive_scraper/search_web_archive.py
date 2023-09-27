@@ -24,7 +24,6 @@ class SearchWebArchiveWithSelenium(SeleniumSearch):
     """
     type = "web_archive_scraper-search"  # job ID
     extension = "ndjson"
-    max_workers = 1
 
     # Web Archive returns "internal error" sometimes even when snapshot exists; we retry
     bad_response_text = ['This snapshot cannot be displayed due to an internal error', 'The Wayback Machine requires your browser to support JavaScript']

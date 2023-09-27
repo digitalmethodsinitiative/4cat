@@ -25,7 +25,6 @@ class ScreenshotWithSelenium(SeleniumSearch):
     """
     type = "image-downloader-screenshots-search"  # job ID
     extension = "zip"
-    max_workers = 1
 
     eager_selenium = True
 
