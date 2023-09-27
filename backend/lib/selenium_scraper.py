@@ -47,6 +47,8 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
     browser = None
 
     consecutive_errors = 0
+    num_consecutive_errors_before_restart = 3
+
     selenium_log = Logger(logger_name='selenium', filename='selenium.log')
 
     def get_with_error_handling(self, url, max_attempts=1, wait=0, restart_browser=False):
@@ -74,9 +76,10 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             except Exception as e:
                 self.selenium_log.error(f"Error driver.get({url}): {e}")
                 errors.append(e)
+                self.consecutive_errors += 1
                 
                 # Check consecutive errors
-                if self.consecutive_errors > 3:
+                if self.consecutive_errors > self.num_consecutive_errors_before_restart:
                     # First kill browser
                     if restart_browser:
                         self.kill_browser(self.browser)
@@ -227,6 +230,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
                 raise ProcessorException('Webdriver not installed or path to executable incorrect (%s)' % str(e))
             else:
                 raise ProcessorException("Could not connect to browser (%s)." % str(e))
+        self.selenium_log.info(f"Selenium started with browser PID: {self.driver.service.process.pid}")
 
     def quit_selenium(self):
         """
@@ -533,14 +537,13 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             time.sleep(.2)
 
     def kill_browser(self, browser):
-        if browser == "firefox":
-            self.selenium_log.info('4CAT is killing Firefox...')
-            subprocess.check_call(['pkill', 'firefox'])
-        elif browser == "chrome":
-            self.selenium_log.info('4CAT is killing Chrome...')
-            subprocess.check_call(['pkill', 'chrome'])
-        else:
-            raise Exception('Cannot kill unknown browser: %s' % browser)
+        self.selenium_log.info(f"4CAT is killing {browser} with PID: {self.driver.service.process.pid}")
+        try:
+            subprocess.check_call(['kill', self.driver.service.process.pid])
+        except subprocess.CalledProcessError as e:
+            self.selenium_log.error(f"Error killing {browser}: {e}")
+            self.quit_selenium()
+            raise e
 
 
 class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
