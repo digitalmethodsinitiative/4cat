@@ -276,9 +276,11 @@ class ScreenshotWithSelenium(SeleniumSearch):
         # Special cases
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         if "web.archive.org/web/" in url:
-            # Extract archived timestamp
-            timestamp = url.split("web.archive.org/web/")[1].split("/")[0].replace("if_", "")
-            # Extract archived domain
-            domain = url.split("web.archive.org/web/")[1].split("://")[1].split("/")[0].strip("/") + "-archived"
+            archived_url = url.split("web.archive.org/web/")[1]
+            if "://" in archived_url:
+                # Extract archived timestamp
+                timestamp = archived_url.split("/")[0].replace("if_", "")
+                # Extract archived domain
+                domain = archived_url.split("://")[1].split("/")[0].strip("/") + "-archived"
 
         return f"{domain}-{timestamp}-{url_hash}"
