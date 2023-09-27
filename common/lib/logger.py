@@ -174,14 +174,14 @@ class Logger:
     }
     alert_level = "FATAL"
 
-    def __init__(self, output=False, filename='4cat.log'):
+    def __init__(self, logger_name='4cat-backend', output=False, filename='4cat.log'):
         """
         Set up log handler
 
         :param bool output:  Whether to print logs to output
         """
-        if self.logger:
-            return
+        # if self.logger:
+        #     return
 
         self.print_logs = output
         log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
@@ -191,7 +191,7 @@ class Logger:
         self.log_path = log_folder.joinpath(filename)
         self.previous_report = time.time()
 
-        self.logger = logging.getLogger("4cat-backend")
+        self.logger = logging.getLogger(logger_name)
         self.logger.setLevel(logging.INFO)
 
         # this handler manages the text log files

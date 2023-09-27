@@ -8,6 +8,7 @@ from bs4.element import Comment
 from textwrap import dedent
 
 from backend.lib.search import Search
+from common.lib.logger import Logger
 from common.lib.exceptions import ProcessorException
 from common.config_manager import config
 
@@ -46,6 +47,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
     browser = None
 
     consecutive_errors = 0
+    selenium_log = Logger(logger_name='selenium', filename='selenium.log')
 
     def get_with_error_handling(self, url, max_attempts=1, wait=0, restart_browser=False):
         """
@@ -67,6 +69,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
                 success = True
                 self.consecutive_errors = 0
             except Exception as e:
+                self.selenium_log.error(f"Error driver.get({url}): {e}")
                 errors.append(e)
                 
                 # Check consecutive errors
@@ -231,8 +234,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         try:
             self.driver.quit()
         except Exception as e:
-            # TODO: log this if possible, but we do not want 4CAT to hang if it cannot quit so that datasets are interrupted correctly
-            print(e)
+            self.selenium_log.error(e)
 
     def restart_selenium(self):
         """
@@ -506,13 +508,12 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             last_bottom = current_bottom
             time.sleep(.2)
 
-    @staticmethod
-    def kill_browser(browser):
+    def kill_browser(self, browser):
         if browser == "firefox":
-            print('4CAT is killing Firefox...')
+            self.selenium_log.info('4CAT is killing Firefox...')
             subprocess.check_call(['pkill', 'firefox'])
         elif browser == "chrome":
-            print('4CAT is killing Chrome...')
+            self.selenium_log.info('4CAT is killing Chrome...')
             subprocess.check_call(['pkill', 'chrome'])
         else:
             raise Exception('Cannot kill unknown browser: %s' % browser)
