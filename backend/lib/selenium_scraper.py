@@ -69,7 +69,8 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
                 success = True
                 self.consecutive_errors = 0
             except TimeoutException as e:
-                errors.append(f"Timeout retrieving {url}): {e}")
+                errors.append(f"Timeout retrieving {url}")
+                self.selenium_log.debug(f"Selenium Timeout({url}): {e}")
             except Exception as e:
                 self.selenium_log.error(f"Error driver.get({url}): {e}")
                 errors.append(e)
