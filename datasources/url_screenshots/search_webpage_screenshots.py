@@ -142,7 +142,6 @@ class ScreenshotWithSelenium(SeleniumSearch):
             self.dataset.update_progress(done / total_urls)
             self.dataset.log("Capturing screenshot %i of %i: %s" % (done + 1, total_urls, url))
 
-            scraped_urls.add(url)
             filename = self.filename_from_url(url) + ".png"
             result = {
                 "url": url,
@@ -160,6 +159,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                     raise ProcessorInterruptedException("Interrupted while making screenshots")
 
                 attempts += 1
+                start_time = time.time()
                 get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=wait, restart_browser=True)
                 if errors:
                     # Even if success, it is possible to have errors on earlier attempts
@@ -169,25 +169,15 @@ class ScreenshotWithSelenium(SeleniumSearch):
                     self.dataset.log("Error collecting screenshot for %s: %s" % (url, ', '.join([str(error) for error in errors])))
                     continue
 
-                start_time = time.time()
                 if capture == "all":
                     # Scroll down to load all content until wait time exceeded
                     self.scroll_down_page_to_load(max_time=wait)
-                else:
-                    # Wait for page to load with no scrolling
-                    while time.time() < start_time + wait:
-                        try:
-                            load_complete = self.driver.execute_script("return (document.readyState == 'complete');")
-                        except UnexpectedAlertPresentException:
-                            # attempt to dismiss random alert
-                            self.dismiss_alert()
-                            load_complete = self.driver.execute_script("return (document.readyState == 'complete');")
-                        if load_complete:
-                            break
-                        time.sleep(0.1)
 
                 if pause:
                     time.sleep(pause)
+
+                page_loaded = self.check_page_is_loaded(max_time=max(int(wait-start_time), 1), auto_dismiss_alert=True)
+                scraped_urls.add(url)
 
                 try:
                     self.save_screenshot(results_path.joinpath(filename), width=width, height=height, viewport_only=(capture == "viewport"))

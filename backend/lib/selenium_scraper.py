@@ -285,6 +285,27 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             return
         self.driver.switch_to.window(current_window_handle)
 
+    def check_page_is_loaded(self, max_time=60, auto_dismiss_alert=True):
+        """
+        Check if page is loaded. Returns True if loaded, False if not.
+        """
+        try:
+            try:
+                WebDriverWait(self.driver, max_time).until(
+                    lambda driver: driver.execute_script('return document.readyState') == 'complete')
+            except UnexpectedAlertPresentException as e:
+                # attempt to dismiss random alert
+                if auto_dismiss_alert:
+                    self.dismiss_alert()
+                    WebDriverWait(self.driver, max_time).until(
+                        lambda driver: driver.execute_script('return document.readyState') == 'complete')
+                else:
+                    raise e
+        except TimeoutException:
+            return False
+
+        return True
+
     def reset_current_page(self):
         """
         It may be desirable to "reset" the current page, for example in conjunction with self.check_for_movement(),
