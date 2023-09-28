@@ -255,6 +255,7 @@ class DmiServiceManager:
         total_files_to_upload = len(to_upload_filenames)
 
         # Check if results folder exists
+        empty_placeholder = None
         if results_name not in existing_files:
             total_files_to_upload += 1
             # Create a blank file to upload into results folder
@@ -271,7 +272,7 @@ class DmiServiceManager:
             while to_upload_filenames:
                 upload_file = to_upload_filenames.pop()
                 # Upload files
-                if files_uploaded == 0:
+                if upload_file == empty_placeholder:
                     # Upload a blank results file to results folder
                     response = requests.post(api_upload_endpoint,
                                              files=[(results_name, open(dir_with_files.joinpath(upload_file), 'rb'))],
@@ -293,6 +294,10 @@ class DmiServiceManager:
                     raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
                 else:
                     self.processor.dataset.log(f"Unable to upload file ({response.status_code - response.reason}): {upload_file}")
+
+                if "errors" in response.json():
+                    self.processor.dataset.log(
+                        f"Unable to upload file ({response.status_code - response.reason}): {upload_file} - {response.json()['errors']}")
 
             self.processor.dataset.update_status(f"Uploaded {files_uploaded} files!")
 
