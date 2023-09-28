@@ -158,7 +158,7 @@ Downloading results
 """
 
 
-@app.route('/result/<string:query_file>')
+@app.route('/result/<path:query_file>')
 def get_result(query_file):
     """
     Get dataset result file
@@ -167,8 +167,7 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    path = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')).joinpath(query_file)
-    return send_from_directory(directory=path.parent, path=path.name)
+    return send_from_directory(directory=config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')), path=query_file)
 
 
 @app.route('/mapped-result/<string:key>/')
