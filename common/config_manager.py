@@ -124,6 +124,7 @@ class ConfigManager:
         unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
 
         if unknown_keys:
+            self.db.log.info(f"Deleting unknown settings from database: {', '.join([key['name'] for key in unknown_keys])}")
             self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
 
         self.db.commit()
