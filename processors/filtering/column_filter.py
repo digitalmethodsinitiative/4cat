@@ -178,7 +178,7 @@ class ColumnFilter(BaseFilter):
                 if type(mapped_item.get(column)) == str:
                     # Text
                     column_value = mapped_item.get(column).lower() if force_lowercase else mapped_item.get(column)
-                elif type(mapped_item.get(column)) is None:
+                elif mapped_item.get(column) is None:
                     column_value = ''
                 else:
                     # Int/Float/Date
