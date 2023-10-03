@@ -121,12 +121,10 @@ class URLCoLinker(BasicProcessor):
 
 		# create co-link pairs from all links per co-link unit (thread or post)
 		self.dataset.update_status("Finding common URLs")
-		# self.dataset.log("LIST Comprehension")
 		# # This is faster than the below for loop, but apparently uses more memory (crashing on giant datasets where the for loop does not), plus we're only talking about seconds per million edges
 		# [network.add_edge(from_link, to_link) for post_links in links.values() if len(post_links) > 1 for i, from_link in enumerate(post_links) for to_link in post_links[i + 1:]]
 
-		# self.dataset.log("FOR LOOP")
-		update_on_item = int(len(links) / 100)
+		update_on_item = max(int(len(links) / 100), 1)
 		for i, post_links in enumerate(links.values()):
 			if i % update_on_item == 0:
 				self.dataset.update_status("Collecting URL links from item %i" % i)
