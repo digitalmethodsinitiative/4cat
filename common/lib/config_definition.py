@@ -478,5 +478,6 @@ categories = {
     "path": "File paths",
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
-    "ui": "User interface"
+    "ui": "User interface",
+    "image-visuals": "Image visualization",
 }
