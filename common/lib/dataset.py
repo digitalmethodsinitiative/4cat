@@ -1508,7 +1508,7 @@ class DataSet(FourcatModule):
 			if processor is not None:
 				processor.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
 			elif hasattr(self.db, "log"):
-				self.db.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
+				self.db.log.warning(f"Unable to map item all items for dataset {closest_dataset.key}.")
 			else:
 				# No other log available
 				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
