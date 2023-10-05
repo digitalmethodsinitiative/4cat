@@ -14,6 +14,7 @@ import io
 import re
 
 from pathlib import Path
+from dateutil.parser import parse as parse_datetime, ParserError
 
 import backend
 from email.mime.multipart import MIMEMultipart
@@ -96,7 +97,8 @@ def list_users(page):
     filter_bits = []
     replacements = []
     if filter_name:
-        filter_bits.append("name LIKE %s")
+        filter_bits.append("(name LIKE %s OR userdata::json->>'notes' LIKE %s)")
+        replacements.append("%" + filter_name + "%")
         replacements.append("%" + filter_name + "%")
 
     if tag:
@@ -702,6 +704,118 @@ def get_log(logfile):
             return "\n".join(tailer.tail(infile, 250))
     else:
         return ""
+
+
+@app.route("/user-bulk", methods=["GET", "POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_users")
+def user_bulk():
+    """
+    Create many users at once
+
+    Useful if one wants to e.g. import users from elsewhere
+    """
+    incomplete = []
+
+    if request.method == "POST" and request.files:
+        # handle the CSV file
+        # sniff the dialect, because it's CSV, so who knows what format it's in
+        file = io.TextIOWrapper(request.files["datafile"])
+        sample = file.read(3 * 1024)  # 3kB should be enough
+        dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+        file.seek(0)
+        reader = csv.DictReader(file, dialect=dialect)
+
+        # keep track of what we read from the file
+        prospective_users = []
+        dupes = []
+        failed_rows = []
+        mail_fail = False
+        row_index = 1
+
+        # use while True instead of looping through the reader directly,
+        # because that way we can catch read errors for individual lines
+        while True:
+            try:
+                row = next(reader)
+                if "name" not in row:
+                    # the one required column
+                    raise ValueError()
+                else:
+                    prospective_users.append(row)
+
+            except ValueError:
+                failed_rows.append(row_index)
+                continue
+
+            except StopIteration:
+                break
+
+        # OK, we have the users with enough data, now add them one by one
+        success = 0
+        if prospective_users:
+            for user in prospective_users:
+                # prevent duplicate users
+                exists = db.fetchone("SELECT name FROM users WHERE name = %s", (user["name"],))
+                if exists:
+                    dupes.append(user["name"])
+                    continue
+
+                # only insert with username - other properties are set through
+                # the object
+                db.insert("users", {"name": user["name"], "timestamp_created": int(time.time())})
+                user_obj = User.get_by_name(db, user["name"])
+
+                if user.get("expires"):
+                    try:
+                        # expiration date needs to be a parseable timestamp
+                        # note that we do not check if it is in the future!
+                        expires_after = parse_datetime(user["expires"])
+                        user_obj.set_value("delete-after", int(expires_after.timestamp()))
+                    except (OverflowError, ParserError):
+                        # delete the already created user because we have bad
+                        # data, and continue with the next one
+                        failed_rows.append(user.get("name"))
+                        user_obj.delete()
+                        continue
+
+                if user.get("password"):
+                    user_obj.set_password(user["password"])
+
+                elif config.get("mail.server") and not mail_fail and "@" in user.get("name"):
+                    # can send a registration e-mail, but only if the name is
+                    # an email address and we have a mail server
+                    try:
+                        user_obj.email_token(new=True)
+                    except RuntimeError as e:
+                        mail_fail = str(e)
+
+                if user.get("tags"):
+                    for tag in user["tags"].split(","):
+                        user_obj.add_tag(tag.strip())
+
+                if user.get("notes"):
+                    user_obj.set_value("notes", user.get("notes"))
+
+                success += 1
+
+            flash(f"{success} user(s) were created.")
+
+        # and now we have some specific errors to output if anything went wrong
+        else:
+            flash("No valid rows in user file, no users added.")
+
+        if dupes:
+            flash(f"The following users were skipped because the username already exists: {', '.join(dupes)}.")
+
+        if mail_fail:
+            flash(f"E-mails were not sent ({mail_fail}).")
+
+        if failed_rows and prospective_users:
+            flash(f"The following rows were skipped because the data in them was invalid: {', '.join([str(r) for r in failed_rows])}.")
+
+    return render_template("controlpanel/user-bulk.html", flashes=get_flashed_messages(),
+                           incomplete=incomplete)
 
 
 @app.route("/dataset-bulk/", methods=["GET", "POST"])

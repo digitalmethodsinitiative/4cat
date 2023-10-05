@@ -1,0 +1,57 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}Bulk user creation{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "user-bulk" %}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Bulk user creation</span></h2>
+
+            <p class="intro">You can create multiple users at the same time by preparing a CSV file with their data and
+                uploading it below. The spreadsheet <em>must</em> have a <code>name</code> column that contains the
+                username of the user to be created. If no other data is provided, the user is created with no
+                password.</p>
+            <p>{% if __user_config("mail.server") %}
+                Optionally, if the username is an e-mail address, an e-mail will be sent to them with a password reset
+                link. Note that e-mail providers may frown upon the mass of e-mails sent at once when creating multiple
+                users at the same time.
+                {% else %}
+                No mail server is currently configured, but if you configure one you will also have the option of
+                sending the users a link to set their password through.
+                {% endif %}
+                You can always find the 'reset password' link for a user via the user management page in the control
+                panel.</p>
+            <p>You can additionally provide the columns <code>password</code>, <code>expires</code> (a timestamp
+                indicating when the user will be automatically deleted; YYYY-MM-DD
+                HH:MM:SS is preferred), <code>tags</code> (a comma-separated list of user tags), and <code>notes</code>
+                (put whatever you want in here). Other columns will be ignored. Rows with invalid data (existing
+                usernames, bad expiration dates) will be skipped.</p>
+
+            <form action="{{ url_for("user_bulk") }}" method="POST" class="wide user-bulk" enctype="multipart/form-data">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+
+                <div class="form-element{% if "datafile" in incomplete %} missing{% endif %}">
+                    <label for="forminput-datafile">CSV file</label>
+                    <div>
+                        <input name="datafile" id="forminput-datafile" type="file">
+                    </div>
+                </div>
+
+                {% if __user_config("mail.server") %}
+                <div class="form-element">
+                    <label for="send-email">Send e-mail?</label>
+                    <input type="checkbox" id="send-email" name="send-email">
+                </div>
+                {% endif %}
+
+                <div class="submit-container">
+                    <button name="action-private"><i class="fa f-fw fa-user-plus" aria-hidden="true"></i> Upload and create users</button>
+                </div>
+            </form>
+        </section>
+    </article>
+{% endblock %}
