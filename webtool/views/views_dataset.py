@@ -144,16 +144,6 @@ def show_results(page):
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
-    dataset_queue = {}
-
-    for dataset in datasets:
-        dataset = DataSet(key=dataset["key"], db=db)
-        filtered.append(dataset)
-        if dataset.job:
-            try:
-                dataset_queue[dataset.key] = Job.get_by_ID(dataset.job, db)
-            except JobNotFoundException:
-                pass
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
@@ -162,7 +152,7 @@ def show_results(page):
                    metadata["has_worker"] and metadata["has_options"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites, dataset_queue=dataset_queue)
+                           datasets=filtered, pagination=pagination, favourites=favourites)
 
 
 """
@@ -469,19 +459,10 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "result.html" if standalone else "components/result-details.html"
 
-    dataset_queue = {}
-    if dataset.job:
-        try:
-            dataset_queue[dataset.key] = Job.get_by_ID(dataset.job, db)
-        except JobNotFoundException:
-            pass
-
-
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources,
-                           dataset_queue=dataset_queue)
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
 
 
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
