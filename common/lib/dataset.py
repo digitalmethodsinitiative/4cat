@@ -50,6 +50,7 @@ class DataSet(FourcatModule):
 	is_new = True
 	no_status_updates = False
 	staging_areas = None
+	queue_position = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent='', extension=None,
 				 type=None, is_private=True, owner="anonymous"):
@@ -143,6 +144,7 @@ class DataSet(FourcatModule):
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
 
 		self.refresh_owners()
+		self.get_place_in_queue()
 
 	def check_dataset_finished(self):
 		"""
@@ -1296,6 +1298,29 @@ class DataSet(FourcatModule):
 				available[processor_type] = processor
 
 		return available
+
+	def get_place_in_queue(self):
+		"""
+		Determine dataset's position in queue
+
+		If the dataset is already finished, the position is -1. Else, the
+		position is the amount of datasets to be completed before this one will
+		be processed. A position of 0 would mean that the dataset is currently
+		being executed, or that the backend is not running.
+
+		:return int:  Queue position
+		"""
+		if self.is_finished() or not self.data["job"]:
+			self.queue_position = -1
+			return
+		else:
+			try:
+				job = Job.get_by_ID(self.data["job"], self.db)
+				self.queue_position = job.data["queue_ahead"]
+			except JobNotFoundException:
+				self.queue_position = -1
+
+		return self.queue_position
 
 	def get_own_processor(self):
 		"""

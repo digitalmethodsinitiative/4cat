@@ -21,7 +21,8 @@ from werkzeug.utils import secure_filename
 from webtool import app, db, log, openapi, limiter, queue, config
 from webtool.lib.helpers import error, setting_required
 
-from common.lib.exceptions import QueryParametersException, JobNotFoundException, QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
+from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
+	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.config_manager import ConfigWrapper
