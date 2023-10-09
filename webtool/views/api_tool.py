@@ -414,19 +414,12 @@ def check_dataset():
 	else:
 		path = ""
 
-	dataset_queue = {}
-	if dataset.job:
-		try:
-			dataset_queue[dataset.key] = Job.get_by_ID(dataset.job, db)
-		except JobNotFoundException:
-			pass
-
 	template = "components/result-status.html" if block == "status" else "components/result-result-row.html"
 
 	status = {
 		"datasource": dataset.parameters.get("datasource"),
 		"status": dataset.get_status(),
-		"status_html": render_template(template, dataset=dataset, dataset_queue=dataset_queue),
+		"status_html": render_template(template, dataset=dataset),
 		"label": dataset.get_label(),
 		"rows": dataset.data["num_rows"],
 		"key": dataset_key,
