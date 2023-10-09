@@ -17,9 +17,6 @@ from webtool.views.api_tool import toggle_favourite, toggle_private, queue_proce
 
 import backend
 from common.lib.dataset import DataSet
-from common.lib.queue import JobQueue
-from common.lib.job import Job
-from common.lib.exceptions import JobNotFoundException
 from common.config_manager import ConfigWrapper
 
 config = ConfigWrapper(config, user=current_user, request=request)
@@ -143,7 +140,7 @@ def show_results(page):
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = []
+    filtered = [DataSet(key=dataset["key"], db=db) for dataset in datasets]
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
