@@ -6,19 +6,74 @@ import csv
 import json
 import markdown
 
-import common.config_manager as config
 from pathlib import Path
 from datetime import datetime
 
 import backend
 
-from flask import render_template, jsonify, Response
+from flask import request, render_template, jsonify, Response
 from flask_login import login_required, current_user
 
-from webtool import app, db
-from webtool.lib.helpers import pad_interval, error
+from webtool import app, db, config
+from webtool.lib.helpers import pad_interval, error, setting_required
+from webtool.views.views_dataset import create_dataset, show_results
+
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
+
+
+@app.route('/')
+@login_required
+def show_frontpage():
+    """
+    Index page: news and introduction
+
+    :return:
+    """
+    page = config.get("ui.homepage")
+    if page == "create-dataset":
+        return create_dataset()
+    elif page == "datasets":
+        return show_results(page=1)
+    else:
+        return show_about()
+
+@app.route("/about/")
+@login_required
+def show_about():
+    # load corpus stats that are generated daily, if available
+    stats_path = Path(config.get('PATH_ROOT'), "stats.json")
+    if stats_path.exists():
+        with stats_path.open() as stats_file:
+            stats = stats_file.read()
+        try:
+            stats = json.loads(stats)
+        except json.JSONDecodeError:
+            stats = None
+    else:
+        stats = None
+
+    news_path = Path(config.get('PATH_ROOT'), "news.json")
+    if news_path.exists():
+        with news_path.open() as news_file:
+            news = news_file.read()
+        try:
+            news = json.loads(news)
+            for item in news:
+                if "time" not in item or "text" not in item:
+                    raise RuntimeError()
+        except (json.JSONDecodeError, RuntimeError):
+            news = None
+    else:
+        news = None
+
+    datasources = {k: v for k, v in backend.all_modules.datasources.items() if
+                   k in config.get("datasources.enabled") and not v["importable"]}
+    importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
+
+    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 
 
 @app.route("/robots.txt")
@@ -50,59 +105,6 @@ def show_access_tokens():
     return render_template("access-tokens.html", tokens=tokens)
 
 
-@app.route('/')
-@login_required
-def show_frontpage():
-    """
-    Index page: news and introduction
-
-    :return:
-    """
-
-    # load corpus stats that are generated daily, if available
-    stats_path = Path(config.get('PATH_ROOT'), "stats.json")
-    if stats_path.exists():
-        with stats_path.open() as stats_file:
-            stats = stats_file.read()
-        try:
-            stats = json.loads(stats)
-        except json.JSONDecodeError:
-            stats = None
-    else:
-        stats = None
-
-    news_path = Path(config.get('PATH_ROOT'), "news.json")
-    if news_path.exists():
-        with news_path.open() as news_file:
-            news = news_file.read()
-        try:
-            news = json.loads(news)
-            for item in news:
-                if "time" not in item or "text" not in item:
-                    raise RuntimeError()
-        except (json.JSONDecodeError, RuntimeError):
-            news = None
-    else:
-        news = None
-
-    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("4cat.datasources") and not v["importable"]}
-    importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
-
-    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
-
-
-@app.route('/create-dataset/')
-@login_required
-def show_index():
-    """
-    Main tool frontend
-    """
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get("4cat.datasources", {})}
-
-    return render_template('create-dataset.html', datasources=datasources)
-
-
 @app.route('/data-overview/')
 @app.route('/data-overview/<string:datasource>')
 @login_required
@@ -111,7 +113,7 @@ def data_overview(datasource=None):
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and datasource in config.get("4cat.datasources")}
+                   metadata["has_worker"] and datasource in config.get("datasources.enabled")}
 
     if datasource not in datasources:
         datasource = None
@@ -130,6 +132,8 @@ def data_overview(datasource=None):
 
         datasource_id = datasource
         worker_class = backend.all_modules.workers.get(datasource_id + "-search")
+        # Database IDs may be different from the Datasource ID (e.g. the datasource "4chan" became "fourchan" but the database ID remained "4chan")
+        database_db_id = worker_class.prefix if hasattr(worker_class, "prefix") else datasource_id
 
         # Get description
         description_path = Path(datasources[datasource_id].get("path"), "DESCRIPTION.md")
@@ -153,7 +157,7 @@ def data_overview(datasource=None):
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":
 
-            total_counts = db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (datasource_id,))
+            total_counts = db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (database_db_id,))
 
             if total_counts:
                 
@@ -162,7 +166,7 @@ def data_overview(datasource=None):
                 boards = set(total_counts.keys())
                 
                 # Fetch date counts per board from the database
-                db_counts = db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (datasource_id,))
+                db_counts = db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (database_db_id,))
 
                 # Get the first and last days for padding
                 all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
@@ -184,10 +188,10 @@ def data_overview(datasource=None):
 @app.route('/get-boards/<string:datasource>/')
 @login_required
 def getboards(datasource):
-    if datasource not in config.get("4cat.datasources"):
+    if datasource not in config.get("datasources.enabled"):
         result = False
     else:
-        result = config.get(datasource + ".boards", False)
+        result = config.get(datasource + "-search.boards", False)
 
     return jsonify(result)
 

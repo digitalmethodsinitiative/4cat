@@ -1,11 +1,10 @@
 import packaging.version
 import requests
 import json
-import re
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import add_notification, get_github_version
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from pathlib import Path
 
 
@@ -33,12 +32,16 @@ class UpdateChecker(BasicWorker):
             # need something to compare against...
             return
 
+        timeout = 15
         try:
-            (latest_tag, release_url) = get_github_version()
+            (latest_tag, release_url) = get_github_version(timeout)
             if latest_tag == "unknown":
                 raise ValueError()
         except ValueError:
             self.log.warning("'4cat.github_url' may be misconfigured - repository does not exist or is private")
+            return
+        except requests.Timeout:
+            self.log.warning(f"GitHub URL '4cat.github_url' did not respond within {timeout} seconds - not checking for new version")
             return
         except (requests.RequestException, json.JSONDecodeError):
             # some issue with the data, or the GitHub API, but not something we

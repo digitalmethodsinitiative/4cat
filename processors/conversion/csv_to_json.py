@@ -3,8 +3,7 @@ Convert a CSV file to JSON
 """
 import json
 
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -22,11 +21,11 @@ class ConvertCSVToJSON(BasicProcessor):
 	extension = "json"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Determine if processor is compatible with a dataset or processor
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		
 		return module.get_extension() == "csv"

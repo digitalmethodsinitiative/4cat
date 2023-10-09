@@ -34,7 +34,6 @@ class Job:
 			self.is_finished = "is_finished" in self.data and self.data["is_finished"]
 			self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
 		except KeyError:
-			print(data)
 			raise Exception
 
 	def get_by_ID(id, database):

@@ -16,9 +16,9 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters, Sal Hagen"
@@ -66,7 +66,7 @@ class ImageDownloader(BasicProcessor):
 	}
 
 	config = {
-		"image_downloader.MAX_NUMBER_IMAGES": {
+		"image-downloader.max": {
 			"type": UserInput.OPTION_TEXT,
 			"coerce_type": int,
 			"default": 1000,
@@ -95,7 +95,7 @@ class ImageDownloader(BasicProcessor):
 		options = cls.options
 
 		# Update the amount max and help from config
-		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		max_number_images = int(config.get('image-downloader.max', 1000, user=user))
 		options['amount']['max'] = max_number_images
 		options['amount']['help'] = "No. of images (max %s)" % max_number_images
 
@@ -119,7 +119,7 @@ class ImageDownloader(BasicProcessor):
 		return options
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on top image rankings
 
@@ -142,7 +142,7 @@ class ImageDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 
 		if amount == 0:
-			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
+			amount = self.config.get('image-downloader.max', 1000)
 		columns = self.parameters.get("columns")
 		if type(columns) is str:
 			columns = [columns]
@@ -347,7 +347,7 @@ class ImageDownloader(BasicProcessor):
 		metadata = {
 			url: {
 				"filename": url_file_map.get(url),
-				"success": not url_file_map.get(url) is None and url not in failures, # skipped and fails are NOT success
+				"success": not url_file_map.get(url) is None and url not in failures,  # skipped and fails are NOT success
 				"from_dataset": self.source_dataset.key,
 				"post_ids": urls[url]
 			} for url in urls
@@ -358,7 +358,7 @@ class ImageDownloader(BasicProcessor):
 		self.dataset.log('Downloaded %i images.' % downloaded_images)
 		# finish up
 		self.dataset.update_status("Compressing images")
-		self.write_archive_and_finish(results_path)
+		self.write_archive_and_finish(results_path, len([x for x in metadata.values() if x.get("success")]))
 
 	def get_image(self, url):
 		"""
@@ -448,7 +448,10 @@ class ImageDownloader(BasicProcessor):
 			# Check if we succeeded; content type should be an image
 			if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
 				raise FileNotFoundError()
-			image = BytesIO(image.content)
+			try:
+				image = BytesIO(image.content)
+			except requests.exceptions.ConnectionError:
+				raise FileNotFoundError()
 			image_name = image_url.split("/")[-1].split("?")[0]
 		else:
 			raise FileNotFoundError()
@@ -572,3 +575,22 @@ class ImageDownloader(BasicProcessor):
 			raise FileNotFoundError()
 
 		return response
+
+	@staticmethod
+	def map_metadata(url, data):
+		"""
+		Iterator to yield modified metadata for CSV
+
+		:param str url:  string that may contain URLs
+		:param dict data:  dictionary with metadata collected previously
+		:yield dict:  	  iterator containing reformated metadata
+		"""
+		row = {
+			"url": url,
+			"number_of_posts_with_url": len(data.get("post_ids", [])),
+			"post_ids": ", ".join(data.get("post_ids", [])),
+			"filename": data.get("filename"),
+			"download_successful": data.get('success', "")
+		}
+
+		yield row

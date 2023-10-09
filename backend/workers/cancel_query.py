@@ -1,7 +1,7 @@
 """
 Cancel a PostgreSQL query
 """
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 
 
 class QueryCanceller(BasicWorker):

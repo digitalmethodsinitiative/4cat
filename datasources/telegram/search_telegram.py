@@ -2,7 +2,6 @@
 Search Telegram via API
 """
 import traceback
-import binascii
 import datetime
 import hashlib
 import asyncio
@@ -12,10 +11,11 @@ import re
 
 from pathlib import Path
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
+from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient
@@ -25,7 +25,6 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
 
-import common.config_manager as config
 
 
 class SearchTelegram(Search):
@@ -127,6 +126,15 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Resolve references",
             "default": False,
+        }
+    }
+
+    config = {
+        "telegram-search.can_query_all_messages": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Remove message amount limit",
+            "default": False,
+            "tooltip": "Allows users to query unlimited messages from Telegram. This can lead to HUGE datasets!"
         }
     }
 
@@ -399,6 +407,7 @@ class SearchTelegram(Search):
                         self.details_cache[value["user_id"]] = SearchTelegram.serialize_obj(user)
 
                     resolved_message[key] = self.details_cache[value["user_id"]]
+                    resolved_message[key]["user_id"] = value["user_id"]
                 else:
                     resolved_message[key] = await self.resolve_groups(client, value)
 
@@ -667,24 +676,19 @@ class SearchTelegram(Search):
                 mapped_obj[item] = value.timestamp()
             elif type(value).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
                 mapped_obj[item] = SearchTelegram.serialize_obj(value)
-                if type(obj[item]) is not dict:
-                    mapped_obj[item]["_type"] = type(value).__name__
             elif type(value) is list:
                 mapped_obj[item] = [SearchTelegram.serialize_obj(item) for item in value]
-            elif type(value).__module__[0:8] == "telethon":
-                # some type of internal telethon struct
-                continue
             elif type(value) is bytes:
                 mapped_obj[item] = value.hex()
             elif type(value) not in scalars and value is not None:
                 # type we can't make sense of here
                 continue
-            elif type(value) is dict:
-                for key, vvalue in value:
-                    mapped_obj[item][key] = SearchTelegram.serialize_obj(vvalue)
             else:
                 mapped_obj[item] = value
 
+        # Add the _type if the original object was a telethon type
+        if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
+            mapped_obj["_type"] = type(input_obj).__name__
         return mapped_obj
 
     @staticmethod
@@ -704,7 +708,7 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        privileged = user.get_value("telegram.can_query_all_messages", False)
+        privileged = config.get("telegram-search.can_query_all_messages", False, user=user)
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
@@ -852,7 +856,7 @@ class SearchTelegram(Search):
         """
         options = cls.options.copy()
 
-        if user and user.get_value("telegram.can_query_all_messages", False):
+        if user and config.get("telegram-search.can_query_all_messages", False, user=user):
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
 

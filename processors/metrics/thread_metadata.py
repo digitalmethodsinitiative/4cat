@@ -5,9 +5,8 @@ import datetime
 import math
 import time
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
-import common.config_manager as config
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
@@ -20,7 +19,8 @@ class ThreadMetadata(BasicProcessor):
 	type = "thread-metadata"  # job type ID
 	category = "Post metrics"  # category
 	title = "Thread metadata"  # title displayed in UI
-	description = "Extract various metadata on the threads in the dataset, including time data and post counts. Note that this extracted only on the basis of the posts present this dataset."  # description displayed in UI
+	description = "Extract various metadata on the threads in the dataset, including time data and post counts. Note " \
+				  "that this extracted only on the basis of the items present this dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	def process(self):
@@ -83,7 +83,7 @@ class ThreadMetadata(BasicProcessor):
 					"num_images": threads[thread_id]["images"],
 					"image_md5": threads[thread_id]["image_md5"],
 					"country_code": threads[thread_id]["country_code"],
-				} if self.source_dataset.type in ("4chan", "8chan", "8kun") else {}
+				} if self.source_dataset.type in ("fourchan", "eightchan", "eightkun") else {}
 			)
 		} for thread_id in threads]
 

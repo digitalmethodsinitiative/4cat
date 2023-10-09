@@ -1,6 +1,8 @@
 """
 Custom data upload to create bespoke datasets
 """
+import secrets
+import hashlib
 import time
 import csv
 import re
@@ -11,9 +13,9 @@ import datasources.upload.import_formats as import_formats
 from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException
-from common.lib.helpers import strip_tags, sniff_encoding, UserInput
+from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
 
 
 class SearchCustom(BasicProcessor):
@@ -87,6 +89,11 @@ class SearchCustom(BasicProcessor):
                 set(tool_format["columns"]) != set(tool_format["columns"]):
             raise QueryParametersException("Not all columns are present")
 
+        # hasher for pseudonymisation
+        salt = secrets.token_bytes(16)
+        hasher = hashlib.blake2b(digest_size=24, salt=salt)
+        hash_cache = HashCache(hasher)
+
         # write the resulting dataset
         writer = None
         done = 0
@@ -104,11 +111,20 @@ class SearchCustom(BasicProcessor):
 
                     if not writer:
                         writer = csv.DictWriter(output_csv, fieldnames=list(item.keys()))
-                        header = list(item.keys())
                         writer.writeheader()
 
                     if self.parameters.get("strip_html") and "body" in item:
                         item["body"] = strip_tags(item["body"])
+
+                    # pseudonymise or anonymise as needed
+                    filtering = self.parameters.get("pseudonymise")
+                    if filtering:
+                        for field, value in item.items():
+                            if field.startswith("author"):
+                                if filtering == "anonymise":
+                                    item[field] = "REDACTED"
+                                elif filtering == "pseudonymise":
+                                    item[field] = hash_cache.update_cache(value)
 
                     try:
                         writer.writerow(item)
@@ -119,7 +135,8 @@ class SearchCustom(BasicProcessor):
                     done += 1
 
             except import_formats.InvalidCustomFormat as e:
-                self.log.warning(f"Unable to import invalid formatted file for {tool_format['name']}.")
+                self.log.warning(f"Unable to import improperly formatted file for {tool_format['name']}. See dataset "
+                                 "log for details.")
                 infile.close()
                 temp_file.unlink()
                 return self.dataset.finish_with_error(str(e))

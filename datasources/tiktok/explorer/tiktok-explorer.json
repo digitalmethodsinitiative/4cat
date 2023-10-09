@@ -1,0 +1,45 @@
+{
+	"ndjson": {
+		"tiktok-user": "<a href='https://www.tiktok.com/@{{ author.uniqueId }}' target='__blank'>@{{ author.uniqueId }}</a>",
+		"external_url": "https://www.tiktok.com/@{{ author.uniqueId }}/video/{{ id }}",
+		"body": "<a href='https://www.tiktok.com/@{{ author.uniqueId }}/video/{{ id }}' target='_blank'><img class='preview' src='{{ video.cover }}'></a><br>{{ desc }}",
+		"author": "{{ nickname }}",
+		"created": "{{ createTime | datetime }}",
+		"plays": "<i class='fa-solid fa-play'></i> {{ stats.playCount | numberify }}",
+		"likes": "<i class='fa-solid fa-heart'></i> {{ stats.diggCount | numberify }}",
+		"comments": "<i class='fa-solid fa-comment'></i> {{ stats.commentCount | numberify }}",
+		"shares": "<i class='fa-solid fa-share'></i> {{ stats.shareCount | numberify }}",
+		
+		"sort_options": [
+			{
+				"key": "createTime",
+				"label": "Old to new"
+			},
+			{
+				"key": "createTime",
+				"label": "New to old",
+				"descending": true
+			},
+			{
+				"key": "stats.playCount",
+				"label": "Plays",
+				"descending": true
+			},
+			{
+				"key": "stats.diggCount",
+				"label": "Likes",
+				"descending": true
+			},
+			{
+				"key": "stats.commentCount",
+				"label": "Comments",
+				"descending": true
+			},
+			{
+				"key": "stats.shareCount",
+				"label": "Shares",
+				"descending": true
+			}
+		]		
+	}
+}

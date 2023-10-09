@@ -4,15 +4,13 @@ Database wrapper
 import itertools
 import psycopg2.extras
 import psycopg2
+import logging
 import time
 
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 
 from common.lib.exceptions import DatabaseQueryInterruptedException
-
-
-import common.config_manager as config
 
 class Database:
 	"""
@@ -42,21 +40,14 @@ class Database:
 		:param port:  Database port
 		:param appname:  App name, mostly useful to trace connections in pg_stat_activity
 		"""
-		dbname = config.get('DB_NAME') if not dbname else dbname
-		user = config.get('DB_USER') if not user else user
-		password = config.get('DB_PASSWORD') if not password else password
-		host = config.get('DB_HOST') if not host else host
-		port = config.get('DB_PORT') if not port else port
-
 		self.appname = "4CAT" if not appname else "4CAT-%s" % appname
 
 		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=self.appname)
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 
-
 		if self.log is None:
-			raise NotImplementedError
+			self.log = logging
 
 		self.commit()
 

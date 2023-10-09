@@ -3,18 +3,16 @@ Request image text detection from DMI OCR server
 
 The DMI OCR Server can be downloaded seperately here:
 https://github.com/digitalmethodsinitiative/ocr_server#readme
-
-Note: if using a Docker hosted OCR Server, the setting in 4CAT Settings for
-URL to the OCR server should be "http://host.docker.internal:4000" (or whatever
-port you chose).
+and is run using the DMI Service Manager
 """
 import requests
 import json
 import os
 
-import common.config_manager as config
+from common.config_manager import config
+from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 
 __author__ = "Dale Wahl"
@@ -49,19 +47,23 @@ class ImageTextDetector(BasicProcessor):
     ]
 
     config = {
-        "text_from_images.DMI_OCR_SERVER": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": 'URL to the OCR server',
-            "tooltip": "URL to the API endpoint of a version of the DMI OCR server (more info at https://github.com/digitalmethodsinitiative/ocr_server)",
-        }
+        "dmi-service-manager.ea_ocr-intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "OCR (optical character recognition) allows text in images to be identified and extracted. Use our [prebuilt OCR image](https://github.com/digitalmethodsinitiative/ocr_server) with different available models.",
+        },
+        "dmi-service-manager.eb_ocr_enabled": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Enable OCR processor",
+        },
     }
 
     options = {
         "amount": {
             "type": UserInput.OPTION_TEXT,
             "help": "Images to process (0 = all)",
-            "default": 0
+            "default": 0,
+            "coerce_type": int,
         },
         "model_type": {
             "type": UserInput.OPTION_CHOICE,
@@ -81,13 +83,15 @@ class ImageTextDetector(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on image sets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader") and config.get('text_from_images.DMI_OCR_SERVER', False)
+        return config.get('dmi-service-manager.eb_ocr_enabled', False, user=user) and \
+               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+               module.type.startswith("image-downloader")
 
     def process(self):
         """
@@ -95,68 +99,115 @@ class ImageTextDetector(BasicProcessor):
         following structure:
 
         """
-        max_images = convert_to_int(self.parameters.get("amount", 0), 100)
-        total = self.source_dataset.num_rows if not max_images else min(max_images, self.source_dataset.num_rows)
-        done = 0
+        if self.source_dataset.num_rows == 0:
+            self.dataset.finish_with_error("No images available.")
+            return
+
+        # Unpack the images into a staging_area
+        self.dataset.update_status("Unzipping images")
+        staging_area = self.unpack_archive_contents(self.source_file)
+
+        # Collect filenames (skip .json metadata files)
+        image_filenames = [filename for filename in os.listdir(staging_area) if
+                           filename.split('.')[-1] not in ["json", "log"]]
+        if int(self.parameters.get("amount", 100)) != 0:
+            image_filenames = image_filenames[:int(self.parameters.get("amount", 100))]
+        total_image_files = len(image_filenames)
+
+        # Make output dir
+        output_dir = self.dataset.get_staging_area()
+
+        # Initialize DMI Service Manager
+        dmi_service_manager = DmiServiceManager(processor=self)
+
+        # Results should be unique to this dataset
+        server_results_folder_name = f"4cat_results_{self.dataset.key}"
+        # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
+        file_collection_name = dmi_service_manager.get_folder_name(self.source_dataset)
+
+        # Process the image files (upload to server if needed)
+        path_to_files, path_to_results = dmi_service_manager.process_files(input_file_dir=staging_area,
+                                                                           filenames=image_filenames,
+                                                                           output_file_dir=output_dir,
+                                                                           server_file_collection_name=file_collection_name,
+                                                                           server_results_folder_name=server_results_folder_name)
+
+        # Arguments for the OCR server
+        data = {'args': ['--model', self.parameters.get("model_type"),
+                         '--output_dir', f"data/{path_to_results}",
+                         '--images']}
+        data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
+
+        # Send request to DMI Service Manager
+        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        api_endpoint = "ocr"
+        try:
+            dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30,
+                                                                  check_process=True)
+        except DsmOutOfMemory:
+            self.dataset.finish_with_error(
+                "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
+            return
+        except DmiServiceManagerException as e:
+            self.dataset.finish_with_error(str(e))
+            return
+
+        self.dataset.update_status("Processing OCR results...")
+        # Download the result files if necessary
+        dmi_service_manager.process_results(output_dir)
+
+        # Load the metadata from the archive
+        image_metadata = {}
+        with open(os.path.join(staging_area, '.metadata.json')) as file:
+            image_data = json.load(file)
+            for url, data in image_data.items():
+                if data.get('success'):
+                    data.update({"url": url})
+                    image_metadata[data['filename']] = data
 
         # Check if we need to collect data for updating the original dataset
         update_original = self.parameters.get("update_original", False)
         if update_original:
-            # We need to unpack the archive to get the metadata
-            # If we use the file from iterate_archive_contents() we may not have the metadata for the first few files
-            staging_area = self.unpack_archive_contents(self.source_file)
-            # Load the metadata from the archive
-            with open(os.path.join(staging_area, '.metadata.json')) as file:
-                image_data = json.load(file)
-                filename_to_post_id = {}
-                for url, data in image_data.items():
-                    if data.get('success'):
-                        filename_to_post_id[data.get('filename')] = data.get('post_ids')
-                del image_data
-
-            # And something to store the results
+            filename_to_post_id = {}
+            for url, data in image_data.items():
+                if data.get('success'):
+                    filename_to_post_id[data.get('filename')] = data.get('post_ids')
             post_id_to_results = {}
-        else:
-            staging_area = None
 
-        for image_file in self.iterate_archive_contents(self.source_file, staging_area=staging_area):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
+        # Save files as NDJSON, then use map_item for 4CAT to interact
+        processed = 0
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+            for result_filename in os.listdir(output_dir):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while writing results to file")
 
-            if image_file.name == '.metadata.json':
-                continue
+                self.dataset.log(f"Writing {result_filename}...")
+                with open(output_dir.joinpath(result_filename), "r") as result_file:
+                    result_data = json.loads(''.join(result_file))
+                    image_name = result_data.get("filename")
 
-            done += 1
-            self.dataset.update_status("Annotating image %i/%i" % (done, total))
-            self.dataset.update_progress(done / total)
+                    # Collect annotations for updating the original dataset
+                    if update_original:
+                        # Need to include filename as there may be many images to a single post
+                        detected_text = '%s:"""%s"""' % (image_name, result_data.get('simplified_text', {}).get('raw_text', ''))
 
-            annotations = self.annotate_image(image_file)
+                        post_ids = filename_to_post_id[image_name]
+                        for post_id in post_ids:
+                            # Posts can have multiple images
+                            if post_id in post_id_to_results.keys():
+                                post_id_to_results[post_id].append(detected_text)
+                            else:
+                                post_id_to_results[post_id] = [detected_text]
 
-            if not annotations:
-                continue
+                    data = {
+                        "id": image_name,
+                        **result_data,
+                        "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
+                    }
+                    outfile.write(json.dumps(data) + "\n")
 
-            annotations = {"file_name": image_file.name, **annotations}
-
-            # Collect annotations for updating the original dataset
-            if update_original:
-                # Need to include filename as there may be many images to a single post
-                detected_text = '%s:"""%s"""' % (image_file.name, annotations.get('simplified_text', {}).get('raw_text', ''))
-
-                post_ids = filename_to_post_id[image_file.name]
-                for post_id in post_ids:
-                    # Posts can have multiple images
-                    if post_id in post_id_to_results.keys():
-                        post_id_to_results[post_id].append(detected_text)
-                    else:
-                        post_id_to_results[post_id] = [detected_text]
-
-            with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:
-                outfile.write(json.dumps(annotations) + "\n")
-
-            if max_images and done >= max_images:
-                break
-
-        self.dataset.update_status("Annotations retrieved for %i images" % done)
+                    processed += 1
+        self.dataset.update_status("Annotations retrieved for %i images" % processed)
 
         # Update the original dataset with the detected text if requested
         if update_original:
@@ -168,55 +219,18 @@ class ImageTextDetector(BasicProcessor):
                 detected_text_column.append('\n'.join(post_id_to_results.get(post.get('id'), [])))
 
             try:
-                self.add_field_to_parent(field_name='detexted_text',
+                self.add_field_to_parent(field_name='4CAT_detexted_text',
                                          new_data=detected_text_column,
                                          which_parent=self.dataset.top_parent())
             except ProcessorException as e:
                 self.dataset.update_status("Error updating parent dataset: %s" % e)
 
-        self.dataset.finish(done)
-
-    def annotate_image(self, image_file):
-        """
-        Get annotations from the DMI OCR server
-
-        :param Path image_file:  Path to file to annotate
-        :return dict:  Lists of detected features, one key for each feature
-        """
-        server = config.get('text_from_images.DMI_OCR_SERVER', '')
-
-        # Get model_type if available
-        parameters = {}
-        model_type = self.parameters.get("model_type")
-        if model_type:
-            parameters['model_type'] = model_type
-
-        if not server:
-            raise ProcessorException('DMI OCR server not configured')
-
-        with image_file.open("rb") as infile:
-            try:
-                api_request = requests.post(server.rstrip('/') + '/api/detect_text', files={'image': infile}, data=parameters, timeout=30)
-            except requests.exceptions.ConnectionError as e:
-                message = f"Unable to establish connection to OCR server {e}. 4CAT admins notified; your processor will continue when issue is resolved."
-                self.dataset.update_status(message)
-                raise ProcessorException(message)
-
-        if api_request.status_code != 200:
-            self.dataset.update_status("Got response code %i from DMI OCR server for image %s: %s" % (api_request.status_code, image_file.name, api_request.content))
-            return None
-
-        try:
-            response = api_request.json()
-        except (json.JSONDecodeError, KeyError):
-            self.dataset.update_status("Got an improperly formatted response from DMI OCR server for image %s, skipping" % image_file.name)
-            return None
-
-        return response
+        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images")
+        self.dataset.finish(processed)
 
     @staticmethod
     def map_item(item):
         """
         For preview frontend
         """
-        return {'filename': item.get('filename'), 'text':item.get('simplified_text').get('raw_text')}
+        return {"filename": item.get("filename"), "model_type": item.get("model_type"), "text": item.get("simplified_text", {}).get("raw_text"), "post_ids": ", ".join([str(post_id) for post_id in item.get("image_metadata", {}).get("post_ids", [])]), "image_url": item.get("image_metadata", {}).get("url")}

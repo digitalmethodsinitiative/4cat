@@ -1,7 +1,8 @@
-{% extends "layout.html" %}
+{% extends "controlpanel/layout.html" %}
 
 {% block title %}Restart/Upgrade 4CAT{% endblock %}
 {% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "restart" %}{% endblock %}
 
 {% block body %}
     <article class="small">
@@ -21,8 +22,8 @@
                 relevant upgrade scripts will be run with default settings.</p>
 
             <p>Restarting is relatively safe, upgrading always has a risk of breaking things. The web interface may be
-                unresponsive during the process. Do not refresh the page until it is finished. This may take op to ten
-                minutes.</p>
+                unresponsive during the process. Do not refresh the page until it is finished. This may take a while.
+                <strong>We recommend making a backup before upgrading.</strong></p>
 
             <p>Don't upgrade on Friday afternoons :-)</p>
 
@@ -32,7 +33,7 @@
             <p>{% if in_progress %}
                     A restart or upgrade is currently in progress.
                 {% elif can_upgrade %}
-                    You can upgrade 4CAT.
+                    You can upgrade 4CAT{% if release_notes %}. Make sure to read the <a href="{{ release_notes }}">release notes</a> before you do{% endif %}.
                 {% else %}
                     No upgrades are currently available.
                 {% endif %}</p>

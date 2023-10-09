@@ -1,9 +1,8 @@
 """
 Generate co-tag network of co-occurring (hash)tags in items
 """
-import csv
 
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -34,19 +33,15 @@ class CoTaggerPreset(ProcessorPreset):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on datasets containing a tags column
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         usable_columns = {"tags", "hashtags", "groups"}
-
-        if module.is_dataset():
-            columns = module.get_columns()
-            return bool(set(columns) & usable_columns) if columns else False
-        else:
-            return False
+        columns = module.get_columns()
+        return bool(set(columns) & usable_columns) if columns else False
 
     def get_processor_pipeline(self):
         """

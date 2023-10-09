@@ -8,12 +8,12 @@ import json
 import re
 import io
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
+from common.config_manager import config
 
-import common.config_manager as config
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
 
 
@@ -26,6 +26,7 @@ class SearchWithinTCATBins(Search):
     """
     type = "dmi-tcat-search"  # job ID
     extension = "ndjson"
+    title = "TCAT Search (HTTP)"
 
     # TCAT has a few fields that do not exist in APIv2
     additional_TCAT_fields = ["to_user_name", "filter_level", "favorite_count", "truncated", "from_user_favourites_count", "from_user_lang", "from_user_utcoffset",
@@ -119,12 +120,12 @@ class SearchWithinTCATBins(Search):
     }
 
     config = {
-        "dmi-tcat.instances": {
+        "dmi-tcat-search.instances": {
             "type": UserInput.OPTION_TEXT_JSON,
             "help": "DMI-TCAT instances",
             "tooltip": 'List of DMI-TCAT instance URLs, e.g. ["http://username:password@tcat.instance.webpage.net"]. '
                        'This  needs to be formatted as a JSON list of strings.',
-            "default": ''
+            "default": {}
         }
     }
 
@@ -138,7 +139,7 @@ class SearchWithinTCATBins(Search):
         """
         Requests bin information from TCAT instances
         """
-        instances = config.get("dmi-tcat.instances", [])
+        instances = config.get("dmi-tcat-search.instances", [])
         for instance in instances:
             # query each configured TCAT instance for a list of bins that can
             # be subsetted
@@ -155,7 +156,8 @@ class SearchWithinTCATBins(Search):
                 except (requests.RequestException, json.JSONDecodeError):
                     cls.bin_data["all_bins"][instance] = {"failed": True}
                     # TODO: No logger here as nothing has been initialized
-                    print(f"WARNING, unable to collect TCAT bins from instance {instance}")
+                    # print(f"WARNING, unable to collect TCAT bins from instance {instance}")
+                    pass
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -214,7 +216,7 @@ class SearchWithinTCATBins(Search):
         # instance URL again here
         # while the parameter could be marked 'sensitive', the values would
         # still show up in e.g. the HTML of the 'create dataset' form
-        available_instances = config.get("dmi-tcat.instances", [])
+        available_instances = config.get("dmi-tcat-search.instances", [])
         instance_url = ""
         instance = None
         for available_instance in available_instances:

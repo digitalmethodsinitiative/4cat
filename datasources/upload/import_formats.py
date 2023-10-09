@@ -88,7 +88,10 @@ def import_crowdtangle_facebook(reader, columns, dataset, parameters):
     overperforming_column = None
     for item in reader:
         hashtags = hashtag.findall(item["Message"])
-        date = datetime.datetime.strptime(" ".join(item["Post Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
+        try:
+            date = datetime.datetime.strptime(" ".join(item["Post Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            yield InvalidImportedItem(reason=f"Cannot parse date/time '{item['Post Created']}'; skipping post")
 
         is_from_elsewhere = item["Link"].find("https://www.facebook.com/" + item["User Name"]) < 0
         shared_page = item["Link"].split("/")[3] if is_from_elsewhere and item["Link"].find(
@@ -280,7 +283,7 @@ def import_bzy_weibo(reader, columns, dataset, parameter):
             raise InvalidCustomFormat("CSV does not appear to be Bazhuayu format for Sina Weibo; please try importing again with CSV format set to \"Custom/other\".")
         raw_timestamp = item["from1"].strip()
         timestamp_bits = re.split(r"[年月日\s:]+", raw_timestamp)
-        print(timestamp_bits)
+
         if re.match(r"[0-9]{2}月[0-9]{2}日 [0-9]{2}:[0-9]{2}", raw_timestamp):
             timestamp = datetime.datetime(year, int(timestamp_bits[0]), int(timestamp_bits[1]), int(timestamp_bits[2]),
                                           int(timestamp_bits[3]))

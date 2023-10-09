@@ -14,9 +14,9 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 
 from common.lib.helpers import UserInput, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
+from common.config_manager import config
 
-import common.config_manager as config
 __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = ["Stijn Peeters", "Sal Hagen"]
@@ -43,103 +43,136 @@ class Tokenise(BasicProcessor):
 			"[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
 	]
 
-	options = {
-		"columns": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Column(s) to tokenise",
-			"default": "body",
-			"tooltip": "Each enabled column will be treated as a separate item to tokenise."
-		},
-		"docs_per": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "thread": "Thread"},
-			"help": "Produce documents per"
-		},
-		"tokenizer_type": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "twitter",
-			"options": {
-				"twitter": "nltk TweetTokenizer",
-				"regular": "nltk word_tokenize",
-				"jieba-cut": "jieba (for Chinese text; accurate mode)",
-				"jieba-cut-all": "jieba (for Chinese text; full mode)",
-				"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+		Allow CSV and NDJSON datasets
+		"""
+		return module.get_extension() in ("csv", "ndjson")
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = {
+			"columns": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Column(s) to tokenise",
+				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
 			},
-			"help": "Tokeniser",
-			"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
-		},
-		"language": {
-			"type": UserInput.OPTION_CHOICE,
-			"options": {
-				**{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
-				"other": "Other (language-specific options such as stemming, lemmatizing and sentence splitting will "
-						 "have no effect)"
+			"docs_per": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "all",
+				"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "thread": "Thread"},
+				"help": "Produce documents per"
 			},
-			"default": "english",
-			"help": "Language"
-		},
-		"grouping-per": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "item",
-			"help": "Group tokens per",
-			"options": {
-				"item": "Item",
-				"sentence": "Sentence in item"
+			"tokenizer_type": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "twitter",
+				"options": {
+					"twitter": "nltk TweetTokenizer",
+					"regular": "nltk word_tokenize",
+					"jieba-cut": "jieba (for Chinese text; accurate mode)",
+					"jieba-cut-all": "jieba (for Chinese text; full mode)",
+					"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+				},
+				"help": "Tokeniser",
+				"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
 			},
-			"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'item'."
-		},
-		"stem": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Stem tokens (with SnowballStemmer)",
-			"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', etc."
-		},
-		"lemmatise": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Lemmatise tokens (English only)",
-			"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', 'bicycles' " \
-					   " becomes 'bicycle', 'better' becomes 'good'."
-		},
-		"accept_words": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Always allow these words",
-			"tooltip": "These won't be deleted as stop words. Also won't be stemmed or lemmatised. Separate with commas."
-		},
-		"reject_words": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Always delete these words",
-			"tooltip": "These will be deleted from the corpus. Also won't be stemmed or lemmatised. Separate with commas."
-		},
-		"filter": {
-			"type": UserInput.OPTION_MULTI,
-			"default": [],
-			"options": {
-				#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
-				"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
-				"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
-				"stopwords-iso-zh": "Chinese stopwords (stopwords-iso)",
-				"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
-				#"wordlist-infochimps-english": "English word list (infochimps)",
-				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
-				"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. Warning: computationally heavy)",
-				"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
-				#"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
+			"language": {
+				"type": UserInput.OPTION_CHOICE,
+				"options": {
+					**{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+					"other": "Other (language-specific options such as stemming, lemmatizing and sentence splitting will "
+							 "have no effect)"
+				},
+				"default": "english",
+				"help": "Language"
 			},
-			"help": "Word lists to exclude",
-			"tooltip": "See the references for information per word list. It is highly recommended to exclude stop words. " \
-					   "Choosing more word lists increases processing time."
-		},
-		"only_unique": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Only keep unique words per item",
-			"tooltip": "Can be useful to filter out spam."
+			"grouping-per": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "item",
+				"help": "Group tokens per",
+				"options": {
+					"item": "Item",
+					"sentence": "Sentence in item"
+				},
+				"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'item'."
+			},
+			"stem": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Stem tokens (with SnowballStemmer)",
+				"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', etc."
+			},
+			"lemmatise": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Lemmatise tokens (English only)",
+				"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', 'bicycles' " \
+						   " becomes 'bicycle', 'better' becomes 'good'."
+			},
+			"accept_words": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "",
+				"help": "Always allow these words",
+				"tooltip": "These won't be deleted as stop words. Also won't be stemmed or lemmatised. Separate with commas."
+			},
+			"reject_words": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "",
+				"help": "Always delete these words",
+				"tooltip": "These will be deleted from the corpus. Also won't be stemmed or lemmatised. Separate with commas."
+			},
+			"filter": {
+				"type": UserInput.OPTION_MULTI,
+				"default": [],
+				"options": {
+					#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
+					"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
+					"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
+					"stopwords-iso-zh": "Chinese stopwords (stopwords-iso)",
+					"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
+					#"wordlist-infochimps-english": "English word list (infochimps)",
+					"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
+					"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. Warning: computationally heavy)",
+					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
+					#"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
+				},
+				"help": "Word lists to exclude",
+				"tooltip": "See the references for information per word list. It is highly recommended to exclude stop words. " \
+						   "Choosing more word lists increases processing time."
+			},
+			"only_unique": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Only keep unique words per item",
+				"tooltip": "Can be useful to filter out spam."
+			}
 		}
-	}
+
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI
+			options["columns"]["inline"] = True
+			options["columns"]["options"] = {v: v for v in columns}
+			default_options = [default for default in ["body", "text", "subject"] if default in columns]
+			if default_options:
+				options["columns"]["default"] = default_options.pop(0)
+
+		return options
 
 	def process(self):
 		"""
@@ -173,6 +206,11 @@ class Tokenise(BasicProcessor):
 		The result is valid JSON, written in chunks.
 		"""
 		columns = self.parameters.get("columns")
+		if not columns:
+			self.dataset.update_status("No columns selected, aborting.", is_final=True)
+			self.dataset.update_status(0)
+			return
+
 		if type(columns) is not list:
 			columns = [columns]
 
@@ -390,31 +428,3 @@ class Tokenise(BasicProcessor):
 
 		# create zip of archive and delete temporary files and folder
 		self.write_archive_and_finish(staging_area)
-
-
-	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Get processor options
-
-		This method by default returns the class's "options" attribute, or an
-		empty dictionary. It can be redefined by processors that need more
-		fine-grained options, e.g. in cases where the availability of options
-		is partially determined by the parent dataset's parameters.
-
-		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
-		"""
-		options = cls.options
-
-		if parent_dataset and parent_dataset.get_columns():
-			columns = parent_dataset.get_columns()
-			options["columns"]["type"] = UserInput.OPTION_MULTI
-			options["columns"]["inline"] = True
-			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = ["body"]
-
-		return options

@@ -2,7 +2,6 @@
 Log handler
 """
 import traceback
-import importlib
 import platform
 import logging
 import time
@@ -13,7 +12,7 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler, HTTPHandler
 from importlib.machinery import SourceFileLoader
 
-import common.config_manager as config
+from common.config_manager import config
 
 
 class WebHookLogHandler(HTTPHandler):
@@ -204,10 +203,14 @@ class Logger:
 
         # the slack webhook has its own handler, and is only active if the
         # webhook URL is set
-        if config.get("logging.slack.webhook"):
-            slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
-            slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
-            self.logger.addHandler(slack_handler)
+        try:
+            if config.get("logging.slack.webhook"):
+                slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
+                slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
+                self.logger.addHandler(slack_handler)
+        except Exception:
+            # we *may* need the logger before the database is in working order
+            config.db.rollback()
 
     def log(self, message, level=logging.INFO, frame=None):
         """

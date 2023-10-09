@@ -3,8 +3,8 @@ Extracts topics per model and top associated words
 """
 
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import ProcessorInterruptedException
 
 import csv
 import json
@@ -71,11 +71,11 @@ class TopicModelWordExtractor(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on topic models
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "topic-modeller"
 
@@ -141,11 +141,11 @@ class TopicModelWordExtractor(BasicProcessor):
                     raise ProcessorInterruptedException("Interrupted while writing results file")
 
                 # Grab metadata related to post
-                token_data = token_metadata[post.get('id')]
+                token_data = token_metadata[str(post.get('id'))]
                 model_data = model_metadata[token_data.get('filename')]
                 interval = token_data['interval']
 
-                combined_data = {'post_id':post.get('id'), 'interval':interval}
+                combined_data = {'post_id': str(post.get('id')), 'interval':interval}
                 # Add original post data
                 for post_column in post_column_names:
                     combined_data[post_column] = post.get(post_column)
@@ -160,7 +160,7 @@ class TopicModelWordExtractor(BasicProcessor):
 
                 # Collect predictions for post
                 for document_number in token_data['document_numbers']:
-                    combined_data['id'] = post.get('id') + '-' + str(document_number)
+                    combined_data['id'] = str(post.get('id')) + '-' + str(document_number)
                     combined_data['document_id'] = document_number
 
                     # Add specific document resulting in prediction if unclear (i.e. multiple documents per item/post)

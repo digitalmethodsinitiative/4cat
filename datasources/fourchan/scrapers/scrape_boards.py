@@ -4,7 +4,7 @@
 
 import json
 
-from backend.abstract.scraper import BasicJSONScraper
+from backend.lib.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 
 
@@ -15,7 +15,7 @@ class BoardScraper4chan(BasicJSONScraper):
 	The threads found aren't saved themselves, but new jobs are created to scrape the
 	individual threads so post data can be saved
 	"""
-	type = "4chan-board"
+	type = "fourchan-board"
 	max_workers = 2  # should probably be equivalent to the amount of boards to scrape
 
 	required_fields = ["no", "last_modified"]
@@ -85,7 +85,7 @@ class BoardScraper4chan(BasicJSONScraper):
 
 		# schedule a job for scraping the thread's posts
 		try:
-			jobtype = self.prefix + "-thread"
+			jobtype = self.type.replace("-board", "-thread")
 			self.queue.add_job(jobtype=jobtype, remote_id=thread["no"], details={"board": board_id})
 		except JobAlreadyExistsException:
 			# this might happen if the workers can't keep up with the queue
@@ -101,7 +101,7 @@ class BoardScraper4chan(BasicJSONScraper):
 			self.db.insert("threads_" + self.prefix, thread_data)
 
 		replacements = [self.init_time, thread.get("last_modified", 0)]
-		if "4chan" in self.type:
+		if "fourchan" in self.type:
 			# update timestamps and position, but only for 4chan
 			# other chans have different strategies and often have "infinite"
 			# threads which would rapidly bloat the database with an infinite
@@ -147,7 +147,7 @@ class BoardScraper4chan(BasicJSONScraper):
 				# which also updates its deleted/archived status 
 				try:
 					# Add a new thread job if it isn't in the jobs table anymore
-					jobtype = self.prefix + "-thread"
+					jobtype = self.type.replace("-board", "-thread")
 					query = "SELECT remote_id FROM jobs WHERE remote_id = '%s' AND details = '%s';" % (str(thread["id"]), json.dumps({"board": board_id}))
 					remote_id = self.db.fetchone(query)
 					

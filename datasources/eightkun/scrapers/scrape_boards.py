@@ -11,7 +11,7 @@ class BoardScraper8kun(BoardScraper4chan):
 	8kun's API is compatible with 4chan's, so we extend the 4chan board scraper to
 	work with the 8kun API instead
 	"""
-	type = "8kun-board"
+	type = "eightkun-board"
 	datasource = "8kun"
 	max_workers = 4
 	log_level="info"

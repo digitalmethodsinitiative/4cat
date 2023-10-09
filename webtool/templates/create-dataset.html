@@ -2,6 +2,7 @@
 
 {% block title %}Create dataset{% endblock %}
 {% block body_class %}plain-page frontpage {% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "create-dataset" %}{% endblock %}
 
 {% block body %}
     <article class="with-aside">
@@ -12,23 +13,21 @@
 
             <form id="query-form" action="{{ url_for('queue_dataset') }}" method="POST" enctype="multipart/form-data">
                 <fieldset class="datasource-form">
-                    <p><br>Please be considerate of other users; {{ __tool_name }} is a shared resource and large dataset queries may
+                    <p><br>Please be considerate of other users; {{ __user_config("4cat.name") }} is a shared resource and large dataset queries may
                         prevent others from using it if they take a very long time to complete. We recommend to start
                         with smaller date ranges and specific queries and then cast a wider net if needed.</p>
-                {%  if __expire_datasets %}
-                    <p>Note that datasets will be deleted automatically after {{ __expire_datasets|timify_long }}.
-                        {% if __expire_optout %} You can choose to keep the dataset for longer from the result
-                            page.{% endif %}</p>
-                {% endif %}
+
                     <div class="form-element">
                         <label for="datasource-select">Data source:</label>
                         <div>
-                            <select name="datasource" id="datasource-select" aria-label="Data sources">
-                            {% include 'components/datasource-select.html' %}
-                            </select>
-                            <div class="data-overview-link"><a href="{{ url_for('data_overview') }}{{ datasource }}">How is this data collected?</a></div>
+                            <div class="datasource-explain-wrap">
+                                <select name="datasource" id="datasource-select" aria-label="Data sources">
+                                {% include 'components/datasource-select.html' %}
+                                </select>
+                                <span class="data-overview-link"><a href="{{ url_for('data_overview') }}{{ datasource }}">How is this data collected?</a></span>
+                            </div>
+                            <button class="tooltip-trigger" aria-controls="tooltip-datasource-type" aria-label="Explain datasource type" id="datasource-type-label">Local</button>
                         </div>
-                        <button class="tooltip-trigger" aria-controls="tooltip-datasource-type" aria-label="Explain datasource type" id="datasource-type-label">Local</button>
                     </div>
                 </fieldset>
 
@@ -37,22 +36,28 @@
                 </div>
 
                 <div id="data-options">
-                    <p class="form-intro">4CAT can replace author names with their <a href="https://techterms.com/definition/hash">hashed</a> value. Other personal
-                        information may persist; it is your responsibility to further anonymise data where
+                    <p class="form-intro">4CAT can remove information it identifies as relating to an item's author, or
+                        replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value. Other
+                        personal information may persist; it is your responsibility to further anonymise data where
                         appropriate.</p>
                     <div class="form-element">
                         <label for="data-pseudonymise">Pseudonymise:</label>
                         <div class="filter-parameters">
-                            <label><input type="checkbox" checked="checked" name="pseudonymise" id="data-pseudonymise"> Replace author names with hashed values</label>
+                            <select name="pseudonymise" id="data-pseudonymise">
+                                <option value="anonymise">Replace author information with 'REDACTED'</option>
+                                <option value="pseudonymise" selected="selected">Replace author information with hashed values</option>
+                                <option value="none">Leave author information as-is</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-element">
                         <label for="data-make-private">Make private:</label>
                         <div class="filter-parameters">
                             <label><input type="checkbox" name="make-private" id="data-make-private" checked="checked"> Make dataset private</label>
+                            <button class="tooltip-trigger" aria-controls="tooltip-dataset-private" aria-label="Extended help for option">?</button>
                         </div>
 
-                        <button class="tooltip-trigger" aria-controls="tooltip-dataset-private" aria-label="Extended help for option">?</button>
+
                         <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and server administrators will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
                     </div>
                     <div class="form-element">

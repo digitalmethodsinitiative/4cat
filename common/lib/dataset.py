@@ -1,4 +1,5 @@
 import collections
+import itertools
 import datetime
 import hashlib
 import fnmatch
@@ -10,10 +11,10 @@ import re
 
 from pathlib import Path
 
-import common.config_manager as config
 import backend
+from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
+from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -41,13 +42,16 @@ class DataSet(FourcatModule):
 	preset_parent = None
 	parameters = {}
 
+	owners = None
+	tagged_owners = None
+
 	db = None
 	folder = None
 	is_new = True
 	no_status_updates = False
 	staging_areas = None
 
-	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension=None,
+	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent='', extension=None,
 				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
@@ -98,15 +102,12 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
-			if config.get('expire.timeout') and not parent:
-				parameters["expires-after"] = int(time.time() + config.get('expire.timeout'))
-
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
-				"owner": owner,
 				"parameters": json.dumps(parameters),
 				"result_file": "",
+				"creator": owner,
 				"status": "",
 				"type": type,
 				"timestamp": int(time.time()),
@@ -121,12 +122,14 @@ class DataSet(FourcatModule):
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
+			self.refresh_owners()
+			self.add_owner(owner)
 
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
 				own_processor = self.get_own_processor()
 				if own_processor:
-					extension = own_processor.get_extension(parent_dataset=parent)
+					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
 				# Still no extension, default to 'csv'
 				if not extension:
 					extension = "csv"
@@ -138,6 +141,8 @@ class DataSet(FourcatModule):
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
 		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
+
+		self.refresh_owners()
 
 	def check_dataset_finished(self):
 		"""
@@ -168,6 +173,16 @@ class DataSet(FourcatModule):
 		:return Path:  A path to the results file
 		"""
 		return self.folder.joinpath(self.data["result_file"])
+
+	def get_results_folder_path(self):
+		"""
+		Get path to folder containing accompanying results
+
+		Returns a path that may not yet be created
+
+		:return Path:  A path to the results file
+		"""
+		return self.folder.joinpath("folder_" + self.key)
 
 	def get_log_path(self):
 		"""
@@ -498,6 +513,9 @@ class DataSet(FourcatModule):
 		if self.is_finished():
 			copy.finish(self.num_rows)
 
+		# make sure ownership is also copied
+		copy.copy_ownership_from(self)
+
 		return copy
 
 	def delete(self, commit=True):
@@ -521,10 +539,16 @@ class DataSet(FourcatModule):
 
 		# delete from database
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
+		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
+		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
 		# delete from drive
 		try:
 			self.get_results_path().unlink()
+			if self.get_results_path().with_suffix(".log").exists():
+				self.get_results_path().with_suffix(".log").unlink()
+			if self.get_results_folder_path().exists():
+				shutil.rmtree(self.get_results_folder_path())
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
@@ -581,6 +605,179 @@ class DataSet(FourcatModule):
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
 				return False
+
+	def is_accessible_by(self, username, role="owner"):
+		"""
+		Check if dataset has given user as owner
+
+		:param str|User username: Username to check for
+		:return bool:
+		"""
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
+
+		# 'normal' owners
+		if username in [owner for owner, meta in self.owners.items() if (role is None or meta["role"] == role)]:
+			return True
+
+		# owners that are owner by being part of a tag
+		if username in itertools.chain(*[tagged_owners for tag, tagged_owners in self.tagged_owners.items() if (role is None or self.owners[f"tag:{tag}"]["role"] == role)]):
+			return True
+
+		return False
+
+	def get_owners_users(self, role="owner"):
+		"""
+		Get list of dataset owners
+
+		This returns a list of *users* that are considered owners. Tags are
+		transparently replaced with the users with that tag.
+
+		:param str|None role:  Role to check for. If `None`, all owners are
+		returned regardless of role.
+
+		:return set:  De-duplicated owner list
+		"""
+		# 'normal' owners
+		owners = [owner for owner, meta in self.owners.items() if
+				  (role is None or meta["role"] == role) and not owner.startswith("tag:")]
+
+		# owners that are owner by being part of a tag
+		owners.extend(itertools.chain(*[tagged_owners for tag, tagged_owners in self.tagged_owners.items() if
+									   role is None or self.owners[f"tag:{tag}"]["role"] == role]))
+
+		# de-duplicate before returning
+		return set(owners)
+
+	def get_owners(self, role="owner"):
+		"""
+		Get list of dataset owners
+
+		This returns a list of all owners, and does not transparently resolve
+		tags (like `get_owners_users` does).
+
+		:param str|None role:  Role to check for. If `None`, all owners are
+		returned regardless of role.
+
+		:return set:  De-duplicated owner list
+		"""
+		return [owner for owner, meta in self.owners.items() if (role is None or meta["role"] == role)]
+
+	def add_owner(self, username, role="owner"):
+		"""
+		Set dataset owner
+
+		If the user is already an owner, but with a different role, the role is
+		updated. If the user is already an owner with the same role, nothing happens.
+
+		:param str|User username:  Username to set as owner
+		:param str|None role:  Role to add user with.
+		"""
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
+
+		if username not in self.owners:
+			self.owners[username] = {
+				"name": username,
+				"key": self.key,
+				"role": role
+			}
+			self.db.insert("datasets_owners", data=self.owners[username], safe=True)
+
+		elif username in self.owners and self.owners[username]["role"] != role:
+			self.db.update("datasets_owners", data={"role": role}, where={"name": username, "key": self.key})
+			self.owners[username]["role"] = role
+
+		if username.startswith("tag:"):
+			# this is a bit more complicated than just adding to the list of
+			# owners, so do a full refresh
+			self.refresh_owners()
+
+		# make sure children's owners remain in sync
+		for child in self.children:
+			child.add_owner(username, role)
+			# not recursive, since we're calling it from recursive code!
+			child.copy_ownership_from(self, recursive=False)
+
+	def remove_owner(self, username):
+		"""
+		Remove dataset owner
+
+		If no owner is set, the dataset is assigned to the anonymous user.
+		If the user is not an owner, nothing happens.
+
+		:param str|User username:  Username to set as owner
+		"""
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
+
+		if username in self.owners:
+			del self.owners[username]
+			self.db.delete("datasets_owners", where={"name": username, "key": self.key})
+
+			if not self.owners:
+				self.add_owner("anonymous")
+
+		if username in self.tagged_owners:
+			del self.tagged_owners[username]
+
+		# make sure children's owners remain in sync
+		for child in self.children:
+			child.remove_owner(username)
+			# not recursive, since we're calling it from recursive code!
+			child.copy_ownership_from(self, recursive=False)
+
+	def refresh_owners(self):
+		"""
+		Update internal owner cache
+
+		This makes sure that the list of *users* and *tags* which can access the
+		dataset is up to date.
+		"""
+		self.owners = {owner["name"]: owner for owner in self.db.fetchall("SELECT * FROM datasets_owners WHERE key = %s", (self.key,))}
+
+		# determine which users (if any) are owners of the dataset by having a
+		# tag that is listed as an owner
+		owner_tags = [name[4:] for name in self.owners if name.startswith("tag:")]
+		if owner_tags:
+			tagged_owners = self.db.fetchall("SELECT name, tags FROM users WHERE tags ?| %s ", (owner_tags,))
+			self.tagged_owners = {
+				owner_tag: [user["name"] for user in tagged_owners if owner_tag in user["tags"]]
+				for owner_tag in owner_tags
+			}
+		else:
+			self.tagged_owners = {}
+
+	def copy_ownership_from(self, dataset, recursive=True):
+		"""
+		Copy ownership
+
+		This is useful to e.g. make sure a dataset's ownership stays in sync
+		with its parent
+
+		:param Dataset dataset:  Parent to copy from
+		:return:
+		"""
+		self.db.delete("datasets_owners", where={"key": self.key}, commit=False)
+
+		for role in ("owner", "viewer"):
+			owners = dataset.get_owners(role=role)
+			for owner in owners:
+				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False)
+
+		self.db.commit()
+		if recursive:
+			for child in self.children:
+				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
 		"""
@@ -648,9 +845,11 @@ class DataSet(FourcatModule):
 		"""
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
-
+		
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
+		else:
+			annotation_fields = {}
 
 		return annotation_fields
 
@@ -717,6 +916,8 @@ class DataSet(FourcatModule):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
+		elif "datasource" in parameters and parameters["datasource"] in backend.all_modules.datasources:
+			return backend.all_modules.datasources[parameters["datasource"]]["name"] + " Dataset"
 		else:
 			return default
 
@@ -1066,7 +1267,7 @@ class DataSet(FourcatModule):
 			genealogy.append(self.key)
 			return ",".join(genealogy)
 
-	def get_compatible_processors(self):
+	def get_compatible_processors(self, user=None):
 		"""
 		Get list of processors compatible with this dataset
 
@@ -1074,6 +1275,9 @@ class DataSet(FourcatModule):
 		by the processor, for each known type: if the processor does not
 		specify accepted types (via the `is_compatible_with` method), it is
 		assumed it accepts any top-level datasets
+
+		:param str|User|None user:  User to get compatibility for. If set,
+		use the user-specific config settings where available.
 
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
@@ -1088,7 +1292,7 @@ class DataSet(FourcatModule):
 			# method returns True *or* if it has no explicit compatibility
 			# check and this dataset is top-level (i.e. has no parent)
 			if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
-					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self)):
+					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, user=user)):
 				available[processor_type] = processor
 
 		return available
@@ -1103,7 +1307,7 @@ class DataSet(FourcatModule):
 		return backend.all_modules.processors.get(processor_type)
 
 
-	def get_available_processors(self):
+	def get_available_processors(self, user=None):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1112,12 +1316,15 @@ class DataSet(FourcatModule):
 		run but have options are included so they may be run again with a
 		different configuration
 
+		:param str|User|None user:  User to get compatibility for. If set,
+		use the user-specific config settings where available.
+
 		:return dict:  Available processors, `name => properties` mapping
 		"""
 		if self.available_processors:
 			return self.available_processors
 
-		processors = self.get_compatible_processors()
+		processors = self.get_compatible_processors(user=user)
 
 		for analysis in self.children:
 			if analysis.type not in processors:
@@ -1194,6 +1401,67 @@ class DataSet(FourcatModule):
 		if self.key_parent:
 			return False
 		return True
+
+	def is_expiring(self, user=None):
+		"""
+		Determine if dataset is set to expire
+
+		Similar to `is_expired`, but checks if the dataset will be deleted in
+		the future, not if it should be deleted right now.
+
+		:param user:  User to use for configuration context. Provide to make
+		sure configuration overrides for this user are taken into account.
+		:return bool|int:  `False`, or the expiration date as a Unix timestamp.
+		"""
+		# has someone opted out of deleting this?
+		if self.parameters.get("keep"):
+			return False
+
+		# is this dataset explicitly marked as expiring after a certain time?
+		if self.parameters.get("expires-after"):
+			return self.parameters.get("expires-after")
+
+		# is the data source configured to have its datasets expire?
+		expiration = config.get("datasources.expiration", {}, user=user)
+		if not expiration.get(self.parameters.get("datasource")):
+			return False
+
+		# is there a timeout for this data source?
+		if expiration.get(self.parameters.get("datasource")).get("timeout"):
+			return self.timestamp + expiration.get(self.parameters.get("datasource")).get("timeout")
+
+		return False
+
+	def is_expired(self, user=None):
+		"""
+		Determine if dataset should be deleted
+
+		Datasets can be set to expire, but when they should be deleted depends
+		on a number of factor. This checks them all.
+
+		:param user:  User to use for configuration context. Provide to make
+		sure configuration overrides for this user are taken into account.
+		:return bool:
+		"""
+		# has someone opted out of deleting this?
+		if not self.is_expiring():
+			return False
+
+		# is this dataset explicitly marked as expiring after a certain time?
+		future = time.time() + 3600  # ensure we don't delete datasets with invalid expiration times
+		if self.parameters.get("expires-after") and convert_to_int(self.parameters["expires-after"], future) < time.time():
+			return True
+
+		# is the data source configured to have its datasets expire?
+		expiration = config.get("datasources.expiration", {}, user=user)
+		if not expiration.get(self.parameters.get("datasource")):
+			return False
+
+		# is the dataset older than the set timeout?
+		if expiration.get(self.parameters.get("datasource")).get("timeout"):
+			return self.timestamp + expiration[self.parameters.get("datasource")]["timeout"] < time.time()
+
+		return False
 
 	def is_from_collector(self):
 		"""

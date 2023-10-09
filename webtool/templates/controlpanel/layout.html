@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+
+{% block breadcrumbs %}{% set navigation.current = "control-panel" %}{% endblock %}
+
+{% block subnavigation %}
+<ul>
+    {% if __user_config("privileges.admin.can_restart") %}
+        <li{% if navigation.sub == "restart" %} class="current"{% endif %}><a href="{{ url_for("trigger_restart") }}">Restart or Upgrade</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_manage_settings") %}
+        <li{% if navigation.sub == "config" %} class="current"{% endif %}><a href="{{ url_for("manipulate_settings") }}">Settings</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_manage_users") %}
+        <li{% if navigation.sub == "user" %} class="current"{% endif %}><a href="{{ url_for("list_users") }}">Users</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_manage_tags") %}
+        <li{% if navigation.sub == "tags" %} class="current"{% endif %}><a href="{{ url_for("manipulate_tags") }}">Configuration Tags</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_manage_notifications") %}
+        <li{% if navigation.sub == "notifications" %} class="current"{% endif %}><a href="{{ url_for("manipulate_notifications") }}">Notifications</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_view_status") %}
+        <li{% if navigation.sub == "logs" %} class="current"{% endif %}><a href="{{ url_for("view_logs") }}">View logs</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_manipulate_all_datasets") %}
+        <li{% if navigation.sub == "dataset-bulk" %} class="current"{% endif %}><a href="{{ url_for("dataset_bulk") }}">Dataset bulk management</a></li>{% endif %}
+</ul>
+{% endblock %}

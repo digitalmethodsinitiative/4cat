@@ -4,9 +4,8 @@
 import requests
 import random
 
-from backend.abstract.worker import BasicWorker
-
-import common.config_manager as config
+from backend.lib.worker import BasicWorker
+from common.config_manager import config
 
 class ImageDownloader(BasicWorker):
 	"""
@@ -16,7 +15,7 @@ class ImageDownloader(BasicWorker):
 
 	todo: shrink images or keep archive at a manageable size otherwise
 	"""
-	type = "4chan-image"
+	type = "fourchan-image"
 	pause = 1
 	max_workers = 10
 
