@@ -1310,7 +1310,7 @@ class DataSet(FourcatModule):
 
 		:return int:  Queue position
 		"""
-		if self.is_finished() or not self.data["job"]:
+		if self.is_finished() or not self.data.get("job"):
 			self.queue_position = -1
 			return
 		else:
