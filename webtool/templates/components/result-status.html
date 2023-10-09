@@ -16,7 +16,7 @@
         <i class="fa fa-check" aria-hidden="true"></i>
     {% endif %}
 {% endif %}
-{% if dataset.queue_position < 0 %}
+{% if dataset.queue_position <= 0 %}
 {% if dataset.get_status() %}
     {{ dataset.get_status() }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
 {% endif %}
