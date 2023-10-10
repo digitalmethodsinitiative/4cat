@@ -140,8 +140,14 @@ def upgrade_frontend():
     log_stream.flush()
     upgrade_ok = False
 
-    command = sys.executable + " helper-scripts/migrate.py --component frontend --release --repository %s --yes --current-version %s" % (
+    command = sys.executable + " helper-scripts/migrate.py --component frontend --repository %s --yes --current-version %s" % (
         shlex.quote(config.get("4cat.github_url")), shlex.quote(str(frontend_version_file)))
+
+    # there should be one and only one job of this type, with the parameters of
+    # our upgrade. it determines if we update to the latest release or to a
+    # branch
+    upgrade_job = queue.get_job("restart-4cat")
+    command += " --release" if not upgrade_job.details.get("branch") else f" --branch {upgrade_job.details['branch']}"
 
     try:
         response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
