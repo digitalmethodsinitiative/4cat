@@ -887,7 +887,7 @@ def dataset_bulk():
                 incomplete.append("bulk-owner")
 
             if not bulk_owner.startswith("tag:"):
-                users = db.fetchall("SELECT name AS num FROM users WHERE name LIKE %s", (bulk_owner,))
+                users = db.fetchall("SELECT name FROM users WHERE name LIKE %s", (bulk_owner,))
                 if not users:
                     flash("No users match that username")
                     incomplete.append("bulk-owner")
