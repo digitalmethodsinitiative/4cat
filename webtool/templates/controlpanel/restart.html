@@ -38,16 +38,22 @@
                     No upgrades are currently available.
                 {% endif %}</p>
 
-            <form action="{{ url_for("trigger_restart") }}" method="POST" class="button-container">
-                <button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>
-                    <i class="fa fa-power-off" aria-hidden="true"></i> Restart
-                </button>
+            <form action="{{ url_for("trigger_restart") }}" method="POST">
+            <ul class="button-container">
+                <li><button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>
+                    <i class="fa fa-power-off" aria-hidden="true"></i> Restart back-end & front-end
+                </button></li>
+
+                <li><button name="action" value="restart-frontend"{% if in_progress %} disabled="disabled"{% endif %} data-url="{{ url_for("trigger_restart_frontend") }}">
+                    <i class="fa fa-power-off" aria-hidden="true"></i> Restart front-end only
+                </button></li>
 
                 {% if can_upgrade %}
-                    <button name="action" value="upgrade"{% if in_progress %} disabled="disabled"{% endif %}>
+                    <li><button name="action" value="upgrade"{% if in_progress %} disabled="disabled"{% endif %}>
                         <i class="fa fa-wrench" aria-hidden="true"></i> Upgrade (danger!)
-                    </button>
+                    </button></li>
                 {% endif %}
+            </ul>
             </form>
         </section>
 
