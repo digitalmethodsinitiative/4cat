@@ -168,6 +168,7 @@ def trigger_restart_frontend():
     If restarting is not supported a JSON is returned explaining so. In that
     case the user needs to restart the server in some other way.
     """
+    status = "error"
     def server_killer(pid, sig, touch_path=False):
         """
         Helper function. Gives Flask time to complete the request before
@@ -183,7 +184,9 @@ def trigger_restart_frontend():
         return kill_function
 
     # ensure a restart is in progress and the request is from the backend
-    if not check_restart_request():
+    # alternatively, this can be called directly, but only with the right
+    # privileges
+    if not check_restart_request() and not config.get("privileges.admin.can_restart"):
         return app.login_manager.unauthorized()
 
     # we support restarting with gunicorn and apache/mod_wsgi
@@ -192,17 +195,50 @@ def trigger_restart_frontend():
     # flask additionally lists waitress and uwsgi as standalone wsgi servers
     # we currently do not support these (but they may be easy to add)
     message = ""
-    if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
-        import psutil
 
-        def get_parent_gunicorn_pid():
-            for proc in psutil.process_iter():
-                if "gunicorn" in proc.name() and proc.parent().name() != "gunicorn":
-                    return proc.pid
-        # gunicorn
-        message = "Detected Flask running in Gunicorn, sending SIGUP."
-        kill_thread = threading.Thread(target=server_killer(get_parent_gunicorn_pid(), signal.SIGHUP))
+    # determine if we're in uwsgi
+    # if not in wsgi, importing will always fail!
+    in_uwsgi = False
+    try:
+        import uwsgi
+        in_uwsgi = True
+    except (ModuleNotFoundError, ImportError):
+        pass
+
+    if in_uwsgi:
+        message = "Detected Flask running in uWSGI, sending SIGHUP"
+        kill_thread = threading.Thread(target=server_killer(uwsgi.masterpid(), signal.SIGHUP))
         kill_thread.start()
+
+    elif "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
+        # no easy way to get pid (unless we run gunicorn with a pid file, but
+        # that is not guaranteed)
+        # so traverse up the process tree, from the current process, to the
+        # uppermost process running a "gunicorn" command
+        import psutil
+        process = psutil.Process(os.getpid()).parent()
+        gunicorn_pid = None
+        while process:
+            try:
+                if any([c for c in process.cmdline() if c.endswith("gunicorn")]):
+                    # technically this matches anything ending in "gunicorn",
+                    # also e.g. cmdline params. But should be good enough
+                    # (worst case we send a HUP to the wrong process)
+                    gunicorn_pid = process.pid
+            except psutil.NoSuchProcess:
+                break
+
+            process = process.parent()
+
+        if not gunicorn_pid:
+            message = ("4CAT is running with Gunicorn, but could not find Gunicorn PID. You will need to restart the "
+                       "front-end manually.")
+
+        else:
+            message = "Detected Flask running in Gunicorn, sending SIGHUP."
+            kill_thread = threading.Thread(target=server_killer(gunicorn_pid, signal.SIGHUP))
+            kill_thread.start()
+            status = "OK"
 
     elif os.environ.get("APACHE_PID_FILE", "") != "":
         # apache
@@ -214,13 +250,14 @@ def trigger_restart_frontend():
             message = "Detected Flask running in mod_wsgi as daemon, sending SIGINT."
             kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT, touch=Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")))
             kill_thread.start()
+            status = "OK"
 
     else:
         return jsonify({"status": "error", "message": "4CAT is not hosted with Gunicorn or mod_wsgi. Cannot restart "
                                                       "4CAT's front-end remotely - you have to do so manually."})
 
     # up to whatever called this to monitor for restarting
-    return jsonify({"status": "OK", "message": message})
+    return jsonify({"status": status, "message": message})
 
 
 @app.route("/admin/restart-log/")
