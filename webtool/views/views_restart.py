@@ -73,7 +73,11 @@ def trigger_restart():
     elif request.method == "POST":
         # run upgrade or restart via shell commands
         mode = request.form.get("action")
-        if mode not in ("upgrade", "restart"):
+        allowed_modes = ["upgrade", "restart"]
+        if config.get("privileges.can_upgrade_to_dev"):
+            allowed_modes.append("upgrade-to-branch")
+
+        if mode not in allowed_modes:
             return "Invalid mode", 400
 
         # ensure lockfile exists - will be written to later by worker
@@ -84,19 +88,19 @@ def trigger_restart():
         restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
         with restart_log_file.open("w") as outfile:
             outfile.write(
-                "%s initiated at server timestamp %s\n" % (mode.title(), datetime.datetime.now().strftime("%c")))
-            outfile.write("Telling 4CAT to %s via job queue...\n" % mode)
+                f"{mode.title().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}")
+            outfile.write(f"Telling 4CAT to {mode.replace('-', ' ')} via job queue...\n")
         # this file will be updated when the upgrade runs
         # and it is shared between containers, but we will need to upgrade the
         # front-end separately - so keep a local copy for the latter step
-        if config.get("USING_DOCKER") and mode == "upgrade":
+        if config.get("USING_DOCKER") and mode.startswith("upgrade"):
             frontend_version_file = current_version_file.with_name(".current-version-frontend")
             shutil.copy(current_version_file, frontend_version_file)
 
         # from here on, the back-end takes over
         details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
         queue.add_job("restart-4cat", details, mode)
-        flash("%s initiated. Check process log for progress." % mode.title())
+        flash(f"{mode.title()} initiated. Check process log for progress.")
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
@@ -143,12 +147,12 @@ def upgrade_frontend():
         response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
                                   check=True, cwd=str(config.get("PATH_ROOT")), stdin=subprocess.DEVNULL)
         if response.returncode != 0:
-            raise RuntimeError("Unexpected return code %s" % str(response.returncode))
+            raise RuntimeError(f"Unexpected return code {response.returncode}")
         upgrade_ok = True
 
     except (RuntimeError, subprocess.CalledProcessError) as e:
         # this is bad :(
-        message = "Upgrade unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % e
+        message = f"Upgrade unsuccessful ({e}). Check log files for details. You may need to manually restart 4CAT."
         log_stream.write(message + "\n")
 
     finally:

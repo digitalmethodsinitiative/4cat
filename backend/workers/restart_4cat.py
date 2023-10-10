@@ -75,7 +75,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             if log_file_backend.exists():
                 log_file_backend.unlink()
 
-            if self.job.data["remote_id"] == "upgrade":
+            if self.job.data["remote_id"].startswith("upgrade"):
                 command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart --output %s" % \
                           (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_backend)))
                 if self.job.details and self.job.details.get("branch"):
@@ -99,7 +99,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # when trying to close the stdin file descriptor of the
                 # subprocess (man, that was a fun bug to hunt down)
                 log_stream_backend = log_file_backend.open("a")
-                self.log.info("Running command %s" % command)
+                self.log.info(f"Running command {command}")
                 process = subprocess.Popen(shlex.split(command), cwd=str(config.get("PATH_ROOT")),
                                            stdout=log_stream_backend, stderr=log_stream_backend,
                                            stdin=subprocess.DEVNULL)
@@ -117,7 +117,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 if process.returncode is not None:
                     # if we reach this, 4CAT was never restarted, and so the job failed
                     log_stream_restart.write(
-                        "\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
+                        f"\nUnexpected outcome of restart call ({process.returncode})\n")
 
                     raise RuntimeError()
                 else:
@@ -130,7 +130,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_restart.write(
                     "[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
                     "(see above). You may need to restart 4CAT manually.\n")
-                self.log.error("Error restarting 4CAT. See %s for details." % log_stream_restart.name)
+                self.log.error(f"Error restarting 4CAT. See {log_stream_restart.name} for details.")
                 lock_file.unlink()
                 self.job.finish()
 
@@ -143,7 +143,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             log_stream_restart.write("4CAT restarted.\n")
             with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
-                log_stream_restart.write("4CAT is now running version %s.\n" % infile.readline().strip())
+                log_stream_restart.write(f"4CAT is now running version {infile.readline().strip()}.\n")
 
             if log_file_backend.exists():
                 # copy output of started process to restart log
@@ -157,7 +157,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             api_host = "https://" if config.get("flask.https") else "http://"
             api_host += "4cat_frontend:5000" if config.get("USING_DOCKER") else config.get("flask.server_name")
 
-            if self.job.data["remote_id"] == "upgrade" and config.get("USING_DOCKER"):
+            if self.job.data["remote_id"].startswith("upgrade") and config.get("USING_DOCKER"):
                 # when using Docker, the front-end needs to update separately
                 log_stream_restart.write("Telling front-end Docker container to upgrade...\n")
                 log_stream_restart.close()  # close, because front-end will be writing to it
