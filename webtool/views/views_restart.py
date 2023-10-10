@@ -88,7 +88,7 @@ def trigger_restart():
         restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
         with restart_log_file.open("w") as outfile:
             outfile.write(
-                f"{mode.title().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}")
+                f"{mode.capitalize().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
             outfile.write(f"Telling 4CAT to {mode.replace('-', ' ')} via job queue...\n")
         # this file will be updated when the upgrade runs
         # and it is shared between containers, but we will need to upgrade the
@@ -100,7 +100,7 @@ def trigger_restart():
         # from here on, the back-end takes over
         details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
         queue.add_job("restart-4cat", details, mode)
-        flash(f"{mode.title()} initiated. Check process log for progress.")
+        flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
