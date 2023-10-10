@@ -104,10 +104,30 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                                            stdout=log_stream_backend, stderr=log_stream_backend,
                                            stdin=subprocess.DEVNULL)
 
+                # we can't let the process output to restart.log directly for a
+                # number of reasons
+                # so we have to awkwardly copy one to the other, so that users
+                # watching the front-end interface log panel can see what's
+                # happening.
+                with log_file_backend.open() as infile:
+                    num_lines = len(infile.readlines())
+
                 while not self.interrupted:
                     # basically wait for either the process to quit or 4CAT to
                     # be restarted (hopefully the latter)
                     try:
+                        # copy new lines to overall restart log (see
+                        # above)
+                        with log_file_backend.open() as infile:
+                            current_lines = list(infile.readlines())
+                        if len(current_lines) > num_lines:
+                            with log_file_restart.open("a") as outfile:
+                                for line in current_lines[num_lines:]:
+                                    outfile.write(line)
+                            num_lines = len(current_lines)
+
+                        # now see if the process is finished - if not a
+                        # TimeoutExpired will be raised
                         process.wait(1)
                         log_stream_backend.close()
                         break
@@ -146,10 +166,6 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_restart.write(f"4CAT is now running version {infile.readline().strip()}.\n")
 
             if log_file_backend.exists():
-                # copy output of started process to restart log
-                with log_file_backend.open() as infile:
-                    log_stream_restart.write(infile.read() + "\n")
-
                 log_file_backend.unlink()
 
             # we're gonna use some specific Flask routes to trigger this, i.e.
