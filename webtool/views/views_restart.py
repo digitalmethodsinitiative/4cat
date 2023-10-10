@@ -94,7 +94,8 @@ def trigger_restart():
             shutil.copy(current_version_file, frontend_version_file)
 
         # from here on, the back-end takes over
-        queue.add_job("restart-4cat", {}, mode)
+        details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
+        queue.add_job("restart-4cat", details, mode)
         flash("%s initiated. Check process log for progress." % mode.title())
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),

@@ -76,8 +76,15 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_file_backend.unlink()
 
             if self.job.data["remote_id"] == "upgrade":
-                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart --output %s" % \
+                command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart --output %s" % \
                           (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_backend)))
+                if self.job.details and self.job.details.get("branch"):
+                    # migrate to code in specific branch
+                    command += f" --branch {self.job.details['branch']}"
+                else:
+                    # migrate to latest release
+                    command += " --release"
+
             else:
                 command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 

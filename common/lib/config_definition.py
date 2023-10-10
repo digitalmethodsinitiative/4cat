@@ -136,6 +136,17 @@ config_definition = {
         "help": "Can restart/upgrade",
         "tooltip": "Controls whether users can restart and upgrade 4CAT via the Control Panel"
     },
+    "privileges.can_upgrade_to_dev": {
+        # this is NOT an admin privilege, because all admins automatically
+        # get all admin privileges! users still need the above privilege
+        # to actually use this, anyway
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can upgrade to development branch",
+        "tooltip": "Controls whether users can upgrade 4CAT to a development branch of the code via the Control Panel. "
+                   "This is an easy way to break 4CAT so it is recommended to not enable this unless you're really "
+                   "sure of what you're doing."
+    },
     "privileges.admin.can_manage_tags": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
