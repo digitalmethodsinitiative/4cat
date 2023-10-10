@@ -69,7 +69,9 @@
             </div>
 
             <div class="submit-container">
-                <button class="confirm-first" name="action" value="upgrade-to-branch"><i class="fa fa-explosion"></i> Update to branch</button>
+                <button class="confirm-first" name="action" value="upgrade-to-branch"{% if in_progress %} disabled="disabled"{% endif %}>
+                    <i class="fa fa-explosion"></i> Update to branch
+                </button>
             </div>
         </form>
         {% endif %}
