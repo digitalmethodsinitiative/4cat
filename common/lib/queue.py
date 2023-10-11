@@ -47,6 +47,7 @@ class JobQueue:
 
 		# select the number of jobs of the same type that have been queued for
 		# longer than the job as well
+		replacements = [jobtype]
 		query = (
 			"SELECT main_queue.*, ( " \
 			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
@@ -64,10 +65,12 @@ class JobQueue:
 			"          AND main_queue.timestamp_claimed = 0"
 			"          AND main_queue.timestamp_after < %s"
 			"          AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)")
+			replacements.append(timestamp)
+			replacements.append(timestamp)
 
 		query += "    ORDER BY main_queue.timestamp ASC LIMIT 1;"
 
-		job = self.db.fetchone(query, (jobtype, timestamp, timestamp))
+		job = self.db.fetchone(query, tuple(replacements))
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
