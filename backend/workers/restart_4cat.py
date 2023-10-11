@@ -77,7 +77,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                           (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_restart)))
                 if self.job.details and self.job.details.get("branch"):
                     # migrate to code in specific branch
-                    command += f" --branch {self.job.details['branch']}"
+                    command += f" --branch {shlex.quote(self.job.details['branch'])}"
                 else:
                     # migrate to latest release
                     command += " --release"

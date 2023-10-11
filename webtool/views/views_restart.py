@@ -147,7 +147,7 @@ def upgrade_frontend():
     # our upgrade. it determines if we update to the latest release or to a
     # branch
     upgrade_job = queue.get_job("restart-4cat", restrict_claimable=False)
-    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {upgrade_job.details['branch']}"
+    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {shlex.quote(upgrade_job.details['branch'])}"
 
     try:
         response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
