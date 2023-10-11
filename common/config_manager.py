@@ -1,4 +1,5 @@
 import pickle
+import time
 import json
 
 from pathlib import Path
@@ -59,7 +60,27 @@ class ConfigManager:
         if module_config_path.exists():
             try:
                 with module_config_path.open("rb") as infile:
-                    module_config = pickle.load(infile)
+                    retries = 0
+                    module_config = None
+                    # if 4CAT is being run in two different containers
+                    # (front-end and back-end) they might both be running this
+                    # bit of code at the same time. If the file is half-written
+                    # loading it will fail, so allow for a few retries
+                    while retries < 3:
+                        try:
+                            module_config = pickle.load(infile)
+                            break
+                        except Exception:  # this can be a number of exceptions, all with the same recovery path
+                            time.sleep(0.1)
+                            retries += 1
+                            continue
+
+                    if module_config is None:
+                        # not really a way to gracefully recover from this, but
+                        # we can at least describe the error
+                        raise RuntimeError("Could not read module_config.bin. The 4CAT developers did a bad job of "
+                                           "preventing this. Shame on them!")
+
                     self.config_definition.update(module_config)
             except (ValueError, TypeError) as e:
                 pass
