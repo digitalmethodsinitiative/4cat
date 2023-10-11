@@ -180,7 +180,8 @@ def trigger_restart_frontend():
     case the user needs to restart the server in some other way.
     """
     status = "error"
-    def server_killer(pid, sig, touch_path=False):
+
+    def server_killer(pid, sig, touch_path=None):
         """
         Helper function. Gives Flask time to complete the request before
         sending the signal.
@@ -203,12 +204,12 @@ def trigger_restart_frontend():
     # we support restarting with gunicorn and apache/mod_wsgi
     # nginx would usually be a front for gunicorn so that use case is also
     # covered
-    # flask additionally lists waitress and uwsgi as standalone wsgi servers
-    # we currently do not support these (but they may be easy to add)
+    # flask additionally lists waitress as a standalone wsgi server
+    # we currently do not support this (but it may be easy to add)
     message = ""
 
     # determine if we're in uwsgi
-    # if not in wsgi, importing will always fail!
+    # if not in uwsgi, importing will always fail!
     in_uwsgi = False
     try:
         import uwsgi
@@ -255,17 +256,20 @@ def trigger_restart_frontend():
         # apache
         # mod_wsgi? touching the file is always safe
         message = "Detected Flask running in mod_wsgi, touching 4cat.wsgi."
+        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
 
         # send a signal to apache to reload if running in daemon mode
         if os.environ.get("mod_wsgi.process_group") not in (None, ""):
             message = "Detected Flask running in mod_wsgi as daemon, sending SIGINT."
-            kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT, touch=Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")))
+            kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT, touch_path=wsgi_file))
             kill_thread.start()
             status = "OK"
+        else:
+            wsgi_file.touch()
 
     else:
-        return jsonify({"status": "error", "message": "4CAT is not hosted with Gunicorn or mod_wsgi. Cannot restart "
-                                                      "4CAT's front-end remotely - you have to do so manually."})
+        return jsonify({"status": "error", "message": "4CAT is not hosted with gunicorn, uwsgi or mod_wsgi. Cannot "
+                                                      "restart 4CAT's front-end remotely; you have to do so manually."})
 
     # up to whatever called this to monitor for restarting
     return jsonify({"status": status, "message": message})
