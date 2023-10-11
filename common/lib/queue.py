@@ -27,7 +27,7 @@ class JobQueue:
 
 		self.db = database
 
-	def get_job(self, jobtype, timestamp=-1):
+	def get_job(self, jobtype, timestamp=-1, restrict_claimable=True):
 		"""
 		Get job of a specific type
 
@@ -38,6 +38,8 @@ class JobQueue:
 		:param int timestamp:  Find jobs that may be claimed after this timestamp. If set to
 							   a negative value (default), any job with a "claim after" time
 							   earlier than the current time is selected.
+		:param bool restrict_claimable:  Only return jobs that may be claimed
+		according to their parameters
 		:return dict: Job data, or `None` if no job was found
 		"""
 		if timestamp < 0:
@@ -45,7 +47,7 @@ class JobQueue:
 
 		# select the number of jobs of the same type that have been queued for
 		# longer than the job as well
-		job = self.db.fetchone((
+		query = (
 			"SELECT main_queue.*, ( " \
 			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
 			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
@@ -54,13 +56,18 @@ class JobQueue:
 			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
 			"  ) " \
 			") AS queue_ahead FROM jobs AS main_queue"
-			"        WHERE main_queue.jobtype = %s"
+			"        WHERE main_queue.jobtype = %s")
+
+		if restrict_claimable:
+			# claimability is determined through various timestamps
+			query += (
 			"          AND main_queue.timestamp_claimed = 0"
 			"          AND main_queue.timestamp_after < %s"
-			"          AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)"
-			"    ORDER BY main_queue.timestamp ASC"
-			"       LIMIT 1;"),
-			(jobtype, timestamp, timestamp))
+			"          AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)")
+
+		query += "    ORDER BY main_queue.timestamp ASC LIMIT 1;"
+
+		job = self.db.fetchone(query, (jobtype, timestamp, timestamp))
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
