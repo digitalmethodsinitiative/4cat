@@ -48,9 +48,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         # after 4cat has been restarted
         is_resuming = self.job.data["attempts"] > 0
 
-        # this file will keep the output of the process started to restart or
-        # upgrade 4cat
-        log_file_backend = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
+        # prevent multiple restarts running at the same time which could blow
+        # up really fast
         lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
 
         # this file has the log of the restart worker itself and is checked by
@@ -72,12 +71,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # trigger a restart and/or upgrade
             # returns a JSON with a 'status' key and a message, the message
             # being the process output
-            if log_file_backend.exists():
-                log_file_backend.unlink()
 
             if self.job.data["remote_id"].startswith("upgrade"):
                 command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart --output %s" % \
-                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_backend)))
+                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_restart)))
                 if self.job.details and self.job.details.get("branch"):
                     # migrate to code in specific branch
                     command += f" --branch {self.job.details['branch']}"
@@ -89,6 +86,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 
             try:
+                # flush any writes before the other process starts writing to
+                # the stream
+                self.log.info(f"Running command {command}")
+                log_stream_restart.flush()
+
                 # the tricky part is that this command will interrupt the
                 # daemon, i.e. this worker!
                 # so we'll never get to actually send a response, if all goes
@@ -98,38 +100,17 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # restarts and we re-attempt to make a daemon, it will fail
                 # when trying to close the stdin file descriptor of the
                 # subprocess (man, that was a fun bug to hunt down)
-                log_stream_backend = log_file_backend.open("a")
-                self.log.info(f"Running command {command}")
                 process = subprocess.Popen(shlex.split(command), cwd=str(config.get("PATH_ROOT")),
-                                           stdout=log_stream_backend, stderr=log_stream_backend,
+                                           stdout=log_stream_restart, stderr=log_stream_restart,
                                            stdin=subprocess.DEVNULL)
-
-                # we can't let the process output to restart.log directly for a
-                # number of reasons
-                # so we have to awkwardly copy one to the other, so that users
-                # watching the front-end interface log panel can see what's
-                # happening.
-                with log_file_backend.open() as infile:
-                    num_lines = len(infile.readlines())
 
                 while not self.interrupted:
                     # basically wait for either the process to quit or 4CAT to
                     # be restarted (hopefully the latter)
                     try:
-                        # copy new lines to overall restart log (see
-                        # above)
-                        with log_file_backend.open() as infile:
-                            current_lines = list(infile.readlines())
-                        if len(current_lines) > num_lines:
-                            with log_file_restart.open("a") as outfile:
-                                for line in current_lines[num_lines:]:
-                                    outfile.write(line)
-                            num_lines = len(current_lines)
-
                         # now see if the process is finished - if not a
                         # TimeoutExpired will be raised
                         process.wait(1)
-                        log_stream_backend.close()
                         break
                     except subprocess.TimeoutExpired:
                         pass
@@ -164,9 +145,6 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             log_stream_restart.write("4CAT restarted.\n")
             with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
                 log_stream_restart.write(f"4CAT is now running version {infile.readline().strip()}.\n")
-
-            if log_file_backend.exists():
-                log_file_backend.unlink()
 
             # we're gonna use some specific Flask routes to trigger this, i.e.
             # we're interacting with the front-end through HTTP
