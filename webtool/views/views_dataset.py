@@ -217,35 +217,28 @@ def get_mapped_result(key):
         """
         writer = None
         buffer = io.StringIO()
-        with dataset.get_results_path().open() as infile:
-            for line in infile:
-                item = json.loads(line)
-                mapped_item = mapper(item)
-
-                # Add possible annotation items
-                if annotation_fields:
+        for mapped_item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
+            if not writer:
+                fieldnames = mapped_item.keys()
+                if annotation_labels:
                     for label in annotation_labels:
-                        mapped_item[label] = item[label]
+                        if label not in fieldnames:
+                            fieldnames.append(label)
 
-                if not writer:
-                    fieldnames = mapped_item.keys()
-
-                    # Add possible annotation headers
-                    if annotation_labels:
-                        for label in annotation_labels:
-                            if label not in fieldnames:
-                                fieldnames.append(label)
-
-                    writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
-                    writer.writeheader()
-                    yield buffer.getvalue()
-                    buffer.truncate(0)
-                    buffer.seek(0)
-
-                writer.writerow(mapped_item)
+                writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
+                writer.writeheader()
                 yield buffer.getvalue()
                 buffer.truncate(0)
                 buffer.seek(0)
+
+            if annotation_fields:
+                for label in annotation_labels:
+                    mapped_item[label] = item[label]
+
+            writer.writerow(mapped_item)
+            yield buffer.getvalue()
+            buffer.truncate(0)
+            buffer.seek(0)
 
     disposition = 'attachment; filename="%s"' % dataset.get_results_path().with_suffix(".csv").name
     return app.response_class(stream_with_context(map_response()), mimetype="text/csv",
@@ -325,7 +318,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_items():
+            for row in dataset.iterate_items(warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 
