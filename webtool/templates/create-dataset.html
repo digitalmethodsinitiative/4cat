@@ -60,7 +60,7 @@
 
                         <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and server administrators will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
                     </div>
-                    {% if __user_config("ui.option_email") and __user_config("mail.server") %}
+                    {% if __user_config("ui.option_email") in ["both", "datasources_only"] and __user_config("mail.server") %}
                     <div class="form-element">
                         <label for="data-email-complete">Receive email on completion:</label>
                         <div class="filter-parameters">

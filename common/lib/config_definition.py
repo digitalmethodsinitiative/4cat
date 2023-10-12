@@ -463,9 +463,15 @@ config_definition = {
                    "of the underlying JSON."
     },
     "ui.option_email": {
-        "type": UserInput.OPTION_TOGGLE,
+        "type": UserInput.OPTION_CHOICE,
+        "options": {
+            "none": "No Emails",
+            "processor_only": "Processors only",
+            "datasources_only": "Create Dataset only",
+            "both": "Both datasets and processors"
+        },
+        "default": "none",
         "help": "Show email when complete option",
-        "default": True,
         "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
     },
 }

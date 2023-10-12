@@ -61,7 +61,7 @@
                 {% for option in processor_options %}
                     {% include "components/processor-option.html" %}
                 {% endfor %}
-            {% if __user_config("ui.option_email") and __user_config("mail.server") %}
+            {% if __user_config("ui.option_email") in ["both", "processor_only"] and __user_config("mail.server") %}
                 <div class="form-element">
                     <label for="data-email-complete">Receive email on completion:</label>
                     <div class="filter-parameters">
