@@ -575,7 +575,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
 
-	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
+	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED):
 		"""
 		Archive a bunch of files into a zip archive and finish processing
 
