@@ -62,14 +62,14 @@
                     {% include "components/processor-option.html" %}
                 {% endfor %}
             {% if __user_config("ui.option_email") in ["both", "processor_only"] and __user_config("mail.server") %}
-                <div class="form-element">
-                    <label for="data-email-complete">Receive email on completion:</label>
-                    <div class="filter-parameters">
-                        <label><input type="checkbox" name="email-complete" id="data-email-complete"></label>
-                        <label><input id="data-email-user" type="email" name="email-user" value={{ current_user.get_name() }}></label>
-                        <button class="tooltip-trigger" aria-controls="tooltip-dataset-email" aria-label="Extended help for option">?</button>
-                    </div>
-                    <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
+                <div class="form-element combo-checkbox-input">
+                    <label>
+                        <input type="checkbox" name="email-complete" id="data-email-complete">
+                        Receive email on completion:
+                    </label>
+                    <input id="data-email-user" type="email" name="email-user" value={{ current_user.get_name() }}>
+                    <button class="tooltip-trigger" aria-controls="tooltip-email-{{ dataset.key }}-{{ processor.type }}" aria-label="Extended help for option">?</button>
+                    <p role="tooltip" id="tooltip-email-{{ dataset.key }}-{{ processor.type }}">Get an e-mail when the dataset is complete. This will only function if your username is your email address.</p>
                 </div>
             {% endif %}
             </fieldset>
