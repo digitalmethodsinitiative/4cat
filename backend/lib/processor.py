@@ -17,8 +17,7 @@ from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version, remove_nuls, send_email
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException, \
-	MapItemException
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException, MapItemException
 from common.config_manager import config, ConfigWrapper
 
 
