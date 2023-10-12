@@ -1,0 +1,198 @@
+{% set item = child %}
+{% set can_process = (current_user.is_authenticated and item.get_available_processors(user=current_user)) %}
+{% set deprecated = (item.type not in processors) %}
+{% set is_filtered = (not deprecated and processors[item.type].is_filter()) %}
+
+<li id="child-{{ item.key }}" data-dataset-key="{{ item.key }}" class="child-wrapper{% if not item.is_finished() %} running{% endif %}" data-status="{{ item.status }}">
+    {# The status button for this processor #}
+
+    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}{% if item.progress and item.progress > 0 and not item.is_finished() %} progress progress-{{ (item.progress * 100)|round(0)|int }}{% endif %}">
+
+    <div class="button-object">
+
+    {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file) }}">{% endif %}
+        <span class="headline">
+            {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file) }}">{% endif %}
+            {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('show_result', key=item.parameters.copied_to) }}">{% endif %}
+            {% if is_filtered %}
+            <i class="fa fa-filter" aria-hidden="true"></i> <span class="sr-only">Filter</span>
+            {% elif item.is_finished() and item.num_rows > 0 %}
+            <i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ processors[item.type].extension if item.type in processors else "" }}, {{ item.get_results_path()|filesize_short }}
+            {% elif item.is_finished() %}
+            <i class="fa fa-skull" aria-hidden="true"></i>
+            {% elif "queued" in item.status|lower %}
+            <i class="fa fa-hourglass-half" aria-hidden="true"></i>
+            {% else %}
+            <i class="fa fa-spin fa-sync-alt" aria-hidden="true"></i>
+            {% endif %}
+            {% if item.is_finished() and ("copied_to" in item.parameters or not is_filtered) %}</a>{% endif %}
+        </span>
+        <span class="byline">
+            {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file) }}">{% endif %}
+            {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('show_result', key=item.parameters.copied_to) }}">{% endif %}
+            {% if item.is_finished() and item.num_rows >= 0 %}
+                {% if is_filtered and "copied_to" in item.parameters %}
+                    New dataset
+                {% elif is_filtered %}
+                    Filtered
+                {% else %}
+                <span class="tooltip-trigger" aria-controls="tooltip-metadata-{{ item.key }}" aria-hidden="true">
+                <i class="fa fa-file-alt" aria-hidden="true"></i> <span class="sr-only" id="dataset-{{ item.key }}-result-count" data-num-results="{{ item.num_rows }}">Items:</span> {{ "{:,}".format(item.num_rows) }}
+                </span>
+                <p role="tooltip" id="tooltip-metadata-{{ item.key }}" aria-hidden="true">{{ "{:,}".format(item.num_rows) }} {{processors[item.type].extension|ext2noun if not deprecated else ""}}{% if item.num_rows != 1 %}s{% endif %}</p>
+                {% endif %}
+            {% elif item.is_finished() %}
+                {% if is_filtered %}{% if item.num_rows == 0 %}No posts left{% else %}Filter failed{% endif %}{% else %}No results{% endif %}
+            {% elif "queued" in item.status|lower %}
+                {% if is_filtered %}Filter queued{% else %}Queued{% endif %}
+            {% else %}
+                {% if is_filtered %}Filtering...{% else %}In progress{% endif %}
+            {% endif %}
+            {% if item.is_finished() and ("copied_to" in item.parameters or not is_filtered) %}</a>{% endif %}
+        </span>
+        <span class="queue-notice"></span>
+
+    {% if item.is_finished() and not is_filtered %}</a>{% endif %}
+    </div>
+    </div>
+
+    {# Processor header, showing title, status, and a tooltip with a description #}
+    <div class="processor-header">
+        <header>
+            <h4>{{ processors[item.type].title if not deprecated else "(Deprecated analysis) " + item.type }}</h4>
+            <button class="tooltip-trigger" aria-controls="tooltip-processor-result-{{ item.key }}" aria-label="Post-processor details">?</button>
+            <p role="tooltip" id="tooltip-processor-result-{{ item.key }}">{{ processors[item.type].description if not deprecated else "This analysis module has been deprecated but you can still download the result." }}</p>
+        </header>
+
+        <span class="processor-status">
+            {% if item.is_finished() and item.num_rows == 0 %}No results.{% endif %}
+        {% with dataset=item, no_icons=True %}
+            {% include "components/result-status.html" %}
+        {% endwith %}
+        </span>
+
+        {# Parameters #}
+        <div class="parameters">
+            <ul>
+                {% if item.get_extension() in ("gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp") or item.get_own_processor().map_item %}
+                <li>
+                    <a href="{{ url_for('preview_items', key=item.key) }}"
+                       data-load-from="{{ url_for('preview_items', key=item.key) }}"
+                       class="property-badge permalink popup-trigger tooltip-trigger"
+                       aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}"><i
+                            class="fa fa-fw fa-search"></i> Preview<span class="sr-only"> this dataset</span></a>
+                    <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
+                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
+                </li>
+                {% endif %}
+                {% if item.get_log_path().exists() and current_user.is_authenticated %}
+                <li>
+                    <a href="{{ url_for('view_log', key=item.key) }}"
+                       data-load-from="{{ url_for('view_log', key=item.key) }}"
+                       class="property-badge permalink popup-trigger tooltip-trigger"
+                       aria-controls="tooltip-log-{{ item.key }} popup-log-{{ item.key }}"><i
+                            class="fa fa-fw fa-clipboard-list"></i> <span class="sr-only">View dataset log file</span></a>
+                    <div role="dialog" id="popup-log-{{ dataset.key }}"></div>
+                    <p role="tooltip" id="tooltip-log-{{ item.key }}" aria-hidden="true">View the log file for this dataset</p>
+                </li>
+                {% endif %}
+                <li rel="external">
+                    <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-permalink-{{ item.key }}" href="{{ url_for('show_result', key=parent_key) }}#nav={{ item.get_breadcrumbs() }}" target="_blank"><i class="fa fa-fw fa-hashtag" aria-hidden="true"></i> <span class="sr-only">Permalink to this result (with context)</span></a>
+                    <p role="tooltip" id="tooltip-permalink-{{ item.key }}" aria-hidden="true">Permanent link to this analysis (with context)</p>
+                </li>
+                {% if item.type in processors %}
+                {% if processors[item.type]["references"] %}
+                <li>
+                    {% set ref_name = processors[item.type].title %}{% set ref_refs = processors[item.type]["references"] %}{% set ref_id = item.key %}{% include "components/processor-references.html" %}
+                </li>
+                {% endif %}
+                {% if item.get_version_url("backend/processors/" + processors[item.type].filepath) %}
+                <li rel="external">
+                    <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-code-{{ item.key }}" href="{{ item.get_version_url("backend/processors/" + processors[item.type].filepath) }}" rel="external" target="_blank"><i class="fab fa-fw fa-github" aria-hidden="true"></i> <span class="sr-only">Review the code that generated this result</span></a>
+                    <p role="tooltip" id="tooltip-code-{{ item.key }}" aria-hidden="true">Review the code that generated this result</p>
+                </li>
+                {% endif %}
+                {% endif %}
+                {% if current_user.is_authenticated and (dataset.is_accessible_by(current_user, "owner") or __user_config("privileges.admin.can_manipulate_all_datasets") or item.is_accessible_by(current_user, "owner")) %}
+                <li>
+                    <a class="property-badge delete-link tooltip-trigger" href="{{ url_for('delete_dataset', key=item.key) }}?redirect" data-confirm-action="delete this dataset"><i class="fa fa-fw fa-times" aria-hidden="true"></i> <span class="sr-only">Delete this analysis</span></a>
+                    <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished() %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
+                </li>
+                {% endif %}
+
+                {% if item.is_finished() and item.num_rows > 0 and item.type in processors and processors[item.type].extension in ("jpg", "jpeg", "png", "csv", "html") and processors[item.type].can_preview %}
+                <li>
+                    <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="popup-preview-{{ item.key }} tooltip-preview-{{ item.key }}"><i class="fa fa-fw fa-eye" aria-hidden="true"></i> <span class="sr-only">Preview this dataset</span></a>
+                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
+                    <div role="dialog" id="popup-preview-{{ item.key }}">
+                        {% if processors[child.type].extension == "html" %}
+                            <iframe class="query-result-iframe" src="{{ url_for('get_result', query_file=child.result_file) }}"></iframe>
+                        {% elif processors[child.type].extension in ("png", "jpg", "jpeg", "gif") %}
+                            <a href="{{ url_for('get_result', query_file=child.result_file) }}"><img class="details-only" src="{{ url_for('get_result', query_file=child.result_file) }}"></a>
+                        {% elif processors[child.type].extension == "svg" %}
+                            <embed class="query-result-svg details-only" type="image/svg+xml" src="{{ url_for('get_result', query_file=child.result_file) }}">
+                        {% endif %}
+                    </div>
+                </li>
+                {% endif %}
+            {% if item.type in processors %}{% set processor_options = processors[item.type].get_options() %}{% endif %}
+            {% for option in item.parameters %}
+                {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
+                {% if processor_options[option].type == "toggle" %}
+                    {% if item.parameters[option] %}<li><span class="property-badge">{{ option }}</span></li>{% endif %}
+                {% else %}
+                    <li><span class="property-badge">{{ option }}=<!--
+                        {% set str_param = item.parameters[option]|string %}
+                        {% if str_param|length < 15 %}
+                        -->{{ item.parameters[option] }}
+                        {% else %}
+                        --><span class="tooltip-trigger" aria-controls="tooltip-parameter-{{ item.key }}-{{ option }}">{{ str_param[:14] }}<span class="ellipsis" aria-label="Parameter truncated">...</span></span>
+                        <p role="tooltip" id="tooltip-parameter-{{ item.key }}-{{ option }}">{{ item.parameters[option] }}</p>
+                        {% endif %}
+                    </span></li>
+                {% endif %}
+            {% endif %}
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    {# 'More' button to show further analysis and preview #}
+    <div class="processor-expand button-wrap">
+        {% if current_user.is_authenticated and item.is_finished() and item.num_rows > 0 and (item.children or item.get_available_processors()) %}
+        <button aria-controls="child-{{ item.key }}-details" class="toggle-button">
+            <span class="headline">
+            <i class="fa fa-sitemap" aria-hidden="true"></i> <span class="sr-only">More info</span>
+            {% if item.children %}
+                +{{ item.children|length }}
+            {% endif %}
+            </span>
+            <span class="byline" aria-hidden="true">More...</span>
+        </button>
+        {% endif %}
+    </div>
+
+    {# Panel with preview, available processors, and further analyses, hidden by default #}
+    <div class="processor-details" id="child-{{ item.key }}-details" aria-expanded="false">
+        {# Child processors, recursively #}
+        <ol class="children-datasets child-list">
+            {% for child in item.children %}
+                {% include "components/result-child.html" %}
+            {% endfor %}
+        </ol>
+
+        {# Possible further analyses #}
+        {% if __user_config("privileges.can_run_processors") and (__user_config("privileges.admin.can_manipulate_all_datasets") or item.is_accessible_by(current_user, role="owner")) %}
+        <ol class="children-processors">
+            {% for processor in item.get_available_processors().values() %}
+
+                {% set git_url = item.get_version_url("backend/processors/" + processor.filepath)%}
+                {% set dataset = item %}
+                {% set inline = true %}
+                {% include "components/processor-details.html" %}
+                {% set inline = false %}
+            {% endfor %}
+        </ol>
+        {% endif %}
+    </div>
+</li>

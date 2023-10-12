@@ -1,0 +1,34 @@
+* {
+	color: black;
+}
+
+h1 span {
+	color: white;
+}
+
+body {
+	background-color: white;
+}
+
+.posts li.post {
+	max-width: 225px;
+	background-color: white;
+	font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-size: 14px;
+	border-bottom: 1px solid grey;
+}
+
+.posts header {
+	border: none;
+}
+
+.posts .alt, .posts .alt time {
+	color: grey;
+}
+
+.posts .post-image {
+	max-width: 200px;
+	margin: 0 auto;
+	margin-top: 30px;
+	margin-bottom: 30px;
+}

@@ -26,6 +26,7 @@ packages = [
 	"html2text==2020.*",
 	"ImageHash~=4.2.0",
 	"jieba~=0.42",
+	"json_stream",
 	"lxml~=4.9.0",
 	"markdown==3.0.1",
 	"markdown2==2.4.2",
@@ -50,6 +51,8 @@ packages = [
 	"shapely",
 	"spacy==3.4.3",
 	"svgwrite~=1.4.0",
+	"typing_extensions<4.6.0",
+	"tailer",
 	"Telethon~=1.25.2",
 	"typing_extensions<4.6.0",
 	"ural~=0.33",
@@ -59,6 +62,7 @@ packages = [
 	"videohash==3.0.1",
 	"videohash @ https://github.com/dale-wahl/videohash/archive/refs/heads/main.zip",
 	"vk_api",
+	"yt-dlp",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.1/en_core_web_sm-3.4.1.tar.gz#egg=en_core_web_sm"
 ]
 

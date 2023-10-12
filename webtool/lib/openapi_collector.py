@@ -22,7 +22,7 @@ import inspect
 import json
 import re
 
-import common.config_manager as config
+from common.config_manager import config
 
 class OpenAPICollector:
 	"""
@@ -293,6 +293,4 @@ class OpenAPICollector:
 			schema = json.loads(quote.sub('"\\1"', schema.strip().replace("=", ":")))
 			return schema
 		except json.JSONDecodeError as e:
-			print(e)
-			print(quote.sub('"\\1"', schema.strip().replace("=", ":")))
 			return {"type": schema}

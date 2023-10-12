@@ -121,3 +121,18 @@ export async function fetch_with_progress(url, callback = null) {
     // Step 5: decode into a string
     return new TextDecoder("utf-8").decode(chunksAll);
 }
+
+/**
+ * (Mostly) unique ID
+ *
+ * Thanks to https://stackoverflow.com/a/48593447
+ *
+ * @param prefix
+ * @param random
+ * @returns {string}
+ */
+export function uniqid(prefix = "", random = false) {
+    const sec = Date.now() * 1000 + Math.random() * 1000;
+    const id = sec.toString(16).replace(/\./g, "").padEnd(14, "0");
+    return `${prefix}${id}${random ? `.${Math.trunc(Math.random() * 100000000)}` : ""}`;
+}

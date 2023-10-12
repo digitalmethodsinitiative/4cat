@@ -5,17 +5,14 @@ Direct database connection
 import datetime
 import re
 import ural
-import io
 import pymysql
 
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
-from common.lib.helpers import sniff_encoding
 from backend.lib.database_mysql import MySQLDatabase
-
-import common.config_manager as config
+from common.config_manager import config
 
 
 class SearchWithinTCATBinsV2(Search):
@@ -27,6 +24,7 @@ class SearchWithinTCATBinsV2(Search):
     """
     type = "dmi-tcatv2-search"  # job ID
     extension = "csv"
+    title = "TCAT Search (SQL)"
 
     options = {
         "intro-1": {
@@ -63,14 +61,14 @@ class SearchWithinTCATBinsV2(Search):
     }
 
     config = {
-        "dmi-tcat.database_instances": {
+        "dmi-tcatv2-search.database_instances": {
             "type": UserInput.OPTION_TEXT_JSON,
             "help": "DMI-TCAT instances",
             "tooltip": "List of DMI-TCAT instance metadata, e.g. [{'tcat_name': 'tcat2','db_name': 'twittercapture',"
                     "'db_user': 'username','db_password': 'password','db_host': '127.0.0.1','db_port': 3306}] All of "
                     "these values need to be provided for each instance. This needs to be formatted as a JSON list of "
                     "objects.",
-            "default": ''
+            "default": {}
         }
     }
 
@@ -118,7 +116,7 @@ class SearchWithinTCATBinsV2(Search):
         bin_name = bin.split("@")[0]
         tcat_name = bin.split("@").pop()
 
-        available_instances = config.get("dmi-tcatv2.instances", [])
+        available_instances = config.get("dmi-tcatv2-search.database_instances", [])
         instance = [instance for instance in available_instances if instance.get('tcat_name') == tcat_name][0]
 
         db = MySQLDatabase(logger=self.log,

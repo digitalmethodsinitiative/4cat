@@ -7,7 +7,7 @@
     <article class="small">
         <section>
             <h2><span>Request account</span></h2>
-            <p>Access to {{ __tool_name }} is available upon request for researchers and students who would like to use
+            <p>Access to {{ __user_config("4cat.name") }} is available upon request for researchers and students who would like to use
                 it for their
                 project. Please provide your details via the form below to request an account.</p>
         {% if access_policy %}
@@ -37,11 +37,11 @@
                     <input type="text" name="university" id="request-uni" value="{{ form.university }}" placeholder="E.g. university, employer, et cetera">
                 </div>
                 <div class="form-element{% if "source" in incomplete %} missing{% endif %}">
-                    <label for="request-source">How did you hear about {{ __tool_name }}?</label>
+                    <label for="request-source">How did you hear about {{ __user_config("4cat.name") }}?</label>
                     <input type="text" name="source" id="request-source" value="{{ form.source }}">
                 </div>
                 <div class="form-element{% if "intent" in incomplete %} missing{% endif %}">
-                    <label for="request-intent">What do you intend to use {{ __tool_name }} for?</label>
+                    <label for="request-intent">What do you intend to use {{ __user_config("4cat.name") }} for?</label>
                     <textarea rows="10" cols="50" name="intent" id="request-intent">{{ form.intent }}</textarea>
                 </div>
                 <div class="submit-container">
@@ -54,7 +54,7 @@
                     <ul class="flat">
                         <li><a href="{{ url_for('request_access') }}">Request access</a></li>
                         <li><a href="{{ url_for('request_password') }}">Recover password</a></li>
-                        <li><a href="{{ url_for('show_page', page='data-policy') }}">Data policy</a></li>
+                        <li><a href="{{ url_for('show_page', page='data-policy') }}">Data policy</a></li>
                     </ul>
                 </nav>
             </footer>

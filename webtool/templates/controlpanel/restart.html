@@ -1,7 +1,8 @@
-{% extends "layout.html" %}
+{% extends "controlpanel/layout.html" %}
 
 {% block title %}Restart/Upgrade 4CAT{% endblock %}
 {% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "restart" %}{% endblock %}
 
 {% block body %}
     <article class="small">
@@ -21,8 +22,8 @@
                 relevant upgrade scripts will be run with default settings.</p>
 
             <p>Restarting is relatively safe, upgrading always has a risk of breaking things. The web interface may be
-                unresponsive during the process. Do not refresh the page until it is finished. This may take op to ten
-                minutes.</p>
+                unresponsive during the process. Do not refresh the page until it is finished. This may take a while.
+                <strong>We recommend making a backup before upgrading.</strong></p>
 
             <p>Don't upgrade on Friday afternoons :-)</p>
 
@@ -32,22 +33,48 @@
             <p>{% if in_progress %}
                     A restart or upgrade is currently in progress.
                 {% elif can_upgrade %}
-                    You can upgrade 4CAT.
+                    You can upgrade 4CAT{% if release_notes %}. Make sure to read the <a href="{{ release_notes }}">release notes</a> before you do{% endif %}.
                 {% else %}
                     No upgrades are currently available.
                 {% endif %}</p>
 
-            <form action="{{ url_for("trigger_restart") }}" method="POST" class="button-container">
-                <button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>
-                    <i class="fa fa-power-off" aria-hidden="true"></i> Restart
-                </button>
+            <form action="{{ url_for("trigger_restart") }}" method="POST">
+            <ul class="button-container">
+                <li><button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>
+                    <i class="fa fa-power-off" aria-hidden="true"></i> Restart back-end & front-end
+                </button></li>
+
+                <li><button name="action" value="restart-frontend"{% if in_progress %} disabled="disabled"{% endif %} data-url="{{ url_for("trigger_restart_frontend") }}">
+                    <i class="fa fa-power-off" aria-hidden="true"></i> Restart front-end only
+                </button></li>
 
                 {% if can_upgrade %}
-                    <button name="action" value="upgrade"{% if in_progress %} disabled="disabled"{% endif %}>
+                    <li><button name="action" class="confirm-first" value="upgrade"{% if in_progress %} disabled="disabled"{% endif %}>
                         <i class="fa fa-wrench" aria-hidden="true"></i> Upgrade (danger!)
-                    </button>
+                    </button></li>
                 {% endif %}
+            </ul>
             </form>
+        {% if __user_config("privileges.can_upgrade_to_dev") %}
+            <hr>
+        <form action="{{ url_for("trigger_restart") }}" method="POST">
+            <p>You can also upgrade to a development branch of the <a href="{{ __user_config("4cat.github_url") }}">
+                configured GitHub repository</a>. This way you can for example use new or experimental features
+                before they are officially released.</p>
+            <p><strong>WARNING:</strong> it is <em>very</em> easy to break your 4CAT by upgrading to a development
+            branch. Only use this if you know what you're doing. Don't say we didn't warn you! </p>
+            <div class="form-element">
+                <label for="update-branch">Branch</label>
+                <input type="text" name="branch" id="update-branch" value="master">
+            </div>
+
+            <div class="submit-container">
+                <button class="confirm-first" name="action" value="upgrade-to-branch"{% if in_progress %} disabled="disabled"{% endif %}>
+                    <i class="fa fa-explosion"></i> Update to branch
+                </button>
+            </div>
+        </form>
+        {% endif %}
         </section>
 
         <section>

@@ -4,7 +4,7 @@ Merge one dataset with another (creating a new dataset)
 import csv
 import json
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
@@ -50,11 +50,11 @@ class DatasetMerger(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on any top-level CSV or NDJSON file
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
 
@@ -100,10 +100,11 @@ class DatasetMerger(BasicProcessor):
             #                                          f"type - all datasets must be of the type "
             #                                          f"'{self.source_dataset.type}")
 
-            if source_dataset.owner != self.source_dataset.owner and (
+            if not set(source_dataset.get_owners_users("owner")).intersection(
+                    set(self.source_dataset.get_owners_users("owner"))) and (
                     source_dataset.is_private or self.source_dataset.is_private):
-                return self.dataset.finish_with_error("Cannot merge datasets - all need to be public or have the same "
-                                                      "owner.")
+                return self.dataset.finish_with_error("Cannot merge datasets - all need to be public or have "
+                                                      "overlapping ownership.")
 
             if source_dataset.key in [d.key for d in source_datasets]:
                 self.dataset.update_status(f"Skipping dataset with URL {source_dataset_url} - already in list of "
@@ -206,6 +207,10 @@ class DatasetMerger(BasicProcessor):
 
         # Request standalone
         standalone = self.create_standalone()
+        if not standalone:
+            # something failed earlier, so there's nothing to copy or make
+            # standalone
+            return
 
         # merged dataset has the same type as the original
         if self.source_dataset.parameters.get("datasource"):

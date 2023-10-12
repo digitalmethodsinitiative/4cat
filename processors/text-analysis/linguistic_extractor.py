@@ -13,7 +13,7 @@ from spacy.util import compile_prefix_regex, compile_suffix_regex
 
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Stijn Peeters"]

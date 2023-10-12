@@ -4,12 +4,12 @@ Get YouTube metadata from video links posted
 import time
 import urllib.request
 
-import common.config_manager as config
 from apiclient.discovery import build
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids
+from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -33,7 +33,7 @@ class YouTubeThumbnails(BasicProcessor):
 	sleep_time = 10
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on YouTube metadata sets
 
@@ -64,8 +64,8 @@ class YouTubeThumbnails(BasicProcessor):
 		results_path = self.dataset.get_staging_area()
 
 		# Use YouTubeDL and the YouTube API to request video data
-		youtube = build(config.get('api.youtube.name'), config.get('api.youtube.version'),
-											developerKey=config.get('api.youtube.key'))
+		youtube = build(self.config.get('api.youtube.name'), self.config.get('api.youtube.version'),
+											developerKey=self.config.get('api.youtube.key'))
 		
 		ids_list = get_yt_compatible_ids(video_ids)
 		retries = 0

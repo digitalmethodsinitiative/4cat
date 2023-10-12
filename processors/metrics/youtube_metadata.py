@@ -9,10 +9,10 @@ import urllib.request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
+from common.config_manager import config
 
-import common.config_manager as config
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
@@ -66,11 +66,11 @@ class YouTubeMetadata(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on datasets probably containing youtube links
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		# Compatible with every top-level dataset.
 		return module.is_top_dataset()
@@ -86,7 +86,7 @@ class YouTubeMetadata(BasicProcessor):
 		"""
 
 		# First check if there's a YouTube Developer API key in config
-		if not config.get('api.youtube.key'):
+		if not self.config.get('api.youtube.key'):
 			self.dataset.update_status("No API key found")
 			self.dataset.finish(0)
 			return
@@ -419,7 +419,7 @@ class YouTubeMetadata(BasicProcessor):
 		if custom_key:
 			api_key = custom_key
 		else:
-			api_key = config.get('api.youtube.key')
+			api_key = self.config.get('api.youtube.key')
 
 		for i, ids_string in enumerate(ids_list):
 
@@ -428,7 +428,7 @@ class YouTubeMetadata(BasicProcessor):
 
 			try:
 				# Use YouTubeDL and the YouTube API to request video data
-				youtube = build(config.get('api.youtube.name'), config.get('api.youtube.version'),
+				youtube = build(self.config.get('api.youtube.name'), self.config.get('api.youtube.version'),
 												developerKey=api_key)
 			# Catch invalid API keys
 			except HttpError as e:

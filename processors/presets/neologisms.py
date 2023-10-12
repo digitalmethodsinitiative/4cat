@@ -1,7 +1,7 @@
 """
 Extract neologisms
 """
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 from common.lib.helpers import UserInput
 
@@ -19,14 +19,34 @@ class NeologismExtractor(ProcessorPreset):
 
 	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
 
-	options = {
-		"timeframe": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "month",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-			"help": "Extract neologisms per"
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+		"""
+		options = {
+			"timeframe": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "month",
+				"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+				"help": "Extract neologisms per"
+			},
+			"columns": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Column(s) from which to extract neologisms",
+				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
+			},
 		}
-	}
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI
+			options["columns"]["inline"] = True
+			options["columns"]["options"] = {v: v for v in columns}
+			default_options = [default for default in ["body", "text", "subject"] if default in columns]
+			if default_options:
+				options["columns"]["default"] = default_options.pop(0)
+
+		return options
 
 	def get_processor_pipeline(self):
 		"""
@@ -35,6 +55,7 @@ class NeologismExtractor(ProcessorPreset):
 		ranking is used as the result of this processor, once available.
 		"""
 		timeframe = self.parameters.get("timeframe")
+		columns = self.parameters.get("columns")
 
 		pipeline = [
 			# first, tokenise the posts, excluding all common words
@@ -45,6 +66,7 @@ class NeologismExtractor(ProcessorPreset):
 					"strip_symbols": True,
 					"lemmatise": False,
 					"docs_per": timeframe,
+					"columns": columns,
 					"filter": ["wordlist-googlebooks-english", "stopwords-iso-all"]
 				}
 			},

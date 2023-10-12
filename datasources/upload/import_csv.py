@@ -9,12 +9,11 @@ import re
 import io
 
 import datasources.upload.import_formats as import_formats
-import common.config_manager as config
 
 from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException
 from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
 

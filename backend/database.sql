@@ -5,9 +5,15 @@
 
 -- 4CAT settings table
 CREATE TABLE IF NOT EXISTS settings (
-  name                   TEXT UNIQUE PRIMARY KEY,
-  value                  TEXT DEFAULT '{}'
+  name                   TEXT DEFAULT '' NOT NULL,
+  value                  TEXT DEFAULT '{}' NOT NULL,
+  tag                    TEXT DEFAULT '' NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_setting
+  ON settings (
+    name, tag
+  );
 
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
@@ -37,8 +43,8 @@ CREATE TABLE IF NOT EXISTS datasets (
   id                SERIAL PRIMARY KEY,
   key               text,
   type              text DEFAULT 'search',
-  key_parent        text DEFAULT '',
-  owner             VARCHAR DEFAULT 'anonymous',
+  key_parent        text DEFAULT '' NOT NULL,
+  creator           VARCHAR DEFAULT 'anonymous',
   query             text,
   job               integer DEFAULT 0,
   parameters        text,
@@ -53,6 +59,15 @@ CREATE TABLE IF NOT EXISTS datasets (
   software_file     text DEFAULT '',
   annotation_fields text DEFAULT ''
 );
+
+CREATE TABLE datasets_owners (
+    "name" text DEFAULT 'anonymous'::text,
+    key text NOT NULL,
+    role TEXT DEFAULT 'owner'
+);
+
+CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("name" text_ops,key text_ops);
+
 
 -- annotations
 CREATE TABLE IF NOT EXISTS annotations (
@@ -73,12 +88,13 @@ CREATE TABLE IF NOT EXISTS metrics (
 CREATE TABLE IF NOT EXISTS users (
   name               TEXT UNIQUE PRIMARY KEY,
   password           TEXT,
-  is_admin           BOOLEAN DEFAULT FALSE,
   register_token     TEXT DEFAULT '',
+  timestamp_created  INTEGER DEFAULT 0,
   timestamp_token    INTEGER DEFAULT 0,
   timestamp_seen     INTEGER DEFAULT 0,
   userdata           TEXT DEFAULT '{}',
-  is_deactivated     BOOLEAN DEFAULT FALSE
+  is_deactivated     BOOLEAN DEFAULT FALSE,
+  tags               JSONB DEFAULT '[]'
 );
 
 INSERT INTO users
@@ -136,35 +152,14 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
   END;
   $$ LANGUAGE plpgsql VOLATILE STRICT;
 
-
--- fourcat settings insert default settings
--- TODO SHOULD BE ABLE TO REMOVE; all these should have corresponding values in common/lib/config_definitions given defaults
-INSERT INTO settings
-  (name, value)
-  Values
-    ('4cat.datasources', '["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2", "tiktok", "instagram", "9gag", "imgur", "linkedin", "parler", "douyin", "twitter-import"]'),
-    ('4cat.name', '"4CAT"'),
-    ('4cat.name_long', '"4CAT: Capture and Analysis Toolkit"'),
-    ('4cat.github_url', '"https://github.com/digitalmethodsinitiative/4cat"'),
-    ('4cat.phone_home_url', '"https://ping.4cat.nl"'),
-    ('path.versionfile', '".git-checked-out"'),
-    ('expire.timeout', '0'),
-    ('expire.allow_optout', 'true'),
-    ('expire.datasources', '{"tumblr": {"timeout": 259200, "allow_optout": false}}'),
-    ('logging.slack.level', '"WARNING"'),
-    ('logging.slack.webhook', 'null'),
-    ('mail.admin_email', 'null'),
-    ('mail.ssl', 'false'),
-    ('mail.username', 'null'),
-    ('mail.password', 'null'),
-    ('mail.noreply', '"noreply@localhost"'),
-    ('fourchan.image_interval', '3600'),
-    ('explorer.max_posts', '100000'),
-    ('flask.flask_app', '"webtool/fourcat"'),
-    ('flask.secret_key', concat('"', substr(md5(random()::text), 0, 25), '"')),
-    ('flask.https', 'false'),
-    ('flask.server_name', '"localhost"'),
-    ('flask.autologin.name', '"Automatic login"'),
-    ('flask.autologin.hostnames', '["localhost"]'),
-    ('flask.autologin.api', '["localhost"]')
-    ON CONFLICT DO NOTHING;
+-- default admin privileges
+INSERT INTO settings (name, value, tag) VALUES
+  ('privileges.admin.can_view_status', 'true', 'admin'),
+  ('privileges.admin.can_manage_users', 'true', 'admin'),
+  ('privileges.admin.can_manage_settings', 'true', 'admin'),
+  ('privileges.admin.can_manage_notifications', 'true', 'admin'),
+  ('privileges.admin.can_manage_tags', 'true', 'admin'),
+  ('privileges.admin.can_restart', 'true', 'admin'),
+  ('privileges.admin.can_manipulate_all_datasets', 'true', 'admin'),
+  ('privileges.can_view_all_datasets', 'true', 'admin'),
+  ('privileges.can_view_private_datasets', 'true', 'admin');

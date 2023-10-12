@@ -5,13 +5,8 @@ It's prohibitively difficult to scrape data from Imgur within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
 from datetime import datetime
-from pathlib import Path
-from urllib.parse import urlparse, parse_qs
-import json
-import time
 
-from backend.abstract.search import Search
-from common.lib.exceptions import WorkerInterruptedException
+from backend.lib.search import Search
 
 
 class SearchNineGag(Search):

@@ -6,7 +6,7 @@ import re
 from collections import OrderedDict
 from itertools import islice, chain
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -96,11 +96,11 @@ class AttributeRanker(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on top image rankings
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.get_extension() in ["csv", "ndjson"]
 
@@ -164,7 +164,7 @@ class AttributeRanker(BasicProcessor):
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)
 			except ValueError as e:
-				self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+				self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
 				self.dataset.update_status(0)
 				return
 
@@ -218,7 +218,7 @@ class AttributeRanker(BasicProcessor):
 		if rows:
 			self.write_csv_items_and_finish(rows)
 		else:
-			self.dataset.update_status("No posts contain the requested attributes.")
+			self.dataset.update_status("No items contain the requested attributes.")
 			self.dataset.finish(0)
 
 	def get_values(self, post, attributes, filter, split_comma, extract):

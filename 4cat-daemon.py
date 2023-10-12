@@ -59,7 +59,7 @@ if not args.no_version_check:
 # we can only import this here, because the version check above needs to be
 # done first, as it may detect that the user needs to migrate first before
 # the config manager can be run properly
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import call_api
 # ---------------------------------------------
 #     Check validity of configuration file

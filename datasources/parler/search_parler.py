@@ -6,10 +6,9 @@ due to its aggressive rate limiting and login wall. Instead, import data
 collected elsewhere.
 """
 import datetime
-import json
 import re
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 
 
 class SearchParler(Search):

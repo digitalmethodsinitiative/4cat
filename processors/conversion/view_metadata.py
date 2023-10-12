@@ -6,7 +6,7 @@ Designed to work with any processor that has a 'map_metadata' method
 import json
 import zipfile
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -37,12 +37,13 @@ class ViewMetadata(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow on only
+		Determine if processor is compatible with dataset
+
+		:param module: Module to determine compatibility with
 		"""
-		# return (module.is_dataset() and hasattr(module.get_own_processor(), "map_metadata")) or (not module.is_dataset() and hasattr(module, "map_metadata"))
-		return module.type.startswith("video-downloader")
+		return module.type.startswith("video-downloader") or module.type.startswith("image-downloader")
 
 	def process(self):
 		"""
@@ -63,12 +64,13 @@ class ViewMetadata(BasicProcessor):
 				metadata_file = json.load(file)
 
 		parent_processor = self.dataset.get_parent().get_own_processor()
-		self.dataset.log(f"Collecting metadata created by {parent_processor.type}")
-		if not hasattr(parent_processor, "map_metadata"):
-			self.log.warning(f"Metadata formatter processor cannot run on {parent_processor.type}; has no 'map_metadata' method")
-			self.dataset.update_status("Cannot reformat metadata", is_final=True)
+		if parent_processor is None or not hasattr(parent_processor, "map_metadata"):
+			if parent_processor is not None:
+				self.log.warning(f"Metadata formatter processor cannot run on {parent_processor.type}; map_metadata method not implemented")
+			self.dataset.update_status("Cannot reformat metadata for this dataset", is_final=True)
 			self.dataset.finish(0)
 			return
+		self.dataset.log(f"Collecting metadata created by {parent_processor.type}")
 
 		include_failed = self.parameters.get("include_failed", False)
 		rows = []

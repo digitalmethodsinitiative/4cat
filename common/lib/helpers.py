@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
-import common.config_manager as config
+from common.config_manager import config
 
 
 def init_datasource(database, logger, queue, name):
@@ -140,11 +140,13 @@ def get_software_version():
         return ""
 
 
-def get_github_version():
+def get_github_version(timeout=5):
     """
     Get latest release tag version from GitHub
 
     Will raise a ValueError if it cannot retrieve information from GitHub.
+
+    :param int timeout:  Timeout in seconds for HTTP request
 
     :return tuple:  Version, e.g. `1.26`, and release URL.
     """
@@ -155,7 +157,7 @@ def get_github_version():
     repo_id = re.sub(r"(\.git)?/?$", "", re.sub(r"^https?://(www\.)?github\.com/", "", repo_url))
 
     api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
-    response = requests.get(api_url, timeout=5)
+    response = requests.get(api_url, timeout=timeout)
     response = response.json()
     if response.get("message") == "Not Found":
         raise ValueError("Invalid GitHub URL or repository name")

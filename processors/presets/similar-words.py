@@ -3,7 +3,7 @@ Find similar words
 """
 from nltk.stem.snowball import SnowballStemmer
 
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 from common.lib.helpers import UserInput
 
@@ -54,6 +54,7 @@ class SimilarWords(ProcessorPreset):
 				"parameters": {
 					"stem": False,
 					"lemmatise": False,
+					"columns": "body",
 					"timeframe": timeframe,
 					"grouping-per": "sentence",
 					"language": language

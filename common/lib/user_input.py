@@ -1,5 +1,6 @@
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import QueryParametersException
+from werkzeug.datastructures import ImmutableMultiDict
 import json
 
 import re
@@ -26,6 +27,9 @@ class UserInput:
     OPTION_DIVIDER = "divider"  # meta-option, divides related sets of options
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
+    OPTION_DATASOURCES = "datasources"  # data source toggling
+
+    OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
     @staticmethod
     def parse_all(options, input, silently_correct=True):
@@ -48,7 +52,20 @@ class UserInput:
 
         :return dict:  Sanitised form input
         """
+        from common.lib.helpers import convert_to_int
         parsed_input = {}
+
+        if type(input) is not dict and type(input) is not ImmutableMultiDict:
+            raise TypeError("input must be a dictionary or ImmutableMultiDict")
+
+        if type(input) is ImmutableMultiDict:
+            # we are not using to_dict, because that messes up multi-selects
+            input = {key: input.getlist(key) for key in input}
+            for key, value in input.items():
+                if type(value) is list and len(value) == 1:
+                    input[key] = value[0]
+
+        print(input)
 
         # all parameters are submitted as option-[parameter ID], this is an 
         # artifact of how the web interface works and we can simply remove the
@@ -56,7 +73,12 @@ class UserInput:
         input = {re.sub(r"^option-", "", field): input[field] for field in input}
 
         for option, settings in options.items():
-            if settings.get("type") in (UserInput.OPTION_DIVIDER, UserInput.OPTION_INFO):
+            if settings.get("indirect"):
+                # these are settings that are derived from and set by other
+                # settings
+                continue
+
+            if settings.get("type") in UserInput.OPTIONS_COSMETIC:
                 # these are structural form elements and never have a value
                 continue
 
@@ -87,7 +109,24 @@ class UserInput:
             elif settings.get("type") == UserInput.OPTION_TOGGLE:
                 # special case too, since if a checkbox is unchecked, it simply
                 # does not show up in the input
-                parsed_input[option] = option in input
+                if option in input:
+                    # Toggle needs to be parsed
+                    parsed_input[option] = UserInput.parse_value(settings, input[option], silently_correct)
+                else:
+                    # Toggle was left blank
+                    parsed_input[option] = False
+
+            elif settings.get("type") == UserInput.OPTION_DATASOURCES:
+                # special case, because this combines multiple inputs to
+                # configure data source availability and expiration
+                datasources = {datasource: {
+                    "enabled": f"{option}-enable-{datasource}" in input,
+                    "allow_optout": f"{option}-optout-{datasource}" in input,
+                    "timeout": convert_to_int(input[f"{option}-timeout-{datasource}"], 0)
+                } for datasource in input[option].split(",")}
+
+                parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
+                parsed_input[option.split(".")[0] + ".expiration"] = datasources
 
             elif option not in input:
                 # not provided? use default
@@ -116,13 +155,22 @@ class UserInput:
         :return:  Validated and parsed input
         """
         input_type = settings.get("type", "")
-        if input_type in (UserInput.OPTION_INFO, UserInput.OPTION_DIVIDER):
+        if input_type in UserInput.OPTIONS_COSMETIC:
             # these are structural form elements and can never return a value
             return None
 
         elif input_type == UserInput.OPTION_TOGGLE:
             # simple boolean toggle
-            return choice is not None
+            if type(choice) == bool:
+                return choice
+            elif choice in ['false', 'False']:
+                # Sanitized options passed back to Flask can be converted to strings as 'false'
+                return False
+            elif choice in ['true', 'True', 'on']:
+                # Toggle will have value 'on', but may also becomes a string 'true'
+                return True
+            else:
+                raise QueryParametersException("Toggle invalid input")
 
         elif input_type in (UserInput.OPTION_DATE, UserInput.OPTION_DATERANGE):
             # parse either integers (unix timestamps) or try to guess the date
@@ -152,8 +200,13 @@ class UserInput:
             if not choice:
                 return settings.get("default", [])
 
-            chosen = choice.split(",")
-            return [item for item in chosen if item in settings.get("options", [])]
+            if type(choice) is str:
+                # should be a list if the form control was actually a multiselect
+                # but we have some client side UI helpers that may produce a string
+                # instead
+                choice = choice.split(",")
+
+            return [item for item in choice if item in settings.get("options", [])]
 
         elif input_type == UserInput.OPTION_CHOICE:
             # select box
@@ -168,13 +221,13 @@ class UserInput:
                 return choice
 
         elif input_type == UserInput.OPTION_TEXT_JSON:
-            # needs to be parsed as JSON
+            # verify that this is actually json
             try:
                 redumped_value = json.dumps(json.loads(choice))
             except json.JSONDecodeError:
                 raise QueryParametersException("Invalid JSON value '%s'" % choice)
 
-            return redumped_value
+            return json.loads(choice)
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
             # text string

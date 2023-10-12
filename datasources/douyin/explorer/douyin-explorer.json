@@ -1,0 +1,44 @@
+{
+	"ndjson": {
+		"author": "{{ author.nickname }}",
+		"created": "{{ create_time | datetime }}",
+		"body": "<a href='{{ share_url }}' target='__blank'><img class='preview' src='{{ video.cover.url_list[0] }}'></a><br>{{ desc }}",
+		"external_url": "{{ share_url }}",
+		"plays": "<i class='fa-solid fa-play'></i> {{ statistics.play_count | numberify }}",
+		"likes": "<i class='fa-solid fa-heart'></i> {{ statistics.digg_count | numberify }}",
+		"comments": "<i class='fa-solid fa-comment'></i> {{ statistics.comment_count | numberify }}",
+		"shares": "<i class='fa-solid fa-share'></i> {{ statistics.share_count | numberify }}",
+		
+		"sort_options": [
+			{
+				"key": "create_time",
+				"label": "Old to new"
+			},
+			{
+				"key": "create_time",
+				"label": "New to old",
+				"descending": true
+			},
+			{
+				"key": "statistics.play_count",
+				"label": "Plays",
+				"descending": true
+			},
+			{
+				"key": "statistics.digg_count",
+				"label": "Likes",
+				"descending": true
+			},
+			{
+				"key": "statistics.comment_count",
+				"label": "Comments",
+				"descending": true
+			},
+			{
+				"key": "statistics.share_count",
+				"label": "Shares",
+				"descending": true
+			}
+		]		
+	}
+}
