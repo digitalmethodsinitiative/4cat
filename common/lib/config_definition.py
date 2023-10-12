@@ -257,7 +257,7 @@ config_definition = {
     },
     "mail.server": {
         "type": UserInput.OPTION_TEXT,
-        "default": "localhost",
+        "default": "",
         "help": "SMTP server",
         "tooltip": "SMTP server to connect to for sending e-mail alerts.",
         "global": True
@@ -472,7 +472,19 @@ config_definition = {
         "default": True,
         "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
                    "of the underlying JSON."
-    }
+    },
+    "ui.option_email": {
+        "type": UserInput.OPTION_CHOICE,
+        "options": {
+            "none": "No Emails",
+            "processor_only": "Processors only",
+            "datasources_only": "Create Dataset only",
+            "both": "Both datasets and processors"
+        },
+        "default": "none",
+        "help": "Show email when complete option",
+        "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
+    },
 }
 
 # These are used in the web interface for more readable names

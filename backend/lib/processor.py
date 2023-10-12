@@ -1,6 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+import re
 import traceback
 import zipfile
 import typing
@@ -15,7 +16,7 @@ from pathlib import Path, PurePath
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version, remove_nuls
+from common.lib.helpers import get_software_version, remove_nuls, send_email
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 from common.config_manager import config, ConfigWrapper
 
@@ -300,6 +301,39 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.job.finish()
 
+		if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+			owner = self.dataset.get_parameters().get("email-complete", False)
+			# Check that username is email address
+			if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+				from email.mime.multipart import MIMEMultipart
+				from email.mime.text import MIMEText
+				from smtplib import SMTPException
+				import socket
+				import html2text
+
+				self.log.debug("Sending email to %s" % owner)
+				dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get('flask.server_name') + '/results/' + self.dataset.key
+				sender = config.get('mail.noreply')
+				message = MIMEMultipart("alternative")
+				message["From"] = sender
+				message["To"] = owner
+				message["Subject"] = "4CAT dataset completed: %s - %s" % (self.dataset.type, self.dataset.get_label())
+				mail = """
+					<p>Hello %s,</p>
+					<p>4CAT has finished collecting your %s dataset labeled: %s</p>
+					<p>You can view your dataset via the following link:</p>
+					<p><a href="%s">%s</a></p> 
+					<p>Sincerely,</p>
+					<p>Your friendly neighborhood 4CAT admin</p>
+					""" % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
+				html_parser = html2text.HTML2Text()
+				message.attach(MIMEText(html_parser.handle(mail), "plain"))
+				message.attach(MIMEText(mail, "html"))
+				try:
+					send_email([owner], message)
+				except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
+					self.log.error("Error sending email to %s" % owner)
+
 	def remove_files(self):
 		"""
 		Clean up result files and any staging files for processor to be attempted
@@ -578,7 +612,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if num_items is None:
 			num_items = done
 
-		self.dataset.finish(num_items)
+		if finish:
+			self.dataset.finish(num_items)
 
 	def create_standalone(self):
 		"""
