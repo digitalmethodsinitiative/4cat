@@ -23,7 +23,6 @@ module_cache.pb
 webtool/fourcat/js/jquery-csv-master/
 webtool/fourcat/static/data/word_embeddings/
 *.session
-data/
 webtool/fourcat/static/boards.json
 webtool/pages/reject-template.md
 webtool/pages/access-policy.md
