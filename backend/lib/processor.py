@@ -613,8 +613,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if num_items is None:
 			num_items = done
 
-		if finish:
-			self.dataset.finish(num_items)
+		self.dataset.finish(num_items)
 
 	def create_standalone(self):
 		"""
