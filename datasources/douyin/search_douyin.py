@@ -104,7 +104,7 @@ class SearchDouyin(Search):
             mix_current_episode = post.get(mix_info_key, {}).get("currentEpisode", "N/A")
 
         else:
-            stream_data = post.get("cell_room", {}).get("rawdata")
+            stream_data = post.get("rawdata", post.get("cell_room", {}).get("rawdata"))
             if stream_data:
                 subject = "Stream"
                 stream_data = json.loads(stream_data)
@@ -147,7 +147,7 @@ class SearchDouyin(Search):
             is_fake_key = "is_ad_fake"
 
             # Stats
-            stats = post["statistics"]
+            stats = post.get("statistics")
             collect_count = stats.get("collect_count") if stats else "Unknown"
             comment_count = stats.get("comment_count") if stats else "Unknown"
             digg_count = stats.get("digg_count") if stats else "Unknown"
@@ -198,7 +198,7 @@ class SearchDouyin(Search):
             "play_count": play_count,
             "share_count": share_count,
             # Author data
-            "author_user_id": post[author_id_key] if author_id_key in post else author["uid"],
+            "author_user_id": post[author_id_key] if author_id_key in post else author.get("uid", author.get("id")),
             "author_nickname": author["nickname"],
             "author_profile_url": f"https://www.douyin.com/user/{author[author_sec_key]}",
             "author_thumbnail_url": author[avatar_thumb_key].get(url_list_key, [''])[0],
