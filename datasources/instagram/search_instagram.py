@@ -8,6 +8,8 @@ import datetime
 import re
 
 from backend.lib.search import Search
+from common.lib.helpers import UserInput
+from common.lib.exceptions import WorkerInterruptedException, MapItemException
 
 
 class SearchInstagram(Search):
@@ -56,6 +58,11 @@ class SearchInstagram(Search):
         :param dict item:  Item to map
         :return:  Mapped item
         """
+        if (item.get("product_type", "") == "ad") or \
+                (item.get("link", "").startswith("https://www.facebook.com/ads/ig_redirect")):
+            # These are ads
+            raise MapItemException("appears to be Instagram ad, check raw data to confirm and ensure ZeeSchuimer is up to date.")
+
         is_graph_response = "__typename" in item
 
         if is_graph_response:
