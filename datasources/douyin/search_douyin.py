@@ -53,6 +53,7 @@ class SearchDouyin(Search):
                 video_description = stream_data.get("title")
                 duration = "Unknown"
                 prevent_download = None
+                stats = stream_data.get("stats")
 
                 # Author is stream owner
                 author = stream_data.get("owner")
@@ -68,6 +69,7 @@ class SearchDouyin(Search):
                 video_description = post["desc"]
                 duration = post.get("duration", post.get("video", {}).get("duration", "Unknown"))
                 prevent_download = "yes" if post["download"]["prevent"] else "no"
+                stats = post["stats"]
 
                 # Author is, well, author
                 author = post["authorInfo"]
@@ -88,7 +90,6 @@ class SearchDouyin(Search):
             mix_name_key = "mixName"
 
             # Stats
-            stats = post["stats"]
             collect_count = stats["collectCount"]
             comment_count = stats["commentCount"]
             digg_count = stats["diggCount"]
@@ -108,14 +109,17 @@ class SearchDouyin(Search):
             if stream_data:
                 subject = "Stream"
                 stream_data = json.loads(stream_data)
-                post_timestamp = datetime.fromtimestamp(stream_data.get("create_time", post.get("create_time", metadata.get(
-                    "timestamp_collected") / 1000)))  # Some posts appear to have no timestamp! We substitute collection time
+                post_timestamp = datetime.fromtimestamp(
+                    stream_data.get("create_time", post.get("create_time", metadata.get(
+                        "timestamp_collected") / 1000)))  # Some posts appear to have no timestamp! We substitute collection time
                 video_url = stream_data.get("stream_url").get("flv_pull_url", {}).get("FULL_HD1")
                 video_description = stream_data.get("title")
                 duration = "Unknown"
 
                 # Author is stream owner
                 author = stream_data.get("owner")
+                video_tags = stream_data.get("video_feed_tag")
+                stats = stream_data.get("stats")
 
             else:
                 post_timestamp = datetime.fromtimestamp(post["create_time"])
@@ -127,6 +131,10 @@ class SearchDouyin(Search):
 
                 # Author is, well, author
                 author = post["author"]
+                video_tags = ",".join(
+                    [item["tag_name"] for item in (post["video_tag"] if post["video_tag"] is not None else []) if
+                     "tag_name" in item])
+                stats = post.get("statistics")
 
             prevent_download = ("yes" if post["prevent_download"] else "no") if "prevent_download" in post else None
 
@@ -147,7 +155,6 @@ class SearchDouyin(Search):
             is_fake_key = "is_ad_fake"
 
             # Stats
-            stats = post.get("statistics")
             collect_count = stats.get("collect_count") if stats else "Unknown"
             comment_count = stats.get("comment_count") if stats else "Unknown"
             digg_count = stats.get("digg_count") if stats else "Unknown"
@@ -162,6 +169,10 @@ class SearchDouyin(Search):
                  "tag_name" in item])
 
             mix_current_episode = post.get(mix_info_key, {}).get("statis", {}).get("current_episode", "N/A")
+
+        # Stream Stats
+        count_total_streams_viewers = stats.get("total_user", "N/A")
+        count_current_stream_viewers = int(stats.get("user_count_str")) if "user_count_str" in stats else "N/A"
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
         displayed = True
@@ -197,6 +208,8 @@ class SearchDouyin(Search):
             "forward_count": forward_count,
             "play_count": play_count,
             "share_count": share_count,
+            "count_total_streams_viewers": count_total_streams_viewers,
+            "count_current_stream_viewers": count_current_stream_viewers,
             # Author data
             "author_user_id": post[author_id_key] if author_id_key in post else author.get("uid", author.get("id")),
             "author_nickname": author["nickname"],

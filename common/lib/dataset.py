@@ -33,14 +33,15 @@ class DataSet(FourcatModule):
 	workers; this class defines method to create and manipulate the dataset's
 	properties.
 	"""
-	data = {}
+	# Attributes must be created here to ensure getattr and setattr work properly
+	data = None
 	key = ""
 
-	children = []
-	available_processors = {}
-	genealogy = []
+	children = None
+	available_processors = None
+	genealogy = None
 	preset_parent = None
-	parameters = {}
+	parameters = None
 
 	owners = None
 	tagged_owners = None
@@ -48,11 +49,12 @@ class DataSet(FourcatModule):
 	db = None
 	folder = None
 	is_new = True
+
 	no_status_updates = False
 	staging_areas = None
 	queue_position = None
 
-	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent='', extension=None,
+	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
 				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
@@ -64,6 +66,12 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
+		self.data = {}
+		self.parameters = {}
+		self.children = []
+		self.available_processors = {}
+		self.genealogy = []
 		self.staging_areas = []
 
 		if key is not None:

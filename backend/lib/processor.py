@@ -17,7 +17,7 @@ from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version, remove_nuls, send_email
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException, MapItemException
 from common.config_manager import config, ConfigWrapper
 
 
@@ -75,14 +75,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Extension of the file created by the processor
 	extension = "csv"
 
-	#: Configurable options for this processor
-	options = {}
-
 	#: 4CAT settings from the perspective of the dataset's owner
 	config = None
-
-	#: Values for the processor's options, populated by user input
-	parameters = {}
 
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
@@ -613,8 +607,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if num_items is None:
 			num_items = done
 
-		if finish:
-			self.dataset.finish(num_items)
+		self.dataset.finish(num_items)
 
 	def create_standalone(self):
 		"""
