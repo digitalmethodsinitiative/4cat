@@ -75,14 +75,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Extension of the file created by the processor
 	extension = "csv"
 
-	#: Configurable options for this processor
-	options = {}
-
 	#: 4CAT settings from the perspective of the dataset's owner
 	config = None
-
-	#: Values for the processor's options, populated by user input
-	parameters = {}
 
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
