@@ -464,7 +464,7 @@ def manipulate_tags():
         db.commit()
 
         # save global order, too
-        config.set("flask.tag_order", json.dumps(order))
+        config.set("flask.tag_order", order, tag="")
 
         # always async
         return jsonify({"success": True})
