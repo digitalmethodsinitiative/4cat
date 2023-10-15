@@ -170,7 +170,12 @@ class SearchInstagram(Search):
 
         if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
             media_url = media_node["video_versions"][0]["url"]
-            display_url = media_node["image_versions2"]["candidates"][0]["url"]
+            if "image_versions2" in media_node:
+                display_url = media_node["image_versions2"]["candidates"][0]["url"]
+            else:
+                # no image links at all :-/
+                # video is all we have
+                display_url = media_node["video_versions"][0]["url"]
         elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO:
             media_url = media_node["image_versions2"]["candidates"][0]["url"]
             display_url = media_url
