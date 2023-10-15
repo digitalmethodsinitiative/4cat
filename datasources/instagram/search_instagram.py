@@ -64,7 +64,7 @@ class SearchInstagram(Search):
             # These are ads
             raise MapItemException("appears to be Instagram ad, check raw data to confirm and ensure ZeeSchuimer is up to date.")
 
-        is_graph_response = "__typename" in item
+        is_graph_response = "__typename" in item and item["__typename"] not in ("XDTMediaDict",)
 
         if is_graph_response:
             return SearchInstagram.parse_graph_item(item)
