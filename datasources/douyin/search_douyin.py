@@ -3,6 +3,7 @@ Import scraped Douyin data
 """
 import urllib
 import json
+import re
 from datetime import datetime
 
 from backend.lib.search import Search
@@ -172,7 +173,8 @@ class SearchDouyin(Search):
 
         # Stream Stats
         count_total_streams_viewers = stats.get("total_user", "N/A")
-        count_current_stream_viewers = int(stats.get("user_count_str")) if "user_count_str" in stats else "N/A"
+        stream_viewers = stats.get("user_count_str", "")
+        count_current_stream_viewers = SearchDouyin.get_chinese_number(stats.get("user_count_str")) if "user_count_str" in stats else "N/A"
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
         displayed = True
@@ -226,3 +228,15 @@ class SearchDouyin(Search):
             "place_in_collection": mix_current_episode,
             "unix_timestamp": int(post_timestamp.timestamp()),
         }
+
+    @staticmethod
+    def get_chinese_number(num):
+        if type(num) in (float, int):
+            return num
+        elif type(num) is not str:
+            return 0
+
+        if "万" in num:
+            return float(re.sub(r"[^0-9.]", "", num)) * 10000
+        else:
+            return int(re.sub(r"[^0-9.]", "", num))
