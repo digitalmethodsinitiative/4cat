@@ -187,28 +187,6 @@ def convert_to_int(value, default=0):
         return default
 
 
-def expand_short_number(text):
-    """
-    Expands a number descriptor like '300K' to an integer like '300000'
-
-    Wil raise a ValueError if the number cannot be converted
-
-    :param text: Number descriptor
-    :return int:  Number
-    """
-    try:
-        return int(text)
-    except ValueError:
-        number_bit = float(re.split(r"[^0-9.]", text)[0])
-        multiplier_bit = re.sub(r"[0-9.]", "", text).strip()
-        if multiplier_bit == "K":
-            return int(number_bit * 1000)
-        elif multiplier_bit == "M":
-            return int(number_bit * 1000000)
-        else:
-            raise ValueError("Unknown multiplier '%s' in number '%s'" % (multiplier_bit, text))
-
-
 def timify_long(number):
     """
     Make a number look like an indication of time
@@ -832,18 +810,3 @@ def sets_to_lists(d: MutableMapping):
                 yield k, v
 
     return dict(_sets_to_lists_gen(d))
-
-
-def validate_url(x):
-    """
-    Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
-    and netloc (host) for the url.
-
-    :param str x:  string representing a url
-    :return bool:  True if string is valid url, False if not
-    """
-    if type(x) == str:
-        result = urlparse(x)
-        return all([result.scheme, result.netloc])
-    else:
-        raise ValueError('Must provide type str not type %s' % type(x))
