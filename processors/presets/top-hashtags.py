@@ -1,16 +1,13 @@
 """
-Find similar words
+Find most-used hashtags in a dataset
 """
-from nltk.stem.snowball import SnowballStemmer
-
 from backend.lib.preset import ProcessorPreset
-
 from common.lib.helpers import UserInput
 
 
 class TopHashtags(ProcessorPreset):
     """
-    Run processor pipeline to find similar words
+    Run processor pipeline to find top hashtags
     """
     type = "preset-top-hashtags"  # job type ID
     category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
@@ -36,6 +33,13 @@ class TopHashtags(ProcessorPreset):
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
+        """
+        Check if dataset has a hashtag attribute
+
+        :param module:  Dataset to check
+        :param user:  User trying to run the processor
+        :return bool:
+        """
         columns = module.get_columns()
         return columns and "hashtags" in module.get_columns()
 
@@ -47,13 +51,12 @@ class TopHashtags(ProcessorPreset):
         top = self.parameters.get("top")
 
         pipeline = [
-            # first, tokenise the posts, excluding all common words
             {
                 "type": "attribute-frequencies",
                 "parameters": {
                     "columns": ["hashtags"],
                     "split-comma": True,
-                    "extract": "none",
+                    "extract": "none",  # *not* 'hashtags', because they may not start with #
                     "timeframe": timeframe,
                     "top": top,
                     "top-style": "per-item",
