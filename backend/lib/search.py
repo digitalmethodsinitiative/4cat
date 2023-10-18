@@ -117,7 +117,7 @@ class Search(BasicProcessor, ABC):
 		if self.flawless == 0:
 			self.dataset.finish(num_rows=num_items)
 		else:
-			self.dataset.update_status(f"Unexpected data format for {self.flawless} items. All data can be downloaded, but will not be available to 4CAT processors; check logs for details", is_final=True)
+			self.dataset.update_status(f"Unexpected data format for {self.flawless} items. All data can be downloaded, but only data with expected format will be available to 4CAT processors; check logs for details", is_final=True)
 			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
@@ -203,10 +203,10 @@ class Search(BasicProcessor, ABC):
 				if check_map_item:
 					try:
 						self.get_mapped_item(new_item)
-					except MapItemException:
+					except MapItemException as e:
 						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
 						self.flawless += 1
-						self.dataset.warn_unmappable_item(i, processor=self, warn_admins=unmapped_items is False)
+						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e, warn_admins=unmapped_items is False)
 						unmapped_items = True
 
 				yield new_item

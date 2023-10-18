@@ -685,7 +685,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		Ensure map_item method is compatible with a dataset by checking map_item_method_available first.
 		"""
-		mapped_item = cls.map_item(item)
+		try:
+			mapped_item = cls.map_item(item)
+		except (KeyError, IndexError) as e:
+			raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}")
 		if not mapped_item:
 			raise MapItemException("Unable to map item!")
 		return mapped_item
