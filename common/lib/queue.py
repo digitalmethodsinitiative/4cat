@@ -27,7 +27,7 @@ class JobQueue:
 
 		self.db = database
 
-	def get_job(self, jobtype, timestamp=-1):
+	def get_job(self, jobtype, timestamp=-1, restrict_claimable=True):
 		"""
 		Get job of a specific type
 
@@ -38,20 +38,39 @@ class JobQueue:
 		:param int timestamp:  Find jobs that may be claimed after this timestamp. If set to
 							   a negative value (default), any job with a "claim after" time
 							   earlier than the current time is selected.
+		:param bool restrict_claimable:  Only return jobs that may be claimed
+		according to their parameters
 		:return dict: Job data, or `None` if no job was found
 		"""
 		if timestamp < 0:
 			timestamp = int(time.time())
 
-		job = self.db.fetchone((
-			"SELECT * FROM jobs"
-			"        WHERE jobtype = %s"
-			"          AND timestamp_claimed = 0"
-			"          AND timestamp_after < %s"
-			"          AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
-			"    ORDER BY timestamp ASC"
-			"       LIMIT 1;"),
-			(jobtype, timestamp, timestamp))
+		# select the number of jobs of the same type that have been queued for
+		# longer than the job as well
+		replacements = [jobtype]
+		query = (
+			"SELECT main_queue.*, ( " \
+			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
+			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
+			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
+			"  ) " \
+			") AS queue_ahead FROM jobs AS main_queue"
+			"        WHERE main_queue.jobtype = %s")
+
+		if restrict_claimable:
+			# claimability is determined through various timestamps
+			query += (
+			"          AND main_queue.timestamp_claimed = 0"
+			"          AND main_queue.timestamp_after < %s"
+			"          AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)")
+			replacements.append(timestamp)
+			replacements.append(timestamp)
+
+		query += "    ORDER BY main_queue.timestamp ASC LIMIT 1;"
+
+		job = self.db.fetchone(query, tuple(replacements))
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
@@ -75,13 +94,21 @@ class JobQueue:
 		else:
 			filter = "WHERE jobtype != ''"
 
-
-		query = "SELECT * FROM jobs %s" % filter
+		# select the number of jobs of the same type that have been queued for
+		# longer than the job as well
+		query = "SELECT main_queue.*, ( " \
+				"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
+				"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
+				"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
+				"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
+				"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
+				"  ) " \
+				") AS queue_ahead FROM jobs AS main_queue " + filter
 
 		if restrict_claimable:
-			query += ("        AND timestamp_claimed = 0"
-					  "              AND timestamp_after < %s"
-					  "              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)")
+			query += ("        AND main_queue.timestamp_claimed = 0"
+					  "              AND main_queue.timestamp_after < %s"
+					  "              AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)")
 
 			now = int(time.time())
 			replacements.append(now)
@@ -135,7 +162,7 @@ class JobQueue:
 		             with those parameters could be queued, and the old one is
 		             just as valid).
 		"""
-		data =  data={
+		data = {
 			"jobtype": jobtype,
 			"details": json.dumps(details),
 			"timestamp": int(time.time()),
@@ -158,8 +185,6 @@ class JobQueue:
 		All claimed jobs are released. This is useful to run when the backend is restarted.
 		"""
 		self.db.execute("UPDATE jobs SET timestamp_claimed = 0")
-
-
 
 	def get_place_in_queue(self, job):
 		"""

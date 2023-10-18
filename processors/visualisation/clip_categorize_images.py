@@ -1,18 +1,13 @@
 """
 OpenAI CLIP categorize images
 """
-import datetime
 import os
 import json
-import time
-import requests
-from pathlib import Path
-from json import JSONDecodeError
 
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
 
@@ -103,7 +98,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("image-to-categories.cd_clip_num_files", 100, user=user))
+        max_number_images = int(config.get("dmi-service-manager.cd_clip_num_files", 100, user=user))
         if max_number_images == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of images"
             options["amount"]["default"] = 100
@@ -151,7 +146,11 @@ class CategorizeImagesCLIP(BasicProcessor):
         dmi_service_manager = DmiServiceManager(processor=self)
 
         # Check GPU memory available
-        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("clip")
+        try:
+            gpu_memory, info = dmi_service_manager.check_gpu_memory_available("clip")
+        except DmiServiceManagerException as e:
+            self.dataset.finish_with_error(str(e))
+            return
         if not gpu_memory:
             if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
                 self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
@@ -176,7 +175,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                 }
 
         # Finally, add image files to args
-        data["args"].extend([f"data/{path_to_files.joinpath(filename)}" for filename in image_filenames])
+        data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
 
         # Send request to DMI Service Manager
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")
@@ -214,8 +213,10 @@ class CategorizeImagesCLIP(BasicProcessor):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while writing results to file")
 
-                self.dataset.log(f"Writing {result_filename}...")
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
+                    if not result_filename.endswith(".json"):
+                        self.dataset.log(f"Skipping {result_filename} (not a JSON results file)")
+                        continue
                     result_data = json.loads(''.join(result_file))
                     image_name = ".".join(result_filename.split(".")[:-1])
                     data = {

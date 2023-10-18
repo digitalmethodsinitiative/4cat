@@ -457,6 +457,9 @@ class User:
             if tag not in sorted_tags:
                 sorted_tags.append(tag)
 
+        # whitespace isn't a tag
+        sorted_tags = [tag for tag in sorted_tags if tag.strip()]
+
         self.data["tags"] = sorted_tags
         self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
 

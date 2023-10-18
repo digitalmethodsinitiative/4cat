@@ -292,7 +292,7 @@ class PixPlotGenerator(BasicProcessor):
                         post_id_image_dictionary[post_id] = [url]
 
                 # Add to metadata
-                images[filename] = {'filename': filename,
+                images[url] = {'filename': filename,
                                     'permalink': url,
                                     'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(data.get('post_ids'))),
                                     'tags': '',

@@ -339,7 +339,7 @@ class ConsolidateURLs(BasicProcessor):
         if remove_scheme:
             parsed_url = parsed_url._replace(scheme="")
         if remove_domain:
-            parsed_url = parsed_url._replace(domain="")
+            parsed_url = parsed_url._replace(netloc="")
         if remove_path:
             parsed_url = parsed_url._replace(path="")
         if remove_query:

@@ -43,7 +43,7 @@ class SearchTelegram(Search):
     details_cache = None
     failures_cache = None
     eventloop = None
-    flawless = True
+    flawless = 0
     end_if_rate_limited = 600  # break if Telegram requires wait time above number of seconds
 
     max_workers = 1
@@ -161,8 +161,8 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_phone", instant=True)
             self.dataset.delete_parameter("api_id", instant=True)
 
-        if not self.flawless:
-            self.dataset.update_status("Dataset completed, but some requested entities were unavailable (they may have "
+        if self.flawless:
+            self.dataset.update_status(f"Dataset completed, but {self.flawless} requested entities were unavailable (they may have "
                                        "been private). View the log file for details.", is_final=True)
 
         return results
@@ -319,11 +319,11 @@ class SearchTelegram(Search):
 
                 except ChannelPrivateError:
                     self.dataset.update_status("Entity %s is private, skipping" % query)
-                    self.flawless = False
+                    self.flawless += 1
 
                 except (UsernameInvalidError,):
                     self.dataset.update_status("Could not scrape entity '%s', does not seem to exist, skipping" % query)
-                    self.flawless = False
+                    self.flawless += 1
 
                 except FloodWaitError as e:
                     self.dataset.update_status("Rate-limited by Telegram: %s; waiting" % str(e))
@@ -331,7 +331,7 @@ class SearchTelegram(Search):
                         time.sleep(e.seconds)
                         continue
                     else:
-                        self.flawless = False
+                        self.flawless += 1
                         no_additional_queries = True
                         self.dataset.update_status(
                             "Telegram wait grown large than %i minutes, ending" % int(e.seconds / 60))
@@ -340,11 +340,11 @@ class SearchTelegram(Search):
                 except BadRequestError as e:
                     self.dataset.update_status(
                         "Error '%s' while collecting entity %s, skipping" % (e.__class__.__name__, query))
-                    self.flawless = False
+                    self.flawless += 1
 
                 except ValueError as e:
                     self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (str(e), query))
-                    self.flawless = False
+                    self.flawless += 1
 
                 except ChannelPrivateError as e:
                     self.dataset.update_status(
@@ -357,7 +357,7 @@ class SearchTelegram(Search):
                         self.dataset.update_status(
                             "Tried to fetch messages for entity '%s' but timed out %i times. Skipping." % (
                                 query, retries))
-                        self.flawless = False
+                        self.flawless += 1
                         break
 
                     self.dataset.update_status(

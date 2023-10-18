@@ -20,6 +20,7 @@ from flask import Flask
 from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from common.config_manager import config
 from common.lib.database import Database
@@ -32,6 +33,11 @@ from webtool.lib.helpers import generate_css_colours
 # initialize global objects for interacting with all the things
 login_manager = LoginManager()
 app = Flask(__name__)
+
+# this ensures that HTTPS is properly applied to built URLs even if the app
+# is running behind a proxy
+# see https://stackoverflow.com/a/45333882
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 # Set up logging for Gunicorn; only run w/ Docker
 if config.get("USING_DOCKER"):

@@ -8,6 +8,8 @@ import datetime
 import re
 
 from backend.lib.search import Search
+from common.lib.helpers import UserInput
+from common.lib.exceptions import WorkerInterruptedException, MapItemException
 
 
 class SearchInstagram(Search):
@@ -56,7 +58,13 @@ class SearchInstagram(Search):
         :param dict item:  Item to map
         :return:  Mapped item
         """
-        is_graph_response = "__typename" in item
+        link = item.get("link", "")
+        if (item.get("product_type", "") == "ad") or \
+                (link and link.startswith("https://www.facebook.com/ads/ig_redirect")):
+            # These are ads
+            raise MapItemException("appears to be Instagram ad, check raw data to confirm and ensure ZeeSchuimer is up to date.")
+
+        is_graph_response = "__typename" in item and item["__typename"] not in ("XDTMediaDict",)
 
         if is_graph_response:
             return SearchInstagram.parse_graph_item(item)
@@ -162,7 +170,12 @@ class SearchInstagram(Search):
 
         if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
             media_url = media_node["video_versions"][0]["url"]
-            display_url = media_node["image_versions2"]["candidates"][0]["url"]
+            if "image_versions2" in media_node:
+                display_url = media_node["image_versions2"]["candidates"][0]["url"]
+            else:
+                # no image links at all :-/
+                # video is all we have
+                display_url = media_node["video_versions"][0]["url"]
         elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO:
             media_url = media_node["image_versions2"]["candidates"][0]["url"]
             display_url = media_url

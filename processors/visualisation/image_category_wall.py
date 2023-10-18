@@ -17,6 +17,7 @@ from PIL import Image
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -37,6 +38,23 @@ class ImageWallGenerator(BasicProcessor):
 
 	number_of_ranges = 10  # number of ranges to use for numeric categories
 
+	config = {
+		"image-visuals.max_per_cat": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 1000,
+			"help": "Max images per category when visualising",
+			"tooltip": "0 will allow visualization of any number of images."
+		},
+		"image-visuals.max_pixels_per_image": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 300,
+			"min": 25,
+			"help": "Max pixels for each images when visualising",
+		}
+	}
+
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
@@ -51,6 +69,8 @@ class ImageWallGenerator(BasicProcessor):
 		"""
 		Collect maximum number of audio files from configuration and update options accordingly
 		"""
+		max_number_images = int(config.get("image-visuals.max_per_cat", 1000, user=user))
+		max_pixels = int(config.get("image-visuals.max_pixels_per_image", 300, user=user))
 		options = {
 			"category": {
 				"type": UserInput.OPTION_TEXT,
@@ -58,20 +78,20 @@ class ImageWallGenerator(BasicProcessor):
 			},
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "No. of images (max 1000)",
-				"default": 100,
-				"min": 0,
-				"max": 1000,
-				"tooltip": "'0' uses as many images as available in the archive (up to 1000)"
+				"help": "Max images per category",
+				"default": 10 if max_number_images == 0 else min(max_number_images, 10),
+				"min": 0 if max_number_images == 0 else 1,
+				"max": max_number_images,
+				"tooltip": "'0' uses as many images as available in the archive" + (f" (up to {max_number_images})" if max_number_images != 0 else "")
 			},
 			"height": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Image height",
-				"tooltip": "In pixels. Each image will be this height and are resized proportionally to fit it. Must be between 25 and 300.",
+				"tooltip": f"In pixels. Each image will be this height and are resized proportionally to fit it. Must be between 25 and {max_pixels}.",
 				"coerce_type": int,
-				"default": 100,
+				"default": min(max_pixels, 100),
 				"min": 25,
-				"max": 300
+				"max": max_pixels
 			}
 		}
 
@@ -134,9 +154,9 @@ class ImageWallGenerator(BasicProcessor):
 			return
 
 		# 0 = use as many images as in the archive, up to the max
-		max_images = convert_to_int(self.parameters.get("amount"), 100)
-		if max_images == 0:
-			max_images = self.get_options()["amount"]["max"]
+		images_per_category = convert_to_int(self.parameters.get("amount"), 100)
+		if images_per_category == 0:
+			images_per_category = self.get_options()["amount"]["max"]
 
 		# Some processors may have a special category type to extract categories
 		special_case = category_dataset.type == "image-to-categories"
@@ -259,14 +279,6 @@ class ImageWallGenerator(BasicProcessor):
 		# Drop categories with no images (ranges may have no images)
 		categories = {cat: images for cat, images in categories.items() if images}
 		self.dataset.log(f"Found {len(categories)} categories")
-		# TODO: this is semi arbitrary; max_images is only ever hit if each category is evenly sized
-		# If we break, when max_images is hit, categories are not representative and the last categories will be empty
-		# Instead, we could calculate each category's proportional size and then use that to determine how many images
-		# to take from each category while remaining under max_images
-		images_per_category = max(max_images // len(categories), 1)
-		# Could do something like this, but it also appears to cut smaller categories off uncessarily
-		# total_images = sum([len(images) for images in categories.values()])
-		# max_images_per_categories = {cat: max(math.ceil((len(images)/total_images) * max_images), 1) for cat, images in categories.items()}
 
 		# Create SVG with categories and images
 		base_height = self.parameters.get("height", 100)
@@ -287,7 +299,8 @@ class ImageWallGenerator(BasicProcessor):
 			offset_w = 0
 
 			for i, image in enumerate(images):
-				if i >= images_per_category:
+				if images_per_category != 0 and i >= images_per_category:
+					# Category full; add a label to indicate there are more images in category
 					remaining = f"+ {len(images) - images_per_category} more images"
 					footersize = (fontsize * (len(remaining) + 2) * 0.5925, fontsize * 2)
 					footer_shape = SVG(insert=(offset_w, base_height/2 - footersize[1]), size=footersize)

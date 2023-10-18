@@ -1524,6 +1524,21 @@ const ui_helpers = {
                 });
             }
         });
+
+        // special case - restart 4cat front-end
+        $('button[name=action][value=restart-frontend]').on('click', function(e) {
+            e.preventDefault();
+            const button = $('button[name=action][value=restart-frontend]');
+            const url = button.attr('data-url');
+            $('.button-container button').attr('disabled', 'disabled');
+            button.find('i').removeClass('fa-power-off').addClass('fa-sync-alt').addClass('fa-spin');
+            fetch(url, {method: 'POST'}).then(response => response.json()).then(response => {
+                popup.alert(response['message'], 'Front-end restart: ' + response['status']);
+            }).catch(e => {}).finally(() => {
+                button.find('i').removeClass('fa-sync-alt').removeClass('fa-spin').addClass('fa-power-off');
+                $('.button-container button').removeAttr('disabled');
+            });
+        });
     },
 
     /**

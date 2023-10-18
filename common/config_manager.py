@@ -1,4 +1,5 @@
 import pickle
+import time
 import json
 
 from pathlib import Path
@@ -59,7 +60,27 @@ class ConfigManager:
         if module_config_path.exists():
             try:
                 with module_config_path.open("rb") as infile:
-                    module_config = pickle.load(infile)
+                    retries = 0
+                    module_config = None
+                    # if 4CAT is being run in two different containers
+                    # (front-end and back-end) they might both be running this
+                    # bit of code at the same time. If the file is half-written
+                    # loading it will fail, so allow for a few retries
+                    while retries < 3:
+                        try:
+                            module_config = pickle.load(infile)
+                            break
+                        except Exception:  # this can be a number of exceptions, all with the same recovery path
+                            time.sleep(0.1)
+                            retries += 1
+                            continue
+
+                    if module_config is None:
+                        # not really a way to gracefully recover from this, but
+                        # we can at least describe the error
+                        raise RuntimeError("Could not read module_config.bin. The 4CAT developers did a bad job of "
+                                           "preventing this. Shame on them!")
+
                     self.config_definition.update(module_config)
             except (ValueError, TypeError) as e:
                 pass
@@ -124,6 +145,7 @@ class ConfigManager:
         unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
 
         if unknown_keys:
+            self.db.log.info(f"Deleting unknown settings from database: {', '.join([key['name'] for key in unknown_keys])}")
             self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
 
         self.db.commit()
@@ -191,31 +213,8 @@ class ConfigManager:
         if not self.db:
             self.with_db()
 
-        # be flexible about the input types here
-        if tags is None:
-            tags = []
-        elif type(tags) is str:
-            tags = [tags]
-
-        # can provide either a string or user object
-        if type(user) is not str:
-            if hasattr(user, "get_id"):
-                user = user.get_id()
-            elif user is not None:
-                raise TypeError("get() expects None, a User object or a string for argument 'user'")
-
-        # user-specific settings are just a special type of tag (which takes
-        # precedence), same goes for user groups
-        if user:
-            user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
-            if user_tags:
-                try:
-                    tags.extend(user_tags["tags"])
-                except (TypeError, ValueError):
-                    # should be a JSON list, but isn't
-                    pass
-
-            tags.insert(0, f"user:{user}")
+        # get tags to look for
+        tags = self.get_active_tags(user, tags)
 
         # query database for any values within the required tags
         tags.append("")  # empty tag = default value
@@ -263,6 +262,49 @@ class ConfigManager:
             return list(final_settings.values())[0]
         else:
             return final_settings
+
+    def get_active_tags(self, user=None, tags=None):
+        """
+        Get active tags for given user/tag list
+
+        Used internally to harmonize tag setting for various methods, but can
+        also be called directly to verify tag activation.
+
+        :param user:  User object or name. Adds a tag `user:[username]` in
+        front of the tag list.
+        :param tags:  Tag or tags for the required setting. If a tag is
+        provided, the method checks if a special value for the setting exists
+        with the given tag, and returns that if one exists. First matching tag
+        wins.
+        :return list:  List of tags
+        """
+        # be flexible about the input types here
+        if tags is None:
+            tags = []
+        elif type(tags) is str:
+            tags = [tags]
+
+        # can provide either a string or user object
+        if type(user) is not str:
+            if hasattr(user, "get_id"):
+                user = user.get_id()
+            elif user is not None:
+                raise TypeError("get() expects None, a User object or a string for argument 'user'")
+
+        # user-specific settings are just a special type of tag (which takes
+        # precedence), same goes for user groups
+        if user:
+            user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
+            if user_tags:
+                try:
+                    tags.extend(user_tags["tags"])
+                except (TypeError, ValueError):
+                    # should be a JSON list, but isn't
+                    pass
+
+            tags.insert(0, f"user:{user}")
+
+        return tags
 
     def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True):
         """
@@ -379,6 +421,10 @@ class ConfigWrapper:
         """
         Wrap `get_all()`
 
+        Takes the `user`, `tags` and `request` given when initialised into
+        account. If `tags` is set explicitly, the HTTP header-based override
+        is not applied.
+
         :param args:
         :param kwargs:
         :return:
@@ -386,16 +432,19 @@ class ConfigWrapper:
         if "user" not in kwargs and self.user:
             kwargs["user"] = self.user
 
-        if "tags" not in kwargs and self.tags:
-            kwargs["tags"] = self.tags
-
-        kwargs["tags"] = self.request_override(kwargs["tags"])
+        if "tags" not in kwargs:
+            kwargs["tags"] = self.tags if self.tags else []
+            kwargs["tags"] = self.request_override(kwargs["tags"])
 
         return self.config.get_all(*args, **kwargs)
 
     def get(self, *args, **kwargs):
         """
         Wrap `get()`
+
+        Takes the `user`, `tags` and `request` given when initialised into
+        account. If `tags` is set explicitly, the HTTP header-based override
+        is not applied.
 
         :param args:
         :param kwargs:
@@ -405,11 +454,28 @@ class ConfigWrapper:
             kwargs["user"] = self.user
 
         if "tags" not in kwargs:
-            kwargs["tags"] = self.tags
-
-        kwargs["tags"] = self.request_override(kwargs["tags"])
+            kwargs["tags"] = self.tags if self.tags else []
+            kwargs["tags"] = self.request_override(kwargs["tags"])
 
         return self.config.get(*args, **kwargs)
+
+    def get_active_tags(self, user=None, tags=None):
+        """
+        Wrap `get_active_tags()`
+
+        Takes the `user`, `tags` and `request` given when initialised into
+        account. If `tags` is set explicitly, the HTTP header-based override
+        is not applied.
+
+        :param user:
+        :param tags:
+        :return list:
+        """
+        active_tags = self.config.get_active_tags(user, tags)
+        if not tags:
+            active_tags = self.request_override(active_tags)
+
+        return active_tags
 
     def request_override(self, tags):
         """

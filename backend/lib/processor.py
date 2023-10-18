@@ -1,6 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+import re
 import traceback
 import zipfile
 import typing
@@ -15,9 +16,10 @@ from pathlib import Path, PurePath
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version, remove_nuls
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
+from common.lib.helpers import get_software_version, remove_nuls, send_email
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException, MapItemException
 from common.config_manager import config, ConfigWrapper
+
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -73,14 +75,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Extension of the file created by the processor
 	extension = "csv"
 
-	#: Configurable options for this processor
-	options = {}
-
 	#: 4CAT settings from the perspective of the dataset's owner
 	config = None
-
-	#: Values for the processor's options, populated by user input
-	parameters = {}
 
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
@@ -299,6 +295,39 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.dataset.key, self.parameters["attach_to"]))
 
 		self.job.finish()
+
+		if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+			owner = self.dataset.get_parameters().get("email-complete", False)
+			# Check that username is email address
+			if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+				from email.mime.multipart import MIMEMultipart
+				from email.mime.text import MIMEText
+				from smtplib import SMTPException
+				import socket
+				import html2text
+
+				self.log.debug("Sending email to %s" % owner)
+				dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get('flask.server_name') + '/results/' + self.dataset.key
+				sender = config.get('mail.noreply')
+				message = MIMEMultipart("alternative")
+				message["From"] = sender
+				message["To"] = owner
+				message["Subject"] = "4CAT dataset completed: %s - %s" % (self.dataset.type, self.dataset.get_label())
+				mail = """
+					<p>Hello %s,</p>
+					<p>4CAT has finished collecting your %s dataset labeled: %s</p>
+					<p>You can view your dataset via the following link:</p>
+					<p><a href="%s">%s</a></p> 
+					<p>Sincerely,</p>
+					<p>Your friendly neighborhood 4CAT admin</p>
+					""" % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
+				html_parser = html2text.HTML2Text()
+				message.attach(MIMEText(html_parser.handle(mail), "plain"))
+				message.attach(MIMEText(mail, "html"))
+				try:
+					send_email([owner], message)
+				except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
+					self.log.error("Error sending email to %s" % owner)
 
 	def remove_files(self):
 		"""
@@ -624,6 +653,45 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		shutil.copy(self.dataset.get_log_path(), standalone.get_log_path())
 
 		return standalone
+
+	@classmethod
+	def map_item_method_available(cls, dataset):
+		"""
+		Checks if map_item method exists and is compatible with dataset. If dataset does not have an extension,
+		returns False
+
+		:param BasicProcessor processor:	The BasicProcessor subclass object with which to use map_item
+		:param DataSet dataset:				The DataSet object with which to use map_item
+		"""
+		# only run item mapper if extension of processor == extension of
+		# data file, for the scenario where a csv file was uploaded and
+		# converted to an ndjson-based data source, for example
+		# todo: this is kind of ugly, and a better fix may be possible
+		dataset_extension = dataset.get_extension()
+		if not dataset_extension:
+			# DataSet results file does not exist or has no extension, use expected extension
+			if hasattr(dataset, "extension"):
+				dataset_extension = dataset.extension
+			else:
+				# No known DataSet extension; cannot determine if map_item method compatible
+				return False
+
+		return hasattr(cls, "map_item") and cls.extension == dataset_extension
+
+	@classmethod
+	def get_mapped_item(cls, item):
+		"""
+		Get the mapped item using a processors map_item method.
+
+		Ensure map_item method is compatible with a dataset by checking map_item_method_available first.
+		"""
+		try:
+			mapped_item = cls.map_item(item)
+		except (KeyError, IndexError) as e:
+			raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}")
+		if not mapped_item:
+			raise MapItemException("Unable to map item!")
+		return mapped_item
 
 	@classmethod
 	def is_filter(cls):

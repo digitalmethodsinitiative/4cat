@@ -207,6 +207,10 @@ class DatasetMerger(BasicProcessor):
 
         # Request standalone
         standalone = self.create_standalone()
+        if not standalone:
+            # something failed earlier, so there's nothing to copy or make
+            # standalone
+            return
 
         # merged dataset has the same type as the original
         if self.source_dataset.parameters.get("datasource"):

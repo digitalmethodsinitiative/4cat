@@ -142,6 +142,17 @@ config_definition = {
         "help": "Can restart/upgrade",
         "tooltip": "Controls whether users can restart and upgrade 4CAT via the Control Panel"
     },
+    "privileges.can_upgrade_to_dev": {
+        # this is NOT an admin privilege, because all admins automatically
+        # get all admin privileges! users still need the above privilege
+        # to actually use this, anyway
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can upgrade to development branch",
+        "tooltip": "Controls whether users can upgrade 4CAT to a development branch of the code via the Control Panel. "
+                   "This is an easy way to break 4CAT so it is recommended to not enable this unless you're really "
+                   "sure of what you're doing."
+    },
     "privileges.admin.can_manage_tags": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
@@ -200,7 +211,8 @@ config_definition = {
         "value": 81,
         "min": 0,
         "max": 360,
-        "coerce_type": int
+        "coerce_type": int,
+        "global": True
     },
     "4cat.layout_hue_secondary": {
         "type": UserInput.OPTION_HUE,
@@ -210,7 +222,8 @@ config_definition = {
         "value": 90,
         "min": 0,
         "max": 360,
-        "coerce_type": int
+        "coerce_type": int,
+        "global": True
     },
     "4cat.allow_access_request": {
         "type": UserInput.OPTION_TOGGLE,
@@ -250,7 +263,7 @@ config_definition = {
     },
     "mail.server": {
         "type": UserInput.OPTION_TEXT,
-        "default": "localhost",
+        "default": "",
         "help": "SMTP server",
         "tooltip": "SMTP server to connect to for sending e-mail alerts.",
         "global": True
@@ -465,7 +478,19 @@ config_definition = {
         "default": True,
         "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
                    "of the underlying JSON."
-    }
+    },
+    "ui.option_email": {
+        "type": UserInput.OPTION_CHOICE,
+        "options": {
+            "none": "No Emails",
+            "processor_only": "Processors only",
+            "datasources_only": "Create Dataset only",
+            "both": "Both datasets and processors"
+        },
+        "default": "none",
+        "help": "Show email when complete option",
+        "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
+    },
 }
 
 # These are used in the web interface for more readable names
@@ -482,5 +507,6 @@ categories = {
     "path": "File paths",
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
-    "ui": "User interface"
+    "ui": "User interface",
+    "image-visuals": "Image visualization",
 }

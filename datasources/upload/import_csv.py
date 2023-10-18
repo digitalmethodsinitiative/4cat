@@ -14,7 +14,8 @@ from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException
+from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException, \
+    QueryNeedsExplicitConfirmationException
 from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
 
 
@@ -186,9 +187,9 @@ class SearchCustom(BasicProcessor):
             wrapped_file = io.TextIOWrapper(file, encoding=encoding)
             sample = wrapped_file.read(1024 * 1024)
             wrapped_file.seek(0)
-            if not csv.Sniffer().has_header(sample):
-                raise QueryParametersException("The uploaded file does not seem to have a header row. CSV files need "
-                                               "a header row to be compatible with 4CAT.")
+            if not csv.Sniffer().has_header(sample) and not query.get("frontend-confirm"):
+                raise QueryNeedsExplicitConfirmationException(
+                    "The uploaded file does not seem to have a header row. Continue anyway?")
             dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
 
             # override the guesses for specific formats if defiend so in

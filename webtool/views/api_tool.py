@@ -21,7 +21,8 @@ from werkzeug.utils import secure_filename
 from webtool import app, db, log, openapi, limiter, queue, config
 from webtool.lib.helpers import error, setting_required
 
-from common.lib.exceptions import QueryParametersException, JobNotFoundException, QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
+from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
+	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.config_manager import ConfigWrapper
@@ -332,6 +333,9 @@ def queue_dataset():
 
 	if request.form.to_dict().get("pseudonymise") in ("pseudonymise", "anonymise"):
 		sanitised_query["pseudonymise"] = request.form.to_dict().get("pseudonymise")
+
+	if request.form.to_dict().get("email-complete", False):
+		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
 
 	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
 	is_private = bool(request.form.get("make-private", False))
@@ -1031,6 +1035,9 @@ def queue_processor(key=None, processor=None):
 		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form, silently_correct=False)
 	except QueryParametersException as e:
 		return error(400, error=str(e))
+
+	if request.form.to_dict().get("email-complete", False):
+		options["email-complete"] = request.form.to_dict().get("email-user", False)
 
 	# private or not is inherited from parent dataset
 	analysis = DataSet(parent=dataset.key,
