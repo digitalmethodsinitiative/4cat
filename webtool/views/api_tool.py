@@ -341,6 +341,7 @@ def queue_dataset():
 	is_private = bool(request.form.get("make-private", False))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
+
 	dataset = DataSet(
 		parameters=sanitised_query,
 		db=db,
@@ -349,6 +350,12 @@ def queue_dataset():
 		is_private=is_private,
 		owner=current_user.get_id()
 	)
+
+	# this bit allows search workers to insist on the new dataset having a
+	# certain key. This is at the time of writing only used by the worker that
+	# imports 4CAT datasets from elsewhere
+	if hasattr(search_worker, "ensure_key"):
+		dataset.set_key(search_worker.ensure_key(sanitised_query))
 
 	if request.form.get("label"):
 		dataset.update_label(request.form.get("label"))
