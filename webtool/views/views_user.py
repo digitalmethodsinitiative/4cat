@@ -324,7 +324,7 @@ def show_login():
 
     have_email = config.get('mail.admin_email') and config.get('mail.server')
     if request.method == 'GET':
-        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email)
+        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email), 401
 
     username = request.form['username']
     password = request.form['password']
