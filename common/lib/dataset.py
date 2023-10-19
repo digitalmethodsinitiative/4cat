@@ -16,7 +16,8 @@ from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
-from common.lib.exceptions import ProcessorInterruptedException, DataSetException, MapItemException
+from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
+								   MapItemException)
 
 
 class DataSet(FourcatModule):
@@ -78,29 +79,29 @@ class DataSet(FourcatModule):
 			self.key = key
 			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
 			if not current:
-				raise TypeError("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
+				raise DataSetNotFoundException("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
 			query = current["query"]
 		elif job is not None:
 			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
-				raise TypeError("DataSet() requires a valid job ID for its 'job' argument")
+				raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
 
 			query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
-				raise ValueError("DataSet() requires a complete dataset record for its 'data' argument")
+				raise DataSetException("DataSet() requires a complete dataset record for its 'data' argument")
 
 			query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
-				raise TypeError("DataSet() requires either 'key', or 'parameters' to be given")
+				raise DataSetException("DataSet() requires either 'key', or 'parameters' to be given")
 
 			if not type:
-				raise ValueError("Datasets must have their type set explicitly")
+				raise DataSetException("Datasets must have their type set explicitly")
 
 			query = self.get_label(parameters, default=type)
 			self.key = self.get_key(query, parameters, parent)
@@ -556,7 +557,7 @@ class DataSet(FourcatModule):
 			try:
 				child = DataSet(key=child["key"], db=self.db)
 				child.delete(commit=commit)
-			except TypeError:
+			except DataSetException:
 				# dataset already deleted - race condition?
 				pass
 
@@ -1186,7 +1187,7 @@ class DataSet(FourcatModule):
 		while key_parent:
 			try:
 				parent = DataSet(key=key_parent, db=self.db)
-			except TypeError:
+			except DataSetException:
 				break
 
 			genealogy.append(parent)

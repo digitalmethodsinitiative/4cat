@@ -22,7 +22,7 @@ from webtool import app, db, log, openapi, limiter, queue, config
 from webtool.lib.helpers import error, setting_required
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
-	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
+	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.config_manager import ConfigWrapper
@@ -398,7 +398,7 @@ def check_dataset():
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not current_user.can_access_dataset(dataset):
@@ -468,7 +468,7 @@ def edit_dataset_label(key):
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
@@ -513,7 +513,7 @@ def convert_dataset(key):
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not current_user.is_admin:
@@ -561,7 +561,7 @@ def nuke_dataset(key=None, reason=None):
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not current_user.is_admin:
@@ -633,7 +633,7 @@ def delete_dataset(key=None):
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
@@ -703,7 +703,7 @@ def erase_credentials(key=None):
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
@@ -789,7 +789,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
@@ -847,7 +847,7 @@ def remove_dataset_owner(key=None, username=None):
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
@@ -903,7 +903,7 @@ def toggle_favourite(key):
 	"""
 	try:
 		dataset = DataSet(key=key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not current_user.can_access_dataset(dataset):
@@ -943,7 +943,7 @@ def toggle_private(key):
 	"""
 	try:
 		dataset = DataSet(key=key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
@@ -1019,7 +1019,7 @@ def queue_processor(key=None, processor=None):
 	# cover all bases - can only run processor on "parent" dataset
 	try:
 		dataset = DataSet(key=key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Not a valid dataset key.")
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not current_user.can_access_dataset(dataset):
@@ -1105,7 +1105,7 @@ def check_processor():
 	for key in keys:
 		try:
 			dataset = DataSet(key=key, db=db)
-		except TypeError:
+		except DataSetException:
 			continue
 
 		if not current_user.can_access_dataset(dataset):
@@ -1190,7 +1190,7 @@ def export_packed_dataset(key=None, component=None):
 	"""
 	try:
 		dataset = DataSet(key=key, db=db)
-	except (TypeError,):
+	except DataSetException:
 		return error(404, error="Dataset not found.")
 
 	if not current_user.can_access_dataset(dataset=dataset, role="owner"):
