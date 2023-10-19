@@ -3,6 +3,7 @@ import itertools
 import datetime
 import hashlib
 import fnmatch
+import random
 import shutil
 import json
 import time
@@ -978,7 +979,7 @@ class DataSet(FourcatModule):
 		self.data["result_file"] = file
 		return updated > 0
 
-	def get_key(self, query, parameters, parent=""):
+	def get_key(self, query, parameters, parent="", time_offset=0):
 		"""
 		Generate a unique key for this dataset that can be used to identify it
 
@@ -988,6 +989,9 @@ class DataSet(FourcatModule):
 		:param str query:  Query string
 		:param parameters:  Dataset parameters
 		:param parent: Parent dataset's key (if applicable)
+		:param time_offset:  Offset to add to the time component of the dataset
+		key. This can be used to ensure a unique key even if the parameters and
+		timing is otherwise identical to an existing dataset's
 
 		:return str:  Dataset key
 		"""
@@ -1005,11 +1009,50 @@ class DataSet(FourcatModule):
 		# different results when done at different times, getting a
 		# duplicate key is not actually always desirable. The resolution
 		# of this salt could be experimented with...
-		param_key["_salt"] = int(time.time())
+		param_key["_salt"] = int(time.time()) + time_offset
 
 		parent_key = str(parent) if parent else ""
 		plain_key = repr(param_key) + str(query) + parent_key
-		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		hashed_key = hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+
+		if self.db.fetchone("SELECT key FROM datasets WHERE key = %s", (hashed_key,)):
+			# key exists, generate a new one
+			return self.get_key(query, parameters, parent, time_offset=random.randint(1,10))
+		else:
+			return hashed_key
+
+	def set_key(self, key):
+		"""
+		Change dataset key
+
+		In principe, keys should never be changed. But there are rare cases
+		where it is useful to do so, in particular when importing a dataset
+		from another 4CAT instance; in that case it makes sense to try and
+		ensure that the key is the same as it was before. This function sets
+		the dataset key and updates any dataset references to it.
+
+		:param str key:  Key to set
+		:return str:  Key that was set. If the desired key already exists, the
+		original key is kept.
+		"""
+		key_exists = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (key,))
+		if key_exists or not key:
+			return self.key
+
+		old_key = self.key
+		self.db.update("datasets", data={"key": key}, where={"key": old_key})
+
+		# update references
+		self.db.update("datasets", data={"key_parent": key}, where={"key_parent": old_key})
+		self.db.update("datasets_owners", data={"key": key}, where={"key": old_key})
+		self.db.update("jobs", data={"remote_id": key}, where={"remote_id": old_key})
+		self.db.update("users_favourites", data={"key": key}, where={"key": old_key})
+
+		# for good measure
+		self.db.commit()
+		self.key = key
+
+		return self.key
 
 	def get_status(self):
 		"""
