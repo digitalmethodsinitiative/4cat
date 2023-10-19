@@ -1,5 +1,5 @@
 """
-Custom data upload to create bespoke datasets
+Import datasets from other 4CATs
 """
 import requests
 import time
@@ -19,7 +19,7 @@ class SearchImportFromFourcat(BasicProcessor):
     type = "import_4cat-search"  # job ID
     category = "Search"  # category
     title = "Import from 4CAT"  # title displayed in UI
-    description = "Import a dataset from another 4CAT instance"  # description displayed in UI
+    description = "Import a dataset from another 4CAT server"  # description displayed in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
 
@@ -53,10 +53,10 @@ class SearchImportFromFourcat(BasicProcessor):
 
     def process(self):
         """
-        Process uploaded CSV file
+        Import 4CAT dataset from another 4CAT server
 
-        Applies the provided mapping and makes sure the file is in a format
-        4CAT will understand.
+        Interfaces with another 4CAT server to transfer a dataset's metadata,
+        data files and child datasets.
         """
         urls = [url.strip() for url in self.parameters.get("url").split(",")]
         base = urls[0].split("/results/")[0]
