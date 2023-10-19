@@ -1203,6 +1203,9 @@ def export_packed_dataset(key=None, component=None):
 	if not current_user.can_access_dataset(dataset=dataset, role="owner"):
 		raise error(403, error=f"You cannot export this dataset. {current_user}")
 
+	if not dataset.is_finished():
+		return error(403, error="You cannot export unfinished datasets.")
+
 	if component == "metadata":
 		metadata = db.fetchone("SELECT * FROM datasets WHERE key = %s", (dataset.key,))
 
@@ -1211,7 +1214,7 @@ def export_packed_dataset(key=None, component=None):
 		return jsonify(metadata)
 
 	elif component == "children":
-		children = [d["key"] for d in db.fetchall("SELECT key FROM datasets WHERE key_parent = %s", (dataset.key,))]
+		children = [d["key"] for d in db.fetchall("SELECT key FROM datasets WHERE key_parent = %s AND is_finished = TRUE", (dataset.key,))]
 		return jsonify(children)
 
 	elif component in ("data", "log"):
