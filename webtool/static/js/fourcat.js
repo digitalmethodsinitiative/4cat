@@ -338,6 +338,7 @@ const query = {
         query.check_search_queue();
 
         let form = $('#query-form');
+        query.enable_form();
         let formdata = new FormData(form[0]);
 
         if (!for_real) {
@@ -380,14 +381,17 @@ const query = {
             $('#query-status .message').html('Starting data collection (do not close your browser)');
         }
 
+        query.disable_form();
         fetch(form.attr('action'), {method: 'POST', body: formdata})
             .then(function (response) {
                 return response.json();
             })
             .then(function (response) {
                 if (response['status'] === 'error') {
+                    query.enable_form();
                     popup.alert(response['message'], 'Error');
                 } else if (response['status'] === 'confirm') {
+                    query.enable_form();
                     popup.confirm(response['message'], 'Confirm', function () {
                         // re-send, but this time for real
                         query.start({'frontend-confirm': true}, true);
@@ -398,6 +402,7 @@ const query = {
                 } else if (response['status'] === 'extra-form') {
                     // new form elements to fill in
                     // some fancy css juggling to make it obvious that these need to be completed
+                    query.enable_form();
                     $('#query-status .message').html('Enter dataset parameters to continue.');
                     let target_top = $('#datasource-form')[0].offsetTop + $('#datasource-form')[0].offsetHeight - 50;
 
@@ -412,7 +417,6 @@ const query = {
                         });
                     });
                 } else {
-                    query.disable_form();
                     $('#query-status .message').html('Query submitted, waiting for results');
                     query.query_key = response['key'];
                     query.check(query.query_key);
