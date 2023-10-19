@@ -34,6 +34,10 @@ class TempFileCleaner(BasicWorker):
 
         result_files = Path(config.get('PATH_DATA')).glob("*")
         for file in result_files:
+            if file.stem.startswith("."):
+                # skip hidden files
+                continue
+
             if self.interrupted:
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
 
