@@ -221,9 +221,6 @@ class Logger:
         :param frame:  Traceback frame. If no frame is given, it is
         extrapolated
         """
-        if self.print_logs and level > logging.DEBUG:
-            print("LOG: %s" % message)
-
         # logging can include the full stack trace in the log, but that's a
         # bit excessive - instead, only include the location the log was called
         if not frame:
