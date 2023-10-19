@@ -65,8 +65,6 @@ class UserInput:
                 if type(value) is list and len(value) == 1:
                     input[key] = value[0]
 
-        print(input)
-
         # all parameters are submitted as option-[parameter ID], this is an 
         # artifact of how the web interface works and we can simply remove the
         # prefix
