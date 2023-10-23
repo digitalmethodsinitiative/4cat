@@ -461,9 +461,8 @@ config_definition = {
             "faq": "FAQ",
             "data-policy": "Data Policy",
             "citing": "How to cite",
-            "about": "About",
         },
-        "default": ["faq", "about"],
+        "default": ["faq"],
         "tooltip": "These pages will be included in the navigation bar at the top of the interface."
     },
     "ui.prefer_mapped_preview": {
