@@ -62,12 +62,12 @@ class SearchImportFromFourcat(BasicProcessor):
         base = urls[0].split("/results/")[0]
         keys = SearchImportFromFourcat.get_keys_from_urls(urls)
         api_key = self.parameters.get("api-key")
-        file_paths = []
-        imported_keys = []
-        failed_imports = []
-        remapped_keys = {}
-        num_rows = 0
 
+        imported = []  # successfully imported datasets
+        created_datasets = []  # keys of created datasets - may not be successful!
+        failed_imports = []  # keys that failed to import
+        remapped_keys = {}  # changed dataset keys
+        num_rows = 0  # will be used later
         dataset_owner = self.dataset.get_owners()[0]  # at this point it has 1 owner
 
         # we can add support for multiple datasets later by removing
@@ -75,13 +75,17 @@ class SearchImportFromFourcat(BasicProcessor):
         keys = [keys[0]]
 
         while keys:
-            dataset_key = keys.pop()
+            dataset_key = keys.pop(0)
             if self.interrupted:
-                for path in file_paths:
-                    # clean up partially implemented datasets and delete imported datasets
-                    path.unlink()
-                    self.db.delete("datasets", where={"key": tuple(imported_keys)})
-                    self.db.delete("datasets_owners", where={"key": tuple(imported_keys)})
+                # resuming is impossible because the original dataset (which
+                # has the list of URLs to import) has probably been
+                # overwritten by this point
+                deletables = [k for k in created_datasets if k != self.dataset.key]
+                for deletable in deletables:
+                    DataSet(key=deletable, db=self.db).delete()
+
+                self.dataset.finish_with_error(f"Interrupted while importing datasets from {base}. Cannot resume - you "
+                                               f"will need to initiate the import again.")
 
                 raise ProcessorInterruptedException()
 
@@ -112,7 +116,7 @@ class SearchImportFromFourcat(BasicProcessor):
 
             # if this is the first dataset we're importing, make it the
             # processor's "own" dataset
-            if not imported_keys:
+            if not imported:
                 new_dataset = self.dataset
                 metadata.pop("key")
                 num_rows = metadata["num_rows"]
@@ -226,7 +230,7 @@ class SearchImportFromFourcat(BasicProcessor):
                 self.dataset.log(f"Adding child dataset {child} to import queue")
 
             # done - remember that we've imported this one
-            imported_keys.append(new_dataset.key)
+            imported.append(new_dataset)
             new_dataset.update_status(metadata["status"])
 
             if new_dataset.key != self.dataset.key:
@@ -240,7 +244,7 @@ class SearchImportFromFourcat(BasicProcessor):
                                        f"{len(failed_imports)} dataset(s) were not successfully imported. Check the "
                                        f"dataset log file for details.", is_final=True)
         else:
-            self.dataset.update_status(f"{len(imported_keys)} dataset(s) succesfully imported from {base}.",
+            self.dataset.update_status(f"{len(imported)} dataset(s) succesfully imported from {base}.",
                                        is_final=True)
 
         if not self.dataset.is_finished():
