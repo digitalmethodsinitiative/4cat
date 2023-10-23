@@ -43,6 +43,7 @@ packages = [
 	"psycopg2~=2.9.0",
 	"pyahocorasick~=1.4.0",
 	"PyMySQL~=1.0",
+	"python-memcached",
 	"PyTumblr==0.1.0",
 	"requests~=2.27",
 	"requests_futures",
