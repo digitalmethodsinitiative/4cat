@@ -51,6 +51,9 @@ class SearchImportFromFourcat(BasicProcessor):
         }
     }
 
+    created_datasets = None
+    base = None
+
     def process(self):
         """
         Import 4CAT dataset from another 4CAT server
@@ -59,12 +62,12 @@ class SearchImportFromFourcat(BasicProcessor):
         data files and child datasets.
         """
         urls = [url.strip() for url in self.parameters.get("url").split(",")]
-        base = urls[0].split("/results/")[0]
+        self.base = urls[0].split("/results/")[0]
         keys = SearchImportFromFourcat.get_keys_from_urls(urls)
         api_key = self.parameters.get("api-key")
 
+        self.created_datasets = set()   # keys of created datasets - may not be successful!
         imported = []  # successfully imported datasets
-        created_datasets = []  # keys of created datasets - may not be successful!
         failed_imports = []  # keys that failed to import
         remapped_keys = {}  # changed dataset keys
         num_rows = 0  # will be used later
@@ -76,24 +79,13 @@ class SearchImportFromFourcat(BasicProcessor):
 
         while keys:
             dataset_key = keys.pop(0)
-            if self.interrupted:
-                # resuming is impossible because the original dataset (which
-                # has the list of URLs to import) has probably been
-                # overwritten by this point
-                deletables = [k for k in created_datasets if k != self.dataset.key]
-                for deletable in deletables:
-                    DataSet(key=deletable, db=self.db).delete()
 
-                self.dataset.finish_with_error(f"Interrupted while importing datasets from {base}. Cannot resume - you "
-                                               f"will need to initiate the import again.")
-
-                raise ProcessorInterruptedException()
-
-            self.dataset.log(f"Importing dataset {dataset_key} from 4CAT server {base}.")
+            self.halt_and_catch_fire()
+            self.dataset.log(f"Importing dataset {dataset_key} from 4CAT server {self.base}.")
 
             # first, metadata!
             try:
-                metadata = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "metadata")
+                metadata = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "metadata")
                 metadata = metadata.json()
             except FourcatImportException as e:
                 self.dataset.log(f"Error retrieving record for dataset {dataset_key}: {e}")
@@ -112,6 +104,7 @@ class SearchImportFromFourcat(BasicProcessor):
             metadata.pop("current_4CAT_version")
             metadata.pop("id")
             metadata.pop("job")
+            metadata.pop("is_private")
             metadata.pop("is_finished")  # we'll finish it ourselves, thank you!!!
 
             # if this is the first dataset we're importing, make it the
@@ -119,7 +112,6 @@ class SearchImportFromFourcat(BasicProcessor):
             if not imported:
                 new_dataset = self.dataset
                 metadata.pop("key")
-                num_rows = metadata["num_rows"]
                 self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
 
             else:
@@ -148,6 +140,7 @@ class SearchImportFromFourcat(BasicProcessor):
                                 f"{new_dataset.key} instead of key {dataset_key}!")
 
             # refresh object, make sure it's in sync with the database
+            self.created_datasets.add(new_dataset.key)
             old_log_path = new_dataset.get_log_path()
             new_dataset = DataSet(key=new_dataset.key, db=self.db)
             if new_dataset.key == self.dataset.key:
@@ -177,9 +170,10 @@ class SearchImportFromFourcat(BasicProcessor):
             new_dataset.db.commit()
 
             # then, the log
+            self.halt_and_catch_fire()
             try:
                 self.dataset.update_status(f"Transferring log file for dataset {new_dataset.key}")
-                log = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "log")
+                log = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "log")
                 logpath = new_dataset.get_log_path()
                 new_dataset.log("Original dataset log included below:")
                 with logpath.open("a") as outfile:
@@ -194,12 +188,18 @@ class SearchImportFromFourcat(BasicProcessor):
                 continue
 
             # then, the results
+            self.halt_and_catch_fire()
             try:
                 self.dataset.update_status(f"Transferring data file for dataset {new_dataset.key}")
-                data = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "data")
+                data = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "data")
                 datapath = new_dataset.get_results_path()
                 with datapath.open("wb") as outfile:
                     outfile.write(data.content)
+
+                if not imported:
+                    # first dataset - use num rows as 'overall'
+                    num_rows = metadata["num_rows"]
+
             except FourcatImportException as e:
                 self.dataset.log(f"Dataset {new_dataset.key} does not seem to have a data file, skipping import")
                 if new_dataset.key != self.dataset.key:
@@ -212,9 +212,10 @@ class SearchImportFromFourcat(BasicProcessor):
                 continue
 
             # finally, the kids
+            self.halt_and_catch_fire()
             try:
                 self.dataset.update_status(f"Looking for child datasets to transfer for dataset {new_dataset.key}")
-                children = SearchImportFromFourcat.fetch_from_4cat(base, dataset_key, api_key, "children")
+                children = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "children")
                 children = children.json()
             except FourcatImportException as e:
                 self.dataset.update_status(f"Error retrieving children for dataset {new_dataset.key}: {e}")
@@ -244,11 +245,34 @@ class SearchImportFromFourcat(BasicProcessor):
                                        f"{len(failed_imports)} dataset(s) were not successfully imported. Check the "
                                        f"dataset log file for details.", is_final=True)
         else:
-            self.dataset.update_status(f"{len(imported)} dataset(s) succesfully imported from {base}.",
+            self.dataset.update_status(f"{len(imported)} dataset(s) succesfully imported from {self.base}.",
                                        is_final=True)
 
         if not self.dataset.is_finished():
             self.dataset.finish(num_rows)
+
+    def halt_and_catch_fire(self):
+        """
+        Clean up on interrupt
+
+        There are multiple places in the code where we can bail out on an
+        interrupt, so abstract that away in its own function.
+        :return:
+        """
+        if self.interrupted:
+            # resuming is impossible because the original dataset (which
+            # has the list of URLs to import) has probably been
+            # overwritten by this point
+            deletables = [k for k in self.created_datasets if k != self.dataset.key]
+            for deletable in deletables:
+                if deletable == self.dataset.key:
+                    continue
+                DataSet(key=deletable, db=self.db).delete()
+
+            self.dataset.finish_with_error(f"Interrupted while importing datasets from {self.base}. Cannot resume - you "
+                                           f"will need to initiate the import again.")
+
+            raise ProcessorInterruptedException()
 
     @staticmethod
     def fetch_from_4cat(base, dataset_key, api_key, component):
