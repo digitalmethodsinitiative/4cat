@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 
 from common.config_manager import config
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, get_html_redirect_page
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
@@ -227,7 +227,7 @@ class PixPlotGenerator(BasicProcessor):
 
         # Results HTML file redirects to output_dir/index.html
         plot_url = ('https://' if config.get("flask.https") else 'http://') + config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
-        html_file = self.get_html_page(plot_url)
+        html_file = get_html_redirect_page(plot_url)
 
         # Write HTML file
         with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:
@@ -361,12 +361,6 @@ class PixPlotGenerator(BasicProcessor):
 
         self.dataset.update_status("Metadata.csv created")
         return metadata_file_path if rows_written != 0 else False
-
-    def get_html_page(self, url):
-        """
-        Returns a html string to redirect to PixPlot.
-        """
-        return f"<head><meta http-equiv='refresh' charset='utf-8' content='0; URL={url}'></head>"
 
     def clean_filename(self, s):
         """

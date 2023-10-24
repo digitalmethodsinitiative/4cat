@@ -99,6 +99,12 @@ def sniff_encoding(file):
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
 
+def get_html_redirect_page(url):
+    """
+    Returns a html string to redirect to PixPlot.
+    """
+    return f"<head><meta http-equiv='refresh' charset='utf-8' content='0; URL={url}'></head>"
+
 def get_software_version():
     """
     Get current 4CAT version
