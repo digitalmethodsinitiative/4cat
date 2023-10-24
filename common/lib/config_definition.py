@@ -233,6 +233,13 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
+    "4cat.memcached_host": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Memcached server",
+        "tooltip": "Memcached server address, e.g. 'localhost' or '127.0.0.1:11211. If empty, memcached is not used.",
+        "global": True
+    },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",

@@ -2,6 +2,7 @@ import pickle
 import time
 import json
 
+from pymemcache.client.base import Client
 from pathlib import Path
 from common.lib.database import Database
 
@@ -17,6 +18,7 @@ class ConfigManager:
     db = None
     dbconn = None
     cache = {}
+    memcache = None
 
     core_settings = {}
     config_definition = {}
@@ -28,7 +30,8 @@ class ConfigManager:
         self.load_user_settings()
 
         # establish database connection if none available
-        self.db = db
+        if db:
+            self.with_db(db)
 
     def with_db(self, db=None):
         """
@@ -42,6 +45,12 @@ class ConfigManager:
         self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
                                          port=self.get("DB_PORT"), appname="config-reader") if not db else db
+
+        # now we have a database connection, we can initialise the memcached
+        # client (since the address is stored in the database)
+        memcache_address = self.get("4cat.memcached_server")
+        if memcache_address:
+            self.memcache = Client(memcache_address)
 
     def load_user_settings(self):
         """
