@@ -227,7 +227,7 @@ const processor = {
             return;
         }
 
-        $.ajax(getRelativeURL('api/delete-dataset/'), {
+        $.ajax(getRelativeURL('api/delete-dataset/' + $(this).attr('data-key') + '/'), {
             method: 'DELETE',
             data: {key: $(this).attr('data-key')},
             success: function (json) {
@@ -768,6 +768,16 @@ const query = {
             $(board_specific).prop('disabled', true);
             $('.form-element[data-board-specific*="' + board + '"]').prop('disabled', false);
             $('.form-element[data-board-specific*="' + board + '"]').show();
+        }
+
+        // there is one data source where the anonymisation and labeling
+        // controls are of no use...
+        if($('#query-form').hasClass('import_4cat')) {
+            $('.dataset-anonymisation').hide();
+            $('.dataset-labeling').hide();
+        } else {
+            $('.dataset-anonymisation').show();
+            $('.dataset-labeling').show();
         }
     },
 
