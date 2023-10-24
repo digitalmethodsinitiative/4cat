@@ -7,6 +7,7 @@ additionally need an API token for that server, which you can generate via the
 'API Access' link in the 4CAT navigation.
 
 There are some caveats and limitations to consider:
+
 * If an imported dataset was filtered from another dataset, the 'link' to the
   original dataset will not be retained on importing, and it will not be
   possible to see what dataset the imported, filtered dataset originated from.
