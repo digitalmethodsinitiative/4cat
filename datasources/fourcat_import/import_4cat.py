@@ -2,6 +2,7 @@
 Import datasets from other 4CATs
 """
 import requests
+import json
 import time
 
 from backend.lib.processor import BasicProcessor
@@ -106,6 +107,12 @@ class SearchImportFromFourcat(BasicProcessor):
             metadata.pop("job")
             metadata.pop("is_private")
             metadata.pop("is_finished")  # we'll finish it ourselves, thank you!!!
+
+            # extra params are stored as JSON...
+            metadata["parameters"] = json.loads(metadata["parameters"])
+            if "copied_from" in metadata["parameters"]:
+                metadata["parameters"].pop("copied_from")
+            metadata["parameters"] = json.dumps(metadata["parameters"])
 
             # if this is the first dataset we're importing, make it the
             # processor's "own" dataset
