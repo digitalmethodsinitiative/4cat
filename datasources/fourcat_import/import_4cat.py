@@ -101,7 +101,8 @@ class SearchImportFromFourcat(BasicProcessor):
                 failed_imports.append(dataset_key)
                 continue
 
-            # get rid of some keys that are server-specific and don't need to be stored
+            # get rid of some keys that are server-specific and don't need to
+            # be stored (or don't correspond to database columns)
             metadata.pop("current_4CAT_version")
             metadata.pop("id")
             metadata.pop("job")
@@ -114,11 +115,13 @@ class SearchImportFromFourcat(BasicProcessor):
                 metadata["parameters"].pop("copied_from")
             metadata["parameters"] = json.dumps(metadata["parameters"])
 
-            # if this is the first dataset we're importing, make it the
-            # processor's "own" dataset
             if not imported:
+                # if this is the first dataset we're importing, make it the
+                # processor's "own" dataset. the key has already been set to
+                # the imported dataset's key via ensure_key() (or a new unqiue
+                # key if it already existed on this server)
                 new_dataset = self.dataset
-                metadata.pop("key")
+                metadata.pop("key")  # key already OK (see above)
                 self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
 
             else:
@@ -126,22 +129,25 @@ class SearchImportFromFourcat(BasicProcessor):
                 try:
                     key_exists = DataSet(key=metadata["key"], db=self.db)
 
-                    # if we *haven't* thrown, then the key is already in use,
-                    # so create a "dummy" dataset and overwrite it with the
-                    # metadata we have (except for the key). this ensures
-                    # that a new unique key will be generated
+                    # if we *haven't* thrown a DatasetException now, then the
+                    # key is already in use, so create a "dummy" dataset and
+                    # overwrite it with the metadata we have (except for the
+                    # key). this ensures that a new unique key will be
+                    # generated.
                     new_dataset = DataSet(parameters={}, type=self.type, db=self.db)
                     metadata.pop("key")
                     self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
 
                 except DataSetException:
-                    # this is *good* since it means the key doesn't exist
+                    # this is *good* since it means the key doesn't exist, so
+                    # we can re-use the key of the imported dataset
                     self.db.insert("datasets", data=metadata)
                     new_dataset = DataSet(key=metadata["key"], db=self.db)
 
             new_dataset.update_status("Imported dataset created")
             if new_dataset.key != dataset_key:
                 # could not use original key because it was already in use
+                # so update any references to use the new key
                 remapped_keys[dataset_key] = new_dataset.key
                 new_dataset.update_status(f"Cannot import with same key - already in use on this server. Using key "
                                 f"{new_dataset.key} instead of key {dataset_key}!")
@@ -151,6 +157,10 @@ class SearchImportFromFourcat(BasicProcessor):
             old_log_path = new_dataset.get_log_path()
             new_dataset = DataSet(key=new_dataset.key, db=self.db)
             if new_dataset.key == self.dataset.key:
+                # this ensures that the first imported dataset becomes the
+                # processor's "own" dataset, and that the import logs go to
+                # that dataset's log file. For later imports, this evaluates to
+                # False.
                 self.dataset = new_dataset
 
             # if the key of the parent dataset was changed, change the
@@ -255,6 +265,9 @@ class SearchImportFromFourcat(BasicProcessor):
                                        is_final=True)
 
         if not self.dataset.is_finished():
+            # now all related datasets are imported, we can finish the 'main'
+            # dataset, and the user will be alerted that the full import is
+            # complete
             self.dataset.finish(num_rows)
 
     def halt_and_catch_fire(self):
@@ -271,8 +284,6 @@ class SearchImportFromFourcat(BasicProcessor):
             # overwritten by this point
             deletables = [k for k in self.created_datasets if k != self.dataset.key]
             for deletable in deletables:
-                if deletable == self.dataset.key:
-                    continue
                 DataSet(key=deletable, db=self.db).delete()
 
             self.dataset.finish_with_error(f"Interrupted while importing datasets from {self.base}. Cannot resume - you "

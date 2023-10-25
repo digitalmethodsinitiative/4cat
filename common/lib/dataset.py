@@ -1004,11 +1004,9 @@ class DataSet(FourcatModule):
 		for key in sorted(parameters):
 			param_key[key] = parameters[key]
 
-		# this ensures a different key for the same query if not queried
-		# at the exact same second. Since the same query may return
-		# different results when done at different times, getting a
-		# duplicate key is not actually always desirable. The resolution
-		# of this salt could be experimented with...
+		# we additionally use the current time as a salt - this should usually
+		# ensure a unique key for the dataset. if for some reason there is a
+		# hash collision
 		param_key["_salt"] = int(time.time()) + time_offset
 
 		parent_key = str(parent) if parent else ""
