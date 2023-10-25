@@ -120,12 +120,17 @@ class SearchImportFromFourcat(BasicProcessor):
                 # processor's "own" dataset. the key has already been set to
                 # the imported dataset's key via ensure_key() (or a new unqiue
                 # key if it already existed on this server)
+                # by making it the "own" dataset, the user initiating the
+                # import will see the imported dataset as the "result" of their
+                # import query in the interface, similar to the workflow for
+                # other data sources
                 new_dataset = self.dataset
                 metadata.pop("key")  # key already OK (see above)
                 self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
 
             else:
                 # supernumerary datasets - handle on their own
+                # these include any children of imported datasets
                 try:
                     key_exists = DataSet(key=metadata["key"], db=self.db)
 
