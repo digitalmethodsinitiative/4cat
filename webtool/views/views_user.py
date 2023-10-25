@@ -21,7 +21,7 @@ from webtool import app, login_manager, db, config
 from webtool.views.api_tool import limiter
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
-from common.lib.helpers import send_email, get_software_version
+from common.lib.helpers import send_email, get_software_commit
 
 from pathlib import Path
 
@@ -286,7 +286,7 @@ def first_run_dialog():
 
         payload = {
             "version": version,
-            "commit": get_software_version(),
+            "commit": get_software_commit(),
             "role": request.form.get("role", ""),
             "affiliation": request.form.get("affiliation", ""),
             "email": request.form.get("email", "")

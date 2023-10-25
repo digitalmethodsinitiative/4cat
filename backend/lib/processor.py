@@ -16,7 +16,7 @@ from pathlib import Path, PurePath
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version, remove_nuls, send_email
+from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
 								   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
@@ -161,7 +161,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# start log file
 		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_version())
+		self.dataset.update_version(get_software_commit())
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided

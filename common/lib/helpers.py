@@ -99,7 +99,7 @@ def sniff_encoding(file):
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
 
-def get_software_version():
+def get_software_commit():
     """
     Get current 4CAT version
 

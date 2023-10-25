@@ -15,7 +15,7 @@ from pathlib import Path
 import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
 								   MapItemException)
@@ -124,7 +124,7 @@ class DataSet(FourcatModule):
 				"timestamp": int(time.time()),
 				"is_finished": False,
 				"is_private": is_private,
-				"software_version": get_software_version(),
+				"software_version": get_software_commit(),
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
