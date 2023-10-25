@@ -161,9 +161,8 @@ class SearchImportFromFourcat(BasicProcessor):
             # also make sure to generate a result path based on the *new* key,
             # which may not be the same as the old one
             old_path = new_dataset.get_results_path()
-            bits = old_path.stem.split("-")
-            bits[-1] = new_dataset.key
-            new_dataset.result_file = old_path.with_stem("-".join(bits)).name
+            old_key = old_path.stem.split("-")[-1]
+            new_dataset.result_file = old_path.name.replace(old_key, new_dataset.key)
             if old_log_path.exists():
                 # secretly the old self.dataset log
                 old_log_path.rename(new_dataset.get_results_path().with_suffix(".log"))
