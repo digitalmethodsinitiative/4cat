@@ -1202,7 +1202,7 @@ def export_packed_dataset(key=None, component=None):
 		return error(404, error="Dataset not found.")
 
 	if not current_user.can_access_dataset(dataset=dataset, role="owner"):
-		raise error(403, error=f"You cannot export this dataset. {current_user}")
+		return error(403, error=f"You cannot export this dataset. {current_user}")
 
 	if not dataset.is_finished():
 		return error(403, error="You cannot export unfinished datasets.")

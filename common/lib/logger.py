@@ -210,7 +210,8 @@ class Logger:
                 self.logger.addHandler(slack_handler)
         except Exception:
             # we *may* need the logger before the database is in working order
-            config.db.rollback()
+            if config.db is not None:
+                config.db.rollback()
 
     def log(self, message, level=logging.INFO, frame=None):
         """
