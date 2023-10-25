@@ -149,6 +149,12 @@ class SearchImportFromFourcat(BasicProcessor):
                     self.db.insert("datasets", data=metadata)
                     new_dataset = DataSet(key=metadata["key"], db=self.db)
 
+            # make sure the dataset path uses the new key and local dataset
+            # path settings. this also makes sure the log file is created in
+            # the right place (since it is derived from the results file path)
+            extension = metadata["result_file"].split(".")[-1]
+            new_dataset.reserve_result_file(parameters=new_dataset.parameters, extension=extension)
+
             new_dataset.update_status("Imported dataset created")
             if new_dataset.key != dataset_key:
                 # could not use original key because it was already in use
@@ -159,7 +165,6 @@ class SearchImportFromFourcat(BasicProcessor):
 
             # refresh object, make sure it's in sync with the database
             self.created_datasets.add(new_dataset.key)
-            old_log_path = new_dataset.get_log_path()
             new_dataset = DataSet(key=new_dataset.key, db=self.db)
             if new_dataset.key == self.dataset.key:
                 # this ensures that the first imported dataset becomes the
@@ -172,15 +177,6 @@ class SearchImportFromFourcat(BasicProcessor):
             # reference to it that the child dataset has
             if new_dataset.key_parent and new_dataset.key_parent in remapped_keys:
                 new_dataset.key_parent = remapped_keys[new_dataset.key_parent]
-
-            # also make sure to generate a result path based on the *new* key,
-            # which may not be the same as the old one
-            old_path = new_dataset.get_results_path()
-            old_key = old_path.stem.split("-")[-1]
-            new_dataset.result_file = old_path.name.replace(old_key, new_dataset.key)
-            if old_log_path.exists():
-                # secretly the old self.dataset log
-                old_log_path.rename(new_dataset.get_results_path().with_suffix(".log"))
 
             # update some attributes that should come from the new server, not
             # the old
