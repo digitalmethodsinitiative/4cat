@@ -210,7 +210,8 @@ class Logger:
                 self.logger.addHandler(slack_handler)
         except Exception:
             # we *may* need the logger before the database is in working order
-            config.db.rollback()
+            if config.db is not None:
+                config.db.rollback()
 
     def log(self, message, level=logging.INFO, frame=None):
         """
@@ -221,9 +222,6 @@ class Logger:
         :param frame:  Traceback frame. If no frame is given, it is
         extrapolated
         """
-        if self.print_logs and level > logging.DEBUG:
-            print("LOG: %s" % message)
-
         # logging can include the full stack trace in the log, but that's a
         # bit excessive - instead, only include the location the log was called
         if not frame:

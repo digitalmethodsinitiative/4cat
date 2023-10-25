@@ -17,7 +17,7 @@ from yt_dlp.utils import ExistingVideoReached
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
 from common.lib.helpers import UserInput, sets_to_lists
 
 __author__ = "Dale Wahl"
@@ -783,7 +783,7 @@ class DatasetVideoLibrary:
                 original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
                 previous_downloaders += [child for child in original_dataset.top_parent().children if
                                          (child.type == "video-downloader" and child.key != self.current_dataset.key)]
-            except TypeError:
+            except DataSetException:
                 # parent dataset no longer exists!
                 pass
 

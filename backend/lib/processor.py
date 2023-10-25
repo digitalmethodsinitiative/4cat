@@ -16,8 +16,9 @@ from pathlib import Path, PurePath
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version, remove_nuls, send_email
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException, MapItemException
+from common.lib.helpers import get_software_commit, remove_nuls, send_email
+from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
+								   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
 
 
@@ -98,7 +99,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# that actually queued the processor, so their config is relevant
 			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
 			self.owner = self.dataset.creator
-		except TypeError as e:
+		except DataSetException as e:
 			# query has been deleted in the meantime. finish without error,
 			# as deleting it will have been a conscious choice by a user
 			self.job.finish()
@@ -133,10 +134,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 						self.job.finish()
 						return
 
-			except TypeError:
+			except DataSetException:
 				# we need to know what the source_dataset dataset was to properly handle the
 				# analysis
-				self.log.warning("Processor %s queued for orphan query %s: cannot run, cancelling job" % (
+				self.log.warning("Processor %s queued for orphan dataset %s: cannot run, cancelling job" % (
 					self.type, self.dataset.key))
 				self.job.finish()
 				return
@@ -160,7 +161,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# start log file
 		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_version())
+		self.dataset.update_version(get_software_commit())
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided

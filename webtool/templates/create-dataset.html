@@ -36,11 +36,11 @@
                 </div>
 
                 <div id="data-options">
-                    <p class="form-intro">4CAT can remove information it identifies as relating to an item's author, or
+                    <p class="form-intro dataset-anonymisation">4CAT can remove information it identifies as relating to an item's author, or
                         replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value. Other
                         personal information may persist; it is your responsibility to further anonymise data where
                         appropriate.</p>
-                    <div class="form-element">
+                    <div class="form-element dataset-anonymisation">
                         <label for="data-pseudonymise">Pseudonymise:</label>
                         <div class="filter-parameters">
                             <select name="pseudonymise" id="data-pseudonymise">
@@ -71,7 +71,7 @@
                         <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
                     </div>
                     {% endif %}
-                    <div class="form-element">
+                    <div class="form-element dataset-labeling">
                         <label for="dataset-label">Dataset name:</label>
                         <input id="dataset-label" name="label">
 

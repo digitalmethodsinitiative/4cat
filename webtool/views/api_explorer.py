@@ -21,6 +21,7 @@ from webtool import app, db, openapi, limiter, config
 from webtool.lib.helpers import format_chan_post, error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
+from common.lib.exceptions import DataSetException
 
 from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
@@ -46,7 +47,7 @@ def explorer_dataset(key, page):
 	# Get dataset info.
 	try:
 		dataset = DataSet(key=key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset not found.")
 
 	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
