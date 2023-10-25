@@ -3,6 +3,7 @@ import itertools
 import datetime
 import hashlib
 import fnmatch
+import random
 import shutil
 import json
 import time
@@ -14,9 +15,10 @@ from pathlib import Path
 import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
-from common.lib.exceptions import ProcessorInterruptedException, DataSetException, MapItemException
+from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
+								   MapItemException)
 
 
 class DataSet(FourcatModule):
@@ -78,29 +80,29 @@ class DataSet(FourcatModule):
 			self.key = key
 			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
 			if not current:
-				raise TypeError("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
+				raise DataSetNotFoundException("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
 			query = current["query"]
 		elif job is not None:
 			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
-				raise TypeError("DataSet() requires a valid job ID for its 'job' argument")
+				raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
 
 			query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
-				raise ValueError("DataSet() requires a complete dataset record for its 'data' argument")
+				raise DataSetException("DataSet() requires a complete dataset record for its 'data' argument")
 
 			query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
-				raise TypeError("DataSet() requires either 'key', or 'parameters' to be given")
+				raise DataSetException("DataSet() requires either 'key', or 'parameters' to be given")
 
 			if not type:
-				raise ValueError("Datasets must have their type set explicitly")
+				raise DataSetException("Datasets must have their type set explicitly")
 
 			query = self.get_label(parameters, default=type)
 			self.key = self.get_key(query, parameters, parent)
@@ -122,7 +124,7 @@ class DataSet(FourcatModule):
 				"timestamp": int(time.time()),
 				"is_finished": False,
 				"is_private": is_private,
-				"software_version": get_software_version(),
+				"software_version": get_software_commit(),
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
@@ -556,7 +558,7 @@ class DataSet(FourcatModule):
 			try:
 				child = DataSet(key=child["key"], db=self.db)
 				child.delete(commit=commit)
-			except TypeError:
+			except DataSetException:
 				# dataset already deleted - race condition?
 				pass
 
@@ -977,7 +979,7 @@ class DataSet(FourcatModule):
 		self.data["result_file"] = file
 		return updated > 0
 
-	def get_key(self, query, parameters, parent=""):
+	def get_key(self, query, parameters, parent="", time_offset=0):
 		"""
 		Generate a unique key for this dataset that can be used to identify it
 
@@ -987,6 +989,9 @@ class DataSet(FourcatModule):
 		:param str query:  Query string
 		:param parameters:  Dataset parameters
 		:param parent: Parent dataset's key (if applicable)
+		:param time_offset:  Offset to add to the time component of the dataset
+		key. This can be used to ensure a unique key even if the parameters and
+		timing is otherwise identical to an existing dataset's
 
 		:return str:  Dataset key
 		"""
@@ -999,16 +1004,53 @@ class DataSet(FourcatModule):
 		for key in sorted(parameters):
 			param_key[key] = parameters[key]
 
-		# this ensures a different key for the same query if not queried
-		# at the exact same second. Since the same query may return
-		# different results when done at different times, getting a
-		# duplicate key is not actually always desirable. The resolution
-		# of this salt could be experimented with...
-		param_key["_salt"] = int(time.time())
+		# we additionally use the current time as a salt - this should usually
+		# ensure a unique key for the dataset. if for some reason there is a
+		# hash collision
+		param_key["_salt"] = int(time.time()) + time_offset
 
 		parent_key = str(parent) if parent else ""
 		plain_key = repr(param_key) + str(query) + parent_key
-		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		hashed_key = hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+
+		if self.db.fetchone("SELECT key FROM datasets WHERE key = %s", (hashed_key,)):
+			# key exists, generate a new one
+			return self.get_key(query, parameters, parent, time_offset=random.randint(1,10))
+		else:
+			return hashed_key
+
+	def set_key(self, key):
+		"""
+		Change dataset key
+
+		In principe, keys should never be changed. But there are rare cases
+		where it is useful to do so, in particular when importing a dataset
+		from another 4CAT instance; in that case it makes sense to try and
+		ensure that the key is the same as it was before. This function sets
+		the dataset key and updates any dataset references to it.
+
+		:param str key:  Key to set
+		:return str:  Key that was set. If the desired key already exists, the
+		original key is kept.
+		"""
+		key_exists = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (key,))
+		if key_exists or not key:
+			return self.key
+
+		old_key = self.key
+		self.db.update("datasets", data={"key": key}, where={"key": old_key})
+
+		# update references
+		self.db.update("datasets", data={"key_parent": key}, where={"key_parent": old_key})
+		self.db.update("datasets_owners", data={"key": key}, where={"key": old_key})
+		self.db.update("jobs", data={"remote_id": key}, where={"remote_id": old_key})
+		self.db.update("users_favourites", data={"key": key}, where={"key": old_key})
+
+		# for good measure
+		self.db.commit()
+		self.key = key
+
+		return self.key
 
 	def get_status(self):
 		"""
@@ -1186,7 +1228,7 @@ class DataSet(FourcatModule):
 		while key_parent:
 			try:
 				parent = DataSet(key=key_parent, db=self.db)
-			except TypeError:
+			except DataSetException:
 				break
 
 			genealogy.append(parent)

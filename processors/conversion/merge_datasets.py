@@ -6,7 +6,7 @@ import json
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, DataSetException
 from common.lib.helpers import UserInput
 import ural
 
@@ -87,7 +87,7 @@ class DatasetMerger(BasicProcessor):
             source_dataset_url = source_dataset.strip()
             try:
                 source_dataset = self.get_dataset_from_url(source_dataset_url, self.db)
-            except TypeError:
+            except DataSetException:
                 return self.dataset.finish_with_error(f"Dataset URL '{source_dataset_url} not found - cannot perform "
                                                       f"merge.")
 

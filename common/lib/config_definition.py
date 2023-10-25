@@ -105,6 +105,12 @@ config_definition = {
         "help": "Can use explorer",
         "tooltip": "Controls whether users can use the Explorer feature to navigate datasets."
     },
+    "privileges.can_export_datasets": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Can export datasets",
+        "tooltip": "Allows users to export datasets they own to other 4CAT instances."
+    },
     "privileges.admin.can_manage_users": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,

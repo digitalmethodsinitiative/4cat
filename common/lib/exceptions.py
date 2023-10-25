@@ -53,6 +53,12 @@ class DataSetException(FourcatException):
 	"""
 	pass
 
+class DataSetNotFoundException(DataSetException):
+	"""
+	Raise if dataset does not exist
+	"""
+	pass
+
 
 class JobClaimedException(QueueException):
 	"""

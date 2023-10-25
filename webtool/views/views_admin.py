@@ -690,15 +690,17 @@ def get_log(logfile):
     :param str logfile: 'backend' or 'stderr'
     :return:
     """
-    if logfile not in ("stderr", "backend"):
+    if logfile not in ("stderr", "backend", "import"):
         return "Not Found", 404
 
     if logfile == "backend":
         filename = "4cat.log" if not config.get("USING_DOCKER") else "backend_4cat.log"
-    else:
+    elif logfile == "stderr":
         filename = "4cat.stderr"
+    else:
+        filename = f"{logfile}.log"
 
-    log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), filename)
+    log_file = config.get("PATH_ROOT").joinpath(config.get("PATH_LOGS")).joinpath(filename)
     if log_file.exists():
         with log_file.open() as infile:
             return "\n".join(tailer.tail(infile, 250))
@@ -949,3 +951,52 @@ def dataset_bulk():
 
     return render_template("controlpanel/dataset-bulk.html", flashes=get_flashed_messages(),
                            incomplete=incomplete, form=forminput, datasources=datasources)
+
+def import_dataset_from():
+    """
+    Validate custom data input
+
+    Confirms that the uploaded file is a valid CSV or tab file and, if so, returns
+    some metadata.
+
+    :param dict query:  Query parameters, from client-side.
+    :param request:  Flask request
+    :param User user:  User object of user who has submitted the query
+    :return dict:  Safe query parameters
+    """
+    urls = query.get("url")
+    if not urls:
+        return QueryParametersException("Provide at least one dataset URL.")
+
+    urls = urls.split(",")
+    bases = set([url.split("/results/")[0].lower() for url in urls])
+    keys = [url.split("/results/")[-1].split("/")[0].split("#")[0].split("?")[0] for url in urls]
+    if len(bases) != 1:
+        return QueryParametersException("All URLs need to point to the same 4CAT server. You can only import from "
+                                        "one 4CAT server at a time.")
+
+    base = urls[0].split("/results/")[0]
+    try:
+        test = SearchImportFromFourcat.fetch_from_4cat(base, keys[0], query.get("api-key"), "metadata")
+    except FourcatImportException as e:
+        raise QueryParametersException(str(e))
+
+    try:
+        metadata = test.json()
+    except ValueError:
+        raise QueryParametersException(f"Unexpected response when trying to fetch metadata for dataset {keys[0]}.")
+
+    version_file = config.get("PATH_ROOT", user=user).joinpath("config/.current-version")
+    with version_file.open() as infile:
+        version = infile.readline().strip()
+
+    if metadata.get("version") != version:
+        raise QueryParametersException("This 4CAT server is running a different version of 4CAT ({version}) than "
+                                       "the one you are trying to import from ({metadata.get('version')}). Make "
+                                       "sure both are running the same version of 4CAT and try again.")
+
+    # OK, we can import at least one dataset
+    return {
+        "url": ",".join(urls),
+        "api-key": query.get("api-key")
+    }

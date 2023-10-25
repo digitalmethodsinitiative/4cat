@@ -9,7 +9,7 @@ from pathlib import Path
 from common.config_manager import config
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
-from common.lib.exceptions import WorkerInterruptedException
+from common.lib.exceptions import WorkerInterruptedException, DataSetException
 
 
 class TempFileCleaner(BasicWorker):
@@ -34,6 +34,10 @@ class TempFileCleaner(BasicWorker):
 
         result_files = Path(config.get('PATH_DATA')).glob("*")
         for file in result_files:
+            if file.stem.startswith("."):
+                # skip hidden files
+                continue
+
             if self.interrupted:
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
 
@@ -50,7 +54,7 @@ class TempFileCleaner(BasicWorker):
 
             try:
                 dataset = DataSet(key=key, db=self.db)
-            except TypeError:
+            except DataSetException:
                 # the dataset has been deleted since, but the result file still
                 # exists - should be safe to clean up
                 self.log.info("No matching dataset with key %s for file %s, deleting file" % (key, str(file)))

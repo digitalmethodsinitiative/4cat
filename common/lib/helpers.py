@@ -18,7 +18,7 @@ import io
 
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
-from urllib.parse import urlparse
+from pathlib import Path
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
@@ -99,18 +99,21 @@ def sniff_encoding(file):
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
 
-def get_software_version():
+def get_software_commit():
     """
-    Get current 4CAT version
+    Get current 4CAT commit hash
 
     Reads a given version file and returns the first string found in there
     (up until the first space). On failure, return an empty string.
+
+    Use `get_software_version()` instead if you need the release version
+    number rather than the precise commit hash.
 
     If no version file is available, run `git show` to test if there is a git
     repository in the 4CAT root folder, and if so, what commit is currently
     checked out in it.
 
-    :return str:  4CAT version
+    :return str:  4CAT git commit hash
     """
     versionpath = config.get('PATH_ROOT').joinpath(config.get('path.versionfile'))
 
@@ -139,6 +142,23 @@ def get_software_version():
     except OSError:
         return ""
 
+def get_software_version():
+    """
+    Get current 4CAT version
+
+    This is the actual software version, i.e. not the commit hash (see
+    `get_software_hash()` for that). The current version is stored in a file
+    with a canonical location: if the file doesn't exist, an empty string is
+    returned.
+
+    :return str:  Software version, for example `1.37`.
+    """
+    current_version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    if not current_version_file.exists():
+        return ""
+
+    with current_version_file.open() as infile:
+        return infile.readline().strip()
 
 def get_github_version(timeout=5):
     """
