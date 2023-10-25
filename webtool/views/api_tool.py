@@ -27,7 +27,7 @@ from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.config_manager import ConfigWrapper
 from common.lib.dataset import DataSet
-from common.lib.helpers import UserInput, call_api, get_software_commit
+from common.lib.helpers import UserInput, call_api, get_software_version
 from common.lib.user import User
 from backend.lib.worker import BasicWorker
 
@@ -1211,7 +1211,7 @@ def export_packed_dataset(key=None, component=None):
 		metadata = db.fetchone("SELECT * FROM datasets WHERE key = %s", (dataset.key,))
 
 		# get 4CAT version (presumably to ensure export is compatible with import)
-		metadata["current_4CAT_version"] = get_software_commit()
+		metadata["current_4CAT_version"] = get_software_version()
 		return jsonify(metadata)
 
 	elif component == "children":
