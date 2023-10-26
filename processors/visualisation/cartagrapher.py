@@ -1,10 +1,11 @@
-# from stijn https://gist.github.com/stijn-uva/6389a09ef796a1c51bb27c2e75f78a86
 import datetime
 import json
 import math
 import os
 import shutil
 import uuid
+from distutils.dir_util import copy_tree
+
 from PIL import Image, UnidentifiedImageError
 from pathlib import Path
 from itertools import product
@@ -12,11 +13,11 @@ from itertools import product
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
-__credits__ = ["Dale Wahl"]
+__credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
-from common.lib.helpers import get_html_redirect_page
+from common.lib.helpers import get_html_redirect_page, get_software_commit
 from common.lib.user_input import UserInput
 
 
@@ -49,6 +50,7 @@ class ImagePlotGenerator(BasicProcessor):
             "amount": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "No. of images",
+                "coerce_type": int,
                 "default": 1000,
                 "tooltip": "Increasing this can easily lead to very long-running processors."
             },
@@ -90,6 +92,9 @@ class ImagePlotGenerator(BasicProcessor):
         output_dir = self.dataset.get_results_folder_path()
         output_dir.mkdir(exist_ok=True)
 
+        # Copy the web template into the results output_dir
+        ImagePlotGenerator.copy_web_assets(web_assets_path=self.config.get("PATH_ROOT").joinpath("common", "assets", "pixplot_template"), output_dir=output_dir, version_number=f"4CAT commit {get_software_commit()}")
+
         # Create the manifest
         self.dataset.update_status("Creating manifest")
         self.cartograph(output_dir,
@@ -103,11 +108,11 @@ class ImagePlotGenerator(BasicProcessor):
                         thumbnail_size=128)
 
         # Copy images into results folder
-        shutil.copy(staging_area, output_dir.joinpath("originals"))
+        shutil.copytree(staging_area, output_dir.joinpath("data/originals"), dirs_exist_ok=True)
 
         # Results HTML file redirects to output_dir/index.html
         plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get(
-            "flask.server_name") + '/result/' + f"{os.path.relpath(output_dir)}/index.html"
+            "flask.server_name") + '/result/' + f"{os.path.relpath(output_dir, self.config.get('PATH_DATA'))}/index.html"
         html_file = get_html_redirect_page(plot_url)
 
         # Write HTML file
@@ -183,6 +188,7 @@ class ImagePlotGenerator(BasicProcessor):
         :param int thumbnail_size:  Max dimension (width or height, whichever is
         greatest) for the individually generated thumbnails, loaded when zooming in
         """
+        # Modified from Stijn https://gist.github.com/stijn-uva/6389a09ef796a1c51bb27c2e75f78a86
         # find eligible image files
         images = []
         sizes = {}
@@ -223,16 +229,7 @@ class ImagePlotGenerator(BasicProcessor):
                 "custom": None
             },
             "initial_layout": "umap",
-            "point_sizes": {  # TODO No idea what these are yet
-                "min": 0,
-                "grid": 0.125,
-                "max": 0.15,
-                "scatter": 0.025,
-                "initial": 0.025,
-                "categorical": 0.075,
-                "geographic": 0.003125,
-                "date": 0.07142857142857142
-            },
+            "point_sizes": {},
             "imagelist": f"{root}/data/imagelists/imagelist-{plot_id}.json",
             "atlas_dir": f"{root}/data/atlases/{plot_id}",
             "metadata": False,
@@ -325,6 +322,10 @@ class ImagePlotGenerator(BasicProcessor):
             imagelist["atlas"]["positions"][atlas_index].append((atlas_x, atlas_y))
             imagelist["cell_sizes"][atlas_index].append(tsize)
             image_indexes.append(image.name)
+
+        # Update the manifest point sizes
+        # TODO: date info to be added to point sizes
+        manifest["point_sizes"] = ImagePlotGenerator.specify_point_sizes(len(image_indexes))
 
         # done with the atlases, save final one too
         if not atlas:
@@ -440,3 +441,50 @@ class ImagePlotGenerator(BasicProcessor):
         with staging_area.joinpath(f"data/manifest.json").open("w") as outfile:
             json.dump(manifest, outfile)
 
+    @staticmethod
+    def specify_point_sizes(num_of_images, date_columns=None, date_labels=None):
+        """
+        Specify point size scalars. These are used to scale the thumbnail sizes based on the number of images.
+
+        Adapted from here:
+        https://github.com/YaleDHLab/pix-plot/blob/84afbd098f24c5a3ec41219fa849d3eb7b3dc57f/pixplot/pixplot.py#L422
+
+        If there is date information, the point size for the date layout is scaled by the number of date columns (+ 1)
+        times the number of date labels.
+
+        :param num_of_images: Number of images in the dataset
+        :param date_columns: Number of date columns in the dataset
+        :param date_labels: Number of date labels in the dataset
+        """
+        grid = 1 / math.ceil(num_of_images ** (1 / 2))
+        # TODO: These seem "fluffy". Can we do better?
+        point_sizes = {
+            'min': 0,
+            'grid': grid,
+            "max": grid * 1.2,
+            "scatter": grid * .2,
+            "initial": grid * .2,
+            "categorical": grid * .6,
+            "geographic": grid * .025,
+        }
+        # fetch the date distribution data for point sizing
+        if date_columns is not None and date_labels is not None:
+            # date: number of columns (+ 1) times the number of date labels
+            point_sizes['date'] = 1 / ((date_columns + 1) * date_labels)
+
+        return point_sizes
+
+    @staticmethod
+    def copy_web_assets(web_assets_path, output_dir, version_number):
+        """
+        Copy the template web site into the results folder. Additionally, update the version number in the web assets
+        (index.html and tsne.js) to match the version number of 4CAT.
+        """
+        shutil.copytree(web_assets_path, output_dir, dirs_exist_ok=True)
+        # write version numbers into output
+        for document in ['index.html', os.path.join('assets', 'js', 'tsne.js')]:
+            path = web_assets_path.joinpath(output_dir, document)
+            with open(path, 'r') as f:
+                f = f.read().replace('VERSION_NUMBER', version_number)
+                with open(path, 'w') as out:
+                    out.write(f)
