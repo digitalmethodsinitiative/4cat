@@ -4,7 +4,6 @@ import math
 import os
 import shutil
 import uuid
-from distutils.dir_util import copy_tree
 
 from PIL import Image, UnidentifiedImageError
 from pathlib import Path
@@ -93,6 +92,7 @@ class ImagePlotGenerator(BasicProcessor):
         output_dir.mkdir(exist_ok=True)
 
         # Copy the web template into the results output_dir
+        # TODO: Rewrite index.html to reference these assets (instead of copying them for every mapping!)
         ImagePlotGenerator.copy_web_assets(web_assets_path=self.config.get("PATH_ROOT").joinpath("common", "assets", "pixplot_template"), output_dir=output_dir, version_number=f"4CAT commit {get_software_commit()}")
 
         # Create the manifest
@@ -104,7 +104,7 @@ class ImagePlotGenerator(BasicProcessor):
                         clusters=None,
                         root='',
                         atlas_resolution=2048,
-                        cell_height=32,
+                        cell_height=64, # min of 64 still seems blurry to me
                         thumbnail_size=128)
 
         # Copy images into results folder
@@ -140,17 +140,18 @@ class ImagePlotGenerator(BasicProcessor):
         # Calculate the coordinates
         x_coordinates = [-1 + (i * (2 / row_len)) for i in range(row_len)]
         y_coordinates = [1 - (i * (2/column_num)) for i in range(column_num)]
-
-        # Sort grid by y coordinate than x coordinate (i.e., start from top left (1,-1) to bottom right (-1,1))
         possible_positions = list(product(x_coordinates, y_coordinates))
+
+        # Sort grid (i.e., start from top left (1,-1) to bottom right (-1,1))
+        # Already sorted by x coordinate (from above), now sort by y coordinate
         possible_positions.sort(key=lambda x: x[1], reverse=True)
 
         # Combine with filenames
         return dict(zip(list_of_image_filenames, possible_positions))
 
     @staticmethod
-    def cartograph(staging_area, images_path, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
-                   cell_height=32, thumbnail_size=128):
+    def cartograph(output_dir, images_path, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
+                   cell_height=64, thumbnail_size=128):
         """
         Turn image data into a PixPlot-compatible data manifest
 
@@ -168,7 +169,7 @@ class ImagePlotGenerator(BasicProcessor):
         native options. It is intended for quick visualisation of large image
         datasets given an arbitrary plotting outcome.
 
-        :param Path staging_area:  Where to create the relevant files.
+        :param Path output_dir:  Where to create the relevant files.
         :param Path images_path:  A path to a folder containing images.
         :param list umap:  UMAP positions, each one a dictionary with the keys
         `n_neighbors`, `min_dist`, `positions` and `positions_jittered`.
@@ -202,15 +203,15 @@ class ImagePlotGenerator(BasicProcessor):
         plot_id = str(uuid.uuid4())
 
         # prepare folders
-        path_thumbnails = staging_area.joinpath("data", "thumbs")
-        path_layouts = staging_area.joinpath("data", "layouts")
-        path_atlases = staging_area.joinpath("data", "atlases", plot_id)
+        path_thumbnails = output_dir.joinpath("data", "thumbs")
+        path_layouts = output_dir.joinpath("data", "layouts")
+        path_atlases = output_dir.joinpath("data", "atlases", plot_id)
         path_thumbnails.mkdir(parents=True)
         path_atlases.mkdir(parents=True)
         path_layouts.mkdir(parents=True)
 
-        staging_area.joinpath("data", "imagelists").mkdir(parents=True)
-        staging_area.joinpath("data", "hotspots").mkdir(parents=True)
+        output_dir.joinpath("data", "imagelists").mkdir(parents=True)
+        output_dir.joinpath("data", "hotspots").mkdir(parents=True)
 
         # prepare manifest - we will add more data as we go
         manifest = {
@@ -304,10 +305,8 @@ class ImagePlotGenerator(BasicProcessor):
                     atlas = None
                 else:
                     # move to next row
+                    atlas_x = 0
                     atlas_y += cell_height
-            else:
-                # Same row, next column
-                atlas_x = math.ceil(atlas_x + cell_width)
 
             if atlas is None:
                 # initialise a new atlas
@@ -322,6 +321,9 @@ class ImagePlotGenerator(BasicProcessor):
             imagelist["atlas"]["positions"][atlas_index].append((atlas_x, atlas_y))
             imagelist["cell_sizes"][atlas_index].append(tsize)
             image_indexes.append(image.name)
+
+            # Prepare for next image by increasing the atlas_x by width of the cell
+            atlas_x = math.ceil(atlas_x + cell_width)
 
         # Update the manifest point sizes
         # TODO: date info to be added to point sizes
@@ -432,13 +434,13 @@ class ImagePlotGenerator(BasicProcessor):
             manifest["layouts"]["umap"]["variants"].append(manifest_variant)
 
         # write the JSONs
-        with staging_area.joinpath(f"data/hotspots/hotspot-{plot_id}.json").open("w") as outfile:
+        with output_dir.joinpath(f"data/hotspots/hotspot-{plot_id}.json").open("w") as outfile:
             json.dump(hotspots, outfile)
 
-        with staging_area.joinpath(f"data/imagelists/imagelist-{plot_id}.json").open("w") as outfile:
+        with output_dir.joinpath(f"data/imagelists/imagelist-{plot_id}.json").open("w") as outfile:
             json.dump(imagelist, outfile)
 
-        with staging_area.joinpath(f"data/manifest.json").open("w") as outfile:
+        with output_dir.joinpath(f"data/manifest.json").open("w") as outfile:
             json.dump(manifest, outfile)
 
     @staticmethod
