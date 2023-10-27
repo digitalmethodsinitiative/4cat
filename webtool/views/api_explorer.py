@@ -617,17 +617,16 @@ def get_custom_css(datasource):
 
 	# Set the directory name of this datasource.
 	# Some naming inconsistensies are caught here
-	if datasource.startswith("4"):
-		datasource_dir = datasource.replace("4", "four")
-	elif datasource.startswith("8"):
-		datasource_dir = datasource.replace("8", "eight")
-	elif datasource == "twitter":
+	if datasource == "twitter":
 		datasource_dir = "twitter-import"
 		datasource = "twitter-import"
 	else:
 		datasource_dir = datasource
 
+
 	css_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+	
+	print(css_path)
 	read = False
 	if css_path.exists():
 		read = True
@@ -662,12 +661,7 @@ def get_custom_fields(datasource, filetype=None):
 	"""
 
 	# Set the directory name of this datasource.
-	# Do some conversion for some imageboard names (4chan, 8chan).
-	if datasource.startswith("4"):
-		datasource_dir = datasource.replace("4", "four")
-	elif datasource.startswith("8"):
-		datasource_dir = datasource.replace("8", "eight")
-	elif datasource == "twitter":
+	if datasource == "twitter":
 		datasource_dir = "twitter-import"
 		datasource = "twitter-import"
 	else:
