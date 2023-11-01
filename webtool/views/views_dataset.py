@@ -301,6 +301,11 @@ def preview_items(key):
     has_mapper = hasattr(processor, "map_item")
     use_mapper = has_mapper and config.get("ui.prefer_mapped_preview")
 
+    if dataset.get_extension() == "html":
+        # html files
+        log.info("Previewing HTML file %s" % dataset.get_results_path().name)
+        return get_result(dataset.get_results_path().name)
+
     if dataset.get_extension() == "gexf":
         # network files
         # use GEXF preview panel which loads full data file client-side
@@ -581,6 +586,4 @@ def view_image_plot(key):
     if not dataset.type.startswith("image-downloader") and not dataset.type.startswith("custom-image-plot") and not dataset.type.startswith("pix-plot"):
         return error(403, error="This dataset is not an image dataset.")
 
-    #TODO: Get path to image data!
-    log.info(f"Dataset folder: {dataset.get_results_folder_path()}")
-    return render_template("pixplot.html", dataset=dataset, image_path=dataset.get_results_folder_path())
+    return render_template("pixplot.html", dataset=dataset)

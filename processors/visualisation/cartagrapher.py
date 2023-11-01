@@ -103,9 +103,9 @@ class ImagePlotGenerator(BasicProcessor):
                         {"grid": grid_map},
                         clusters=None,
                         root='',
-                        atlas_resolution=2048,
-                        cell_height=64, # min of 64 still seems blurry to me
-                        thumbnail_size=128)
+                        atlas_resolution=2048 * 2,
+                        cell_height=64 * 2, # min of 64 seems blurry to me
+                        thumbnail_size=128) # TODO: changing from 128 breaks the plot; figure out WHY
 
         # Copy images into results folder
         shutil.copytree(staging_area, output_dir.joinpath("data/originals"), dirs_exist_ok=True)
