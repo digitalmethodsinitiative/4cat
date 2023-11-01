@@ -43,12 +43,16 @@
 /**
  * URL to necessary static assets
  */
-var assets_directory_url = document.getElementById('assets_directory_url').value;
 
 function Config() {
+  var assets_directory_url = document.getElementById('assets_directory_url').value;
+  var dataset_directory_url = document.getElementById('dataset_directory_url').value;
+
   this.data = {
     output_directory: "", // user specified out_dir or 'output'
     dir: 'data', // data folder within the output_directory
+    assets_url_base: assets_directory_url,
+    data_url_base: dataset_directory_url + "/data/",
     file: 'manifest.json',
     gzipped: false,
   }
@@ -967,7 +971,7 @@ World.prototype.getHeightMap = function(callback) {
     this.heightmap = ctx.getImageData(0,0, img.width, img.height);
     callback();
   }.bind(this);
-  img.src = this.heightmap || assets_directory_url + 'images/heightmap.jpg';
+  img.src = this.heightmap || config.data.assets_url_base + 'images/heightmap.jpg';
 }
 
 // determine the height of the heightmap at coordinates x,y
@@ -1995,7 +1999,7 @@ Lasso.prototype.getSelectedMetadata = function(callback) {
   if (data.json.metadata) {
     for (var i=0; i<images.length; i++) {
       var metadata = {};
-      get(config.data.dir + '/metadata/file/' + images[i] + '.json', function(data) {
+      get(getPath(config.data.dir +'/metadata/file/' + images[i] + '.json'), function(data) {
         metadata[data.filename] = data;
         // if all metadata has loaded prepare data download
         if (Object.keys(metadata).length == images.length) {
@@ -2605,7 +2609,7 @@ Modal.prototype.showCells = function(cellIndices, cellIdx) {
   // parse data attributes
   var filename = data.json.images[self.cellIndices[self.cellIdx]];
   // conditionalize the path to the image
-  var src = config.data.dir + '/originals/' + filename;
+  var src = config.data.data_url_base + '/originals/' + filename;
   // define function to show the modal
   function showModal(json) {
     var json = json || {};
@@ -2630,7 +2634,7 @@ Modal.prototype.showCells = function(cellIndices, cellIdx) {
   image.id = 'selected-image';
   image.onload = function() {
     showModal({image: image})
-    get(config.data.dir + '/metadata/file/' + filename + '.json', function(json) {
+    get(getPath(config.data.dir + '/metadata/file/' + filename + '.json'), function(json) {
       showModal(Object.assign({}, json, {image: image}));
     });
   }
@@ -2832,7 +2836,7 @@ LOD.prototype.fetchNextImage = function() {
           this.state.cellsToActivate = this.state.cellsToActivate.concat(cellIdx);
         }
       }.bind(this, cellIdx);
-      image.src = config.data.dir + '/thumbs/' + data.json.images[cellIdx];
+      image.src = config.data.data_url_base + '/thumbs/' + data.json.images[cellIdx];
     };
   // there was no image to fetch, so add neighbors to fetch queue if possible
   } else if (this.state.neighborsRequested < this.state.radius) {
@@ -3084,8 +3088,8 @@ Filter.prototype.filterImages = function() {
     filters.filterImages();
   } else {
     var filename = this.selected.replace(/\//g, '-').replace(/ /g, '__') + '.json',
-        path = getPath(config.data.dir + '/metadata/options/' + filename);
-    get(path, function(json) {
+        path = config.data.dir + '/metadata/options/' + filename;
+    get(getPath(path), function(json) {
       var vals = json.reduce(function(obj, i) {
         obj[i] = true;
         return obj;
@@ -3439,7 +3443,7 @@ Globe.prototype.load = function() {
     parentGeometry.merge(mesh.geometry, mesh.matrix);
   }
 
-  get(assets_directory_url + '/json/flat-continents.json', function(json) {
+  get(config.data.assets_url_base + '/json/flat-continents.json', function(json) {
     json.forEach(addShape.bind(this, self.globeGeometry));
     var material = new THREE.MeshBasicMaterial({
       color: 0x333333,
@@ -3448,7 +3452,7 @@ Globe.prototype.load = function() {
     self.globeMesh = new THREE.Mesh(self.globeGeometry, material);
   })
 
-  get(assets_directory_url +'/json/geographic-features.json', function(json) {
+  get(config.data.assets_url_base +'/json/geographic-features.json', function(json) {
     json.forEach(addShape.bind(this, self.featureGeometry));
     var material = new THREE.MeshBasicMaterial({
       color: 0x222222,

@@ -14,7 +14,7 @@
     <!-- version: VERSION_NUMBER -->
     <label for="dataset_output_directory"></label><input value="{{ dataset.get_results_folder_path().name }}" type="text" hidden="hidden" id="dataset_output_directory" />
     <label for="assets_directory_url"></label><input value="{{ url_for("static", filename="pixplot_template/assets/") }}" type="text" hidden="hidden" id="assets_directory_url" />
-    <label for="base_dataset_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_results_folder_path().name) }}" type="text" hidden="hidden" id="base_dataset_url" />
+    <label for="dataset_directory_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_results_folder_path().name) }}" type="text" hidden="hidden" id="dataset_directory_url" />
     <script type='x-shader/x-vertex' id='vertex-shader'>
     /**
     * The vertex shader's main() function must define `gl_Position`,
