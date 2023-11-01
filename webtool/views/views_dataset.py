@@ -11,7 +11,7 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, config
+from webtool import app, db, config, log
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
@@ -565,3 +565,22 @@ def keep_dataset(key):
 
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
     return redirect(url_for("show_result", key=key))
+
+@app.route("/results/<string:key>/plot/")
+@login_required
+def view_image_plot(key):
+    try:
+        dataset = DataSet(key=key, db=db)
+    except DataSetException:
+        return error(404, error="Dataset not found.")
+
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+        return error(403, error="This dataset is private.")
+
+    if not dataset.type.startswith("image-downloader") and not dataset.type.startswith("custom-image-plot") and not dataset.type.startswith("pix-plot"):
+        return error(403, error="This dataset is not an image dataset.")
+
+    #TODO: Get path to image data!
+    log.info(f"Dataset folder: {dataset.get_results_folder_path()}")
+    return render_template("pixplot.html", dataset=dataset, image_path=dataset.get_results_folder_path())

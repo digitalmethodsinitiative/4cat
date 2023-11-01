@@ -2,8 +2,8 @@
 <html lang='en'>
   <head>
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:300,400,600' rel='stylesheet'>
-    <link rel='stylesheet' type='text/css' href='assets/css/no-ui-slider.css'>
-    <link rel='stylesheet' type='text/css' href='assets/css/style.css'>
+    <link rel='stylesheet' type='text/css' href='{{ url_for("static", filename="pixplot_template/assets/css/no-ui-slider.css") }}'>
+    <link rel='stylesheet' type='text/css' href='{{ url_for("static", filename="pixplot_template/assets/css/style.css") }}'>
     <meta name='viewport' content='width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no'>
     <meta http-equiv='ScreenOrientation' content='autoRotate:disabled'>
     <title>PixPlot | Visualizing Image Fields</title>
@@ -12,6 +12,9 @@
   </head>
   <body>
     <!-- version: VERSION_NUMBER -->
+    <label for="dataset_output_directory"></label><input value="{{ dataset.get_results_folder_path().name }}" type="text" hidden="hidden" id="dataset_output_directory" />
+    <label for="assets_directory_url"></label><input value="{{ url_for("static", filename="pixplot_template/assets/") }}" type="text" hidden="hidden" id="assets_directory_url" />
+    <label for="base_dataset_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_results_folder_path().name) }}" type="text" hidden="hidden" id="base_dataset_url" />
     <script type='x-shader/x-vertex' id='vertex-shader'>
     /**
     * The vertex shader's main() function must define `gl_Position`,
@@ -361,7 +364,7 @@
       <header id='header' class='no-highlight'></header>
       <div id='header-brand' class='row align-center'>
         <a href='https://dhlab.yale.edu' target='_blank'>
-          <img id='logo' src='assets/images/dhlab-logo.svg' alt='DHLab logo' />
+          <img id='logo' src='{{ url_for("static", filename="pixplot_template/assets/images/dhlab-logo.svg") }}' alt='DHLab logo' />
         </a>
         <a id='app-name-container' class='row align-center' href='https://github.com/YaleDHLab/pix-plot'>
           <div id='app-name'>PixPlot</div>
@@ -374,7 +377,7 @@
         <div id='header-controls-top' class='no-highlight'>
           <div id='image-search-container'>
             <input id='image-search' type='text' placeholder='Search for an image'>
-            <img id='image-search-icon' src='assets/images/icons/search-icon.svg'>
+            <img id='image-search-icon' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/search-icon.svg") }}'>
             <div id='typeahead-container'></div>
           </div>
           <div id='date-container'>
@@ -383,14 +386,14 @@
           </div>
           <div id='filters-desktop'></div>
           <div id='layout-icons'>
-            <img class='layout-icon' id='layout-alphabetic' src='assets/images/icons/az-layout.svg' />
-            <img class='layout-icon' id='layout-umap' src='assets/images/icons/scatter-layout.svg' />
-            <img class='layout-icon' id='layout-grid' src='assets/images/icons/grid-layout.svg' />
-            <img class='layout-icon conditional' id='layout-date' src='assets/images/icons/date-layout.svg' />
-            <img class='layout-icon conditional' id='layout-categorical' src='assets/images/icons/categorical-layout.svg' />
-            <img class='layout-icon conditional' id='layout-geographic' src='assets/images/icons/geographic-layout.svg' />
-            <img class='layout-icon conditional' id='layout-custom' src='assets/images/icons/custom-layout.svg' />
-            <img id='settings-icon' src='assets/images/icons/gear-icon.svg' />
+            <img class='layout-icon' id='layout-alphabetic' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/az-layout.svg") }}' />
+            <img class='layout-icon' id='layout-umap' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/scatter-layout.svg") }}' />
+            <img class='layout-icon' id='layout-grid' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/grid-layout.svg") }}' />
+            <img class='layout-icon conditional' id='layout-date' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/date-layout.svg") }}' />
+            <img class='layout-icon conditional' id='layout-categorical' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/categorical-layout.svg") }}' />
+            <img class='layout-icon conditional' id='layout-geographic' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/geographic-layout.svg") }}' />
+            <img class='layout-icon conditional' id='layout-custom' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/custom-layout.svg") }}' />
+            <img id='settings-icon' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/gear-icon.svg") }}' />
           </div>
         </div>
         <div id='header-controls-bottom' class='no-highlight'>
@@ -468,10 +471,10 @@
               <% if (isLocalhost) { %>
                 <div class='hotspot-action remove-hotspot-x'>✕</div>
                 <div class='hotspot-action drag-hotspot'>...</div>
-                <img class='hotspot-action refresh-hotspot' src='assets/images/icons/refresh.svg'>
+                <img class='hotspot-action refresh-hotspot' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/refresh.svg") }}'>
               <% } %>
               <div class='hotspot-body no-highlight'>
-                <img class='hotspot-image' src='data/thumbs/<%= hotspot.img %>'>
+                <img class='hotspot-image' src='{{ dataset.get_results_folder_path() }}/<%= hotspot.img %>'>
                 <div class='hotspot-bar-container'>
                   <div class='hotspot-bar-inner'></div>
                 </div>
@@ -505,15 +508,15 @@
             <div id='selected-image-target'></div>
             <div class='icons'>
               <a target='_blank' id='eye-icon' href='<%- meta.permalink || meta.src %>'>
-                <img src='assets/images/icons/eye-icon.png' alt='eye icon' />
+                <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons/eye-icon.png") }}' alt='eye icon' />
               </a>
               <a id='download-icon' href='<%- meta.src || "#" %>' download>
-                <img src='assets/images/icons/download-icon.png' alt='download icon' />
+                <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons//download-icon.png") }}' alt='download icon' />
               </a>
             </div>
             <% if (multiImage) { %>
-              <img id='caret-left' class='image-caret' src='assets/images/icons/chevron.png' onclick='modal.showPreviousCell()'>
-              <img id='caret-right' class='image-caret' src='assets/images/icons/chevron.png' onclick='modal.showNextCell()'>
+              <img id='caret-left' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons//chevron.png") }}' onclick='modal.showPreviousCell()'>
+              <img id='caret-right' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/chevron.png") }}' onclick='modal.showNextCell()'>
             <% } %>
           </div>
         </div>
@@ -547,8 +550,8 @@
     <div id='selected-image-modal'></div>
     <!-- Image Selection: multi-image selection -->
     <div id='selection-icons' class='no-highlight'>
-      <img id='pan' src='assets/images/icons/pan.svg' class='active' />
-      <img id='select' src='assets/images/icons/lasso.png' class='' />
+      <img id='pan' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/pan.svg") }}' class='active' />
+      <img id='select' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/lasso.png") }}' class='' />
       <!-- Dismissible Tooltip: Lasso -->
       <div class='dismissible-tooltip' id='select-tooltip'>
         <b>Selection Mode</b>
@@ -575,7 +578,7 @@
                 <% _.forEach(images, function(image, idx) { %>
                   <div class='selected-image'>
                     <div class='toggle-selection'>✕</div>
-                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("data/thumbs/<%- image %>");'></div>
+                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("{{ dataset.get_results_folder_path() }}/thumbs/<%- image %>");'></div>
                   </div>
                 <% }); %>
               </div>
@@ -613,7 +616,7 @@
       <p>Use two fingers to zoom in and out.</p>
       <div class='row'>
         <button id='dismiss-mobile-interaction-guide'>Got it</button>
-        <img src='assets/images/icons/pinch-icon.svg'>
+        <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons/pinch-icon.svg") }}'>
       </div>
     </div>
     <!-- Webgl / Noscript Warnings -->
@@ -623,18 +626,18 @@
     <noscript>
       <span class='browser-message'>Sorry, your browser is not able to load a WebGL scene currently. Please enable JavaScript and try again.</span>
     </noscript>
-    <script src='assets/vendor/dist/three.min.js'></script>
-    <script src='assets/vendor/dist/lodash.min.js'></script>
-    <script src='assets/js/object-assign-polyfill.js'></script>
-    <script src='assets/vendor/dist/gsap.min.js'></script>
-    <script src='assets/vendor/src/trackball-controls.js'></script>
-    <script src='assets/vendor/src/fly-controls.js'></script>
-    <script src='assets/vendor/dist/stats.min.js'></script>
-    <script src='assets/vendor/dist/gunzip.min.js'></script>
-    <script src='assets/vendor/dist/papaparse.min.js'></script>
-    <script src='assets/vendor/dist/no-ui-slider.min.js'></script>
-    <script src='assets/vendor/dist/jszip.min.js'></script>
-    <script src='assets/vendor/dist/d3.min.js'></script>
-    <script src='assets/js/tsne.js'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/three.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/lodash.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/js/object-assign-polyfill.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/gsap.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/src/trackball-controls.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/src/fly-controls.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/stats.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/gunzip.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/papaparse.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/no-ui-slider.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/jszip.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/vendor/dist/d3.min.js") }}'></script>
+    <script src='{{ url_for("static", filename="pixplot_template/assets/js/tsne.js") }}'></script>
   </body>
 </html>

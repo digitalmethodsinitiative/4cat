@@ -40,9 +40,14 @@
 * atlasesPerTex: number of atlases to include in each texture
 **/
 
+/**
+ * URL to necessary static assets
+ */
+var assets_directory_url = document.getElementById('assets_directory_url').value;
+
 function Config() {
   this.data = {
-    output_directory: 'output', // user specified out_dir or 'output'
+    output_directory: "", // user specified out_dir or 'output'
     dir: 'data', // data folder within the output_directory
     file: 'manifest.json',
     gzipped: false,
@@ -962,7 +967,7 @@ World.prototype.getHeightMap = function(callback) {
     this.heightmap = ctx.getImageData(0,0, img.width, img.height);
     callback();
   }.bind(this);
-  img.src = this.heightmap || 'assets/images/heightmap.jpg';
+  img.src = this.heightmap || assets_directory_url + 'images/heightmap.jpg';
 }
 
 // determine the height of the heightmap at coordinates x,y
@@ -3434,7 +3439,7 @@ Globe.prototype.load = function() {
     parentGeometry.merge(mesh.geometry, mesh.matrix);
   }
 
-  get(getPath('assets/json/flat-continents.json'), function(json) {
+  get(assets_directory_url + '/json/flat-continents.json', function(json) {
     json.forEach(addShape.bind(this, self.globeGeometry));
     var material = new THREE.MeshBasicMaterial({
       color: 0x333333,
@@ -3443,7 +3448,7 @@ Globe.prototype.load = function() {
     self.globeMesh = new THREE.Mesh(self.globeGeometry, material);
   })
 
-  get(getPath('assets/json/geographic-features.json'), function(json) {
+  get(assets_directory_url +'/json/geographic-features.json', function(json) {
     json.forEach(addShape.bind(this, self.featureGeometry));
     var material = new THREE.MeshBasicMaterial({
       color: 0x222222,
@@ -3711,6 +3716,7 @@ function Swipes(obj) {
 **/
 
 function get(url, onSuccess, onErr) {
+  console.debug(url)
   onSuccess = onSuccess || function() {};
   onErr = onErr || function() {};
   var xhr = new XMLHttpRequest();
@@ -3986,8 +3992,10 @@ function getCanvasSize() {
 
 function getPath(path) {
   var base = window.location.origin;
-  base += window.location.pathname.replace('index.html', '');
-  base += path.replace('\\','/').replace(config.data.output_directory + '/', '');
+  var dataset_output_directory = document.getElementById('dataset_output_directory').value;
+  //base += window.location.pathname.replace('pixplot.html', '');
+  base += "/result/" + dataset_output_directory + "/" + config.data.output_directory + "/" + path.replace('\\','/');
+  //base += path.replace('\\','/').replace(config.data.output_directory + '/', '');
   return base;
 }
 
