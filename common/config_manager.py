@@ -1,3 +1,4 @@
+import itertools
 import pickle
 import time
 import json
@@ -158,6 +159,33 @@ class ConfigManager:
 
             self.set(setting, parameters.get("default", ""))
 
+        # make sure settings and user table are in sync
+        user_tags = list(set(itertools.chain(*[u["tags"] for u in self.db.fetchall("SELECT DISTINCT tags FROM users")])))
+        known_tags = [t["tag"] for t in self.db.fetchall("SELECT DISTINCT tag FROM settings")]
+        tag_order = self.get("flask.tag_order")
+
+        for tag in tag_order:
+            # don't include tags not used by users in the tag order
+            if tag not in user_tags:
+                tag_order.remove(tag)
+
+        for tag in known_tags:
+            # add tags used by a setting to tag order
+            if tag and tag not in tag_order:
+                tag_order.append(tag)
+
+        for tag in user_tags:
+            # add tags used by a user to tag order
+            if tag and tag not in tag_order:
+                tag_order.append(tag)
+
+        # admin tag should always be first in order
+        if "admin" in tag_order:
+            tag_order.remove("admin")
+
+        tag_order.insert(0, "admin")
+
+        self.set("flask.tag_order", tag_order)
         self.db.commit()
 
     def get_all(self, is_json=False, user=None, tags=None):

@@ -237,7 +237,7 @@ const processor = {
                 if ($('.child-list.top-level li').length === 0) {
                     $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
                 }
-                query.enable_form();
+                query.reset_form();
             },
             error: function (json) {
                 popup.alert('Could not delete dataset: ' + json.status, 'Error');
@@ -308,13 +308,19 @@ const query = {
     /**
      * Enable query form, so settings may be changed
      */
-    enable_form: function () {
-        $('#query-status .delete-link').remove();
-        $('#query-status .status_message .dots').html('');
-        $('#query-status .message').html('Enter dataset parameters to begin.');
+    enable_form: function (reset=false) {
+        if(reset) {
+            $('#query-status .delete-link').remove();
+            $('#query-status .status_message .dots').html('');
+            $('#query-status .message').html('Enter dataset parameters to begin.');
+            $('#query-form .datasource-extra-input').remove();
+        }
         $('#query-form fieldset').prop('disabled', false);
-        $('#query-form .datasource-extra-input').remove();
         $('#query-status').removeClass('active');
+    },
+
+    reset_form: function() {
+        query.enable_form(true);
     },
 
     /**
@@ -336,9 +342,9 @@ const query = {
 
         // Show loader
         query.check_search_queue();
+        query.enable_form();
 
         let form = $('#query-form');
-        query.enable_form();
         let formdata = new FormData(form[0]);
 
         if (!for_real) {
@@ -372,6 +378,7 @@ const query = {
 
         // Disable form
         $('html,body').scrollTop(200);
+        query.disable_form();
 
         // AJAX the query to the server
         // first just to validate - then for real (if validated)
@@ -381,14 +388,13 @@ const query = {
             $('#query-status .message').html('Starting data collection (do not close your browser)');
         }
 
-        query.disable_form();
         fetch(form.attr('action'), {method: 'POST', body: formdata})
             .then(function (response) {
                 return response.json();
             })
             .then(function (response) {
                 if (response['status'] === 'error') {
-                    query.enable_form();
+                    query.reset_form();
                     popup.alert(response['message'], 'Error');
                 } else if (response['status'] === 'confirm') {
                     query.enable_form();
@@ -430,7 +436,8 @@ const query = {
                 }
             })
             .catch(function (e) {
-                popup.alert('4CAT could not process the file you are trying to upload.', 'Error');
+                query.enable_form();
+                popup.alert('4CAT could not process your dataset.', 'Error');
             });
     },
 
@@ -461,7 +468,7 @@ const query = {
                     let keyword = json.label;
 
                     $('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
-                    query.enable_form();
+                    query.reset_form();
                     popup.alert('Query for \'' + keyword + '\' complete!', 'Success');
                 } else {
                     let dots = '';

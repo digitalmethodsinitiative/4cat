@@ -135,14 +135,9 @@ if __name__ == "__main__":
         frontend_servername = config.get('flask.server_name').split(":")[0]
         # Check if port changed
         if frontend_port != public_port:
-            if public_port == 80:
-                # Set flask.server to existing frontend_servername with no port
-                config.set('flask.server_name', f"{frontend_servername}")
-                print(f"Updated flask.server_name: {frontend_servername}")
-            else:
-                # Set flask.server to existing frontend_servername with the new public_port
-                config.set('flask.server_name', f"{frontend_servername}:{public_port}")
-                print(f"Updated flask.server_name with new public port: {frontend_servername}:{public_port}")
+            print(f"Exposed PUBLIC_PORT {public_port} from .env file not included in Server Name; if you are not using a reverse proxy, you may need to update the Server Name variable.")
+            print(f"You can do so by running the following command if you do not have access to the 4CAT frontend Control Panel:\n"
+                  f"docker exec 4cat_backend python -c \"from common.config_manager import config;config.set('flask.server_name', '{frontend_servername}:{public_port}');\"")
 
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"

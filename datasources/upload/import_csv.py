@@ -142,6 +142,12 @@ class SearchCustom(BasicProcessor):
                 temp_file.unlink()
                 return self.dataset.finish_with_error(str(e))
 
+            except UnicodeDecodeError as e:
+                infile.close()
+                temp_file.unlink()
+                return self.dataset.finish_with_error("The uploaded file is not encoded with the UTF-8 character set. "
+                                                      "Make sure the file is encoded properly and try again.")
+
         # done!
         infile.close()
         if skipped:

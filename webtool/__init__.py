@@ -37,7 +37,8 @@ app = Flask(__name__)
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy
 # see https://stackoverflow.com/a/45333882
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
+app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
 # Set up logging for Gunicorn; only run w/ Docker
 if config.get("USING_DOCKER"):

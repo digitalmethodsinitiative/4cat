@@ -18,7 +18,7 @@ config_definition = {
     },
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
-        "default": ["ninegag", "bitchute", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
+        "default": ["ninegag", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
                     "telegram", "tiktok", "twitter"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
@@ -361,6 +361,22 @@ config_definition = {
         "help": "Use HTTPS",
         "tooltip": "If your server is using 'https', set to True and 4CAT will use HTTPS links.",
         "global": True
+    },
+    "flask.proxy_override": {
+        "type": UserInput.OPTION_MULTI_SELECT,
+        "default": [],
+        "options": {
+            "x_for": "X-Forwarded-For",
+            "x_proto": "X-Forwarded-Proto",
+            "x_host": "X-Forwarded-Host",
+            "x_port": "X-Forwarded-Port",
+            "x_prefix": "X-Forwarded-Prefix"
+        },
+        "help": "Use proxy headers for URL",
+        "tooltip": "These proxy headers will be taken into account when building URLs. For example, if "
+                   "X-Forwarded-Proto is enabled, the URL scheme (http/https) of the built URL will be based on the "
+                   "scheme defined by this header. Use when running 4CAT behind a reverse proxy. Requires a front-end "
+                   "restart to take effect."
     },
     "flask.autologin.name": {
         "type": UserInput.OPTION_TEXT,
