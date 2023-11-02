@@ -64,5 +64,6 @@ sphinx/
 !webtool/static/img/*.jpg
 !webtool/static/img/favicon/*.ico
 !webtool/static/img/flags/*.png
-!webtool/static/pixplot_template/assets/*
+!webtool/static/pixplot_template/assets/images/*
+!webtool/static/pixplot_template/assets/images/icons/*
 !common/assets/github-screenshots/*.png
