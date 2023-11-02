@@ -49,10 +49,9 @@ function Config() {
   var dataset_directory_url = document.getElementById('dataset_directory_url').value;
 
   this.data = {
-    output_directory: "", // user specified out_dir or 'output'
-    dir: 'data', // data folder within the output_directory
-    assets_url_base: assets_directory_url,
-    data_url_base: dataset_directory_url + "/data/",
+    dir: '/data', // data folder within the output_directory; this is coded directly in the manifest files, and so potentially dynamic
+    assets_url_base: assets_directory_url + "/",
+    data_url_base: dataset_directory_url + "/",
     file: 'manifest.json',
     gzipped: false,
   }
@@ -134,7 +133,7 @@ function Data() {
 Data.prototype.load = function() {
   get(getPath(config.data.dir + '/' + config.data.file),
     function(json) {
-      config.data.output_directory = json.output_directory;
+      //config.data.output_directory = json.output_directory; // no longer needed based on two URL path now (assets and data)
       get(getPath(json.imagelist), function(data) {
         this.parseManifest(Object.assign({}, json, data));
       }.bind(this))
@@ -2609,7 +2608,7 @@ Modal.prototype.showCells = function(cellIndices, cellIdx) {
   // parse data attributes
   var filename = data.json.images[self.cellIndices[self.cellIdx]];
   // conditionalize the path to the image
-  var src = config.data.data_url_base + '/originals/' + filename;
+  var src = config.data.data_url_base + config.data.dir + '/originals/' + filename;
   // define function to show the modal
   function showModal(json) {
     var json = json || {};
@@ -2836,7 +2835,7 @@ LOD.prototype.fetchNextImage = function() {
           this.state.cellsToActivate = this.state.cellsToActivate.concat(cellIdx);
         }
       }.bind(this, cellIdx);
-      image.src = config.data.data_url_base + '/thumbs/' + data.json.images[cellIdx];
+      image.src = config.data.data_url_base + config.data.dir + '/thumbs/' + data.json.images[cellIdx];
     };
   // there was no image to fetch, so add neighbors to fetch queue if possible
   } else if (this.state.neighborsRequested < this.state.radius) {
@@ -3443,7 +3442,7 @@ Globe.prototype.load = function() {
     parentGeometry.merge(mesh.geometry, mesh.matrix);
   }
 
-  get(config.data.assets_url_base + '/json/flat-continents.json', function(json) {
+  get(config.data.assets_url_base + 'json/flat-continents.json', function(json) {
     json.forEach(addShape.bind(this, self.globeGeometry));
     var material = new THREE.MeshBasicMaterial({
       color: 0x333333,
@@ -3452,7 +3451,7 @@ Globe.prototype.load = function() {
     self.globeMesh = new THREE.Mesh(self.globeGeometry, material);
   })
 
-  get(config.data.assets_url_base +'/json/geographic-features.json', function(json) {
+  get(config.data.assets_url_base +'json/geographic-features.json', function(json) {
     json.forEach(addShape.bind(this, self.featureGeometry));
     var material = new THREE.MeshBasicMaterial({
       color: 0x222222,
@@ -3995,12 +3994,9 @@ function getCanvasSize() {
 **/
 
 function getPath(path) {
-  var base = window.location.origin;
-  var dataset_output_directory = document.getElementById('dataset_output_directory').value;
-  //base += window.location.pathname.replace('pixplot.html', '');
-  base += "/result/" + dataset_output_directory + "/" + config.data.output_directory + "/" + path.replace('\\','/');
-  //base += path.replace('\\','/').replace(config.data.output_directory + '/', '');
-  return base;
+  // Return a URL specifically to the data files
+  // TODO Some pathings here uses the config.data.dir which seems to be hardcoded in manifest files; this could be simplified
+  return config.data.data_url_base + path.replace('\\','/');
 }
 
 function trimFilenameSuffix(filename) {
