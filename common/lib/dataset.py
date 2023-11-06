@@ -797,7 +797,7 @@ class DataSet(FourcatModule):
 		for role in ("owner", "viewer"):
 			owners = dataset.get_owners(role=role)
 			for owner in owners:
-				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False)
+				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False, safe=True)
 
 		self.db.commit()
 		if recursive:

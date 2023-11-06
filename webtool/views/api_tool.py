@@ -756,8 +756,16 @@ def remove_tag():
 
 	if tag in all_tags:
 		all_tags.remove(tag)
-		db.delete("settings", where={"tag": tag})
-		config.set("flask.tag_order", all_tags, tag="")
+
+	# all_tags is now our canonical list of tags
+	# clean up settings
+	# delete all tagged settings for tags that are no longer in use
+	configured_tags = [t["tag"] for t in db.fetchall("SELECT DISTINCT tag FROM settings")]
+	for configured_tag in configured_tags:
+		if configured_tag and configured_tag not in all_tags:
+			db.delete("settings", where={"tag": configured_tag})
+
+	config.set("flask.tag_order", all_tags, tag="")
 
 	if request.args.get("redirect") is not None:
 		flash("Tag removed.")
