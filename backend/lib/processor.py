@@ -233,6 +233,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
+			can_run_next = True
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
 			try:
@@ -243,6 +244,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 			# run it only if the post-processor is actually available for this query
 			if self.dataset.data["num_rows"] <= 0:
+				can_run_next = False
 				self.log.info("Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (next_type, self.dataset.key))
 
 			elif next_type in available_processors:
@@ -257,7 +259,31 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
+				can_run_next = False
 				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
+
+			if not can_run_next:
+				# We are unable to continue the chain of processors, so we check to see if we are attaching to a parent
+				# preset; this allows the parent (for example a preset) to be finished and any successful processors displayed
+				if "attach_to" in self.parameters:
+					# Probably should not happen, but for some reason a mid processor has been designated as the processor
+					# the parent should attach to
+					pass
+				else:
+					# Check for "attach_to" parameter in descendents
+					have_attach_to = False
+					while not have_attach_to:
+						if "attach_to" in next_parameters:
+							self.parameters["attach_to"] = next_parameters["attach_to"]
+							break
+						else:
+							if "next" in next_parameters:
+								next_parameters = next_parameters["next"]
+							else:
+								# No more descendents
+								# Should not happen; we cannot find the source dataset
+								break
+
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
