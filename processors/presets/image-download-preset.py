@@ -6,7 +6,7 @@ class ImageDownloaderPreset(ProcessorPreset):
 	Run processor pipeline to annotate images
 	"""
 	type = "preset-image-downloader"  # job type ID
-	category = "Combined processors"  # category
+	category = "Visual"  # category
 	title = "Download images"  # title displayed in UI
 	description = "Download images and store in a a zip file. May take a while to complete as images are retrieved " \
 				  "externally. Note that not always all images can be saved. For imgur galleries, only the first " \

@@ -20,7 +20,6 @@ from common.config_manager import config
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.lib.preset import ProcessorPreset
 
 __author__ = "Stijn Peeters, Sal Hagen"
 __credits__ = ["Stijn Peeters, Sal Hagen"]
@@ -29,6 +28,9 @@ __email__ = "4cat@oilab.eu"
 
 class ImageDownloader(BasicProcessor):
 	"""
+	NOTE: The image-download-preset.py file is a preset for this processor and automatically runs the cartographer in
+	addition to downloading the images. This processor is marked as "not compatible" so it does not appear in the UI.
+
 	Image downloader
 
 	Downloads top images and saves as zip archive
@@ -122,13 +124,11 @@ class ImageDownloader(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow processor on top image rankings
+		This processor can be called by presets, but not indepentently.
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return (module.type == "top-images" or module.is_from_collector() or module.type.startswith("image-downloader-preset")) \
-			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
-
+		return False
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a zip file with
