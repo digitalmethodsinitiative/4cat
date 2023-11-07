@@ -11,11 +11,10 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, config
+from webtool import app, db, config, fourcat_modules
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
-import backend
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
 from common.config_manager import ConfigWrapper
@@ -32,7 +31,7 @@ def create_dataset():
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
                    metadata["has_worker"] and metadata["has_options"] and datasource in config.get(
                        "datasources.enabled", {})}
 
@@ -146,7 +145,7 @@ def show_results(page):
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
                    metadata["has_worker"] and metadata["has_options"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
@@ -424,7 +423,7 @@ def show_result(key):
 
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
-    datasources = backend.all_modules.datasources
+    datasources = fourcat_modules.datasources
     datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
     can_unexpire = ((config.get('expire.allow_optout') and \
@@ -450,7 +449,7 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "result.html" if standalone else "components/result-details.html"
 
-    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
+    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=fourcat_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)

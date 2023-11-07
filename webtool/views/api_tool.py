@@ -11,14 +11,12 @@ import os
 
 from pathlib import Path
 
-import backend
-
 from flask import jsonify, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
 	get_flashed_messages, send_from_directory
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-from webtool import app, db, log, openapi, limiter, queue, config
+from webtool import app, db, log, openapi, limiter, queue, config, fourcat_modules
 from webtool.lib.helpers import error, setting_required
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
@@ -132,14 +130,14 @@ def datasource_form(datasource_id):
 
 	:return-error 404: If the datasource does not exist.
 	"""
-	if datasource_id not in backend.all_modules.datasources:
+	if datasource_id not in fourcat_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	if datasource_id not in config.get('datasources.enabled'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	datasource = backend.all_modules.datasources[datasource_id]
-	worker_class = backend.all_modules.workers.get(datasource_id + "-search")
+	datasource = fourcat_modules.datasources[datasource_id]
+	worker_class = fourcat_modules.workers.get(datasource_id + "-search")
 
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
@@ -203,13 +201,13 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
-	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
+	if not platform or platform not in fourcat_modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message="Unknown platform or source format")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
 	worker = None
 	for worker_type in worker_types:
-		worker = backend.all_modules.workers.get(worker_type)
+		worker = fourcat_modules.workers.get(worker_type)
 		if worker:
 			break
 
@@ -277,14 +275,14 @@ def queue_dataset():
 	:return-error 404: If the datasource does not exist.
 	"""
 	datasource_id = request.form.get("datasource", "")
-	if datasource_id not in backend.all_modules.datasources:
+	if datasource_id not in fourcat_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	search_worker_id = datasource_id + "-search"
-	if search_worker_id not in backend.all_modules.workers:
+	if search_worker_id not in fourcat_modules.workers:
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
-	search_worker = backend.all_modules.workers[search_worker_id]
+	search_worker = fourcat_modules.workers[search_worker_id]
 
 	# handle confirmation outside of parameter parsing, since it is not data
 	# source specific
@@ -1083,7 +1081,7 @@ def queue_processor(key=None, processor=None):
 		"container": "*[data-dataset-key=" + dataset.key + "]",
 		"key": analysis.key,
 		"html": render_template("components/result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
-                                processors=backend.all_modules.processors) if analysis.is_new else "",
+                                processors=fourcat_modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
 		"is_filter": available_processors[processor].is_filter()
 	})
@@ -1137,7 +1135,7 @@ def check_processor():
 			"progress": round(dataset.get_progress() * 100),
 			"html": render_template("components/result-child.html", child=dataset, dataset=parent,
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
-                                    processors=backend.all_modules.processors),
+                                    processors=fourcat_modules.processors),
 			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
 			"url": "/result/" + dataset.data["result_file"]
 		})

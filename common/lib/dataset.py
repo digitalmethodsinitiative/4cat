@@ -12,9 +12,9 @@ import re
 
 from pathlib import Path
 
-import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
+from common.lib.module_loader import ModuleCollector
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -44,6 +44,7 @@ class DataSet(FourcatModule):
 	genealogy = None
 	preset_parent = None
 	parameters = None
+	modules = None
 
 	owners = None
 	tagged_owners = None
@@ -920,8 +921,8 @@ class DataSet(FourcatModule):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
-		elif "datasource" in parameters and parameters["datasource"] in backend.all_modules.datasources:
-			return backend.all_modules.datasources[parameters["datasource"]]["name"] + " Dataset"
+		elif "datasource" in parameters and parameters["datasource"] in self.get_modules().datasources:
+			return self.get_modules().datasources[parameters["datasource"]]["name"] + " Dataset"
 		else:
 			return default
 
@@ -1152,7 +1153,7 @@ class DataSet(FourcatModule):
 		try:
 			# this fails if the processor type is unknown
 			# edge case, but let's not crash...
-			processor_path = backend.all_modules.processors.get(self.data["type"]).filepath
+			processor_path = self.get_modules().processors.get(self.data["type"]).filepath
 		except AttributeError:
 			processor_path = ""
 
@@ -1325,7 +1326,7 @@ class DataSet(FourcatModule):
 
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
-		processors = backend.all_modules.processors
+		processors = self.get_modules().processors
 
 		available = {}
 		for processor_type, processor in processors.items():
@@ -1364,6 +1365,20 @@ class DataSet(FourcatModule):
 
 		return self.queue_position
 
+	def get_modules(self):
+		"""
+		Get 4CAT modules
+
+		Is a function because loading them is not free, and this way we can
+		cache the result.
+
+		:return:
+		"""
+		if not self.modules:
+			self.modules = ModuleCollector()
+
+		return self.modules
+
 	def get_own_processor(self):
 		"""
 		Get the processor class that produced this dataset
@@ -1371,7 +1386,7 @@ class DataSet(FourcatModule):
 		:return:  Processor class, or `None` if not available.
 		"""
 		processor_type = self.parameters.get("type", self.data.get("type"))
-		return backend.all_modules.processors.get(processor_type)
+		return self.get_modules().processors.get(processor_type)
 
 
 	def get_available_processors(self, user=None):
