@@ -30,7 +30,6 @@ class ImageDownloaderPreset(ProcessorPreset):
 
 	def get_processor_pipeline(self):
 		params = self.parameters
-		self.dataset.log("Downloading images with parameters: {}".format(params))
 
 		pipeline = [
 			# download images
