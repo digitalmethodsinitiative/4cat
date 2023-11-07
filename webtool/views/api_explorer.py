@@ -42,7 +42,7 @@ def explorer_dataset(key, page):
 
 	# Get dataset info.
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 

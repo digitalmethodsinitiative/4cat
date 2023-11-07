@@ -182,7 +182,7 @@ def get_mapped_result(key):
     :param str key:  Dataset key
     """
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -249,7 +249,7 @@ def get_mapped_result(key):
 @login_required
 def view_log(key):
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -279,7 +279,7 @@ def preview_items(key):
     :return:  HTML preview
     """
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -403,7 +403,7 @@ def show_result(key):
     :return:  Rendered template
     """
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404)
 
@@ -534,7 +534,7 @@ def toggle_private_interactive(key):
 @login_required
 def keep_dataset(key):
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, message="Dataset not found.")
 

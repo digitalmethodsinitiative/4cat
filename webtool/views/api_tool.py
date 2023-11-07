@@ -219,7 +219,8 @@ def import_dataset():
 		type=worker.type,
 		db=db,
 		owner=current_user.get_id(),
-		extension=worker.extension
+		extension=worker.extension,
+		modules=fourcat_modules
 	)
 	dataset.update_status("Importing uploaded file...")
 
@@ -346,7 +347,8 @@ def queue_dataset():
 		type=search_worker_id,
 		extension=extension,
 		is_private=is_private,
-		owner=current_user.get_id()
+		owner=current_user.get_id(),
+		modules=fourcat_modules
 	)
 
 	# this bit allows search workers to insist on the new dataset having a
@@ -402,7 +404,7 @@ def check_dataset():
 	block = request.args.get("block", "status")
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -472,7 +474,7 @@ def edit_dataset_label(key):
 	label = request.form.get("label", "")
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -517,7 +519,7 @@ def convert_dataset(key):
 	datasource = request.form.get("to_datasource", "")
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -565,7 +567,7 @@ def nuke_dataset(key=None, reason=None):
 		reason = "[no reason given]"
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -638,7 +640,7 @@ def delete_dataset(key=None):
 	dataset_key = request.form.get("key", "") if not key else key
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -669,7 +671,7 @@ def delete_dataset(key=None):
 					 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
 	# do we have a parent?
-	parent_dataset = DataSet(key=dataset.key_parent, db=db) if dataset.key_parent else None
+	parent_dataset = DataSet(key=dataset.key_parent, db=db, modules=fourcat_modules) if dataset.key_parent else None
 
 	# and delete the dataset and child datasets
 	dataset.delete()
@@ -708,7 +710,7 @@ def erase_credentials(key=None):
 	dataset_key = request.form.get("key", "") if not key else key
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -802,7 +804,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 	username = request.form.get("name", "") if not username else username
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -860,7 +862,7 @@ def remove_dataset_owner(key=None, username=None):
 	username = request.form.get("name", "") if not username else username
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -916,7 +918,7 @@ def toggle_favourite(key):
 	:return-error 404:  If the dataset key was not found
 	"""
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -956,7 +958,7 @@ def toggle_private(key):
 	:return-error 404:  If the dataset key was not found
 	"""
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -1032,7 +1034,7 @@ def queue_processor(key=None, processor=None):
 
 	# cover all bases - can only run processor on "parent" dataset
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Not a valid dataset key.")
 
@@ -1060,7 +1062,8 @@ def queue_processor(key=None, processor=None):
 					   extension=available_processors[processor].get_extension(parent_dataset=dataset),
 					   type=processor,
 					   is_private=dataset.is_private,
-					   owner=current_user.get_id()
+					   owner=current_user.get_id(),
+					   modules=fourcat_modules
 	)
 
 	# give same ownership as parent dataset
@@ -1118,7 +1121,7 @@ def check_processor():
 
 	for key in keys:
 		try:
-			dataset = DataSet(key=key, db=db)
+			dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 		except DataSetException:
 			continue
 
@@ -1203,7 +1206,7 @@ def export_packed_dataset(key=None, component=None):
 	:return:
 	"""
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 

@@ -58,14 +58,33 @@ class DataSet(FourcatModule):
 	queue_position = None
 
 	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
-				 type=None, is_private=True, owner="anonymous"):
+				 type=None, is_private=True, owner="anonymous", modules=None):
 		"""
 		Create new dataset object
 
 		If the dataset is not in the database yet, it is added.
 
-		:param parameters:  Parameters, e.g. search query, date limits, et cetera
+		:param dict parameters:  Only when creating a new dataset. Dataset
+		parameters, free-form dictionary.
+		:param str key: Dataset key. If given, dataset with this key is loaded.
+		:param int job: Job ID. If given, dataset corresponding to job is
+		loaded.
+		:param dict data: Dataset data, corresponding to a row in the datasets
+		database table. If not given, retrieved from database depending on key.
 		:param db:  Database connection
+		:param str parent:  Only when creating a new dataset. Parent dataset
+		key to which the one being created is a child.
+		:param str extension: Only when creating a new dataset. Extension of
+		dataset result file.
+		:param str type: Only when creating a new dataset. Type of the dataset,
+		corresponding to the type property of a processor class.
+		:param bool is_private: Only when creating a new dataset. Whether the
+		dataset is private or public.
+		:param str owner: Only when creating a new dataset. The user name of
+		the dataset's creator.
+		:param modules: Module cache. If not given, will be loaded when needed
+		(expensive). Used to figure out what processors are compatible with
+		this dataset.
 		"""
 		self.db = db
 		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
@@ -76,6 +95,7 @@ class DataSet(FourcatModule):
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
+		self.modules = modules
 
 		if key is not None:
 			self.key = key
@@ -522,7 +542,7 @@ class DataSet(FourcatModule):
 		parameters["copied_from"] = self.key
 		parameters["copied_at"] = time.time()
 
-		copy = DataSet(parameters=parameters, db=self.db, extension=self.result_file.split(".")[-1], type=self.type)
+		copy = DataSet(parameters=parameters, db=self.db, extension=self.result_file.split(".")[-1], type=self.type, modules=self.modules)
 		for field in self.data:
 			if field in ("id", "key", "timestamp", "job", "parameters", "result_file"):
 				continue
@@ -557,7 +577,7 @@ class DataSet(FourcatModule):
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
 			try:
-				child = DataSet(key=child["key"], db=self.db)
+				child = DataSet(key=child["key"], db=self.db, modules=self.modules)
 				child.delete(commit=commit)
 			except DataSetException:
 				# dataset already deleted - race condition?
@@ -590,7 +610,7 @@ class DataSet(FourcatModule):
 		"""
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
-			child = DataSet(key=child["key"], db=self.db)
+			child = DataSet(key=child["key"], db=self.db, modules=self.modules)
 			for attr, value in kwargs.items():
 				child.__setattr__(attr, value)
 
@@ -1228,7 +1248,7 @@ class DataSet(FourcatModule):
 
 		while key_parent:
 			try:
-				parent = DataSet(key=key_parent, db=self.db)
+				parent = DataSet(key=key_parent, db=self.db, modules=self.modules)
 			except DataSetException:
 				break
 
@@ -1458,7 +1478,7 @@ class DataSet(FourcatModule):
 
 		:return DataSet:  Parent dataset, or `None` if not applicable
 		"""
-		return DataSet(key=self.key_parent, db=self.db) if self.key_parent else None
+		return DataSet(key=self.key_parent, db=self.db, modules=self.modules) if self.key_parent else None
 
 	def detach(self):
 		"""

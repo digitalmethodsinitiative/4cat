@@ -143,7 +143,8 @@ def process_standalone(processor):
 		parameters={"next": [processor]},
 		db=db,
 		owner=current_user.get_id(),
-		is_private=True
+		is_private=True,
+		modules=fourcat_modules
 	)
 	temp_dataset.finish(len(input))
 
@@ -165,7 +166,7 @@ def process_standalone(processor):
 
 	# queue the postprocessor
 	metadata = processors[processor]
-	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=db)
+	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=db, modules=fourcat_modules)
 
 	queue = JobQueue(database=db, logger=log)
 	job = queue.add_job(processor, {}, processed.key)
