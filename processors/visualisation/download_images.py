@@ -20,6 +20,7 @@ from common.config_manager import config
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
+from backend.lib.preset import ProcessorPreset
 
 __author__ = "Stijn Peeters, Sal Hagen"
 __credits__ = ["Stijn Peeters, Sal Hagen"]
@@ -125,7 +126,7 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return (module.type == "top-images" or module.is_from_collector()) \
+		return (module.type == "top-images" or module.is_from_collector() or module.type.startswith("image-downloader-preset")) \
 			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
 
 	def process(self):
