@@ -161,7 +161,7 @@ class DataSet(FourcatModule):
 			if extension is None:
 				own_processor = self.get_own_processor()
 				if own_processor:
-					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
+					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db, modules=self.modules) if parent else None)
 				# Still no extension, default to 'csv'
 				if not extension:
 					extension = "csv"
@@ -171,7 +171,7 @@ class DataSet(FourcatModule):
 
 		# retrieve analyses and processors that may be run for this dataset
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
+		self.children = sorted([DataSet(data=analysis, db=self.db, modules=self.modules) for analysis in analyses],
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
 
 		self.refresh_owners()
@@ -1274,7 +1274,7 @@ class DataSet(FourcatModule):
 
 		:return list:  List of DataSets
 		"""
-		children = [DataSet(data=record, db=self.db) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		children = [DataSet(data=record, db=self.db, modules=self.modules) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
 		results = children.copy()
 		if recursive:
 			for child in children:

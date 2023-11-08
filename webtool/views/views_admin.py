@@ -900,7 +900,7 @@ def dataset_bulk():
             flash(f"{len(bulk_owner):,} new owner(s) were added to the datasets.")
 
         if not incomplete:
-            datasets = [DataSet(data=dataset, db=db) for dataset in datasets_meta]
+            datasets = [DataSet(data=dataset, db=db, modules=fourcat_modules) for dataset in datasets_meta]
             flash(f"{len(datasets):,} dataset(s) updated.")
 
             if action == "export":

@@ -140,7 +140,7 @@ def show_results(page):
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = [DataSet(key=dataset["key"], db=db) for dataset in datasets]
+    filtered = [DataSet(key=dataset["key"], db=db, modules=fourcat_modules) for dataset in datasets]
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
