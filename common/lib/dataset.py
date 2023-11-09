@@ -941,8 +941,8 @@ class DataSet(FourcatModule):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
-		elif "datasource" in parameters and parameters["datasource"] in self.get_modules().datasources:
-			return self.get_modules().datasources[parameters["datasource"]]["name"] + " Dataset"
+		elif "datasource" in parameters and parameters["datasource"] in self.modules.datasources:
+			return self.modules.datasources[parameters["datasource"]]["name"] + " Dataset"
 		else:
 			return default
 
@@ -1173,7 +1173,7 @@ class DataSet(FourcatModule):
 		try:
 			# this fails if the processor type is unknown
 			# edge case, but let's not crash...
-			processor_path = self.get_modules().processors.get(self.data["type"]).filepath
+			processor_path = self.modules.processors.get(self.data["type"]).filepath
 		except AttributeError:
 			processor_path = ""
 
@@ -1346,7 +1346,7 @@ class DataSet(FourcatModule):
 
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
-		processors = self.get_modules().processors
+		processors = self.modules.processors
 
 		available = {}
 		for processor_type, processor in processors.items():
@@ -1406,7 +1406,7 @@ class DataSet(FourcatModule):
 		:return:  Processor class, or `None` if not available.
 		"""
 		processor_type = self.parameters.get("type", self.data.get("type"))
-		return self.get_modules().processors.get(processor_type)
+		return self.modules.processors.get(processor_type)
 
 
 	def get_available_processors(self, user=None):
