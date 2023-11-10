@@ -20,7 +20,7 @@ __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
 
-class CategorizeImagesCLIP(BasicProcessor):
+class StableDiffusionImageGenerator(BasicProcessor):
     """
     Generate images with Stable Diffusion
     """
