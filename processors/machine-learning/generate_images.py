@@ -250,12 +250,12 @@ class StableDiffusionImageGenerator(BasicProcessor):
                     "from_dataset": self.source_dataset.key,
                     "filename": make_filename(prompt_id, data["prompt"]),
                     "success": output_dir.joinpath(make_filename(prompt_id, data["prompt"])).exists(),
-                    "item_ids": [prompt_id],
+                    "post_ids": [prompt_id],
                     "prompt": data["prompt"],
                     "negative-prompt": data["negative"],
                 } for prompt_id, data in prompts.items()
             }
-            json.dump(results, outfile)
+            json.dump(metadata, outfile)
 
         shutil.rmtree(staging_area)
 
