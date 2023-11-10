@@ -245,13 +245,16 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
         self.dataset.update_status("Verifying results")
         with output_dir.joinpath(".metadata.json").open("w") as outfile:
-            results = [{
-                "id": prompt_id,
-                "prompt": data["prompt"],
-                "negative-prompt": data["negative"],
-                "filename": make_filename(prompt_id, data["prompt"]),
-                "success": output_dir.joinpath(make_filename(prompt_id, data["prompt"])).exists()
-            } for prompt_id, data in prompts.items()]
+            metadata = {
+                prompt_id: {
+                    "from_dataset": self.source_dataset.key,
+                    "filename": make_filename(prompt_id, data["prompt"]),
+                    "success": output_dir.joinpath(make_filename(prompt_id, data["prompt"])).exists(),
+                    "item_ids": [prompt_id],
+                    "prompt": data["prompt"],
+                    "negative-prompt": data["negative"],
+                } for prompt_id, data in prompts.items()
+            }
             json.dump(results, outfile)
 
         shutil.rmtree(staging_area)
