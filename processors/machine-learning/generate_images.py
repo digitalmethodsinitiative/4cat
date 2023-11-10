@@ -260,6 +260,6 @@ class StableDiffusionImageGenerator(BasicProcessor):
         shutil.rmtree(staging_area)
 
         self.dataset.update_status(
-            f"Generated {len([r for r in results if r['success']]):,} image(s) for {len(prompts):,} prompt(s)",
+            f"Generated {len([r for r in metadata.values() if r['success']]):,} image(s) for {len(prompts):,} prompt(s)",
             is_final=True)
-        self.write_archive_and_finish(output_dir, num_items=len([r for r in results if r['success']]))
+        self.write_archive_and_finish(output_dir, num_items=len([r for r in metadata.values() if r['success']]))
