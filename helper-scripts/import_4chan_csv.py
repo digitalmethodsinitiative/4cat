@@ -21,6 +21,7 @@ from psycopg2.errors import UniqueViolation
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.config_manager import config
 
 def commit(posts, post_fields, db, datasource, fast=False):
 	posts_added = 0
@@ -88,7 +89,7 @@ if args.fast:
 	print("Fast mode enabled.")
 
 logger = Logger()
-db = Database(logger=logger, appname="queue-dump")
+db = Database(logger=logger, appname="4chan-import", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 
 csvnone = re.compile(r"^N$")
 
@@ -200,7 +201,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 			postbuffer = []
 
 # Add the last posts and threads as well
-print("Commiting leftover posts")
+print("Committing leftover posts")
 commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 
 # Insert deleted posts, and get their id_seq to use in the posts_{datasource}_deleted table
