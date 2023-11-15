@@ -23,7 +23,7 @@ print("  Dropping 'status' column from jobs table...")
 status_column_check = db.fetchone(
     "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'status'")
 if status_column_check["num"] != 0:
-    db.execute("ALTER TABLE datasets DROP COLUMN status")
+    db.execute("ALTER TABLE jobs DROP COLUMN status")
     db.commit()
     print("  - dropped!")
 else:
