@@ -134,6 +134,8 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
 			self.job.add_status("Crash during execution")
+		finally:
+			self.db.close()
 
 	def abort(self):
 		"""
