@@ -64,7 +64,7 @@ class URLCoLinker(BasicProcessor):
 		trailing_dot = re.compile(r"[.,)]$")
 
 		self.dataset.update_status("Reading source file")
-		update_on_item = int(self.source_dataset.num_rows / 100)
+		update_on_item = max(10, int(self.source_dataset.num_rows / 100))
 
 		links = {}
 		processed = 0

@@ -154,10 +154,6 @@ with open(args.input, encoding="utf-8") as inputfile:
 		if posts >= args.end:
 			break
 
-		# DELETE LATER
-		if int(csvpost["timestamp"]) < 1433116800:
-			continue
-
 		post = sanitize(csvpost)
 
 		if int(csvpost["subnum"]) > 0:
