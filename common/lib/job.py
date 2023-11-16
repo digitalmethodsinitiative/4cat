@@ -44,14 +44,7 @@ class Job:
 		:param database:  Database handler
 		:return Job: Job object
 		"""
-		data = database.fetchone("SELECT main_queue.*, ( " \
-			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
-			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
-			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
-			"  ) " \
-			") AS queue_ahead FROM jobs AS main_queue WHERE main_queue.id = %s", (id,))
+		data = database.fetchone("SELECT * FROM jobs WHERE id = %s", (id,))
 		if not data:
 			raise JobNotFoundException
 
@@ -79,23 +72,9 @@ class Job:
 		:return Job: Job object
 		"""
 		if jobtype != "*":
-			data = database.fetchone("SELECT main_queue.*, ( " \
-			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
-			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
-			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
-			"  ) " \
-			") AS queue_ahead FROM jobs AS main_queue WHERE main_queue.jobtype = %s AND main_queue.remote_id = %s", (jobtype, remote_id))
+			data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s", (jobtype, remote_id))
 		else:
-			data = database.fetchone("SELECT main_queue.*, ( " \
-			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
-			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
-			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
-			"  ) " \
-			") AS queue_ahead FROM jobs AS main_queue WHERE main_queue.remote_id = %s", (remote_id,))
+			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id,))
 
 		if not data:
 			raise JobNotFoundException
@@ -171,6 +150,32 @@ class Job:
 		:return bool: If the job is not claimed yet and also isn't finished.
 		"""
 		return not self.is_claimed and not self.is_finished
+
+	def get_place_in_queue(self):
+		"""
+		Get the place of this job in the queue
+
+		:return int: Place in queue
+		"""
+		query = "SELECT COUNT(*) as queue_ahead FROM jobs WHERE jobtype = %s"
+		replacements = [self.data["jobtype"]]
+		if self.data["timestamp_after"] == 0:
+			# Job can be claimed immediately
+			query += (
+				" AND (timestamp_after = 0 AND timestamp < %s OR "  # Other jobs that can be claimed immediately and were queued prior to this job being queued
+				" timestamp_after > 0 AND timestamp_after < %s) ")  # Other jobs that are waiting for a specific time, but prior to this job being queued
+			replacements += [self.data["timestamp"], self.data["timestamp"]]
+		else:
+			# Job must wait until timestamp_after
+			query += (
+				" AND (timestamp_after = 0 AND timestamp < %s OR "  # Other jobs that can be claimed immediately and were queued prior to this job
+				" timestamp_after > 0 AND timestamp_after < %s) ")  # Other jobs that are waiting, but prior to this job's start time
+			replacements += [self.data["timestamp_after"], self.data["timestamp_after"]]
+		queue_result = self.db.fetchone(query, replacements)
+		if queue_result["queue_ahead"] is None:
+			raise Exception(f"what? {queue_result}")
+
+		return queue_result["queue_ahead"]
 
 	@property
 	def details(self):

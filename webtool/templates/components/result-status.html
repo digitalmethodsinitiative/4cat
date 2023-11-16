@@ -1,6 +1,6 @@
-{% if not dataset.is_finished() and dataset.queue_position > 0 %}
-    {% if not no_icons %}<i class="fas fa-hourglass-half" aria-label="Query in progress..."></i>{% endif %} In a queue{% if dataset.queue_position > 0 %}
-        (waiting for {{ dataset.queue_position }} dataset{% if dataset.queue_position != 1 %}s{% endif %} to finish).
+{% if not dataset.is_finished() and dataset.get_place_in_queue() > 0 %}
+    {% if not no_icons %}<i class="fas fa-hourglass-half" aria-label="Query in progress..."></i>{% endif %} In a queue{% if dataset.get_place_in_queue() > 0 %}
+        (waiting for {{ dataset.get_place_in_queue() }} dataset{% if dataset.get_place_in_queue() != 1 %}s{% endif %} to finish).
     {% else %}, waiting for job to be started...{% endif %}
 {% elif not dataset.is_finished() %}
         {% if not no_icons %}<i class="fas fa-arrow-down scroll" aria-label="Query in progress..."></i>{% endif %}
@@ -13,7 +13,7 @@
         <i class="fa fa-check" aria-hidden="true"></i>
     {% endif %}
 {% endif %}
-{% if dataset.queue_position <= 0 %}
+{% if dataset.get_place_in_queue() <= 0 %}
     {% if dataset.get_status() %}
         {{ dataset.get_status() }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
     {% elif not dataset.is_finished() %}
