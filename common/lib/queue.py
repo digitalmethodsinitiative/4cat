@@ -116,15 +116,7 @@ class JobQueue:
 
 		query += "         ORDER BY timestamp ASC"
 
-		try:
-			jobs = self.db.fetchall(query, replacements)
-		except psycopg2.ProgrammingError:
-			# there seems to be a bug with psycopg2 where it sometimes raises
-			# this for empty query results even though it shouldn't. this
-			# doesn't seem to indicate an actual problem so we catch the
-			# exception and return an empty list
-			# https://github.com/psycopg/psycopg2/issues/346
-			jobs = []
+		jobs = self.db.fetchall(query, replacements)
 
 		return [Job.get_by_data(job, self.db) for job in jobs if job]
 
