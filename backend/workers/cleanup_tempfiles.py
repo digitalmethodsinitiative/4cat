@@ -81,3 +81,5 @@ class TempFileCleaner(BasicWorker):
                 self.log.debug("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
                 dataset.key, str(file)))
                 shutil.rmtree(file)
+
+        self.job.finish()
