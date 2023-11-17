@@ -564,6 +564,7 @@ const query = {
                     $('#dataset-results').html(child.resultrow_html);
 
                     target.replaceWith(update);
+                    ui_helpers.conditional_form.init();
                     update.addClass('updated');
                     target.remove();
                 });
@@ -1449,6 +1450,10 @@ const ui_helpers = {
         //table controls
         $(document).on('input', '.copy-from', ui_helpers.table_control);
 
+        //mighty morphing web forms
+        $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select', ui_helpers.conditional_form.manage);
+        ui_helpers.conditional_form.init();
+
         //iframe flexible sizing
         $('iframe').on('load', ui_helpers.fit_iframe);
 
@@ -1756,6 +1761,85 @@ const ui_helpers = {
                 element.value = value;
             }
         })
+    },
+
+    conditional_form: {
+        /**
+         * Set visibility of form elements when they are loaded
+         */
+        init: function() {
+            document.querySelectorAll('*[data-requires]').forEach((element) => {
+                const form = $(element).parents('form')[0];
+                if(form.getAttribute('data-form-managed')) {
+                    return;
+                }
+                ui_helpers.conditional_form.manage({target: element});
+            });
+        },
+
+        /**
+         * Manage visibility of form elements when forms are interacted with
+
+         * @param e  Event
+         */
+        manage: function (e) {
+            const form = $(e.target).parents('form')[0];
+            form.setAttribute('data-form-managed', true);
+            const conditionals = form.querySelectorAll('*[data-requires]');
+
+            if (!conditionals) {
+                return;
+            }
+
+            conditionals.forEach((element) => {
+                let requirement = RegExp(/([a-zA-Z0-9_]+)([!=$~^]+)(.*)/g).exec(element.getAttribute('data-requires'));
+                if (!requirement || requirement.length !== 4) { // assume 'field is not empty'
+                    requirement = [null, element.getAttribute('data-requires'), '!=', ''];
+                }
+
+                const negate = requirement[2] === '!=';
+                const other_field = 'option-' + requirement[1];
+                const other_element = form.querySelector("*[name='" + other_field + "']");
+
+                if (!other_element) { //invalid reference
+                    return;
+                }
+
+                const other_value = other_element.value;
+                let requirement_met = false;
+                if (other_element.getAttribute('type') === 'checkbox') {
+                    // checkboxes are a bit different (and simpler)
+                    const checked = other_element.checked;
+                    if(requirement[2] === '!=') {
+                        if((checked && ['', 'false'].includes(requirement[3])) || (!checked && ['checked', 'true'].includes(requirement[3]))) {
+                            requirement_met = true;
+                        }
+                    } else {
+                        if((checked && ['checked', 'true'].includes(requirement)) || (!checked) && ['', 'false'].includes(requirement[3])) {
+                            requirement_met = true;
+                        }
+                    }
+                } else {
+                    if(requirement[2] === '!=') {
+                        requirement_met = other_value !== requirement[3];
+                    } else if(requirement[2] === '^=') {
+                        requirement_met = other_value.startsWith(requirement[3]);
+                    } else if(requirement[2] === '~=') {
+                        requirement_met = other_value.indexOf(requirement[3]) >= 0;
+                    } else if(requirement[2] === '$=') {
+                        requirement_met = other_value.endsWith(requirement[3]);
+                    } else if(['==', '='].includes(requirement[2])) {
+                        requirement_met = other_value === requirement[3];
+                    }
+                }
+
+                if (requirement_met) {
+                    $(element).show();
+                } else {
+                    $(element).hide();
+                }
+            });
+        }
     },
 
     /**
