@@ -195,16 +195,29 @@ class UserInput:
                     if (other_value and value not in ("true", "checked")) or (not other_value and value not in ("", "false")):
                         raise RequirementsNotMetException()
 
-            elif operator == "^=" and not str(other_input.get(field)).startswith(value):
-                raise RequirementsNotMetException()
-            elif operator == "$=" and not str(other_input.get(field)).endswith(value):
-                raise RequirementsNotMetException()
-            elif operator == "~=" and value not in str(other_input.get(field)):
-                raise RequirementsNotMetException()
-            elif operator == "!=" and value == other_input.get(field):
-                raise RequirementsNotMetException()
-            elif operator in ("==", "=") and value != other_input.get(field):
-                raise RequirementsNotMetException()
+            else:
+                if type(other_value) in (tuple, list):
+                # iterables are a bit special
+                    if len(other_value) == 1:
+                        # treat one-item lists as "normal" values
+                        other_value = other_value[0]
+                    elif operator == "~=":  # interpret as 'is in list?'
+                        if value not in other_value:
+                            raise RequirementsNotMetException()
+                    else:
+                        # condition doesn't make sense for a list, so assume it's not True
+                        raise RequirementsNotMetException()
+
+                if operator == "^=" and not str(other_value).startswith(value):
+                    raise RequirementsNotMetException()
+                elif operator == "$=" and not str(other_value).endswith(value):
+                    raise RequirementsNotMetException()
+                elif operator == "~=" and value not in str(other_value):
+                    raise RequirementsNotMetException()
+                elif operator == "!=" and value == other_value:
+                    raise RequirementsNotMetException()
+                elif operator in ("==", "=") and value != other_value:
+                    raise RequirementsNotMetException()
 
         input_type = settings.get("type", "")
         if input_type in UserInput.OPTIONS_COSMETIC:
