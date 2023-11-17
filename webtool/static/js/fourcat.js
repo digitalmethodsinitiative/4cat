@@ -737,6 +737,8 @@ const query = {
                     multichoice.makeMultichoice();
                     multichoice.makeMultiSelect();
                 }
+
+                ui_helpers.conditional_form.manage(document.getElementById('query-form'));
             },
             'error': function () {
                 $('#datasource-select').parents('form').trigger('reset');
@@ -1451,7 +1453,7 @@ const ui_helpers = {
         $(document).on('input', '.copy-from', ui_helpers.table_control);
 
         //mighty morphing web forms
-        $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select', ui_helpers.conditional_form.manage);
+        $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select, #query-form input, #query-form select', ui_helpers.conditional_form.manage);
         ui_helpers.conditional_form.init();
 
         //iframe flexible sizing
@@ -1767,7 +1769,7 @@ const ui_helpers = {
         /**
          * Set visibility of form elements when they are loaded
          */
-        init: function() {
+        init: function(form=null) {
             document.querySelectorAll('*[data-requires]').forEach((element) => {
                 const form = $(element).parents('form')[0];
                 if(form.getAttribute('data-form-managed')) {
@@ -1780,10 +1782,17 @@ const ui_helpers = {
         /**
          * Manage visibility of form elements when forms are interacted with
 
-         * @param e  Event
+         * @param e  Event, or a form object
          */
         manage: function (e) {
-            const form = $(e.target).parents('form')[0];
+            let form;
+
+            if('tagName' in e && e.tagName === 'FORM') {
+                form = e;
+            } else {
+                form = $(e.target).parents('form')[0];
+            }
+
             form.setAttribute('data-form-managed', true);
             const conditionals = form.querySelectorAll('*[data-requires]');
 
@@ -1806,6 +1815,7 @@ const ui_helpers = {
                 }
 
                 const other_value = other_element.value;
+
                 let requirement_met = false;
                 if (other_element.getAttribute('type') === 'checkbox') {
                     // checkboxes are a bit different (and simpler)

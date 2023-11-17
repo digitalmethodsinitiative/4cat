@@ -2,9 +2,9 @@
         </fieldset>
         {% set fieldset.open = False %}
     {% elif settings.type == "info" %}
-        <p class="form-intro">{{ settings.help|markdown|safe }}</p>
+        <p class="form-intro"{% if settings.requires %} data-requires="{{ settings.requires }}"{% endif %}>{{ settings.help|markdown|safe }}</p>
     {% else %}
-        <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}>
+        <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}{% if settings.requires %} data-requires="{{ settings.requires }}"{% endif %}>
             <label for="forminput-{{ option }}">{{ settings.help }}</label>
             <div{% if settings.type == "toggle" %} class="with-tail"{% endif %}>
         {% if settings.type == "toggle" %}
