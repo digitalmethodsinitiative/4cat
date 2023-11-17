@@ -64,6 +64,7 @@ class SimilarWords(ProcessorPreset):
 				"parameters": {
 					"stem": False,
 					"lemmatise": False,
+					"columns": "body",
 					"timeframe": timeframe,
 					"grouping-per": "sentence",
 					"language": language

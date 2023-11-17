@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.config_manager import config
 
 # parse parameters
 cli = argparse.ArgumentParser()
@@ -28,7 +29,8 @@ if not Path(args.input).exists() or not Path(args.input).is_dir():
 	sys.exit(1)
 
 logger = Logger()
-db = Database(logger=logger, appname="queue-folder")
+db = Database(logger=logger, appname="folder-import", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
+
 folder = Path(args.input)
 
 for jsonfile in folder.glob("*.json"):

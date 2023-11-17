@@ -17,7 +17,7 @@ from webtool.views.api_tool import toggle_favourite, toggle_private, queue_proce
 
 import backend
 from common.lib.dataset import DataSet
-
+from common.lib.exceptions import DataSetException
 from common.config_manager import ConfigWrapper
 
 config = ConfigWrapper(config, user=current_user, request=request)
@@ -158,7 +158,7 @@ Downloading results
 """
 
 
-@app.route('/result/<string:query_file>')
+@app.route('/result/<path:query_file>')
 def get_result(query_file):
     """
     Get dataset result file
@@ -167,8 +167,7 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    path = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')).joinpath(query_file)
-    return send_from_directory(directory=path.parent, path=path.name)
+    return send_from_directory(directory=config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')), path=query_file)
 
 
 @app.route('/mapped-result/<string:key>/')
@@ -185,7 +184,7 @@ def get_mapped_result(key):
     """
     try:
         dataset = DataSet(key=key, db=db)
-    except TypeError:
+    except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
@@ -219,35 +218,28 @@ def get_mapped_result(key):
         """
         writer = None
         buffer = io.StringIO()
-        with dataset.get_results_path().open() as infile:
-            for line in infile:
-                item = json.loads(line)
-                mapped_item = mapper(item)
-
-                # Add possible annotation items
-                if annotation_fields:
+        for mapped_item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
+            if not writer:
+                fieldnames = mapped_item.keys()
+                if annotation_labels:
                     for label in annotation_labels:
-                        mapped_item[label] = item[label]
+                        if label not in fieldnames:
+                            fieldnames.append(label)
 
-                if not writer:
-                    fieldnames = mapped_item.keys()
-
-                    # Add possible annotation headers
-                    if annotation_labels:
-                        for label in annotation_labels:
-                            if label not in fieldnames:
-                                fieldnames.append(label)
-
-                    writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
-                    writer.writeheader()
-                    yield buffer.getvalue()
-                    buffer.truncate(0)
-                    buffer.seek(0)
-
-                writer.writerow(mapped_item)
+                writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
+                writer.writeheader()
                 yield buffer.getvalue()
                 buffer.truncate(0)
                 buffer.seek(0)
+
+            if annotation_fields:
+                for label in annotation_labels:
+                    mapped_item[label] = item[label]
+
+            writer.writerow(mapped_item)
+            yield buffer.getvalue()
+            buffer.truncate(0)
+            buffer.seek(0)
 
     disposition = 'attachment; filename="%s"' % dataset.get_results_path().with_suffix(".csv").name
     return app.response_class(stream_with_context(map_response()), mimetype="text/csv",
@@ -259,7 +251,7 @@ def get_mapped_result(key):
 def view_log(key):
     try:
         dataset = DataSet(key=key, db=db)
-    except TypeError:
+    except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
@@ -289,7 +281,7 @@ def preview_items(key):
     """
     try:
         dataset = DataSet(key=key, db=db)
-    except TypeError:
+    except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
@@ -327,7 +319,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_items():
+            for row in dataset.iterate_items(warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 
@@ -413,7 +405,7 @@ def show_result(key):
     """
     try:
         dataset = DataSet(key=key, db=db)
-    except TypeError:
+    except DataSetException:
         return error(404)
 
     if not current_user.can_access_dataset(dataset):
@@ -460,8 +452,7 @@ def show_result(key):
 
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
-                           is_favourite=is_favourite, timestamp_expires=timestamp_expires,
-                           has_credentials=has_credentials,
+                           is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
 
 
@@ -545,7 +536,7 @@ def toggle_private_interactive(key):
 def keep_dataset(key):
     try:
         dataset = DataSet(key=key, db=db)
-    except TypeError:
+    except DataSetException:
         return error(404, message="Dataset not found.")
 
     if not config.get("expire.allow_optout"):

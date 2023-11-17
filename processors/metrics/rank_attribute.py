@@ -51,7 +51,7 @@ class AttributeRanker(BasicProcessor):
 				"none": "Use column value",
 				"urls": "URLs",
 				"hostnames": "Host names",
-				"hashtags": "Hashtags"
+				"hashtags": "Hashtags (words starting with #)"
 			},
 			"help": "Extract from column",
 			"tooltip": "This can be used to extract more specific values from the value of the selected column(s); for "
@@ -145,7 +145,10 @@ class AttributeRanker(BasicProcessor):
 		# inspected to determine those overall top-scoring items
 		overall_top = {}
 		if rank_style == "overall":
-			self.dataset.update_status("Determining overall top-%i items" % cutoff)
+			if cutoff:
+				self.dataset.update_status(f"Determining overall top-{cutoff} items")
+			else:
+				self.dataset.update_status("Determining overall top items")
 			for post in self.source_dataset.iterate_items(self):
 				values = self.get_values(post, columns, filter, split_comma, extract)
 				for value in values:
@@ -156,7 +159,9 @@ class AttributeRanker(BasicProcessor):
 
 					overall_top[value] += convert_to_int(post.get(weighby, 1), 1)
 
-			overall_top = sorted(overall_top, key=lambda item: overall_top[item], reverse=True)[0:cutoff]
+			overall_top = sorted(overall_top, key=lambda item: overall_top[item], reverse=True)
+			if cutoff:
+				overall_top = overall_top[:cutoff]
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")

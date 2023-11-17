@@ -98,6 +98,8 @@
                 <div>
                     <a href="{{ url_for("manipulate_user", mode="create") }}" class="button-like"><i
                             class="fa fa-user-plus" aria-hidden="true"></i> Create user</a>
+                    <a href="{{ url_for("user_bulk") }}" class="button-like"><i
+                            class="fa fa-user-plus" aria-hidden="true"></i> Create users (bulk)</a>
                     {% if __user_config("privileges.admin.can_manage_tags") %}
                     <a href="{{ url_for("manipulate_tags") }}" class="button-like"><i
                             class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Manage tags</a>
@@ -105,7 +107,7 @@
                 </div>
                 <hr>
                 <form action="{{ url_for("list_users") }}" method="GET">
-                    <input aria-label="User filter" placeholder="Search by username" name="name"
+                    <input aria-label="User filter" placeholder="Search by username/notes" name="name"
                            value="{{ filter.name }}" list="all-users">
 
                     <input aria-label="User filter" placeholder="Search by tag" name="tag"

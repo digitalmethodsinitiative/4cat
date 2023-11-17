@@ -109,7 +109,7 @@ class DmiServiceManager:
             self.processor.dataset.update_progress(current_completed / self.num_files_to_process)
             self.processed_files = current_completed
 
-    def send_request_and_wait_for_results(self, service_endpoint, data, wait_period=60, check_process=True):
+    def send_request_and_wait_for_results(self, service_endpoint, data, wait_period=60, check_process=True, callback=None):
         """
         Send request and wait for results to be ready.
 
@@ -163,6 +163,9 @@ class DmiServiceManager:
                 # Update progress
                 if check_process:
                     self.check_progress()
+
+                if callback:
+                    callback(self)
 
                 result = requests.get(results_url, timeout=30)
                 if 'status' in result.json().keys() and result.json()['status'] == 'running':
@@ -221,7 +224,8 @@ class DmiServiceManager:
         elif filename_response.status_code == 404:
             # Folder not found; no files
             return {}
-
+        elif filename_response.status_code != 200:
+            raise DmiServiceManagerException(f"Unknown response from DMI Service Manager: {filename_response.status_code} - {filename_response.reason}")
         return filename_response.json()
 
     def send_files(self, file_collection_name, results_name, files_to_upload, dir_with_files):
@@ -254,6 +258,7 @@ class DmiServiceManager:
         total_files_to_upload = len(to_upload_filenames)
 
         # Check if results folder exists
+        empty_placeholder = None
         if results_name not in existing_files:
             total_files_to_upload += 1
             # Create a blank file to upload into results folder
@@ -270,7 +275,7 @@ class DmiServiceManager:
             while to_upload_filenames:
                 upload_file = to_upload_filenames.pop()
                 # Upload files
-                if files_uploaded == 0:
+                if upload_file == empty_placeholder:
                     # Upload a blank results file to results folder
                     response = requests.post(api_upload_endpoint,
                                              files=[(results_name, open(dir_with_files.joinpath(upload_file), 'rb'))],
@@ -292,6 +297,10 @@ class DmiServiceManager:
                     raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
                 else:
                     self.processor.dataset.log(f"Unable to upload file ({response.status_code - response.reason}): {upload_file}")
+
+                if "errors" in response.json():
+                    self.processor.dataset.log(
+                        f"Unable to upload file ({response.status_code - response.reason}): {upload_file} - {response.json()['errors']}")
 
             self.processor.dataset.update_status(f"Uploaded {files_uploaded} files!")
 

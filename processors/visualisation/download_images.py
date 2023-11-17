@@ -265,7 +265,7 @@ class ImageDownloader(BasicProcessor):
 		processed_urls = 0
 		failures = []
 		for url in urls:
-			if downloaded_images >= amount:
+			if amount != 0 and downloaded_images >= amount:
 				break
 
 			# stop processing if worker has been asked to stop

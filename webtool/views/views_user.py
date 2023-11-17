@@ -21,7 +21,7 @@ from webtool import app, login_manager, db, config
 from webtool.views.api_tool import limiter
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
-from common.lib.helpers import send_email, get_software_version
+from common.lib.helpers import send_email, get_software_commit
 
 from pathlib import Path
 
@@ -57,6 +57,11 @@ def load_user_from_request(request):
     token = request.args.get("access-token")
 
     if not token:
+        token = request.headers.get("Authentication")
+
+    if not token:
+        # this was a mistake, but was being checked for a long time, so we're
+        # keeping it for legacy support
         token = request.headers.get("Authorization")
 
     if not token:
@@ -281,7 +286,7 @@ def first_run_dialog():
 
         payload = {
             "version": version,
-            "commit": get_software_version(),
+            "commit": get_software_commit(),
             "role": request.form.get("role", ""),
             "affiliation": request.form.get("affiliation", ""),
             "email": request.form.get("email", "")
@@ -319,7 +324,7 @@ def show_login():
 
     have_email = config.get('mail.admin_email') and config.get('mail.server')
     if request.method == 'GET':
-        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email)
+        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email), 401
 
     username = request.form['username']
     password = request.form['password']

@@ -1,6 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+import re
 import traceback
 import zipfile
 import typing
@@ -15,9 +16,11 @@ from pathlib import Path, PurePath
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version, remove_nuls
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
+from common.lib.helpers import get_software_commit, remove_nuls, send_email
+from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
+								   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
+
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -73,14 +76,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Extension of the file created by the processor
 	extension = "csv"
 
-	#: Configurable options for this processor
-	options = {}
-
 	#: 4CAT settings from the perspective of the dataset's owner
 	config = None
-
-	#: Values for the processor's options, populated by user input
-	parameters = {}
 
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
@@ -102,7 +99,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# that actually queued the processor, so their config is relevant
 			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
 			self.owner = self.dataset.creator
-		except TypeError as e:
+		except DataSetException as e:
 			# query has been deleted in the meantime. finish without error,
 			# as deleting it will have been a conscious choice by a user
 			self.job.finish()
@@ -137,10 +134,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 						self.job.finish()
 						return
 
-			except TypeError:
+			except DataSetException:
 				# we need to know what the source_dataset dataset was to properly handle the
 				# analysis
-				self.log.warning("Processor %s queued for orphan query %s: cannot run, cancelling job" % (
+				self.log.warning("Processor %s queued for orphan dataset %s: cannot run, cancelling job" % (
 					self.type, self.dataset.key))
 				self.job.finish()
 				return
@@ -164,7 +161,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# start log file
 		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_version())
+		self.dataset.update_version(get_software_commit())
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided
@@ -236,6 +233,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
+			can_run_next = True
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
 			try:
@@ -246,6 +244,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 			# run it only if the post-processor is actually available for this query
 			if self.dataset.data["num_rows"] <= 0:
+				can_run_next = False
 				self.log.info("Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (next_type, self.dataset.key))
 
 			elif next_type in available_processors:
@@ -260,7 +259,31 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
+				can_run_next = False
 				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
+
+			if not can_run_next:
+				# We are unable to continue the chain of processors, so we check to see if we are attaching to a parent
+				# preset; this allows the parent (for example a preset) to be finished and any successful processors displayed
+				if "attach_to" in self.parameters:
+					# Probably should not happen, but for some reason a mid processor has been designated as the processor
+					# the parent should attach to
+					pass
+				else:
+					# Check for "attach_to" parameter in descendents
+					have_attach_to = False
+					while not have_attach_to:
+						if "attach_to" in next_parameters:
+							self.parameters["attach_to"] = next_parameters["attach_to"]
+							break
+						else:
+							if "next" in next_parameters:
+								next_parameters = next_parameters["next"]
+							else:
+								# No more descendents
+								# Should not happen; we cannot find the source dataset
+								break
+
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
@@ -299,6 +322,39 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.dataset.key, self.parameters["attach_to"]))
 
 		self.job.finish()
+
+		if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+			owner = self.dataset.get_parameters().get("email-complete", False)
+			# Check that username is email address
+			if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+				from email.mime.multipart import MIMEMultipart
+				from email.mime.text import MIMEText
+				from smtplib import SMTPException
+				import socket
+				import html2text
+
+				self.log.debug("Sending email to %s" % owner)
+				dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get('flask.server_name') + '/results/' + self.dataset.key
+				sender = config.get('mail.noreply')
+				message = MIMEMultipart("alternative")
+				message["From"] = sender
+				message["To"] = owner
+				message["Subject"] = "4CAT dataset completed: %s - %s" % (self.dataset.type, self.dataset.get_label())
+				mail = """
+					<p>Hello %s,</p>
+					<p>4CAT has finished collecting your %s dataset labeled: %s</p>
+					<p>You can view your dataset via the following link:</p>
+					<p><a href="%s">%s</a></p> 
+					<p>Sincerely,</p>
+					<p>Your friendly neighborhood 4CAT admin</p>
+					""" % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
+				html_parser = html2text.HTML2Text()
+				message.attach(MIMEText(html_parser.handle(mail), "plain"))
+				message.attach(MIMEText(mail, "html"))
+				try:
+					send_email([owner], message)
+				except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
+					self.log.error("Error sending email to %s" % owner)
 
 	def remove_files(self):
 		"""
@@ -626,6 +682,45 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		shutil.copy(self.dataset.get_log_path(), standalone.get_log_path())
 
 		return standalone
+
+	@classmethod
+	def map_item_method_available(cls, dataset):
+		"""
+		Checks if map_item method exists and is compatible with dataset. If dataset does not have an extension,
+		returns False
+
+		:param BasicProcessor processor:	The BasicProcessor subclass object with which to use map_item
+		:param DataSet dataset:				The DataSet object with which to use map_item
+		"""
+		# only run item mapper if extension of processor == extension of
+		# data file, for the scenario where a csv file was uploaded and
+		# converted to an ndjson-based data source, for example
+		# todo: this is kind of ugly, and a better fix may be possible
+		dataset_extension = dataset.get_extension()
+		if not dataset_extension:
+			# DataSet results file does not exist or has no extension, use expected extension
+			if hasattr(dataset, "extension"):
+				dataset_extension = dataset.extension
+			else:
+				# No known DataSet extension; cannot determine if map_item method compatible
+				return False
+
+		return hasattr(cls, "map_item") and cls.extension == dataset_extension
+
+	@classmethod
+	def get_mapped_item(cls, item):
+		"""
+		Get the mapped item using a processors map_item method.
+
+		Ensure map_item method is compatible with a dataset by checking map_item_method_available first.
+		"""
+		try:
+			mapped_item = cls.map_item(item)
+		except (KeyError, IndexError) as e:
+			raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}")
+		if not mapped_item:
+			raise MapItemException("Unable to map item!")
+		return mapped_item
 
 	@classmethod
 	def is_filter(cls):

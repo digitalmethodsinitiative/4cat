@@ -40,6 +40,26 @@ class ProcessorException(FourcatException):
 	pass
 
 
+class MapItemException(ProcessorException):
+	"""
+	Raise if processor throws an exception
+	"""
+	pass
+
+
+class DataSetException(FourcatException):
+	"""
+	Raise if dataset throws an exception
+	"""
+	pass
+
+class DataSetNotFoundException(DataSetException):
+	"""
+	Raise if dataset does not exist
+	"""
+	pass
+
+
 class JobClaimedException(QueueException):
 	"""
 	Raise if job is claimed, but is already marked as such

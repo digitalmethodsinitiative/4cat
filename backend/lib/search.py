@@ -16,7 +16,7 @@ from common.config_manager import config
 from common.lib.dataset import DataSet
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
 
 
 class Search(BasicProcessor, ABC):
@@ -50,6 +50,8 @@ class Search(BasicProcessor, ABC):
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'body', 'subject', 'timestamp']
+
+	flawless = 0
 
 	def process(self):
 		"""
@@ -116,8 +118,11 @@ class Search(BasicProcessor, ABC):
 				# file exists somewhere, so we create it as an empty file
 				with open(query_parameters.get("copy_to"), "w") as empty_file:
 					empty_file.write("")
-
-		self.dataset.finish(num_rows=num_items)
+		if self.flawless == 0:
+			self.dataset.finish(num_rows=num_items)
+		else:
+			self.dataset.update_status(f"Unexpected data format for {self.flawless} items. All data can be downloaded, but only data with expected format will be available to 4CAT processors; check logs for details", is_final=True)
+			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
 		"""
@@ -178,8 +183,15 @@ class Search(BasicProcessor, ABC):
 		if not path.exists():
 			return []
 
+		# Check if processor and dataset can use map_item
+		check_map_item = self.map_item_method_available(dataset=self.dataset)
+		if not check_map_item:
+			self.log.warning(
+				f"Processor {self.type} importing item without map_item method for Dataset {self.dataset.type} - {self.dataset.key}")
+
 		with path.open(encoding="utf-8") as infile:
-			for line in infile:
+			unmapped_items = False
+			for i, line in enumerate(infile):
 				if self.interrupted:
 					raise WorkerInterruptedException()
 
@@ -187,10 +199,21 @@ class Search(BasicProcessor, ABC):
 				# things
 				# also include import metadata in item
 				item = json.loads(line.replace("\0", ""))
-				yield {
+				new_item = {
 					**item["data"],
 					"__import_meta": {k: v for k, v in item.items() if k != "data"}
 				}
+				# Check map item here!
+				if check_map_item:
+					try:
+						self.get_mapped_item(new_item)
+					except MapItemException as e:
+						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
+						self.flawless += 1
+						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e, warn_admins=unmapped_items is False)
+						unmapped_items = True
+
+				yield new_item
 
 		path.unlink()
 		self.dataset.delete_parameter("file")

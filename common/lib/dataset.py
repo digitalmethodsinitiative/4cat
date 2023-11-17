@@ -3,6 +3,7 @@ import itertools
 import datetime
 import hashlib
 import fnmatch
+import random
 import shutil
 import json
 import time
@@ -14,9 +15,10 @@ from pathlib import Path
 import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
 from common.lib.fourcat_module import FourcatModule
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
+								   MapItemException)
 
 
 class DataSet(FourcatModule):
@@ -33,14 +35,15 @@ class DataSet(FourcatModule):
 	workers; this class defines method to create and manipulate the dataset's
 	properties.
 	"""
-	data = {}
+	# Attributes must be created here to ensure getattr and setattr work properly
+	data = None
 	key = ""
 
-	children = []
-	available_processors = {}
-	genealogy = []
+	children = None
+	available_processors = None
+	genealogy = None
 	preset_parent = None
-	parameters = {}
+	parameters = None
 
 	owners = None
 	tagged_owners = None
@@ -48,10 +51,12 @@ class DataSet(FourcatModule):
 	db = None
 	folder = None
 	is_new = True
+
 	no_status_updates = False
 	staging_areas = None
+	_queue_position = None
 
-	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent='', extension=None,
+	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
 				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
@@ -63,35 +68,41 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
+		self.data = {}
+		self.parameters = {}
+		self.children = []
+		self.available_processors = {}
+		self.genealogy = []
 		self.staging_areas = []
 
 		if key is not None:
 			self.key = key
 			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
 			if not current:
-				raise TypeError("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
+				raise DataSetNotFoundException("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
 			query = current["query"]
 		elif job is not None:
 			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
-				raise TypeError("DataSet() requires a valid job ID for its 'job' argument")
+				raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
 
 			query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
-				raise ValueError("DataSet() requires a complete dataset record for its 'data' argument")
+				raise DataSetException("DataSet() requires a complete dataset record for its 'data' argument")
 
 			query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
-				raise TypeError("DataSet() requires either 'key', or 'parameters' to be given")
+				raise DataSetException("DataSet() requires either 'key', or 'parameters' to be given")
 
 			if not type:
-				raise ValueError("Datasets must have their type set explicitly")
+				raise DataSetException("Datasets must have their type set explicitly")
 
 			query = self.get_label(parameters, default=type)
 			self.key = self.get_key(query, parameters, parent)
@@ -113,7 +124,7 @@ class DataSet(FourcatModule):
 				"timestamp": int(time.time()),
 				"is_finished": False,
 				"is_private": is_private,
-				"software_version": get_software_version(),
+				"software_version": get_software_commit(),
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
@@ -252,7 +263,7 @@ class DataSet(FourcatModule):
 				logmsg = ":".join(line.split(":")[1:])
 				yield (logtime, logmsg)
 
-	def iterate_items(self, processor=None, bypass_map_item=False):
+	def iterate_items(self, processor=None, bypass_map_item=False, warn_unmappable=True):
 		"""
 		A generator that iterates through a CSV or NDJSON file
 
@@ -280,38 +291,38 @@ class DataSet(FourcatModule):
 		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
+		unmapped_items = False
 		path = self.get_results_path()
 
 		# see if an item mapping function has been defined
 		# open question if 'source_dataset' shouldn't be an attribute of the dataset
 		# instead of the processor...
-		item_mapper = None
-
-		if not bypass_map_item:
-			own_processor = self.get_own_processor()
-			# only run item mapper if extension of processor == extension of
-			# data file, for the scenario where a csv file was uploaded and
-			# converted to an ndjson-based data source, for example
-			# todo: this is kind of ugly, and a better fix may be possible
-			extension_fits = hasattr(own_processor, "extension") and own_processor.extension == self.get_extension()
-			if hasattr(own_processor, "map_item") and extension_fits:
-				item_mapper = own_processor.map_item
+		item_mapper = False
+		own_processor = self.get_own_processor()
+		if not bypass_map_item and own_processor is not None:
+			if own_processor.map_item_method_available(dataset=self):
+				item_mapper = True
 
 		# go through items one by one, optionally mapping them
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
-				own_processor = self.get_own_processor()
 				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
 
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
 				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
-				for item in reader:
+				for i, item in enumerate(reader):
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
 
 					if item_mapper:
-						item = item_mapper(item)
+						try:
+							item = own_processor.get_mapped_item(item)
+						except MapItemException as e:
+							if warn_unmappable:
+								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
+								unmapped_items = True
+							continue
 
 					yield item
 
@@ -319,20 +330,26 @@ class DataSet(FourcatModule):
 			# in this format each line in the file is a self-contained JSON
 			# file
 			with path.open(encoding="utf-8") as infile:
-				for line in infile:
+				for i, line in enumerate(infile):
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
 					item = json.loads(line)
 					if item_mapper:
-						item = item_mapper(item)
+						try:
+							item = own_processor.get_mapped_item(item)
+						except MapItemException as e:
+							if warn_unmappable:
+								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
+								unmapped_items = True
+							continue
 
 					yield item
 
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_items(self, processor=None):
+	def iterate_mapped_items(self, processor=None, warn_unmappable=True):
 		"""
 		Wrapper for iterate_items that returns both the original item and the mapped item (or else the same identical item).
 		No extension check is performed here as the point is to be able to handle the original object and save as an appropriate
@@ -342,20 +359,27 @@ class DataSet(FourcatModule):
 		iterating the dataset.
 		:return generator:  A generator that yields a tuple with the unmapped item followed by the mapped item
 		"""
+		unmapped_items = False
 		# Collect item_mapper for use with filter
-		item_mapper = None
+		item_mapper = False
 		own_processor = self.get_own_processor()
-		if hasattr(own_processor, "map_item"):
-			item_mapper = own_processor.map_item
+		if own_processor.map_item_method_available(dataset=self):
+			item_mapper = True
 
 		# Loop through items
-		for item in self.iterate_items(processor=processor, bypass_map_item=True):
+		for i, item in enumerate(self.iterate_items(processor=processor, bypass_map_item=True)):
 			# Save original to yield
 			original_item = item.copy()
 
-			# Map item for filter
+			# Map item
 			if item_mapper:
-				mapped_item = item_mapper(item)
+				try:
+					mapped_item = own_processor.get_mapped_item(item)
+				except MapItemException as e:
+					if warn_unmappable:
+						self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
+						unmapped_items = True
+					continue
 			else:
 				mapped_item = original_item
 
@@ -377,7 +401,7 @@ class DataSet(FourcatModule):
 		  dataset
 		"""
 
-		items = self.iterate_items(processor)
+		items = self.iterate_items(processor, warn_unmappable=False)
 		try:
 			keys = list(items.__next__().keys())
 		except StopIteration:
@@ -533,7 +557,7 @@ class DataSet(FourcatModule):
 			try:
 				child = DataSet(key=child["key"], db=self.db)
 				child.delete(commit=commit)
-			except TypeError:
+			except DataSetException:
 				# dataset already deleted - race condition?
 				pass
 
@@ -772,7 +796,7 @@ class DataSet(FourcatModule):
 		for role in ("owner", "viewer"):
 			owners = dataset.get_owners(role=role)
 			for owner in owners:
-				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False)
+				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False, safe=True)
 
 		self.db.commit()
 		if recursive:
@@ -811,31 +835,10 @@ class DataSet(FourcatModule):
 			# no file to get columns from
 			return False
 
-		if self.get_results_path().suffix.lower() == ".csv":
-			with self.get_results_path().open(encoding="utf-8") as infile:
-				own_processor = self.get_own_processor()
-				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
-				reader = csv.DictReader(infile, **csv_parameters)
-				try:
-					return list(reader.fieldnames)
-				except (TypeError, ValueError):
-					# not a valid CSV file?
-					return []
-
-		elif self.get_results_path().suffix.lower() == ".ndjson" and hasattr(self.get_own_processor(), "map_item"):
-			with self.get_results_path().open(encoding="utf-8") as infile:
-				first_line = infile.readline()
-
-			try:
-				item = json.loads(first_line)
-				return list(self.get_own_processor().map_item(item).keys())
-			except (json.JSONDecodeError, ValueError):
-				# not a valid NDJSON file?
-				return []
-
+		if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor() is not None and self.get_own_processor().map_item_method_available(dataset=self)):
+			return self.get_item_keys(processor=self.get_own_processor())
 		else:
-			# not a CSV or NDJSON file, or no map_item function available
+			# Filetype not CSV or an NDJSON with `map_item`
 			return []
 
 	def get_annotation_fields(self):
@@ -977,7 +980,7 @@ class DataSet(FourcatModule):
 		self.data["result_file"] = file
 		return updated > 0
 
-	def get_key(self, query, parameters, parent=""):
+	def get_key(self, query, parameters, parent="", time_offset=0):
 		"""
 		Generate a unique key for this dataset that can be used to identify it
 
@@ -987,6 +990,9 @@ class DataSet(FourcatModule):
 		:param str query:  Query string
 		:param parameters:  Dataset parameters
 		:param parent: Parent dataset's key (if applicable)
+		:param time_offset:  Offset to add to the time component of the dataset
+		key. This can be used to ensure a unique key even if the parameters and
+		timing is otherwise identical to an existing dataset's
 
 		:return str:  Dataset key
 		"""
@@ -999,16 +1005,53 @@ class DataSet(FourcatModule):
 		for key in sorted(parameters):
 			param_key[key] = parameters[key]
 
-		# this ensures a different key for the same query if not queried
-		# at the exact same second. Since the same query may return
-		# different results when done at different times, getting a
-		# duplicate key is not actually always desirable. The resolution
-		# of this salt could be experimented with...
-		param_key["_salt"] = int(time.time())
+		# we additionally use the current time as a salt - this should usually
+		# ensure a unique key for the dataset. if for some reason there is a
+		# hash collision
+		param_key["_salt"] = int(time.time()) + time_offset
 
 		parent_key = str(parent) if parent else ""
 		plain_key = repr(param_key) + str(query) + parent_key
-		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		hashed_key = hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+
+		if self.db.fetchone("SELECT key FROM datasets WHERE key = %s", (hashed_key,)):
+			# key exists, generate a new one
+			return self.get_key(query, parameters, parent, time_offset=random.randint(1,10))
+		else:
+			return hashed_key
+
+	def set_key(self, key):
+		"""
+		Change dataset key
+
+		In principe, keys should never be changed. But there are rare cases
+		where it is useful to do so, in particular when importing a dataset
+		from another 4CAT instance; in that case it makes sense to try and
+		ensure that the key is the same as it was before. This function sets
+		the dataset key and updates any dataset references to it.
+
+		:param str key:  Key to set
+		:return str:  Key that was set. If the desired key already exists, the
+		original key is kept.
+		"""
+		key_exists = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (key,))
+		if key_exists or not key:
+			return self.key
+
+		old_key = self.key
+		self.db.update("datasets", data={"key": key}, where={"key": old_key})
+
+		# update references
+		self.db.update("datasets", data={"key_parent": key}, where={"key_parent": old_key})
+		self.db.update("datasets_owners", data={"key": key}, where={"key": old_key})
+		self.db.update("jobs", data={"remote_id": key}, where={"remote_id": old_key})
+		self.db.update("users_favourites", data={"key": key}, where={"key": old_key})
+
+		# for good measure
+		self.db.commit()
+		self.key = key
+
+		return self.key
 
 	def get_status(self):
 		"""
@@ -1186,7 +1229,7 @@ class DataSet(FourcatModule):
 		while key_parent:
 			try:
 				parent = DataSet(key=key_parent, db=self.db)
-			except TypeError:
+			except DataSetException:
 				break
 
 			genealogy.append(parent)
@@ -1298,6 +1341,34 @@ class DataSet(FourcatModule):
 				available[processor_type] = processor
 
 		return available
+
+	def get_place_in_queue(self, update=False):
+		"""
+		Determine dataset's position in queue
+
+		If the dataset is already finished, the position is -1. Else, the
+		position is the amount of datasets to be completed before this one will
+		be processed. A position of 0 would mean that the dataset is currently
+		being executed, or that the backend is not running.
+
+		:param bool update:  Update the queue position from database if True, else return cached value
+		:return int:  Queue position
+		"""
+		if self.is_finished() or not self.data.get("job"):
+			self._queue_position = -1
+			return self._queue_position
+		elif not update and self._queue_position is not None:
+			# Use cached value
+			return self._queue_position
+		else:
+			# Collect queue position from database via the job
+			try:
+				job = Job.get_by_ID(self.data["job"], self.db)
+				self._queue_position = job.get_place_in_queue()
+			except JobNotFoundException:
+				self._queue_position = -1
+
+			return self._queue_position
 
 	def get_own_processor(self):
 		"""
@@ -1499,6 +1570,29 @@ class DataSet(FourcatModule):
 		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
 						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
+
+	def warn_unmappable_item(self, item_count, processor=None, error_message=None, warn_admins=True):
+		"""
+		Log an item that is unable to be mapped and warn administrators.
+
+		:param int item_count:			Item index
+		:param Processor processor:		Processor calling function8
+		"""
+		dataset_error_message = f"MapItemException (item {item_count}): {'is unable to be mapped! Check raw datafile.' if error_message is None else error_message}"
+
+		# Use processing dataset if available, otherwise use original dataset (which likely already has this error message)
+		closest_dataset = processor.dataset if processor is not None and processor.dataset is not None else self
+		# Log error to dataset log
+		closest_dataset.log(dataset_error_message)
+
+		if warn_admins:
+			if processor is not None:
+				processor.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
+			elif hasattr(self.db, "log"):
+				self.db.log.warning(f"Unable to map item all items for dataset {closest_dataset.key}.")
+			else:
+				# No other log available
+				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
 
 	def __getattr__(self, attr):
 		"""
