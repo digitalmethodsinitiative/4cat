@@ -544,6 +544,7 @@ config_definition = {
         "default": True,
         "help": "Offer create as private",
         "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
+    },
     "ui.option_email": {
         "type": UserInput.OPTION_CHOICE,
         "options": {
