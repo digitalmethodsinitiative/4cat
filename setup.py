@@ -67,6 +67,17 @@ packages = [
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.1/en_core_web_sm-3.4.1.tar.gz#egg=en_core_web_sm"
 ]
 
+# Check for extension packages
+if os.path.isdir("extensions"):
+	extension_packages = []
+	additional_requirements = os.path.join("extensions", 'additional_requirements.txt')
+	if os.path.exists(additional_requirements):
+		with open(additional_requirements) as extension_requirements:
+			for line in extension_requirements.readlines():
+				extension_packages.append(line.strip())
+	print("Found extensions, installing additional packages: " + str(extension_packages))
+	packages = packages + extension_packages
+
 # Some packages don't run on Windows
 unix_packages = [
 	"python-daemon==2.3.2"
