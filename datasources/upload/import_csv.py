@@ -84,7 +84,7 @@ class SearchCustom(BasicProcessor):
 
         # With validated csvs, save as is but make sure the raw file is sorted
         infile.seek(0)
-        reader = csv.DictReader(infile, dialect=dialect, **tool_format.get("csv_reader_attributes", {}))
+        reader = csv.DictReader(infile, dialect=dialect)
 
         if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
                 set(tool_format["columns"]) != set(tool_format["columns"]):
