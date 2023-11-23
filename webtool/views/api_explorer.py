@@ -2,22 +2,18 @@
 4CAT Data API - endpoints to get post and thread data from
 """
 
-import datetime
 import json
 import csv
 import re
-import operator
-#import markdown
 import markdown2
 
-from backend import all_modules
 
 from pathlib import Path
 
 from flask import jsonify, abort, send_file, request, render_template
 from flask_login import login_required, current_user
 
-from webtool import app, db, openapi, limiter, config
+from webtool import app, db, openapi, limiter, config, fourcat_modules
 from webtool.lib.helpers import format_chan_post, error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
@@ -46,7 +42,7 @@ def explorer_dataset(key, page):
 
 	# Get dataset info.
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
@@ -80,8 +76,8 @@ def explorer_dataset(key, page):
 	# (like the ability to navigate to threads)
 	is_local = False
 
-	if datasource in list(all_modules.datasources.keys()):
-		is_local = True if all_modules.datasources[datasource].get("is_local") else False
+	if datasource in list(fourcat_modules.datasources.keys()):
+		is_local = True if fourcat_modules.datasources[datasource].get("is_local") else False
 
 	# Check if we have to sort the data in a specific way.
 	sort_by = request.args.get("sort")

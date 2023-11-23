@@ -91,7 +91,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		# all_modules cannot be easily imported into a worker because all_modules itself
 		# imports all workers, so you get a recursive import that Python (rightly) blocks
 		# so for workers, all_modules' content is passed as a constructor argument
-		self.all_modules = modules
+		self.modules = modules
 
 		database_appname = "%s-%s" % (self.type, self.job.data["id"])
 		self.db = Database(logger=self.log, appname=database_appname,

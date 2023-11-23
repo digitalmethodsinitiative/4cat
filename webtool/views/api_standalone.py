@@ -8,12 +8,10 @@ import json
 import time
 import csv
 
-import backend
-
 from flask import jsonify, request, send_file, after_this_request
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, openapi, limiter
+from webtool import app, db, log, openapi, limiter, fourcat_modules
 from webtool.lib.helpers import error, setting_required
 
 from common.lib.exceptions import JobNotFoundException
@@ -53,9 +51,9 @@ def get_standalone_processors():
 	"""
 	available_processors = {}
 
-	for processor in backend.all_modules.processors:
-		if not backend.all_modules.processors[processor].hasattr("datasources") and not hasattr(backend.all_modules.processors[processor], "accepts"):
-			available_processors[processor] = backend.all_modules.processors[processor]
+	for processor in fourcat_modules.processors:
+		if not fourcat_modules.processors[processor].hasattr("datasources") and not hasattr(fourcat_modules.processors[processor], "accepts"):
+			available_processors[processor] = fourcat_modules.processors[processor]
 
 	return jsonify({processor: {
 		"name": available_processors[processor].name,
@@ -145,7 +143,8 @@ def process_standalone(processor):
 		parameters={"next": [processor]},
 		db=db,
 		owner=current_user.get_id(),
-		is_private=True
+		is_private=True,
+		modules=fourcat_modules
 	)
 	temp_dataset.finish(len(input))
 
@@ -167,7 +166,7 @@ def process_standalone(processor):
 
 	# queue the postprocessor
 	metadata = processors[processor]
-	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=db)
+	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=db, modules=fourcat_modules)
 
 	queue = JobQueue(database=db, logger=log)
 	job = queue.add_job(processor, {}, processed.key)

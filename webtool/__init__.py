@@ -26,6 +26,7 @@ from common.config_manager import config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
+from common.lib.module_loader import ModuleCollector
 
 from common.lib.user import User
 from webtool.lib.helpers import generate_css_colours
@@ -65,6 +66,7 @@ if config.get("USING_DOCKER"):
 else:
     log = Logger()
 
+fourcat_modules = ModuleCollector()
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
               password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
               port=config.get("DB_PORT"), appname="frontend")
