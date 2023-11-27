@@ -16,6 +16,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install dependencies
 RUN pip3 install --upgrade pip
 COPY ./requirements.txt /usr/src/app/requirements.txt
+COPY ./extensions /usr/src/app/extensions
 COPY ./setup.py /usr/src/app/setup.py
 COPY ./VERSION /usr/src/app/VERSION
 COPY ./README.md /usr/src/app/README.md
@@ -33,7 +34,7 @@ COPY --from=compile-image /opt/venv /opt/venv
 # Make virtual env available
 ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt install -y \
+RUN apt-get update && apt install -y --fix-missing \
     # Called in docker-entrypoint.sh:
     curl \
     netcat-traditional \
