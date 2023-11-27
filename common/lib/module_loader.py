@@ -69,23 +69,21 @@ class ModuleCollector:
         """
         Determine if a module member is a worker class we can use
         """
-        # it would be super cool to just use issubclass() here!
-        # but that requires importing the classes themselves, which leads to
-        # circular imports
-        # todo: fix this because this sucks
-        # agreed - Dale
-        parent_classes = {"BasicWorker", "BasicProcessor", "Search", "SearchWithScope", "Search4Chan",
-                          "ProcessorPreset", "TwitterStatsBase", "BaseFilter", "TwitterAggregatedStats", "ColumnFilter",
-                          "BasicJSONScraper", "BoardScraper4chan", "ThreadScraper4chan"}
-        if only_processors:
-            # only allow processors
-            for worker_only_class in ["BasicWorker", "BasicJSONScraper", "BoardScraper4chan", "ThreadScraper4chan"]:
-                parent_classes.remove(worker_only_class)
-
-        return inspect.isclass(object) and \
-               parent_classes & set([f.__name__ for f in object.__bases__]) and \
-               object.__name__ not in("BasicProcessor", "BasicWorker") and \
-               not inspect.isabstract(object)
+        if inspect.isclass(object):
+            if object.__name__ in("BasicProcessor", "BasicWorker") or inspect.isabstract(object):
+                # ignore abstract and base classes
+                return False
+                
+            if hasattr(object, "is_4cat_class"):
+                if only_processors:
+                    if hasattr(object, "is_4cat_processor"):
+                        return object.is_4cat_processor()
+                    else:
+                        return False
+                else:
+                    return object.is_4cat_class()
+        
+        return False
 
     def load_modules(self):
         """
