@@ -178,3 +178,27 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		classes should implement this method.
 		"""
 		pass
+
+	@staticmethod
+	def is_4cat_class():
+		"""
+		Is this a 4CAT class?
+
+		This is used to determine whether a class is a 4CAT worker or a
+		processor. This method should always return True for workers.
+
+		:return:  True
+		"""
+		return True
+	
+	@staticmethod
+	def is_4cat_processor():
+		"""
+		Is this a 4CAT processor?
+
+		This is used to determine whether a class is a 4CAT
+		processor.
+		
+		:return:  False
+		"""
+		return False
