@@ -21,6 +21,7 @@ class SearchGab(Search):
     description = "Import Gab data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_from_extension = True
+    fake = ""
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -34,34 +35,92 @@ class SearchGab(Search):
         raise NotImplementedError("Gab datasets can only be created by importing data from elsewhere")
 
     @staticmethod
-    def map_item(node):
+    def map_item(post):
         """
         Parse Gab post
 
         :param node:  Data as received from Gab
         :return dict:  Mapped item
         """
-        #post = node["data"]
-        post_time = datetime.datetime.strptime(post["post.created_at"], "%Y-%m-%dT%H:%M:%S.000000Z")
+
+        post_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ")
 
         mapped_item = {
             "id": post["id"],
+            "type": post["type"],
+            "created_at": post["created_at"],
             "thread_id": post["id"],
-            "body": post["content"],
             "timestamp": post_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "author": post["account"]["username"],
-            "author_name": post["account"]["display_name"],
-            #"author_followers": post["user"]["follower_count"],
-            #"detected_language": post["detected_language"],
-            #"views": post["views"],
-            #"echoes": post["echos"],
-            #"comments": post["total_comments"],
-            #"is_sensitive": "yes" if post["sensitive"] else "no",
-            #"is_echo": "yes" if post["is_echo"] else "no",
-            #"is_ad": "yes" if post["ad"] else "no",
-            #"hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", post["body"])),
-            #"image_url": post["image"] if post["image"] else "",
-            #"unix_timestamp": int(post_time.timestamp())
+            "url": post["url"],
+            "post_id": "",
+            "body": "",
+            "reaction_count": "",
+            "reposts_count": "",
+            "replies_count": "",
+            "account_id": "",
+            "account_username": "",
+            "account_display_name": "",
+            "account_url": "",
+            "group_id": "",
+            "group_title": "",
+            "group_description": "",
+            "group_member_count": "",
+            "group_is_verified": "",
+            "group_is_private": "",
+            "group_category": "",
+            "account_note": "",
+            "account_followers_count": "",
+            "account_following_count": "",
+            "account_statuses_count": "",
+            "account_is_pro": "",
+            "account_is_verified": "",
+            "account_is_donor": "",
+            "account_is_investor": "",
+            "account_show_pro_life": "",
+            "account_is_parody": ""
         }
 
+        
+        if post["type"] == "post":
+            mapped_item["post_id"] = post["id"]
+            mapped_item["body"] = post["content"]
+            mapped_item["reaction_count"] = post["reaction_count"]
+            mapped_item["reposts_count"] = post["reposts_count"]
+            mapped_item["replies_count"] = post["replies_count"]
+            
+            ### poster-specific
+            mapped_item["account_id"] = post["account"]["id"] 
+            mapped_item["account_username"] = post["account"]["username"]
+            mapped_item["account_display_name"] = post["account"]["display_name"]
+            mapped_item["account_url"] = post["account"]["url"]
+
+        if post["type"] == "group":
+            mapped_item["group_id"] = post["id"]
+            mapped_item["body"] = post["account"]["title"]
+            mapped_item["group_title"] = post["account"]["title"]
+            mapped_item["group_description"] = post["account"]["description"]
+            mapped_item["group_member_count"] = post["account"]["member_count"]
+            mapped_item["group_is_verified"] = post["account"]["is_verified"]
+            mapped_item["group_is_private"] = post["account"]["is_private"]
+            mapped_item["group_category"] = post["account"]["category"]
+
+
+        if post["type"] == "user":
+            mapped_item["account_id"] = post["id"]
+            mapped_item["account_username"] = post["account"]["username"]
+            mapped_item["account_display_name"] = post["account"]["display_name"]
+            mapped_item["account_url"] = post["account"]["url"]
+            mapped_item["account_note"] = post["account"]["note"]
+            mapped_item["account_avatar"] = post["account"]["avatar"]
+            mapped_item["account_followers_count"] = post["account"]["followers_count"]
+            mapped_item["account_following_count"] = post["account"]["following_count"]
+            mapped_item["account_statuses_count"] = post["account"]["statuses_count"]
+            mapped_item["account_is_pro"] = post["account"]["is_pro"]
+            mapped_item["account_is_verified"] = post["account"]["is_verified"]
+            mapped_item["account_is_donor"] = post["account"]["is_donor"]
+            mapped_item["account_is_investor"] = post["account"]["is_investor"]
+            mapped_item["account_show_pro_life"] = post["account"]["show_pro_life"]
+            mapped_item["account_is_parody"] = post["account"]["is_parody"]
+        
+    
         return mapped_item
