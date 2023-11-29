@@ -91,10 +91,6 @@ class ImagePlotGenerator(BasicProcessor):
         output_dir = self.dataset.get_results_folder_path()
         output_dir.mkdir(exist_ok=True)
 
-        # Copy the web template into the results output_dir
-        # TODO: Rewrite index.html to reference these assets (instead of copying them for every mapping!)
-        # ImagePlotGenerator.copy_web_assets(web_assets_path=self.config.get("PATH_ROOT").joinpath("webtool", "static", "pixplot_template"), output_dir=output_dir, version_number=f"4CAT commit {get_software_commit()}")
-
         # Create the manifest
         self.dataset.update_status("Creating manifest")
         self.cartograph(output_dir,
@@ -108,6 +104,7 @@ class ImagePlotGenerator(BasicProcessor):
                         thumbnail_size=128) # TODO: changing from 128 breaks the plot; figure out WHY
 
         # Copy images into results folder
+        # TODO: how to use originals instead of copying?
         shutil.copytree(staging_area, output_dir.joinpath("data/originals"), dirs_exist_ok=True)
 
         # Results HTML file redirects to output_dir/index.html
