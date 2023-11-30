@@ -69,6 +69,9 @@ class ModuleCollector:
         """
         Determine if a module member is a worker class we can use
         """
+        # it would be super cool to just use issubclass() here!
+        # but that requires importing the classes themselves, which leads to
+        # circular imports
         if inspect.isclass(object):
             if object.__name__ in("BasicProcessor", "BasicWorker") or inspect.isabstract(object):
                 # ignore abstract and base classes
