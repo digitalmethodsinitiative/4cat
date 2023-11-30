@@ -279,7 +279,7 @@ class UserInput:
             # return option if valid, or default
             if choice not in settings.get("options"):
                 if not silently_correct:
-                    raise QueryParametersException("Invalid value selected; must be one of %s." % ", ".join(settings.get("options", {}).keys()))
+                    raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(settings.get('options', {}).keys())}. {settings}")
                 else:
                     return settings.get("default", "")
             else:

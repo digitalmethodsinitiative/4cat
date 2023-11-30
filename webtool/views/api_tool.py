@@ -203,6 +203,13 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
+
+	# data source identifiers cannot start with a number but some do (such as
+	# 9gag and 4chan) so sanitise those numbers to account for this...
+	platform = platform.replace("1", "one").replace("2", "two").replace("3", "three").replace("4", "four") \
+		.replace("5", "five").replace("6", "six").replace("7", "seven").replace("8", "eight") \
+		.replace("9", "nine")
+
 	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message="Unknown platform or source format")
 
@@ -1011,22 +1018,7 @@ def queue_processor(key=None, processor=None):
 		messages={type=array,items={type=string}}
 	}}}
 	"""
-	if request.files and "input_file" in request.files:
-		input_file = request.files["input_file"]
-		if not input_file:
-			return error(400, error="No file input provided")
-
-		if input_file.filename[-4:] != ".csv":
-			return error(400, error="File input is not a csv file")
-
-		test_csv_file = csv.DictReader(input_file.stream)
-		if "body" not in test_csv_file.fieldnames:
-			return error(400, error="File must contain a 'body' column")
-
-		filename = secure_filename(input_file.filename)
-		input_file.save(str(config.get('PATH_DATA')) + "/")
-
-	elif not key:
+	if not key:
 		key = request.form.get("key", "")
 
 	if not processor:
@@ -1046,18 +1038,26 @@ def queue_processor(key=None, processor=None):
 	if processor not in available_processors:
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 
-	# create a dataset now
+	processor_worker = available_processors[processor]
 	try:
-		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form, silently_correct=False)
+		sanitised_query = UserInput.parse_all(processor_worker.get_options(None, current_user), request.form,
+											  silently_correct=False)
+
+		if hasattr(processor_worker, "validate_query"):
+			# validate_query is optional for processors
+			sanitised_query = processor_worker.validate_query(sanitised_query, request, current_user)
+
 	except QueryParametersException as e:
-		return error(400, error=str(e))
+		# parameters need amending
+		return jsonify({"status": "error", "message": (str(e) if e else "Cannot run the processor with these settings.")})
+
 
 	if request.form.to_dict().get("email-complete", False):
-		options["email-complete"] = request.form.to_dict().get("email-user", False)
+		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
 
 	# private or not is inherited from parent dataset
 	analysis = DataSet(parent=dataset.key,
-					   parameters=options,
+					   parameters=sanitised_query,
 					   db=db,
 					   extension=available_processors[processor].get_extension(parent_dataset=dataset),
 					   type=processor,

@@ -36,6 +36,8 @@
             {% endfor %}
             </select>
         </div>
+    {% elif option_settings.type == "file" %}
+        <input name="option-{{ option }}" value="{{ option_settings.default }}" type="file"{% if option_settings.accept %}accept=".csv"{% endif %}>
     {% elif option_settings.type == "daterange" %}
         <div class="daterange-wrapper">
             <input name="option-{{ option }}-min_proxy" id="forminput-{{ option }}" class="input-time" type="date"

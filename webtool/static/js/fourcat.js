@@ -138,10 +138,11 @@ const processor = {
         e.preventDefault();
 
         if ($(this).text().includes('Run')) {
-            let form = $(this).parents('form');
+            const run_button = $(this);
+            let form = run_button.parents('form');
 
             // if it's a big dataset, ask if the user is *really* sure
-            let parent = $(this).parents('li.child-wrapper');
+            let parent = run_button.parents('li.child-wrapper');
             if (parent.length === 0) {
                 parent = $('.result-tree');
             }
@@ -153,12 +154,21 @@ const processor = {
                 }
             }
 
-            $.ajax(form.attr('data-async-action') + '?async', {
-                'method': form.attr('method'),
-                'data': form.serialize(),
-                'success': function (response) {
+            let reset_form = true;
+            fetch(form.attr('data-async-action') + '?async', {method: form.attr('method'), body: new FormData(form[0])})
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (response) {
                     if (response.hasOwnProperty("messages") && response.messages.length > 0) {
                         popup.alert(response.messages.join("\n\n"));
+                    } else if(response.hasOwnProperty('message')) {
+                        popup.alert(response.message);
+                    }
+
+                    if(response.hasOwnProperty('status') && response['status'] === 'error') {
+                        reset_form = false;
+                        return;
                     }
 
                     if (response.html.length > 0) {
@@ -196,27 +206,29 @@ const processor = {
                             expand();
                         }
                     }
-                },
-                'error': function (response) {
+                })
+                .catch(function (response) {
                     try {
                         response = JSON.parse(response.responseText);
                         popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
-                    } catch (Exception) {
+                    } catch {
                         popup.alert('The analysis could not be queued: ' + response.responseText, 'Warning');
                     }
-                }
-            });
-
-            if ($(this).data('original-content')) {
-                $(this).html($(this).data('original-content'));
-                $(this).trigger('click');
-                $(this).html($(this).data('original-content'));
-                form.trigger('reset');
-            }
+                })
+                .finally(() => {
+                    if (reset_form && run_button.data('original-content')) {
+                        run_button.html(run_button.data('original-content'));
+                        run_button.trigger('click');
+                        run_button.html(run_button.data('original-content'));
+                        form.trigger('reset');
+                        ui_helpers.toggleButton({target: run_button});
+                    }
+                });
         } else {
             $(this).data('original-content', $(this).html());
             $(this).find('.byline').html('Run');
             $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
+            ui_helpers.toggleButton({target: $(this)[0]});
         }
     },
 
@@ -1676,11 +1688,11 @@ const ui_helpers = {
      * @param force_close  Assume the event is un-toggling something regardless of current state
      */
     toggleButton: function (e, force_close = false) {
-        if (!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') {
+        if ((!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') && typeof e.preventDefault === "function") {
             e.preventDefault();
         }
 
-        let target = '#' + $(this).attr('aria-controls');
+        let target = '#' + $(e.target).attr('aria-controls');
         let is_open = $(target).attr('aria-expanded') !== 'false';
 
         if (is_open || force_close) {
