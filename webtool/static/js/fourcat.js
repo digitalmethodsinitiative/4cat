@@ -261,7 +261,7 @@ const query = {
         // Check status of query
         if ($('body.result-page').length > 0) {
             query.update_status();
-            setInterval(query.update_status, 1000);
+            setInterval(query.update_status, 1500);
 
             // Check processor queue
             query.check_processor_queue();
@@ -536,7 +536,9 @@ const query = {
             return;
         }
 
-        let queued = $('.child-wrapper.running');
+        // first selector is top-level child datasets (always visible)
+        // second selector is children of children (only visible when expanded)
+        let queued = $('.top-level > .child-wrapper.running, div[aria-expanded=true] > ol > li.child-wrapper.running');
         if (queued.length === 0) {
             return;
         }

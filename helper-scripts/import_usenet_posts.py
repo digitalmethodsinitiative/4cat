@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.config_manager import config
 
 cli = argparse.ArgumentParser()
 cli.add_argument("--input", "-i", help="SQLite database file to use as input", required=True)
@@ -36,7 +37,8 @@ dbconn = sqlite3.connect(args.input)
 dbconn.row_factory = sqlite3.Row
 cursor = dbconn.cursor()
 
-db = Database(logger=Logger())
+db = Database(logger=Logger(), appname="4chan-import", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
+
 db.execute(open("database.sql").read())
 if args.truncate:
 	db.execute("TRUNCATE posts_usenet")

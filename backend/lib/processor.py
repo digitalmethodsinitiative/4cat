@@ -271,17 +271,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					pass
 				else:
 					# Check for "attach_to" parameter in descendents
-					have_attach_to = False
-					while not have_attach_to:
+					while True:
 						if "attach_to" in next_parameters:
 							self.parameters["attach_to"] = next_parameters["attach_to"]
 							break
 						else:
 							if "next" in next_parameters:
-								next_parameters = next_parameters["next"]
+								next_parameters = next_parameters["next"][0]["parameters"]
 							else:
 								# No more descendents
 								# Should not happen; we cannot find the source dataset
+								self.log.warning("Cannot find preset's source dataset for dataset %s" % self.dataset.key)
 								break
 
 
@@ -306,6 +306,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				surrogate = DataSet(key=self.parameters["attach_to"], db=self.db)
 
 				if self.dataset.get_results_path().exists():
+					# Update the surrogate's results file suffix to match this dataset's suffix
+					surrogate.data["result_file"] = surrogate.get_results_path().with_suffix("." + self.dataset.get_results_path().suffix)
 					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
 
 				try:
