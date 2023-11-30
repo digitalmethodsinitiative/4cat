@@ -101,7 +101,7 @@ class ImagePlotGenerator(BasicProcessor):
                         root='',
                         atlas_resolution=2048 * 2,
                         cell_height=64 * 2, # min of 64 seems blurry to me
-                        thumbnail_size=128, # TODO: changing from 128 breaks the plot; figure out WHY
+                        thumbnail_size=128 * 2, # TODO: changing from 128 breaks the plot; figure out WHY
                         )
 
         # Results HTML file redirects to output_dir/index.html
@@ -438,7 +438,7 @@ class ImagePlotGenerator(BasicProcessor):
             json.dump(manifest, outfile)
 
     @staticmethod
-    def specify_point_sizes(num_of_images, date_columns=None, date_labels=None):
+    def specify_point_sizes(num_of_images, date_columns=None, date_labels=None, umap=False):
         """
         Specify point size scalars. These are used to scale the thumbnail sizes based on the number of images.
 
@@ -451,6 +451,7 @@ class ImagePlotGenerator(BasicProcessor):
         :param num_of_images: Number of images in the dataset
         :param date_columns: Number of date columns in the dataset
         :param date_labels: Number of date labels in the dataset
+        :param umap: Whether or not umap was used for initial and scatter layouts
         """
         grid = 1 / math.ceil(num_of_images ** (1 / 2))
         # TODO: These seem "fluffy". Can we do better?
@@ -458,8 +459,8 @@ class ImagePlotGenerator(BasicProcessor):
             'min': 0,
             'grid': grid,
             "max": grid * 1.2,
-            "scatter": grid * .2,
-            "initial": grid * .2,
+            "scatter": grid * .2 if umap else grid,
+            "initial": grid * .2 if umap else grid,
             "categorical": grid * .6,
             "geographic": grid * .025,
         }
@@ -469,18 +470,3 @@ class ImagePlotGenerator(BasicProcessor):
             point_sizes['date'] = 1 / ((date_columns + 1) * date_labels)
 
         return point_sizes
-
-    @staticmethod
-    def copy_web_assets(web_assets_path, output_dir, version_number):
-        """
-        Copy the template web site into the results folder. Additionally, update the version number in the web assets
-        (index.html and tsne.js) to match the version number of 4CAT.
-        """
-        shutil.copytree(web_assets_path, output_dir, dirs_exist_ok=True)
-        # write version numbers into output
-        for document in ['index.html', os.path.join('assets', 'js', 'tsne.js')]:
-            path = web_assets_path.joinpath(output_dir, document)
-            with open(path, 'r') as f:
-                f = f.read().replace('VERSION_NUMBER', version_number)
-                with open(path, 'w') as out:
-                    out.write(f)
