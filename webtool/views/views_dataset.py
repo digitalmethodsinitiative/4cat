@@ -322,7 +322,6 @@ def preview_items(key):
 
     if dataset.get_extension() == "html":
         # html files
-        log.info("Previewing HTML file %s" % dataset.get_results_path().name)
         return get_result(dataset.get_results_path().name)
 
     if dataset.get_extension() == "gexf":

@@ -365,14 +365,14 @@
     <div id='header-container'>
       <header id='header' class='no-highlight'></header>
       <div id='header-brand' class='row align-center'>
-        <a href='https://dhlab.yale.edu' target='_blank'>
-          <img id='logo' src='{{ url_for("static", filename="pixplot_template/assets/images/dhlab-logo.svg") }}' alt='DHLab logo' />
+        <a href='https://4cat.nl' target='_blank'>
+          <img id='logo' src='{{ url_for("static", filename="/img/4cat-heads.svg") }}' alt='4CAT logo' />
         </a>
-        <a id='app-name-container' class='row align-center' href='https://github.com/YaleDHLab/pix-plot'>
-          <div id='app-name'>PixPlot</div>
+        <a id='app-name-container' class='row align-center' href='{{ url_for("show_about") }}'>
+          <div id='app-name'>4CAT Images</div>
         </a>
         <div class='row align-center'>
-          <div class='tagline'>Image Fields in a Local Collection</div>
+          <div class='tagline'>Images from {{ dataset.top_parent().get_label() }} collected on {{ dataset.get_parent().timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}</div>
         </div>
       </div>
       <div id='header-controls'>
@@ -435,7 +435,7 @@
     <div id='tooltip'></div>
     <!-- Loader -->
     <div id='loader-scene'>
-      <p class='welcome'>This page visualizes a large image collection within an interactive WebGL scene. Each image was processed with an <a href='https://arxiv.org/abs/1409.4842' target='_blank'>Inception</a> Convolutional Neural Network, trained on <a href='http://image-net.org/challenges/LSVRC/2012/' target='_blank'>ImageNet 2012</a>, and projected into a two-dimensional manifold with the <a href='https://github.com/lmcinnes/umap' target='_blank'>UMAP</a> algorithm such that similar images appear proximate to one another.</p>
+        <p class='welcome'>This page visualizes a large image collection within an interactive WebGL scene developed by Yale University's <a href='https://dhlab.yale.edu/'>Digital Humanities Lab</a>.</p>
       <div class='loader-container'>
         <div class='loader-icon'>
           <div class='blocks'>
