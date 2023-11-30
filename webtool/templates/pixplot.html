@@ -12,9 +12,11 @@
   </head>
   <body>
     <!-- version: VERSION_NUMBER -->
-    <label for="dataset_output_directory"></label><input value="{{ dataset.get_results_folder_path().name }}" type="text" hidden="hidden" id="dataset_output_directory" />
+    <!-- Variables used by tsne.js to locate assets -->
     <label for="assets_directory_url"></label><input value="{{ url_for("static", filename="pixplot_template/assets/") }}" type="text" hidden="hidden" id="assets_directory_url" />
     <label for="dataset_directory_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_results_folder_path().name) }}" type="text" hidden="hidden" id="dataset_directory_url" />
+    <label for="original_images_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_parent().get_results_path().name) }}" type="text" hidden="hidden" id="original_images_url" />
+
     <script type='x-shader/x-vertex' id='vertex-shader'>
     /**
     * The vertex shader's main() function must define `gl_Position`,

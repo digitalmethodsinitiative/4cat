@@ -47,11 +47,13 @@
 function Config() {
   var assets_directory_url = document.getElementById('assets_directory_url').value;
   var dataset_directory_url = document.getElementById('dataset_directory_url').value;
+  var original_images_url = document.getElementById('original_images_url').value;
 
   this.data = {
     dir: '/data', // data folder within the output_directory; this is coded directly in the manifest files, and so potentially dynamic
     assets_url_base: assets_directory_url + "/",
     data_url_base: dataset_directory_url + "/",
+    original_photos_url_base: original_images_url + "/",
     file: 'manifest.json',
     gzipped: false,
   }
@@ -2039,9 +2041,10 @@ Lasso.prototype.downloadSelected = function() {
       var images = this.getSelectedFilenames();
       var nAdded = 0;
       for (var i=0; i<images.length; i++) {
-        var imagePath = getPath('data/originals/' + images[i]);
+        var imagePath = config.data.original_photos_url_base + images[i];
         imageToDataUrl(imagePath, function(result) {
-          var imageFilename = result.src.split('originals/')[1];
+          //todo: not sure about this.....
+          var imageFilename = result.src.split('/')[-1];
           var base64 = result.dataUrl.split(';base64,')[1];
           subfolder.file(imageFilename, base64, {base64: true});
           if (++nAdded == images.length) {
@@ -2608,7 +2611,7 @@ Modal.prototype.showCells = function(cellIndices, cellIdx) {
   // parse data attributes
   var filename = data.json.images[self.cellIndices[self.cellIdx]];
   // conditionalize the path to the image
-  var src = config.data.data_url_base + config.data.dir + '/originals/' + filename;
+  var src = config.data.original_photos_url_base + filename;
   // define function to show the modal
   function showModal(json) {
     var json = json || {};

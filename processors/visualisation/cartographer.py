@@ -101,11 +101,8 @@ class ImagePlotGenerator(BasicProcessor):
                         root='',
                         atlas_resolution=2048 * 2,
                         cell_height=64 * 2, # min of 64 seems blurry to me
-                        thumbnail_size=128) # TODO: changing from 128 breaks the plot; figure out WHY
-
-        # Copy images into results folder
-        # TODO: how to use originals instead of copying?
-        shutil.copytree(staging_area, output_dir.joinpath("data/originals"), dirs_exist_ok=True)
+                        thumbnail_size=128, # TODO: changing from 128 breaks the plot; figure out WHY
+                        )
 
         # Results HTML file redirects to output_dir/index.html
         plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get(
