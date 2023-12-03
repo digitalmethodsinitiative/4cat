@@ -203,7 +203,6 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
-
 	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message="Unknown platform or source format")
 
