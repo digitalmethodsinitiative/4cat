@@ -1,4 +1,5 @@
 import time
+import datetime
 import re
 from common.lib.helpers import flatten_dict
 
@@ -30,6 +31,17 @@ class SearchAppleStore(Search):
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+
+    # This mapping matches the method names in the collect_from_store function
+    # method names in options use "requires" for the frontend to show/hide options
+    option_to_method = {
+            'query-app': 'app',
+            'list-detail': 'list',
+            'query-search-detail': 'search',
+            'query-developer-detail': 'developer',
+            'query-similar-detail': 'similar',
+            'query-permissions': 'permissions',
+        }
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -106,14 +118,7 @@ class SearchAppleStore(Search):
         """
         queries = re.split(',|\n', self.parameters.get('query', ''))
         # Updated method from options to match the method names in the collect_from_store function
-        method = {
-            'query-app': 'app',
-            'list-detail': 'list',
-            'query-search-detail': 'search',
-            'query-developer-detail': 'developer',
-            'query-similar-detail': 'similar',
-            'query-permissions': 'permissions',
-        }.get(self.parameters.get('method'))
+        method = self.option_to_method.get(self.parameters.get('method'))
 
         params = {}
         if method == 'list':
@@ -132,7 +137,7 @@ class SearchAppleStore(Search):
         self.dataset.log(f"Collecting {method} from Apple Store")
         results = collect_from_store('apple', method, languages=re.split(',|\n', self.parameters.get('languages')), countries=re.split(',|\n', self.parameters.get('countries')), full_detail=self.parameters.get('full_details', False), params=params, log=self.dataset.log)
         self.dataset.log(f"Collected {len(results)} results from Apple Store")
-        return results
+        return [{"query_method": method, "collected_at_timestamp": datetime.datetime.now().timestamp(), "item_index": i, **result} for i, result in enumerate(results)]
 
     @staticmethod
     def validate_query(query, request, user):
@@ -149,6 +154,57 @@ class SearchAppleStore(Search):
         """
            
         return query
+    
+    @staticmethod
+    def map_item(item):
+        """
+        Map item to a common format that includes, at minimum, "id", "thread_id", "author", "body", and "timestamp" fields.
+
+        :param item:
+        :return:
+        """
+        query_method = item.pop("query_method", "")
+        formatted_item = {
+            "query_method": query_method, 
+            "thread_id": "",
+            "author": item.get("artistName", ""),
+            }
+        item_index = item.pop("item_index", "") # Used on query types without unique IDs (e.g., permissions)
+
+        # some queries do not return a publishing timestamp so we use the collected at timestamp
+        timestamp = datetime.datetime.strptime(item.get("releaseDate"), "%Y-%m-%dT%H:%M:%SZ") if "releaseDate" in item else item.get("collected_at_timestamp")
+
+        if query_method == 'app':
+            formatted_item["id"] = item.get("trackId")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'list':
+            formatted_item["id"] = item.get("trackId")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'search':
+            formatted_item["query_term"] = item.pop("term", "")
+            formatted_item["id"] = item.get("id", item.get("trackId", "")) # detailed search returns trackId, simple search returns id
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'developer':
+            formatted_item["id"] = item.get("trackId")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'similar':
+            formatted_item["id"] = item.get("id")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        # elif query_method == 'permissions':
+        #     item["id"] = item_index
+        #     item["body"] = item.get("permission", "")
+        #     item["timestamp"] = timestamp
+        else:
+            # Should not happen
+            raise Exception("Unknown query method: {}".format(query_method))
+        formatted_item.update(**item)
+        
+        return formatted_item
     
 def collect_from_store(store, method, languages=None, countries=None, full_detail=False, params={}, log=print):
     """

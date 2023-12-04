@@ -1,4 +1,5 @@
 import re
+import datetime
 from common.lib.user_input import UserInput
 from datasources.apple_store.search_apple_store import SearchAppleStore, collect_from_store
 
@@ -80,13 +81,7 @@ class SearchGoogleStore(SearchAppleStore):
         """
         queries = re.split(',|\n', self.parameters.get('query', ''))
         # Updated method from options to match the method names in the collect_from_store function
-        method = {
-            'query-app': 'app',
-            'query-search-detail': 'search',
-            'query-developer-detail': 'developer',
-            'query-similar-detail': 'similar',
-            'query-permissions': 'permissions',
-        }.get(self.parameters.get('method'))
+        method = self.option_to_method.get(self.parameters.get('method'))
 
         params = {}
         if method == 'search':
@@ -103,4 +98,59 @@ class SearchGoogleStore(SearchAppleStore):
         self.dataset.log(f"Collecting {method} from Google Store")
         results = collect_from_store('google', method, languages=re.split(',|\n', self.parameters.get('languages')), countries=re.split(',|\n', self.parameters.get('countries')), full_detail=self.parameters.get('full_details', False), params=params, log=self.dataset.log)
         self.dataset.log(f"Collected {len(results)} results from Google Store")
-        return results
+        return [{"query_method": method, "collected_at_timestamp": datetime.datetime.now().timestamp(), "item_index": i, **result} for i, result in enumerate(results)]
+
+    @staticmethod
+    def map_item(item):
+        """
+        Map item to a common format that includes, at minimum, "id", "thread_id", "author", "body", and "timestamp" fields.
+
+        :param item:
+        :return:
+        """
+        query_method = item.pop("query_method", "")
+        formatted_item = {
+            "query_method": query_method, 
+            "thread_id": "",
+            "author": item.get("developer_name", ""),
+            }
+        item_index = item.pop("item_index", "") # Used on query types without unique IDs (e.g., permissions)
+
+        # some queries do not return a publishing timestamp so we use the collected at timestamp
+        timestamp = datetime.datetime.fromtimestamp(item.get("published_timestamp")) if "published_timestamp" in item else datetime.datetime.strptime(item.get("published_date"), "%Y-%m-%d") if "published_date" in item else item.get("collected_at_timestamp")
+
+        if query_method == 'app':
+            formatted_item["id"] = item.get("id", "")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'list':
+            formatted_item["id"] = item.get("id", "")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'search':
+            formatted_item["query_term"] = item.pop("term", "")
+            formatted_item["id"] = item.get("id", "")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'developer':
+            formatted_item["id"] = item.get("id", "")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'similar':
+            formatted_item["id"] = item.get("id", "")
+            formatted_item["body"] = item.get("description", "")
+            formatted_item["timestamp"] = timestamp
+        elif query_method == 'permissions':
+            formatted_item["id"] = item_index
+            formatted_item["body"] = item.get("permission", "")
+            formatted_item["timestamp"] = timestamp
+        else:
+            # Should not happen
+            raise Exception("Unknown query method: {}".format(query_method))
+        
+        if "developer_link" in item:
+            formatted_item["developer_id"] = item["developer_link"].split("dev?id=")[-1]
+
+        formatted_item.update(**item)
+
+        return formatted_item
