@@ -208,10 +208,8 @@ class SearchImportFromFourcat(BasicProcessor):
             self.halt_and_catch_fire()
             try:
                 self.dataset.update_status(f"Transferring data file for dataset {new_dataset.key}")
-                data = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "data")
                 datapath = new_dataset.get_results_path()
-                with datapath.open("wb") as outfile:
-                    outfile.write(data.content)
+                data = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "data", datapath)
 
                 if not imported:
                     # first dataset - use num rows as 'overall'
@@ -293,7 +291,7 @@ class SearchImportFromFourcat(BasicProcessor):
             raise ProcessorInterruptedException()
 
     @staticmethod
-    def fetch_from_4cat(base, dataset_key, api_key, component):
+    def fetch_from_4cat(base, dataset_key, api_key, component, datapath=None):
         """
         Get dataset component from 4CAT export API
 
@@ -304,10 +302,23 @@ class SearchImportFromFourcat(BasicProcessor):
         :return:  HTTP response object
         """
         try:
-            response = requests.get(f"{base}/api/export-packed-dataset/{dataset_key}/{component}/", timeout=5, headers={
-                "User-Agent": "4cat/import",
-                "Authentication": api_key
-            })
+            if component == "data" and datapath:
+                # Stream data
+                with requests.get(f"{base}/api/export-packed-dataset/{dataset_key}/{component}/", timeout=5, stream=True,
+                                  headers={
+                                            "User-Agent": "4cat/import",
+                                            "Authentication": api_key
+                                        }) as r:
+                    r.raise_for_status()
+                    with datapath.open("wb") as outfile:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            outfile.write(chunk)
+                return r
+            else:
+                response = requests.get(f"{base}/api/export-packed-dataset/{dataset_key}/{component}/", timeout=5, headers={
+                    "User-Agent": "4cat/import",
+                    "Authentication": api_key
+                })
         except requests.Timeout:
             raise FourcatImportException(f"The 4CAT server at {base} took too long to respond. Make sure it is "
                                          f"accessible to external connections and try again.")
