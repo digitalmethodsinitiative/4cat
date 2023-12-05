@@ -218,7 +218,7 @@ class SearchImportFromFourcat(BasicProcessor):
                     num_rows = metadata["num_rows"]
 
             except FourcatImportException as e:
-                self.dataset.log(f"Dataset {new_dataset.key} does not seem to have a data file, skipping import")
+                self.dataset.log(f"Dataset {new_dataset.key} unable to import: {e}, skipping import")
                 if new_dataset.key != self.dataset.key:
                     new_dataset.delete()
                 continue
