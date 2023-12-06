@@ -124,6 +124,10 @@ class ImageWallGenerator(BasicProcessor):
 		"""
 		Identify dataset types that are compatible with this processor
 		"""
+		if source_dataset.is_top_dataset():
+			# Currently we need two datasets: image dataset and some category dataset
+			# TODO: use metadata for categories?
+			return None, None
 		if source_dataset.type.startswith("image-downloader"):
 			image_dataset = source_dataset
 			category_dataset = source_dataset.top_parent()
