@@ -21,6 +21,7 @@ from webtool import app, db, openapi, limiter, config
 from webtool.lib.helpers import format_chan_post, error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
+from common.lib.exceptions import DataSetException
 
 from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
@@ -46,7 +47,7 @@ def explorer_dataset(key, page):
 	# Get dataset info.
 	try:
 		dataset = DataSet(key=key, db=db)
-	except TypeError:
+	except DataSetException:
 		return error(404, error="Dataset not found.")
 
 	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
@@ -616,17 +617,16 @@ def get_custom_css(datasource):
 
 	# Set the directory name of this datasource.
 	# Some naming inconsistensies are caught here
-	if datasource.startswith("4"):
-		datasource_dir = datasource.replace("4", "four")
-	elif datasource.startswith("8"):
-		datasource_dir = datasource.replace("8", "eight")
-	elif datasource == "twitter":
+	if datasource == "twitter":
 		datasource_dir = "twitter-import"
 		datasource = "twitter-import"
 	else:
 		datasource_dir = datasource
 
+
 	css_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+	
+	print(css_path)
 	read = False
 	if css_path.exists():
 		read = True
@@ -661,12 +661,7 @@ def get_custom_fields(datasource, filetype=None):
 	"""
 
 	# Set the directory name of this datasource.
-	# Do some conversion for some imageboard names (4chan, 8chan).
-	if datasource.startswith("4"):
-		datasource_dir = datasource.replace("4", "four")
-	elif datasource.startswith("8"):
-		datasource_dir = datasource.replace("8", "eight")
-	elif datasource == "twitter":
+	if datasource == "twitter":
 		datasource_dir = "twitter-import"
 		datasource = "twitter-import"
 	else:

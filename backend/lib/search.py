@@ -51,7 +51,7 @@ class Search(BasicProcessor, ABC):
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'body', 'subject', 'timestamp']
 
-	flawless = True
+	flawless = 0
 
 	def process(self):
 		"""
@@ -118,11 +118,9 @@ class Search(BasicProcessor, ABC):
 				# file exists somewhere, so we create it as an empty file
 				with open(query_parameters.get("copy_to"), "w") as empty_file:
 					empty_file.write("")
-		if self.flawless:
-			self.dataset.finish(num_rows=num_items)
-		else:
-			self.dataset.update_status("Some items did not map correctly. Data is maintained, but will not be available in 4CAT; check logs for details", is_final=True)
-			self.dataset.finish(num_rows=num_items)
+		if self.flawless != 0:
+			self.dataset.update_status(f"Unexpected data format for {self.flawless} items. All data can be downloaded, but only data with expected format will be available to 4CAT processors; check logs for details", is_final=True)
+		self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
 		"""
@@ -207,10 +205,10 @@ class Search(BasicProcessor, ABC):
 				if check_map_item:
 					try:
 						self.get_mapped_item(new_item)
-					except MapItemException:
+					except MapItemException as e:
 						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
-						self.flawless = False
-						self.dataset.warn_unmappable_item(i, processor=self, warn_admins=unmapped_items is False)
+						self.flawless += 1
+						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e, warn_admins=unmapped_items is False)
 						unmapped_items = True
 
 				yield new_item

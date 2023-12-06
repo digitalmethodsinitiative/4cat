@@ -127,13 +127,11 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			self.abort()
 		except ProcessorException as e:
 			self.log.error(str(e), frame=e.frame)
-			self.job.add_status("Crash during execution")
 		except Exception as e:
 			frames = traceback.extract_tb(e.__traceback__)
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
-			self.job.add_status("Crash during execution")
 
 		# Clean up after work successfully completed or terminates
 		self.clean_up()

@@ -1,4 +1,6 @@
+import itertools
 import pickle
+import time
 import json
 
 from pathlib import Path
@@ -59,7 +61,27 @@ class ConfigManager:
         if module_config_path.exists():
             try:
                 with module_config_path.open("rb") as infile:
-                    module_config = pickle.load(infile)
+                    retries = 0
+                    module_config = None
+                    # if 4CAT is being run in two different containers
+                    # (front-end and back-end) they might both be running this
+                    # bit of code at the same time. If the file is half-written
+                    # loading it will fail, so allow for a few retries
+                    while retries < 3:
+                        try:
+                            module_config = pickle.load(infile)
+                            break
+                        except Exception:  # this can be a number of exceptions, all with the same recovery path
+                            time.sleep(0.1)
+                            retries += 1
+                            continue
+
+                    if module_config is None:
+                        # not really a way to gracefully recover from this, but
+                        # we can at least describe the error
+                        raise RuntimeError("Could not read module_config.bin. The 4CAT developers did a bad job of "
+                                           "preventing this. Shame on them!")
+
                     self.config_definition.update(module_config)
             except (ValueError, TypeError) as e:
                 pass
@@ -124,6 +146,7 @@ class ConfigManager:
         unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
 
         if unknown_keys:
+            self.db.log.info(f"Deleting unknown settings from database: {', '.join([key['name'] for key in unknown_keys])}")
             self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
 
         self.db.commit()
@@ -136,6 +159,33 @@ class ConfigManager:
 
             self.set(setting, parameters.get("default", ""))
 
+        # make sure settings and user table are in sync
+        user_tags = list(set(itertools.chain(*[u["tags"] for u in self.db.fetchall("SELECT DISTINCT tags FROM users")])))
+        known_tags = [t["tag"] for t in self.db.fetchall("SELECT DISTINCT tag FROM settings")]
+        tag_order = self.get("flask.tag_order")
+
+        for tag in tag_order:
+            # don't include tags not used by users in the tag order
+            if tag not in user_tags:
+                tag_order.remove(tag)
+
+        for tag in known_tags:
+            # add tags used by a setting to tag order
+            if tag and tag not in tag_order:
+                tag_order.append(tag)
+
+        for tag in user_tags:
+            # add tags used by a user to tag order
+            if tag and tag not in tag_order:
+                tag_order.append(tag)
+
+        # admin tag should always be first in order
+        if "admin" in tag_order:
+            tag_order.remove("admin")
+
+        tag_order.insert(0, "admin")
+
+        self.set("flask.tag_order", tag_order)
         self.db.commit()
 
     def get_all(self, is_json=False, user=None, tags=None):

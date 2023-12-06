@@ -293,6 +293,10 @@ article.small .form-element select[multiple] {
     margin-left: 0.5em;
 }
 
+.form-element.combo-checkbox-input label {
+    line-height: 2em;
+}
+
 .datasource-extra-input {
     overflow: hidden;
 }

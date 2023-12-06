@@ -76,6 +76,7 @@ class WorkerManager:
 			all_workers = self.worker_pool[jobtype]
 			for worker in all_workers:
 				if not worker.is_alive():
+					self.log.debug(f"Terminating worker {worker.job.data['jobtype']}/{worker.job.data['remote_id']}")
 					worker.join()
 					self.worker_pool[jobtype].remove(worker)
 
@@ -97,6 +98,7 @@ class WorkerManager:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
+						self.log.debug(f"Starting new worker of for job {job.data['jobtype']}/{job.data['remote_id']}")
 						self.worker_pool[jobtype].append(worker)
 					except JobClaimedException:
 						# it's fine

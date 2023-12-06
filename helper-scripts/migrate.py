@@ -329,9 +329,10 @@ else:
 # ---------------------------------------------
 #                    Run pip
 # ---------------------------------------------
-logger.info("- Running pip to install any new dependencies (this could take a moment)...")
+logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
+logger.info("  (this could take a moment)...")
 try:
-	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt"],
+	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
 								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
 	for line in pip.stdout.decode("utf-8").split("\n"):
 		if line.startswith("Requirement already satisfied:"):

@@ -13,6 +13,7 @@ import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
+from common.lib.exceptions import DataSetException
 from common.config_manager import config
 
 
@@ -482,7 +483,7 @@ class User:
             for dataset in datasets:
                 try:
                     dataset = DataSet(key=dataset["key"], db=self.db)
-                except (ValueError, TypeError):
+                except DataSetException:
                     # dataset already deleted?
                     continue
 

@@ -54,6 +54,13 @@ class DataSetException(FourcatException):
 	pass
 
 
+class DataSetNotFoundException(DataSetException):
+	"""
+	Raise if dataset does not exist
+	"""
+	pass
+
+
 class JobClaimedException(QueueException):
 	"""
 	Raise if job is claimed, but is already marked as such

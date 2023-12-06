@@ -18,7 +18,7 @@ config_definition = {
     },
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
-        "default": ["ninegag", "bitchute", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
+        "default": ["ninegag", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
                     "telegram", "tiktok", "twitter"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
@@ -105,6 +105,12 @@ config_definition = {
         "help": "Can use explorer",
         "tooltip": "Controls whether users can use the Explorer feature to navigate datasets."
     },
+    "privileges.can_export_datasets": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Can export datasets",
+        "tooltip": "Allows users to export datasets they own to other 4CAT instances."
+    },
     "privileges.admin.can_manage_users": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
@@ -135,6 +141,17 @@ config_definition = {
         "default": False,
         "help": "Can restart/upgrade",
         "tooltip": "Controls whether users can restart and upgrade 4CAT via the Control Panel"
+    },
+    "privileges.can_upgrade_to_dev": {
+        # this is NOT an admin privilege, because all admins automatically
+        # get all admin privileges! users still need the above privilege
+        # to actually use this, anyway
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can upgrade to development branch",
+        "tooltip": "Controls whether users can upgrade 4CAT to a development branch of the code via the Control Panel. "
+                   "This is an easy way to break 4CAT so it is recommended to not enable this unless you're really "
+                   "sure of what you're doing."
     },
     "privileges.admin.can_manage_tags": {
         "type": UserInput.OPTION_TOGGLE,
@@ -246,7 +263,7 @@ config_definition = {
     },
     "mail.server": {
         "type": UserInput.OPTION_TEXT,
-        "default": "localhost",
+        "default": "",
         "help": "SMTP server",
         "tooltip": "SMTP server to connect to for sending e-mail alerts.",
         "global": True
@@ -344,6 +361,22 @@ config_definition = {
         "help": "Use HTTPS",
         "tooltip": "If your server is using 'https', set to True and 4CAT will use HTTPS links.",
         "global": True
+    },
+    "flask.proxy_override": {
+        "type": UserInput.OPTION_MULTI_SELECT,
+        "default": [],
+        "options": {
+            "x_for": "X-Forwarded-For",
+            "x_proto": "X-Forwarded-Proto",
+            "x_host": "X-Forwarded-Host",
+            "x_port": "X-Forwarded-Port",
+            "x_prefix": "X-Forwarded-Prefix"
+        },
+        "help": "Use proxy headers for URL",
+        "tooltip": "These proxy headers will be taken into account when building URLs. For example, if "
+                   "X-Forwarded-Proto is enabled, the URL scheme (http/https) of the built URL will be based on the "
+                   "scheme defined by this header. Use when running 4CAT behind a reverse proxy. Requires a front-end "
+                   "restart to take effect."
     },
     "flask.autologin.name": {
         "type": UserInput.OPTION_TEXT,
@@ -489,9 +522,8 @@ config_definition = {
             "faq": "FAQ",
             "data-policy": "Data Policy",
             "citing": "How to cite",
-            "about": "About",
         },
-        "default": ["faq", "about"],
+        "default": ["faq"],
         "tooltip": "These pages will be included in the navigation bar at the top of the interface."
     },
     "ui.prefer_mapped_preview": {
@@ -513,6 +545,18 @@ config_definition = {
         "help": "Offer create as private",
         "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
     },
+    "ui.option_email": {
+        "type": UserInput.OPTION_CHOICE,
+        "options": {
+            "none": "No Emails",
+            "processor_only": "Processors only",
+            "datasources_only": "Create Dataset only",
+            "both": "Both datasets and processors"
+        },
+        "default": "none",
+        "help": "Show email when complete option",
+        "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
+    },
 }
 
 # These are used in the web interface for more readable names
@@ -530,5 +574,6 @@ categories = {
     "selenium": "Selenium Scraper settings",
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
-    "ui": "User interface"
+    "ui": "User interface",
+    "image-visuals": "Image visualization",
 }

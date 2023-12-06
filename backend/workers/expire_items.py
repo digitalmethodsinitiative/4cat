@@ -8,7 +8,7 @@ import re
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
-from common.config_manager import config
+from common.lib.exceptions import DataSetNotFoundException
 
 from common.lib.user import User
 
@@ -55,10 +55,15 @@ class ThingExpirer(BasicWorker):
 		""")
 
 		for dataset in datasets:
-			dataset = DataSet(key=dataset["key"], db=self.db)
-			if dataset.is_expired():
-				self.log.info(f"Deleting dataset {dataset.key} (expired)")
-				dataset.delete()
+			try:
+				dataset = DataSet(key=dataset["key"], db=self.db)
+				if dataset.is_expired():
+					self.log.info(f"Deleting dataset {dataset.key} (expired)")
+					dataset.delete()
+
+			except DataSetNotFoundException:
+				# dataset already deleted I guess?
+				pass
 
 	def expire_users(self):
 		"""

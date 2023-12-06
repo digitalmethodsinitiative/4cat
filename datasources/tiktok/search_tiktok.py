@@ -91,7 +91,7 @@ class SearchTikTok(Search):
             "is_ad": "yes" if post.get("isAd", False) else "no",
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
-            "music_url": post["music"]["playUrl"],
+            "music_url": post["music"].get("playUrl", ""),
             "music_thumbnail": post["music"].get("coverLarge", ""),
             "music_author": post["music"].get("authorName", ""),
             "video_url": post["video"].get("downloadAddr", ""),

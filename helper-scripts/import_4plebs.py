@@ -14,6 +14,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.config_manager import config
 from chan_flags import get_country_name, get_troll_names
 
 
@@ -118,7 +119,7 @@ if args.board not in boards:
 	print("%s is not a valid 4chan board name." % args.board)
 	sys.exit(1)
 
-db = Database(logger=Logger(), appname="4chan-import")
+db = Database(logger=Logger(), appname="4chan-import", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 
 print("Opening %s." % args.input)
 if args.skip > 0:
