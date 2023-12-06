@@ -62,7 +62,9 @@ class ImageWallGenerator(BasicProcessor):
 		
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		# TODO: cannot run on image-downloader-screenshots-search as it does not have a category column!
+		if module.is_top_dataset():
+			# Currently requires two datasets (image archive and category)
+			return False
 		return module.type.startswith("image-to-categories") or (module.type.startswith("image-downloader") and not module.type not in ["image-downloader-screenshots-search"])
 
 	@classmethod
