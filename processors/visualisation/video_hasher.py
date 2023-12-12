@@ -10,7 +10,7 @@ import shutil
 import zipfile
 
 from videohash import VideoHash
-from videohash.exceptions import FFmpegNotFound
+from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
 from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorPreset
@@ -158,7 +158,10 @@ class VideoHasher(BasicProcessor):
 				self.dataset.finish(0)
 				return
 			except FileNotFoundError as e:
-				self.dataset.update_status(f"Unable to create hash for {str(path)}")
+				self.dataset.update_status(f"Unable to find file {str(path)}")
+				continue
+			except FFmpegFailedToExtractFrames as e:
+				self.dataset.update_status(f"Unable to extract frame for {str(path)}: {e}")
 				continue
 
 			video_hashes[path.name] = {'videohash': videohash}

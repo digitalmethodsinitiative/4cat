@@ -141,7 +141,7 @@ class VideoTimelines(BasicProcessor):
 
                 if looping:
                     # Only prep for new timeline if still looping
-                    self.dataset.update_status(f"Rendering video timeline for collection {video}")
+                    self.dataset.update_status(f"Rendering video timeline for collection {video} ({len(timeline_widths)}/{self.source_dataset.num_rows})")
                     self.dataset.update_progress(len(timeline_widths) / self.source_dataset.num_rows)
                     # reset and ready for the next timeline
                     offset_y += base_height
