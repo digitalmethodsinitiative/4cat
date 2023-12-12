@@ -566,16 +566,17 @@ class DataSet(FourcatModule):
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
-		# delete from drive
-		try:
-			self.get_results_path().unlink()
-			if self.get_results_path().with_suffix(".log").exists():
-				self.get_results_path().with_suffix(".log").unlink()
-			if self.get_results_folder_path().exists():
-				shutil.rmtree(self.get_results_folder_path())
-		except FileNotFoundError:
-			# already deleted, apparently
-			pass
+		# delete from drive if not used elsewhere
+		if self.db.fetchone(f"select * from datasets where result_file = '{self.get_results_path().name}' and key != '{self.key}'") is None:
+			try:
+				self.get_results_path().unlink()
+				if self.get_results_path().with_suffix(".log").exists():
+					self.get_results_path().with_suffix(".log").unlink()
+				if self.get_results_folder_path().exists():
+					shutil.rmtree(self.get_results_folder_path())
+			except FileNotFoundError:
+				# already deleted, apparently
+				pass
 
 	def update_children(self, **kwargs):
 		"""
