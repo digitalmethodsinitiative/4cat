@@ -332,7 +332,17 @@ def preview_items(key):
         # html files
         return get_result(dataset.get_results_path().name)
 
-    if dataset.get_extension() == "gexf":
+    elif dataset.get_extension() == "zip":
+        # Check if a child was a custom-image-plot
+        for child in dataset.children:
+            if child.type == "custom-image-plot":
+                return get_result(child.get_results_path().name)
+            elif child.type == "image-downloader":
+                for grandkid in child.children:
+                    if grandkid.type == "custom-image-plot":
+                        return get_result(grandkid.get_results_path().name)
+
+    elif dataset.get_extension() == "gexf":
         # network files
         # use GEXF preview panel which loads full data file client-side
         hostname = config.get("flask.server_name").split(":")[0]
