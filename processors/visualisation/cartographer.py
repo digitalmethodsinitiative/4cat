@@ -101,7 +101,7 @@ class ImagePlotGenerator(BasicProcessor):
                         root='',
                         atlas_resolution=2048 * 2,
                         cell_height=64 * 2, # min of 64 seems blurry to me
-                        thumbnail_size=128 * 2, # TODO: changing from 128 breaks the plot; figure out WHY
+                        thumbnail_size=128, # TODO: changing from 128 breaks the plot; figure out WHY
                         )
 
         # Results HTML file redirects to output_dir/index.html
@@ -458,7 +458,7 @@ class ImagePlotGenerator(BasicProcessor):
         point_sizes = {
             'min': 0,
             'grid': grid,
-            "max": grid * 1.2,
+            "max": grid * 1.5,
             "scatter": grid * .2 if umap else grid,
             "initial": grid * .2 if umap else grid,
             "categorical": grid * .6,
