@@ -245,7 +245,7 @@ def get_mapped_result(key):
         """
         writer = None
         buffer = io.StringIO()
-        for mapped_item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
+        for original_item, mapped_item in dataset.iterate_mapped_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
                 fieldnames = mapped_item.keys()
                 if annotation_labels:
@@ -261,7 +261,7 @@ def get_mapped_result(key):
 
             if annotation_fields:
                 for label in annotation_labels:
-                    mapped_item[label] = item[label]
+                    mapped_item[label] = original_item[label]
 
             writer.writerow(mapped_item)
             yield buffer.getvalue()
