@@ -4,11 +4,13 @@
 import json
 import csv
 import io
+import mimetypes
+import zipfile
 
 import flask
 import json_stream
 from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
-    url_for, stream_with_context, after_this_request
+    url_for, stream_with_context, after_this_request, Response
 from flask_login import login_required, current_user
 
 from common.lib.helpers import get_archived_file
@@ -167,24 +169,30 @@ def get_result(query_file):
     :rmime: text/csv
     """
     if ".zip" in query_file and not query_file.endswith(".zip"):
-        # if it's an archived file, we need to extract the file first
-        temp_dir = config.get("PATH_ROOT").joinpath(config.get("PATH_DATA")).joinpath("tmp")
-        temp_dir.mkdir(exist_ok=True)
+        def generate_file(archive_path, archived_file):
+            with zipfile.ZipFile(archive_path, "r") as archive:
+                archive_contents = sorted(archive.namelist())
+
+                if archived_file in archive_contents:
+                    info = archive.getinfo(archived_file)
+                    if info.is_dir():
+                        return error(404, error="File not found.")
+
+                    with archive.open(archived_file, "r") as temp_file:
+                        for row in temp_file:
+                            yield row
 
         try:
-            archive_path = config.get("PATH_ROOT").joinpath(config.get("PATH_DATA")).joinpath(query_file.split(".zip")[0].split("/")[-1] + ".zip")
             archived_file = query_file.split(".zip/")[1]
-            temp_file = get_archived_file(archive_path, archived_file, temp_dir)
-            query_file = temp_file.relative_to(config.get("PATH_ROOT").joinpath(config.get("PATH_DATA")))
+            mime_type, _ = mimetypes.guess_type(archived_file)
+
+            return Response(generate_file(archive_path=config.get("PATH_ROOT").joinpath(config.get("PATH_DATA")).joinpath(query_file.split(".zip")[0].split("/")[-1] + ".zip"),
+                                          archived_file= archived_file),
+                            mimetype=mime_type)
+
         except (FileNotFoundError, IsADirectoryError) as e:
             log.error("Error while extracting file from archive: %s" % str(e))
             return error(404, error=str(e))
-
-        @after_this_request
-        def cleanup(response):
-            temp_file.unlink()
-            temp_dir.rmdir()
-            return response
 
     return send_from_directory(directory=config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')), path=query_file)
 
