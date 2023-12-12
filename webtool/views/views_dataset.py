@@ -9,6 +9,7 @@ import zipfile
 
 import flask
 import json_stream
+import markupsafe
 from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
     url_for, stream_with_context, after_this_request, Response
 from flask_login import login_required, current_user
@@ -341,6 +342,16 @@ def preview_items(key):
                 for grandkid in child.children:
                     if grandkid.type == "custom-image-plot":
                         return get_result(grandkid.get_results_path().name)
+
+        # List files in zip w/ links
+        rows = [["Files"]]
+        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive:
+            archive_contents = sorted(archive.namelist())
+            [rows.append([markupsafe.Markup(f"<a href='{url_for('get_result', query_file=dataset.get_results_path().name + '/' + file)}'>{file}</a>")]) for file in archive_contents]
+
+        return render_template("preview/csv.html", rows=rows, max_items=preview_size,
+                               dataset=dataset)
+
 
     elif dataset.get_extension() == "gexf":
         # network files
