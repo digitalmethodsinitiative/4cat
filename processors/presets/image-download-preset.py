@@ -12,7 +12,7 @@ class ImageDownloaderPreset(ProcessorPreset):
 				  "externally. Note that not always all images can be saved. For imgur galleries, only the first " \
 				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
 				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
-	extension = "html"  # extension of result file, used internally and in UI
+	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
@@ -35,7 +35,7 @@ class ImageDownloaderPreset(ProcessorPreset):
 			# download images
 			{
 				"type": "image-downloader",
-				"parameters": params
+				"parameters": {"attach_to":self.dataset.key, **params}
 			},
 			# then create plot
 			{
