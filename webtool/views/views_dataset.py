@@ -315,8 +315,8 @@ def preview_items(key):
             config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
-    preview_size = 1000
-    preview_bytes = (1024 * 1024 * 1)  # 1MB
+    preview_size = int(request.args.get('max_items', 1000))
+    preview_bytes = (1024 * 1024 * int(request.args.get('mb', 1)))  # 1MB
 
     processor = dataset.get_own_processor()
     if not processor:
