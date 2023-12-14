@@ -112,6 +112,7 @@ if __name__ == "__main__":
             config.set('flask.server_name', frontend_servername)
         else:
             config.set('flask.server_name', f"{frontend_servername}:{public_port}")
+        config.db.commit()
 
     # Config file already exists; Update .env variables if they changed
     else:
@@ -137,8 +138,8 @@ if __name__ == "__main__":
         if frontend_port != public_port:
             print(f"Exposed PUBLIC_PORT {public_port} from .env file not included in Server Name; if you are not using a reverse proxy, you may need to update the Server Name variable.")
             print(f"You can do so by running the following command if you do not have access to the 4CAT frontend Control Panel:\n"
-                  f"docker exec 4cat_backend python -c \"from common.config_manager import config;config.set('flask.server_name', '{frontend_servername}:{public_port}');\"")
+                  f"docker exec 4cat_backend python -c \"from common.config_manager import config;config.set('flask.server_name', '{frontend_servername}:{public_port}');config.db.commit();\"")
 
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"
-          f"{'https' if config.get('flask.https', False) else 'http'}://{frontend_servername}{':'+str(public_port) if public_port != 80 else ''}\n")
+          f"{'https' if config.get('flask.https', False) else 'http'}://{config.get('flask.server_name')}\n")
