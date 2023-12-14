@@ -133,6 +133,17 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
 
+		# Clean up after work successfully completed or terminates
+		self.clean_up()
+
+	def clean_up(self):
+		"""
+		Clean up after a processor runs successfully or results in error.
+		Workers should override this method to implement any procedures
+		to run to clean up a worker; by default this does nothing.
+		"""
+		pass
+
 	def abort(self):
 		"""
 		Called when the application shuts down

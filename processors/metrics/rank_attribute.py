@@ -98,11 +98,12 @@ class AttributeRanker(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow processor on top image rankings
+		Allow processor to run on all csv and NDJSON datasets
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.get_extension() in ["csv", "ndjson"]
+
+		return module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
@@ -121,7 +122,7 @@ class AttributeRanker(BasicProcessor):
 		cutoff = convert_to_int(self.parameters.get("top"), 15)
 		weighby = self.parameters.get("weigh")
 		to_lowercase = self.parameters.get("to-lowercase", True)
-		
+
 		try:
 			if self.parameters.get("filter"):
 				filter = re.compile(".*" + self.parameters.get("filter") + ".*")
@@ -183,7 +184,7 @@ class AttributeRanker(BasicProcessor):
 			for value in values:
 				if to_lowercase:
 						value = value.lower()
-				
+
 				if rank_style == "overall" and value not in overall_top:
 					continue
 

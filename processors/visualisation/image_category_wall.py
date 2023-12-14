@@ -62,7 +62,10 @@ class ImageWallGenerator(BasicProcessor):
 		
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type.startswith("image-to-categories") or module.type.startswith("image-downloader")
+		if module.is_top_dataset():
+			# Currently requires two datasets (image archive and category)
+			return False
+		return module.type.startswith("image-to-categories") or (module.type.startswith("image-downloader") and not module.type not in ["image-downloader-screenshots-search"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -123,6 +126,10 @@ class ImageWallGenerator(BasicProcessor):
 		"""
 		Identify dataset types that are compatible with this processor
 		"""
+		if source_dataset.is_top_dataset():
+			# Currently we need two datasets: image dataset and some category dataset
+			# TODO: use metadata for categories?
+			return None, None
 		if source_dataset.type.startswith("image-downloader"):
 			image_dataset = source_dataset
 			category_dataset = source_dataset.top_parent()
@@ -149,7 +156,7 @@ class ImageWallGenerator(BasicProcessor):
 			return
 
 		category_column = self.parameters.get("category")
-		if category_column is None:
+		if not category_column:
 			self.dataset.finish_with_error("No category provided.")
 			return
 

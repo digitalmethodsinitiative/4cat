@@ -45,6 +45,7 @@ if __name__ == "__main__":
     import configparser
     import bcrypt
     from pathlib import Path
+    import sys
 
     # Configuration file location
     CONFIG_FILE = 'config/config.ini'
@@ -138,6 +139,20 @@ if __name__ == "__main__":
             print(f"Exposed PUBLIC_PORT {public_port} from .env file not included in Server Name; if you are not using a reverse proxy, you may need to update the Server Name variable.")
             print(f"You can do so by running the following command if you do not have access to the 4CAT frontend Control Panel:\n"
                   f"docker exec 4cat_backend python -c \"from common.config_manager import config;config.set('flask.server_name', '{frontend_servername}:{public_port}');\"")
+
+    if config.get('selenium.browser') == 'firefox' and not config.get('selenium.installed'):
+        # This currently requires the DOCKER container to be restarted!
+        print('Installing geckodriver and firefox')
+        import subprocess
+        interpreter = sys.executable
+        result = subprocess.run([interpreter, Path(config.get('PATH_ROOT')).joinpath("docker/install_selenium.py")])
+        if result.returncode != 0:
+            print("Error installing selenium")
+            print(result.stderr.decode("ascii"))
+            exit(1)
+        else:
+            config.set('selenium.installed', True)
+            config.set('selenium.selenium_executable_path', "/usr/local/bin/geckodriver")
 
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"

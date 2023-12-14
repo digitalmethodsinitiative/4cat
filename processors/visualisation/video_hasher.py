@@ -25,47 +25,47 @@ __email__ = "4cat@oilab.eu"
 
 
 class VideoHasherPreset(ProcessorPreset):
-    """
-    Run processor pipeline to create video hashes
-    """
-    type = "preset-video-hashes"  # job type ID
-    category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
-    description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
-    extension = "csv"
+	"""
+	Run processor pipeline to create video hashes
+	"""
+	type = "preset-video-hashes"  # job type ID
+	category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
+	title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
+	description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
+	extension = "csv"
 
-    @classmethod
-    def is_compatible_with(cls, module=None, user=None):
-        """
-        Determine compatibility
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+		Determine compatibility
 
-        Compatible with downloaded videos, and not really anything else!
-        Additionally ffmpeg needs to be available.
+		Compatible with downloaded videos, and not really anything else!
+		Additionally ffmpeg needs to be available.
 
-        :param str module:  Module ID to determine compatibility with
-        :return bool:
-        """
-        return module.type.startswith("video-downloader") and \
-               config.get("video-downloader.ffmpeg_path", user=user) and \
-               shutil.which(config.get("video-downloader.ffmpeg_path"))
+		:param str module:  Module ID to determine compatibility with
+		:return bool:
+		"""
+		return module.type.startswith("video-downloader") and \
+			   config.get("video-downloader.ffmpeg_path", user=user) and \
+			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
-    def get_processor_pipeline(self):
-        """
-        This queues a series of post-processors to visualise videos.
-        """
+	def get_processor_pipeline(self):
+		"""
+		This queues a series of post-processors to visualise videos.
+		"""
 
-        pipeline = [
-            # first, create colleges (and hashes) with the default settings
-            {
-                "type": "video-hasher-1"
-            },
-            # then, extract hashes
-            {
-                "type": "video-hasher-2"
-            },
-        ]
+		pipeline = [
+			# first, create colleges (and hashes) with the default settings
+			{
+				"type": "video-hasher-1"
+			},
+			# then, extract hashes
+			{
+				"type": "video-hasher-2"
+			},
+		]
 
-        return pipeline
+		return pipeline
 
 
 class VideoHasher(BasicProcessor):

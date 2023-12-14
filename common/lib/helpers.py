@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import hashlib
 import subprocess
 import requests
 import datetime
@@ -18,7 +19,7 @@ import io
 
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
-from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
@@ -39,6 +40,23 @@ def init_datasource(database, logger, queue, name):
     """
     pass
 
+# I was not completely happy with how either expand_url_shorteners or download_images was working
+# so I am trying regex. Plus we should have this as a helper function I think.
+# https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string
+def extract_urls_from_string(text_with_urls, return_type='string'):
+    """
+    Take a string, return a list of any urls in it.
+
+    :param string text_with_urls: A string of text
+    :return list: A list of urls
+    """
+    link_regex_pattern = re.compile(r"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])", re.IGNORECASE)
+    urls = link_regex_pattern.findall(text_with_urls)
+
+    if return_type == 'string':
+        return [url[0] + '://' + ''.join(url[1:]) for url in urls]
+    elif return_type == 'tuple':
+        return urls
 
 def strip_tags(html, convert_newlines=True):
     """
@@ -153,7 +171,7 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    current_version_file = config.get("PATH_ROOT").joinpath("config/.current-version")
     if not current_version_file.exists():
         return ""
 
@@ -830,3 +848,48 @@ def sets_to_lists(d: MutableMapping):
                 yield k, v
 
     return dict(_sets_to_lists_gen(d))
+
+
+def url_to_hash(url, remove_scheme=True, remove_www=True):
+    """
+    Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
+    rest of the URL.
+    """
+    parsed_url = urlparse(url.lower())
+    if parsed_url:
+        if remove_scheme:
+            parsed_url = parsed_url._replace(scheme="")
+        if remove_www:
+            netloc = re.sub(r"^www\.", "", parsed_url.netloc)
+            parsed_url = parsed_url._replace(netloc=netloc)
+
+        url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
+    else:
+        # Unable to parse URL; use regex
+        if remove_scheme:
+            url = re.sub(r"^https?://", "", url)
+        if remove_www:
+            if not remove_scheme:
+                scheme = re.match(r"^https?://", url).group()
+                temp_url = re.sub(r"^https?://", "", url)
+                url = scheme + re.sub(r"^www\.", "", temp_url)
+            else:
+                url = re.sub(r"^www\.", "", url)
+
+        url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
+
+    return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+
+def validate_url(x):
+    """
+    Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
+    and netloc (host) for the url.
+
+    :param str x:  string representing a url
+    :return bool:  True if string is valid url, False if not
+    """
+    if type(x) == str:
+        result = urlparse(x)
+        return all([result.scheme, result.netloc])
+    else:
+        raise ValueError('Must provide type str not type %s' % type(x))
