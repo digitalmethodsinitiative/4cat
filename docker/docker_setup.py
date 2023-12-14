@@ -112,6 +112,7 @@ if __name__ == "__main__":
             config.set('flask.server_name', frontend_servername)
         else:
             config.set('flask.server_name', f"{frontend_servername}:{public_port}")
+        config.db.commit()
 
     # Config file already exists; Update .env variables if they changed
     else:
@@ -141,4 +142,4 @@ if __name__ == "__main__":
 
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"
-          f"{'https' if config.get('flask.https', False) else 'http'}://{frontend_servername}{':'+str(public_port) if public_port != 80 else ''}\n")
+          f"{'https' if config.get('flask.https', False) else 'http'}://{config.get('flask.server_name')}\n")
