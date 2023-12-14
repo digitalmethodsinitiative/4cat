@@ -187,7 +187,8 @@ class TikTokImageDownloader(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type in ["tiktok-search", "tiktok-urls-search"]
+        # See TikTokImageDownloaderPreset in processors/presets/image-download-preset.py
+        return False
 
     def process(self):
         """

@@ -129,6 +129,7 @@ class ImageDownloader(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		return False
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a zip file with
