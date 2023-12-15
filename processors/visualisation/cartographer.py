@@ -40,7 +40,7 @@ class ImagePlotGenerator(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type.startswith("image-downloader")
+        return any([module.type.startswith(type_prefixes) for type_prefixes in ["image-downloader"]])
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -64,6 +64,8 @@ class ImagePlotGenerator(BasicProcessor):
         # Unpack the images into a staging area
         self.dataset.update_status("Unzipping images")
         staging_area = self.unpack_archive_contents(self.source_file)
+
+        create_metadata = True if ".metadata.json" in os.listdir(staging_area) else False
 
         # Collect filenames (skip .json metadata files)
         image_filenames = [filename for filename in os.listdir(staging_area) if
@@ -102,7 +104,13 @@ class ImagePlotGenerator(BasicProcessor):
                         atlas_resolution=2048 * 2,
                         cell_height=64 * 2, # min of 64 seems blurry to me
                         thumbnail_size=128, # TODO: changing from 128 breaks the plot; figure out WHY
+                        metadata=create_metadata,
                         )
+
+        # Create metadata files
+        if create_metadata:
+            self.dataset.update_status("Creating metadata files")
+            self.create_metadata_files(staging_area, output_dir, self.dataset.top_parent())
 
         # Results HTML file redirects to output_dir/index.html
         plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get(
@@ -145,7 +153,7 @@ class ImagePlotGenerator(BasicProcessor):
 
     @staticmethod
     def cartograph(output_dir, images_path, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
-                   cell_height=64, thumbnail_size=128):
+                   cell_height=64, thumbnail_size=128, metadata=False):
         """
         Turn image data into a PixPlot-compatible data manifest
 
@@ -227,7 +235,7 @@ class ImagePlotGenerator(BasicProcessor):
             "point_sizes": {},
             "imagelist": f"{root}/data/imagelists/imagelist-{plot_id}.json",
             "atlas_dir": f"{root}/data/atlases/{plot_id}",
-            "metadata": False,
+            "metadata": metadata,
             "default_hotspots": f"{root}/data/hotsots/hotspot-{plot_id}.json",
             "custom_hotspots": f"{root}/data/hotspots/user_hotspots.json",
             "gzipped": False,  # TODO Not sure what this option does, but presumably some things can be zipped
@@ -470,3 +478,125 @@ class ImagePlotGenerator(BasicProcessor):
             point_sizes['date'] = 1 / ((date_columns + 1) * date_labels)
 
         return point_sizes
+
+    def create_metadata_files(self, temp_path, output_dir, post_dataset):
+        """
+        Creates a metadata file folder w/ json files for each image.
+
+        JSON format:
+        {
+         "": "1", # Order of images
+        "filename": "B76NjK3p0aD_2.jpg", # filanem
+        "category": "wakeupsheeple", # category if used; for categorical layout
+        "tags": [], # tags if used; for selector
+        "description": "", # displays in the info panel
+        "permalink": "https://www.instagram.com/p/B76NjK3p0aD", # link to original post; TODO: unsure where this is used
+        "year": "2001", # for date layout
+    }
+
+        Columns for PixPlot metadata can be:
+        filename |	the filename of the image
+        category |	a categorical label for the image
+        tags |	a pipe-delimited list of categorical tags for the image
+        description |	a plaintext description of the image's contents
+        permalink |	a link to the image hosted on another domain
+        year |	a year timestamp for the image (should be an integer)
+        label |	a categorical label used for supervised UMAP projection
+        lat |	the latitudinal position of the image
+        lng |	the longitudinal position of the image
+
+        We have a folder with image filenames, a top_downloads csv with filenames and post ids, and a source file with
+        the action information needed. Annoyingly the source file is by far the largest file so we do not want to hold
+        it in memory. Instead we will loop through it and build the metadata file as we go.
+
+        """
+        # Get image data
+        if not os.path.isfile(os.path.join(temp_path, '.metadata.json')):
+            # No metadata
+            return False
+
+        with open(os.path.join(temp_path, '.metadata.json')) as file:
+            image_data = json.load(file)
+
+        # Images can belong to multiple posts, so we must build this file as we go
+        images = {}
+
+        # Reformat image_data to access by filename and begin metadata
+        post_id_image_dictionary = {}
+        successful_image_count = 0
+        for url, data in image_data.items():
+            # Check if image successfully downloaded for image
+            if data.get('success') and data.get('filename') is not None and data.get('post_ids'):
+                successful_image_count += 1
+                # if no filename, bad metadata; file was not actually downloaded, fixed in 9b603cd1ecdf97fd92c3e1c6200e4b6700dc1e37
+
+                for post_id in data.get('post_ids'):
+                    # Add key to post ID dictionary
+                    if post_id in post_id_image_dictionary.keys():
+                        post_id_image_dictionary[post_id].append(url)
+                    else:
+                        post_id_image_dictionary[post_id] = [url]
+
+                # Add to metadata
+                images[url] = {
+                    '': successful_image_count,
+                    'filename': data.get('filename'),
+                    'permalink': url,
+                    'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(data.get('post_ids'))),
+                    'tags': [],
+                    'number_of_posts': 0,
+                    }
+
+        self.dataset.log(f"Metadata for {successful_image_count} images collected from {len(post_id_image_dictionary)} posts")
+
+        # Loop through source file
+        posts_with_images = 0
+        for post in post_dataset.iterate_items(self):
+            # Check if post contains one of the downloaded images
+            if post['id'] in post_id_image_dictionary.keys():
+                posts_with_images += 1
+                for img_name in post_id_image_dictionary[post['id']]:
+                    image = images[img_name]
+
+                    # Update description
+                    image['number_of_posts'] += 1
+                    image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
+                    # Order of Description elements
+                    ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
+                    for detail in ordered_descriptions:
+                        if post.get(detail):
+                            image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
+                    for key, value in post.items():
+                        if key not in ordered_descriptions:
+                            image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
+
+                    # Add tags or hashtags
+                    if 'tags' in post.keys():
+                        if type(post['tags']) == list:
+                            image['tags'] += post['tags']
+                        else:
+                            image['tags'] += post['tags'].split(',')
+                    elif 'hashtags' in post.keys():
+                        if type(post['hashtags']) == list:
+                            image['tags'] += post['hashtags']
+                        else:
+                            image['tags'] += post['hashtags'].split(',')
+
+                    # Category could perhaps be a user chosen column...
+
+                    # If images repeat this will overwrite prior value
+                    # I really dislike that the download images is not a one to one with posts...
+                    if 'timestamp' in post.keys():
+                        image['year'] = datetime.datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+        self.dataset.log(f"Image metadata added to {posts_with_images} posts")
+
+        # Create metadata files
+        metadata_file_path = output_dir.joinpath('data/metadata/file')
+        if not os.path.isdir(metadata_file_path):
+            os.makedirs(metadata_file_path)
+
+        for image in images.values():
+            with open(os.path.join(metadata_file_path, image['filename'] + '.json'), 'w') as file:
+                json.dump(image, file)
+
+        self.dataset.update_status("Metadata.csv created")
