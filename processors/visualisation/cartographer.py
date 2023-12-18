@@ -73,6 +73,7 @@ class ImagePlotGenerator(BasicProcessor):
         if self.parameters.get("amount", 100) != 0:
             image_filenames = image_filenames[:self.parameters.get("amount", 100)]
         total_image_files = len(image_filenames)
+        self.dataset.log(f"Total image files: {total_image_files}")
 
         # Create the grid map
         self.dataset.update_status("Creating grid map")
@@ -94,9 +95,9 @@ class ImagePlotGenerator(BasicProcessor):
         output_dir.mkdir(exist_ok=True)
 
         # Create the manifest
-        self.dataset.update_status("Creating manifest")
+        self.dataset.update_status("Creating manifests for visualization")
         self.cartograph(output_dir,
-                        staging_area,
+                        [staging_area.joinpath(image) for image in image_filenames],
                         umap_maps,
                         {"grid": grid_map},
                         clusters=None,
@@ -136,12 +137,11 @@ class ImagePlotGenerator(BasicProcessor):
         """
         # Size the grid
         num_of_images = len(list_of_image_filenames)
-        row_len = math.ceil(math.sqrt(num_of_images))
-        column_num = math.floor(math.sqrt(num_of_images))
+        side_length = math.ceil(math.sqrt(num_of_images))
 
         # Calculate the coordinates
-        x_coordinates = [-1 + (i * (2 / row_len)) for i in range(row_len)]
-        y_coordinates = [1 - (i * (2/column_num)) for i in range(column_num)]
+        x_coordinates = [-1 + (i * (2 / side_length)) for i in range(side_length)]
+        y_coordinates = [1 - (i * (2 / side_length)) for i in range(side_length)]
         possible_positions = list(product(x_coordinates, y_coordinates))
 
         # Sort grid (i.e., start from top left (1,-1) to bottom right (-1,1))
@@ -152,7 +152,7 @@ class ImagePlotGenerator(BasicProcessor):
         return dict(zip(list_of_image_filenames, possible_positions))
 
     @staticmethod
-    def cartograph(output_dir, images_path, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
+    def cartograph(output_dir, images_paths, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
                    cell_height=64, thumbnail_size=128, metadata=False):
         """
         Turn image data into a PixPlot-compatible data manifest
@@ -172,7 +172,7 @@ class ImagePlotGenerator(BasicProcessor):
         datasets given an arbitrary plotting outcome.
 
         :param Path output_dir:  Where to create the relevant files.
-        :param Path images_path:  A path to a folder containing images.
+        :param list[Path] images_paths:  A path to a folder containing images.
         :param list umap:  UMAP positions, each one a dictionary with the keys
         `n_neighbors`, `min_dist`, `positions` and `positions_jittered`.
         :param dict position_maps:  A dictionary, each key being a map name (e.g.
@@ -195,12 +195,11 @@ class ImagePlotGenerator(BasicProcessor):
         # find eligible image files
         images = []
         sizes = {}
-        for image in images_path.glob("*.*"):
+        for image in images_paths:
             if image.suffix.lower() not in (".jpeg", ".jpg", ".png"):
                 continue
 
             images.append(image)
-
         # pseudo-random ID for plot, used to tie things together
         plot_id = str(uuid.uuid4())
 
