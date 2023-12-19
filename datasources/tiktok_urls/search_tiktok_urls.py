@@ -143,6 +143,8 @@ class TikTokScraper:
     last_time_proxy_available = None
     no_available_proxy_timeout = 600
 
+    VIDEO_NOT_FOUND = "oh no, sire, no video was found"
+
     def __init__(self, processor, config):
         """
         :param Processor processor:  The processor using this function and needing updates
@@ -371,9 +373,15 @@ class TikTokScraper:
                     continue
 
                 for video in self.reformat_metadata(metadata):
+                    if video == self.VIDEO_NOT_FOUND:
+                        failed += 1
+                        self.processor.dataset.log(f"Video for {url} not found, may have been removed, skipping")
+                        continue
+
                     if not video.get("stats") or video.get("createTime") == "0":
                         # sometimes there are empty videos? which seems to
                         # indicate a login wall
+
                         self.processor.dataset.log(
                             f"Empty metadata returned for video {url} ({video['id']}), skipping. This likely means that the post requires logging in to view.")
                         continue
@@ -405,7 +413,15 @@ class TikTokScraper:
         """
         # may need some extra parsing to find the item data...
         if "__DEFAULT_SCOPE__" in metadata and "webapp.video-detail" in metadata["__DEFAULT_SCOPE__"]:
-            video = metadata["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"]["itemStruct"]
+            try:
+                video = metadata["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"]["itemStruct"]
+            except KeyError as e:
+                if "statusCode" in metadata["__DEFAULT_SCOPE__"]["webapp.video-detail"]:
+                    yield self.VIDEO_NOT_FOUND
+                    return
+                else:
+                    raise e.__class__ from e
+
             metadata = {"ItemModule": {
                 video["id"]: video
             }}
