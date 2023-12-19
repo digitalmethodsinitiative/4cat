@@ -339,6 +339,10 @@ class TikTokScraper:
                 sigil = soup.select_one("script#SIGI_STATE")
 
                 if not sigil:
+                    # alternatively, the JSON is here
+                    sigil = soup.select_one("script#__UNIVERSAL_DATA_FOR_REHYDRATION__")
+
+                if not sigil:
                     if url not in retries or retries[url] < 3:
                         if url not in retries:
                             retries[url] = 0
@@ -399,6 +403,13 @@ class TikTokScraper:
         :param dict metadata: Metadata extracted from the TikTok video page
         :return:  Yields one dictionary per video
         """
+        # may need some extra parsing to find the item data...
+        if "__DEFAULT_SCOPE__" in metadata and "webapp.video-detail" in metadata["__DEFAULT_SCOPE__"]:
+            video = metadata["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"]["itemStruct"]
+            metadata = {"ItemModule": {
+                video["id"]: video
+            }}
+
         if "ItemModule" in metadata:
             for video_id, item in metadata["ItemModule"].items():
                 if "CommentItem" in metadata:
