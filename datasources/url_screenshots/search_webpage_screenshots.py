@@ -90,9 +90,9 @@ class ScreenshotWithSelenium(SeleniumSearch):
         if config.get('selenium.firefox_extensions', user=user) and config.get('selenium.firefox_extensions', user=user).get('i_dont_care_about_cookies', {}).get('path'):
             options["ignore-cookies"] = {
                "type": UserInput.OPTION_TOGGLE,
-               "help": "Attempt to ignore cookie walls",
+               "help": "Attempt to accept cookies",
                "default": False,
-               "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically.'
+               "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically via https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies.'
             }
 
         return options
@@ -120,8 +120,12 @@ class ScreenshotWithSelenium(SeleniumSearch):
 
         # Enable Firefox extension: i don't care about cookies
         if ignore_cookies:
-            self.enable_firefox_extension(self.config.get('selenium.firefox_extensions').get('i_dont_care_about_cookies', {}).get('path'))
-            self.dataset.update_status("Enabled Firefox extension: i don't care about cookies")
+            try:
+                self.enable_firefox_extension(self.config.get('selenium.firefox_extensions').get('i_dont_care_about_cookies', {}).get('path'))
+                self.dataset.update_status("Enabled Firefox extension: i don't care about cookies")
+            except FileNotFoundError:
+                self.dataset.update_status(
+                    "Firefox \"i dont care about cookies\" extension not found; continuing without.")
 
         screenshots = 0
         done = 0

@@ -112,9 +112,9 @@ class ScreenshotURLs(BasicProcessor):
         if config.get('selenium.firefox_extensions', user=user) and config.get('selenium.firefox_extensions', user=user).get('i_dont_care_about_cookies', {}).get('path'):
             options['ignore-cookies'] = {
                 "type": UserInput.OPTION_TOGGLE,
-                "help": "Attempt to ignore cookie requests",
+                "help": "Attempt to accept cookies",
                 "default": False,
-                "tooltip": "If enabled, a firefox extension [i don't care about cookies](https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies/) will be used"
+                "tooltip": "If enabled, a firefox extension will attempt to \"agree\" to any cookie walls automatically via https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies."
             }
 
         return options
@@ -183,7 +183,7 @@ class ScreenshotURLs(BasicProcessor):
         self.dataset.log('Staging directory location: %s' % results_path)
 
         # Start Selenium
-        ignore_cookies = False  # self.parameters.get("ignore-cookies")
+        ignore_cookies = self.parameters.get("ignore-cookies")
         capture = self.parameters.get("capture")
         resolution = self.parameters.get("resolution", "1024x786")
         pause = self.parameters.get("pause-time")
@@ -197,9 +197,12 @@ class ScreenshotURLs(BasicProcessor):
         try:
             webdriver.start_selenium()
             if ignore_cookies:
-                webdriver.enable_firefox_extension(
+                try:
+                    webdriver.enable_firefox_extension(
                     self.config.get('selenium.firefox_extensions').get('i_dont_care_about_cookies', {}).get('path'))
-                self.dataset.update_status("Enabled Firefox extension: i don't care about cookies")
+                    self.dataset.update_status("Enabled Firefox extension: i don't care about cookies")
+                except FileNotFoundError:
+                    self.dataset.update_status("Firefox \"i dont care about cookies\" extension not found; continuing without.")
         except ProcessorException as e:
             self.dataset.log("Error starting Selenium: %s" % str(e))
             self.dataset.update_status("Error starting Selenium; contact admin.", is_final=True)

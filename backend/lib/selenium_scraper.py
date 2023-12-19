@@ -366,7 +366,12 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             raise Exception('Cannot add firefox extension to non firefox browser!')
         if self.driver is None:
             raise Exception('Must start firefox before installing extension!')
-        self.driver.install_addon(os.path.abspath(path_to_extension), temporary=temporary)
+        try:
+            addon_id = self.driver.install_addon(os.path.abspath(path_to_extension), temporary=temporary)
+            self.selenium_log.info(f"Installed Firefox extension: {addon_id}")
+        except FileNotFoundError:
+            self.selenium_log.error(f"Firefox \"i dont care about cookies\" extension not found at {path_to_extension}")
+            raise FileNotFoundError(f"Firefox \"i dont care about cookies\" extension not found at {path_to_extension}")
 
     def save_screenshot(self, path, wait=2, width=None, height=None, viewport_only=False):
         # Save current screen size
