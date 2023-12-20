@@ -120,17 +120,17 @@ class SearchCustom(BasicProcessor):
 
                     # pseudonymise or anonymise as needed
                     filtering = self.parameters.get("pseudonymise")
-                    if filtering:
-                        for field, value in item.items():
-                            if field is None:
-                                raise ValueError("Field is None") # This would normally be caught when writerow is called
-                            if field.startswith("author"):
-                                if filtering == "anonymise":
-                                    item[field] = "REDACTED"
-                                elif filtering == "pseudonymise":
-                                    item[field] = hash_cache.update_cache(value)
-
                     try:
+                        if filtering:
+                            for field, value in item.items():
+                                if field is None:
+                                    raise ValueError("Field is None") # This would normally be caught when writerow is called
+                                if field.startswith("author"):
+                                    if filtering == "anonymise":
+                                        item[field] = "REDACTED"
+                                    elif filtering == "pseudonymise":
+                                        item[field] = hash_cache.update_cache(value)
+
                         writer.writerow(item)
                     except ValueError as e:
                         self.dataset.log(f"Error ({e}) writing item {i}: {item}")
