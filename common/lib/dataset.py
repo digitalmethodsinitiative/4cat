@@ -149,9 +149,8 @@ class DataSet(FourcatModule):
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
-		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
-							   key=lambda dataset: dataset.is_finished(), reverse=True)
+		# TODO: replace self.children w/ self.get_children() everywhere?
+		self.children = self.get_children()
 
 		self.refresh_owners()
 
@@ -1243,7 +1242,24 @@ class DataSet(FourcatModule):
 		self.genealogy = genealogy
 		return self.genealogy
 
-	def get_all_children(self, recursive=True):
+	def get_children(self, instantiate_datasets=True):
+		"""
+		Get children of this dataset
+
+		:param bool instantiate_datasets:  Instantiate DataSet objects for each child else return (key, type) tuples
+		:return list:  List of child datasets
+		"""
+		if instantiate_datasets:
+			analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC",
+										(self.key,))
+			return sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
+							  key=lambda dataset: dataset.is_finished(), reverse=True)
+		else:
+			# Only (key, type) tuples
+			return self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
+
+
+	def get_all_children(self, recursive=True, instantiate_datasets=True):
 		"""
 		Get all children of this dataset
 
@@ -1253,11 +1269,18 @@ class DataSet(FourcatModule):
 
 		:return list:  List of DataSets
 		"""
-		children = [DataSet(data=record, db=self.db) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		children = self.get_children(instantiate_datasets=instantiate_datasets)
 		results = children.copy()
 		if recursive:
-			for child in children:
-				results += child.get_all_children(recursive)
+			if instantiate_datasets:
+				for child in children:
+					results += child.get_all_children(recursive)
+			else:
+				while children:
+					child = children.pop(0)
+					new_kids = self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (child['key'],))
+					children += new_kids
+					results += new_kids
 
 		return results
 
