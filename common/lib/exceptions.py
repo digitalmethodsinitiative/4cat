@@ -59,6 +59,11 @@ class DataSetNotFoundException(DataSetException):
 	"""
 	pass
 
+class CsvDialectException(FourcatException):
+	"""
+	Raised when there is a problem with the configuration settings.
+	"""
+	pass
 
 class JobClaimedException(QueueException):
 	"""

@@ -15,7 +15,7 @@ from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException, \
-    QueryNeedsExplicitConfirmationException
+    QueryNeedsExplicitConfirmationException, CsvDialectException
 from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
 
 
@@ -78,78 +78,99 @@ class SearchCustom(BasicProcessor):
         # guess and set the properties as defined in import_formats.py
         infile = temp_file.open("r", encoding=encoding)
         sample = infile.read(1024 * 1024)
-        dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
-        for prop in tool_format.get("csv_dialect", {}):
-            setattr(dialect, prop, tool_format["csv_dialect"][prop])
+        possible_dialects = [csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))]
+        if tool_format.get("csv_dialect", {}):
+            # Known dialects are defined in import_formats.py
+            dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+            for prop in tool_format.get("csv_dialect", {}):
+                setattr(dialect, prop, tool_format["csv_dialect"][prop])
+            possible_dialects.append(dialect)
 
-        # With validated csvs, save as is but make sure the raw file is sorted
-        infile.seek(0)
-        reader = csv.DictReader(infile, dialect=dialect)
+        while possible_dialects:
+            # With validated csvs, save as is but make sure the raw file is sorted
+            infile.seek(0)
+            dialect = possible_dialects.pop() # Use the last dialect first
+            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect)}")
+            reader = csv.DictReader(infile, dialect=dialect)
 
-        if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
-                set(tool_format["columns"]) != set(tool_format["columns"]):
-            raise QueryParametersException("Not all columns are present")
+            if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
+                    set(tool_format["columns"]) != set(tool_format["columns"]):
+                raise QueryParametersException("Not all columns are present")
 
-        # hasher for pseudonymisation
-        salt = secrets.token_bytes(16)
-        hasher = hashlib.blake2b(digest_size=24, salt=salt)
-        hash_cache = HashCache(hasher)
+            # hasher for pseudonymisation
+            salt = secrets.token_bytes(16)
+            hasher = hashlib.blake2b(digest_size=24, salt=salt)
+            hash_cache = HashCache(hasher)
 
-        # write the resulting dataset
-        writer = None
-        done = 0
-        skipped = 0
-        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-            # mapper is defined in import_formats
-            try:
-                for item in tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters):
-                    if isinstance(item, import_formats.InvalidImportedItem):
-                        # if the mapper returns this class, the item is not written
-                        skipped += 1
-                        if hasattr(item, "reason"):
-                            self.dataset.log(f"Skipping item ({item.reason})")
-                        continue
+            # write the resulting dataset
+            writer = None
+            done = 0
+            skipped = 0
+            with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+                # mapper is defined in import_formats
+                try:
+                    for i, item in enumerate(tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters)):
+                        if isinstance(item, import_formats.InvalidImportedItem):
+                            # if the mapper returns this class, the item is not written
+                            skipped += 1
+                            if hasattr(item, "reason"):
+                                self.dataset.log(f"Skipping item ({item.reason})")
+                            continue
 
-                    if not writer:
-                        writer = csv.DictWriter(output_csv, fieldnames=list(item.keys()))
-                        writer.writeheader()
+                        if not writer:
+                            writer = csv.DictWriter(output_csv, fieldnames=list(item.keys()))
+                            writer.writeheader()
 
-                    if self.parameters.get("strip_html") and "body" in item:
-                        item["body"] = strip_tags(item["body"])
+                        if self.parameters.get("strip_html") and "body" in item:
+                            item["body"] = strip_tags(item["body"])
 
-                    # pseudonymise or anonymise as needed
-                    filtering = self.parameters.get("pseudonymise")
-                    if filtering:
-                        for field, value in item.items():
-                            if field.startswith("author"):
-                                if filtering == "anonymise":
-                                    item[field] = "REDACTED"
-                                elif filtering == "pseudonymise":
-                                    item[field] = hash_cache.update_cache(value)
+                        # pseudonymise or anonymise as needed
+                        filtering = self.parameters.get("pseudonymise")
+                        try:
+                            if filtering:
+                                for field, value in item.items():
+                                    if field is None:
+                                        raise CsvDialectException("Field is None") # This would normally be caught when writerow is called
+                                    if field.startswith("author"):
+                                        if filtering == "anonymise":
+                                            item[field] = "REDACTED"
+                                        elif filtering == "pseudonymise":
+                                            item[field] = hash_cache.update_cache(value)
 
-                    try:
-                        writer.writerow(item)
-                    except ValueError as e:
-                        return self.dataset.finish_with_error("Could not parse CSV file. Have you selected the correct "
-                                                              "format?")
+                            writer.writerow(item)
+                        except ValueError as e:
+                            if not possible_dialects:
+                                self.dataset.log(f"Error ({e}) writing item {i}: {item}")
+                                return self.dataset.finish_with_error("Could not parse CSV file. Have you selected the correct "
+                                                                      "format or edited the CSV after exporting? Try importing "
+                                                                      "as custom format.")
+                            else:
+                                raise CsvDialectException(f"Error ({e}) writing item {i}: {item}")
 
-                    done += 1
+                        done += 1
 
-            except import_formats.InvalidCustomFormat as e:
-                self.log.warning(f"Unable to import improperly formatted file for {tool_format['name']}. See dataset "
-                                 "log for details.")
-                infile.close()
-                temp_file.unlink()
-                return self.dataset.finish_with_error(str(e))
+                except import_formats.InvalidCustomFormat as e:
+                    self.log.warning(f"Unable to import improperly formatted file for {tool_format['name']}. See dataset "
+                                     "log for details.")
+                    infile.close()
+                    temp_file.unlink()
+                    return self.dataset.finish_with_error(str(e))
 
-            except UnicodeDecodeError as e:
-                infile.close()
-                temp_file.unlink()
-                return self.dataset.finish_with_error("The uploaded file is not encoded with the UTF-8 character set. "
-                                                      "Make sure the file is encoded properly and try again.")
+                except UnicodeDecodeError as e:
+                    infile.close()
+                    temp_file.unlink()
+                    return self.dataset.finish_with_error("The uploaded file is not encoded with the UTF-8 character set. "
+                                                          "Make sure the file is encoded properly and try again.")
 
-        # done!
-        infile.close()
+                except CsvDialectException as e:
+                    self.dataset.log(f"Error with CSV dialect: {vars(dialect)}")
+                    continue
+
+            # done!
+            infile.close()
+            # We successfully read the CSV, no need to try other dialects
+            break
+
         if skipped:
             self.dataset.update_status(
                 "CSV file imported, but %i items were skipped because their date could not be parsed." % skipped,
