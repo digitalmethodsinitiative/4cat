@@ -84,6 +84,7 @@ class SearchCustom(BasicProcessor):
 
         # With validated csvs, save as is but make sure the raw file is sorted
         infile.seek(0)
+        self.dataset.log(f"Importing CSV file with dialect: {vars(dialect)}")
         reader = csv.DictReader(infile, dialect=dialect)
 
         if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
@@ -102,7 +103,7 @@ class SearchCustom(BasicProcessor):
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
             # mapper is defined in import_formats
             try:
-                for item in tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters):
+                for i, item in enumerate(tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters)):
                     if isinstance(item, import_formats.InvalidImportedItem):
                         # if the mapper returns this class, the item is not written
                         skipped += 1
@@ -121,6 +122,8 @@ class SearchCustom(BasicProcessor):
                     filtering = self.parameters.get("pseudonymise")
                     if filtering:
                         for field, value in item.items():
+                            if field is None:
+                                raise ValueError("Field is None") # This would normally be caught when writerow is called
                             if field.startswith("author"):
                                 if filtering == "anonymise":
                                     item[field] = "REDACTED"
@@ -130,8 +133,10 @@ class SearchCustom(BasicProcessor):
                     try:
                         writer.writerow(item)
                     except ValueError as e:
+                        self.dataset.log(f"Error ({e}) writing item {i}: {item}")
                         return self.dataset.finish_with_error("Could not parse CSV file. Have you selected the correct "
-                                                              "format?")
+                                                              "format or edited the CSV after exporting? Try importing "
+                                                              "as custom format.")
 
                     done += 1
 
