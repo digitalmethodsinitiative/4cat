@@ -1615,6 +1615,18 @@ class DataSet(FourcatModule):
 			else:
 				# No other log available
 				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
+	@staticmethod
+	def get_dataset_by_key(key, db=None):
+		"""
+		Get dataset by key
+
+		:param str key:  Dataset key
+		:return DataSet:  Dataset
+		"""
+		if db is None:
+			config.with_db()
+			db = config.db
+		return DataSet(key=key, db=db)
 
 	def __getattr__(self, attr):
 		"""
