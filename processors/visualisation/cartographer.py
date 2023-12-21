@@ -2,7 +2,6 @@ import datetime
 import json
 import math
 import os
-import shutil
 import uuid
 
 from PIL import Image, UnidentifiedImageError
@@ -16,7 +15,8 @@ __credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
-from common.lib.helpers import get_html_redirect_page, get_software_commit
+from common.lib.dataset import DataSet
+from common.lib.helpers import get_html_redirect_page
 from common.lib.user_input import UserInput
 
 
@@ -54,6 +54,21 @@ class ImagePlotGenerator(BasicProcessor):
                 "tooltip": "Increasing this can easily lead to very long-running processors."
             },
         }
+
+        # TODO: enable this when we have a way to map images to plots
+        # if parent_dataset and parent_dataset.is_dataset():
+        #     # Get potential mapping datasets
+        #     mapping_datasets = ImagePlotGenerator.get_mapping_datasets(parent_dataset)
+        #     if mapping_datasets:
+        #         mapping_datasets = [DataSet.get_dataset_by_key(key=dataset['key']) for dataset in mapping_datasets]
+        #         options["mapping_dataset"] = {
+        #             "type": UserInput.OPTION_CHOICE,
+        #             "help": "Map images to existing plot",
+        #             "options": {dataset.key: dataset.get_label() for dataset in mapping_datasets}, # TODO these labels suck... user defined field for coordinate-map dataset option?
+        #             "default": mapping_datasets.pop().key,
+        #             "tooltip": "Map images to an existing plot (e.g., from a network). This will override the default map."
+        #         }
+
         return options
 
     def process(self):
@@ -599,3 +614,13 @@ class ImagePlotGenerator(BasicProcessor):
                 json.dump(image, file)
 
         self.dataset.update_status("Metadata.csv created")
+
+    @staticmethod
+    def get_mapping_datasets(parent_dataset):
+        """
+        The cartographer can collect mappings from other datasets from the same datasource top level dataset.
+
+        :param DataSet parent_dataset: The parent dataset of the current dataset
+        """
+        top_dataset = parent_dataset.top_parent()
+        return [dataset for dataset in top_dataset.get_all_children(instantiate_datasets=False) if dataset.get('type') == "coordinate-map"]
