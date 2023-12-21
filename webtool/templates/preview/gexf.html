@@ -11,10 +11,13 @@
     <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/solid.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/brands.css") }}" rel="stylesheet">
+	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.6.3.min.js')}}"></script>
     <script type="module" src="{{ url_for("static", filename="js/sigma_network.js") }}"></script>
 </head>
 <body>
 <!-- Control panel -->
+<label for="dataset_key"></label><input value="{{ dataset.key }}" type="text" hidden="hidden" id="dataset_key" />
+
 <div id='control-panel'>
 
     <div id="network-name-box" class="control-panel-notice">
@@ -42,6 +45,7 @@
                    class="button-byline">Reference</a>
             </div>
             <!-- Other network settings -->
+            <!-- <button id="getPositionsButton">Export Coordinates</button> -->
             <div class="graph-manipulation-subbox layout-parameters" data-layout="fa2">
                 <p><label for="gravity">Gravity: </label>
                     <input class="parameter-input" id="gravity" name="gravity" type="number" min="1" value="1">

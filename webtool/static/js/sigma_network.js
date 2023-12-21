@@ -11,6 +11,22 @@ const gradient = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((fractio
     return 'rgb(' + hsv2rgb(...base).map(v => parseInt(v)).join(', ') + ')';
 });
 
+/**
+ * Get absolute API URL to call
+ *
+ * Determines proper URL to call
+ *
+ * @param endpoint Relative URL to call (/api/endpoint)
+ * @returns  Absolute URL
+ */
+function getRelativeURL(endpoint) {
+    let root = $("body").attr("data-url-root");
+    if (!root) {
+        root = '/';
+    }
+    return root + endpoint;
+}
+
 const sigma_graph = {
     // store the graph here
     graph: null,
@@ -246,6 +262,10 @@ const sigma_graph = {
 
 
         sigma_graph.update_visual_settings();
+
+        // Button to get node positions
+        let button = document.getElementById('getPositionsButton');
+        button.addEventListener('click', sigma_graph.get_node_positions);
     },
 
     /**
@@ -513,8 +533,49 @@ const sigma_graph = {
                 hierarchyAttributes: ['degree', 'community']
             });
         }
+    },
+    /**
+     * Get current node positions.
+     *
+     */
+    get_node_positions: function(event) {
+        let positions = {};
+        sigma_graph.graph.nodes().forEach((node) => {
+            let attributes = sigma_graph.graph.getNodeAttributes(node);
+            positions[node] = {x: attributes.x, y: attributes.y};
+        });
+        // got anything good?
+        console.log(positions);
+
+        // Create a dataset with the positions
+        // Dale doing dark magiks
+        // extrapolating from fourcat.js
+        event.preventDefault();
+        $.ajax(getRelativeURL('api/queue-processor/'), {
+            method: 'POST',
+            data: {key: document.getElementById('dataset_key').value, processor: 'coordinate-map', coordinates: JSON.stringify(positions)}, // what's this? need a key and processor plus these positions (somehow...)
+            // TODO: pop up or something would be good
+            // TODO: dataset results page ought to update/refresh
+            success: function (response) {
+                console.log('yay!');
+                if (response.hasOwnProperty("messages") && response.messages.length > 0) {
+                        console.log(response.messages.join("\n\n"));
+                    }
+            },
+            error: function (response) {
+                console.log('boo! :(');
+                try {
+                        response = JSON.parse(response.responseText);
+                        console.log('The analysis could not be queued: ' + response["error"], 'Warning');
+                    } catch (Exception) {
+                        console.log('The analysis could not be queued: ' + response.responseText, 'Warning');
+                    }
+            }
+        });
     }
 }
+
+
 
 // run it....
 if (document.readyState !== 'loading') {
