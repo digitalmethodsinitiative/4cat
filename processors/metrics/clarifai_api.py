@@ -46,7 +46,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader")
+        return module.type.startswith("image-downloader") or module.type == "video-frames"
 
     options = {
         "amount": {
@@ -132,7 +132,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     send_batch = True
 
                 if image:
-                    if image.name.startswith("."):
+                    if image.name.startswith(".") or image.suffix in (".json", ".log"):
                         # .metadata.json
                         continue
 
