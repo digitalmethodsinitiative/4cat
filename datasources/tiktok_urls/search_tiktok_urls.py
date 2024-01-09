@@ -125,7 +125,7 @@ class SearchTikTokByID(Search):
 
 
 class TikTokScraper:
-    proxy_map = {}
+    proxy_map = None
     proxy_sleep = 1
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -149,6 +149,7 @@ class TikTokScraper:
         """
         :param Processor processor:  The processor using this function and needing updates
         """
+        self.proxy_map = {}
         self.processor = processor
 
     def update_proxies(self):

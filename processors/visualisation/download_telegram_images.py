@@ -227,7 +227,7 @@ class TelegramImageDownloader(BasicProcessor):
         """
         row = {
             "number_of_posts_with_image": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
+            "post_ids": ", ".join(map(str, data.get("post_ids", []))),
             "filename": filename,
             "download_successful": data.get('success', "")
         }
