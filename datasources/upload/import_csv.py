@@ -130,7 +130,8 @@ class SearchCustom(BasicProcessor):
                             if filtering:
                                 for field, value in item.items():
                                     if field is None:
-                                        raise CsvDialectException("Field is None") # This would normally be caught when writerow is called
+                                        # This would normally be caught when writerow is called
+                                        raise CsvDialectException("Field is None")
                                     if field.startswith("author"):
                                         if filtering == "anonymise":
                                             item[field] = "REDACTED"
@@ -173,7 +174,7 @@ class SearchCustom(BasicProcessor):
 
         if skipped:
             self.dataset.update_status(
-                "CSV file imported, but %i items were skipped because their date could not be parsed." % skipped,
+                f"CSV file imported, but {skipped:,} items were skipped because their date could not be parsed.",
                 is_final=True)
 
         temp_file.unlink()
@@ -205,29 +206,46 @@ class SearchCustom(BasicProcessor):
             raise QueryParametersException("No file was offered for upload.")
 
         if query.get("format") not in import_formats.tools:
-            raise QueryParametersException("Cannot import CSV from tool %s" % str(query.get("format")))
+            raise QueryParametersException(f"Cannot import CSV from tool {query.get('format')}")
 
+        # content_length seems unreliable, so figure out the length by reading
+        # the file...
+        upload_size = 0
+        while True:
+            bit = file.read(1024)
+            if len(bit) == 0:
+                break
+            upload_size += len(bit)
+
+        file.seek(0)
         encoding = sniff_encoding(file)
         tool_format = import_formats.tools.get(query.get("format"))
 
         try:
+            # try reading the file as csv here
+            # never read more than 128 kB (to keep it quick)
+            sample_size = min(upload_size, 128 * 1024)  # 128 kB is sent from the frontend at most
             wrapped_file = io.TextIOWrapper(file, encoding=encoding)
-            sample = wrapped_file.read(1024 * 1024)
-            wrapped_file.seek(0)
+            sample = wrapped_file.read(sample_size)
+
             if not csv.Sniffer().has_header(sample) and not query.get("frontend-confirm"):
+                # this may be intended, or the check may be bad, so allow user to continue
                 raise QueryNeedsExplicitConfirmationException(
                     "The uploaded file does not seem to have a header row. Continue anyway?")
-            dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
 
-            # override the guesses for specific formats if defiend so in
+            wrapped_file.seek(0)
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+
+            # override the guesses for specific formats if defined so in
             # import_formats.py
             for prop in tool_format.get("csv_dialect", {}):
                 setattr(dialect, prop, tool_format["csv_dialect"][prop])
-        except UnicodeDecodeError:
+
+        except UnicodeDecodeError as e:
             raise QueryParametersException("The uploaded file does not seem to be a CSV file encoded with UTF-8. "
                                            "Save the file in the proper format and try again.")
         except csv.Error:
-            raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
+            raise QueryParametersException("Uploaded file is not a well-formed, UTF 8-encoded CSV or TAB file.")
 
         # With validated csvs, save as is but make sure the raw file is sorted
         reader = csv.DictReader(wrapped_file, dialect=dialect)
@@ -237,7 +255,7 @@ class SearchCustom(BasicProcessor):
         try:
             fields = reader.fieldnames
         except UnicodeDecodeError:
-            raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
+            raise QueryParametersException("The uploaded file is not a well-formed, UTF 8-encoded CSV or TAB file.")
 
         incomplete_mapping = list(tool_format["columns"])
         for field in tool_format["columns"]:
