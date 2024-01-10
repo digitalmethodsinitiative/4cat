@@ -141,6 +141,10 @@ class TopicModelWordExtractor(BasicProcessor):
                     raise ProcessorInterruptedException("Interrupted while writing results file")
 
                 # Grab metadata related to post
+                if post.get('id') not in token_metadata:
+                    # post has no tokens...
+                    continue
+
                 token_data = token_metadata[str(post.get('id'))]
                 model_data = model_metadata[token_data.get('filename')]
                 interval = token_data['interval']
