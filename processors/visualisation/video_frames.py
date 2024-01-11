@@ -89,7 +89,7 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
-		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
