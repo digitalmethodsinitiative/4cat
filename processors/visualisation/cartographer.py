@@ -1,23 +1,28 @@
 import datetime
+import operator
 import json
 import math
 import os
 import uuid
+import zipfile
+from dateutil.parser import parse as parse_date
 
+import numpy as np
+
+from collections import defaultdict
 from PIL import Image, UnidentifiedImageError
 from pathlib import Path
 from itertools import product
 
 from backend.lib.processor import BasicProcessor
+from common.lib.dataset import DataSet
+from common.lib.helpers import get_html_redirect_page
+from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
-
-from common.lib.dataset import DataSet
-from common.lib.helpers import get_html_redirect_page
-from common.lib.user_input import UserInput
 
 
 class ImagePlotGenerator(BasicProcessor):
@@ -32,6 +37,8 @@ class ImagePlotGenerator(BasicProcessor):
     title = "Create Image visualisation"  # title displayed in UI
     description = "Create an explorable map of images using different algorithms to identify similarities."
     extension = "html"  # extension of result file, used internally and in UI
+
+    image_dates = None
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
@@ -51,11 +58,26 @@ class ImagePlotGenerator(BasicProcessor):
                 "help": "No. of images",
                 "coerce_type": int,
                 "default": 1000,
-                "tooltip": "Increasing this can easily lead to very long-running processors."
+                "tooltip": "0 will use all images."
             },
         }
 
-        # TODO: enable this when we have a way to map images to plots
+        # TODO: enable when I figure out the stupid point sizes UGH
+        # # If we have a parent dataset and this dataset has metadata, we can use the metadata to create a category layout
+        # if parent_dataset and ImagePlotGenerator.check_for_metadata(parent_dataset.get_results_path()):
+        #     parent_columns = parent_dataset.top_parent().get_columns()
+        #     if parent_columns:
+        #         parent_columns = {c: c for c in sorted(parent_columns)}
+        #         parent_columns["None"] = "None"
+        #         options["category"] = {
+        #             "type": UserInput.OPTION_CHOICE,
+        #             "help": "Category column",
+        #             "tooltip": "Only one category per image. If left blank, no category layout will be created.",
+        #             "options": parent_columns,
+        #             "default": "None",
+        #     }
+
+        # TODO: enable this when we have a way to map images to network plots
         # if parent_dataset and parent_dataset.is_dataset():
         #     # Get potential mapping datasets
         #     mapping_datasets = ImagePlotGenerator.get_mapping_datasets(parent_dataset)
@@ -71,16 +93,31 @@ class ImagePlotGenerator(BasicProcessor):
 
         return options
 
+    @staticmethod
+    def check_for_metadata(path):
+        """
+        Check if metadata exists for the images in the dataset
+        """
+        if path.exists() and path.is_file() and path.suffix == ".zip":
+            with zipfile.ZipFile(path, "r") as archive_file:
+                archive_contents = sorted(archive_file.namelist())
+                return True if ".metadata.json" in archive_contents else False
+        else:
+            return False
+
+
     def process(self):
         if self.source_dataset.num_rows == 0:
             self.dataset.finish_with_error("No images available to render to visualization.")
             return
-
+        self.dataset.log(self.parameters)
         # Unpack the images into a staging area
         self.dataset.update_status("Unzipping images")
         staging_area = self.unpack_archive_contents(self.source_file)
 
-        create_metadata = True if ".metadata.json" in os.listdir(staging_area) else False
+        create_metadata = ImagePlotGenerator.check_for_metadata(self.source_file)
+        # TODO: images can only have one category, but images can belong to multiple posts!
+        category = None if self.parameters.get("category", None) == "None" else self.parameters.get("category", None)
 
         # Collect filenames (skip .json metadata files)
         image_filenames = [filename for filename in os.listdir(staging_area) if
@@ -89,6 +126,22 @@ class ImagePlotGenerator(BasicProcessor):
             image_filenames = image_filenames[:self.parameters.get("amount", 100)]
         total_image_files = len(image_filenames)
         self.dataset.log(f"Total image files: {total_image_files}")
+
+        # Results folder
+        output_dir = self.dataset.get_results_folder_path()
+        output_dir.mkdir(exist_ok=True)
+
+        # Create metadata files
+        category_layout = None
+        if create_metadata:
+            self.dataset.update_status("Creating metadata files")
+            categories = self.create_metadata_files(staging_area, output_dir, self.dataset.top_parent(), category=category)
+
+            if categories:
+                # Create category layout
+                categories = [categories.get(filename) for filename in image_filenames]
+                self.dataset.update_status(f"Creating categorical layout (num categories: {len(set(categories))}; num images: {len(categories)})")
+                category_layout = self.get_categorical_layout(list(set(categories)), categories)
 
         # Create the grid map
         self.dataset.update_status("Creating grid map")
@@ -105,28 +158,26 @@ class ImagePlotGenerator(BasicProcessor):
                     "positions_jittered": grid_map,
                     }]
 
-        # Results folder
-        output_dir = self.dataset.get_results_folder_path()
-        output_dir.mkdir(exist_ok=True)
+        mappings = {"grid": grid_map}
+        labels = {}
+        if create_metadata and category_layout:
+            mappings["categorical"] = dict(zip(image_filenames, category_layout.get("layout")))
+            labels["categorical"] = category_layout.get("labels")
 
         # Create the manifest
         self.dataset.update_status("Creating manifests for visualization")
         self.cartograph(output_dir,
                         [staging_area.joinpath(image) for image in image_filenames],
                         umap_maps,
-                        {"grid": grid_map},
+                        mappings,
                         clusters=None,
                         root='',
                         atlas_resolution=2048 * 2,
                         cell_height=64 * 2, # min of 64 seems blurry to me
                         thumbnail_size=128, # TODO: changing from 128 breaks the plot; figure out WHY
                         metadata=create_metadata,
+                        labels=labels,
                         )
-
-        # Create metadata files
-        if create_metadata:
-            self.dataset.update_status("Creating metadata files")
-            self.create_metadata_files(staging_area, output_dir, self.dataset.top_parent())
 
         # Results HTML file redirects to output_dir/index.html
         plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get(
@@ -166,9 +217,8 @@ class ImagePlotGenerator(BasicProcessor):
         # Combine with filenames
         return dict(zip(list_of_image_filenames, possible_positions))
 
-    @staticmethod
-    def cartograph(output_dir, images_paths, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
-                   cell_height=64, thumbnail_size=128, metadata=False):
+    def cartograph(self, output_dir, images_paths, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
+                   cell_height=64, thumbnail_size=128, metadata=False, labels=None):
         """
         Turn image data into a PixPlot-compatible data manifest
 
@@ -341,9 +391,22 @@ class ImagePlotGenerator(BasicProcessor):
             # Prepare for next image by increasing the atlas_x by width of the cell
             atlas_x = math.ceil(atlas_x + cell_width)
 
-        # Update the manifest point sizes
-        # TODO: date info to be added to point sizes
-        manifest["point_sizes"] = ImagePlotGenerator.specify_point_sizes(len(image_indexes))
+        # Get date layout if possible
+        date_columns = None
+        date_labels = None
+        if metadata and self.image_dates is not None:
+            image_filenames = [image.name for image in images]
+            date_layout = self.get_date_layout(image_filenames)
+            if date_layout:
+                position_maps["date"] = dict(zip(image_filenames, date_layout.get("layout", {})))
+                labels["date"] = date_layout.get("labels", {})
+
+            date_columns = date_layout.get('labels', {}).get('cols', None)
+            date_labels = len(set(date_layout.get('labels', {}).get("labels", [])))
+
+        # Create point_sizes for starting atlas image size and text size (text come from date layout)
+        # TODO would be nice to have some concept of date_columns for categorical layout in case we somehow don't have a date layout
+        manifest["point_sizes"] = ImagePlotGenerator.specify_point_sizes(len(image_indexes), date_columns=date_columns, date_labels=date_labels, umap=False)
 
         # done with the atlases, save final one too
         if not atlas:
@@ -411,6 +474,17 @@ class ImagePlotGenerator(BasicProcessor):
             manifest["layouts"][layout] = {
                 "layout": f"{root}/data/layouts/{layout}-{plot_id}.json"
             }
+
+        if labels:
+            for layout, layout_labels in labels.items():
+                if layout not in manifest["layouts"]:
+                    raise ValueError(f"Labels for layout {layout} given, but layout not found in position mappings")
+                self.dataset.log(f"Writing labels for {layout} layout")
+                label_path = path_layouts.joinpath(f"{layout}-labels-{plot_id}.json")
+                with label_path.open("w") as outfile:
+                    json.dump(layout_labels, outfile)
+
+                manifest["layouts"][layout]["labels"] = f"{root}/data/layouts/{layout}-labels-{plot_id}.json"
 
         # write UMAP-generated positions
         for i, variant in enumerate(umap):
@@ -491,9 +565,11 @@ class ImagePlotGenerator(BasicProcessor):
             # date: number of columns (+ 1) times the number of date labels
             point_sizes['date'] = 1 / ((date_columns + 1) * date_labels)
 
+            point_sizes['cat_text'] = point_sizes['date'] * 0.5
+
         return point_sizes
 
-    def create_metadata_files(self, temp_path, output_dir, post_dataset):
+    def create_metadata_files(self, temp_path, output_dir, post_dataset, category=None):
         """
         Creates a metadata file folder w/ json files for each image.
 
@@ -506,7 +582,7 @@ class ImagePlotGenerator(BasicProcessor):
         "description": "", # displays in the info panel
         "permalink": "https://www.instagram.com/p/B76NjK3p0aD", # link to original post; TODO: unsure where this is used
         "year": "2001", # for date layout
-    }
+        }
 
         Columns for PixPlot metadata can be:
         filename |	the filename of the image
@@ -560,6 +636,9 @@ class ImagePlotGenerator(BasicProcessor):
                     'tags': [],
                     'number_of_posts': 0,
                     }
+                if category:
+                    # multiple posts means multiple possible categories...
+                    images[url]['category'] = []
 
         self.dataset.log(f"Metadata for {successful_image_count} images collected from {len(post_id_image_dictionary)} posts")
 
@@ -580,6 +659,17 @@ class ImagePlotGenerator(BasicProcessor):
                     for detail in ordered_descriptions:
                         if post.get(detail):
                             image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
+
+                        # Add timestamps to image_dates
+                        if detail == 'timestamp':
+                            if not self.image_dates:
+                                self.image_dates = {}
+                            if image.get("filename") not in self.image_dates.keys():
+                                self.image_dates[image.get("filename")] = parse_date(post.get(detail))
+                            else:
+                                # Use earliest date
+                                self.image_dates[image.get("filename")] = min(parse_date(post.get(detail)), self.image_dates[image.get("filename")])
+
                     for key, value in post.items():
                         if key not in ordered_descriptions:
                             image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
@@ -596,13 +686,21 @@ class ImagePlotGenerator(BasicProcessor):
                         else:
                             image['tags'] += post['hashtags'].split(',')
 
-                    # Category could perhaps be a user chosen column...
-
                     # If images repeat this will overwrite prior value
                     # I really dislike that the download images is not a one to one with posts...
                     if 'timestamp' in post.keys():
                         image['year'] = datetime.datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+
+                    if category:
+                        image['category'] += [post.get(category, "None")]
+
         self.dataset.log(f"Image metadata added to {posts_with_images} posts")
+
+        # The Image Plot only supports one category per image, so we combine all categories into one string
+        if category:
+            # Remove duplicates from categories & combine into one string
+            for image in images.values():
+                image['category'] = ",".join(list(set(image['category'])))
 
         # Create metadata files
         metadata_file_path = output_dir.joinpath('data/metadata/file')
@@ -615,6 +713,12 @@ class ImagePlotGenerator(BasicProcessor):
 
         self.dataset.update_status("Metadata.csv created")
 
+        # Return categories for categorical layout
+        if category:
+            return {image['filename']: image['category'] for image in images.values()}
+        else:
+            return False
+
     @staticmethod
     def get_mapping_datasets(parent_dataset):
         """
@@ -624,3 +728,251 @@ class ImagePlotGenerator(BasicProcessor):
         """
         top_dataset = parent_dataset.top_parent()
         return [dataset for dataset in top_dataset.get_all_children(instantiate_datasets=False) if dataset.get('type') == "coordinate-map"]
+
+
+# Adapted from YaleDHLab's PixPlot here:
+# https://github.com/YaleDHLab/pix-plot/blob/84afbd098f24c5a3ec41219fa849d3eb7b3dc57f/pixplot/pixplot.py#L975
+
+    def get_categorical_layout(self, categories, images_to_category, null_category='Other', margin=2, **kwargs):
+        """
+        Return a numpy array with shape (n_points, 2) with the point
+        positions of observations in box regions determined by
+        each point's category metadata attribute (if applicable)
+
+        :param [str] categories: list of categories
+        :param [str] images_to_category: ordered list of image categories ['image_1_category_name', 'image_2_category_name', ...]
+        """
+        # if not kwargs.get('metadata', False): return False
+        # # determine the out path and return from cache if possible
+        # out_path = get_path('layouts', 'categorical', **kwargs)
+        # labels_out_path = get_path('layouts', 'categorical-labels', **kwargs)
+
+
+        # accumulate d[category] = [indices of points with category]
+        # categories = [i.get('category', None) for i in kwargs['metadata']] # TODO List of categories?
+        if not any(categories) or len(set(categories) - set([None])) == 1: return False
+        d = defaultdict(list)
+        for idx, i in enumerate(images_to_category): d[i].append(idx)
+        # store the number of observations in each group
+        keys_and_counts = [{'key': i, 'count': len(d[i])} for i in d]
+        keys_and_counts.sort(key=operator.itemgetter('count'), reverse=True)
+        # get the box layout then subdivide into discrete points
+        boxes = get_categorical_boxes([i['count'] for i in keys_and_counts], margin=margin)
+        points = get_categorical_points(boxes)
+        # sort the points into the order of the observations in the metadata
+        counts = {i['key']: 0 for i in keys_and_counts}
+        offsets = {i['key']: 0 for i in keys_and_counts}
+        for idx, i in enumerate(keys_and_counts):
+            offsets[i['key']] += sum([j['count'] for j in keys_and_counts[:idx]])
+        sorted_points = []
+        # for idx, i in enumerate(stream_images(**kwargs)): # TODO Pass images in order w/ metadata?
+            # category = i.metadata.get('category', null_category)
+        for idx, category in enumerate(images_to_category):
+            if category is None:
+                category = null_category
+            sorted_points.append(points[ offsets[category] + counts[category] ])
+            counts[category] += 1
+        sorted_points = np.array(sorted_points)
+        # add to the sorted points the anchors for the text labels for each group
+        text_anchors = np.array([[i.x, i.y-margin/2] for i in boxes])
+        # add the anchors to the points - these will be removed after the points are projected
+        sorted_points = np.vstack([sorted_points, text_anchors])
+        # scale -1:1 using the largest axis as the scaling metric
+        _max = np.max(sorted_points)
+        for i in range(2):
+            _min = np.min(sorted_points[:,i])
+            sorted_points[:,i] -= _min
+            sorted_points[:,i] /= (_max-_min)
+            sorted_points[:,i] -= np.max(sorted_points[:,i])/2
+            sorted_points[:,i] *= 2
+        # separate out the sorted points and text positions
+        text_anchors = sorted_points[-len(text_anchors):]
+        sorted_points = sorted_points[:-len(text_anchors)]
+        z = round_floats(sorted_points.tolist())
+        # Structure for manifest
+        return {
+            # 'layout': write_json(out_path, z, **kwargs), # TODO: we are writing this elsewhere in cartographer.py
+            # 'labels': write_json(labels_out_path, { # TODO: Ditto... well not yet, but ought we to be? other layouts have labels too
+            #         'positions': round_floats(text_anchors.tolist()),
+            #         'labels': [i['key'] for i in keys_and_counts],
+            #     }, **kwargs)
+            'layout': z,
+            'labels': {
+              'positions': round_floats(text_anchors.tolist()),
+              'labels': [i['key'] for i in keys_and_counts],
+            }
+        }
+    def get_date_layout(self, image_filenames, cols=3, bin_units='years'):
+      '''
+      Get the x,y positions of input images based on their dates
+      @param int cols: the number of columns to plot for each bar
+      @param str bin_units: the temporal units to use when creating bins
+      '''
+      print('Creating date layout with {} columns'.format(cols))
+      datestrings = [self.image_dates.get(image, 'no_date') for image in image_filenames]
+      dates = [datestring_to_date(i) for i in datestrings]
+      rounded_dates = [round_date(i, bin_units) for i in dates]
+      # create d[formatted_date] = [indices into datestrings of dates that round to formatted_date]
+      d = defaultdict(list)
+      for idx, i in enumerate(rounded_dates):
+        d[i].append(idx)
+      # determine the number of distinct grid positions in the x and y axes
+      n_coords_x = (cols+1)*len(d)
+      n_coords_y = 1 + max([len(d[i]) for i in d]) // cols
+      if n_coords_y > n_coords_x: return self.get_date_layout(image_filenames, cols=int(cols*2), bin_units=bin_units)
+      # create a mesh of grid positions in clip space -1:1 given the time distribution
+      grid_x = (np.arange(0,n_coords_x)/(n_coords_x-1))*2
+      grid_y = (np.arange(0,n_coords_y)/(n_coords_x-1))*2
+      # divide each grid axis by half its max length to center at the origin 0,0
+      grid_x = grid_x - np.max(grid_x)/2.0
+      grid_y = grid_y - np.max(grid_y)/2.0
+      # make dates increase from left to right by sorting keys of d
+      d_keys = np.array(list(d.keys()))
+      seconds = np.array([date_to_seconds(dates[ d[i][0] ]) for i in d_keys])
+      d_keys = d_keys[np.argsort(seconds)]
+      # determine which images will fill which units of the grid established above
+      coords = np.zeros((len(datestrings), 2)) # 2D array with x, y clip-space coords of each date
+      for jdx, j in enumerate(d_keys):
+        for kdx, k in enumerate(d[j]):
+          x = jdx*(cols+1) + (kdx%cols)
+          y = kdx // cols
+          coords[k] = [grid_x[x], grid_y[y]]
+      # find the positions of labels
+      label_positions = np.array([ [ grid_x[i*(cols+1)], grid_y[0] ] for i in range(len(d)) ])
+      # move the labels down in the y dimension by a grid unit
+      dx = (grid_x[1]-grid_x[0]) # size of a single cell
+      label_positions[:,1] = label_positions[:,1] - dx
+      # quantize the label positions and label positions
+      image_positions = round_floats(coords)
+      label_positions = round_floats(label_positions.tolist())
+      # write and return the paths to the date based layout
+      return {
+        'layout': image_positions,
+        'labels': {
+          'positions': label_positions,
+          'labels': d_keys.tolist(),
+          'cols': cols,
+        }
+      }
+
+
+def get_categorical_boxes(group_counts, margin=2):
+    """
+    @arg [int] group_counts: counts of the number of images in each
+    distinct level within the metadata's caetgories
+    @kwarg int margin: space between boxes in the 2D layout
+    @returns [Box] an array of Box() objects; one per level in `group_counts`
+    """
+    group_counts = sorted(group_counts, reverse=True)
+    boxes = []
+    for i in group_counts:
+        w = h = math.ceil(i**(1/2))
+        boxes.append(Box(i, w, h, None, None))
+    # find the position along x axis where we want to create a break
+    wrap = math.floor(sum([i.cells for i in boxes])**(1/2)) - (2 * margin)
+    # find the valid positions on the y axis
+    y = margin
+    y_spots = []
+    for i in boxes:
+        if (y + i.h + margin) <= wrap:
+            y_spots.append(y)
+            y += i.h + margin
+        else:
+            y_spots.append(y)
+            break
+    # get a list of lists where sublists contain elements at the same y position
+    y_spot_index = 0
+    for i in boxes:
+        # find the y position
+        y = y_spots[y_spot_index]
+        # find members with this y position
+        row_members = [j.x + j.w for j in boxes if j.y == y]
+        # assign the y position
+        i.y = y
+        y_spot_index = (y_spot_index + 1) % len(y_spots)
+        # assign the x position
+        i.x = max(row_members) + margin if row_members else margin
+    return boxes
+
+def get_categorical_points(arr, unit_size=None):
+    """
+    Given an array of Box() objects, return a 2D distribution with shape (n_cells, 2)
+    """
+    points_arr = []
+    for i in arr:
+        area = i.w*i.h
+        per_unit = (area / i.cells)**(1/2)
+        x_units = math.ceil(i.w / per_unit)
+        y_units = math.ceil(i.h / per_unit)
+        if not unit_size: unit_size = min(i.w/x_units, i.h/y_units)
+        for j in range(i.cells):
+            x = j%x_units
+            y = j//x_units
+            points_arr.append([
+                    i.x+x*unit_size,
+                    i.y+y*unit_size,
+            ])
+    return np.array(points_arr)
+
+def round_floats(obj, digits=5):
+  """
+  Return 2D array obj with rounded float precision
+  """
+  return [[round(float(j), digits) for j in i] for i in obj]
+
+class Box:
+    """
+    Store the width, height, and x, y coords of a box
+    """
+    def __init__(self, *args):
+        self.cells = args[0]
+        self.w = args[1]
+        self.h = args[2]
+        self.x = None if len(args) < 4 else args[3]
+        self.y = None if len(args) < 5 else args[4]
+
+##
+# Date Layout
+##
+
+
+def datestring_to_date(datestring):
+  '''
+  Given a string representing a date return a datetime object
+  '''
+  try:
+    return parse_date(str(datestring), fuzzy=True, default=datetime.datetime(9999, 1, 1))
+  except Exception as exc:
+    print('Could not parse datestring {}'.format(datestring))
+    return datestring
+
+
+def date_to_seconds(date):
+  '''
+  Given a datetime object return an integer representation for that datetime
+  '''
+  if isinstance(date, datetime.datetime):
+    return (date - datetime.datetime.today()).total_seconds()
+  else:
+    return - float('inf')
+
+
+def round_date(date, unit):
+  '''
+  Return `date` truncated to the temporal unit specified in `units`
+  '''
+  if not isinstance(date, datetime.datetime): return 'no_date'
+  formatted = date.strftime('%d %B %Y -- %X')
+  if unit in set(['seconds', 'minutes', 'hours']):
+    date = formatted.split('--')[1].strip()
+    if unit == 'seconds': date = date
+    elif unit == 'minutes': date = ':'.join(date.split(':')[:-1]) + ':00'
+    elif unit == 'hours': date = date.split(':')[0] + ':00:00'
+  elif unit in set(['days', 'months', 'years', 'decades', 'centuries']):
+    date = formatted.split('--')[0].strip()
+    if unit == 'days': date = date
+    elif unit == 'months': date = ' '.join(date.split()[1:])
+    elif unit == 'years': date = date.split()[-1]
+    elif unit == 'decades': date = str(int(date.split()[-1])//10) + '0'
+    elif unit == 'centuries': date = str(int(date.split()[-1])//100) + '00'
+  return date

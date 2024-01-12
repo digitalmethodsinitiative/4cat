@@ -2504,9 +2504,8 @@ Text.prototype.getTexture = function() {
 
 // initialize the text mesh
 Text.prototype.createMesh = function() {
-  // set mesh sizing attributes based on number of columns in each bar group
-  this.scale = config.size.points.date;
-  this.kerning = this.scale * 0.8;
+  // update scale/kerning
+  this.updateScale();
   // create the mesh
   var geometry = new THREE.BufferGeometry(),
       positions = new THREE.BufferAttribute(new Float32Array(this.count*3), 3),
@@ -2571,7 +2570,15 @@ Text.prototype.setWords = function(arr) {
   }.bind(this));
 }
 
+Text.prototype.updateScale = function() {
+  let text_scale = (Layout.selected === 'categorical' &&  "cat_text" in config.size.points)? config.size.points.cat_text : config.size.points.date;
+  // set mesh sizing attributes based on number of columns in each bar group
+  this.scale = text_scale;
+  this.kerning = this.scale * 0.8;
+}
+
 Text.prototype.getPointScale = function() {
+  this.updateScale();
   return window.devicePixelRatio * window.innerHeight * this.scale;
 }
 
