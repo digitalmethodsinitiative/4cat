@@ -2442,7 +2442,7 @@ Dates.prototype.addFilter = function() {
 function Text() {}
 
 Text.prototype.init = function() {
-  if (!data.json.layouts.date) return;
+  if ((!data.json.layouts.date && !data.json.layouts.categorical )) return;
   this.count = 1000; // max number of characters to represent
   this.point = 128.0; // px of each letter in atlas texture
   this.scale = 0; // 8 so 'no date' fits in one grid space
