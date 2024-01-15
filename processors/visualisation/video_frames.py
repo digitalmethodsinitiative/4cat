@@ -36,7 +36,7 @@ class VideoFrames(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"help": "Number of frames extracted per second to extract from video",
 			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
-					   "pass 5, and so on.",
+					   "pass 5, and so on. Use '0' to only capture the first frame of the video.",
 			"coerce_type": float,
 			"default": 1,
 			"min": 0,
@@ -89,7 +89,7 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
-		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
@@ -108,12 +108,19 @@ class VideoFrames(BasicProcessor):
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", shlex.quote(str(path)),
-				"-r", str(frame_interval),
+				"-i", shlex.quote(str(path))
 			]
+
+			if frame_interval != 0:
+				command += ["-r", str(frame_interval)]
+			else:
+				command += ["-vframes", "1"]
+
 			if frame_size != 'no_modify':
 				command += ['-s', shlex.quote(frame_size)]
 			command += [shlex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
+
+			self.dataset.log(" ".join(command))
 
 			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

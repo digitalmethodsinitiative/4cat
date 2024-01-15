@@ -307,7 +307,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 				if self.dataset.get_results_path().exists():
 					# Update the surrogate's results file suffix to match this dataset's suffix
-					surrogate.data["result_file"] = surrogate.get_results_path().with_suffix("." + self.dataset.get_results_path().suffix)
+					surrogate.data["result_file"] = surrogate.get_results_path().with_suffix(self.dataset.get_results_path().suffix)
 					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
 
 				try:

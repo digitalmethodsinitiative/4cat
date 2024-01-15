@@ -353,12 +353,13 @@ const query = {
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    let content = await FileReaderPromise(pair[1]);
-                    if (content.byteLength > snippet_size) {
-                        content = content.slice(0, snippet_size);
-                        let snippet = new File([content], pair[1].name);
-                        formdata.set(pair[0], snippet)
-                    }
+                    const sample_size = Math.min(pair[1].size, snippet_size);
+                    const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
+
+                    // make sure we're submitting utf-8 - read and then re-encode to be sure
+                    const blobAsText = await FileReaderPromise(blob);
+                    const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
+                    formdata.set(pair[0], snippet);
                 }
             }
         }
@@ -1820,7 +1821,7 @@ function FileReaderPromise(file) {
         fr.onload = () => {
             resolve(fr.result);
         }
-        fr.readAsArrayBuffer(file);
+        fr.readAsText(file);
     });
 }
 

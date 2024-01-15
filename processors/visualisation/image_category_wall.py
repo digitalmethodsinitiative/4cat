@@ -38,6 +38,8 @@ class ImageWallGenerator(BasicProcessor):
 
 	number_of_ranges = 10  # number of ranges to use for numeric categories
 
+	image_datasets = ["image-downloader", "video-hasher-1"]
+
 	config = {
 		"image-visuals.max_per_cat": {
 			"type": UserInput.OPTION_TEXT,
@@ -59,11 +61,14 @@ class ImageWallGenerator(BasicProcessor):
 	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on CLIP dataset only
-		
+
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		# TODO: cannot run on image-downloader-screenshots-search as it does not have a category column!
-		return module.type.startswith("image-to-categories") or (module.type.startswith("image-downloader") and not module.type not in ["image-downloader-screenshots-search"])
+		return module.type.startswith("image-to-categories") or \
+			module.type.startswith("image-downloader") or \
+			module.type.startswith("video-hasher-1") or \
+			module.type.startswith("video-hash-similarity-matrix") and \
+			not module.type not in ["image-downloader-screenshots-search"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -124,10 +129,10 @@ class ImageWallGenerator(BasicProcessor):
 		"""
 		Identify dataset types that are compatible with this processor
 		"""
-		if source_dataset.type.startswith("image-downloader"):
+		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
 			image_dataset = source_dataset
 			category_dataset = source_dataset.top_parent()
-		elif source_dataset.get_parent().type.startswith("image-downloader"):
+		elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
 			image_dataset = source_dataset.get_parent()
 			category_dataset = source_dataset
 		else:
@@ -148,6 +153,7 @@ class ImageWallGenerator(BasicProcessor):
 		if image_dataset.num_rows == 0 or category_dataset == 0:
 			self.dataset.finish_with_error("No images/categories available to render to image wall.")
 			return
+		self.dataset.log(f"Found {image_dataset.type} w/ {image_dataset.num_rows} images and {category_dataset.type} w/ {category_dataset.num_rows} items")
 
 		category_column = self.parameters.get("category")
 		if not category_column:
@@ -168,7 +174,10 @@ class ImageWallGenerator(BasicProcessor):
 		staging_area = self.unpack_archive_contents(image_dataset.get_results_path())
 
 		# Map post IDs to filenames
-		if special_case:
+		if image_dataset.type == "video-hasher-1":
+			# We know the post ID is the filename.stem as this dataset is derived from the image dataset
+			filename_map = {filename.stem + ".mp4": filename for filename in staging_area.iterdir()}
+		elif special_case:
 			# We know the post ID is the filename.stem as this dataset is derived from the image dataset
 			filename_map = {filename.stem: filename for filename in staging_area.iterdir()}
 		else:
@@ -177,7 +186,7 @@ class ImageWallGenerator(BasicProcessor):
 				image_data = json.load(file)
 			filename_map = {post_id: staging_area.joinpath(image.get("filename")) for image in image_data.values()
 							if image.get("success") for post_id in image.get("post_ids")}
-
+		self.dataset.log(filename_map)
 		# Organize posts into categories
 		category_type = None
 		categories = {}
@@ -231,6 +240,10 @@ class ImageWallGenerator(BasicProcessor):
 						# Unsure exactly how to handle; possibly the first post was convertible to a float
 						raise ProcessorException(
 							f"Mixed category types detected; unable to render image wall (item {i} {post_category})")
+
+		if len(categories) == 0:
+			self.dataset.finish_with_error("No categories found")
+			return
 
 		# Sort collected category results as needed
 		self.dataset.update_status("Sorting categories")
@@ -383,6 +396,3 @@ class ImageWallGenerator(BasicProcessor):
 		canvas.save(pretty=True)
 		self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
 		return self.dataset.finish(len(category_widths))
-
-
-

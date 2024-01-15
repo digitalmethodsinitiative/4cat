@@ -1,10 +1,10 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
-import itertools
 import markdown2
 import datetime
 import psycopg2
+import psycopg2.errors
 import tailer
 import smtplib
 import time
@@ -190,7 +190,7 @@ def add_user():
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
-        except psycopg2.IntegrityError:
+        except (psycopg2.IntegrityError, psycopg2.errors.UniqueViolation):
             db.rollback()
             if not force:
                 response = {**response, **{

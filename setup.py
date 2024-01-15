@@ -60,7 +60,6 @@ packages = [
 	"unidecode~=1.3",
 	"Werkzeug~=2.2",
 	"wordcloud~=1.8",
-	"videohash==3.0.1",
 	"videohash @ https://github.com/dale-wahl/videohash/archive/refs/heads/main.zip",
 	"vk_api",
 	"yt-dlp",

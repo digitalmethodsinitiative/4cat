@@ -203,6 +203,13 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
+
+	# data source identifiers cannot start with a number but some do (such as
+	# 9gag and 4chan) so sanitise those numbers to account for this...
+	platform = platform.replace("1", "one").replace("2", "two").replace("3", "three").replace("4", "four") \
+		.replace("5", "five").replace("6", "six").replace("7", "seven").replace("8", "eight") \
+		.replace("9", "nine")
+
 	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message="Unknown platform or source format")
 
