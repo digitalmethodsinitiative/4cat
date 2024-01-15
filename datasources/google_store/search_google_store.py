@@ -151,6 +151,45 @@ class SearchGoogleStore(SearchAppleStore):
         if "developer_link" in item:
             formatted_item["developer_id"] = item["developer_link"].split("dev?id=")[-1]
 
-        formatted_item.update(**item)
+        formatted_item["app_id"] = item.get("id", "")
+        # Map expected fields which may be missing
+        mapped_fields = [
+            "title",
+            "country",
+            "lang",
+            "link",
+            "developer_name",
+            "developer_link",
+            "price_inapp",
+            "category",
+            "video_link",
+            "icon_link",
+            "num_downloads_approx",
+            "num_downloads",
+            "published_date",
+            "published_timestamp",
+            "pegi",
+            "pegi_detail",
+            "os",
+            "rating",
+            "description",
+            "price",
+            "num_of_reviews",
+            "developer_email",
+            "developer_address",
+            "developer_website",
+            "developer_privacy_policy_link",
+            "data_safety_list",
+            "updated_on",
+            "app_version",
+            "list_of_categories",
+            "errors",
+        ]
+        for field in mapped_fields:
+            formatted_item[field] = item.get(field, "")
+
+        # Add any additional fields to the item
+        # TODO: Map them to a common format
+        formatted_item["additional_data_in_ndjson"] = ", ".join([f"{key}: {value}" for key, value in item.items() if key not in mapped_fields])
 
         return formatted_item

@@ -196,17 +196,72 @@ class SearchAppleStore(Search):
             formatted_item["id"] = item.get("id")
             formatted_item["body"] = item.get("description", "")
             formatted_item["timestamp"] = timestamp
-        # elif query_method == 'permissions':
-        #     item["id"] = item_index
-        #     item["body"] = item.get("permission", "")
-        #     item["timestamp"] = timestamp
         else:
             # Should not happen
             raise Exception("Unknown query method: {}".format(query_method))
-        formatted_item.update(**item)
-        
+
+        formatted_item["app_id"] = item.get("id", item.get("trackId", ""))
+        # Map expected fields which may be missing
+        mapped_fields = [
+            "trackName",
+            "country",
+            "lang",
+            "screenshotUrls",
+            "ipadScreenshotUrls",
+            "appletvScreenshotUrls",
+            "artworkUrl60",
+            "artworkUrl512",
+            "artworkUrl100",
+            "artistViewUrl",
+            "isGameCenterEnabled",
+            "features",
+            "advisories",
+            "supportedDevices",
+            "kind",
+            "currency",
+            "trackCensoredName",
+            "languageCodesISO2A",
+            "fileSizeBytes",
+            "sellerUrl",
+            "formattedPrice",
+            "contentAdvisoryRating",
+            "averageUserRatingForCurrentVersion",
+            "userRatingCountForCurrentVersion",
+            "averageUserRating",
+            "trackViewUrl",
+            "trackContentRating",
+            "trackId",
+            "releaseNotes",
+            "genres",
+            "artistId",
+            "artistName",
+            "price",
+            "bundleId",
+            "description",
+            "releaseDate",
+            "genreIds",
+            "isVppDeviceBasedLicensingEnabled",
+            "primaryGenreName",
+            "primaryGenreId",
+            "sellerName",
+            "currentVersionReleaseDate",
+            "minimumOsVersion",
+            "version",
+            "wrapperType",
+            "userRatingCount",
+            "user_ratings",
+            "errors",
+        ]
+        for field in mapped_fields:
+            formatted_item[field] = item.get(field, "")
+
+        # Add any additional fields to the item
+        # TODO: Map them to a common format
+        formatted_item["additional_data_in_ndjson"] = ", ".join(
+            [f"{key}: {value}" for key, value in item.items() if key not in mapped_fields])
+
         return formatted_item
-    
+
 def collect_from_store(store, method, languages=None, countries=None, full_detail=False, params={}, log=print):
     """
     Collect data from Apple or Google store
