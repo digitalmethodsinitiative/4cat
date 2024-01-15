@@ -118,14 +118,16 @@ class Tokenise(BasicProcessor):
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
 				"help": "Stem tokens (with SnowballStemmer)",
-				"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', etc."
+				"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', etc.",
+				"requires": "language!=other"
 			},
 			"lemmatise": {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
 				"help": "Lemmatise tokens (English only)",
 				"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', 'bicycles' " \
-						   " becomes 'bicycle', 'better' becomes 'good'."
+						   " becomes 'bicycle', 'better' becomes 'good'.",
+				"requires": "language==english"
 			},
 			"accept_words": {
 				"type": UserInput.OPTION_TEXT,
