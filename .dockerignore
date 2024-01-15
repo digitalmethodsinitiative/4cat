@@ -1,0 +1,2 @@
+# Do not copy data files on build
+data/
