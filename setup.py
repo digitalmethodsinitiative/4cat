@@ -11,7 +11,7 @@ with open("VERSION") as versionfile:
 packages = [
 	"anytree~=2.8.0",
 	"bcrypt~=3.2.0",
-	"beautifulsoup4~=4.11.0",
+	"beautifulsoup4",#~=4.11.0",
 	"clarifai-grpc~=9.0",
 	"cryptography>=39.0.1",
 	"cssselect~=1.1.0",

@@ -31,7 +31,7 @@ class SearchGoogleStore(SearchAppleStore):
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Query Type",
                 "options": {
-                    "query-app": "App IDs",
+                    "query-app-detail": "App IDs",
                     "query-search-detail": "Search by query",
                     "query-developer-detail": "Developer IDs",
                     "query-similar-detail": "Similar Apps",

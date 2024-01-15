@@ -55,7 +55,7 @@ class SearchAppleStore(Search):
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Query Type",
                 "options": {
-                    "query-app": "App IDs",
+                    "query-app-detail": "App IDs",
                     "list-detail": "Apple App Collection",
                     "query-search-detail": "Search by query",
                     "query-developer-detail": "Developer IDs",
@@ -73,7 +73,7 @@ class SearchAppleStore(Search):
             "collection": {
                 "type": UserInput.OPTION_INFO,
                 "help": "Apple Store App Collection",
-                "requires": "method=list", 
+                "requires": "method^=list", # starts with list
             },
             "full_details": {
                 "type": UserInput.OPTION_TOGGLE,
