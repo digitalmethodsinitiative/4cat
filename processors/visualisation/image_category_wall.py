@@ -68,7 +68,7 @@ class ImageWallGenerator(BasicProcessor):
 			module.type.startswith("image-downloader") or \
 			module.type.startswith("video-hasher-1") or \
 			module.type.startswith("video-hash-similarity-matrix") and \
-			not module.type not in ["image-downloader-screenshots-search"])
+			not module.type not in ["image-downloader-screenshots-search"]
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
