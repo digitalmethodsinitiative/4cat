@@ -68,7 +68,8 @@ class SearchAppleStore(Search):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "List of App IDs, Developer IDs, or queries to search for.",
                 "requires": "method^=query", # starts with query
-                "tooltip": "Seperate IDs or queries with commas to search multiple."
+                "tooltip": "Seperate IDs or queries with commas to search multiple.",
+                "default": "", # need default else regex will fail
             },
             "collection": {
                 "type": UserInput.OPTION_INFO,
