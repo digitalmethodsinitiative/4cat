@@ -251,6 +251,7 @@ class SearchAppleStore(Search):
             "userRatingCount",
             "user_ratings",
             "errors",
+            "collected_at_timestamp",
         ]
         for field in mapped_fields:
             formatted_item[field] = item.get(field, "")
@@ -258,7 +259,7 @@ class SearchAppleStore(Search):
         # Add any additional fields to the item
         # TODO: Map them to a common format
         formatted_item["additional_data_in_ndjson"] = ", ".join(
-            [f"{key}: {value}" for key, value in item.items() if key not in mapped_fields])
+            [f"{key}: {value}" for key, value in item.items() if key not in mapped_fields + ["id"]])
 
         return formatted_item
 
