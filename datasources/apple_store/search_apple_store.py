@@ -1,7 +1,6 @@
 import time
 import datetime
 import re
-from common.lib.helpers import flatten_dict
 
 from google_play_scraper.scraper import PlayStoreScraper
 from itunes_app_scraper.scraper import AppStoreScraper
