@@ -230,7 +230,7 @@ class DmiServiceManager:
             except requests.exceptions.ConnectionError as e:
                 retries += 1
                 if retries > 3:
-                    raise DmiServiceManagerException(f"Connection Error {e} while downloading files from: {folder_name}")
+                    raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading files from: {folder_name}")
                 continue
 
         # Check if 4CAT has access to this server
@@ -354,7 +354,7 @@ class DmiServiceManager:
                 except requests.exceptions.ConnectionError as e:
                     retries += 1
                     if retries > 3:
-                        raise DmiServiceManagerException(f"Connection Error {e} while downloading file: {filename}")
+                        raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading file: {filename}")
                     continue
             files_downloaded += 1
             if files_downloaded % 1000 == 0:
