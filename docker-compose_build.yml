@@ -10,7 +10,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
-      - ./data/postgres/:/var/lib/postgresql/data/
+      - ${DOCKER_DB_VOL}:/var/lib/postgresql/data/
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
       interval: 5s
@@ -31,9 +31,9 @@ services:
     ports:
       - ${PUBLIC_API_PORT}:4444
     volumes:
-      - ./data/datasets/:/usr/src/app/data/
-      - ./data/config/:/usr/src/app/config/
-      - ./data/logs/:/usr/src/app/logs/
+      - ${DOCKER_DATA_VOL}:/usr/src/app/data/
+      - ${DOCKER_CONFIG_VOL}:/usr/src/app/config/
+      - ${DOCKER_LOGS_VOL}:/usr/src/app/logs/
     entrypoint: docker/docker-entrypoint.sh
 
   frontend:
@@ -46,9 +46,9 @@ services:
       - ${PUBLIC_PORT}:5000
       - ${TELEGRAM_PORT}:443
     volumes:
-      - ./data/datasets/:/usr/src/app/data/
-      - ./data/config/:/usr/src/app/config/
-      - ./data/logs/:/usr/src/app/logs/
+      - ${DOCKER_DATA_VOL}:/usr/src/app/data/
+      - ${DOCKER_CONFIG_VOL}:/usr/src/app/config/
+      - ${DOCKER_LOGS_VOL}:/usr/src/app/logs/
     command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
 
 volumes:
