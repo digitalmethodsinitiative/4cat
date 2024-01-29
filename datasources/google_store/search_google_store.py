@@ -35,7 +35,7 @@ class SearchGoogleStore(SearchAppleStore):
                     "query-search-detail": "Search by query",
                     "query-developer-detail": "Developer IDs",
                     "query-similar-detail": "Similar Apps",
-                    "query-permissions": "Permissions", # Permissions do not exist for apple store!
+                    "query-permissions": "Permissions",
                 },
                 "default": "query-search-detail"
             },
@@ -117,87 +117,85 @@ class SearchGoogleStore(SearchAppleStore):
         """
         query_method = item.pop("query_method", "")
         formatted_item = {
-            "query_method": query_method, 
-            "thread_id": "",
-            "author": item.get("developer_name", ""),
-            }
+            "4CAT_query_type": query_method,
+            "query_country": item.get("country", ""),
+            "query_language": item.get("lang", ""),
+        }
         item_index = item.pop("item_index", "") # Used on query types without unique IDs (e.g., permissions)
-
-        # some queries do not return a publishing timestamp so we use the collected at timestamp
-        timestamp = datetime.datetime.fromtimestamp(item.get("published_timestamp")) if "published_timestamp" in item else datetime.datetime.strptime(item.get("published_date"), "%Y-%m-%d") if "published_date" in item else item.get("collected_at_timestamp")
 
         if query_method == 'app':
             formatted_item["id"] = item.get("id", "")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
+            body = item.get("description", "")
         elif query_method == 'list':
             formatted_item["id"] = item.get("id", "")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
+            body = item.get("description", "")
         elif query_method == 'search':
             formatted_item["query_term"] = item.pop("term", "")
             formatted_item["id"] = item.get("id", "")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
+            body = item.get("description", "")
         elif query_method == 'developer':
             formatted_item["id"] = item.get("id", "")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
+            body = item.get("description", "")
         elif query_method == 'similar':
             formatted_item["id"] = item.get("id", "")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
+            body = item.get("description", "")
         elif query_method == 'permissions':
             formatted_item["id"] = item_index
-            formatted_item["body"] = item.get("permission", "")
-            formatted_item["timestamp"] = timestamp
+            body = item.get("permission", "")
         else:
             # Should not happen
             raise Exception("Unknown query method: {}".format(query_method))
-        
-        if "developer_link" in item:
-            formatted_item["developer_id"] = item["developer_link"].split("dev?id=")[-1]
 
         formatted_item["app_id"] = item.get("id", "")
-        # Map expected fields which may be missing
-        mapped_fields = [
-            "title",
-            "country",
-            "lang",
-            "link",
-            "developer_name",
-            "developer_link",
-            "price_inapp",
-            "category",
-            "video_link",
-            "icon_link",
-            "num_downloads_approx",
-            "num_downloads",
-            "published_date",
-            "published_timestamp",
-            "pegi",
-            "pegi_detail",
-            "os",
-            "rating",
-            "description",
-            "price",
-            "num_of_reviews",
-            "developer_email",
-            "developer_address",
-            "developer_website",
-            "developer_privacy_policy_link",
-            "data_safety_list",
-            "updated_on",
-            "app_version",
-            "list_of_categories",
-            "errors",
-            "collected_at_timestamp",
-        ]
+        if "developer_link" in item:
+            item["4cat_developer_id"] = item["developer_link"].split("dev?id=")[-1]
+        # Map expected fields which may be missing and rename as desired
+        mapped_fields = {
+            "country": "query_country",
+            "lang": "query_language",
+            "title": "title",
+            "link": "link",
+            "4cat_developer_id": "developer_id",
+            "developer_name": "developer_name",
+            "developer_link": "developer_link",
+            "price_inapp": "price_inapp",
+            "category": "category",
+            "video_link": "video_link",
+            "icon_link": "icon_link",
+            "num_downloads_approx": "num_downloads_approx",
+            "num_downloads": "num_downloads",
+            "published_date": "published_date",
+            "published_timestamp": "published_timestamp",
+            "pegi": "pegi",
+            "pegi_detail": "pegi_detail",
+            "os": "os",
+            "rating": "rating",
+            "description": "description",
+            "price": "price",
+            "num_of_reviews": "num_of_reviews",
+            "developer_email": "developer_email",
+            "developer_address": "developer_address",
+            "developer_website": "developer_website",
+            "developer_privacy_policy_link": "developer_privacy_policy_link",
+            "data_safety_list": "data_safety_list",
+            "updated_on": "updated_on",
+            "app_version": "app_version",
+            "list_of_categories": "list_of_categories",
+            "errors": "errors",
+            "collected_at_timestamp": "collected_at_timestamp",
+        }
         for field in mapped_fields:
-            formatted_item[field] = item.get(field, "")
+            formatted_item[mapped_fields[field]] = item.get(field, "")
 
         # Add any additional fields to the item
-        # TODO: Map them to a common format
-        formatted_item["additional_data_in_ndjson"] = ", ".join([f"{key}: {value}" for key, value in item.items() if key not in mapped_fields + ["id"]])
+        formatted_item["additional_data_in_ndjson"] = ", ".join(
+            [f"{key}: {value}" for key, value in item.items() if key not in list(mapped_fields) +  ["app_id"]])
+
+        # 4CAT required fields
+        formatted_item["thread_id"] = ""
+        formatted_item["author"] = item.get("developer_name", "")
+        formatted_item["body"] = body
+        # some queries do not return a publishing timestamp so we use the collected at timestamp
+        formatted_item["timestamp"] = datetime.datetime.fromtimestamp(item.get("published_timestamp")) if "published_timestamp" in item else datetime.datetime.strptime(item.get("published_date"), "%Y-%m-%d") if "published_date" in item else item.get("collected_at_timestamp")
 
         return formatted_item

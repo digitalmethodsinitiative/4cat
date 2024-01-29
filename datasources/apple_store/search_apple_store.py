@@ -192,7 +192,7 @@ class SearchAppleStore(Search):
             raise Exception("Unknown query method: {}".format(query_method))
 
         formatted_item["app_id"] = item.get("id", item.get("trackId", ""))
-        # Map expected fields which may be missing
+        # Map expected fields which may be missing and rename as desired
         mapped_fields = {
             "releaseDate": "release_date",
             "currentVersionReleaseDate": "current_version_release_date",
