@@ -82,6 +82,8 @@ class SearchGoogleStore(SearchAppleStore):
         queries = re.split(',|\n', self.parameters.get('query', ''))
         # Updated method from options to match the method names in the collect_from_store function
         method = self.option_to_method.get(self.parameters.get('method'))
+        if method is None:
+            self.log.warning(f"Apple store unknown query method; check option_to_method dictionary matches method options.")
 
         params = {}
         if method == 'search':
@@ -97,8 +99,13 @@ class SearchGoogleStore(SearchAppleStore):
 
         self.dataset.log(f"Collecting {method} from Google Store")
         results = collect_from_store('google', method, languages=re.split(',|\n', self.parameters.get('languages')), countries=re.split(',|\n', self.parameters.get('countries')), full_detail=self.parameters.get('full_details', False), params=params, log=self.dataset.log)
-        self.dataset.log(f"Collected {len(results)} results from Google Store")
-        return [{"query_method": method, "collected_at_timestamp": datetime.datetime.now().timestamp(), "item_index": i, **result} for i, result in enumerate(results)]
+        if results:
+            self.dataset.log(f"Collected {len(results)} results from Google Store")
+            return [{"query_method": method, "collected_at_timestamp": datetime.datetime.now().timestamp(), "item_index": i, **result} for i, result in enumerate(results)]
+        else:
+            self.dataset.log(
+                f"No results identified for {self.parameters.get('query', '') if method != 'lists' else self.parameters.get('collection')} from Google Play Store")
+            return []
 
     @staticmethod
     def map_item(item):
