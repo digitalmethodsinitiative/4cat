@@ -1837,7 +1837,7 @@ const ui_helpers = {
                             requirement_met = true;
                         }
                     } else {
-                        if((checked && ['checked', 'true'].includes(requirement)) || (!checked) && ['', 'false'].includes(requirement[3])) {
+                        if((checked && ['checked', 'true'].includes(requirement[3])) || (!checked && ['', 'false'].includes(requirement[3]))) {
                             requirement_met = true;
                         }
                     }
@@ -1926,7 +1926,7 @@ function FileReaderPromise(file) {
         fr.onload = () => {
             resolve(fr.result);
         }
-        fr.readAsArrayBuffer(file);
+        fr.readAsText(file);
     });
 }
 
