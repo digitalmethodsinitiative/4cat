@@ -1838,7 +1838,7 @@ const ui_helpers = {
                             requirement_met = true;
                         }
                     } else {
-                        if((checked && ['checked', 'true'].includes(requirement)) || (!checked) && ['', 'false'].includes(requirement[3])) {
+                        if((checked && ['checked', 'true'].includes(requirement[3])) || (!checked && ['', 'false'].includes(requirement[3]))) {
                             requirement_met = true;
                         }
                     }
