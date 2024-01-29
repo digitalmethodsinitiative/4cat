@@ -171,100 +171,91 @@ class SearchAppleStore(Search):
         """
         query_method = item.pop("query_method", "")
         formatted_item = {
-            "4CAT_Query_Type": query_method,
-            "thread_id": "",
-            "author": item.get("artistName", ""),
+            "4CAT_query_type": query_method,
+            "query_country": item.get("country", ""),
+            "query_language": item.get("lang", ""),
             }
-        item_index = item.pop("item_index", "") # Used on query types without unique IDs (e.g., permissions)
-
-        # some queries do not return a publishing timestamp so we use the collected at timestamp
-        timestamp = datetime.datetime.strptime(item.get("releaseDate"), "%Y-%m-%dT%H:%M:%SZ") if "releaseDate" in item else item.get("collected_at_timestamp")
 
         if query_method == 'app':
             formatted_item["id"] = item.get("trackId")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
         elif query_method == 'list':
             formatted_item["id"] = item.get("trackId")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
         elif query_method == 'search':
-            formatted_item["query_term"] = item.pop("term", "")
+            formatted_item["4CAT_query_term"] = item.pop("term", "")
             formatted_item["id"] = item.get("id", item.get("trackId", "")) # detailed search returns trackId, simple search returns id
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
         elif query_method == 'developer':
             formatted_item["id"] = item.get("trackId")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
         elif query_method == 'similar':
             formatted_item["id"] = item.get("id")
-            formatted_item["body"] = item.get("description", "")
-            formatted_item["timestamp"] = timestamp
         else:
             # Should not happen
             raise Exception("Unknown query method: {}".format(query_method))
 
         formatted_item["app_id"] = item.get("id", item.get("trackId", ""))
         # Map expected fields which may be missing
-        mapped_fields = [
-            "trackName",
-            "country",
-            "lang",
-            "screenshotUrls",
-            "ipadScreenshotUrls",
-            "appletvScreenshotUrls",
-            "artworkUrl60",
-            "artworkUrl512",
-            "artworkUrl100",
-            "artistViewUrl",
-            "isGameCenterEnabled",
-            "features",
-            "advisories",
-            "supportedDevices",
-            "kind",
-            "currency",
-            "trackCensoredName",
-            "languageCodesISO2A",
-            "fileSizeBytes",
-            "sellerUrl",
-            "formattedPrice",
-            "contentAdvisoryRating",
-            "averageUserRatingForCurrentVersion",
-            "userRatingCountForCurrentVersion",
-            "averageUserRating",
-            "trackViewUrl",
-            "trackContentRating",
-            "trackId",
-            "releaseNotes",
-            "genres",
-            "artistId",
-            "artistName",
-            "price",
-            "bundleId",
-            "description",
-            "releaseDate",
-            "genreIds",
-            "isVppDeviceBasedLicensingEnabled",
-            "primaryGenreName",
-            "primaryGenreId",
-            "sellerName",
-            "currentVersionReleaseDate",
-            "minimumOsVersion",
-            "version",
-            "wrapperType",
-            "userRatingCount",
-            "user_ratings",
-            "errors",
-            "collected_at_timestamp",
-        ]
+        mapped_fields = {
+            "releaseDate": "release_date",
+            "currentVersionReleaseDate": "current_version_release_date",
+            "artistId": "developer_id",
+            "artistName": "developer_name",
+            "sellerName": "seller_name",
+            "sellerUrl": "seller_url",
+            "trackId": "app_id",
+            "trackName": "app_name",
+            "description": "description",
+            "genres": "genres",
+            "primaryGenreName": "primary_genre_name",
+            "primaryGenreId": "primary_genre_id",
+            "genreIds": "genre_ids",
+            "kind": "kind",
+            "version": "version",
+            "fileSizeBytes": "file_size_bytes",
+            "screenshotUrls": "screenshot_urls",
+            "ipadScreenshotUrls": "ipad_screenshot_urls",
+            "appletvScreenshotUrls": "appletv_screenshot_urls",
+            "artworkUrl60": "artwork_url_60",
+            "artworkUrl512": "artwork_url_512",
+            "artworkUrl100": "artwork_url_100",
+            "artistViewUrl": "artist_view_url",
+            "isGameCenterEnabled": "is_game_center_enabled",
+            "features": "features",
+            "advisories": "advisories",
+            "supportedDevices": "supported_devices",
+            "trackCensoredName": "app_censored_name",
+            "languageCodesISO2A": "language_codes_iso2a",
+            "contentAdvisoryRating": "content_advisory_rating",
+            "userRatingCount": "user_rating_count",
+            "user_ratings": "user_ratings",
+            "averageUserRating": "average_user_rating",
+            "averageUserRatingForCurrentVersion": "average_user_rating_for_current_version",
+            "userRatingCountForCurrentVersion": "user_rating_count_for_current_version",
+            "trackViewUrl": "app_view_url",
+            "trackContentRating": "app_content_rating",
+            "releaseNotes": "release_notes",
+            "price": "price",
+            "formattedPrice": "formatted_price",
+            "currency": "currency",
+            "bundleId": "bundle_id",
+            "isVppDeviceBasedLicensingEnabled": "is_vpp_device_based_licensing_enabled",
+            "minimumOsVersion": "minimum_os_version",
+            "wrapperType": "wrapper_type",
+            "errors": "errors",
+            "collected_at_timestamp": "collected_at_timestamp",
+        }
+
         for field in mapped_fields:
-            formatted_item[field] = item.get(field, "")
+            formatted_item[mapped_fields[field]] = item.get(field, "")
 
         # Add any additional fields to the item
-        # TODO: Map them to a common format
         formatted_item["additional_data_in_ndjson"] = ", ".join(
-            [f"{key}: {value}" for key, value in item.items() if key not in mapped_fields + ["id"]])
+            [f"{key}: {value}" for key, value in item.items() if key not in list(mapped_fields) +  ["id"]])
+
+        # 4CAT required fields
+        formatted_item["thread_id"] =  ""
+        formatted_item["author"] = item.get("artistName", "")
+        formatted_item["body"] = item.get("description", "")
+        # some queries do not return a publishing timestamp so we use the collected at timestamp
+        formatted_item["timestamp"] = datetime.datetime.strptime(item.get("releaseDate"), "%Y-%m-%dT%H:%M:%SZ") if "releaseDate" in item else item.get("collected_at_timestamp")
 
         return formatted_item
 
