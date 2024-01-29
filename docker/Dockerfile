@@ -14,7 +14,7 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install dependencies
-RUN pip3 install --upgrade pip
+RUN pip3 install --upgrade pip==21.2.4
 COPY ./requirements.txt /usr/src/app/requirements.txt
 COPY ./extensions /usr/src/app/extensions
 COPY ./setup.py /usr/src/app/setup.py

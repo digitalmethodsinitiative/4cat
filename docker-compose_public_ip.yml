@@ -19,7 +19,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
-      - ${DOCKER_DB_VOL}:/var/lib/postgresql/data/
+      - 4cat_db:/var/lib/postgresql/data/
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
       interval: 5s
@@ -39,9 +39,9 @@ services:
     ports:
       - ${PUBLIC_API_PORT}:4444
     volumes:
-      - ${DOCKER_DATA_VOL}:/usr/src/app/data/
-      - ${DOCKER_CONFIG_VOL}:/usr/src/app/config/
-      - ${DOCKER_LOGS_VOL}:/usr/src/app/logs/
+      - 4cat_data:/usr/src/app/data/
+      - 4cat_config:/usr/src/app/config/
+      - 4cat_logs:/usr/src/app/logs/
     # The -p sets your SERVER_NAME to your public IP
     entrypoint: docker/docker-entrypoint.sh -p
 
@@ -56,9 +56,9 @@ services:
       - ${TELEGRAM_PORT}:443
       - ${PUBLIC_PORT}:5000
     volumes:
-      - ${DOCKER_DATA_VOL}:/usr/src/app/data/
-      - ${DOCKER_CONFIG_VOL}:/usr/src/app/config/
-      - ${DOCKER_LOGS_VOL}:/usr/src/app/logs/
+      - 4cat_data:/usr/src/app/data/
+      - 4cat_config:/usr/src/app/config/
+      - 4cat_logs:/usr/src/app/logs/
     command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "4", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
 
 volumes:
