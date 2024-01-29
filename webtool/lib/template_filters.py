@@ -366,3 +366,7 @@ def inject_now():
 		"__version": version,
 		"uniqid": uniqid
 	}
+
+@app.template_filter('log')
+def _jinja2_filter_log(text):
+	app.logger.info(text)
