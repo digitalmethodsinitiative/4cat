@@ -16,6 +16,7 @@ from itertools import product
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_html_redirect_page
 from common.lib.user_input import UserInput
 
@@ -36,7 +37,8 @@ class ImagePlotGenerator(BasicProcessor):
     category = "Visual"  # category
     title = "Create Image visualisation"  # title displayed in UI
     description = "Create an explorable map of images using different algorithms to identify similarities."
-    extension = "html"  # extension of result file, used internally and in UI
+    extension = "zip"  # extension of result file, used internally and in UI
+    is_plot = True  # can ZIP use pixplot template?
 
     image_dates = None
 
@@ -110,26 +112,45 @@ class ImagePlotGenerator(BasicProcessor):
         if self.source_dataset.num_rows == 0:
             self.dataset.finish_with_error("No images available to render to visualization.")
             return
+
+        # TODO: remove
         self.dataset.log(self.parameters)
-        # Unpack the images into a staging area
+
+        if int(self.parameters.get("amount", 100)) != 0:
+            max_images = int(self.parameters.get("amount", 100))
+        else:
+            max_images = None
+
         self.dataset.update_status("Unzipping images")
-        staging_area = self.unpack_archive_contents(self.source_file)
+        staging_area = self.dataset.get_staging_area()
+        # Collect filenames and metadata
+        image_filenames = []
+        for image in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while unzipping images")
 
-        create_metadata = ImagePlotGenerator.check_for_metadata(self.source_file)
-        # TODO: images can only have one category, but images can belong to multiple posts!
-        category = None if self.parameters.get("category", None) == "None" else self.parameters.get("category", None)
+            if image.name.split('.')[-1] not in ["json", "log"]:
+                image_filenames.append(image.name)
 
-        # Collect filenames (skip .json metadata files)
-        image_filenames = [filename for filename in os.listdir(staging_area) if
-                           filename.split('.')[-1] not in ["json", "log"]]
-        if self.parameters.get("amount", 100) != 0:
-            image_filenames = image_filenames[:self.parameters.get("amount", 100)]
+            if max_images and len(image_filenames) >= max_images:
+                break
         total_image_files = len(image_filenames)
         self.dataset.log(f"Total image files: {total_image_files}")
 
+        # Check if metadata exists and if so ensure extracted
+        try:
+            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+            create_metadata = True if metadata_file else False
+        except KeyError:
+            self.dataset.update_status("No metadata file found")
+            create_metadata = False
+
+        # Check if category layout requested
+        # TODO: images can only have one category, but images can belong to multiple posts!
+        category = None if self.parameters.get("category", None) == "None" else self.parameters.get("category", None)
+
         # Results folder
-        output_dir = self.dataset.get_results_folder_path()
-        output_dir.mkdir(exist_ok=True)
+        output_dir = self.dataset.get_staging_area()
 
         # Create metadata files
         category_layout = None
@@ -149,7 +170,8 @@ class ImagePlotGenerator(BasicProcessor):
         grid_map = self.create_grid_map(image_filenames)
 
         # Create the UMAP map
-        # TODO: this. And add options for different types.
+        # TODO: Create a UMAP. And add options for different types.
+        # TODO: hide UMAP view somehow if not used; currently it is just the grid map repeated
         # We'll use the gridmap in place of the UMAP map for now.
         umap_maps = [{
                     "n_neighbors": 3,
@@ -179,18 +201,20 @@ class ImagePlotGenerator(BasicProcessor):
                         labels=labels,
                         )
 
-        # Results HTML file redirects to output_dir/index.html
-        plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get(
-            "flask.server_name") + '/results/' + self.dataset.key + "/plot/"
-        html_file = get_html_redirect_page(plot_url)
+        self.write_archive_and_finish(output_dir, total_image_files)
 
-        # Write HTML file
-        with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:
-            output_file.write(html_file)
-
-        # Finish
-        self.dataset.update_status("Finished")
-        self.dataset.finish(1)
+        # # Results HTML file redirects to output_dir/index.html
+        # plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get(
+        #     "flask.server_name") + '/results/' + self.dataset.key + "/plot/"
+        # html_file = get_html_redirect_page(plot_url)
+        #
+        # # Write HTML file
+        # with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:
+        #     output_file.write(html_file)
+        #
+        # # Finish
+        # self.dataset.update_status("Finished")
+        # self.dataset.finish(1)
 
     @staticmethod
     def create_grid_map(list_of_image_filenames):
@@ -557,7 +581,7 @@ class ImagePlotGenerator(BasicProcessor):
             "max": grid * 1.5,
             "scatter": grid * .2 if umap else grid,
             "initial": grid * .2 if umap else grid,
-            "categorical": grid * .6,
+            "categorical": grid * .5,
             "geographic": grid * .025,
         }
         # fetch the date distribution data for point sizing
@@ -565,7 +589,7 @@ class ImagePlotGenerator(BasicProcessor):
             # date: number of columns (+ 1) times the number of date labels
             point_sizes['date'] = 1 / ((date_columns + 1) * date_labels)
 
-            point_sizes['cat_text'] = point_sizes['date'] * 0.5
+            point_sizes['cat_text'] = point_sizes['date'] * 0.2
 
         return point_sizes
 
@@ -757,7 +781,7 @@ class ImagePlotGenerator(BasicProcessor):
         keys_and_counts = [{'key': i, 'count': len(d[i])} for i in d]
         keys_and_counts.sort(key=operator.itemgetter('count'), reverse=True)
         # get the box layout then subdivide into discrete points
-        boxes = get_categorical_boxes([i['count'] for i in keys_and_counts], margin=margin)
+        boxes = self.get_categorical_boxes([i['count'] for i in keys_and_counts], margin=margin)
         points = get_categorical_points(boxes)
         # sort the points into the order of the observations in the metadata
         counts = {i['key']: 0 for i in keys_and_counts}
@@ -856,43 +880,50 @@ class ImagePlotGenerator(BasicProcessor):
       }
 
 
-def get_categorical_boxes(group_counts, margin=2):
-    """
-    @arg [int] group_counts: counts of the number of images in each
-    distinct level within the metadata's caetgories
-    @kwarg int margin: space between boxes in the 2D layout
-    @returns [Box] an array of Box() objects; one per level in `group_counts`
-    """
-    group_counts = sorted(group_counts, reverse=True)
-    boxes = []
-    for i in group_counts:
-        w = h = math.ceil(i**(1/2))
-        boxes.append(Box(i, w, h, None, None))
-    # find the position along x axis where we want to create a break
-    wrap = math.floor(sum([i.cells for i in boxes])**(1/2)) - (2 * margin)
-    # find the valid positions on the y axis
-    y = margin
-    y_spots = []
-    for i in boxes:
-        if (y + i.h + margin) <= wrap:
-            y_spots.append(y)
-            y += i.h + margin
-        else:
-            y_spots.append(y)
-            break
-    # get a list of lists where sublists contain elements at the same y position
-    y_spot_index = 0
-    for i in boxes:
-        # find the y position
-        y = y_spots[y_spot_index]
-        # find members with this y position
-        row_members = [j.x + j.w for j in boxes if j.y == y]
-        # assign the y position
-        i.y = y
-        y_spot_index = (y_spot_index + 1) % len(y_spots)
-        # assign the x position
-        i.x = max(row_members) + margin if row_members else margin
-    return boxes
+    def get_categorical_boxes(self, group_counts, margin=2):
+        """
+        @arg [int] group_counts: counts of the number of images in each
+        distinct level within the metadata's caetgories
+        @kwarg int margin: space between boxes in the 2D layout
+        @returns [Box] an array of Box() objects; one per level in `group_counts`
+        """
+        group_counts = sorted(group_counts, reverse=True)
+        boxes = []
+        for i in group_counts:
+            w = h = math.ceil(i**(1/2))
+            boxes.append(Box(i, w, h, None, None))
+        self.dataset.log(f"Num boxes {len(boxes)}")
+        # find the position along x axis where we want to create a break
+        wrap = math.ceil(sum([i.cells for i in boxes])**(1/2)) - (2 * margin)
+        wrap = sum([i.w + (2 * margin) for i in boxes])
+        self.dataset.log(f"total width {wrap}")
+
+        wrap = math.ceil(wrap**(1/2))
+        self.dataset.log(f"square root {wrap}")
+        # find the valid positions on the y axis
+        y = margin
+        y_spots = []
+        for i in boxes:
+            if (y + i.h + margin) <= wrap:
+                y_spots.append(y)
+                y += i.h + margin
+            else:
+                y_spots.append(y)
+                break
+        self.dataset.log(f"y spots {y_spots}")
+        # get a list of lists where sublists contain elements at the same y position
+        y_spot_index = 0
+        for i in boxes:
+            # find the y position
+            y = y_spots[y_spot_index]
+            # find members with this y position
+            row_members = [j.x + j.w for j in boxes if j.y == y]
+            # assign the y position
+            i.y = y
+            y_spot_index = (y_spot_index + 1) % len(y_spots)
+            # assign the x position
+            i.x = max(row_members) + margin if row_members else margin
+        return boxes
 
 def get_categorical_points(arr, unit_size=None):
     """

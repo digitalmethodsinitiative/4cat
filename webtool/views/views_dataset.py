@@ -334,14 +334,22 @@ def preview_items(key):
         return get_result(dataset.get_results_path().name)
 
     elif dataset.get_extension() == "zip":
-        # Check if a child was a custom-image-plot
-        for child in dataset.children:
-            if child.type == "custom-image-plot":
-                return get_result(child.get_results_path().name)
+        # Check if zip can use pixplot template
+        if hasattr(processor, "is_plot") and processor.is_plot:
+            return view_image_plot(dataset.key)
+
+        # Check if a children are plotable (e.g., a plot was created from the zip)
+        for child in dataset.get_children(instantiate_datasets=False):
+            child_processor = child.get_own_processor()
+            if hasattr(child_processor, "is_plot") and child_processor.is_plot:
+                return view_image_plot(child.key)
+            # TODO: Better way to identify this edge case
             elif child.type == "image-downloader":
-                for grandkid in child.children:
-                    if grandkid.type == "custom-image-plot":
-                        return get_result(grandkid.get_results_path().name)
+                # Images were downloaded from this zip; this is the case for presets
+                for grandkid in child.get_children(instaniate_datasets=False):
+                    grandkid_processor = grandkid.get_own_processor()
+                    if hasattr(grandkid_processor, "is_plot") and grandkid_processor.is_plot:
+                        return view_image_plot(grandkid.key)
 
         # List files in zip w/ links
         rows = [["Files"]]

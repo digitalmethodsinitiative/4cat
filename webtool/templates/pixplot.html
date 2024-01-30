@@ -14,7 +14,7 @@
     <!-- version: VERSION_NUMBER -->
     <!-- Variables used by tsne.js to locate assets -->
     <label for="assets_directory_url"></label><input value="{{ url_for("static", filename="pixplot_template/assets/") }}" type="text" hidden="hidden" id="assets_directory_url" />
-    <label for="dataset_directory_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_results_folder_path().name) }}" type="text" hidden="hidden" id="dataset_directory_url" />
+    <label for="dataset_directory_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_results_path().name) }}" type="text" hidden="hidden" id="dataset_directory_url" />
     <label for="original_images_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_parent().get_results_path().name) }}" type="text" hidden="hidden" id="original_images_url" />
 
     <script type='x-shader/x-vertex' id='vertex-shader'>
@@ -476,7 +476,7 @@
                 <img class='hotspot-action refresh-hotspot' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/refresh.svg") }}'>
               <% } %>
               <div class='hotspot-body no-highlight'>
-                <img class='hotspot-image' src='{{ dataset.get_results_folder_path() }}/<%= hotspot.img %>'>
+                <img class='hotspot-image' src='{{ dataset.get_results_path() }}/<%= hotspot.img %>'>
                 <div class='hotspot-bar-container'>
                   <div class='hotspot-bar-inner'></div>
                 </div>
@@ -580,7 +580,7 @@
                 <% _.forEach(images, function(image, idx) { %>
                   <div class='selected-image'>
                     <div class='toggle-selection'>✕</div>
-                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("{{ dataset.get_results_folder_path() }}/thumbs/<%- image %>");'></div>
+                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("{{ dataset.get_results_path() }}/thumbs/<%- image %>");'></div>
                   </div>
                 <% }); %>
               </div>
