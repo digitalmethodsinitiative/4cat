@@ -537,6 +537,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param Path staging_area:  Where to store the files while they're
 		  being worked with. If omitted, a temporary folder is created and
 		  deleted after use
+		:param int max_number_files:  Maximum number of files to unpack. If None, all files unpacked
 		:return Path:  A path to the staging area
 		"""
 
@@ -563,6 +564,32 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				paths.append(temp_file)
 
 		return staging_area
+
+	def extract_archived_file_by_name(self, filename, archive_path, staging_area=None):
+		"""
+		Extract a file from an archive by name
+
+		:param str filename:  Name of file to extract
+		:param Path archive_path:  Path to zip file to read
+		:param Path staging_area:  Where to store the files while they're
+		  		being worked with. If omitted, a temporary folder is created
+		:return Path:  A path to the extracted file
+		"""
+		if not archive_path.exists():
+			return
+
+		if not staging_area:
+			staging_area = self.dataset.get_staging_area()
+
+		if not staging_area.exists() or not staging_area.is_dir():
+			raise RuntimeError("Staging area %s is not a valid folder")
+
+		with zipfile.ZipFile(archive_path, "r") as archive_file:
+			if filename not in archive_file.namelist():
+				raise KeyError("File %s not found in archive %s" % (filename, archive_path))
+			else:
+				archive_file.extract(filename, staging_area)
+				return staging_area.joinpath(filename)
 
 	def write_csv_items_and_finish(self, data):
 		"""

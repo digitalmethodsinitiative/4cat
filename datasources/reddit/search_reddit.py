@@ -44,8 +44,7 @@ class SearchReddit(Search):
 			"type": UserInput.OPTION_INFO,
 			"help": "The requirement for searching by keyword has been lifted for your account; you can search by "
 					"date range only. This can potentially return hundreds of millions of posts, so **please be "
-					"careful** when using this privilege.",
-			"requires": "reddit-search.can_query_without_keyword"
+					"careful** when using this privilege."
 		},
 		"pushshift_track": {
 			"type": UserInput.OPTION_CHOICE,
@@ -126,6 +125,25 @@ class SearchReddit(Search):
 	api_type = None
 	since = "since"
 	after = "after"
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Determine if user needs to see the 'careful with wildcard queries!'
+		warning
+
+		:param parent_dataset:
+		:param user:
+		:return dict:  Options definition
+		"""
+		options = cls.options
+
+		# this warning isn't needed if the user can't search for everything
+		# anyway
+		if not config.get("reddit-search.can_query_without_keyword"):
+			del options["wildcard-warning"]
+
+		return options
 
 	@staticmethod
 	def build_query(query):

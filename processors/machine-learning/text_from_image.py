@@ -105,13 +105,29 @@ class ImageTextDetector(BasicProcessor):
 
         # Unpack the images into a staging_area
         self.dataset.update_status("Unzipping images")
-        staging_area = self.unpack_archive_contents(self.source_file)
 
-        # Collect filenames (skip .json metadata files)
-        image_filenames = [filename for filename in os.listdir(staging_area) if
-                           filename.split('.')[-1] not in ["json", "log"]]
         if int(self.parameters.get("amount", 100)) != 0:
-            image_filenames = image_filenames[:int(self.parameters.get("amount", 100))]
+            max_images = int(self.parameters.get("amount", 100))
+        else:
+            max_images = None
+
+        staging_area = self.dataset.get_staging_area()
+        # Collect filenames and metadata
+        image_filenames = []
+        metadata_file = None
+        for image in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while unzipping images")
+
+            if image.name.split('.')[-1] not in ["json", "log"]:
+                image_filenames.append(image.name)
+
+            if image.name == ".metadata.json":
+                metadata_file = image.name
+
+            if max_images and len(image_filenames) >= max_images:
+                break
+
         total_image_files = len(image_filenames)
 
         # Make output dir
@@ -158,12 +174,21 @@ class ImageTextDetector(BasicProcessor):
 
         # Load the metadata from the archive
         image_metadata = {}
-        with open(os.path.join(staging_area, '.metadata.json')) as file:
-            image_data = json.load(file)
-            for url, data in image_data.items():
-                if data.get('success'):
-                    data.update({"url": url})
-                    image_metadata[data['filename']] = data
+        if metadata_file is None:
+            try:
+                self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+                metadata_success = True
+            except KeyError:
+                self.dataset.update_status("No metadata file found")
+                metadata_success = False
+
+            if metadata_success:
+                with open(os.path.join(staging_area, '.metadata.json')) as file:
+                    image_data = json.load(file)
+                    for url, data in image_data.items():
+                        if data.get('success'):
+                            data.update({"url": url})
+                            image_metadata[data['filename']] = data
 
         # Check if we need to collect data for updating the original dataset
         update_original = self.parameters.get("update_original", False)

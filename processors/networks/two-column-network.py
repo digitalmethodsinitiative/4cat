@@ -252,9 +252,10 @@ class ColumnNetworker(BasicProcessor):
 
                         edge = (node_a, node_b)
                         if edge not in network.edges():
-                            network.add_edge(node_a, node_b, frequency=1)
+                            network.add_edge(node_a, node_b, frequency=1, weight=1)
                         else:
                             network.edges[edge]['frequency'] += 1
+                            network.edges[edge]['weight'] += 1
 
         if not network.edges():
             self.dataset.update_status("No edges could be created for the given parameters", is_final=True)

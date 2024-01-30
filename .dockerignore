@@ -1,0 +1,4 @@
+data/
+.github/
+.ipynb_checkpoints/
+.gitignore
