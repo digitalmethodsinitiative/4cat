@@ -1,6 +1,8 @@
 import time
 import datetime
 import re
+import json
+import requests
 
 from google_play_scraper.scraper import PlayStoreScraper
 from itunes_app_scraper.scraper import AppStoreScraper
@@ -13,6 +15,7 @@ from itunes_app_scraper.util import AppStoreCollections
 
 
 from backend.lib.search import Search
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
 
@@ -82,6 +85,13 @@ class SearchAppleStore(Search):
                 "tooltip": "If enabled, the full details of each application will be included in the output.",
                 "requires": "method$=detail", # ends with detail
             },
+            "beta_details": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Use new beta details endpoint",
+                "default": False,
+                "tooltip": "If enabled, the full details will be collected from apps.apple.com.",
+                "requires": "full_details==true",
+            },
             "intro-2": {
                 "type": UserInput.OPTION_INFO,
                 "help": "Language and Country options have limited effects due to geographic restrictions and results given based on from what country the request originates (i.e. the country where 4CAT is based)."
@@ -136,11 +146,36 @@ class SearchAppleStore(Search):
         else:
             params['appId'] = queries
 
-        self.dataset.log(f"Collecting {method} from Apple Store")
-        results = collect_from_store('apple', method, languages=re.split(',|\n', self.parameters.get('languages')), countries=re.split(',|\n', self.parameters.get('countries')), full_detail=self.parameters.get('full_details', False), params=params, log=self.dataset.log)
+        results = []
+
+        if not self.parameters.get('beta_details', False):
+            self.dataset.log(f"Collecting {method} from Apple Store")
+            results += collect_from_store('apple', method, languages=re.split(',|\n', self.parameters.get('languages')), countries=re.split(',|\n', self.parameters.get('countries')), full_detail=self.parameters.get('full_details', False), params=params, log=self.dataset.log)
+        else:
+            self.dataset.update_status("Collecting results with new beta endpoint")
+            if method != 'app':
+                list_of_apps = collect_from_store('apple', method, languages=re.split(',|\n', self.parameters.get('languages')), countries=re.split(',|\n', self.parameters.get('countries')), params=params, log=self.dataset.log)
+            else:
+                list_of_apps = queries
+
+            for i, app in enumerate(list_of_apps):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while getting collecting detailed results from Apple Store")
+                if method != 'app':
+                    results.append(self.collect_detailed_data_from_apple_store_by_id(app['id'], app['country'], app['lang']))
+                else:
+                    # List of apps only contains IDs
+                    # TODO: issue w/ languages and countries; likely codes
+                    # languages = [lang.strip() for lang in self.parameters.get('languages')] if self.parameters.get('languages') else []
+                    # countries = [country.strip() for country in self.parameters.get('countries')] if self.parameters.get('countries') else []
+                    # for country in countries:
+                    #     for language in languages:
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while getting collecting detailed results from Apple Store")
+                    results.append(self.collect_detailed_data_from_apple_store_by_id(app))#, country, language))
         if results:
             self.dataset.log(f"Collected {len(results)} results from Apple Store")
-            return [{"query_method": method, "collected_at_timestamp": datetime.datetime.now().timestamp(), "item_index": i, **result} for i, result in enumerate(results)]
+            return [{"4CAT_metadata": {"query_method": method, "collected_at_timestamp": datetime.datetime.now().timestamp(), "item_index": i, "beta": self.parameters.get('beta_details', False)}, **result} for i, result in enumerate(results)]
         else:
             self.dataset.log(f"No results identified for {self.parameters.get('query', '') if method != 'lists' else self.parameters.get('collection')} from Apple Store")
             return []
@@ -148,7 +183,7 @@ class SearchAppleStore(Search):
     @staticmethod
     def validate_query(query, request, user):
         """
-        Validate input for a dataset query on the VK data source.
+        Validate input for a dataset query on the data source.
 
         Will raise a QueryParametersException if invalid parameters are
         encountered. Parameters are additionally sanitised.
@@ -160,6 +195,10 @@ class SearchAppleStore(Search):
         """
            
         return query
+
+    @staticmethod
+    def map_beta_item(item, fourcat_metadata):
+        return {}
     
     @staticmethod
     def map_item(item):
@@ -169,7 +208,17 @@ class SearchAppleStore(Search):
         :param item:
         :return:
         """
-        query_method = item.pop("query_method", "")
+        if "4CAT_metadata" in item:
+            fourcat_metadata = item.pop("4CAT_metadata")
+            if fourcat_metadata.get("beta", False):
+                return SearchAppleStore.map_beta_item(item, fourcat_metadata)
+            else:
+                query_method = fourcat_metadata.get("query_method", "")
+                collected_timestamp = fourcat_metadata.get("collected_at_timestamp", "")
+        else:
+            query_method = item.pop("query_method", "")
+            collected_timestamp = item.pop("collected_at_timestamp", "")
+
         formatted_item = {
             "4CAT_query_type": query_method,
             "query_country": item.get("country", ""),
@@ -240,7 +289,6 @@ class SearchAppleStore(Search):
             "minimumOsVersion": "minimum_os_version",
             "wrapperType": "wrapper_type",
             "errors": "errors",
-            "collected_at_timestamp": "collected_at_timestamp",
         }
 
         for field in mapped_fields:
@@ -251,17 +299,79 @@ class SearchAppleStore(Search):
             [f"{key}: {value}" for key, value in item.items() if key not in list(mapped_fields) +  ["id"]])
 
         # 4CAT required fields
+        formatted_item["collected_timestamp"] = collected_timestamp
         formatted_item["thread_id"] =  ""
         formatted_item["author"] = item.get("artistName", "")
         formatted_item["body"] = item.get("description", "")
         # some queries do not return a publishing timestamp so we use the collected at timestamp
-        formatted_item["timestamp"] = datetime.datetime.strptime(item.get("releaseDate"), "%Y-%m-%dT%H:%M:%SZ") if "releaseDate" in item else item.get("collected_at_timestamp")
+        formatted_item["timestamp"] = datetime.datetime.strptime(item.get("releaseDate"), "%Y-%m-%dT%H:%M:%SZ") if "releaseDate" in item else collected_timestamp
 
         return formatted_item
 
+    @staticmethod
+    def collect_detailed_data_from_apple_store_by_id(app_id, country_id="us", lang="en-us"):
+        """
+        Collect App details from Apple Store
+
+        This is to take advantage of a different endpoint found from looking up apps at https://apps.apple.com/.
+        """
+        user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
+        # Collect token
+        token_url = f"https://apps.apple.com/{country_id}/app/id{app_id}"
+        response = requests.get(token_url, headers={'User-Agent': user_agent})
+        if response.status_code != 200:
+            raise Exception(f"Unable to connect to apps.apple.com: {response.status_code} {response.reason}")
+        html = response.text
+
+        reg_exp = re.compile(r'token%22%3A%22([^%]+)%22%7D')
+        match = reg_exp.search(html)
+        token = match.group(1)
+        if not token:
+            raise Exception("Unable to find token to collect data from apps.apple.com")
+
+        # Collect data
+        # Copied from browser request
+        url = f"https://amp-api.apps.apple.com/v1/catalog/{country_id}/apps/{app_id}?l={lang}&l=en-us&platform=web&additionalPlatforms=appletv,ipad,iphone,mac&" \
+              "extend=customPromotionalText,customScreenshotsByType,customVideoPreviewsByType,description,developerInfo,distributionKind,editorialVideo,fileSizeByDevice,messagesScreenshots,privacy,privacyPolicyUrl,requirementsByDeviceFamily,sellerInfo,supportURLForLanguage,versionHistory,websiteUrl,videoPreviewsByType&" \
+              "include=app-events,genres,developer,reviews,merchandised-in-apps,customers-also-bought-apps,developer-other-apps,top-in-apps,related-editorial-items&" \
+              "limit[merchandised-in-apps]=20&" \
+              "omit[resource]=autos&" \
+              "meta=robots&" \
+              "sparseLimit[apps:related-editorial-items]=20&" \
+              "sparseLimit[apps:customers-also-bought-apps]=20&" \
+              "sparseLimit[app:developer-other-apps]=20"
+
+        headers = {
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Origin': 'https://apps.apple.com',
+            'Authorization': f"Bearer {token}",
+            'User-Agent': user_agent
+        }
+
+        response = requests.get(url, headers=headers)
+
+        if response.status_code != 200:
+            raise Exception(f"Unable to collect data from apps.apple.com: {response.status_code} {response.reason} - {response.text}")
+
+        if len(response.text) == 0:
+            raise ValueError(f"App not found (404): app - {app_id}, country - {country_id}, lang - {lang}")
+
+        data = json.loads(response.text)
+        if not data.get('data'):
+            raise ValueError(f"App not found (404): app - {app_id}, country - {country_id}, lang - {lang}")
+        elif len(data['data']) == 0:
+            raise ValueError(f"App not found (404): app - {app_id}, country - {country_id}, lang - {lang}")
+        elif len(data['data']) > 1:
+            raise ValueError(f"Multiple apps found (500): app - {app_id}, country - {country_id}, lang - {lang}")
+        else:
+            return data['data'][0]
+
+
 def collect_from_store(store, method, languages=None, countries=None, full_detail=False, params={}, log=print):
     """
-    Collect data from Apple or Google store
+    Collect data from Apple or Google store using https://github.com/digitalmethodsinitiative/itunes-app-scraper
+    or https://github.com/digitalmethodsinitiative/google-play-scraper
 
     :param store: 'apple' or 'google'
     :param method: 'app', 'list', 'search', 'developer', 'similar', 'permissions'
@@ -519,3 +629,4 @@ def collect_from_store(store, method, languages=None, countries=None, full_detai
                     log(f"Error collecting permissions for app {id}: {e}")
 
         return result
+
