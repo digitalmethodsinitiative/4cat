@@ -339,14 +339,14 @@ def preview_items(key):
             return view_image_plot(dataset.key)
 
         # Check if a children are plotable (e.g., a plot was created from the zip)
-        for child in dataset.get_children(instantiate_datasets=False):
+        for child in dataset.get_children(instantiate_datasets=True):
             child_processor = child.get_own_processor()
             if hasattr(child_processor, "is_plot") and child_processor.is_plot:
                 return view_image_plot(child.key)
-            # TODO: Better way to identify this edge case
-            elif child.type == "image-downloader":
+            # TODO: Better way to identify this edge case?
+            elif child.type.startswith("image-downloader"):
                 # Images were downloaded from this zip; this is the case for presets
-                for grandkid in child.get_children(instaniate_datasets=False):
+                for grandkid in child.get_children(instaniate_datasets=True):
                     grandkid_processor = grandkid.get_own_processor()
                     if hasattr(grandkid_processor, "is_plot") and grandkid_processor.is_plot:
                         return view_image_plot(grandkid.key)

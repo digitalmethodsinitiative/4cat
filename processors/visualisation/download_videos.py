@@ -778,19 +778,20 @@ class DatasetVideoLibrary:
 
         parent_dataset = self.current_dataset.get_parent()
         # Note: exclude current dataset
-        previous_downloaders = [child for child in parent_dataset.children if (child.type == "video-downloader" and child.key != self.current_dataset.key)]
+        previous_downloaders = [child for child in parent_dataset.get_children(instantiate_datasets=False) if (child.get("type") == "video-downloader" and child.get("key") != self.current_dataset.key)]
 
         # Check to see if filtered dataset
         if "copied_from" in parent_dataset.parameters and parent_dataset.is_top_dataset():
             try:
                 original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
-                previous_downloaders += [child for child in original_dataset.top_parent().children if
+                previous_downloaders += [child for child in original_dataset.top_parent().get_children(instantiate_datasets=False) if
                                          (child.type == "video-downloader" and child.key != self.current_dataset.key)]
             except DataSetException:
                 # parent dataset no longer exists!
                 pass
 
-        return previous_downloaders
+        # Instantiate the downloader datasets so we can use their methods
+        return [downloader.instatiate(db=self.current_dataset.db) for downloader in previous_downloaders]
 
     def collect_metadata_file(self, dataset, staging_area):
         source_file = dataset.get_results_path()

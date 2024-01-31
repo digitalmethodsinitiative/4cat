@@ -39,7 +39,7 @@ class DataSet(FourcatModule):
 	data = None
 	key = ""
 
-	children = None
+	_children = None
 	available_processors = None
 	genealogy = None
 	preset_parent = None
@@ -71,7 +71,6 @@ class DataSet(FourcatModule):
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}
-		self.children = []
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
@@ -147,10 +146,6 @@ class DataSet(FourcatModule):
 
 			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
-
-		# retrieve analyses and processors that may be run for this dataset
-		# TODO: replace self.children w/ self.get_children() everywhere?
-		self.children = self.get_children()
 
 		self.refresh_owners()
 
@@ -724,7 +719,7 @@ class DataSet(FourcatModule):
 			self.refresh_owners()
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(instantiate_datasets=True):
 			child.add_owner(username, role)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -755,7 +750,7 @@ class DataSet(FourcatModule):
 			del self.tagged_owners[username]
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(instantiate_datasets=True):
 			child.remove_owner(username)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -800,7 +795,7 @@ class DataSet(FourcatModule):
 
 		self.db.commit()
 		if recursive:
-			for child in self.children:
+			for child in self.get_children(instantiate_datasets=True):
 				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
@@ -1242,22 +1237,27 @@ class DataSet(FourcatModule):
 		self.genealogy = genealogy
 		return self.genealogy
 
-	def get_children(self, instantiate_datasets=True):
+	def get_children(self, instantiate_datasets=True, update=False):
 		"""
 		Get children of this dataset
 
-		:param bool instantiate_datasets:  Instantiate DataSet objects for each child else return (key, type) tuples
+		:param bool instantiate_datasets:  Instantiate DataSet objects for each child else return ChildDataset objects w/ only key and type attributes
+		:param bool update:  Update the list of children from database if True, else return cached value
 		:return list:  List of child datasets
 		"""
+		if self._children and not update:
+			return self._children
+
 		if instantiate_datasets:
 			analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC",
 										(self.key,))
-			return sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
+			self._children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
 							  key=lambda dataset: dataset.is_finished(), reverse=True)
+			return self._children
 		else:
-			# Only (key, type) tuples
-			return self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-
+			# Returns simple ChildDataset objects with only key and type
+			# Do not update self._children since this is not a list of DataSet objects
+			return [ChildDataset(key=key, type=dataset_type) for key, dataset_type in self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))]
 
 	def get_all_children(self, recursive=True, instantiate_datasets=True):
 		"""
@@ -1398,9 +1398,11 @@ class DataSet(FourcatModule):
 
 		:return:  Processor class, or `None` if not available.
 		"""
-		processor_type = self.parameters.get("type", self.data.get("type"))
+		processor_type = self.type if hasattr(self, "type") else self.parameters.get("type")
 		return backend.all_modules.processors.get(processor_type)
 
+	def get(self, key):
+		return self.data.get(key)
 
 	def get_available_processors(self, user=None):
 		"""
@@ -1421,7 +1423,7 @@ class DataSet(FourcatModule):
 
 		processors = self.get_compatible_processors(user=user)
 
-		for analysis in self.children:
+		for analysis in self.get_children(instantiate_datasets=False):
 			if analysis.type not in processors:
 				continue
 
@@ -1676,3 +1678,17 @@ class DataSet(FourcatModule):
 
 		if attr == "parameters":
 			self.parameters = json.loads(value)
+
+class ChildDataset:
+	"""
+	Allows for easy access to child some dataset attributes without instantiating them all
+	"""
+	def __init__(self, key, type):
+		self.key = key
+		self.type = type
+
+	def instantiate(self, db):
+		"""
+		Instantiates the dataset
+		"""
+		return DataSet(key=self.key, db=db)
