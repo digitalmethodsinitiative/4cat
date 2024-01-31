@@ -27,6 +27,21 @@ config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+if app.logger.getEffectiveLevel() == 10:
+    # if we're in debug mode, we want to see how long it takes to load datasets
+    import time
+    from functools import wraps
+    def time_this(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            r = func(*args, **kwargs)
+            app.logger.debug("%s dataset took %.2f seconds" % (func.__name__, time.time() - start_time))
+            return r
+        return wrapper
+else:
+    def time_this(func):
+        return func
 
 @app.route('/create-dataset/')
 @login_required
@@ -44,6 +59,7 @@ def create_dataset():
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
+@time_this
 @login_required
 def show_results(page):
     """
@@ -297,6 +313,7 @@ def view_log(key):
 
 
 @app.route("/preview/<string:key>/")
+@time_this
 def preview_items(key):
     """
     Preview a dataset file
@@ -453,6 +470,7 @@ Individual result pages
 """
 @app.route('/results/<string:key>/processors/')
 @app.route('/results/<string:key>/')
+@time_this
 def show_result(key):
     """
     Show result page
@@ -463,10 +481,12 @@ def show_result(key):
     :param key:  Result key
     :return:  Rendered template
     """
+    ds_start = time.time()
     try:
         dataset = DataSet(key=key, db=db)
     except DataSetException:
         return error(404)
+    app.logger.debug("Loading dataset took %.2f seconds" % (time.time() - ds_start))
 
     if not current_user.can_access_dataset(dataset):
         return error(403, error="This dataset is private.")
