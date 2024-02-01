@@ -12,7 +12,7 @@
         {% set outer_loop = loop %}
         <tr>
         {% for cell in row %}
-            <t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>{{ cell }}</t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
+            <t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}><div class="cell-content">{{ cell }}</div></t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
         {% endfor %}
         </tr>
     {% endfor %}
