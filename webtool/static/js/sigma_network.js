@@ -264,8 +264,11 @@ const sigma_graph = {
         sigma_graph.update_visual_settings();
 
         // Button to get node positions
-        let button = document.getElementById('getPositionsButton');
-        button.addEventListener('click', sigma_graph.get_node_positions);
+        if (document.getElementById('getPositionsButton')) {
+            let button = document.getElementById('getPositionsButton');
+            button.addEventListener('click', sigma_graph.get_node_positions);
+        }
+
     },
 
     /**
