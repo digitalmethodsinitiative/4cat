@@ -263,11 +263,11 @@ db.commit()
 
 print("Updating thread statistics.")
 db.execute(
-	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s AND board = %s",
-	(tuple(thread_ids), args.board,))
+	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND board = %s) WHERE t.id IN %s AND board = %s",
+	(args.board, tuple(thread_ids), args.board,))
 db.execute(
-	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s AND board = %s",
-	(tuple(thread_ids), args.board,))
+	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND board = %s AND image_file != '') WHERE t.id IN %s AND board = %s",
+	(args.board, tuple(thread_ids), args.board,))
 
 db.commit()
 print("Done!")

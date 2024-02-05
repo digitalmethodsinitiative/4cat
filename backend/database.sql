@@ -17,7 +17,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_setting
 
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
-  id                     SERIAL PRIMARY KEY,
+  id                     BIGSERIAL PRIMARY KEY,
   jobtype                text    DEFAULT 'misc',
   remote_id              text,
   details                text,
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   key_parent        text DEFAULT '' NOT NULL,
   creator           VARCHAR DEFAULT 'anonymous',
   query             text,
-  job               integer DEFAULT 0,
+  job               BIGINT DEFAULT 0,
   parameters        text,
   result_file       text DEFAULT '',
   timestamp         integer,

@@ -299,7 +299,7 @@ class User:
         try:
             send_email([username], message)
             return url
-        except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
+        except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout, socket.gaierror) as e:
             raise RuntimeError("Could not send password reset e-mail: %s" % e)
 
     def generate_token(self, username=None, regenerate=True):

@@ -63,7 +63,7 @@ class TikTokVideoDownloader(BasicProcessor):
         # Update the amount max and help from config
         max_number_videos = int(config.get('video-downloader.max', 1000, user=user))
         options['amount']['max'] = max_number_videos
-        options['amount']['help'] = f"No. of images (max {max_number_videos:,})"
+        options['amount']['help'] = f"No. of videos (max {max_number_videos:,})"
 
         return options
 
@@ -174,9 +174,9 @@ class TikTokImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get('image-downloader.max', 1000))
+        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
         options['amount']['max'] = max_number_images
-        options['amount']['help'] = "No. of images (max %s)" % max_number_images
+        options['amount']['help'] = f"No. of images (max {max_number_images:,})"
 
         return options
 
