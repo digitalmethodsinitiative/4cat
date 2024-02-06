@@ -140,7 +140,7 @@ def upgrade_frontend():
     log_stream.flush()
     upgrade_ok = False
 
-    command = sys.executable + " helper-scripts/migrate.py --component frontend --repository %s --yes --current-version %s" % (
+    command = sys.executable + "-m helper-scripts.migrate.py --component frontend --repository %s --yes --current-version %s" % (
         shlex.quote(config.get("4cat.github_url")), shlex.quote(str(frontend_version_file)))
 
     # there should be one and only one job of this type, with the parameters of
