@@ -2571,19 +2571,28 @@ Text.prototype.setWords = function(arr) {
 }
 
 Text.prototype.updateScale = function() {
-  let text_scale = (Layout.selected === 'categorical' &&  "cat_text" in config.size.points)? config.size.points.cat_text : config.size.points.date;
+  let text_scale;
+  if (layout.selected === 'categorical' &&  ("cat_text" in config.size.points)) {
+    text_scale = config.size.points.cat_text;
+  } else {
+    text_scale = config.size.points.date;
+  }
   // set mesh sizing attributes based on number of columns in each bar group
   this.scale = text_scale;
+  if ( this.mesh ) {
+    // Update the scale of the text
+    text.mesh.material.uniforms.scale.value = text.getPointScale();
+  }
   this.kerning = this.scale * 0.8;
 }
 
 Text.prototype.getPointScale = function() {
-  this.updateScale();
   return window.devicePixelRatio * window.innerHeight * this.scale;
 }
 
 // use JSON data with labels and positions attributes to set current text
 Text.prototype.formatText = function(json) {
+  this.updateScale();
   var l = [];
   json.labels.forEach(function(word, idx) {
     l.push({
