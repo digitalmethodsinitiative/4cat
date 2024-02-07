@@ -17,7 +17,6 @@ from itertools import product
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import get_html_redirect_page
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -64,34 +63,19 @@ class ImagePlotGenerator(BasicProcessor):
             },
         }
 
-        # TODO: enable when I figure out the stupid point sizes UGH
-        # # If we have a parent dataset and this dataset has metadata, we can use the metadata to create a category layout
-        # if parent_dataset and ImagePlotGenerator.check_for_metadata(parent_dataset.get_results_path()):
-        #     parent_columns = parent_dataset.top_parent().get_columns()
-        #     if parent_columns:
-        #         parent_columns = {c: c for c in sorted(parent_columns)}
-        #         parent_columns["None"] = "None"
-        #         options["category"] = {
-        #             "type": UserInput.OPTION_CHOICE,
-        #             "help": "Category column",
-        #             "tooltip": "Only one category per image. If left blank, no category layout will be created.",
-        #             "options": parent_columns,
-        #             "default": "None",
-        #     }
-
-        # TODO: enable this when we have a way to map images to network plots
-        # if parent_dataset and parent_dataset.is_dataset():
-        #     # Get potential mapping datasets
-        #     mapping_datasets = ImagePlotGenerator.get_mapping_datasets(parent_dataset)
-        #     if mapping_datasets:
-        #         mapping_datasets = [DataSet.get_dataset_by_key(key=dataset['key']) for dataset in mapping_datasets]
-        #         options["mapping_dataset"] = {
-        #             "type": UserInput.OPTION_CHOICE,
-        #             "help": "Map images to existing plot",
-        #             "options": {dataset.key: dataset.get_label() for dataset in mapping_datasets}, # TODO these labels suck... user defined field for coordinate-map dataset option?
-        #             "default": mapping_datasets.pop().key,
-        #             "tooltip": "Map images to an existing plot (e.g., from a network). This will override the default map."
-        #         }
+        # If we have a parent dataset and this dataset has metadata, we can use the metadata to create a category layout
+        if parent_dataset and ImagePlotGenerator.check_for_metadata(parent_dataset.get_results_path()):
+            parent_columns = parent_dataset.top_parent().get_columns()
+            if parent_columns:
+                parent_columns = {c: c for c in sorted(parent_columns)}
+                parent_columns["None"] = "None"
+                options["category"] = {
+                    "type": UserInput.OPTION_CHOICE,
+                    "help": "Category column",
+                    "tooltip": "Only one category per image. If left blank, no category layout will be created.",
+                    "options": parent_columns,
+                    "default": "None",
+            }
 
         return options
 
@@ -112,9 +96,6 @@ class ImagePlotGenerator(BasicProcessor):
         if self.source_dataset.num_rows == 0:
             self.dataset.finish_with_error("No images available to render to visualization.")
             return
-
-        # TODO: remove
-        self.dataset.log(self.parameters)
 
         if int(self.parameters.get("amount", 100)) != 0:
             max_images = int(self.parameters.get("amount", 100))
@@ -202,19 +183,6 @@ class ImagePlotGenerator(BasicProcessor):
                         )
 
         self.write_archive_and_finish(output_dir, total_image_files)
-
-        # # Results HTML file redirects to output_dir/index.html
-        # plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get(
-        #     "flask.server_name") + '/results/' + self.dataset.key + "/plot/"
-        # html_file = get_html_redirect_page(plot_url)
-        #
-        # # Write HTML file
-        # with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:
-        #     output_file.write(html_file)
-        #
-        # # Finish
-        # self.dataset.update_status("Finished")
-        # self.dataset.finish(1)
 
     @staticmethod
     def create_grid_map(list_of_image_filenames):
