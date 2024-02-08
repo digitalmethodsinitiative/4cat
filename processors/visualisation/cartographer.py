@@ -549,7 +549,7 @@ class ImagePlotGenerator(BasicProcessor):
             "max": grid * 1.5,
             "scatter": grid * .2 if umap else grid,
             "initial": grid * .2 if umap else grid,
-            "categorical": grid * .5,
+            "categorical": grid * .35, # Better to base on number of categories?
             "geographic": grid * .025,
         }
         # fetch the date distribution data for point sizing
