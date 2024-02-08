@@ -503,9 +503,35 @@
     </div>
     <!-- Image Picker: single image selection -->
     <script type='text/html' id='selected-image-template'>
-      <div class='modal-content'>
+      <div class='modal-row-content'>
         <div class='modal-x'>✕</div>
-        <div class='modal-top'>
+        <div class='modal-left' id='selected-image-meta'>
+          <div class='modal-left-content'>
+            <div class='modal-text-left'>
+              <div id='image-title'><%- meta.filename ? decodeURIComponent(meta.filename) : decodeURIComponent(meta.src) %></div>
+              <div class='modal-text-right'>
+                <% if (meta.category || meta.tags) { %>
+                  <div id='meta-category-container'>
+                    <% if (meta.category) { %>
+                      <div class='meta-category'><%- meta.category %></div>
+                    <% }; %>
+                    <% if (meta.tags) { %>
+                      <% _.forEach(meta.tags, function(tag) { %>
+                        <% if (tag != meta.category) { %>
+                          <div class='meta-tag'><%- tag %></div>
+                        <% } %>
+                      <% }) %>
+                    <% } %>
+                  </div>
+                <% } %>
+              </div>
+              <span id='image-text'><%= meta.description ? decodeURIComponent(meta.description) : '' %></span>
+              <span id='image-date'><%- meta.date ? '(' + meta.date + ')' : '' %></span>
+            </div>
+
+          </div>
+        </div>
+        <div class='modal-right'>
           <div id='selected-image-container'>
             <div id='selected-image-target'></div>
             <div class='icons'>
@@ -520,31 +546,6 @@
               <img id='caret-left' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons//chevron.png") }}' onclick='modal.showPreviousCell()'>
               <img id='caret-right' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/chevron.png") }}' onclick='modal.showNextCell()'>
             <% } %>
-          </div>
-        </div>
-        <div class='modal-bottom' id='selected-image-meta'>
-          <div class='modal-bottom-content'>
-            <div class='modal-text-left'>
-              <div id='image-title'><%- meta.filename ? decodeURIComponent(meta.filename) : decodeURIComponent(meta.src) %></div>
-              <span id='image-text'><%= meta.description ? decodeURIComponent(meta.description) : '' %></span>
-              <span id='image-date'><%- meta.date ? '(' + meta.date + ')' : '' %></span>
-            </div>
-            <div class='modal-text-right'>
-              <% if (meta.category || meta.tags) { %>
-                <div id='meta-category-container'>
-                  <% if (meta.category) { %>
-                    <div class='meta-category'><%- meta.category %></div>
-                  <% }; %>
-                  <% if (meta.tags) { %>
-                    <% _.forEach(meta.tags, function(tag) { %>
-                      <% if (tag != meta.category) { %>
-                        <div class='meta-tag'><%- tag %></div>
-                      <% } %>
-                    <% }) %>
-                  <% } %>
-                </div>
-              <% } %>
-            </div>
           </div>
         </div>
       </div>
@@ -571,6 +572,7 @@
     </div>
     <div id='selected-images-modal'>
       <div class='modal-content'>
+        <div class='modal-x'>✕</div>
         <div class='modal-top'>
           <script type='text/html' id='selected-images-template'>
             <div class='modal-top-content'>
@@ -580,7 +582,7 @@
                 <% _.forEach(images, function(image, idx) { %>
                   <div class='selected-image'>
                     <div class='toggle-selection'>✕</div>
-                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("{{ dataset.get_results_path() }}/thumbs/<%- image %>");'></div>
+                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("{{ url_for("get_result", query_file=dataset.get_results_path().name) }}/data/thumbs/<%- image %>");'></div>
                   </div>
                 <% }); %>
               </div>
