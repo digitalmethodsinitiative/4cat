@@ -778,7 +778,7 @@ class SearchWithTwitterAPIv2(Search):
             if variants:
                 videos.append(variants[0].get('url'))
 
-        public_metrics = {k: tweet["public_metrics"].get(k, 0) for k in ("impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count")}
+        public_metrics = {k: tweet["public_metrics"].get(k, "") for k in ("impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count")}
 
         return {
             "id": tweet["id"],
