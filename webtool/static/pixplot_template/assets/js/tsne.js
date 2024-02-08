@@ -2482,7 +2482,7 @@ Text.prototype.getTexture = function() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#ffffff';
   // draw the letters on the canvas
-  var x = 0,
+  var x = 0 + this.point, //adding this point to leave the first position empty
       y = 0;
   for (var i=charFirst; i<charLast+1; i++) {
     var char = String.fromCharCode(i);
