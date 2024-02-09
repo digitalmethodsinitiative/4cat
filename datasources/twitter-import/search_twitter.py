@@ -5,10 +5,10 @@ It's prohibitively difficult to scrape data from Twitter within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
 from datetime import datetime
-import json
 
 from backend.lib.search import Search
 from common.lib.helpers import strip_tags
+from common.lib.item_mapping import MappedItem
 
 
 class SearchTwitterViaZeeschuimer(Search):
@@ -40,9 +40,9 @@ class SearchTwitterViaZeeschuimer(Search):
     @staticmethod
     def map_item(item):
         if item.get("rest_id"):
-            return SearchTwitterViaZeeschuimer.map_item_modern(item)
+            return MappedItem(SearchTwitterViaZeeschuimer.map_item_modern(item))
         elif item.get("type") == "adaptive":
-            return SearchTwitterViaZeeschuimer.map_item_legacy(item)
+            return MappedItem(SearchTwitterViaZeeschuimer.map_item_legacy(item))
         else:
             raise NotImplementedError
 

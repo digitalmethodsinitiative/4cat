@@ -12,6 +12,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
 from common.config_manager import config
+from common.lib.item_mapping import MappedItem
 
 
 class SearchWithTwitterAPIv2(Search):
@@ -28,7 +29,7 @@ class SearchWithTwitterAPIv2(Search):
     is_static = False   # Whether this datasource is still updated
 
     previous_request = 0
-    flawless = True
+    import_issues = True
 
     references = [
         "[Twitter API documentation](https://developer.twitter.com/en/docs/twitter-api)"
@@ -780,7 +781,7 @@ class SearchWithTwitterAPIv2(Search):
 
         public_metrics = {k: item["public_metrics"].get(k, "") for k in ("impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count")}
 
-        return {
+        return MappedItem({
             "id": item["id"],
             "thread_id": item.get("conversation_id", item["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -809,4 +810,4 @@ class SearchWithTwitterAPIv2(Search):
             "mentions": ','.join(set(mentions)),
             "long_lat": ', '.join([str(x) for x in item.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
             'place_name': item.get('geo', {}).get('place', {}).get('full_name', ''),
-        }
+        })

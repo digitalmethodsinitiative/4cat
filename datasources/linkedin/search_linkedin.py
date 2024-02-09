@@ -10,7 +10,7 @@ import time
 import re
 
 from backend.lib.search import Search
-
+from common.lib.item_mapping import MappedItem
 
 class SearchLinkedIn(Search):
     """
@@ -121,7 +121,7 @@ class SearchLinkedIn(Search):
         elif item.get("content") and item["content"].get("articleComponent") and "navigationContext" in post["content"]["articleComponent"]:
             link_url = item["content"]["articleComponent"]["navigationContext"].get("actionTarget", "")
 
-        mapped_item = {
+        return MappedItem({
             "id": item_id,
             "thread_id": item_id,
             "body": item["commentary"]["text"]["text"] if item["commentary"] else "",
@@ -138,9 +138,7 @@ class SearchLinkedIn(Search):
             "inclusion_context": item["header"]["text"]["text"] if item.get("header") else "",
             "unix_timestamp": timestamp,
             "unix_timestamp_collected": time_collected
-        }
-
-        return mapped_item
+        })
 
     @staticmethod
     def get_author(post):

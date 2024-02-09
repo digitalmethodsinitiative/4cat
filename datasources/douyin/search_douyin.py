@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
-
+from common.lib.item_mapping import MappedItem
 
 class SearchDouyin(Search):
     """
@@ -178,7 +178,7 @@ class SearchDouyin(Search):
         if item.get("ZS_collected_from_mix") and not item.get("ZS_first_mix_vid"):
             displayed = False
 
-        return {
+        return MappedItem({
             "id": item[aweme_id_key],
             "thread_id": item[group_id_key],
             "subject": subject,
@@ -224,7 +224,7 @@ class SearchDouyin(Search):
             "collection_name": item.get(mix_info_key, {}).get(mix_name_key, "N/A"),
             "place_in_collection": mix_current_episode,
             "unix_timestamp": int(post_timestamp.timestamp()),
-        }
+        })
 
     @staticmethod
     def get_chinese_number(num):

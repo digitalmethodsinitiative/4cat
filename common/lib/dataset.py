@@ -317,7 +317,7 @@ class DataSet(FourcatModule):
 
 					if item_mapper:
 						try:
-							item = own_processor.get_mapped_item(item)
+							item = own_processor.get_mapped_item(item).get_item_data()
 						except MapItemException as e:
 							if warn_unmappable:
 								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
@@ -337,7 +337,7 @@ class DataSet(FourcatModule):
 					item = json.loads(line)
 					if item_mapper:
 						try:
-							item = own_processor.get_mapped_item(item)
+							item = own_processor.get_mapped_item(item).get_item_data()
 						except MapItemException as e:
 							if warn_unmappable:
 								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
@@ -374,7 +374,7 @@ class DataSet(FourcatModule):
 			# Map item
 			if item_mapper:
 				try:
-					mapped_item = own_processor.get_mapped_item(item)
+					mapped_item = own_processor.get_mapped_item(item).get_item_data()
 				except MapItemException as e:
 					if warn_unmappable:
 						self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
@@ -1587,6 +1587,7 @@ class DataSet(FourcatModule):
 			if processor is not None:
 				processor.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
 			elif hasattr(self.db, "log"):
+				# borrow the database's log handler
 				self.db.log.warning(f"Unable to map item all items for dataset {closest_dataset.key}.")
 			else:
 				# No other log available

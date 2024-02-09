@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 
 from backend.lib.search import Search
+from common.lib.item_mapping import MappedItem
 
 
 class SearchTikTok(Search):
@@ -75,7 +76,7 @@ class SearchTikTok(Search):
         thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [now])[0]) >= now]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
-        return {
+        return MappedItem({
             "id": post["id"],
             "thread_id": post["id"],
             "author": user_nickname,
@@ -108,4 +109,4 @@ class SearchTikTok(Search):
             "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "effects": ",".join([e["name"] for e in post.get("effectStickers", [])]),
             "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])
-        }
+        })

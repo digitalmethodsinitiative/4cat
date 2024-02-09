@@ -7,7 +7,7 @@ to its aggressive rate limiting. Instead, import data collected elsewhere.
 from datetime import datetime
 
 from backend.lib.search import Search
-
+from common.lib.item_mapping import MappedItem
 
 class SearchNineGag(Search):
     """
@@ -39,7 +39,7 @@ class SearchNineGag(Search):
     def map_item(item):
         post_timestamp = datetime.strptime(item["created_at"], "%Y-%m-%dT%H:%M:%SZ")
 
-        return {
+        return MappedItem({
             "id": item["id"],
             "subject": item["title"],
             "body": item["description"],
@@ -61,4 +61,4 @@ class SearchNineGag(Search):
             "favourites": item["favorite_count"],
             "virality_score": item["virality"],
             "unix_timestamp": int(post_timestamp.timestamp()),
-        }
+        })

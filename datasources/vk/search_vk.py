@@ -9,6 +9,7 @@ import vk_api
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
+from common.lib.item_mapping import MappedItem
 from common.config_manager import config
 
 
@@ -23,7 +24,7 @@ class SearchVK(Search):
     is_static = False   # Whether this datasource is still updated
 
     previous_request = 0
-    flawless = True
+    import_issues = True
 
     references = [
         "[VK API documentation](https://vk.com/dev/first_guide)",
@@ -416,7 +417,7 @@ class SearchVK(Search):
         # Use source of author profile if "type" not present (e.g., in users profiles do not seem to have type)
         author_type = author_profile.get("type", profile_source)
 
-        return {
+        return MappedItem({
             "id": item.get("id"),
             "thread_id": tread_id,
             "timestamp": vk_item_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -452,4 +453,4 @@ class SearchVK(Search):
             "links": ", ".join(links),
             "docs": ", ".join(docs),
             "subject": "",
-        }
+        })

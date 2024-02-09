@@ -745,8 +745,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			mapped_item = cls.map_item(item)
 		except (KeyError, IndexError) as e:
 			raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}")
+
 		if not mapped_item:
 			raise MapItemException("Unable to map item!")
+
 		return mapped_item
 
 	@classmethod
