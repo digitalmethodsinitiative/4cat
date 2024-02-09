@@ -531,14 +531,14 @@ class SearchWithinTCATBins(Search):
         return query
 
     @staticmethod
-    def map_item(tweet):
+    def map_item(item):
         """
         Use Twitter APIv2 map_item
         """
-        mapped_tweet = SearchWithTwitterAPIv2.map_item(tweet)
+        mapped_tweet = SearchWithTwitterAPIv2.map_item(item)
 
         # Add TCAT extra data
         for field in SearchWithinTCATBins.additional_TCAT_fields:
-            mapped_tweet["TCAT_" + field] = tweet.get("TCAT_" + field)
+            mapped_tweet["TCAT_" + field] = item.get("TCAT_" + field)
 
         return mapped_tweet

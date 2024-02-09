@@ -712,7 +712,7 @@ class SearchWithTwitterAPIv2(Search):
         return params
 
     @staticmethod
-    def map_item(tweet):
+    def map_item(item):
         """
         Map a nested Tweet object to a flat dictionary
 
@@ -724,39 +724,39 @@ class SearchWithTwitterAPIv2(Search):
         throw away valuable data and allows for later changes that e.g. store
         the tweets more efficiently as a MongoDB collection.
 
-        :param tweet:  Tweet object as originally returned by the Twitter API
+        :param item:  Tweet object as originally returned by the Twitter API
         :return dict:  Dictionary in the format expected by 4CAT
         """
-        tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
+        tweet_time = datetime.datetime.strptime(item["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
 
         # For backward compatibility
-        author_username = tweet["author_user"]["username"] if tweet.get("author_user") else tweet["author_username"]
-        author_fullname = tweet["author_user"]["name"] if tweet.get("author_user") else tweet["author_fullname"]
-        author_followers = tweet["author_user"]["public_metrics"]["followers_count"] if tweet.get("author_user") else ""
+        author_username = item["author_user"]["username"] if item.get("author_user") else item["author_username"]
+        author_fullname = item["author_user"]["name"] if item.get("author_user") else item["author_fullname"]
+        author_followers = item["author_user"]["public_metrics"]["followers_count"] if item.get("author_user") else ""
 
-        hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
-        mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
-        urls = [tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]
-        images = [item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-        video_items = [item for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+        hashtags = [tag["tag"] for tag in item.get("entities", {}).get("hashtags", [])]
+        mentions = [tag["username"] for tag in item.get("entities", {}).get("mentions", [])]
+        urls = [tag["expanded_url"] for tag in item.get("entities", {}).get("urls", [])]
+        images = [attachment["url"] for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
+        video_items = [attachment for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
         # by default, the text of retweets is returned as "RT [excerpt of
         # retweeted tweet]". Since we have the full tweet text, we can complete
         # the excerpt:
-        is_retweet = any([ref.get("type") == "retweeted" for ref in tweet.get("referenced_tweets", [])])
+        is_retweet = any([ref.get("type") == "retweeted" for ref in item.get("referenced_tweets", [])])
         if is_retweet:
-            retweeted_tweet = [t for t in tweet["referenced_tweets"] if t.get("type") == "retweeted"][0]
+            retweeted_tweet = [t for t in item["referenced_tweets"] if t.get("type") == "retweeted"][0]
             if retweeted_tweet.get("text", False):
                 retweeted_body = retweeted_tweet.get("text")
                 # Get user's username that was retweeted
                 if retweeted_tweet.get('author_user') and retweeted_tweet.get('author_user').get('username'):
-                    tweet["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
-                elif tweet.get('entities', {}).get('mentions', []):
+                    item["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
+                elif item.get('entities', {}).get('mentions', []):
                     # Username may not always be here retweeted_tweet["author_user"]["username"] when user was removed/deleted
-                    retweeting_users = [mention.get('username') for mention in tweet.get('entities', {}).get('mentions', []) if mention.get('id') == retweeted_tweet.get('author_id')]
+                    retweeting_users = [mention.get('username') for mention in item.get('entities', {}).get('mentions', []) if mention.get('id') == retweeted_tweet.get('author_id')]
                     if retweeting_users:
                         # should only ever be one, but this verifies that there IS one and not NONE
-                        tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
+                        item["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
             retweeted_user = retweeted_tweet["author_user"]["username"] if retweeted_tweet.get("author_user") else retweeted_tweet.get("author_username", "") # Reference tweets were not always enriched
 
@@ -766,11 +766,11 @@ class SearchWithTwitterAPIv2(Search):
             [mentions.append(tag["username"]) for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]
             [urls.append(tag["expanded_url"]) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
             # Images appear to be inheritted by retweets, but just in case
-            [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-            [video_items.append(item) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+            [images.append(attachment["url"]) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
+            [video_items.append(attachment) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
-        is_quoted = any([ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])])
-        is_reply = any([ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])])
+        is_quoted = any([ref.get("type") == "quoted" for ref in item.get("referenced_tweets", [])])
+        is_reply = any([ref.get("type") == "replied_to" for ref in item.get("referenced_tweets", [])])
 
         videos = []
         for video in video_items:
@@ -778,35 +778,35 @@ class SearchWithTwitterAPIv2(Search):
             if variants:
                 videos.append(variants[0].get('url'))
 
-        public_metrics = {k: tweet["public_metrics"].get(k, "") for k in ("impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count")}
+        public_metrics = {k: item["public_metrics"].get(k, "") for k in ("impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count")}
 
         return {
-            "id": tweet["id"],
-            "thread_id": tweet.get("conversation_id", tweet["id"]),
+            "id": item["id"],
+            "thread_id": item.get("conversation_id", item["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(tweet_time.timestamp()),
-            'link': "https://twitter.com/%s/status/%s" % (author_username, tweet.get('id')),
-            "subject": tweet.get('subject', ""),
-            "body": tweet["text"],
+            'link': "https://twitter.com/%s/status/%s" % (author_username, item.get('id')),
+            "subject": item.get('subject', ""),
+            "body": item["text"],
             "author": author_username,
             "author_fullname": author_fullname,
-            "author_id": tweet["author_id"],
+            "author_id": item["author_id"],
             "author_followers": author_followers,
-            "source": tweet.get("source"),
-            "language_guess": tweet.get("lang"),
-            "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
+            "source": item.get("source"),
+            "language_guess": item.get("lang"),
+            "possibly_sensitive": "yes" if item.get("possibly_sensitive") else "no",
             **public_metrics,
             "is_retweet": "yes" if is_retweet else "no",
             "retweeted_user": "" if not is_retweet else retweeted_user,
             "is_quote_tweet": "yes" if is_quoted else "no",
-            "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
+            "quoted_user": "" if not is_quoted else [ref for ref in item["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
             "is_reply": "yes" if is_reply else "no",
-            "replied_user": tweet.get("in_reply_to_user", {}).get("username", ""),
+            "replied_user": item.get("in_reply_to_user", {}).get("username", ""),
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),
             "videos": ','.join(set(videos)),
             "mentions": ','.join(set(mentions)),
-            "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
-            'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
+            "long_lat": ', '.join([str(x) for x in item.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
+            'place_name': item.get('geo', {}).get('place', {}).get('full_name', ''),
         }

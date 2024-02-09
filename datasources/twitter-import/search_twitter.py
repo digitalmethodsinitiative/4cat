@@ -38,11 +38,11 @@ class SearchTwitterViaZeeschuimer(Search):
         raise NotImplementedError("Twitter datasets can only be created by importing data from elsewhere")
 
     @staticmethod
-    def map_item(tweet):
-        if tweet.get("rest_id"):
-            return SearchTwitterViaZeeschuimer.map_item_modern(tweet)
-        elif tweet.get("type") == "adaptive":
-            return SearchTwitterViaZeeschuimer.map_item_legacy(tweet)
+    def map_item(item):
+        if item.get("rest_id"):
+            return SearchTwitterViaZeeschuimer.map_item_modern(item)
+        elif item.get("type") == "adaptive":
+            return SearchTwitterViaZeeschuimer.map_item_legacy(item)
         else:
             raise NotImplementedError
 
