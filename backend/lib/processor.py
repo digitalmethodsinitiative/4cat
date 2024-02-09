@@ -713,11 +713,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	@classmethod
 	def map_item_method_available(cls, dataset):
 		"""
-		Checks if map_item method exists and is compatible with dataset. If dataset does not have an extension,
-		returns False
+		Check if this processor can use map_item
 
-		:param BasicProcessor processor:	The BasicProcessor subclass object with which to use map_item
-		:param DataSet dataset:				The DataSet object with which to use map_item
+		Checks if map_item method exists and is compatible with dataset. If
+		dataset has a different extension than the default for this processor,
+		or if the dataset has no extension, this means we cannot be sure the
+		data is in the right format to be mapped, so `False` is returned in
+		that case even if a map_item() method is available.
+
+		:param BasicProcessor processor:	The BasicProcessor subclass object
+		with which to use map_item
+		:param DataSet dataset:				The DataSet object with which to
+		use map_item
 		"""
 		# only run item mapper if extension of processor == extension of
 		# data file, for the scenario where a csv file was uploaded and
