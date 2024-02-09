@@ -779,7 +779,12 @@ class SearchWithTwitterAPIv2(Search):
             if variants:
                 videos.append(variants[0].get('url'))
 
-        public_metrics = {k: item["public_metrics"].get(k, "") for k in ("impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count")}
+        expected_metrics = {"impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count"}
+        public_metrics = {k: item["public_metrics"].get(k, "") for k in expected_metrics}
+        missing_metrics = [m for m in expected_metrics if m not in item["public_metrics"]]
+        warning = ""
+        if missing_metrics:
+            warning = f"The following metrics were missing from a tweet: {', '.join(missing_metrics)}."
 
         return MappedItem({
             "id": item["id"],
@@ -810,4 +815,4 @@ class SearchWithTwitterAPIv2(Search):
             "mentions": ','.join(set(mentions)),
             "long_lat": ', '.join([str(x) for x in item.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
             'place_name': item.get('geo', {}).get('place', {}).get('full_name', ''),
-        })
+        }, message=warning)
