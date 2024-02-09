@@ -16,6 +16,7 @@ import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
+from common.lib.item_mapping import MappedItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
 								   MapItemException)
@@ -349,15 +350,19 @@ class DataSet(FourcatModule):
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True):
+	def iterate_mapped_objects(self, processor=None, warn_unmappable=True):
 		"""
-		Wrapper for iterate_items that returns both the original item and the mapped item (or else the same identical item).
-		No extension check is performed here as the point is to be able to handle the original object and save as an appropriate
-		filetype.
+		Generate mapped dataset items
+
+		Wrapper for iterate_items that returns both the original item and the
+		mapped item (or else the same identical item). No extension check is
+		performed here as the point is to be able to handle the original
+		object and save as an appropriate filetype.
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
-		:return generator:  A generator that yields a tuple with the unmapped item followed by the mapped item
+		:return generator:  A generator that yields a tuple with the unmapped
+		item followed by the mapped item
 		"""
 		unmapped_items = False
 		# Collect item_mapper for use with filter
@@ -385,6 +390,24 @@ class DataSet(FourcatModule):
 
 			# Yield the two items
 			yield original_item, mapped_item
+
+	def iterate_mapped_items(self, processor=None, warn_unmappable=True):
+		"""
+		Generate mapped dataset dictionaries
+
+		Identical to iterate_mapped_object, but yields the mapped item's data
+		(i.e. a dictionary) rather than the MappedItem object.
+
+		:param BasicProcessor processor:  A reference to the processor
+		iterating the dataset.
+		:return generator:  A generator that yields a tuple with the unmapped
+		item followed by the mapped item
+		"""
+		for original_item, mapped_item in self.iterate_mapped_items(processor, warn_unmappable):
+			if type(original_item) is MappedItem:
+				yield original_item, mapped_item.get_item_data()
+			else:
+				yield original_item, mapped_item
 
 	def get_item_keys(self, processor=None):
 		"""
