@@ -220,17 +220,6 @@ class DataSet(FourcatModule):
 		with log_path.open("w") as outfile:
 			pass
 
-	def has_log_file(self):
-		"""
-		Check if a log file exists for this dataset
-
-		This should be the case, but datasets created before status logging was
-		added may not have one, so we need to be able to check this.
-
-		:return bool:  Does a log file exist?
-		"""
-		return self.get_log_path().exists()
-
 	def log(self, log):
 		"""
 		Write log message to file
@@ -245,24 +234,6 @@ class DataSet(FourcatModule):
 		log_path = self.get_log_path()
 		with log_path.open("a", encoding="utf-8") as outfile:
 			outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
-
-	def get_log_iterator(self):
-		"""
-		Return an iterator with a (time, message) tuple per line in the log
-
-		Just a convenience function!
-
-		:return iterator:  (time, message) per log message
-		"""
-		log_path = self.get_log_path()
-		if not log_path.exists():
-			return
-
-		with log_path.open(encoding="utf-8") as infile:
-			for line in infile:
-				logtime = line.split(":")[0]
-				logmsg = ":".join(line.split(":")[1:])
-				yield (logtime, logmsg)
 
 	def iterate_items(self, processor=None, bypass_map_item=False, warn_unmappable=True):
 		"""
@@ -473,18 +444,6 @@ class DataSet(FourcatModule):
 				if staging_area.is_dir():
 					shutil.rmtree(staging_area)
 
-	def get_results_dir(self):
-		"""
-		Get path to results directory
-
-		Always returns a path, that will at some point contain the dataset
-		data, but may not do so yet. Use this to get the location to write
-		generated results to.
-
-		:return str:  A path to the results directory
-		"""
-		return self.folder
-
 	def finish(self, num_rows=0):
 		"""
 		Declare the dataset finished
@@ -496,32 +455,6 @@ class DataSet(FourcatModule):
 					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
-
-	def unfinish(self):
-		"""
-		Declare unfinished, and reset status, so that it may be executed again.
-		"""
-		if not self.is_finished():
-			raise RuntimeError("Cannot unfinish an unfinished dataset")
-
-		try:
-			self.get_results_path().unlink()
-		except FileNotFoundError:
-			pass
-
-		self.data["timestamp"] = int(time.time())
-		self.data["is_finished"] = False
-		self.data["num_rows"] = 0
-		self.data["status"] = "Dataset is queued."
-		self.data["progress"] = 0
-
-		self.db.update("datasets", data={
-			"timestamp": self.data["timestamp"],
-			"is_finished": self.data["is_finished"],
-			"num_rows": self.data["num_rows"],
-			"status": self.data["status"],
-			"progress": 0
-		}, where={"key": self.key})
 
 	def copy(self, shallow=True):
 		"""
@@ -1399,7 +1332,6 @@ class DataSet(FourcatModule):
 		"""
 		processor_type = self.parameters.get("type", self.data.get("type"))
 		return backend.all_modules.processors.get(processor_type)
-
 
 	def get_available_processors(self, user=None):
 		"""
