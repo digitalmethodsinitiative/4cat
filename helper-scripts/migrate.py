@@ -254,10 +254,10 @@ if args.release or args.branch:
 					logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
 					logger.info(fetch.stderr)
 					exit(1)
-
-		logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
-		logger.info(fetch.stderr)
-		exit(1)
+		else:
+			logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
+			logger.info(fetch.stderr)
+			exit(1)
 
 	if args.branch:
 		logger.info(f"  ...checking out branch '{args.branch}'")

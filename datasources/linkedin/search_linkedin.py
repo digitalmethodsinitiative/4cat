@@ -78,6 +78,11 @@ class SearchLinkedIn(Search):
                 url = image_data["rootUrl"] + artifacts[0]["fileIdentifyingUrlPathSegment"]
                 images.append(url)
 
+        # or alternatively they are stored here:
+        if not images and post["content"] and post["content"]["articleComponent"] and post["content"]["articleComponent"].get("largeImage"):
+            image = post["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
+            images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
+
         author = SearchLinkedIn.get_author(post)
 
         # the ID is in the format 'urn:li:activity:6960882777168695296'
@@ -86,8 +91,37 @@ class SearchLinkedIn(Search):
         # urn:li:aggregate:(urn:li:activity:3966023054712791616,urn:li:activity:3965915018238312449)
         # effectively both IDs seem to refer to the same post, so just take the
         # first one
-        urn = "urn:li:activity:" + post["updateMetadata"]["urn"].split("urn:li:activity:")[1].split(",")[0].split(")")[0]
+        meta_urn = post.get("updateMetadata", {"urn": post.get("preDashEntityUrn")})["urn"]
+        urn = "urn:li:activity:" + meta_urn.split("urn:li:activity:")[1].split(",")[0].split(")")[0]
         item_id = urn.split(":").pop()
+
+        # the way hashtags were stored changed at some point
+        hashtags = []
+        if post["commentary"] and "attributes" in post["commentary"]["text"]:
+            hashtags = [tag["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]
+        elif post["commentary"] and "attributesV2" in post["commentary"]["text"]:
+            hashtags = [tag["detailData"]["*hashtag"]["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributesV2", []) if "*hashtag" in tag["detailData"]]
+
+        # same for metrics
+        if "*totalSocialActivityCounts" in post["*socialDetail"]:
+            metrics = {
+                "likes": post["*socialDetail"]["*totalSocialActivityCounts"]["numLikes"],
+                "comments": post["*socialDetail"]["*totalSocialActivityCounts"]["numComments"],
+                "shares": post["*socialDetail"]["*totalSocialActivityCounts"]["numShares"]
+            }
+        else:
+            metrics = {
+                "likes": post["*socialDetail"]["likes"]["paging"]["total"],
+                "comments": post["*socialDetail"]["comments"]["paging"]["total"],
+                "shares": post["*socialDetail"]["totalShares"],
+            }
+
+        # and links
+        link_url = ""
+        if post.get("content") and post["content"].get("navigationContext"):
+            link_url = post["content"]["navigationContext"].get("actionTarget", "")
+        elif post.get("content") and post["content"].get("articleComponent") and "navigationContext" in post["content"]["articleComponent"]:
+            link_url = post["content"]["articleComponent"]["navigationContext"].get("actionTarget", "")
 
         mapped_item = {
             "id": item_id,
@@ -98,13 +132,11 @@ class SearchLinkedIn(Search):
             "timestamp_ago": time_ago.split("•")[0].strip(),
             "is_promoted": "yes" if not re.findall(r"[0-9]", time_ago) else "no",
             **{("author_" + k).replace("_username", ""): v for k, v in author.items()},
-            "hashtags": ",".join([tag["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]) if post["commentary"] else "",
+            "hashtags": ",".join(hashtags),
             "image_urls": ",".join(images),
             "post_url": "https://www.linkedin.com/feed/update/" + urn,
-            "link_url": post["content"]["navigationContext"].get("actionTarget", "") if (post.get("content") and post["content"].get("navigationContext")) else "",
-            "likes": post["*socialDetail"]["likes"]["paging"]["total"],
-            "comments": post["*socialDetail"]["comments"]["paging"]["total"],
-            "shares": post["*socialDetail"]["totalShares"],
+            "link_url":  link_url,
+            **metrics,
             "inclusion_context": post["header"]["text"]["text"] if post.get("header") else "",
             "unix_timestamp": timestamp,
             "unix_timestamp_collected": time_collected
@@ -135,7 +167,7 @@ class SearchLinkedIn(Search):
         }
 
         # likewise for author avatars
-        if post["actor"]["name"]["attributes"]:
+        if post["actor"]["name"].get("attributes"):
             if "*miniProfile" in post["actor"]["name"]["attributes"][0]:
                 author_profile = post["actor"]["name"]["attributes"][0]["*miniProfile"]
                 if author_profile["picture"]:
@@ -153,6 +185,18 @@ class SearchLinkedIn(Search):
 
                 author.update({"is_company": "yes"})
                 author.update({"avatar_url": author_profile["logo"]["rootUrl"] + avatar_artifacts[0]["fileIdentifyingUrlPathSegment"]})
+
+        if post["actor"]["name"].get("attributesV2"):
+            pronouns = post["actor"]["name"]["attributesV2"][0]["detailData"].get("*profileFullName", {}).get("pronoun")
+            if pronouns:
+                if pronouns.get("customPronoun"):
+                    author.update({"pronouns": pronouns.get("customPronoun")})
+                elif pronouns.get("standardizedPronoun"):
+                    author.update({"pronouns": pronouns.get("standardizedPronoun")})
+
+        avatar = post["actor"]["image"].get("attributes", [{}])[0].get("detailData", {}).get("nonEntityProfilePicture")
+        if avatar and avatar["vectorImage"]:
+            author.update({"avatar_url": avatar["vectorImage"]["rootUrl"] + avatar["vectorImage"]["artifacts"][0]["fileIdentifyingUrlPathSegment"]})
 
         return author
 

@@ -778,6 +778,8 @@ class SearchWithTwitterAPIv2(Search):
             if variants:
                 videos.append(variants[0].get('url'))
 
+        public_metrics = {k: tweet["public_metrics"].get(k, "") for k in ("impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count")}
+
         return {
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
@@ -793,7 +795,7 @@ class SearchWithTwitterAPIv2(Search):
             "source": tweet.get("source"),
             "language_guess": tweet.get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
-            **tweet["public_metrics"],
+            **public_metrics,
             "is_retweet": "yes" if is_retweet else "no",
             "retweeted_user": "" if not is_retweet else retweeted_user,
             "is_quote_tweet": "yes" if is_quoted else "no",

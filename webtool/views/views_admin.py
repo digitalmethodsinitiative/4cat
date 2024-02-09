@@ -212,8 +212,13 @@ def add_user():
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
                             username, url, url)}}
                 except RuntimeError as e:
+                    # Grab the token and provide it to the admin, so they can send to user
+                    new_token = user.generate_token()
+                    url_base = config.get("flask.server_name")
+                    protocol = "https" if config.get("flask.https") else "http"
+                    url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, new_token)
                     response = {**response, **{
-                        "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
+                        "message": "Token was reset but registration e-mail could not be sent (%s). Reset password link: [%s](%s)" % (e, url, url)}}
 
     if fmt == "html":
         if redirect_to_page:
