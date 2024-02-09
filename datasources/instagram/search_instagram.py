@@ -8,7 +8,7 @@ import datetime
 import re
 
 from backend.lib.search import Search
-from common.lib.helpers import UserInput
+from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import WorkerInterruptedException, MapItemException
 
 
@@ -67,9 +67,9 @@ class SearchInstagram(Search):
         is_graph_response = "__typename" in item and item["__typename"] not in ("XDTMediaDict",)
 
         if is_graph_response:
-            return SearchInstagram.parse_graph_item(item)
+            return MappedItem(SearchInstagram.parse_graph_item(item))
         else:
-            return SearchInstagram.parse_itemlist_item(item)
+            return MappedItem(SearchInstagram.parse_itemlist_item(item))
 
     @staticmethod
     def parse_graph_item(node):
@@ -122,8 +122,6 @@ class SearchInstagram(Search):
                 "location"].get("lat") else ""
             location["city"] = node["location"].get("city")
 
-        music_info = SearchInstagram.get_music_metadata(node)
-
         mapped_item = {
             "id": node["shortcode"],
             "thread_id": node["shortcode"],
@@ -137,7 +135,6 @@ class SearchInstagram(Search):
             "url": "https://www.instagram.com/p/" + node["shortcode"],
             "image_url": node["display_url"],
             "media_url": media_url,
-            **SearchInstagram.get_music_metadata(node),
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
             # "usertags": ",".join(
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
@@ -221,7 +218,6 @@ class SearchInstagram(Search):
             "url": "https://www.instagram.com/p/" + node["code"],
             "image_url": display_url,
             "media_url": media_url,
-            **SearchInstagram.get_music_metadata(node),
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
             # "usertags": ",".join(
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
@@ -235,32 +231,3 @@ class SearchInstagram(Search):
         }
 
         return mapped_item
-
-    @staticmethod
-    def get_music_metadata(node):
-        """
-        Get some metadata about the music used in a reel
-
-        This can be stored in several locations, hence the method.
-
-        :param node:  Post data
-        :return: A dict with `id` and `title` keys, or `None`
-        """
-        music_info = {
-            "music_url": "",
-            "music_title": "",
-        }
-
-        if "clips_metadata" in node:
-            if "music_info" in node["clips_metadata"] and node["clips_metadata"]["music_info"].get("music_asset_info"):
-                music_info.update({
-                    "music_url": f"https://www.instagram.com/reels/audio/{node['clips_metadata']['music_info']['music_asset_info']['audio_cluster_id']}",
-                    "music_title": f"{node['clips_metadata']['music_info']['music_asset_info']['display_artist']} - {node['clips_metadata']['music_info']['music_asset_info']['title']}"
-                })
-            elif "original_sound_info" in node["clips_metadata"] and node["clips_metadata"]["original_sound_info"]:
-                music_info.update({
-                    "music_url": f"https://www.instagram.com/reels/audio/{node['clips_metadata']['original_sound_info']['audio_asset_id']}",
-                    "music_title": f"@{node['clips_metadata']['original_sound_info']['ig_artist']['username']} - {node['clips_metadata']['original_sound_info']['original_audio_title']}"
-                })
-
-        return music_info
