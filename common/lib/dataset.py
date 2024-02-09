@@ -379,7 +379,7 @@ class DataSet(FourcatModule):
 			# Map item
 			if item_mapper:
 				try:
-					mapped_item = own_processor.get_mapped_item(item).get_item_data()
+					mapped_item = own_processor.get_mapped_item(item)
 				except MapItemException as e:
 					if warn_unmappable:
 						self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
