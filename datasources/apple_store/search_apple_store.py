@@ -197,8 +197,172 @@ class SearchAppleStore(Search):
         return query
 
     @staticmethod
-    def map_beta_item(item, fourcat_metadata):
-        return {}
+    def map_beta_item(item, fourcat_metadata, preferred_platform="ios"):
+
+        if any([key not in ["id", "type", "href", "attributes", "relationships", "meta"] for key in item.keys()]):
+            # Additional unknown information in item!
+            pass
+
+            # General App attributes located here
+        app_attributes = item["attributes"]
+
+        # Possible to have multiple platforms which in tern have different release dates, version histories, etc.
+        platform_preferences = preferred_platform if type(preferred_platform) is list else [preferred_platform]
+        if any([pref in app_attributes.get("platformAttributes") for pref in platform_preferences]):
+            # Collect first from preffered_platforms
+            for platform_preference in platform_preferences:
+                if platform_preference in app_attributes.get("platformAttributes"):
+                    platform_data = app_attributes.get("platformAttributes").get(platform_preference)
+                    platform = platform_preference
+                    other_platforms = [key for key in app_attributes.get("platformAttributes").keys() if key != platform_preference]
+                    break
+        else:
+            # Grab first available
+            platform = next(iter(app_attributes.get("platformAttributes")))
+            platform_data = app_attributes.get("platformAttributes").get(platform)
+            other_platforms = [key for key in app_attributes.get("platformAttributes").keys() if key != platform]
+
+        # All screenshots
+        # Note: some screenshots repeat as different sizes for different versions (e.g., pre and post iphone 6)
+        screenshots = []
+        for screenshot_type, screenshot_data in platform_data.get("customAttributes", {}).get("default", {}).get(
+                "default", {}).get("customScreenshotsByType").items():
+            for screenshot in screenshot_data:
+                screenshots.append(convert_screenshot(screenshot))
+
+        # Genres are a relationship item
+        genres, genre_ids = zip(*[(genre.get("attributes", {}).get("name"), genre.get("id", "")) for genre in item.get('relationships').get("genres").get("data")])
+
+        # Supported locale info
+        locale_names, locale_tags = zip(
+            *[(locale.get("name"), locale.get("tag")) for locale in platform_data.get("supportedLocales")])
+
+        # Content rating
+        if len(app_attributes.get("contentRatingsBySystem")) > 1:
+            # More than one!
+            pass
+        content_rating = app_attributes.get("contentRatingsBySystem")[next(iter(app_attributes.get("contentRatingsBySystem")))]
+
+        # Developer
+        if len(item.get("relationships").get("developer", {}).get("data", [])) > 1:
+            # More than one!
+            pass
+        developer = item.get("relationships").get("developer", {}).get("data", [])[0]
+
+        # Purchase options
+        offers = [offer for offer in platform_data.get("offers") if offer.get("type") == "buy"]
+        if len(offers) > 1:
+            # multiple purchase offers is possible...
+            pass
+        offer = offers[0] if offers else None
+
+        return {
+            "4CAT_query_type": fourcat_metadata["query_method"],
+            # Extract country & language from URL as it may not match query; requested lang may exist or store may redirect
+            "country": item.get("href").split("/v1/catalog/")[1].split("/")[0],
+            "language": item.get("href").split("?l=")[1].split("&")[0] if "?l=" in item.get("href") else "",
+            "app_id": item.get("id"),
+            "app_name": app_attributes.get("name"),
+            "app_view_url": app_attributes.get("url"),
+
+            # Developer data
+            "developer_id": developer.get("id", ""),
+            "developer_name": app_attributes.get("artistName", ""),
+            "developer_view_url": developer.get("attributes", {}).get("url", ""),
+
+            # Platform specific data
+            "platform": platform,
+            "other_available_platforms": ", ".join(other_platforms),
+            "release_date": platform_data.get("releaseDate"),
+            "current_version_release_date": platform_data.get("versionHistory")[0].get("releaseTimestamp", ""),
+            "current_version": platform_data.get("versionHistory")[0].get("versionDisplay", ""),
+            "current_version_release_notes": platform_data.get("versionHistory")[0].get("releaseNotes", ""),
+            "description": platform_data.get("description").get("standard"),
+            # Many different sizes are listed, but the displayed size appears to be located in the assets (noted types of "get", "buy", and "update")
+            "file_size_bytes": next(iter(
+                [next(iter(offer.get("assets", []))).get("size") for offer in platform_data.get("offers") if
+                 offer.get("type") in ["buy", "get"]])),
+            "is_game_center_enabled": platform_data.get("isGameCenterEnabled", ""),
+            "seller_name": platform_data.get("seller", ""),
+            "bundle_id": platform_data.get("bundleId", ""),
+            "minimum_os_version": platform_data.get("minimumOSVersion", ""),
+
+            # Purchase info
+            "price": offer.get("price", "") if offer else "",
+            "formatted_price": offer.get("formattedPrice", "").replace(u'\xa0', u' ') if offer else "Free",
+            "currency": offer.get("currencyCode", "") if offer else "",
+            "has_in_app_purchases": platform_data.get("hasInAppPurchases", ""),
+
+            # Genre
+            "primary_genre_name": app_attributes.get("genreDisplayName", ""),
+            "genres": ", ".join(genres),
+            "genre_ids": ", ".join(genre_ids),
+
+            # Images
+            "app_logo": convert_screenshot(platform_data.get("artwork")),
+            "brand_images": ",\n".join(
+                [convert_screenshot(image) for name, image in platform_data.get("editorialArtwork").items()]),
+            "screenshot_urls": ",\n".join(screenshots),
+
+            # Advisories
+            "age_rating": content_rating.get("name"),
+            "advisories": ",\n".join(content_rating.get("advisories")),
+
+            # Privacy
+            "private_policy_url": platform_data.get("privacyPolicyUrl", ""),
+            "data_collected": ",\n".join([
+                                            f"{privacy_type.get('privacyType', '')}: {', '.join([data_type.get('dataCategory', '') for data_type in privacy_type.get('dataCategories', [])])}"
+                                            for privacy_type in
+                                            app_attributes.get("privacy", {}).get("privacyTypes", [])]),
+
+            # Additional info
+            "supported_devices": ", ".join(
+                [device for k, v in app_attributes.get("requirementsByDeviceFamily").items() for device in
+                 (v.get('devices') if v.get('devices') else [v.get('deviceFamily')])]),
+            "supported_locales": ", ".join(locale_names),
+            "supported_locale_tags": ", ".join(locale_tags),
+
+            # Charts
+
+            # In app purchases
+            "in-app_purchases": ",\n".join([
+                                              f"{app_purchase.get('attributes', {}).get('name', {})} - {next(iter(app_purchase.get('attributes', {}).get('offers', []))).get('priceFormatted', '')}".replace(
+                                                  u'\xa0', u' ') for app_purchase in
+                                              item.get("relationships").get("top-in-apps", {}).get("data", [])]),
+            # Events
+            "events": ",\n".join(
+                [f"{event.get('attributes', {}).get('name', {})} - {event.get('attributes', {}).get('url', '')}" for
+                 event in item.get("relationships").get("app-events", {}).get("data", [])]),
+            # Apple editorials related to the app
+            "related_editorials": "\n".join([
+                                                f"{editorial.get('attributes', {}).get('editorialNotes', {}).get('name', '')} - {editorial.get('attributes', {}).get('url', '')}"
+                                                for editorial in
+                                                item.get("relationships").get("related-editorial-items", {}).get("data",
+                                                                                                                 [])]),
+
+            # Ratings
+            "user_rating_count": app_attributes.get('userRating', {}).get('ratingCount', ''),
+            "average_user_rating": app_attributes.get('userRating', {}).get('value', ''),
+            "user_ratings": ", ".join([f"{i + 1} star{'s' if i != 0 else ''}: {num}" for i, num in
+                             enumerate(app_attributes.get('userRating', {}).get('ratingCountList', []))]),
+
+            # Ten reviews are shared
+            "reviews": ",\n".join([
+                                     f"{review.get('attributes', {}).get('title', {})} - rating {review.get('attributes', {}).get('rating', {})} - {review.get('attributes', {}).get('review', '')}"
+                                     for review in item.get("relationships").get("reviews", {}).get("data", [])]),
+
+            # Version history
+            "recent_versions": ",\n".join([
+                                             f"{version.get('releaseTimestamp', '')} - {version.get('versionDisplay', '')}: {version.get('releaseNotes', '')}"
+                                             for version in platform_data.get("versionHistory", [])]),
+
+            # 4CAT necessary fields
+            "collected_timestamp": fourcat_metadata.get("collected_at_timestamp", ""),
+            "id": item.get("id"),
+            "author": app_attributes.get("artistName", ""),
+            "body": platform_data.get("description").get("standard"),
+            "timestamp": platform_data.get("releaseDate"),
+        }
     
     @staticmethod
     def map_item(item):
@@ -247,6 +411,7 @@ class SearchAppleStore(Search):
             "currentVersionReleaseDate": "current_version_release_date",
             "artistId": "developer_id",
             "artistName": "developer_name",
+            "artistViewUrl": "developer_url",
             "sellerName": "seller_name",
             "sellerUrl": "seller_url",
             "trackId": "app_id",
@@ -265,7 +430,6 @@ class SearchAppleStore(Search):
             "artworkUrl60": "artwork_url_60",
             "artworkUrl512": "artwork_url_512",
             "artworkUrl100": "artwork_url_100",
-            "artistViewUrl": "artist_view_url",
             "isGameCenterEnabled": "is_game_center_enabled",
             "features": "features",
             "advisories": "advisories",
@@ -331,7 +495,7 @@ class SearchAppleStore(Search):
 
         # Collect data
         # Copied from browser request
-        url = f"https://amp-api.apps.apple.com/v1/catalog/{country_id}/apps/{app_id}?l={lang}&l=en-us&platform=web&additionalPlatforms=appletv,ipad,iphone,mac&" \
+        url = f"https://amp-api.apps.apple.com/v1/catalog/{country_id}/apps/{app_id}?l={lang}&platform=web&additionalPlatforms=appletv,ipad,iphone,mac&" \
               "extend=customPromotionalText,customScreenshotsByType,customVideoPreviewsByType,description,developerInfo,distributionKind,editorialVideo,fileSizeByDevice,messagesScreenshots,privacy,privacyPolicyUrl,requirementsByDeviceFamily,sellerInfo,supportURLForLanguage,versionHistory,websiteUrl,videoPreviewsByType&" \
               "include=app-events,genres,developer,reviews,merchandised-in-apps,customers-also-bought-apps,developer-other-apps,top-in-apps,related-editorial-items&" \
               "limit[merchandised-in-apps]=20&" \
@@ -355,7 +519,7 @@ class SearchAppleStore(Search):
             raise Exception(f"Unable to collect data from apps.apple.com: {response.status_code} {response.reason} - {response.text}")
 
         if len(response.text) == 0:
-            raise ValueError(f"App not found (404): app - {app_id}, country - {country_id}, lang - {lang}")
+            raise ValueError(f"No result returned: app - {app_id}, country - {country_id}, lang - {lang}")
 
         data = json.loads(response.text)
         if not data.get('data'):
@@ -630,3 +794,15 @@ def collect_from_store(store, method, languages=None, countries=None, full_detai
 
         return result
 
+
+def convert_screenshot(image_obj, c="w", f="jpeg"):
+    """
+    Converts Apple's image objects to useable URLs
+
+    :param dict image_obj:  The dict object returned from Apple
+    :param str c:           Unknown, but "w" is used in interface
+    :param str f:           Image type ("jpeg" and "webp" are known options)
+    """
+    url = image_obj.get("url", "")
+    return url.replace("{w}", str(image_obj.get("width", ""))).replace("{h}", str(image_obj.get("height", ""))).replace(
+        "{c}", c).replace("{f}", f)
