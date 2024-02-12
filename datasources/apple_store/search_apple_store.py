@@ -308,7 +308,7 @@ class SearchAppleStore(Search):
 
             # Advisories
             "age_rating": content_rating.get("name"),
-            "advisories": ",\n".join(content_rating.get("advisories")),
+            "advisories": ",\n".join(content_rating.get("advisories", [])),
 
             # Privacy
             "private_policy_url": platform_data.get("privacyPolicyUrl", ""),
