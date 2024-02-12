@@ -162,7 +162,9 @@ class SearchAppleStore(Search):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while getting collecting detailed results from Apple Store")
                 if method != 'app':
-                    results.append(self.collect_detailed_data_from_apple_store_by_id(app['id'], app['country'], app['lang']))
+                    lang = app.get('lang', 'en-US')
+                    country = app.get('country', 'us')
+                    results.append(self.collect_detailed_data_from_apple_store_by_id(app['id'], country, lang))
                 else:
                     # List of apps only contains IDs
                     # TODO: issue w/ languages and countries; likely codes
