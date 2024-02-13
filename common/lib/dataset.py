@@ -54,7 +54,7 @@ class DataSet(FourcatModule):
 
 	no_status_updates = False
 	staging_areas = None
-	queue_position = None
+	_queue_position = None
 
 	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
 				 type=None, is_private=True, owner="anonymous"):
@@ -154,7 +154,6 @@ class DataSet(FourcatModule):
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
 
 		self.refresh_owners()
-		self.get_place_in_queue()
 
 	def check_dataset_finished(self):
 		"""
@@ -1341,7 +1340,7 @@ class DataSet(FourcatModule):
 
 		return available
 
-	def get_place_in_queue(self):
+	def get_place_in_queue(self, update=False):
 		"""
 		Determine dataset's position in queue
 
@@ -1350,19 +1349,24 @@ class DataSet(FourcatModule):
 		be processed. A position of 0 would mean that the dataset is currently
 		being executed, or that the backend is not running.
 
+		:param bool update:  Update the queue position from database if True, else return cached value
 		:return int:  Queue position
 		"""
 		if self.is_finished() or not self.data.get("job"):
-			self.queue_position = -1
-			return
+			self._queue_position = -1
+			return self._queue_position
+		elif not update and self._queue_position is not None:
+			# Use cached value
+			return self._queue_position
 		else:
+			# Collect queue position from database via the job
 			try:
 				job = Job.get_by_ID(self.data["job"], self.db)
-				self.queue_position = job.data["queue_ahead"]
+				self._queue_position = job.get_place_in_queue()
 			except JobNotFoundException:
-				self.queue_position = -1
+				self._queue_position = -1
 
-		return self.queue_position
+			return self._queue_position
 
 	def get_own_processor(self):
 		"""

@@ -59,7 +59,12 @@ class TempFileCleaner(BasicWorker):
                 # exists - should be safe to clean up
                 self.log.info("No matching dataset with key %s for file %s, deleting file" % (key, str(file)))
                 if file.is_dir():
-                    shutil.rmtree(file)
+                    try:
+                        shutil.rmtree(file)
+                    except PermissionError:
+                        self.log.info(f"Folder {file} does not belong to a dataset but cannot be deleted (no "
+                                      f"permissions), skipping")
+
                 else:
                     try:
                         file.unlink()
@@ -76,3 +81,5 @@ class TempFileCleaner(BasicWorker):
                 self.log.debug("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
                 dataset.key, str(file)))
                 shutil.rmtree(file)
+
+        self.job.finish()

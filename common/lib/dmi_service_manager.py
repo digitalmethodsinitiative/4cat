@@ -109,7 +109,7 @@ class DmiServiceManager:
             self.processor.dataset.update_progress(current_completed / self.num_files_to_process)
             self.processed_files = current_completed
 
-    def send_request_and_wait_for_results(self, service_endpoint, data, wait_period=60, check_process=True):
+    def send_request_and_wait_for_results(self, service_endpoint, data, wait_period=60, check_process=True, callback=None):
         """
         Send request and wait for results to be ready.
 
@@ -163,6 +163,9 @@ class DmiServiceManager:
                 # Update progress
                 if check_process:
                     self.check_progress()
+
+                if callback:
+                    callback(self)
 
                 result = requests.get(results_url, timeout=30)
                 if 'status' in result.json().keys() and result.json()['status'] == 'running':

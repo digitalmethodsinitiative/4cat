@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.config_manager import config
 
 # parse parameters
 cli = argparse.ArgumentParser()
@@ -28,7 +29,7 @@ cli.add_argument("-b", "--board", required=True, help="What board the post IDs b
 cli.add_argument("-d", "--datasource", required=True, type=str, default="4chan", help="Data source ID")
 args = cli.parse_args()
 
-db = Database(logger=Logger(), appname="deleted-import")
+db = Database(logger=Logger(), appname="4chan-import", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 
 posts = 0
 posts_not_found = 0

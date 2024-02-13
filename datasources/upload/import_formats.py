@@ -407,13 +407,13 @@ tools = {
         "name": "YouTube videos (via YouTube Data Tools' Video List module)",
         "columns": {"publishedAt", "videoId", "channelId", "channelTitle", "videoDescription"},
         "mapper": import_ytdt_videolist,
-        "csv_dialect": {"doublequote": True}
+        "csv_dialect": {"doublequote": True, "escapechar": "\\"},
     },
     "youtube_comment_list": {
         "name": "YouTube comments (via YouTube Data Tools' Video Info module)",
         "columns": {"id", "isReplyTo", "authorName", "text", "publishedAt"},
         "mapper": import_ytdt_commentlist,
-        "csv_dialect": {"doublequote": True}
+        "csv_dialect": {"doublequote": True, "escapechar": "\\"},
     },
     "bazhuayu_weibo": {
         "name": "Sina Weibo (via Bazhuayu)",

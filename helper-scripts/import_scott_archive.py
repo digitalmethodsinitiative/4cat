@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.config_manager import config
 
 # parse parameters
 cli = argparse.ArgumentParser()
@@ -86,7 +87,8 @@ if not os.path.isdir(args.input):
 	sys.exit(1)
 
 logger = Logger()
-db = Database(logger=logger, appname="queue-dump")
+db = Database(logger=logger, appname="4chan-import", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
+
 
 # Already add thread IDs to seen ids, so we don't reuse them later.
 print("Listing thread IDs from filenames")
