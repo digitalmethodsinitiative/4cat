@@ -1689,11 +1689,11 @@ const ui_helpers = {
      * @param force_close  Assume the event is un-toggling something regardless of current state
      */
     toggleButton: function (e, force_close = false) {
-        if ((!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') && typeof e.preventDefault === "function") {
+        if (e.target &&  e.target.hasAttribute && (!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') && typeof e.preventDefault === "function") {
             e.preventDefault();
         }
 
-        let target = '#' + $(e.target).attr('aria-controls');
+        let target = '#' + $(this).attr('aria-controls');
         let is_open = $(target).attr('aria-expanded') !== 'false';
 
         if (is_open || force_close) {
