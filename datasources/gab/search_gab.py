@@ -1,9 +1,5 @@
 """
 Import scraped Gab data
-
-It's prohibitively difficult to scrape data from Gab within 4CAT itself
-due to its aggressive rate limiting and login wall. Instead, import data
-collected elsewhere.
 """
 import datetime
 import re
@@ -42,38 +38,45 @@ class SearchGab(Search):
         :param node:  Data as received from Gab
         :return dict:  Mapped item
         """
-
-        post_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ")
-
+        
+        post_time = datetime.datetime.strptime(post["ca"], "%Y-%m-%dT%H:%M:%S.%fZ")
         mapped_item = {
-            "id": post["id"],
-            "created_at": post["created_at"],
-            "body" : post["content"],
-            "url": post["url"],
-            "reaction_count": post["reaction_count"],
-            "reposts_count": post["reposts_count"],
-            "replies_count": post["replies_count"],
-            "group_id": post["group"]["title"],
-            "group_description": post["group"]["description"],
-            "group_member_count": post["group"]["member_count"],
-            "group_is_private": post["group"]["is_private"],
-            "group_url": post["group"]["url"],
-            "group_created_at": post["group"]["created_at"],
-            "account_id": post["account"]["id"],
-            "account_username": post["account"]["username"],
-            "account_account": post["account"]["account"],
-            "account_display_name": post["account"]["display_name"],
-            "account_note": post["account"]["note"],
-            "link_id": post["link"]["id"],
-            "link_url": post["link"]["url"],
-            "link_title": post["link"]["title"],
-            "link_description": post["link"]["description"],
-            "link_type": post["link"]["type"] if "type" in post["link"] else None,
-            "link_image": post["link"]["image"],
-            "image_id": post["image"]["id"],
-            "image_url": post["image"]["url"],
-            "image_type": post["image"]["type"] if "type" in post["image"] else None,
-            "thread_id": post["id"],
+            "id": post["i"],
+            "created_at": post["ca"],
+            "body": post["c"],
+            "url": post["ul"],
+            "reaction_count": post["fc"] if post["fc"] else 0,
+            "reposts_count": post["rbc"],
+            "replies_count": post["rc"],
+            "group_id": post["g"]["id"] if "g" in post else None,
+            "group_title": post["g"]["title"] if "g" in post else None,
+            "group_description": post["g"]["description"] if "g" in post else None,
+            "group_member_count": post["g"]["member_count"] if "g" in post else None,
+            "group_is_private": post["g"]["is_private"] if "g" in post else None,
+            "group_member_count": post["g"]["url"] if "g" in post else None,
+            "group_url": post["g"]["url"] if "g" in post else None,
+            "group_created_at": post["g"]["created_at"] if "g" in post else None,
+
+            "account_id": post["author_info"]["i"],
+            "account_username": post["author_info"]["un"],
+            "account_account": post["author_info"]["ac"],
+            "account_display_name": post["author_info"]["dn"],
+            "account_note": post["author_info"]["nt"] if "nt" in post["author_info"] else None,
+
+            "link_id": post["link_info"]["id"] if post["link_info"] else None,
+            "link_url": post["link_info"]["url"] if post["link_info"] else None,
+            "link_title": post["link_info"]["title"] if post["link_info"] else None,
+            "link_description": post["link_info"]["description"] if post["link_info"] else None,
+            "link_type": post["link_info"]["type"] if post["link_info"] else None,
+            "link_image": post["link_info"]["image"] if post["link_info"] else None,
+
+
+            "image_id": post["image_info"][0]["i"] if (len(post["image_info"]) > 0) else None,
+            "image_url": post["image_info"][0]["u"] if (len(post["image_info"]) > 0) else None,
+            "image_type": post["image_info"][0]["t"] if (len(post["image_info"]) > 0) else None,
+
+
+            "thread_id": post["i"],
             "timestamp": post_time.strftime("%Y-%m-%d %H:%M:%S")
         }        
     
