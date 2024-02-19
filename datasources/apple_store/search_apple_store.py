@@ -325,6 +325,7 @@ class SearchAppleStore(Search):
             "supported_locale_tags": ", ".join(locale_tags),
 
             # Charts
+            "top_charts": ",\n".join([f"{camel_to_title(source)} chart: {chart.get('position')} on {case_to_title(chart.get('chart'))}{' in ' + chart.get('genreName') if 'genreName' in chart else ''}" for source, chart in app_attributes.get("chartPositions", {}).items()]),
 
             # In app purchases
             "in-app_purchases": ",\n".join([
@@ -808,3 +809,8 @@ def convert_screenshot(image_obj, c="w", f="jpeg"):
     url = image_obj.get("url", "")
     return url.replace("{w}", str(image_obj.get("width", ""))).replace("{h}", str(image_obj.get("height", ""))).replace(
         "{c}", c).replace("{f}", f)
+
+def camel_to_title(string):
+    return  "".join([char if char.islower() else " " + char for char in string]).title()
+def case_to_title(string):
+    return string.replace('_', ' ').replace('-', ' ').title()
