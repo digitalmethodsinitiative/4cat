@@ -243,8 +243,6 @@ def get_mapped_result(key):
         # cannot map without a mapping method
         return error(404, error="File not found.")
 
-    mapper = dataset.get_own_processor().map_item
-
     # Also add possibly added annotation items.
     # These cannot be added to the static `map_item` function.
     annotation_labels = None
