@@ -392,7 +392,7 @@ class DataSet(FourcatModule):
 
 						if callable(strategy):
 							# delegate handling to a callback
-							mapped_item.data[missing_field] = strategy(mapped_item.data, mapped_item.data[missing_field])
+							mapped_item.data[missing_field] = strategy(mapped_item.data, missing_field)
 						elif type(strategy) is dict and "replace" in strategy:
 							mapped_item.data[missing_field] = strategy["replace"]
 						elif strategy == "abort":
