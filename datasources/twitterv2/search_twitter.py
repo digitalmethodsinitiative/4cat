@@ -784,7 +784,7 @@ class SearchWithTwitterAPIv2(Search):
         missing_metrics = [m for m in expected_metrics if m not in item["public_metrics"]]
         warning = ""
         if missing_metrics:
-            warning = f"The following metrics were missing from a tweet: {', '.join(missing_metrics)}. They have been replaced with an empty string ('')"
+            warning = f"The following metrics were missing from a tweet: {', '.join(missing_metrics)}. They will have a value of '0' in any exports."
 
         return MappedItem({
             "id": item["id"],
