@@ -815,4 +815,4 @@ class SearchWithTwitterAPIv2(Search):
             "mentions": ','.join(set(mentions)),
             "long_lat": ', '.join([str(x) for x in item.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
             'place_name': item.get('geo', {}).get('place', {}).get('full_name', ''),
-        }, message=warning)
+        }, message=warning, missing=missing_metrics)

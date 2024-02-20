@@ -13,14 +13,21 @@ class MappedItem:
     class allows for additionally passing messages, warnings, etc.
     """
 
-    def __init__(self, data, message=""):
+    def __init__(self, data, message="", missing=None):
         """
         Constructor
         :param dict data:  Mapped item data
         :param str message:  Optionally, a message, e.g. a raised warning
+        :param list|None missing:  List of fields in the mapped data dictionary
+        that were missing or incompatible in the underlying data. This can be
+        used by processors to decide how to deal with the data
         """
+        if missing is None:
+            missing = []
+
         self.data = data
         self.message = message
+        self.missing = missing
 
     def get_item_data(self):
         """
@@ -35,3 +42,10 @@ class MappedItem:
         :return str:
         """
         return self.message
+
+    def get_missing_fields(self):
+        """
+        Get missing data fields
+        :return list:
+        """
+        return self.missing
