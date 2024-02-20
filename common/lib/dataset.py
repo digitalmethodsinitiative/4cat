@@ -19,7 +19,7 @@ from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, conv
 from common.lib.item_mapping import MappedItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-								   MapItemException)
+								   MapItemException, MappedItemIncompleteException)
 
 
 class DataSet(FourcatModule):
@@ -321,7 +321,7 @@ class DataSet(FourcatModule):
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_objects(self, processor=None, warn_unmappable=True):
+	def iterate_mapped_objects(self, processor=None, warn_unmappable=True, map_missing="ignore"):
 		"""
 		Generate mapped dataset items
 
@@ -330,8 +330,32 @@ class DataSet(FourcatModule):
 		performed here as the point is to be able to handle the original
 		object and save as an appropriate filetype.
 
+		Note the two parameters warn_unmappable and map_missing. Items can be
+		unmappable in that their structure is too different to coerce into a
+		neat dictionary of the structure the data source expects. This makes it
+		'unmappable' and warn_unmappable determines what happens in this case.
+		It can also be of the right structure, but with some fields missing or
+		incomplete. map_missing determines what happens in that case. The
+		latter is for example possible when importing data via Zeeschuimer,
+		which produces unstably-structured data captured from social media
+		sites.
+
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
+		:param bool warn_unmappable:  If an item is not mappable, skip the item
+		and log a warning
+		:param map_missing: Indicates what to do with mapped items for which
+		some fields could not be mapped. Defaults to 'ignore'. Must be one of:
+		- 'ignore': fill missing fields with an empty string
+		- 'abort': raise a MappedItemIncompleteException if a field is missing
+		- 'delete': remove the key that would hold the missing field from the
+		  dictionary
+		- a dictionary with a 'replace' key: replace missing field with the
+		  value in the dictionary for the 'replace' key
+		- a callback: replace missing field with the return value of the
+		  callback. The MappedItem object is passed to the callback as the
+		  first argument and the name of the missing field as the second.
+
 		:return generator:  A generator that yields a tuple with the unmapped
 		item followed by the mapped item
 		"""
@@ -356,13 +380,43 @@ class DataSet(FourcatModule):
 						self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
 						unmapped_items = True
 					continue
+
+				if mapped_item.get_missing_fields():
+					default_strategy = "ignore"
+					if type(map_missing) is str:
+						default_strategy = map_missing
+						map_missing = {}
+
+					for missing_field in mapped_item.get_missing_fields():
+						strategy = map_missing.get(missing_field, default_strategy)
+
+						if callable(strategy):
+							# delegate handling to a callback
+							mapped_item.data[missing_field] = strategy(mapped_item.data, mapped_item.data[missing_field])
+						elif type(strategy) is dict and "replace" in strategy:
+							mapped_item.data[missing_field] = strategy["replace"]
+						elif strategy == "abort":
+							# raise an exception to be handled at the processor level
+							raise MappedItemIncompleteException(f"Cannot process item, field {missing_field} missing in source data.")
+						elif strategy == "delete":
+							# remove the field from the item
+							del mapped_item.data[missing_field]
+						elif strategy == "ignore":
+							# "ignore", pretend it's an empty string
+							mapped_item.data[missing_field] = ""
+						else:
+							raise ValueError("map_missing must be 'abort', 'delete', 'ignore', a dictionary with a 'replace' key, or a callback.")
+
+					else:
+						# ignore missing fields, pretend they're empty strings
+						mapped_item.update({k: "" for k in mapped_item.get_missing_fields()})
 			else:
 				mapped_item = original_item
 
 			# Yield the two items
 			yield original_item, mapped_item
 
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True):
+	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="ignore"):
 		"""
 		Generate mapped dataset dictionaries
 
@@ -371,11 +425,16 @@ class DataSet(FourcatModule):
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
+		:param bool warn_unmappable:  If an item is not mappable, skip the item
+		and log a warning
+		:param map_missing: Indicates what to do with mapped items for which
+		some fields could not be mapped. Defaults to 'ignore'.
+
 		:return generator:  A generator that yields a tuple with the unmapped
 		item followed by the mapped item
 		"""
-		for original_item, mapped_item in self.iterate_mapped_items(processor, warn_unmappable):
-			if type(original_item) is MappedItem:
+		for original_item, mapped_item in self.iterate_mapped_objects(processor, warn_unmappable, map_missing):
+			if type(mapped_item) is MappedItem:
 				yield original_item, mapped_item.get_item_data()
 			else:
 				yield original_item, mapped_item
