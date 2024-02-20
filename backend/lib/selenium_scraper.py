@@ -542,6 +542,9 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             time.sleep(.2)
 
     def kill_browser(self, browser):
+        # TODO: This may not be working properly; 2024/2/20 noted many firefox processes still running & 4CAT crashed
+        # Could kill via `pkill firefox` or `killall firefox` but that is very indescriminate... could kill other
+        # processors using selenium or other, even, other user firefox instances
         self.selenium_log.info(f"4CAT is killing {browser} with PID: {self.driver.service.process.pid}")
         try:
             subprocess.check_call(['kill', str(self.driver.service.process.pid)])
@@ -549,6 +552,21 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             self.selenium_log.error(f"Error killing {browser}: {e}")
             self.quit_selenium()
             raise e
+
+        result = subprocess.run(["ps aux | grep firefox"], shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result_output = result.stdout.decode("utf-8")
+
+        if result.returncode != 0:
+            result_error = result.stderr.decode("utf-8")
+            self.selenium_log.error(f"Error checking for {browser} processes: {result_error}")
+
+        processes = [process for process in result.stdout.decode("utf-8").split('\n') if process]
+        if len(processes) > 2:
+            # 2 processes are the grep and the piped command
+            self.selenium_log.warning(f"Additional {browser} processes running: {len(processes) - 2}")
+            self.selenium_log.warning('\n'.join(processes))
+
+
 
 
 class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
