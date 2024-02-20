@@ -10,7 +10,7 @@ import time
 import re
 
 from backend.lib.search import Search
-
+from common.lib.item_mapping import MappedItem
 
 class SearchLinkedIn(Search):
     """
@@ -39,51 +39,49 @@ class SearchLinkedIn(Search):
         raise NotImplementedError("LinkedIn datasets can only be created by importing data from elsewhere")
 
     @staticmethod
-    def map_item(node):
+    def map_item(item):
         """
         Parse LinkedIn post in Voyager V2 format
 
         'Voyager V2' seems to be how the format is referred to in the data
         itself...
 
-        :param node:  Data as received from LinkedIn
+        :param item:  Data as received from LinkedIn
         :return dict:  Mapped item
         """
 
         # annoyingly, posts don't come with a timestamp
         # approximate it by using the time of collection and the "time ago"
         # included with the post (e.g. 'published 18h ago')
-        post = node
-
-        if not post.get("actor"):
+        if not item.get("actor"):
             return {}
 
-        if "__import_meta" in node:
-            time_collected = int(node["__import_meta"]["timestamp_collected"] / 1000)  # milliseconds
+        if "__import_meta" in item:
+            time_collected = int(item["__import_meta"]["timestamp_collected"] / 1000)  # milliseconds
         else:
             # best we got
             time_collected = int(time.time())
 
-        time_ago = post["actor"]["subDescription"]["text"] if post["actor"].get("subDescription") else ""
+        time_ago = item["actor"]["subDescription"]["text"] if item["actor"].get("subDescription") else ""
         timestamp = int(time_collected - SearchLinkedIn.parse_time_ago(time_ago))
 
         # images are stored in some convoluted way
         # there are multiple URLs for various thumbnails, use the one for the
         # largest version of the image
         images = []
-        if post["content"] and "images" in post["content"]:
-            for image in post["content"]["images"]:
+        if item["content"] and "images" in item["content"]:
+            for image in item["content"]["images"]:
                 image_data = image["attributes"][0]["vectorImage"]
                 artifacts = sorted(image_data["artifacts"], key=lambda x: x["width"], reverse=True)
                 url = image_data["rootUrl"] + artifacts[0]["fileIdentifyingUrlPathSegment"]
                 images.append(url)
 
         # or alternatively they are stored here:
-        if not images and post["content"] and post["content"]["articleComponent"] and post["content"]["articleComponent"].get("largeImage"):
-            image = post["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
+        if not images and item["content"] and item["content"]["articleComponent"] and item["content"]["articleComponent"].get("largeImage"):
+            image = item["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
             images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
 
-        author = SearchLinkedIn.get_author(post)
+        author = SearchLinkedIn.get_author(item)
 
         # the ID is in the format 'urn:li:activity:6960882777168695296'
         # retain the numerical part as the item ID for 4CAT
@@ -91,42 +89,42 @@ class SearchLinkedIn(Search):
         # urn:li:aggregate:(urn:li:activity:3966023054712791616,urn:li:activity:3965915018238312449)
         # effectively both IDs seem to refer to the same post, so just take the
         # first one
-        meta_urn = post.get("updateMetadata", {"urn": post.get("preDashEntityUrn")})["urn"]
+        meta_urn = item.get("updateMetadata", {"urn": item.get("preDashEntityUrn")})["urn"]
         urn = "urn:li:activity:" + meta_urn.split("urn:li:activity:")[1].split(",")[0].split(")")[0]
         item_id = urn.split(":").pop()
 
         # the way hashtags were stored changed at some point
         hashtags = []
-        if post["commentary"] and "attributes" in post["commentary"]["text"]:
-            hashtags = [tag["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]
-        elif post["commentary"] and "attributesV2" in post["commentary"]["text"]:
-            hashtags = [tag["detailData"]["*hashtag"]["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributesV2", []) if "*hashtag" in tag["detailData"]]
+        if item["commentary"] and "attributes" in item["commentary"]["text"]:
+            hashtags = [tag["trackingUrn"].split(":").pop() for tag in item["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]
+        elif item["commentary"] and "attributesV2" in item["commentary"]["text"]:
+            hashtags = [tag["detailData"]["*hashtag"]["trackingUrn"].split(":").pop() for tag in item["commentary"]["text"].get("attributesV2", []) if "*hashtag" in tag["detailData"]]
 
         # same for metrics
-        if "*totalSocialActivityCounts" in post["*socialDetail"]:
+        if "*totalSocialActivityCounts" in item["*socialDetail"]:
             metrics = {
-                "likes": post["*socialDetail"]["*totalSocialActivityCounts"]["numLikes"],
-                "comments": post["*socialDetail"]["*totalSocialActivityCounts"]["numComments"],
-                "shares": post["*socialDetail"]["*totalSocialActivityCounts"]["numShares"]
+                "likes": item["*socialDetail"]["*totalSocialActivityCounts"]["numLikes"],
+                "comments": item["*socialDetail"]["*totalSocialActivityCounts"]["numComments"],
+                "shares": item["*socialDetail"]["*totalSocialActivityCounts"]["numShares"]
             }
         else:
             metrics = {
-                "likes": post["*socialDetail"]["likes"]["paging"]["total"],
-                "comments": post["*socialDetail"]["comments"]["paging"]["total"],
-                "shares": post["*socialDetail"]["totalShares"],
+                "likes": item["*socialDetail"]["likes"]["paging"]["total"],
+                "comments": item["*socialDetail"]["comments"]["paging"]["total"],
+                "shares": item["*socialDetail"]["totalShares"],
             }
 
         # and links
         link_url = ""
-        if post.get("content") and post["content"].get("navigationContext"):
-            link_url = post["content"]["navigationContext"].get("actionTarget", "")
-        elif post.get("content") and post["content"].get("articleComponent") and "navigationContext" in post["content"]["articleComponent"]:
-            link_url = post["content"]["articleComponent"]["navigationContext"].get("actionTarget", "")
+        if item.get("content") and item["content"].get("navigationContext"):
+            link_url = item["content"]["navigationContext"].get("actionTarget", "")
+        elif item.get("content") and item["content"].get("articleComponent") and "navigationContext" in post["content"]["articleComponent"]:
+            link_url = item["content"]["articleComponent"]["navigationContext"].get("actionTarget", "")
 
-        mapped_item = {
+        return MappedItem({
             "id": item_id,
             "thread_id": item_id,
-            "body": post["commentary"]["text"]["text"] if post["commentary"] else "",
+            "body": item["commentary"]["text"]["text"] if item["commentary"] else "",
             "timestamp": datetime.datetime.utcfromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp_collected": datetime.datetime.utcfromtimestamp(time_collected).strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp_ago": time_ago.split("•")[0].strip(),
@@ -137,12 +135,10 @@ class SearchLinkedIn(Search):
             "post_url": "https://www.linkedin.com/feed/update/" + urn,
             "link_url":  link_url,
             **metrics,
-            "inclusion_context": post["header"]["text"]["text"] if post.get("header") else "",
+            "inclusion_context": item["header"]["text"]["text"] if item.get("header") else "",
             "unix_timestamp": timestamp,
             "unix_timestamp_collected": time_collected
-        }
-
-        return mapped_item
+        })
 
     @staticmethod
     def get_author(post):

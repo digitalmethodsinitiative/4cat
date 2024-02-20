@@ -9,6 +9,7 @@ import vk_api
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
+from common.lib.item_mapping import MappedItem
 from common.config_manager import config
 
 
@@ -23,7 +24,7 @@ class SearchVK(Search):
     is_static = False   # Whether this datasource is still updated
 
     previous_request = 0
-    flawless = True
+    import_issues = True
 
     references = [
         "[VK API documentation](https://vk.com/dev/first_guide)",
@@ -366,14 +367,14 @@ class SearchVK(Search):
         return params
 
     @staticmethod
-    def map_item(vk_item):
+    def map_item(item):
         """
         Map a nested VK object to a flat dictionary
 
-        :param vk_item:  VK object as originally returned by the VK API
+        :param item:  VK object as originally returned by the VK API
         :return dict:  Dictionary in the format expected by 4CAT
         """
-        vk_item_time = datetime.datetime.fromtimestamp(vk_item.get('date'))
+        vk_item_time = datetime.datetime.fromtimestamp(item.get('date'))
 
         # Process attachments
         photos = []
@@ -381,7 +382,7 @@ class SearchVK(Search):
         audio = []
         links = []
         docs = []
-        for attachment in vk_item.get("attachments", []):
+        for attachment in item.get("attachments", []):
             attachment_type = attachment.get("type")
             attachment = attachment.get(attachment_type)
             if attachment_type == "photo":
@@ -404,27 +405,27 @@ class SearchVK(Search):
         tread_id = ""
         in_reply_to_user = ""
         in_reply_to_comment_id = ""
-        if vk_item.get("4cat_item_type") == "post":
-            tread_id = vk_item.get("id")
-        elif vk_item.get("4cat_item_type") == "comment":
-            tread_id = vk_item.get("post_id")
-            in_reply_to_user = vk_item.get("reply_to_user")
-            in_reply_to_comment_id = vk_item.get("reply_to_comment")
+        if item.get("4cat_item_type") == "post":
+            tread_id = item.get("id")
+        elif item.get("4cat_item_type") == "comment":
+            tread_id = item.get("post_id")
+            in_reply_to_user = item.get("reply_to_user")
+            in_reply_to_comment_id = item.get("reply_to_comment")
 
-        author_profile = vk_item.get("author_profile", {})
+        author_profile = item.get("author_profile", {})
         profile_source = "user" if author_profile.get("4CAT_author_profile_type") == "profile" else "community" if author_profile.get("4CAT_author_profile_type") == "group" else "N/A"
         # Use source of author profile if "type" not present (e.g., in users profiles do not seem to have type)
         author_type = author_profile.get("type", profile_source)
 
-        return {
-            "id": vk_item.get("id"),
+        return MappedItem({
+            "id": item.get("id"),
             "thread_id": tread_id,
             "timestamp": vk_item_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(vk_item_time.timestamp()),
-            "link": f"https://vk.com/wall{vk_item.get('owner_id')}_{vk_item.get('id')}",
-            "item_type": vk_item.get("4cat_item_type"),
-            "body": vk_item.get("text"),
-            "author_id": vk_item.get("from_id"),
+            "link": f"https://vk.com/wall{item.get('owner_id')}_{item.get('id')}",
+            "item_type": item.get("4cat_item_type"),
+            "body": item.get("text"),
+            "author_id": item.get("from_id"),
             "author_type": author_type,
             "author_screen_name": author_profile.get("screen_name"),
             "author_name": author_profile.get("name", " ".join([author_profile.get("first_name", ""), author_profile.get("last_name", "")])),
@@ -441,15 +442,15 @@ class SearchVK(Search):
             "author_followers": author_profile.get("followers_count", author_profile.get("members_count", "N/A")),
             "in_reply_to_user": in_reply_to_user,
             "in_reply_to_comment_id": in_reply_to_comment_id,
-            "source": vk_item.get("post_source", {}).get("type"),
-            "views": vk_item.get("views", {}).get("count"),
-            "likes": vk_item.get("likes", {}).get("count"),
-            "post_comments": vk_item.get("comments", {}).get("count"),
-            "edited": datetime.datetime.fromtimestamp(vk_item.get("edited")).strftime("%Y-%m-%d %H:%M:%S") if vk_item.get("edited", False) else False,
+            "source": item.get("post_source", {}).get("type"),
+            "views": item.get("views", {}).get("count"),
+            "likes": item.get("likes", {}).get("count"),
+            "post_comments": item.get("comments", {}).get("count"),
+            "edited": datetime.datetime.fromtimestamp(item.get("edited")).strftime("%Y-%m-%d %H:%M:%S") if vk_item.get("edited", False) else False,
             "photos": ", ".join(photos),
             "videos": ", ".join(videos),
             "audio": ", ".join(audio),
             "links": ", ".join(links),
             "docs": ", ".join(docs),
             "subject": "",
-        }
+        })

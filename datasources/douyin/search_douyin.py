@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
-
+from common.lib.item_mapping import MappedItem
 
 class SearchDouyin(Search):
     """
@@ -36,19 +36,19 @@ class SearchDouyin(Search):
         raise NotImplementedError("Douyin datasets can only be created by importing data from elsewhere")
 
     @staticmethod
-    def map_item(post):
+    def map_item(item):
         """
         """
-        metadata = post.get("__import_meta")
+        metadata = item.get("__import_meta")
         subject = "Post"
-        if "ZS_collected_from_embed" in post and post["ZS_collected_from_embed"]:
+        if "ZS_collected_from_embed" in item and item["ZS_collected_from_embed"]:
             # HTML embedded posts formated differently than JSON posts
 
-            stream_data = post.get("cellRoom", {}).get("rawdata")
+            stream_data = item.get("cellRoom", {}).get("rawdata")
             if stream_data:
                 # These appear to be streams
                 subject = "Stream"
-                post_timestamp = datetime.fromtimestamp(stream_data.get("createtime", post.get(
+                post_timestamp = datetime.fromtimestamp(stream_data.get("createtime", item.get(
                     "requestTime") / 1000))  # These may only have the timestamp of the request
                 video_url = stream_data.get("stream_url").get("flv_pull_url", {}).get("FULL_HD1")
                 video_description = stream_data.get("title")
@@ -63,17 +63,17 @@ class SearchDouyin(Search):
                 url_list_key = "url_list"
                 is_fake_key = "is_ad_fake"  # have not seen...
             else:
-                post_timestamp = datetime.fromtimestamp(post["createTime"])
-                videos = sorted([vid for vid in post.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
+                post_timestamp = datetime.fromtimestamp(item["createTime"])
+                videos = sorted([vid for vid in item.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
                                 reverse=True)
                 video_url = "https" + videos[0]["playApi"]
-                video_description = post["desc"]
-                duration = post.get("duration", post.get("video", {}).get("duration", "Unknown"))
-                prevent_download = "yes" if post["download"]["prevent"] else "no"
-                stats = post["stats"]
+                video_description = item["desc"]
+                duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
+                prevent_download = "yes" if item["download"]["prevent"] else "no"
+                stats = item["stats"]
 
                 # Author is, well, author
-                author = post["authorInfo"]
+                author = item["authorInfo"]
                 author_sec_key = "secUid"
                 avatar_thumb_key = "avatarThumb"
                 url_list_key = "urlList"
@@ -101,17 +101,17 @@ class SearchDouyin(Search):
             live_watch_count = stats["liveWatchCount"]
 
             # This is a guess, I have not encountered it
-            video_tags = ",".join([item["tagName"] for item in post.get("videoTag", []) if "tagName" in item])
+            video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if "tagName" in tag])
 
-            mix_current_episode = post.get(mix_info_key, {}).get("currentEpisode", "N/A")
+            mix_current_episode = item.get(mix_info_key, {}).get("currentEpisode", "N/A")
 
         else:
-            stream_data = post.get("rawdata", post.get("cell_room", {}).get("rawdata"))
+            stream_data = item.get("rawdata", item.get("cell_room", {}).get("rawdata"))
             if stream_data:
                 subject = "Stream"
                 stream_data = json.loads(stream_data)
                 post_timestamp = datetime.fromtimestamp(
-                    stream_data.get("create_time", post.get("create_time", metadata.get(
+                    stream_data.get("create_time", item.get("create_time", metadata.get(
                         "timestamp_collected") / 1000)))  # Some posts appear to have no timestamp! We substitute collection time
                 video_url = stream_data.get("stream_url").get("flv_pull_url", {}).get("FULL_HD1")
                 video_description = stream_data.get("title")
@@ -123,21 +123,18 @@ class SearchDouyin(Search):
                 stats = stream_data.get("stats")
 
             else:
-                post_timestamp = datetime.fromtimestamp(post["create_time"])
-                videos = sorted([vid for vid in post["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
+                post_timestamp = datetime.fromtimestamp(item["create_time"])
+                videos = sorted([vid for vid in item["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
                                 reverse=True)
-                video_description = post["desc"]
+                video_description = item["desc"]
                 video_url = videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else ""
-                duration = post.get("duration", post.get("video", {}).get("duration", "Unknown"))
+                duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
 
                 # Author is, well, author
-                author = post["author"]
-                video_tags = ",".join(
-                    [item["tag_name"] for item in (post["video_tag"] if post["video_tag"] is not None else []) if
-                     "tag_name" in item])
-                stats = post.get("statistics")
+                author = item["author"]
+                stats = item.get("statistics")
 
-            prevent_download = ("yes" if post["prevent_download"] else "no") if "prevent_download" in post else None
+            prevent_download = ("yes" if item["prevent_download"] else "no") if "prevent_download" in item else None
 
             # Keys
             aweme_id_key = "aweme_id"
@@ -166,10 +163,10 @@ class SearchDouyin(Search):
             live_watch_count = stats.get("live_watch_count") if stats else "Unknown"
 
             video_tags = ",".join(
-                [item["tag_name"] for item in (post["video_tag"] if post["video_tag"] is not None else []) if
-                 "tag_name" in item])
+                [tag["tag_name"] for tag in (item["video_tag"] if item["video_tag"] is not None else []) if
+                 "tag_name" in tag])
 
-            mix_current_episode = post.get(mix_info_key, {}).get("statis", {}).get("current_episode", "N/A")
+            mix_current_episode = item.get(mix_info_key, {}).get("statis", {}).get("current_episode", "N/A")
 
         # Stream Stats
         count_total_streams_viewers = stats.get("total_user", "N/A")
@@ -178,25 +175,25 @@ class SearchDouyin(Search):
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
         displayed = True
-        if post.get("ZS_collected_from_mix") and not post.get("ZS_first_mix_vid"):
+        if item.get("ZS_collected_from_mix") and not item.get("ZS_first_mix_vid"):
             displayed = False
 
-        return {
-            "id": post[aweme_id_key],
-            "thread_id": post[group_id_key],
+        return MappedItem({
+            "id": item[aweme_id_key],
+            "thread_id": item[group_id_key],
             "subject": subject,
             "body": video_description,
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),
             # Adding this as different Douyin pages contain different data
-            "post_url": f"https://www.douyin.com/video/{post[aweme_id_key]}",
-            "region": post.get("region"),
+            "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}",
+            "region": item.get("region"),
             "hashtags": ",".join(
-                [item[hashtag_key] for item in (post[text_extra_key] if post[text_extra_key] is not None else []) if
-                 hashtag_key in item]),
-            "mentions": ",".join([f"https://www.douyin.com/user/{item[mention_key]}" for item in
-                                  (post[text_extra_key] if post[text_extra_key] is not None else []) if
-                                  mention_key in item]),
+                [tag[hashtag_key] for tag in (item[text_extra_key] if item[text_extra_key] is not None else []) if
+                 hashtag_key in tag]),
+            "mentions": ",".join([f"https://www.douyin.com/user/{tag[mention_key]}" for tag in
+                                  (item[text_extra_key] if item[text_extra_key] is not None else []) if
+                                  mention_key in tag]),
             # Actual username does not appear in object, but the sec_uid can be used to form a link to their profile
             "video_tags": video_tags,
             "prevent_download": prevent_download,
@@ -213,21 +210,21 @@ class SearchDouyin(Search):
             "count_total_streams_viewers": count_total_streams_viewers,
             "count_current_stream_viewers": count_current_stream_viewers,
             # Author data
-            "author_user_id": post[author_id_key] if author_id_key in post else author.get("uid", author.get("id")),
+            "author_user_id": item[author_id_key] if author_id_key in item else author.get("uid", author.get("id")),
             "author_nickname": author["nickname"],
             "author_profile_url": f"https://www.douyin.com/user/{author[author_sec_key]}",
             "author_thumbnail_url": author[avatar_thumb_key].get(url_list_key, [''])[0],
             "author_region": author.get("region"),
             "author_is_ad_fake": author.get(is_fake_key),
             # Collection/Mix
-            "part_of_collection": "yes" if mix_info_key in post and mix_id_key in post[mix_info_key] else "no",
+            "part_of_collection": "yes" if mix_info_key in item and mix_id_key in item[mix_info_key] else "no",
             "4CAT_first_video_displayed": "yes" if displayed else "no",
             # other videos may have been viewed, but this is unknown to us
-            "collection_id": post.get(mix_info_key, {}).get(mix_id_key, "N/A"),
-            "collection_name": post.get(mix_info_key, {}).get(mix_name_key, "N/A"),
+            "collection_id": item.get(mix_info_key, {}).get(mix_id_key, "N/A"),
+            "collection_name": item.get(mix_info_key, {}).get(mix_name_key, "N/A"),
             "place_in_collection": mix_current_episode,
             "unix_timestamp": int(post_timestamp.timestamp()),
-        }
+        })
 
     @staticmethod
     def get_chinese_number(num):
