@@ -12,7 +12,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
 from common.config_manager import config
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 
 class SearchWithTwitterAPIv2(Search):
@@ -780,7 +780,7 @@ class SearchWithTwitterAPIv2(Search):
                 videos.append(variants[0].get('url'))
 
         expected_metrics = {"impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count"}
-        public_metrics = {k: item["public_metrics"].get(k, "") for k in expected_metrics}
+        public_metrics = {k: item["public_metrics"].get(k, MissingMappedField(0)) for k in expected_metrics}
         missing_metrics = [m for m in expected_metrics if m not in item["public_metrics"]]
         warning = ""
         if missing_metrics:
@@ -792,7 +792,7 @@ class SearchWithTwitterAPIv2(Search):
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(tweet_time.timestamp()),
             'link': "https://twitter.com/%s/status/%s" % (author_username, item.get('id')),
-            "subject": item.get('subject', ""),
+            "subject": "",
             "body": item["text"],
             "author": author_username,
             "author_fullname": author_fullname,
@@ -815,4 +815,4 @@ class SearchWithTwitterAPIv2(Search):
             "mentions": ','.join(set(mentions)),
             "long_lat": ', '.join([str(x) for x in item.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
             'place_name': item.get('geo', {}).get('place', {}).get('full_name', ''),
-        }, message=warning, missing=missing_metrics)
+        }, message=warning)

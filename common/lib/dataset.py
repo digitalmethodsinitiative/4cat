@@ -16,7 +16,7 @@ import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
 								   MapItemException, MappedItemIncompleteException)
@@ -321,7 +321,7 @@ class DataSet(FourcatModule):
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_objects(self, processor=None, warn_unmappable=True, map_missing="ignore"):
+	def iterate_mapped_objects(self, processor=None, warn_unmappable=True, map_missing="default"):
 		"""
 		Generate mapped dataset items
 
@@ -345,11 +345,9 @@ class DataSet(FourcatModule):
 		:param bool warn_unmappable:  If an item is not mappable, skip the item
 		and log a warning
 		:param map_missing: Indicates what to do with mapped items for which
-		some fields could not be mapped. Defaults to 'ignore'. Must be one of:
-		- 'ignore': fill missing fields with an empty string
+		some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
+		- 'default': fill missing fields with the default passed by map_item
 		- 'abort': raise a MappedItemIncompleteException if a field is missing
-		- 'delete': remove the key that would hold the missing field from the
-		  dictionary
 		- a dictionary with a 'replace' key: replace missing field with the
 		  value in the dictionary for the 'replace' key
 		- a callback: replace missing field with the return value of the
@@ -381,8 +379,15 @@ class DataSet(FourcatModule):
 						unmapped_items = True
 					continue
 
+				# check if fields have been marked as 'missing' in the
+				# underlying data, and treat according to the chosen strategy
 				if mapped_item.get_missing_fields():
-					default_strategy = "ignore"
+					default_strategy = "default"
+
+					# strategy can be for all fields at once, or per field
+					# in the former case it's a string, in the latter a dict
+					# here we make sure it's always a dict to not complicate
+					# the following code
 					if type(map_missing) is str:
 						default_strategy = map_missing
 						map_missing = {}
@@ -393,30 +398,22 @@ class DataSet(FourcatModule):
 						if callable(strategy):
 							# delegate handling to a callback
 							mapped_item.data[missing_field] = strategy(mapped_item.data, missing_field)
-						elif type(strategy) is dict and "replace" in strategy:
-							mapped_item.data[missing_field] = strategy["replace"]
 						elif strategy == "abort":
 							# raise an exception to be handled at the processor level
 							raise MappedItemIncompleteException(f"Cannot process item, field {missing_field} missing in source data.")
-						elif strategy == "delete":
-							# remove the field from the item
-							del mapped_item.data[missing_field]
-						elif strategy == "ignore":
+						elif strategy == "default":
 							# "ignore", pretend it's an empty string
-							mapped_item.data[missing_field] = ""
+							mapped_item.data[missing_field] = mapped_item.data[missing_field].value
 						else:
-							raise ValueError("map_missing must be 'abort', 'delete', 'ignore', a dictionary with a 'replace' key, or a callback.")
+							raise ValueError("map_missing must be 'abort', 'default', or a callback.")
 
-					else:
-						# ignore missing fields, pretend they're empty strings
-						mapped_item.update({k: "" for k in mapped_item.get_missing_fields()})
 			else:
 				mapped_item = original_item
 
 			# Yield the two items
 			yield original_item, mapped_item
 
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="ignore"):
+	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="empty_str"):
 		"""
 		Generate mapped dataset dictionaries
 
