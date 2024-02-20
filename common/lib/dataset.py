@@ -1273,12 +1273,14 @@ class DataSet(FourcatModule):
 		results = children.copy()
 		if recursive:
 			if instantiate_datasets:
+				# Can use the DataSet.get_all_children method for each child
 				for child in children:
 					results += child.get_all_children(recursive)
 			else:
+				# Need to check database directly for children of children
 				while children:
 					child = children.pop(0)
-					new_kids = self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (child['key'],))
+					new_kids = [ChildDataset(key=key, type=dataset_type) for key, dataset_type in self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (child.key,))]
 					children += new_kids
 					results += new_kids
 
