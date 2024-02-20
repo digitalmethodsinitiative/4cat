@@ -212,6 +212,11 @@ class Search(BasicProcessor, ABC):
 						# this means the item could be mapped, but there is
 						# some information the user should take note of
 						warning = mapped_item.get_message()
+						if not warning and mapped_item.get_missing_fields():
+							# usually this would have an explicit warning, but
+							# if not it's still useful to know
+							warning = f"The following fields are missing for this item and will be replaced with a default value: {', '.join(mapped_item.get_missing_fields())}"
+
 						if warning:
 							if warning not in import_warnings:
 								import_warnings[warning] = 0
