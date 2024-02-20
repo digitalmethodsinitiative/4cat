@@ -402,7 +402,7 @@ class DataSet(FourcatModule):
 							# raise an exception to be handled at the processor level
 							raise MappedItemIncompleteException(f"Cannot process item, field {missing_field} missing in source data.")
 						elif strategy == "default":
-							# "ignore", pretend it's an empty string
+							# use whatever was passed to the object constructor
 							mapped_item.data[missing_field] = mapped_item.data[missing_field].value
 						else:
 							raise ValueError("map_missing must be 'abort', 'default', or a callback.")
@@ -413,7 +413,7 @@ class DataSet(FourcatModule):
 			# Yield the two items
 			yield original_item, mapped_item
 
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="empty_str"):
+	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="default"):
 		"""
 		Generate mapped dataset dictionaries
 
@@ -425,7 +425,8 @@ class DataSet(FourcatModule):
 		:param bool warn_unmappable:  If an item is not mappable, skip the item
 		and log a warning
 		:param map_missing: Indicates what to do with mapped items for which
-		some fields could not be mapped. Defaults to 'ignore'.
+		some fields could not be mapped. Defaults to 'default' (see
+		`iterate_mapped_object()`).
 
 		:return generator:  A generator that yields a tuple with the unmapped
 		item followed by the mapped item
