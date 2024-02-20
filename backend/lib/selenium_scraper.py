@@ -234,9 +234,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
 
     def quit_selenium(self):
         """
-        Always attempt to close the browser otherwise multiple versions of Chrome will be left running.
-
-        And Chrome is a memory hungry monster.
+        Always attempt to close the browser otherwise multiple versions of the browser will be left running.
         """
         try:
             self.driver.quit()

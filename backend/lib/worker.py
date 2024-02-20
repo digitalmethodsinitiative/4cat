@@ -132,9 +132,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
-
-		# Clean up after work successfully completed or terminates
-		self.clean_up()
+		finally:
+			# Clean up after work successfully completed or terminates
+			self.clean_up()
 
 	def clean_up(self):
 		"""
