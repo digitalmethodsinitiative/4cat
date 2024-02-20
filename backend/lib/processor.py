@@ -872,4 +872,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		pass
 
+	@staticmethod
+	def is_4cat_processor():
+		"""
+		Is this a 4CAT processor?
+
+		This is used to determine whether a class is a 4CAT
+		processor.
+		
+		:return:  True
+		"""
+		return True
+
 
