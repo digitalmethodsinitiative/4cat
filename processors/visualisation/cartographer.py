@@ -48,7 +48,7 @@ class ImagePlotGenerator(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return any([module.type.startswith(type_prefixes) for type_prefixes in ["image-downloader", "video-hasher-1"]])
+        return any([module.type.startswith(type_prefixes) for type_prefixes in ["image-downloader", "video-hasher-1", "video-scene-frames"]])
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
