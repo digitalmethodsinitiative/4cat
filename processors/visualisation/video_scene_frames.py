@@ -22,53 +22,6 @@ __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
 
-class VideoSceneFramesPreset(ProcessorPreset):
-    """
-    Run processor pipeline to annotate images
-    """
-    type = "preset-video-scene-frames"  # job type ID
-    category = "Visual"  # category
-    title = "Extract first frames from each scene"  # title displayed in UI
-    description = "For each scene identified, extracts the first frame."  # description displayed in UI
-    extension = "zip"  # extension of result file, used internally and in UI
-
-    @classmethod
-    def is_compatible_with(cls, module=None, user=None):
-        """
-        Allow processor on top image rankings
-
-        :param module: Dataset or processor to determine compatibility with
-        """
-        return module.type in ["video-scene-detector"] and \
-               config.get("video-downloader.ffmpeg_path") and \
-               shutil.which(config.get("video-downloader.ffmpeg_path"))
-
-    @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
-        return VideoSceneFrames.get_options(parent_dataset=parent_dataset, user=user)
-
-    def get_processor_pipeline(self):
-        params = self.parameters
-
-        pipeline = [
-            # download images
-            {
-                "type": "video-scene-frames",
-                "parameters": {"attach_to":self.dataset.key, **params}
-            },
-            # then create plot
-            {
-                "type": "custom-image-plot",
-                "parameters": {
-                    "amount": 0
-                }
-            },
-
-        ]
-
-        return pipeline
-
-
 class VideoSceneFrames(BasicProcessor):
     """
     Video Frame Extracter
@@ -107,8 +60,9 @@ class VideoSceneFrames(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        # Preset above (VideoSceneFramesPreset) should regulate compatibility
-        return False
+        return  module.type in ["video-scene-detector"] and \
+               config.get("video-downloader.ffmpeg_path") and \
+               shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def process(self):
         """
