@@ -39,8 +39,7 @@ class VideoSceneFramesPreset(ProcessorPreset):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return False and \
-                module.type in ["video-scene-detector"] and \
+        return module.type in ["video-scene-detector"] and \
                config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
@@ -109,9 +108,7 @@ class VideoSceneFrames(BasicProcessor):
         :return bool:
         """
         # Preset above (VideoSceneFramesPreset) should regulate compatibility
-        return module.type in ["video-scene-detector"] and \
-               config.get("video-downloader.ffmpeg_path") and \
-               shutil.which(config.get("video-downloader.ffmpeg_path"))
+        return False
 
     def process(self):
         """
