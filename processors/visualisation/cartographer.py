@@ -105,17 +105,20 @@ class ImagePlotGenerator(BasicProcessor):
         self.dataset.update_status("Unzipping images")
         staging_area = self.dataset.get_staging_area()
         # Collect filenames and metadata
-        image_filenames = []
+        image_filepaths = []
         for image in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unzipping images")
 
             if image.name.split('.')[-1] not in ["json", "log"]:
-                image_filenames.append(image.name)
+                relative_path = image.absolute().relative_to(staging_area)
+                image_filepaths.append(relative_path)
 
-            if max_images and len(image_filenames) >= max_images:
+            if max_images and len(image_filepaths) >= max_images:
                 break
-        total_image_files = len(image_filenames)
+        # JSONs will need string paths
+        image_filepaths_str = list(map(str, image_filepaths))
+        total_image_files = len(image_filepaths)
         self.dataset.log(f"Total image files: {total_image_files}")
 
         # Check if metadata exists and if so ensure extracted
@@ -141,14 +144,15 @@ class ImagePlotGenerator(BasicProcessor):
 
             if categories:
                 # Create category layout
-                categories = [categories.get(filename) for filename in image_filenames]
+                # TODO: filenames are in relation to .metadata.json file
+                categories = [categories.get(imagepath.name) for imagepath in image_filepaths]
                 self.dataset.update_status(f"Creating categorical layout (num categories: {len(set(categories))}; num images: {len(categories)})")
                 category_layout = self.get_categorical_layout(list(set(categories)), categories)
 
         # Create the grid map
         self.dataset.update_status("Creating grid map")
         # TODO: Order by...?
-        grid_map = self.create_grid_map(image_filenames)
+        grid_map = self.create_grid_map(image_filepaths_str)
 
         # Create the UMAP map
         # TODO: Create a UMAP. And add options for different types.
@@ -164,13 +168,14 @@ class ImagePlotGenerator(BasicProcessor):
         mappings = {"grid": grid_map}
         labels = {}
         if create_metadata and category_layout:
-            mappings["categorical"] = dict(zip(image_filenames, category_layout.get("layout")))
+            mappings["categorical"] = dict(zip(image_filepaths_str, category_layout.get("layout")))
             labels["categorical"] = category_layout.get("labels")
 
         # Create the manifest
         self.dataset.update_status("Creating manifests for visualization")
         self.cartograph(output_dir,
-                        [staging_area.joinpath(image) for image in image_filenames],
+                        staging_area,
+                        image_filepaths,
                         umap_maps,
                         mappings,
                         clusters=None,
@@ -185,7 +190,7 @@ class ImagePlotGenerator(BasicProcessor):
         self.write_archive_and_finish(output_dir, total_image_files)
 
     @staticmethod
-    def create_grid_map(list_of_image_filenames):
+    def create_grid_map(list_of_image_filepaths):
         """
         Takes a list of image filenames and returns a dictionary mapping each filename to a tuple of x,y floats arranged
         in a grid around the origin (0,0) with a maximum of 1 unit between each image. Filenames are mapped in order of
@@ -194,7 +199,7 @@ class ImagePlotGenerator(BasicProcessor):
         Format of grid: {"filename": ('float_x', 'float_y'), ...}
         """
         # Size the grid
-        num_of_images = len(list_of_image_filenames)
+        num_of_images = len(list_of_image_filepaths)
         side_length = math.ceil(math.sqrt(num_of_images))
 
         # Calculate the coordinates
@@ -207,9 +212,9 @@ class ImagePlotGenerator(BasicProcessor):
         possible_positions.sort(key=lambda x: x[1], reverse=True)
 
         # Combine with filenames
-        return dict(zip(list_of_image_filenames, possible_positions))
+        return dict(zip(list_of_image_filepaths, possible_positions))
 
-    def cartograph(self, output_dir, images_paths, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
+    def cartograph(self, output_dir, staging_area, images_paths, umap, position_maps, clusters=None, root="", atlas_resolution=2048,
                    cell_height=64, thumbnail_size=128, metadata=False, labels=None):
         """
         Turn image data into a PixPlot-compatible data manifest
@@ -327,13 +332,13 @@ class ImagePlotGenerator(BasicProcessor):
         # add images to atlases one by one
         for image in images:
             try:
-                original = Image.open(image)
+                original = Image.open(staging_area.joinpath(image))
             except (UnidentifiedImageError, TypeError):
                 # not a valid image, skip
                 continue
 
             size = (original.width, original.height)
-            imagelist["images"].append(image.name)
+            imagelist["images"].append(str(image))
 
             # generate individual thumbnail
             # not sure how pixplot handles thumbnails smaller than thumbnail_size
@@ -345,7 +350,9 @@ class ImagePlotGenerator(BasicProcessor):
 
             thumbnail = original.copy()
             thumbnail.thumbnail(tsize)
-            thumbnail.save(path_thumbnails.joinpath(image.name))
+            thumb_path = path_thumbnails.joinpath(image)
+            thumb_path.parent.mkdir(parents=True, exist_ok=True)
+            thumbnail.save(thumb_path)
 
             # calculate cell size in atlas
             cell_width = (cell_height / size[1]) * size[0]
@@ -357,7 +364,7 @@ class ImagePlotGenerator(BasicProcessor):
                     atlas_index += 1
                     imagelist["atlas"]["count"] += 1
                     imagelist["atlas"]["positions"].append([])
-                    imagelist["atlas"]["cell_sizes"].append([])
+                    imagelist["cell_sizes"].append([])
                     atlas_x = 0
                     atlas_y = 0
                     atlas = None
@@ -378,7 +385,7 @@ class ImagePlotGenerator(BasicProcessor):
             # save positions to imagelist
             imagelist["atlas"]["positions"][atlas_index].append((atlas_x, atlas_y))
             imagelist["cell_sizes"][atlas_index].append(tsize)
-            image_indexes.append(image.name)
+            image_indexes.append(image)
 
             # Prepare for next image by increasing the atlas_x by width of the cell
             atlas_x = math.ceil(atlas_x + cell_width)
@@ -387,10 +394,11 @@ class ImagePlotGenerator(BasicProcessor):
         date_columns = None
         date_labels = None
         if metadata and self.image_dates is not None:
+            # TODO image_filesnames are in relation to .metadata.json file
             image_filenames = [image.name for image in images]
             date_layout = self.get_date_layout(image_filenames)
             if date_layout:
-                position_maps["date"] = dict(zip(image_filenames, date_layout.get("layout", {})))
+                position_maps["date"] = dict(zip(list(map(str, images)), date_layout.get("layout", {})))
                 labels["date"] = date_layout.get("labels", {})
 
             date_columns = date_layout.get('labels', {}).get('cols', None)
