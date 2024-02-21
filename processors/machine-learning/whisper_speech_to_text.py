@@ -9,6 +9,7 @@ from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerE
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
+from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -251,7 +252,7 @@ class AudioToText(BasicProcessor):
         """
         fourcat_metadata = item.get("4CAT_metadata")
         audio_metadata = fourcat_metadata.get("audio_metadata")
-        return {
+        return MappedItem({
             "id": fourcat_metadata.get("audio_id"),
             "body": item.get("text", ""),
             "language": item.get("language", ""),
@@ -261,4 +262,4 @@ class AudioToText(BasicProcessor):
             "original_video_url": audio_metadata.get("url", ""),
             "post_ids": ", ".join(audio_metadata.get("post_ids", [])),
             "from_dataset": audio_metadata.get("from_dataset", "")
-        }
+        })
