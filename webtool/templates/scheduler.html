@@ -44,24 +44,24 @@
         {% if jobs %}
             <ol class="result-list">
                 {% for job in jobs %}
-                    <li id="{{ job.get('id') }}" class="result" data-key="{{ job.get('id') }}">
+                    <li id="{{ job.data.get('id') }}" class="result" data-key="{{ job.data.get('id') }}">
                         <div class="property-container">
-                            <h4>Job type: {{ job.get('jobtype') }}</h4>
+                            <h4>Job type: {{ job.data.get('jobtype') }}</h4>
                         </div>
                         <div class="property-container">
-                            <h4>Remote ID: {{ job.get('remote_id') }}</h4>
+                            <h4>Remote ID: {{ job.data.get('remote_id') }}</h4>
                         </div>
                         <div class="property-container">
-                            <h4>Created at: {{ job.get('timestamp')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
+                            <h4>Created at: {{ job.data.get('timestamp')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
                         </div>
                         <div class="property-container">
-                            <h4>Last run: {{ job.get('timestamp_lastclaimed')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
+                            <h4>Last run: {{ job.data.get('timestamp_lastclaimed')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
                         </div>
                         <div class="property-container">
-                            <h4>Interval (in seconds): {{ job.get('interval') }}</h4>
+                            <h4>Interval (in seconds): {{ job.data.get('interval') }}</h4>
                         </div>
                         <div class="property-container">
-                            <h4>Details: {{ job.get('details') }}</h4>
+                            <h4>Details: {{ job.data.get('details') }}</h4>
                         </div>
                     </li>
                 {% endfor %}

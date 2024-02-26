@@ -151,6 +151,14 @@ class Job:
 		"""
 		return not self.is_claimed and not self.is_finished
 
+	def update_interval(self, interval):
+		"""
+		Change the interval for a job
+		"""
+		self.db.update("jobs", data={"interval": interval},
+					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+		self.data["interval"] = interval
+
 	def get_place_in_queue(self):
 		"""
 		Get the place of this job in the queue
