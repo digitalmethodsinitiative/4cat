@@ -1,0 +1,75 @@
+{% extends "layout.html" %}
+
+{% block title %}Job Scheduler{% endblock %}
+{% block body_class %}result-list plain-page{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
+
+{% block body %}
+{#    <nav class="view-controls block">#}
+{#        <form action="{{ url_for("show_results") }}" method="GET">#}
+{#            <input type="hidden" name="depth" value="{{ depth }}">#}
+{#            <ul>#}
+{#                <li><input aria-label="Filter by query or label" placeholder="Filter datasets..." name="filter"#}
+{#                           value="{{ filter.filter }}"></li>#}
+{#            {% if current_user.is_admin %}#}
+{#                <li><input aria-label="User" placeholder="User..." name="user"#}
+{#                           value="{{ filter.user }}"></li>#}
+{#                <li>#}
+{#                    <select aria-label="Sort datasets by" name="sort_by">#}
+{#                        <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>#}
+{#                        <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>#}
+{#                    </select>#}
+{#                </li>#}
+{#            {% endif %}#}
+{#                <li>#}
+{#                    <select name="datasource" aria-label="Data source">#}
+{#                        <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>#}
+{#                    {% include 'components/datasource-select.html' %}#}
+{#                    </select>#}
+{#                </li>#}
+{#                <li><label><input type="checkbox" name="hide_empty" {% if filter.hide_empty %} checked="checked"{% endif %}> Hide empty datasets</label></li>#}
+{#            </ul>#}
+{#            <button>Filter</button>#}
+{#        </form>#}
+{#    </nav>#}
+    <article>
+        <section>
+            <h2><span>Scheduled Jobs</span></h2>
+{#            <nav class="tabs">#}
+{#                <ul>#}
+{#                    {% if __user_config("privileges.can_view_all_datasets") %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}#}
+{#                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>#}
+{#                </ul>#}
+{#            </nav>#}
+        {% if jobs %}
+            <ol class="result-list">
+                {% for job in jobs %}
+                    <li id="{{ job.get('id') }}" class="result" data-key="{{ job.get('id') }}">
+                        <div class="property-container">
+                            <h4>Job type: {{ job.get('jobtype') }}</h4>
+                        </div>
+                        <div class="property-container">
+                            <h4>Remote ID: {{ job.get('remote_id') }}</h4>
+                        </div>
+                        <div class="property-container">
+                            <h4>Created at: {{ job.get('timestamp')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
+                        </div>
+                        <div class="property-container">
+                            <h4>Last run: {{ job.get('timestamp_lastclaimed')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
+                        </div>
+                        <div class="property-container">
+                            <h4>Interval (in seconds): {{ job.get('interval') }}</h4>
+                        </div>
+                        <div class="property-container">
+                            <h4>Details: {{ job.get('details') }}</h4>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p class="banner">No jobs available.</p>
+        {% endif %}
+        </section>
+    </article>
+    {% include "components/pagination.html" %}
+{% endblock %}

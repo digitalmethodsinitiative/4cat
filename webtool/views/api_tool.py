@@ -344,6 +344,13 @@ def queue_dataset():
 	if request.form.to_dict().get("email-complete", False):
 		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
 
+	# Allow user to schedule datasets to be queue on interval
+	if request.form.to_dict().get("schedule-collection", False) and config.get("privileges.can_schedule_datasources", user=current_user):
+		interval = max(0, int(request.form.to_dict().get("schedule-interval", 0)) * (60 * 60 * 24)) # Convert days to seconds
+
+	else:
+		interval = 0
+
 	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
 	is_private = bool(request.form.get("make-private", False))
 
@@ -370,7 +377,7 @@ def queue_dataset():
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
-	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
+	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=interval)
 	dataset.link_job(Job.get_by_remote_ID(dataset.key, db))
 
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
