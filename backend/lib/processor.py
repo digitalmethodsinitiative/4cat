@@ -237,7 +237,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
 			try:
-				available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
+				available_processors = self.dataset.get_available_processors(user=self.dataset.creator, ui_only=False)
 			except ValueError:
 				self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
 				break
@@ -816,6 +816,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:return bool:  Always `False`, because this is a processor.
 		"""
 		return False
+
+	@classmethod
+	def display_in_ui(cls):
+		"""
+        Display this processor in the 4CAT web interface True/False. This is used to hide processors that are not
+        intended to be used by the user, but are instead used as part of a preset or other processor.
+
+        :return bool:  True if this processor should be displayed in the 4CAT web interface, False otherwise
+        """
+		return True
 
 	@classmethod
 	def is_from_collector(cls):

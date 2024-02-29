@@ -40,11 +40,21 @@ class MappedItem:
         self.message = message
         self.missing = [k for k in self.data if type(self.data[k]) is MissingMappedField]
 
-    def get_item_data(self):
+    def get_item_data(self, safe=False):
         """
         Get mapped item data
+
+        :param bool safe:  Replace MissingMappedFields with their default value
         :return dict:
         """
+        data = self.data.copy()
+
+        # replace MissingMappedFields
+        if safe:
+            for field, value in data.items():
+                if type(value) is MissingMappedField:
+                    data[field] = value.value
+
         return self.data
 
     def get_message(self):

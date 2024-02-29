@@ -300,6 +300,11 @@ class TikTokImageDownloader(BasicProcessor):
                         raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
 
                     refreshed_mapped_item = SearchTikTokByImport.map_item(refreshed_item)
+                    if refreshed_mapped_item.get_missing_fields():
+                        self.dataset.log(f"The following fields were missing in item and have been replaced with a "
+                                         f"default value: {', '.join(refreshed_mapped_item.get_missing_fields())}")
+
+                    refreshed_mapped_item = refreshed_mapped_item.get_item_data(safe=True)
                     post_id = refreshed_mapped_item.get("id")
                     url = refreshed_mapped_item.get(url_column)
 

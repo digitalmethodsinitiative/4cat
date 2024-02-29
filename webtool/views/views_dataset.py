@@ -376,7 +376,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_items(warn_unmappable=False):
+            for original, row in dataset.iterate_mapped_items(dataset.get_own_processor(), warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 

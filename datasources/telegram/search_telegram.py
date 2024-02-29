@@ -49,6 +49,7 @@ class SearchTelegram(Search):
 
     max_workers = 1
     max_retries = 3
+    flawless = 0
 
     options = {
         "intro": {
