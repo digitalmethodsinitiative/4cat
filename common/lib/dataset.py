@@ -40,7 +40,7 @@ class DataSet(FourcatModule):
 	data = None
 	key = ""
 
-	children = None
+	_children = None
 	available_processors = None
 	genealogy = None
 	preset_parent = None
@@ -72,7 +72,6 @@ class DataSet(FourcatModule):
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}
-		self.children = []
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
@@ -148,11 +147,6 @@ class DataSet(FourcatModule):
 
 			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
-
-		# retrieve analyses and processors that may be run for this dataset
-		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
-							   key=lambda dataset: dataset.is_finished(), reverse=True)
 
 		self.refresh_owners()
 
@@ -579,16 +573,17 @@ class DataSet(FourcatModule):
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
-		# delete from drive
-		try:
-			self.get_results_path().unlink()
-			if self.get_results_path().with_suffix(".log").exists():
-				self.get_results_path().with_suffix(".log").unlink()
-			if self.get_results_folder_path().exists():
-				shutil.rmtree(self.get_results_folder_path())
-		except FileNotFoundError:
-			# already deleted, apparently
-			pass
+		# delete from drive if not used elsewhere
+		if self.db.fetchone(f"select * from datasets where result_file = '{self.get_results_path().name}' and key != '{self.key}'") is None:
+			try:
+				self.get_results_path().unlink()
+				if self.get_results_path().with_suffix(".log").exists():
+					self.get_results_path().with_suffix(".log").unlink()
+				if self.get_results_folder_path().exists():
+					shutil.rmtree(self.get_results_folder_path())
+			except FileNotFoundError:
+				# already deleted, apparently
+				pass
 
 	def update_children(self, **kwargs):
 		"""
@@ -737,7 +732,7 @@ class DataSet(FourcatModule):
 			self.refresh_owners()
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(instantiate_datasets=True):
 			child.add_owner(username, role)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -768,7 +763,7 @@ class DataSet(FourcatModule):
 			del self.tagged_owners[username]
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(instantiate_datasets=True):
 			child.remove_owner(username)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -813,7 +808,7 @@ class DataSet(FourcatModule):
 
 		self.db.commit()
 		if recursive:
-			for child in self.children:
+			for child in self.get_children(instantiate_datasets=True):
 				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
@@ -1255,7 +1250,29 @@ class DataSet(FourcatModule):
 		self.genealogy = genealogy
 		return self.genealogy
 
-	def get_all_children(self, recursive=True):
+	def get_children(self, instantiate_datasets=True, update=False):
+		"""
+		Get children of this dataset
+
+		:param bool instantiate_datasets:  Instantiate DataSet objects for each child else return ChildDataset objects w/ only key and type attributes
+		:param bool update:  Update the list of children from database if True, else return cached value
+		:return list:  List of child datasets
+		"""
+		if self._children and not update:
+			return self._children
+
+		if instantiate_datasets:
+			analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC",
+										(self.key,))
+			self._children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
+							  key=lambda dataset: dataset.is_finished(), reverse=True)
+			return self._children
+		else:
+			# Returns simple ChildDataset objects with only key and type
+			# Do not update self._children since this is not a list of DataSet objects
+			return [ChildDataset(key=key, type=dataset_type) for key, dataset_type in self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))]
+
+	def get_all_children(self, recursive=True, instantiate_datasets=True):
 		"""
 		Get all children of this dataset
 
@@ -1265,11 +1282,20 @@ class DataSet(FourcatModule):
 
 		:return list:  List of DataSets
 		"""
-		children = [DataSet(data=record, db=self.db) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		children = self.get_children(instantiate_datasets=instantiate_datasets)
 		results = children.copy()
 		if recursive:
-			for child in children:
-				results += child.get_all_children(recursive)
+			if instantiate_datasets:
+				# Can use the DataSet.get_all_children method for each child
+				for child in children:
+					results += child.get_all_children(recursive)
+			else:
+				# Need to check database directly for children of children
+				while children:
+					child = children.pop(0)
+					new_kids = [ChildDataset(key=key, type=dataset_type) for key, dataset_type in self.db.fetchall("SELECT key, type FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (child.key,))]
+					children += new_kids
+					results += new_kids
 
 		return results
 
@@ -1387,10 +1413,10 @@ class DataSet(FourcatModule):
 
 		:return:  Processor class, or `None` if not available.
 		"""
-		processor_type = self.parameters.get("type", self.data.get("type"))
+		processor_type = self.type if hasattr(self, "type") else self.parameters.get("type")
 		return backend.all_modules.processors.get(processor_type)
 
-	def get_available_processors(self, user=None):
+	def get_available_processors(self, user=None, ui_only=True):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1401,19 +1427,27 @@ class DataSet(FourcatModule):
 
 		:param str|User|None user:  User to get compatibility for. If set,
 		use the user-specific config settings where available.
+		:param bool ui_only:  Only return processors that should be displayed
+		in the UI. If `False`, all processors are returned.
 
 		:return dict:  Available processors, `name => properties` mapping
 		"""
 		if self.available_processors:
-			return self.available_processors
+			# Update to reflect ui_only parameter which may be different from last call
+			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
+			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not ui_only or processor.display_in_ui()}
 
 		processors = self.get_compatible_processors(user=user)
 
-		for analysis in self.children:
+		for analysis in self.get_children(instantiate_datasets=False):
 			if analysis.type not in processors:
 				continue
 
 			if not processors[analysis.type].get_options():
+				del processors[analysis.type]
+				continue
+
+			if ui_only and not processors[analysis.type].display_in_ui():
 				del processors[analysis.type]
 
 		self.available_processors = processors
@@ -1604,6 +1638,18 @@ class DataSet(FourcatModule):
 			else:
 				# No other log available
 				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
+	@staticmethod
+	def get_dataset_by_key(key, db=None):
+		"""
+		Get dataset by key
+
+		:param str key:  Dataset key
+		:return DataSet:  Dataset
+		"""
+		if db is None:
+			config.with_db()
+			db = config.db
+		return DataSet(key=key, db=db)
 
 	def __getattr__(self, attr):
 		"""
@@ -1653,3 +1699,17 @@ class DataSet(FourcatModule):
 
 		if attr == "parameters":
 			self.parameters = json.loads(value)
+
+class ChildDataset:
+	"""
+	Allows for easy access to child some dataset attributes without instantiating them all
+	"""
+	def __init__(self, key, type):
+		self.key = key
+		self.type = type
+
+	def instantiate(self, db):
+		"""
+		Instantiates the dataset
+		"""
+		return DataSet(key=self.key, db=db)

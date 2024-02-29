@@ -237,7 +237,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
 			try:
-				available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
+				available_processors = self.dataset.get_available_processors(user=self.dataset.creator, ui_only=False)
 			except ValueError:
 				self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
 				break
@@ -307,8 +307,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 				if self.dataset.get_results_path().exists():
 					# Update the surrogate's results file suffix to match this dataset's suffix
-					surrogate.data["result_file"] = surrogate.get_results_path().with_suffix(self.dataset.get_results_path().suffix)
-					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
+					surrogate.result_file = str(self.dataset.get_results_path().name)
 
 				try:
 					surrogate.finish(self.dataset.data["num_rows"])
@@ -626,7 +625,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
 
-	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED):
+	def write_archive_and_finish(self, filelist_or_folder, num_items=None, compression=zipfile.ZIP_STORED):
 		"""
 		Archive a bunch of files into a zip archive and finish processing
 
@@ -639,21 +638,30 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		  are not compressed, to speed up unarchiving.
 		"""
 		is_folder = False
-		if issubclass(type(files), PurePath):
-			is_folder = files
-			if not files.exists() or not files.is_dir():
-				raise RuntimeError("Folder %s is not a folder that can be archived" % files)
+		if issubclass(type(filelist_or_folder), PurePath):
+			# folder with files
+			is_folder = filelist_or_folder
+			if not filelist_or_folder.exists() or not filelist_or_folder.is_dir():
+				raise RuntimeError("Folder %s is not a folder that can be archived" % filelist_or_folder)
 
-			files = files.glob("*")
+			#files = files.glob("*")
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")
 		done = 0
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zip:
-			for output_path in files:
-				zip.write(output_path, output_path.name)
-				output_path.unlink()
-				done += 1
+		with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zipf:
+			if is_folder:
+				for root, dirs, files in os.walk(filelist_or_folder):
+					for file in files:
+						zipf.write(os.path.join(root, file),
+								  os.path.relpath(os.path.join(root, file), filelist_or_folder))
+						done += 1
+			else:
+				# list of files
+				for output_path in filelist_or_folder:
+					zipf.write(output_path, output_path.name)
+					output_path.unlink()
+					done += 1
 
 		# delete temporary folder
 		if is_folder:
@@ -808,6 +816,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:return bool:  Always `False`, because this is a processor.
 		"""
 		return False
+
+	@classmethod
+	def display_in_ui(cls):
+		"""
+        Display this processor in the 4CAT web interface True/False. This is used to hide processors that are not
+        intended to be used by the user, but are instead used as part of a preset or other processor.
+
+        :return bool:  True if this processor should be displayed in the 4CAT web interface, False otherwise
+        """
+		return True
 
 	@classmethod
 	def is_from_collector(cls):

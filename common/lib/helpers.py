@@ -2,6 +2,8 @@
 Miscellaneous helper functions for the 4CAT backend
 """
 import subprocess
+import zipfile
+
 import requests
 import datetime
 import smtplib
@@ -97,6 +99,13 @@ def sniff_encoding(file):
         maybe_bom = False
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
+
+
+def get_html_redirect_page(url):
+    """
+    Returns a html string to redirect to PixPlot.
+    """
+    return f"<head><meta http-equiv='refresh' charset='utf-8' content='0; URL={url}'></head>"
 
 
 def get_software_commit():
@@ -830,3 +839,19 @@ def sets_to_lists(d: MutableMapping):
                 yield k, v
 
     return dict(_sets_to_lists_gen(d))
+
+def get_archived_file(archive_path, archived_file, temp_dir):
+    with zipfile.ZipFile(archive_path, "r") as archive_file:
+        archive_contents = sorted(archive_file.namelist())
+
+        if archived_file in archive_contents:
+            info = archive_file.getinfo(archived_file)
+            if info.is_dir():
+                raise IsADirectoryError("File is a directory")
+
+            archive_file.extract(archived_file, temp_dir)
+
+            return temp_dir.joinpath(archived_file)
+
+        else:
+            raise FileNotFoundError("File not found in archive")

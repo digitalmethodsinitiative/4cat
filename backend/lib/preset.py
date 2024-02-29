@@ -27,7 +27,9 @@ class ProcessorPreset(BasicProcessor):
 		# also make sure there is always a "parameters" key
 		pipeline = [{"parameters": {}, **p} for p in pipeline.copy()]
 
-		pipeline[-1]["parameters"]["attach_to"] = self.dataset.key
+		# check that preset has an "attach_to" parameter in one of the processors
+		if not any("attach_to" in p["parameters"] for p in pipeline):
+			pipeline[-1]["parameters"]["attach_to"] = self.dataset.key
 
 		# map the linear pipeline to a nested processor parameter set
 		while len(pipeline) > 1:

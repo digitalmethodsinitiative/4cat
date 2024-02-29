@@ -28,6 +28,9 @@ __email__ = "4cat@oilab.eu"
 
 class ImageDownloader(BasicProcessor):
 	"""
+	NOTE: The image-download-preset.py file is a preset for this processor and automatically runs the cartographer in
+	addition to downloading the images. This processor is marked as "not compatible" so it does not appear in the UI.
+
 	Image downloader
 
 	Downloads top images and saves as zip archive
@@ -121,12 +124,22 @@ class ImageDownloader(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow processor on top image rankings
+        Allow processor on top image rankings, collectors, but not specific collectors with their own image
+        collection methods
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
+        :param module: Dataset or processor to determine compatibility with
+        """
 		return (module.type == "top-images" or module.is_from_collector()) \
-			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
+			and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
+
+	@classmethod
+	def display_in_ui(cls):
+		"""
+        This processor is not displayed in the UI, as it is only used by the image-download-preset.py
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+		return False
 
 	def process(self):
 		"""

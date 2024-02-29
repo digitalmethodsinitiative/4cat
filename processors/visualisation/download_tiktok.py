@@ -189,6 +189,16 @@ class TikTokImageDownloader(BasicProcessor):
         """
         return module.type in ["tiktok-search", "tiktok-urls-search"]
 
+    @classmethod
+    def display_in_ui(cls):
+        """
+        This processor is not displayed in the UI, as it is only used by the image-download-preset.py
+        See TikTokImageDownloaderPreset in processors/presets/image-download-preset.py
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return False
+
     def process(self):
         """
         Reads a file, filtering items that match in the required way, and

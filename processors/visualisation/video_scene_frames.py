@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import shlex
 
+from backend.lib.preset import ProcessorPreset
 from common.config_manager import config
 
 from backend.lib.processor import BasicProcessor
@@ -59,7 +60,7 @@ class VideoSceneFrames(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type in ["video-scene-detector"] and \
+        return  module.type in ["video-scene-detector"] and \
                config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
