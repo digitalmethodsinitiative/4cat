@@ -76,13 +76,22 @@
             <ul>
                 {% if item.get_extension() in ("gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "html", "zip") or item.get_own_processor().map_item %}
                 <li>
+                    {% if item.get_extension() != "zip" %}
                     <a href="{{ url_for('preview_items', key=item.key) }}"
                        data-load-from="{{ url_for('preview_items', key=item.key) }}"
                        class="property-badge permalink popup-trigger tooltip-trigger"
-                       aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}"><i
-                            class="fa fa-fw fa-search"></i> Preview<span class="sr-only"> this dataset</span></a>
+                       aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}">
+                        <i class="fa fa-fw fa-search"></i> {% if item.get_extension() in ("csv", "ndjson", "json") %}Pre{% endif %}view<span class="sr-only"> this dataset</span>
+                    </a>
                     <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
-                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
+                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">{% if item.get_extension() in ("csv", "ndjson", "json") %}Pre{% endif %}view this dataset</p>
+                    {% else %}
+                        {# Do not use iframe for zip files #}
+                    <a href="{{ url_for('preview_items', key=item.key) }}" class="property-badge permalink tooltip-trigger" aria-controls="tooltip-preview-{{ item.key }}" rel="external" target="_blank">
+                        <i class="fa fa-fw fa-search"></i> View<span class="sr-only"> this dataset</span>
+                    </a>
+                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">View this dataset</p>
+                    {% endif %}
                 </li>
                 {% endif %}
                 {% if item.get_log_path().exists() and current_user.is_authenticated %}
