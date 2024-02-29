@@ -1419,6 +1419,7 @@ class DataSet(FourcatModule):
 
 			if not processors[analysis.type].get_options():
 				del processors[analysis.type]
+				continue
 
 			if ui_only and not processors[analysis.type].display_in_ui():
 				del processors[analysis.type]
