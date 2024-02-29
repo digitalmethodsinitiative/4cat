@@ -25,8 +25,7 @@ class ImageDownloaderPreset(ProcessorPreset):
 
         :param module: Dataset or processor to determine compatibility with
         """
-		return (module.type == "top-images" or module.is_from_collector()) \
-			and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
+		return ImageDownloader.is_compatible_with(module=module, user=user)
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -72,15 +71,7 @@ class TelegramImageDownloaderPreset(ProcessorPreset):
 
         :param module: Dataset or processor to determine compatibility with
         """
-		if type(module) is DataSet:
-			# we need these to actually instantiate a telegram client and
-			# download the images
-			return module.type == "telegram-search" and \
-				"api_phone" in module.parameters and \
-				"api_id" in module.parameters and \
-				"api_hash" in module.parameters
-		else:
-			return module.type == "telegram-search"
+		return TelegramImageDownloader.is_compatible_with(module=module, user=user)
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -124,7 +115,7 @@ class TikTokImageDownloaderPreset(ProcessorPreset):
 
         :param module: Dataset or processor to determine compatibility with
         """
-		return module.type in ["tiktok-search", "tiktok-urls-search"]
+		return TikTokImageDownloader.is_compatible_with(module=module, user=user)
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):

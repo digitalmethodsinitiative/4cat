@@ -75,7 +75,6 @@ class TelegramImageDownloader(BasicProcessor):
             }
         }
 
-
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
@@ -83,7 +82,24 @@ class TelegramImageDownloader(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        # See TelegramImageDownloaderPreset in processors/presets/image-download-preset.py
+        if type(module) is DataSet:
+            # we need these to actually instantiate a telegram client and
+            # download the images
+            return module.type == "telegram-search" and \
+                "api_phone" in module.parameters and \
+                "api_id" in module.parameters and \
+                "api_hash" in module.parameters
+        else:
+            return module.type == "telegram-search"
+
+    @classmethod
+    def display_in_ui(cls):
+        """
+        This processor is not displayed in the UI, as it is only used by the image-download-preset.py
+        See TelegramImageDownloaderPreset in processors/presets/image-download-preset.py
+
+        :param module: Dataset or processor to determine compatibility with
+        """
         return False
 
     def process(self):
