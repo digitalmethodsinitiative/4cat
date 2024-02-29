@@ -1409,7 +1409,7 @@ class DataSet(FourcatModule):
 		if self.available_processors:
 			# Update to reflect ui_only parameter which may be different from last call
 			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-			return [self.available_processors for processor in self.available_processors if not ui_only or processor.display_in_ui()]
+			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not ui_only or processor.display_in_ui()}
 
 		processors = self.get_compatible_processors(user=user)
 
