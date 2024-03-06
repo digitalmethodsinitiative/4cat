@@ -178,7 +178,7 @@ class ImageDownloader(BasicProcessor):
 									  re.IGNORECASE)
 
 		external = None
-		if datasource == "4chan" and ("image_md5" in columns or "image_file" in columns):
+		if datasource in ["4chan", "fourchan"] and ("image_md5" in columns or "image_file" in columns):
 			external = "boards.fireden.net" if top_parent.parameters.get("board") == "v" else "archive.4plebs.org"
 
 		# first, get URLs to download images from
