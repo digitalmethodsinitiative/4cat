@@ -353,7 +353,7 @@ class DmiServiceManager:
                 except requests.exceptions.ConnectionError as e:
                     retries += 1
                     if retries > 3:
-                        raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading file: {filename}")
+                        raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading file: {folder_name}/{filename}")
                     continue
             files_downloaded += 1
             if files_downloaded % 1000 == 0:
