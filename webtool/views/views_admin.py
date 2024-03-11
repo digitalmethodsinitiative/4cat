@@ -28,7 +28,7 @@ from webtool.lib.helpers import error, Pagination, generate_css_colours, setting
 from common.lib.user import User
 from common.lib.dataset import DataSet
 
-from common.lib.helpers import call_api, send_email, UserInput
+from common.lib.helpers import call_api, send_email, UserInput, folder_size
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -63,8 +63,8 @@ def admin_frontpage():
     }
 
     disk_stats = {
-        "data": sum([f.stat().st_size for f in config.get("PATH_DATA").glob("**/*") if f.is_file()]),
-        "logs": sum([f.stat().st_size for f in config.get("PATH_LOGS").glob("**/*") if f.is_file()]),
+        "data": folder_size(config.get("PATH_DATA")),
+        "logs": folder_size(config.get("PATH_LOGS")),
         "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
     }
 
