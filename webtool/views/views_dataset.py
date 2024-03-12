@@ -146,10 +146,7 @@ def show_results(page):
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   (metadata["has_worker"] and metadata["has_options"]) or (metadata["importable"]) }
-
-    return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
+    return render_template("results.html", filter=filters, depth=depth, datasources=backend.all_modules.datasources,
                            datasets=filtered, pagination=pagination, favourites=favourites)
 
 
