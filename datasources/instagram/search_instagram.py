@@ -8,7 +8,7 @@ import datetime
 import re
 
 from backend.lib.search import Search
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.exceptions import WorkerInterruptedException, MapItemException
 
 
@@ -82,7 +82,7 @@ class SearchInstagram(Search):
         try:
             caption = node["edge_media_to_caption"]["edges"][0]["node"]["text"]
         except IndexError:
-            caption = ""
+            caption = MissingMappedField("")
 
         num_media = 1 if node["__typename"] != "GraphSidecar" else len(node["edge_sidecar_to_children"]["edges"])
 
@@ -113,7 +113,7 @@ class SearchInstagram(Search):
             media_types = set([s["node"]["__typename"] for s in node["edge_sidecar_to_children"]["edges"]])
             media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
-        location = {"name": "", "latlong": "", "city": ""}
+        location = {"name": MissingMappedField(""), "latlong": MissingMappedField(""), "city": MissingMappedField("")}
         # location has 'id', 'has_public_page', 'name', and 'slug' keys in tested examples; no lat long or "city" though name seems
         if node.get("location"):
             location["name"] = node["location"].get("name")
@@ -122,15 +122,22 @@ class SearchInstagram(Search):
                 "location"].get("lat") else ""
             location["city"] = node["location"].get("city")
 
+        user = node.get("user")
+        owner = node.get("owner")
+        if node.get("user") and node.get("owner"):
+            if user.get("username") != owner.get("username"):
+                raise MapItemException("Unable to parse item: different user and owner")
+
         mapped_item = {
             "id": node["shortcode"],
+            "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"),  # Zeeschuimer metadata
             "thread_id": node["shortcode"],
             "parent_id": node["shortcode"],
             "body": caption,
-            "author": node["owner"]["username"],
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
-            "author_fullname": node["owner"].get("full_name", ""),
-            "author_avatar_url": node["owner"].get("profile_pic_url", ""),
+            "author": user.get("username", owner.get("username", MissingMappedField(""))),
+            "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
+            "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["shortcode"],
             "image_url": node["display_url"],
@@ -158,7 +165,7 @@ class SearchInstagram(Search):
         :return dict:  Mapped item
         """
         num_media = 1 if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
-        caption = "" if not node.get("caption") else node["caption"]["text"]
+        caption = MissingMappedField("") if not "caption" in node else "" if not node.get("caption") else node["caption"]["text"]
 
         # get media url
         # for carousels, get the first media item, for videos, get the video
@@ -180,8 +187,8 @@ class SearchInstagram(Search):
             media_url = media_node["image_versions2"]["candidates"][0]["url"]
             display_url = media_url
         else:
-            media_url = ""
-            display_url = ""
+            media_url = MissingMappedField("")
+            display_url = MissingMappedField("")
 
         # type, 'mixed' means carousel with video and photo
         type_map = {SearchInstagram.MEDIA_TYPE_PHOTO: "photo", SearchInstagram.MEDIA_TYPE_VIDEO: "video"}
@@ -198,21 +205,28 @@ class SearchInstagram(Search):
         else:
             num_comments = -1
 
-        location = {"name": "", "latlong": "", "city": ""}
+        location = {"name": MissingMappedField(""), "latlong": MissingMappedField(""), "city": MissingMappedField("")}
         if node.get("location"):
             location["name"] = node["location"].get("name")
             location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
                 "location"].get("lat") else ""
             location["city"] = node["location"].get("city")
 
+        user = node.get("user", {})
+        owner = node.get("owner", {})
+        if user and owner:
+            if user.get("username") != owner.get("username"):
+                raise MapItemException("Unable to parse item: different user and owner")
+
         mapped_item = {
             "id": node["code"],
+            "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"), # Zeeschuimer metadata
             "thread_id": node["code"],
             "parent_id": node["code"],
             "body": caption,
-            "author": node["user"]["username"],
-            "author_fullname": node["user"]["full_name"],
-            "author_avatar_url": node["user"]["profile_pic_url"],
+            "author": user.get("username", owner.get("username", MissingMappedField(""))),
+            "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
+            "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["code"],
