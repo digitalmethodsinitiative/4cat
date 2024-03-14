@@ -62,7 +62,7 @@ class SearchInstagram(Search):
         if (item.get("product_type", "") == "ad") or \
                 (link and link.startswith("https://www.facebook.com/ads/ig_redirect")):
             # These are ads
-            raise MapItemException("appears to be Instagram ad, check raw data to confirm and ensure ZeeSchuimer is up to date.")
+            raise MapItemException("appears to be Instagram ad, check raw data to confirm and ensure Zeeschuimer is up to date.")
 
         is_graph_response = "__typename" in item and item["__typename"] not in ("XDTMediaDict",)
 
