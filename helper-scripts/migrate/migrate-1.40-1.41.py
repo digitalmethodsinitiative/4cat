@@ -19,6 +19,9 @@ db_config = ini["DATABASE"]
 db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
               host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
 
+print("  Changing 'count' column type to BIGINT...")
+db.execute("ALTER TABLE metrics ALTER COLUMN count TYPE BIGINT")
+
 print("  Ensuring uniqueness of existing stats...")
 # due to an earlier bug, some days have multiple metrics
 # the higher one is always correct
