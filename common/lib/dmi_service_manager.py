@@ -291,6 +291,7 @@ class DmiServiceManager:
             files_uploaded = 0
             while to_upload_filenames:
                 upload_file = to_upload_filenames.pop()
+                self.processor.dataset.log(f"Uploading {upload_file}")
                 # Upload files
                 if upload_file == empty_placeholder:
                     # Upload a blank results file to results folder
