@@ -191,7 +191,7 @@ class DatasourceMetrics(BasicWorker):
 
                         if rows:
                             for row in rows:
-                                self.db.insert("metrics", row)
+                                self.db.upsert("metrics", row, constraints=["metric", "datasource", "board", "date"])
 
                 # -------------------------------
                 #   no other metrics added yet
