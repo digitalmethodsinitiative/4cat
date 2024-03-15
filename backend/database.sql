@@ -83,6 +83,9 @@ CREATE TABLE IF NOT EXISTS metrics (
   count              integer
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS unique_metrics
+    ON metrics (metric, datasource, board, date);
+
 -- users
 CREATE TABLE IF NOT EXISTS users (
   name               TEXT UNIQUE PRIMARY KEY,

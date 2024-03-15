@@ -63,10 +63,13 @@ def admin_frontpage():
     }
 
     disk_stats = {
-        "data": folder_size(config.get("PATH_DATA")),
-        "logs": folder_size(config.get("PATH_LOGS")),
-        "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
+        "data": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_data'"),
+        "logs": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_logs'"),
+        "db": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_db'"),
     }
+
+    # it is possible these stats don't exist yet, so replace with 0 if that is the case
+    disk_stats = {k: v["count"] if v else 0 for k, v in disk_stats.items()}
 
     upgrade_available = not not db.fetchone(
         "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")

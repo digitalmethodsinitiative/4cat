@@ -37,11 +37,11 @@
                     <h3>Disk usage</h3>
                     <dl>
                         <div><dt>Data files</dt>
-                        <dd>{{ stats.disk.data|filesizeformat }}</dd></div>
+                        <dd>{% if stats.disk.data %}{{ stats.disk.data|filesizeformat }}{% else %}N/A{% endif %}</dd></div>
                         <div><dt>Database</dt>
-                        <dd>{{ stats.disk.db|filesizeformat }}</dd></div>
+                        <dd>{% if stats.disk.db %}{{ stats.disk.db|filesizeformat }}{% else %}N/A{% endif %}</dd></div>
                         <div><dt>Logs</dt>
-                        <dd>{{ stats.disk.logs|filesizeformat }}</dd></div>
+                        <dd>{% if stats.disk.logs %}{{ stats.disk.logs|filesizeformat }}{% else %}N/A{% endif %}</dd></div>
                     </dl>
                 </div>
                 <div class="cp-stats">

@@ -284,7 +284,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 								self.log.warning("Cannot find preset's source dataset for dataset %s" % self.dataset.key)
 								break
 
-
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
 			# copy the results to an arbitrary place that was passed
