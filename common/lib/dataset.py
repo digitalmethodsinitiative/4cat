@@ -235,7 +235,7 @@ class DataSet(FourcatModule):
 		with log_path.open("a", encoding="utf-8") as outfile:
 			outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
 
-	def iterate_items(self, processor=None, bypass_map_item=False, warn_unmappable=True):
+	def iterate_items(self, processor=None):
 		"""
 		A generator that iterates through a CSV or NDJSON file
 
@@ -243,14 +243,6 @@ class DataSet(FourcatModule):
 		the processor's 'interrupted' flag is checked, and if set a
 		ProcessorInterruptedException is raised, which by default is caught
 		in the worker and subsequently stops execution gracefully.
-
-		Processors can define a method called `map_item` that can be used to
-		map an item from the dataset file before it is processed any further
-		this is slower than storing the data file in the right format to begin
-		with but not all data sources allow for easy 'flat' mapping of items,
-		e.g. tweets are nested objects when retrieved from the twitter API
-		that are easier to store as a JSON file than as a flat CSV file, and
-		it would be a shame to throw away that data.
 
 		There are two file types that can be iterated (currently): CSV files
 		and NDJSON (newline-delimited JSON) files. In the future, one could
@@ -263,60 +255,32 @@ class DataSet(FourcatModule):
 		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
-		unmapped_items = False
 		path = self.get_results_path()
 
-		# see if an item mapping function has been defined
-		# open question if 'source_dataset' shouldn't be an attribute of the dataset
-		# instead of the processor...
-		item_mapper = False
-		own_processor = self.get_own_processor()
-		if not bypass_map_item and own_processor is not None:
-			if own_processor.map_item_method_available(dataset=self):
-				item_mapper = True
-
-		# go through items one by one, optionally mapping them
+		# Yield through items one by one
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
+				# Processor (that created this dataset) may have a custom CSV dialect and parameters
+				own_processor = self.get_own_processor()
 				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
 
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
 				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
-				for i, item in enumerate(reader):
+				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
-
-					if item_mapper:
-						try:
-							item = own_processor.get_mapped_item(item).get_item_data()
-						except MapItemException as e:
-							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
-								unmapped_items = True
-							continue
 
 					yield item
 
 		elif path.suffix.lower() == ".ndjson":
-			# in this format each line in the file is a self-contained JSON
-			# file
+			# In NDJSON format each line in the file is a self-contained JSON
 			with path.open(encoding="utf-8") as infile:
-				for i, line in enumerate(infile):
+				for line in infile:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
-					item = json.loads(line)
-					if item_mapper:
-						try:
-							item = own_processor.get_mapped_item(item).get_item_data()
-						except MapItemException as e:
-							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
-								unmapped_items = True
-							continue
-
-					yield item
+					yield json.loads(line)
 
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
@@ -326,9 +290,13 @@ class DataSet(FourcatModule):
 		Generate mapped dataset items
 
 		Wrapper for iterate_items that returns both the original item and the
-		mapped item (or else the same identical item). No extension check is
-		performed here as the point is to be able to handle the original
-		object and save as an appropriate filetype.
+		mapped item (or else the same identical item). Processors can define a
+		method called `map_item` that can be used to map an item from the dataset
+		file before it is processed any further this is slower than storing the
+		data file in the right format to beginwith but not all data sources allow
+		for easy 'flat' mapping of items, e.g. tweets are nested objects when
+		retrieved from the twitter API that are easier to store as a JSON file
+		than as a flat CSV file, and it would be a shame to throw away that data.
 
 		Note the two parameters warn_unmappable and map_missing. Items can be
 		unmappable in that their structure is too different to coerce into a
@@ -348,11 +316,11 @@ class DataSet(FourcatModule):
 		some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
 		- 'default': fill missing fields with the default passed by map_item
 		- 'abort': raise a MappedItemIncompleteException if a field is missing
-		- a dictionary with a 'replace' key: replace missing field with the
-		  value in the dictionary for the 'replace' key
 		- a callback: replace missing field with the return value of the
 		  callback. The MappedItem object is passed to the callback as the
 		  first argument and the name of the missing field as the second.
+		- a dictionary with a key for each possible missing field: replace missing
+		  field with a strategy for that field ('default', 'abort', or a callback)
 
 		:return generator:  A generator that yields a tuple with the unmapped
 		item followed by the mapped item
@@ -365,7 +333,7 @@ class DataSet(FourcatModule):
 			item_mapper = True
 
 		# Loop through items
-		for i, item in enumerate(self.iterate_items(processor=processor, bypass_map_item=True)):
+		for i, item in enumerate(self.iterate_items(processor=processor)):
 			# Save original to yield
 			original_item = item.copy()
 
@@ -385,10 +353,9 @@ class DataSet(FourcatModule):
 					default_strategy = "default"
 
 					# strategy can be for all fields at once, or per field
-					# in the former case it's a string, in the latter a dict
-					# here we make sure it's always a dict to not complicate
-					# the following code
-					if type(map_missing) is str:
+					# if it is per field, it is a dictionary with field names and their strategy
+					# if it is for all fields, it is may be a callback, 'abort', or 'default'
+					if type(map_missing) is not dict:
 						default_strategy = map_missing
 						map_missing = {}
 
@@ -413,15 +380,22 @@ class DataSet(FourcatModule):
 			# Yield the two items
 			yield original_item, mapped_item
 
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="default"):
+	def iterate_mapped_items(self, processor=None, item_to_yield="mapped", warn_unmappable=True, map_missing="default"):
 		"""
-		Generate mapped dataset dictionaries
+		Generate mapped dataset dictionaries. Can yield 'original' item directly from
+		the dataset file, 'mapped' items using the datasource's `map_item` method (if
+		map_item method is available otherwise returns original item), or 'both' items
+		as (original, mapped) tuple.
 
 		Identical to iterate_mapped_object, but yields the mapped item's data
 		(i.e. a dictionary) rather than the MappedItem object.
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
+		:param bool item_to_yield:  Indicates which item to return. Must be one of:
+		- 'mapped': return mapped item from map_item method using map_missing strategy
+		- 'original': original item as stored in the dataset file (e.g., raw JSON)
+		- 'both': return both original and mapped item as (original, mapped) tuple
 		:param bool warn_unmappable:  If an item is not mappable, skip the item
 		and log a warning
 		:param map_missing: Indicates what to do with mapped items for which
@@ -431,11 +405,26 @@ class DataSet(FourcatModule):
 		:return generator:  A generator that yields a tuple with the unmapped
 		item followed by the mapped item
 		"""
-		for original_item, mapped_item in self.iterate_mapped_objects(processor, warn_unmappable, map_missing):
-			if type(mapped_item) is MappedItem:
-				yield original_item, mapped_item.get_item_data()
-			else:
-				yield original_item, mapped_item
+		if item_to_yield == "original":
+			# Loop through items directly from the dataset file
+			for item in self.iterate_items(processor):
+				yield item
+		else:
+			# Loop through items, mapping them
+			for original_item, mapped_item_object in self.iterate_mapped_objects(processor, warn_unmappable, map_missing):
+				# Convert MappedItem object to dictionary
+				if type(mapped_item_object) is MappedItem:
+					mapped_item = mapped_item_object.get_item_data()
+				else:
+					mapped_item = mapped_item_object
+
+				# Yield as requested
+				if item_to_yield == "mapped":
+					yield mapped_item
+				elif item_to_yield == "both":
+					yield original_item, mapped_item
+				else:
+					raise ValueError("item_to_yield must be 'original', 'mapped', or 'both'")
 
 	def get_item_keys(self, processor=None):
 		"""
@@ -447,12 +436,12 @@ class DataSet(FourcatModule):
 		these, as a list.
 
 		:param BasicProcessor processor:  A reference to the processor
-		asking for the item keys, to pass on to iterate_itesm
+		asking for the item keys, to pass on to iterate_items
 		:return list:  List of keys, may be empty if there are no items in the
 		  dataset
 		"""
 
-		items = self.iterate_items(processor, warn_unmappable=False)
+		items = self.iterate_mapped_items(processor, warn_unmappable=False)
 		try:
 			keys = list(items.__next__().keys())
 		except StopIteration:

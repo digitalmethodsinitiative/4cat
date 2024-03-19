@@ -87,7 +87,7 @@ class UniqueFilter(BaseFilter):
 		known_items = set()
 
 		# iterate through posts and see if they match
-		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
 			unique_item = False
 
 			if match_mode == "all":

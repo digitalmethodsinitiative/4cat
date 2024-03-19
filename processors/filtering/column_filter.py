@@ -151,7 +151,7 @@ class ColumnFilter(BaseFilter):
         matching_items = 0
         processed_items = 0
         date_compare = None
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_objects(processor=self, item_to_yield="both"):
             processed_items += 1
             if processed_items % 500 == 0:
                 self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
@@ -242,7 +242,7 @@ class ColumnFilter(BaseFilter):
 
         ranked_items = 0
         top_values = sorted(list(possible_values), reverse=(not bottom))[:top_n]
-        for original_item, item in self.source_dataset.iterate_mapped_items():
+        for original_item, item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
             if item.get(column) in top_values:
                 ranked_items = 0
                 yield original_item
