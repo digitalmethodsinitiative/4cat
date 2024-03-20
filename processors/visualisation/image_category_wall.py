@@ -191,26 +191,26 @@ class ImageWallGenerator(BasicProcessor):
 		categories = {}
 		post_values = []  # used for numeric categories
 		self.dataset.update_status("Collecting categories")
-		for i, mapped_post in enumerate(category_dataset.iterate_mapped_items(self)):
+		for i, post in enumerate(category_dataset.iterate_mapped_items(self)):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while collecting categories")
 
-			if mapped_post.get("id") not in filename_map:
+			if post.get("id") not in filename_map:
 				# No image for this post
 				continue
 
 			# Identify category type and collect post_category
-			if mapped_post.get(category_column) is None:
+			if post.get(category_column) is None:
 				self.dataset.finish_with_error("Unable to find category column in dataset")
 				return
 			elif special_case and category_column == "top_categories":
 				if category_type is None:
 					category_type = float
 				# Special case
-				top_cats = mapped_post.get("top_categories")
+				top_cats = post.get("top_categories")
 				top_cat = top_cats.split(",")[0].split(":")[0].strip()
 				top_cat_score = float(top_cats.split(",")[0].split(":")[1].strip().replace("%", ""))
-				post_result = {"id": mapped_post.get("id"), "value": top_cat_score, "top_cats": top_cats}
+				post_result = {"id": post.get("id"), "value": top_cat_score, "top_cats": top_cats}
 				if top_cat not in categories:
 					categories[top_cat] = [post_result]
 				else:
@@ -218,23 +218,23 @@ class ImageWallGenerator(BasicProcessor):
 			else:
 				if category_type is None:
 					try:
-						float(mapped_post.get(category_column))
+						float(post.get(category_column))
 						category_type = float
 					except ValueError:
 						category_type = str
 
 				if category_type == str:
-					post_category = mapped_post.get(category_column)
+					post_category = post.get(category_column)
 					if post_category == "":
 						post_category = "None"
 					if post_category not in categories:
-						categories[post_category] = [{"id": mapped_post.get("id")}]
+						categories[post_category] = [{"id": post.get("id")}]
 					else:
-						categories[post_category].append({"id": mapped_post.get("id")})
+						categories[post_category].append({"id": post.get("id")})
 				elif category_type == float:
 					try:
-						post_category = float(mapped_post.get(category_column))
-						post_values.append((post_category, mapped_post.get("id")))
+						post_category = float(post.get(category_column))
+						post_values.append((post_category, post.get("id")))
 					except ValueError:
 						# Unsure exactly how to handle; possibly the first post was convertible to a float
 						raise ProcessorException(

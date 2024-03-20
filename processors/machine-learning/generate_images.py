@@ -150,7 +150,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
         prompt_c = self.parameters["prompt-column"]
         neg_c = self.parameters.get("negative-prompt-column")
-        for item in self.source_dataset.iterate_mapped_items():
+        for item in self.source_dataset.iterate_mapped_items(self):
             if max_prompts and len(prompts) >= max_prompts:
                 break
 

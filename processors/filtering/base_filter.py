@@ -89,7 +89,7 @@ class BaseFilter(BasicProcessor):
     def filter_items(self):
         """
         Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
-        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(item_to_yield="both")` to iterate through items
+        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self, item_to_yield="both")` to iterate through items
         and yield `original_item`.
 
         :return generator:
