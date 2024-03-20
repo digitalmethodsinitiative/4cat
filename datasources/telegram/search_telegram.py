@@ -80,8 +80,7 @@ class SearchTelegram(Search):
         },
         "query-intro": {
             "type": UserInput.OPTION_INFO,
-            "help": "You can collect messages from up to **25** entities (channels or groups) at a time. Separate with "
-                    "commas or line breaks."
+            "help": "Separate with commas or line breaks."
         },
         "query": {
             "type": UserInput.OPTION_TEXT_LARGE,
@@ -137,8 +136,50 @@ class SearchTelegram(Search):
             "help": "Remove message amount limit",
             "default": False,
             "tooltip": "Allows users to query unlimited messages from Telegram. This can lead to HUGE datasets!"
+        },
+        "telegram-search.max_entities": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Max entities to query",
+            "coerce_type": int,
+            "min": 0,
+            "default": 25,
+            "tooltip": "Amount of entities that can be queried at a time. Entities are groups or channels. 0 to "
+                       "disable limit."
         }
     }
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        Just updates the description of the entities field based on the
+        configured max entities.
+
+        :param DataSet parent_dataset:  An object representing the dataset that
+          the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+          case they are requested for display in the 4CAT web interface. This can
+          be used to show some options only to privileges users.
+        """
+        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+        options = dict(cls.options)
+
+        if max_entities:
+            options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
+                                              f"(channels or groups) at a time. Separate with line breaks or commas.")
+
+        all_messages = config.get("telegram-search.can_query_all_messages", False, user=user)
+        if all_messages:
+            if "max" in options["max_posts"]:
+                del options["max_posts"]["max"]
+        else:
+            options["max_posts"]["help"] = (f"Messages to collect per entity. You can query up to "
+                                             f"{options['max_posts']['max']:,} messages per entity.")
+
+        return options
+
+
 
     def get_items(self, query):
         """
@@ -708,14 +749,17 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        privileged = config.get("telegram-search.can_query_all_messages", False, user=user)
+        all_posts = config.get("telegram-search.can_query_all_messages", False, user=user)
+        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+
+        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.options["max-posts"]["max"])
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
         items = whitespace.sub("", query.get("query").replace("\n", ","))
-        if len(items.split(",")) > 25 and not privileged:
-            raise QueryParametersException("You cannot query more than 25 items at a time.")
+        if max_entities > 0 and len(items.split(",")) > max_entities:
+            raise QueryParametersException(f"You cannot query more than {max_entities:,} items at a time.")
 
         sanitized_items = []
         # handle telegram URLs
@@ -811,7 +855,7 @@ class SearchTelegram(Search):
 
         # simple!
         return {
-            "items": query.get("max_posts"),
+            "items": num_items,
             "query": ",".join(sanitized_items),
             "board": "",  # needed for web interface
             "api_id": query.get("api_id"),
@@ -838,29 +882,3 @@ class SearchTelegram(Search):
         """
         hash_base = api_phone.strip().replace("+", "") + str(api_id).strip() + api_hash.strip()
         return hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-
-    @classmethod
-    def get_options(cls=None, parent_dataset=None, user=None):
-        """
-        Get processor options
-
-        This method by default returns the class's "options" attribute, but
-        will lift the limit on the amount of messages scraped per group if the
-        user requesting the options has been configured as such.
-
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
-        be used to show some options only to privileges users.
-        """
-        options = cls.options.copy()
-
-        if user and config.get("telegram-search.can_query_all_messages", False, user=user):
-            if "max" in options["max_posts"]:
-                del options["max_posts"]["max"]
-
-            options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). " \
-                                             "Separate with commas or line breaks."
-
-        return options
