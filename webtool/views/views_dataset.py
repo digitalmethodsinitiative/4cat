@@ -216,13 +216,13 @@ def get_mapped_result(key):
         buffer = io.StringIO()
         for item in dataset.iterate_mapped_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
-                fieldnames = item.keys()
+                fieldnames = list(item.keys())
                 if annotation_labels:
                     for label in annotation_labels:
                         if label not in fieldnames:
                             fieldnames.append(label)
 
-                writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
+                writer = csv.DictWriter(buffer, fieldnames=fieldnames)
                 writer.writeheader()
                 yield buffer.getvalue()
                 buffer.truncate(0)
