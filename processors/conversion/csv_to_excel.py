@@ -64,7 +64,7 @@ class ConvertCSVToMacExcel(BasicProcessor):
 			writer = csv.DictWriter(output, fieldnames=fieldnames, dialect="excel-mac")
 			writer.writeheader()
 
-			for post in self.source_dataset.iterate_items(self):
+			for post in self.source_dataset.iterate_mapped_items(self):
 				writer.writerow(post)
 				posts += 1
 

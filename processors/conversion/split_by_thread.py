@@ -47,7 +47,7 @@ class ThreadSplitter(BasicProcessor):
 
 		# read and write
 		self.dataset.update_status("Creating separate thread files")
-		for post in self.source_dataset.iterate_items(self):
+		for post in self.source_dataset.iterate_mapped_items(self):
 			thread = results_path.joinpath(post["thread_id"] + ".csv")
 			new = not thread.exists()
 

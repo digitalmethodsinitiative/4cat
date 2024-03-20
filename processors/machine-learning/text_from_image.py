@@ -241,7 +241,7 @@ class ImageTextDetector(BasicProcessor):
 
             # We need an entry for each row/item in the original dataset necitating we loop through it
             detected_text_column = []
-            for post in self.dataset.top_parent().iterate_items(self):
+            for post in self.dataset.top_parent().iterate_mapped_items(self):
                 detected_text_column.append('\n'.join(post_id_to_results.get(post.get('id'), [])))
 
             try:

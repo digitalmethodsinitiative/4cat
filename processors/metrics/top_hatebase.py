@@ -89,7 +89,7 @@ class HatebaseRanker(BasicProcessor):
 		overall_top = {}
 		interval_top = {}
 
-		for post in self.source_dataset.iterate_items(self):
+		for post in self.source_dataset.iterate_mapped_items(self):
 			# determine where to put this data
 			if timeframe == "all":
 				time_unit = "overall"

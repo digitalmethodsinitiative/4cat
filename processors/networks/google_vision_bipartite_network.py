@@ -73,7 +73,7 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
         except ValueError:
             min_confidence = 0
 
-        for annotations in self.source_dataset.iterate_items(self):
+        for annotations in self.source_dataset.iterate_mapped_items(self):
             file_annotations = []
             if "error" in annotations:
                 self.dataset.log(

@@ -151,7 +151,7 @@ class ColumnFilter(BaseFilter):
         matching_items = 0
         processed_items = 0
         date_compare = None
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_objects(processor=self, item_to_yield="both"):
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
             processed_items += 1
             if processed_items % 500 == 0:
                 self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
@@ -237,7 +237,7 @@ class ColumnFilter(BaseFilter):
         """
         possible_values = set()
         top_n = convert_to_int(top_n, 10)
-        for item in self.source_dataset.iterate_items():
+        for item in self.source_dataset.iterate_mapped_items():
             possible_values.add(item.get(column))
 
         ranked_items = 0

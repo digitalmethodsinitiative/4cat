@@ -244,7 +244,7 @@ class ExtractURLs(BasicProcessor):
             url_matches_found = 0
             total_items = self.source_dataset.num_rows
             progress_interval_size = max(int(total_items / 10), 1)  # 1/10 of total number of records
-            for item in self.source_dataset.iterate_items(self):
+            for item in self.source_dataset.iterate_mapped_items(self):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
 

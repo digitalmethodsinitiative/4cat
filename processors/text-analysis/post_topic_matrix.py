@@ -136,7 +136,7 @@ class TopicModelWordExtractor(BasicProcessor):
             writer.writeheader()
 
             # Loop through the source dataset
-            for post in self.dataset.top_parent().iterate_items(self):
+            for post in self.dataset.top_parent().iterate_mapped_items(self):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while writing results file")
 

@@ -184,7 +184,7 @@ class ImageDownloader(BasicProcessor):
 		# first, get URLs to download images from
 		self.dataset.update_status("Reading source file")
 		item_index = 0
-		for item in self.source_dataset.iterate_items(self):
+		for item in self.source_dataset.iterate_mapped_items(self):
 			# note that we do not check if the amount of URLs exceeds the max
 			# `amount` of images; images may fail, so the limit is on the
 			# amount of downloaded images, not the amount of potentially

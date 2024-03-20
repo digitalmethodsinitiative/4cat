@@ -38,7 +38,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
         # This handles and writes one Tweet at a time
         with self.dataset.get_results_path().open("w") as output:
-            for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+            for post in self.source_dataset.iterate_mapped_items(self, item_to_yield="original"):
                 posts += 1
 
                 post = self.map_to_TCAT(post)
@@ -51,6 +51,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     output.write(json.dumps(post, ensure_ascii=False))
                     # NDJSON file is expected by TCAT
                     output.write('\n')
+                else:
+                    self.dataset.log(f"Tweet {post['id_str']} is too large to be imported by TCAT. It has been dropped.")
 
         self.dataset.update_status("Finished.")
         self.dataset.finish(num_rows=posts)

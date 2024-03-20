@@ -71,7 +71,7 @@ class WriteAnnotations(BasicProcessor):
 		# Create dictionary with annotation labels as keys and lists of data as values
 		new_data = {annotation_label: [] for annotation_label in annotation_labels}
 
-		for item in self.source_dataset.iterate_items(self):
+		for item in self.source_dataset.iterate_mapped_items(self):
 			post_count += 1
 
 			# Do some loops so we have empty data for all annotation fields

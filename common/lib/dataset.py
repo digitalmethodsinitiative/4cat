@@ -251,8 +251,6 @@ class DataSet(FourcatModule):
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
-		:param bool bypass_map_item:  If set to `True`, this ignores any
-		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
 		path = self.get_results_path()
@@ -436,7 +434,7 @@ class DataSet(FourcatModule):
 		these, as a list.
 
 		:param BasicProcessor processor:  A reference to the processor
-		asking for the item keys, to pass on to iterate_items
+		asking for the item keys, to pass on to iterate_mapped_items
 		:return list:  List of keys, may be empty if there are no items in the
 		  dataset
 		"""

@@ -71,7 +71,7 @@ class URLCoLinker(BasicProcessor):
 		# create an undirected network
 		network = nx.Graph()
 
-		for post in self.source_dataset.iterate_items(self):
+		for post in self.source_dataset.iterate_mapped_items(self):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while collecting links")
 
