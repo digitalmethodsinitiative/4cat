@@ -749,7 +749,7 @@ class SearchTelegram(Search):
         all_posts = config.get("telegram-search.can_query_all_messages", False, user=user)
         max_entities = config.get("telegram-search.max_entities", 25, user=user)
 
-        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.options["max-posts"]["max"])
+        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options()["max-posts"]["max"])
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
