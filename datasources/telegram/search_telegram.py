@@ -51,85 +51,6 @@ class SearchTelegram(Search):
     max_retries = 3
     flawless = 0
 
-    options = {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
-                    "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
-                    "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
-                    "authentication for Telegram."
-        },
-        "api_id": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API ID",
-            "cache": True,
-        },
-        "api_hash": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API Hash",
-            "cache": True,
-        },
-        "api_phone": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Phone number",
-            "cache": True,
-            "default": "+xxxxxxxxxx"
-        },
-        "divider": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "query-intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Separate with commas or line breaks."
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Entities to scrape",
-            "tooltip": "Separate with commas or line breaks."
-        },
-        "max_posts": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Messages per group",
-            "min": 1,
-            "max": 50000,
-            "default": 10
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range"
-        },
-        "divider-2": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "info-sensitive": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Your API credentials and phone number **will be sent to the 4CAT server** and will be stored "
-                    "there while data is fetched. After the dataset has been created your credentials will be "
-                    "deleted from the server, unless you enable the option below. If you want to download images "
-                    "attached to the messages in your collected data, you need to enable this option. Your "
-                    "credentials will never be visible to other users and can be erased later via the result page."
-        },
-        "save-session": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Save session:",
-            "default": False
-        },
-        "resolve-entities-intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
-                    "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                    "figure out where or who a message was forwarded from. However, this increases query time and "
-                    "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
-                    "to finish capturing. It will also dramatically increase the disk space needed to store the "
-                    "data, so only enable this if you really need it!"
-        },
-        "resolve-entities": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Resolve references",
-            "default": False,
-        }
-    }
-
     config = {
         "telegram-search.can_query_all_messages": {
             "type": UserInput.OPTION_TOGGLE,
@@ -163,7 +84,84 @@ class SearchTelegram(Search):
           be used to show some options only to privileges users.
         """
         max_entities = config.get("telegram-search.max_entities", 25, user=user)
-        options = dict(cls.options)
+        options = {
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
+                        "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
+                        "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
+                        "authentication for Telegram."
+            },
+            "api_id": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API ID",
+                "cache": True,
+            },
+            "api_hash": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API Hash",
+                "cache": True,
+            },
+            "api_phone": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Phone number",
+                "cache": True,
+                "default": "+xxxxxxxxxx"
+            },
+            "divider": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "query-intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Separate with commas or line breaks."
+            },
+            "query": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Entities to scrape",
+                "tooltip": "Separate with commas or line breaks."
+            },
+            "max_posts": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Messages per group",
+                "min": 1,
+                "max": 50000,
+                "default": 10
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Date range"
+            },
+            "divider-2": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "info-sensitive": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Your API credentials and phone number **will be sent to the 4CAT server** and will be stored "
+                        "there while data is fetched. After the dataset has been created your credentials will be "
+                        "deleted from the server, unless you enable the option below. If you want to download images "
+                        "attached to the messages in your collected data, you need to enable this option. Your "
+                        "credentials will never be visible to other users and can be erased later via the result page."
+            },
+            "save-session": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Save session:",
+                "default": False
+            },
+            "resolve-entities-intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
+                        "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
+                        "figure out where or who a message was forwarded from. However, this increases query time and "
+                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
+                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
+                        "data, so only enable this if you really need it!"
+            },
+            "resolve-entities": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Resolve references",
+                "default": False,
+            }
+        }
 
         if max_entities:
             options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
@@ -178,7 +176,6 @@ class SearchTelegram(Search):
                                              f"{options['max_posts']['max']:,} messages per entity.")
 
         return options
-
 
 
     def get_items(self, query):
