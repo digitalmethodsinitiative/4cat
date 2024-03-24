@@ -641,7 +641,7 @@ class SearchTelegram(Search):
                 reactions += reaction["reaction"] * reaction["count"]
 
         return MappedItem({
-            "id": message["id"],
+            "id": f"{message['_chat']['username']}-{message['id']}",
             "thread_id": thread,
             "chat": message["_chat"]["username"],
             "author": user_id,
