@@ -15,7 +15,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.config_manager import config
 
 from datetime import datetime
@@ -556,12 +556,12 @@ class SearchTelegram(Search):
         # untested whether geo_live is significantly different from geo
         #    attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
 
-        elif attachment_type == "photo":
+        elif attachment_type == "photo" or attachment_type == "url" and message["media"]["webpage"].get("photo"):
             # we don't actually store any metadata about the photo, since very
             # little of the metadata attached is of interest. Instead, the
             # actual photos may be downloaded via a processor that is run on the
             # search results
-            attachment = message["media"]["photo"]
+            attachment = message["media"]["photo"] if attachment_type == "photo" else message["media"]["webpage"]["photo"]
             attachment_data = json.dumps({
                 "id": attachment["id"],
                 "dc_id": attachment["dc_id"],
@@ -586,10 +586,6 @@ class SearchTelegram(Search):
                     "votes": -1
                 } for option in options]
             })
-
-        elif attachment_type == "url":
-            # easy!
-            attachment_data = message["media"].get("web_preview", {}).get("url", "")
 
         else:
             attachment_data = ""
@@ -635,6 +631,18 @@ class SearchTelegram(Search):
                         if chat["id"] == channel_id or channel_id is None:
                             forwarded_username = chat["username"]
 
+        link_title = ""
+        link_attached = ""
+        reactions = ""
+
+        if message.get("media") and message["media"].get("webpage"):
+            link_title = message["media"]["webpage"].get("title")
+            link_attached = message["media"]["webpage"].get("url")
+
+        if message.get("reactions") and message["reactions"].get("results"):
+            for reaction in message["reactions"]["results"]:
+                reactions += reaction["reaction"] * reaction["count"]
+
         return MappedItem({
             "id": message["id"],
             "thread_id": thread,
@@ -642,10 +650,12 @@ class SearchTelegram(Search):
             "author": user_id,
             "author_username": username,
             "author_name": fullname,
-            "author_is_bot": user_is_bot,
+            "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
             "reply_to": message.get("reply_to_msg_id", ""),
             "views": message["views"] if message["views"] else "",
+            "forwards": message.get("forwards", MissingMappedField(0)),
+            "reactions": reactions,
             "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(message["date"]),
             "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message[
@@ -656,6 +666,8 @@ class SearchTelegram(Search):
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
                 "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
+            "link_title": link_title,
+            "link_attached": link_attached,
             "attachment_type": attachment_type,
             "attachment_data": attachment_data,
             "attachment_filename": attachment_filename
