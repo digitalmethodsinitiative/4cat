@@ -56,7 +56,7 @@ packages = [
 	"tailer",
 	"Telethon~=1.25.2",
 	"typing_extensions<4.6.0",
-	"ural~=0.33",
+	"ural~=1.3",
 	"unidecode~=1.3",
 	"Werkzeug~=2.2",
 	"wordcloud~=1.8",
