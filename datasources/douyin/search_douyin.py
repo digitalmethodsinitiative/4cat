@@ -64,9 +64,14 @@ class SearchDouyin(Search):
                 is_fake_key = "is_ad_fake"  # have not seen...
             else:
                 post_timestamp = datetime.fromtimestamp(item["createTime"])
-                videos = sorted([vid for vid in item.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
+                videos_list = item.get("video").get("bitRateList")
+                if not videos_list:
+                    # Image galleries do not have video data
+                    video_url = ""
+                else:
+                    videos = sorted([vid for vid in item.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
                                 reverse=True)
-                video_url = "https" + videos[0]["playApi"]
+                    video_url = "https" + videos[0]["playApi"]
                 video_description = item["desc"]
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
                 prevent_download = "yes" if item["download"]["prevent"] else "no"
@@ -124,10 +129,15 @@ class SearchDouyin(Search):
 
             else:
                 post_timestamp = datetime.fromtimestamp(item["create_time"])
-                videos = sorted([vid for vid in item["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
+                videos_list = item.get("video").get("bit_rate")
+                if not videos_list:
+                    # Image galleries do not have video data
+                    video_url = ""
+                else:
+                    videos = sorted([vid for vid in item["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
                                 reverse=True)
+                    video_url = videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else ""
                 video_description = item["desc"]
-                video_url = videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else ""
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
 
                 # Author is, well, author
@@ -178,6 +188,20 @@ class SearchDouyin(Search):
         if item.get("ZS_collected_from_mix") and not item.get("ZS_first_mix_vid"):
             displayed = False
 
+        # Image galleries have been added to Douyin
+        image_urls = []
+        if item.get("images"):
+            for img in item["images"]:
+                if "url_list" in img:
+                    image_urls.append(img["url_list"][0])
+                elif "urlList" in img:
+                    image_urls.append(img["urlList"][0])
+
+        # Music
+        music_author = item.get('music').get('author') if item.get('music') else ""
+        music_title = item.get('music').get('title') if item.get('music') else ""
+        music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') else ""
+
         return MappedItem({
             "id": item[aweme_id_key],
             "thread_id": item[group_id_key],
@@ -199,6 +223,10 @@ class SearchDouyin(Search):
             "prevent_download": prevent_download,
             "video_url": video_url,
             "video_duration": duration,
+            "image_urls": ','.join(image_urls),
+            "music_author": music_author,
+            "music_title": music_title,
+            "music_url": music_url,
             # Video stats
             "collect_count": collect_count,
             "comment_count": comment_count,
