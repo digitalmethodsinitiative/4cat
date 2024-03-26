@@ -475,7 +475,7 @@ class DataSet(FourcatModule):
 		"""
 		results_file = self.get_results_path()
 
-		results_dir_base = Path(results_file.parent)
+		results_dir_base = results_file.parent
 		results_dir = results_file.name.replace(".", "") + "-staging"
 		results_path = results_dir_base.joinpath(results_dir)
 		index = 1
