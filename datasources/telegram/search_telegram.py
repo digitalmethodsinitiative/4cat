@@ -630,11 +630,13 @@ class SearchTelegram(Search):
 
         link_title = ""
         link_attached = ""
+        link_description = ""
         reactions = ""
 
         if message.get("media") and message["media"].get("webpage"):
             link_title = message["media"]["webpage"].get("title")
             link_attached = message["media"]["webpage"].get("url")
+            link_description = message["media"]["webpage"].get("description")
 
         if message.get("reactions") and message["reactions"].get("results"):
             for reaction in message["reactions"]["results"]:
@@ -664,6 +666,7 @@ class SearchTelegram(Search):
                 "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
             "link_title": link_title,
+            "link_description": link_description,
             "link_attached": link_attached,
             "attachment_type": attachment_type,
             "attachment_data": attachment_data,
