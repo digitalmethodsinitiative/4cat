@@ -52,7 +52,6 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 			for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
-
 				# Flatten the dict
 				item = flatten_dict(original_item)
 				# Add any new keys to all_keys

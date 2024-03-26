@@ -163,7 +163,7 @@ class TelegramImageDownloader(BasicProcessor):
 
         total_media = 0
         self.dataset.update_status("Finding messages with image attachments")
-        for message in self.source_dataset.iterate_items(self):
+        for message in self.source_dataset.iterate_mapped_items(self):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while processing messages")
 

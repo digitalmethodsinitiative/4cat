@@ -86,7 +86,7 @@ class VideoSceneFrames(BasicProcessor):
 
         # map scenes to filenames
         scenes = {}
-        for scene in self.source_dataset.iterate_items(self):
+        for scene in self.source_dataset.iterate_mapped_items(self):
             filename = "_scene_".join(scene["id"].split("_scene_")[:-1])
             if filename not in scenes:
                 scenes[filename] = []

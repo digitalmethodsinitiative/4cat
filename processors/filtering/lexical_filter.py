@@ -136,7 +136,7 @@ class LexicalFilter(BaseFilter):
         # keep some stats
         processed = 0
         matching_items = 0
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
             if not mapped_item.get("body", None):
                 continue
 

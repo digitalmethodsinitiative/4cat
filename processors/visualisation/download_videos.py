@@ -628,7 +628,7 @@ class VideoDownloaderPlus(BasicProcessor):
             raise ProcessorException("No columns selected; cannot collect video urls.")
 
         self.dataset.update_status("Reading source file")
-        for index, post in enumerate(self.source_dataset.iterate_items(self)):
+        for index, post in enumerate(self.source_dataset.iterate_mapped_items(self)):
             item_urls = set()
             if index + 1 % 250 == 0:
                 self.dataset.update_status(

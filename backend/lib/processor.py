@@ -437,7 +437,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				writer = csv.DictWriter(output, fieldnames=fieldnames)
 				writer.writeheader()
 
-				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_mapped_items(self, item_to_yield="original")):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing CSV file")
@@ -452,7 +452,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				new_data = [list(datapoint) for datapoint in new_data]
 
 			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_mapped_items(self, item_to_yield="original")):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing NDJSON file")

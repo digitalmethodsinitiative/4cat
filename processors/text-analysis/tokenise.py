@@ -309,7 +309,7 @@ class Tokenise(BasicProcessor):
 		metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'intervals':set()}}
 		multiple_docs_per_post = True if grouping == 'sentence' or len(columns) > 1 else False
 		processed = 0
-		for post in self.source_dataset.iterate_items(self):
+		for post in self.source_dataset.iterate_mapped_items(self):
 			# determine what output unit this post belongs to
 			if docs_per != "thread":
 				try:

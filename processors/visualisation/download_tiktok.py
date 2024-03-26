@@ -95,7 +95,7 @@ class TikTokVideoDownloader(BasicProcessor):
 
         self.dataset.update_status("Downloading TikTok media")
         video_ids_to_download = []
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_mapped_items(self):
             video_ids_to_download.append(mapped_item.get("id"))
 
         tiktok_scraper = TikTokScraper(processor=self, config=self.config)
@@ -222,7 +222,7 @@ class TikTokImageDownloader(BasicProcessor):
         metadata = {}
 
         # Loop through items and collect URLs
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_mapped_items(self):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
 

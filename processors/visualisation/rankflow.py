@@ -120,7 +120,7 @@ class RankFlowRenderer(BasicProcessor):
 		if filter_incomplete:
 			all_periods = set()
 			known_periods = {}
-			for row in self.source_dataset.iterate_items(self):
+			for row in self.source_dataset.iterate_mapped_items(self):
 				all_periods.add(row["date"])
 
 				label = self.get_label(row)
@@ -134,7 +134,7 @@ class RankFlowRenderer(BasicProcessor):
 		# now first create a map with the ranks for each period
 		weighted = False
 		processed = 0
-		for row in self.source_dataset.iterate_items(self):
+		for row in self.source_dataset.iterate_mapped_items(self):
 			processed += 1
 			if processed % 250 == 0:
 				self.dataset.update_status("Determining RankFlow parameters, item %i/%i" % (processed, self.source_dataset.num_rows))

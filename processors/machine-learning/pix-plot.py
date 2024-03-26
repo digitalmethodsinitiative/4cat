@@ -303,7 +303,7 @@ class PixPlotGenerator(BasicProcessor):
 
         # Loop through source file
         posts_with_images = 0
-        for post in self.dataset.top_parent().iterate_items(self):
+        for post in self.dataset.top_parent().iterate_mapped_items(self):
             # Check if post contains one of the downloaded images
             if post['id'] in post_id_image_dictionary.keys():
                 posts_with_images += 1

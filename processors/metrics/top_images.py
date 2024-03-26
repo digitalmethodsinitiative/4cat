@@ -62,7 +62,7 @@ class TopImageCounter(BasicProcessor):
             boards_4plebs = ["pol", "lgbt", "adv", "f", "o", "sp", "tg", "trv", "tv", "x"]
             boards_fireden = ["cm", "co", "ic", "sci", "v", "vip", "y"]
 
-            for post in self.source_dataset.iterate_items(self):
+            for post in self.source_dataset.iterate_mapped_items(self):
 
                 post_img_links = []
 
@@ -137,7 +137,7 @@ class TopImageCounter(BasicProcessor):
 
             img_links = list()
 
-            for post in self.source_dataset.iterate_items(self):
+            for post in self.source_dataset.iterate_mapped_items(self):
                 post_img_links = set()  # set to only count images once per post
                 for field, value in post.items():
                     if value and (field == "body" or "url" in field.lower() or "image" in field.lower()):

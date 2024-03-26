@@ -50,7 +50,7 @@ class WikiURLCoLinker(BasicProcessor):
 
 		self.dataset.update_status("Reading source file")
 
-		for post in self.source_dataset.iterate_items(self):
+		for post in self.source_dataset.iterate_mapped_items(self):
 			processed += 1
 			if processed % 50 == 0:
 				self.dataset.update_status("Extracting URLs from item %i" % processed)

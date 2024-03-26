@@ -65,7 +65,7 @@ class DateFilter(BaseFilter):
         matching_items = 0
 
         # Loop through items
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
             # Update 4CAT and user on status
             processed_items += 1
             if processed_items % 500 == 0:

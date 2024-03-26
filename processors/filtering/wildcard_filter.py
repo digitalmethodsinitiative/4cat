@@ -63,7 +63,7 @@ class WildcardFilter(BaseFilter):
         matching_items = 0
 
         # iterate through posts and see if they match
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
             processed += 1
             if not mapped_item.get("body", None):
                 continue

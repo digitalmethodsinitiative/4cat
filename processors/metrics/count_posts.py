@@ -55,7 +55,7 @@ class CountPosts(BasicProcessor):
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
 
-			for post in self.source_dataset.iterate_items(self):
+			for post in self.source_dataset.iterate_mapped_items(self):
 				try:
 					date = get_interval_descriptor(post, timeframe)
 				except ValueError as e:
