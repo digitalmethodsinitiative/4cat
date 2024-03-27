@@ -54,7 +54,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type.startswith("image-downloader") or module.type == "video-frames"
+		return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):

@@ -61,10 +61,7 @@ class AnnotateImages(ProcessorPreset):
         """
         Determine compatibility
 
-        This preset is compatible with any module that has a dataset and
-        can download images.
-
-        :param str module:  Module ID to determine compatibility with
+        :param Dataset module:  Module ID to determine compatibility with
         :return bool:
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")

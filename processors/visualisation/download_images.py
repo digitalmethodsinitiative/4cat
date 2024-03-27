@@ -135,6 +135,7 @@ class ImageDownloader(BasicProcessor):
 		images along with a file, .metadata.json, that contains identifying
 		information.
 		"""
+		# Set dataset media_type to image
 		self.dataset.media_type = "image"
 
 		# Get the source file data path
