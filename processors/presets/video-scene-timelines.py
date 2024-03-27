@@ -30,7 +30,8 @@ class VideoSceneTimelineCreator(ProcessorPreset):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type.startswith("video-downloader") and \
+        #TODO: add `module.parameters.get("media_type") == "video"` after fixes to not require "original dataset" and metadata
+        return (module.type.startswith("video-downloader")) and \
                config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
