@@ -621,6 +621,15 @@ body.csv-preview table td, body.csv-preview table th {
     border: 1px solid var(--gray-light);
 }
 
+body.csv-preview td {
+    max-width: 30vw;
+}
+
+body.csv-preview .cell-content {
+    max-height: 15vh; /* Adjust as needed */
+    overflow: auto; /* This will hide content that exceeds the max dimensions */
+}
+
 .child.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
 	display: none;
 }
