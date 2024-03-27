@@ -19,6 +19,19 @@ class NeologismExtractor(ProcessorPreset):
 
 	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
 
+	@staticmethod
+	def is_compatible_with(module=None, user=None):
+		"""
+        Determine compatibility
+
+        This preset is compatible with any module that has a dataset and
+        can download images.
+
+        :param str module:  Module ID to determine compatibility with
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
 		"""

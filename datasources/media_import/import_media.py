@@ -15,8 +15,6 @@ class SearchMedia(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
-    # TODO: how can the class know the different media types based on the dataset?
-    # media_type = None  # Media type; audio, video, or image determined by the dataset
 
     max_workers = 1
 
@@ -41,7 +39,7 @@ class SearchMedia(BasicProcessor):
             "help": "Media type",
             "options": {
                 "audio": "Audio",
-                "video": "Video",
+                "video": "Videos",
                 "image": "Images",
             },
             "default": "image"
@@ -77,7 +75,6 @@ class SearchMedia(BasicProcessor):
             "time": time.time(),
             "media_type": query.get("media_type"),
             "num_files": len(files),
-            "filenames": SearchMedia.disallowed_characters.sub("", "".join([f.filename for f in files])),
         }
 
     @staticmethod

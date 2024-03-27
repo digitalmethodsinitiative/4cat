@@ -34,7 +34,7 @@ class WriteAnnotations(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.is_top_dataset()
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
