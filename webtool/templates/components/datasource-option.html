@@ -18,6 +18,14 @@
                     {{ settings.tooltip }}
                 </p>
             {% endif %}
+        {% elif settings.type == "files" %}
+            <input name="option-{{ option }}" id="forminput-{{ option }}" type="file" multiple="true">
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
         {% elif settings.type == "string" %}
             <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min %} min="{{ settings.min }}"{% endif %}{% if settings.max %} max="{{ settings.max }}"{% endif %} type="{% if settings.min or settings.max %}number{% else %}text{% endif %}" value="{{ settings.default }}">
             {% if "tooltip" in settings %}
