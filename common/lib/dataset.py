@@ -1568,6 +1568,18 @@ class DataSet(FourcatModule):
 
 		return False
 
+	def get_media_type(self):
+		"""
+		Gets the media type of the dataset file.
+
+		:return str: media type, e.g., "text"
+		"""
+		if hasattr(self, "media_type"):
+			return self.media_type
+		else:
+			# Default to text
+			return self.parameters.get("media_type", "text")
+
 	def get_result_url(self):
 		"""
 		Gets the 4CAT frontend URL of a dataset file.
