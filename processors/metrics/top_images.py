@@ -37,10 +37,7 @@ class TopImageCounter(BasicProcessor):
         :param module: Module to determine compatibility with
         """
 
-        if module.is_top_dataset() and module.type != "telegram-search":
-            return True
-        else:
-            return False
+        return module.is_top_dataset() and module.type != "telegram-search" and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """

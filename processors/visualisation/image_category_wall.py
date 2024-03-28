@@ -128,10 +128,12 @@ class ImageWallGenerator(BasicProcessor):
 		"""
 		Identify dataset types that are compatible with this processor
 		"""
+		# Is the the source dataset an image dataset?
 		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
 			image_dataset = source_dataset
 			category_dataset = source_dataset.top_parent()
-		elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
+		# Or is the parent dataset an image dataset?
+		elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets] + [source_dataset.get_parent().get_media_type() == "image"]):
 			image_dataset = source_dataset.get_parent()
 			category_dataset = source_dataset
 		else:

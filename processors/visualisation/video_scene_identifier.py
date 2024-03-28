@@ -144,7 +144,7 @@ class VideoSceneDetector(BasicProcessor):
 		"""
 		Allow on videos
 		"""
-		return module.type.startswith("video-downloader")
+		return module.get_media_type() == "video" or module.type.startswith("video-downloader")
 
 	def process(self):
 		"""
@@ -237,7 +237,7 @@ class VideoSceneDetector(BasicProcessor):
 		rows = []
 		if video_metadata is None:
 			# Not good, but let's store the scenes and note the error
-			self.dataset.update_status("Error connecting video scenes to original dataset", is_final=True)
+			self.dataset.log("No metadata file found")
 
 			for filename, video_scenes in collected_scenes.items():
 				for i, scene in enumerate(video_scenes):

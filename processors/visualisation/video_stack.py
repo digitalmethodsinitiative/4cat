@@ -82,17 +82,18 @@ class VideoStack(BasicProcessor):
         """
         Determine compatibility
 
-        :param str module:  Module ID to determine compatibility with
+        :param DataSet module:  Module ID to determine compatibility with
         :return bool:
         """
-        # also need ffprobe to determine video lengths
-        # is usually installed in same place as ffmpeg
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path", user=user))
-        ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
-
-        return module.type.startswith("video-downloader") and \
-               ffmpeg_path and \
-               ffprobe_path
+        if not (module.get_media_type() == "video" or module.type.startswith("video-downloader")):
+            return False
+        else:
+            # Only check these if we have a video dataset
+            # also need ffprobe to determine video lengths
+            # is usually installed in same place as ffmpeg
+            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path", user=user))
+            ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
+            return ffmpeg_path and ffprobe_path
 
     def process(self):
         """
@@ -116,7 +117,10 @@ class VideoStack(BasicProcessor):
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack
-        video_dataset = self.source_dataset.nearest("video-downloader*")
+        video_dataset = None
+        for video_dataset_type in ["video-downloader*", "media-import-search"]:
+            if video_dataset is None:
+                video_dataset = self.source_dataset.nearest(video_dataset_type)
         if not video_dataset:
             self.log.error(
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
