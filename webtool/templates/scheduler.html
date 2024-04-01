@@ -44,25 +44,34 @@
         {% if jobs %}
             <ol class="result-list">
                 {% for job in jobs %}
-                    <li id="{{ job.data.get('id') }}" class="result" data-key="{{ job.data.get('id') }}">
+                    <li id="{{ job.get('scheduler_id') }}" class="result" data-key="{{ job.get('scheduler_id') }}">
                         <div class="property-container">
-                            <h4>Job type: {{ job.data.get('jobtype') }}</h4>
+                            <h4>Job type: {{ job.get('jobtype') }}</h4>
+                        </div>
+                        {% if job.get("last_created") %}
+                        <div class="property-container">
+                            <h4>Last dataset scheduled: {{ job.get('last_created')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
+                        </div>
+                        {% endif %}
+                        <div class="property-container">
+                            <h4>Active: {{ job.get('active') }}</h4>
+                            {% if job.get('active') %}
+                                <li><a href="{{ url_for('delete_job', id=job.get('scheduler_id')) }}" class="confirm-first"
+                               data-confirm-action="delete this job"><i class="fas fa-trash-alt"
+                                                                            aria-hidden="true"></i>
+                            Delete scheduler</a></li>
+                            {% endif %}
                         </div>
                         <div class="property-container">
-                            <h4>Remote ID: {{ job.data.get('remote_id') }}</h4>
+                            <h4>Number of datasets: {{ job.get('number_datasets')}}</h4>
                         </div>
-                        <div class="property-container">
-                            <h4>Created at: {{ job.data.get('timestamp')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
-                        </div>
-                        <div class="property-container">
-                            <h4>Last run: {{ job.data.get('timestamp_lastclaimed')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4>
-                        </div>
-                        <div class="property-container">
-                            <h4>Interval (in seconds): {{ job.data.get('interval') }}</h4>
-                        </div>
-                        <div class="property-container">
-                            <h4>Details: {{ job.data.get('details') }}</h4>
-                        </div>
+                        {% for result in job.get("scheduled_jobs") %}
+                            <div class="property-container">
+                                <li><a href="{{ url_for('show_result', key=result.get('dataset_id')) }}"><i class="fas fa-link"
+                                                                                   aria-hidden="true"></i> Dataset</a>
+                                </li>
+                            </div>
+                        {% endfor %}
                     </li>
                 {% endfor %}
             </ol>

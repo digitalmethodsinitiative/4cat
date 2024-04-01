@@ -35,12 +35,13 @@ class Scheduler(BasicWorker):
 		details: additional details for the job (potentially different for each job)
 		"""
 		# create the table if it doesn't exist
-		self.db.execute("CREATE TABLE IF NOT EXISTS scheduled_jobs (job_id int PRIMARY KEY, scheduler_id int NOT NULL, jobtype text NOT NULL, dataset_id text NOT NULL, status text NOT NULL, last_run timestamp, details jsonb)")
+		self.db.execute("CREATE TABLE IF NOT EXISTS scheduled_jobs (job_id int PRIMARY KEY, scheduler_id int NOT NULL, jobtype text NOT NULL, dataset_id text NOT NULL, status text NOT NULL, created_at timestamp, details jsonb)")
 
 	def work(self):
 		"""
 		Check previous scheduled jobs and schedule new ones as necessary
 		"""
+		# TODO: ensure_database could be called when workers are validated; we could even check for packages there
 		self.ensure_database()
 		# Ensure clean work report
 		self.work_report = {}
@@ -145,7 +146,7 @@ class Scheduler(BasicWorker):
 			"jobtype": self.details.get("processor_type"),
 			"dataset_id": dataset.key,
 			"status": "scheduled",
-			"last_run": None,
+			"created_at": datetime.now().timestamp(),
 			"details": json.dumps(self.details)
 		})
 		self.log.info(f"Scheduler created {self.details.get('processor_type')} job: dataset {self.details.get('last_dataset')}")
@@ -162,10 +163,12 @@ class Scheduler(BasicWorker):
 
 	def update_jobs(self, jobs):
 		"""
-		Update any jobs that are not completed
+		Update any job statuses
 
 		:param list jobs: List of jobs
 		"""
+		# TODO: update statuses
+		# TODO: remove sensitive parameters
 		pass
 
 	def reschedule_jobs(self, jobs):
