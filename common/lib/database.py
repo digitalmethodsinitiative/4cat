@@ -255,7 +255,7 @@ class Database:
 		protoquery += " ON CONFLICT"
 
 		if constraints:
-			protoquery += "(" + ", ".join(["{}" for each in constraints]) + ")"
+			protoquery += " (" + ", ".join(["{}" for each in constraints]) + ")"
 			identifiers.extend([sql.Identifier(column) for column in constraints])
 
 		protoquery += " DO UPDATE SET "

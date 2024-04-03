@@ -206,7 +206,7 @@ class PixPlotGenerator(BasicProcessor):
         data['args'] += ['--cell_size', str(cell_size), '--n_neighbors', str(n_neighbors), '--min_dist', str(min_dist)]
 
         # Increase timeout (default is 3600 seconds)
-        data['timeout'] = 21600
+        data['timeout'] = (86400 * 7)
 
         # Send request to DMI Service Manager
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")

@@ -115,7 +115,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# (but not for sticky threads; posts in stickies
 		# disappear from 4chan after 1000 replies, but 4CAT
 		# considers these as organic activity)
-		deleted = 0
+		deleted = set()
 		if thread["is_sticky"] != True:
 			deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
 			for post_id in deleted:

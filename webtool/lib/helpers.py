@@ -223,7 +223,7 @@ def make_html_colour(rgb):
 def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="favicon.ico"):
 	"""
 	Converts an RGBA image to a different color by first converting to black and then colorizing the image
-	and readding the alpha stream. It works best with Black and White images (already colored images appear
+	and re-adding the alpha stream. It works best with Black and White images (already colored images appear
 	washed out).
 
 	:param str/RGB color:   Accepts either a string represening a color from ImageColor.colormap or a

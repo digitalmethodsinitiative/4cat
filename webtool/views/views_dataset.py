@@ -146,10 +146,7 @@ def show_results(page):
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"]}
-
-    return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
+    return render_template("results.html", filter=filters, depth=depth, datasources=backend.all_modules.datasources,
                            datasets=filtered, pagination=pagination, favourites=favourites)
 
 
@@ -198,8 +195,6 @@ def get_mapped_result(key):
     if not hasattr(dataset.get_own_processor(), "map_item"):
         # cannot map without a mapping method
         return error(404, error="File not found.")
-
-    mapper = dataset.get_own_processor().map_item
 
     # Also add possibly added annotation items.
     # These cannot be added to the static `map_item` function.
@@ -319,7 +314,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_items(warn_unmappable=False):
+            for original, row in dataset.iterate_mapped_items(dataset.get_own_processor(), warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 
