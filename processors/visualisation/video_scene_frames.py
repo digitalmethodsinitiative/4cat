@@ -95,7 +95,7 @@ class VideoSceneFrames(BasicProcessor):
         # two separate staging areas:
         # one to store the videos we're reading from
         # one to store the frames we're capturing
-        video_staging_area = video_dataset.get_staging_area()
+        video_staging_area = self.dataset.get_staging_area()
         staging_area = self.dataset.get_staging_area()
 
         # now go through videos and get the relevant frames
