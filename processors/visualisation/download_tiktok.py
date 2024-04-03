@@ -63,7 +63,7 @@ class TikTokVideoDownloader(BasicProcessor):
         # Update the amount max and help from config
         max_number_videos = int(config.get('video-downloader.max', 1000, user=user))
         options['amount']['max'] = max_number_videos
-        options['amount']['help'] = f"No. of images (max {max_number_videos:,})"
+        options['amount']['help'] = f"No. of videos (max {max_number_videos:,})"
 
         return options
 
@@ -174,9 +174,9 @@ class TikTokImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get('image-downloader.max', 1000))
+        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
         options['amount']['max'] = max_number_images
-        options['amount']['help'] = "No. of images (max %s)" % max_number_images
+        options['amount']['help'] = f"No. of images (max {max_number_images:,})"
 
         return options
 
@@ -299,6 +299,11 @@ class TikTokImageDownloader(BasicProcessor):
                         raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
 
                     refreshed_mapped_item = SearchTikTokByImport.map_item(refreshed_item)
+                    if refreshed_mapped_item.get_missing_fields():
+                        self.dataset.log(f"The following fields were missing in item and have been replaced with a "
+                                         f"default value: {', '.join(refreshed_mapped_item.get_missing_fields())}")
+
+                    refreshed_mapped_item = refreshed_mapped_item.get_item_data(safe=True)
                     post_id = refreshed_mapped_item.get("id")
                     url = refreshed_mapped_item.get(url_column)
 

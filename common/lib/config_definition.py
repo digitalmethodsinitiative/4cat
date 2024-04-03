@@ -395,8 +395,9 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": ["admin"],
         "help": "Tag priority",
-        "tooltip": "User tag priority order. It is recommended to manipulate this with the 'User tags' panel instead of directly.",
-        "global": True
+        "tooltip": "User tag priority order. This can be manipulated from the 'User tags' panel instead of directly.",
+        "global": True,
+        "indirect": True
     },
     "flask.proxy_secret": {
         "type": UserInput.OPTION_TEXT,

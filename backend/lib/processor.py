@@ -284,7 +284,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 								self.log.warning("Cannot find preset's source dataset for dataset %s" % self.dataset.key)
 								break
 
-
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
 			# copy the results to an arbitrary place that was passed
@@ -307,7 +306,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 				if self.dataset.get_results_path().exists():
 					# Update the surrogate's results file suffix to match this dataset's suffix
-					surrogate.data["result_file"] = surrogate.get_results_path().with_suffix("." + self.dataset.get_results_path().suffix)
+					surrogate.data["result_file"] = surrogate.get_results_path().with_suffix(self.dataset.get_results_path().suffix)
 					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
 
 				try:
@@ -538,6 +537,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param Path staging_area:  Where to store the files while they're
 		  being worked with. If omitted, a temporary folder is created and
 		  deleted after use
+		:param int max_number_files:  Maximum number of files to unpack. If None, all files unpacked
 		:return Path:  A path to the staging area
 		"""
 
@@ -564,6 +564,32 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				paths.append(temp_file)
 
 		return staging_area
+
+	def extract_archived_file_by_name(self, filename, archive_path, staging_area=None):
+		"""
+		Extract a file from an archive by name
+
+		:param str filename:  Name of file to extract
+		:param Path archive_path:  Path to zip file to read
+		:param Path staging_area:  Where to store the files while they're
+		  		being worked with. If omitted, a temporary folder is created
+		:return Path:  A path to the extracted file
+		"""
+		if not archive_path.exists():
+			return
+
+		if not staging_area:
+			staging_area = self.dataset.get_staging_area()
+
+		if not staging_area.exists() or not staging_area.is_dir():
+			raise RuntimeError("Staging area %s is not a valid folder")
+
+		with zipfile.ZipFile(archive_path, "r") as archive_file:
+			if filename not in archive_file.namelist():
+				raise KeyError("File %s not found in archive %s" % (filename, archive_path))
+			else:
+				archive_file.extract(filename, staging_area)
+				return staging_area.joinpath(filename)
 
 	def write_csv_items_and_finish(self, data):
 		"""
@@ -686,11 +712,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	@classmethod
 	def map_item_method_available(cls, dataset):
 		"""
-		Checks if map_item method exists and is compatible with dataset. If dataset does not have an extension,
-		returns False
+		Check if this processor can use map_item
 
-		:param BasicProcessor processor:	The BasicProcessor subclass object with which to use map_item
-		:param DataSet dataset:				The DataSet object with which to use map_item
+		Checks if map_item method exists and is compatible with dataset. If
+		dataset has a different extension than the default for this processor,
+		or if the dataset has no extension, this means we cannot be sure the
+		data is in the right format to be mapped, so `False` is returned in
+		that case even if a map_item() method is available.
+
+		:param BasicProcessor processor:	The BasicProcessor subclass object
+		with which to use map_item
+		:param DataSet dataset:				The DataSet object with which to
+		use map_item
 		"""
 		# only run item mapper if extension of processor == extension of
 		# data file, for the scenario where a csv file was uploaded and
@@ -718,8 +751,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			mapped_item = cls.map_item(item)
 		except (KeyError, IndexError) as e:
 			raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}")
+
 		if not mapped_item:
 			raise MapItemException("Unable to map item!")
+
 		return mapped_item
 
 	@classmethod
@@ -835,5 +870,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		To be defined by the child processor.
 		"""
 		pass
+
+	@staticmethod
+	def is_4cat_processor():
+		"""
+		Is this a 4CAT processor?
+
+		This is used to determine whether a class is a 4CAT
+		processor.
+		
+		:return:  True
+		"""
+		return True
 
 

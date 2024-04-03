@@ -149,6 +149,7 @@ class DmiServiceManager:
 
         check_time = time.time()
         success = False
+        connection_error = 0
         while True:
             time.sleep(1)
             # If interrupted is called, attempt to finish dataset while server still running
@@ -166,8 +167,15 @@ class DmiServiceManager:
 
                 if callback:
                     callback(self)
+                try:
+                    result = requests.get(results_url, timeout=30)
+                except requests.exceptions.ConnectionError as e:
+                    # Have seen the Service Manager fail particularly when another processor is uploading many consecutive files
+                    connection_error += 1
+                    if connection_error > 3:
+                        raise DmiServiceManagerException(f"Unable to connect to DMI Service Manager server: {str(e)}")
+                    continue
 
-                result = requests.get(results_url, timeout=30)
                 if 'status' in result.json().keys() and result.json()['status'] == 'running':
                     # Still running
                     continue
@@ -214,7 +222,16 @@ class DmiServiceManager:
         Request files from a folder on the DMI Service Manager server.
         """
         filename_url = f"{self.server_address}list_filenames/{folder_name}"
-        filename_response = requests.get(filename_url, timeout=30)
+        retries = 0
+        while True:
+            try:
+                filename_response = requests.get(filename_url, timeout=30)
+                break
+            except requests.exceptions.ConnectionError as e:
+                retries += 1
+                if retries > 3:
+                    raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading files from: {folder_name}")
+                continue
 
         # Check if 4CAT has access to this server
         if filename_response.status_code == 403:
@@ -296,11 +313,15 @@ class DmiServiceManager:
                 elif response.status_code == 405:
                     raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
                 else:
-                    self.processor.dataset.log(f"Unable to upload file ({response.status_code - response.reason}): {upload_file}")
+                    self.processor.dataset.log(f"Unable to upload file ({response.status_code} - {response.reason}): {upload_file}")
 
-                if "errors" in response.json():
+                try:
+                    response_json = response.json()
+                except JSONDecodeError:
+                    response_json = None
+                if response_json and "errors" in response.json():
                     self.processor.dataset.log(
-                        f"Unable to upload file ({response.status_code - response.reason}): {upload_file} - {response.json()['errors']}")
+                        f"Unable to upload file ({response.status_code} - {response.reason}): {upload_file} - {response.json()['errors']}")
 
             self.processor.dataset.update_status(f"Uploaded {files_uploaded} files!")
 
@@ -324,7 +345,16 @@ class DmiServiceManager:
         files_downloaded = 0
         self.processor.dataset.update_status(f"Downloading {total_files_to_download} files from {folder_name}...")
         for filename in filenames_to_download:
-            file_response = requests.get(api_upload_endpoint + f"{folder_name}/{filename}", timeout=timeout)
+            retries = 0
+            while True:
+                try:
+                    file_response = requests.get(api_upload_endpoint + f"{folder_name}/{filename}", timeout=timeout)
+                    break
+                except requests.exceptions.ConnectionError as e:
+                    retries += 1
+                    if retries > 3:
+                        raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading file: {folder_name}/{filename}")
+                    continue
             files_downloaded += 1
             if files_downloaded % 1000 == 0:
                 self.processor.dataset.update_status(f"Downloaded {files_downloaded} of {total_files_to_download} files")

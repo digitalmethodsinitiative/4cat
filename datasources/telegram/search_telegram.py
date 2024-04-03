@@ -15,6 +15,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
+from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.config_manager import config
 
 from datetime import datetime
@@ -43,91 +44,12 @@ class SearchTelegram(Search):
     details_cache = None
     failures_cache = None
     eventloop = None
-    flawless = 0
+    import_issues = 0
     end_if_rate_limited = 600  # break if Telegram requires wait time above number of seconds
 
     max_workers = 1
     max_retries = 3
-
-    options = {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
-                    "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
-                    "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
-                    "authentication for Telegram."
-        },
-        "api_id": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API ID",
-            "cache": True,
-        },
-        "api_hash": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API Hash",
-            "cache": True,
-        },
-        "api_phone": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Phone number",
-            "cache": True,
-            "default": "+xxxxxxxxxx"
-        },
-        "divider": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "query-intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "You can collect messages from up to **25** entities (channels or groups) at a time. Separate with "
-                    "commas or line breaks."
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Entities to scrape",
-            "tooltip": "Separate with commas or line breaks."
-        },
-        "max_posts": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Messages per group",
-            "min": 1,
-            "max": 50000,
-            "default": 10
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range"
-        },
-        "divider-2": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "info-sensitive": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Your API credentials and phone number **will be sent to the 4CAT server** and will be stored "
-                    "there while data is fetched. After the dataset has been created your credentials will be "
-                    "deleted from the server, unless you enable the option below. If you want to download images "
-                    "attached to the messages in your collected data, you need to enable this option. Your "
-                    "credentials will never be visible to other users and can be erased later via the result page."
-        },
-        "save-session": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Save session:",
-            "default": False
-        },
-        "resolve-entities-intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
-                    "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                    "figure out where or who a message was forwarded from. However, this increases query time and "
-                    "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
-                    "to finish capturing. It will also dramatically increase the disk space needed to store the "
-                    "data, so only enable this if you really need it!"
-        },
-        "resolve-entities": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Resolve references",
-            "default": False,
-        }
-    }
+    flawless = 0
 
     config = {
         "telegram-search.can_query_all_messages": {
@@ -135,8 +57,126 @@ class SearchTelegram(Search):
             "help": "Remove message amount limit",
             "default": False,
             "tooltip": "Allows users to query unlimited messages from Telegram. This can lead to HUGE datasets!"
+        },
+        "telegram-search.max_entities": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Max entities to query",
+            "coerce_type": int,
+            "min": 0,
+            "default": 25,
+            "tooltip": "Amount of entities that can be queried at a time. Entities are groups or channels. 0 to "
+                       "disable limit."
         }
     }
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        Just updates the description of the entities field based on the
+        configured max entities.
+
+        :param DataSet parent_dataset:  An object representing the dataset that
+          the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+          case they are requested for display in the 4CAT web interface. This can
+          be used to show some options only to privileges users.
+        """
+        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+        options = {
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
+                        "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
+                        "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
+                        "authentication for Telegram."
+            },
+            "api_id": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API ID",
+                "cache": True,
+            },
+            "api_hash": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API Hash",
+                "cache": True,
+            },
+            "api_phone": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Phone number",
+                "cache": True,
+                "default": "+xxxxxxxxxx"
+            },
+            "divider": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "query-intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Separate with commas or line breaks."
+            },
+            "query": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Entities to scrape",
+                "tooltip": "Separate with commas or line breaks."
+            },
+            "max_posts": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Messages per group",
+                "min": 1,
+                "max": 50000,
+                "default": 10
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Date range"
+            },
+            "divider-2": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "info-sensitive": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Your API credentials and phone number **will be sent to the 4CAT server** and will be stored "
+                        "there while data is fetched. After the dataset has been created your credentials will be "
+                        "deleted from the server, unless you enable the option below. If you want to download images "
+                        "attached to the messages in your collected data, you need to enable this option. Your "
+                        "credentials will never be visible to other users and can be erased later via the result page."
+            },
+            "save-session": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Save session:",
+                "default": False
+            },
+            "resolve-entities-intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
+                        "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
+                        "figure out where or who a message was forwarded from. However, this increases query time and "
+                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
+                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
+                        "data, so only enable this if you really need it!"
+            },
+            "resolve-entities": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Resolve references",
+                "default": False,
+            }
+        }
+
+        if max_entities:
+            options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
+                                              f"(channels or groups) at a time. Separate with line breaks or commas.")
+
+        all_messages = config.get("telegram-search.can_query_all_messages", False, user=user)
+        if all_messages:
+            if "max" in options["max_posts"]:
+                del options["max_posts"]["max"]
+        else:
+            options["max_posts"]["help"] = (f"Messages to collect per entity. You can query up to "
+                                             f"{options['max_posts']['max']:,} messages per entity.")
+
+        return options
+
 
     def get_items(self, query):
         """
@@ -513,12 +553,12 @@ class SearchTelegram(Search):
         # untested whether geo_live is significantly different from geo
         #    attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
 
-        elif attachment_type == "photo":
+        elif attachment_type == "photo" or attachment_type == "url" and message["media"]["webpage"].get("photo"):
             # we don't actually store any metadata about the photo, since very
             # little of the metadata attached is of interest. Instead, the
             # actual photos may be downloaded via a processor that is run on the
             # search results
-            attachment = message["media"]["photo"]
+            attachment = message["media"]["photo"] if attachment_type == "photo" else message["media"]["webpage"]["photo"]
             attachment_data = json.dumps({
                 "id": attachment["id"],
                 "dc_id": attachment["dc_id"],
@@ -543,10 +583,6 @@ class SearchTelegram(Search):
                     "votes": -1
                 } for option in options]
             })
-
-        elif attachment_type == "url":
-            # easy!
-            attachment_data = message["media"].get("web_preview", {}).get("url", "")
 
         else:
             attachment_data = ""
@@ -592,17 +628,33 @@ class SearchTelegram(Search):
                         if chat["id"] == channel_id or channel_id is None:
                             forwarded_username = chat["username"]
 
-        msg = {
-            "id": message["id"],
+        link_title = ""
+        link_attached = ""
+        link_description = ""
+        reactions = ""
+
+        if message.get("media") and message["media"].get("webpage"):
+            link_title = message["media"]["webpage"].get("title")
+            link_attached = message["media"]["webpage"].get("url")
+            link_description = message["media"]["webpage"].get("description")
+
+        if message.get("reactions") and message["reactions"].get("results"):
+            for reaction in message["reactions"]["results"]:
+                reactions += reaction["reaction"] * reaction["count"]
+
+        return MappedItem({
+            "id": f"{message['_chat']['username']}-{message['id']}",
             "thread_id": thread,
             "chat": message["_chat"]["username"],
             "author": user_id,
             "author_username": username,
             "author_name": fullname,
-            "author_is_bot": user_is_bot,
+            "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
             "reply_to": message.get("reply_to_msg_id", ""),
             "views": message["views"] if message["views"] else "",
+            "forwards": message.get("forwards", MissingMappedField(0)),
+            "reactions": reactions,
             "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(message["date"]),
             "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message[
@@ -613,12 +665,13 @@ class SearchTelegram(Search):
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
                 "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
+            "link_title": link_title,
+            "link_description": link_description,
+            "link_attached": link_attached,
             "attachment_type": attachment_type,
             "attachment_data": attachment_data,
             "attachment_filename": attachment_filename
-        }
-
-        return msg
+        })
 
     @staticmethod
     def get_media_type(media):
@@ -708,14 +761,17 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        privileged = config.get("telegram-search.can_query_all_messages", False, user=user)
+        all_posts = config.get("telegram-search.can_query_all_messages", False, user=user)
+        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+
+        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options()["max_posts"]["max"])
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
         items = whitespace.sub("", query.get("query").replace("\n", ","))
-        if len(items.split(",")) > 25 and not privileged:
-            raise QueryParametersException("You cannot query more than 25 items at a time.")
+        if max_entities > 0 and len(items.split(",")) > max_entities:
+            raise QueryParametersException(f"You cannot query more than {max_entities:,} items at a time.")
 
         sanitized_items = []
         # handle telegram URLs
@@ -811,7 +867,7 @@ class SearchTelegram(Search):
 
         # simple!
         return {
-            "items": query.get("max_posts"),
+            "items": num_items,
             "query": ",".join(sanitized_items),
             "board": "",  # needed for web interface
             "api_id": query.get("api_id"),
@@ -838,29 +894,3 @@ class SearchTelegram(Search):
         """
         hash_base = api_phone.strip().replace("+", "") + str(api_id).strip() + api_hash.strip()
         return hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-
-    @classmethod
-    def get_options(cls=None, parent_dataset=None, user=None):
-        """
-        Get processor options
-
-        This method by default returns the class's "options" attribute, but
-        will lift the limit on the amount of messages scraped per group if the
-        user requesting the options has been configured as such.
-
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
-        be used to show some options only to privileges users.
-        """
-        options = cls.options.copy()
-
-        if user and config.get("telegram-search.can_query_all_messages", False, user=user):
-            if "max" in options["max_posts"]:
-                del options["max_posts"]["max"]
-
-            options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). " \
-                                             "Separate with commas or line breaks."
-
-        return options

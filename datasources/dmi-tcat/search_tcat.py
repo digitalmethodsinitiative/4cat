@@ -12,6 +12,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
+from common.lib.item_mapping import MappedItem
 from common.config_manager import config
 
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
@@ -531,14 +532,16 @@ class SearchWithinTCATBins(Search):
         return query
 
     @staticmethod
-    def map_item(tweet):
+    def map_item(item):
         """
         Use Twitter APIv2 map_item
         """
-        mapped_tweet = SearchWithTwitterAPIv2.map_item(tweet)
+        mapped_tweet = SearchWithTwitterAPIv2.map_item(item)
 
         # Add TCAT extra data
+        data = mapped_tweet.get_item_data()
+        message = mapped_tweet.get_message()
         for field in SearchWithinTCATBins.additional_TCAT_fields:
-            mapped_tweet["TCAT_" + field] = tweet.get("TCAT_" + field)
+            data["TCAT_" + field] = item.get("TCAT_" + field)
 
-        return mapped_tweet
+        return MappedItem(data, message)

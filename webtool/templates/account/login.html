@@ -29,7 +29,7 @@
                 <nav>
                     <ul class="flat">
                         {% if have_email %}
-                            {% if can_request_access %}
+                            {% if __user_config("4cat.allow_access_request") %}
                                 <li><a href="{{ url_for('request_access') }}">Request access</a></li>
                             {% endif %}
                             <li><a href="{{ url_for('request_password') }}">Recover password</a></li>

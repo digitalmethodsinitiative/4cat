@@ -1,10 +1,10 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
-import itertools
 import markdown2
 import datetime
 import psycopg2
+import psycopg2.errors
 import tailer
 import smtplib
 import time
@@ -28,7 +28,7 @@ from webtool.lib.helpers import error, Pagination, generate_css_colours, setting
 from common.lib.user import User
 from common.lib.dataset import DataSet
 
-from common.lib.helpers import call_api, send_email, UserInput
+from common.lib.helpers import call_api, send_email, UserInput, folder_size
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -63,10 +63,13 @@ def admin_frontpage():
     }
 
     disk_stats = {
-        "data": sum([f.stat().st_size for f in config.get("PATH_DATA").glob("**/*") if f.is_file()]),
-        "logs": sum([f.stat().st_size for f in config.get("PATH_LOGS").glob("**/*") if f.is_file()]),
-        "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
+        "data": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_data'"),
+        "logs": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_logs'"),
+        "db": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_db'"),
     }
+
+    # it is possible these stats don't exist yet, so replace with 0 if that is the case
+    disk_stats = {k: v["count"] if v else 0 for k, v in disk_stats.items()}
 
     upgrade_available = not not db.fetchone(
         "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
@@ -190,7 +193,7 @@ def add_user():
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
-        except psycopg2.IntegrityError:
+        except (psycopg2.IntegrityError, psycopg2.errors.UniqueViolation):
             db.rollback()
             if not force:
                 response = {**response, **{
@@ -212,8 +215,13 @@ def add_user():
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
                             username, url, url)}}
                 except RuntimeError as e:
+                    # Grab the token and provide it to the admin, so they can send to user
+                    new_token = user.generate_token()
+                    url_base = config.get("flask.server_name")
+                    protocol = "https" if config.get("flask.https") else "http"
+                    url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, new_token)
                     response = {**response, **{
-                        "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
+                        "message": "Token was reset but registration e-mail could not be sent (%s). Reset password link: [%s](%s)" % (e, url, url)}}
 
     if fmt == "html":
         if redirect_to_page:
