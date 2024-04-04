@@ -23,7 +23,7 @@
                 {% if inner_loop.index in ns.links and outer_loop.index != 1 %}
                     <a href="{{ cell }}" target="_blank">{{ cell }}</a>
                 {% else %}
-                    {{ inner_loop.index }}{{ cell }}
+                    {{ cell }}
                 {% endif %}
             </t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
         {% endfor %}
