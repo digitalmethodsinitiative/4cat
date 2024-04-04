@@ -128,7 +128,8 @@ class SlackLogHandler(WebHookLogHandler):
                     "value": "```" + infile.readlines()[record.frame.lineno - 1].strip() + "```",
                     "short": False
                 })
-        except IndexError:
+        except (IndexError, AttributeError):
+            # the file is not readable, or the line number is out of bounds
             pass
 
         try:
