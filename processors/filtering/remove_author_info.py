@@ -115,8 +115,9 @@ class AuthorInfoRemover(BasicProcessor):
 
             elif self.source_file.suffix.lower() == ".ndjson":
                 # Iterating through items
-                # using bypass_map_item to not modify data further than necessary
-                for item in self.source_dataset.iterate_items(self, bypass_map_item=True):
+                for item in self.source_dataset.iterate_items(self):
+                    item = item.original
+
                     # Filter author data
                     if mode == "anonymise":
                         item = dict_search_and_update(item, fields, lambda v: "REDACTED")
