@@ -1693,7 +1693,9 @@ const ui_helpers = {
             e.preventDefault();
         }
 
-        let target = '#' + $(e.target).attr('aria-controls');
+        const button_target = $(e.target).is('.toggle-button, .processor-queue-button') ? $(e.target) : $(e.target).parents('.toggle-button, .processor-queue-button')[0];
+
+        let target = '#' + $(button_target).attr('aria-controls');
         let is_open = $(target).attr('aria-expanded') !== 'false';
 
         if (is_open || force_close) {
