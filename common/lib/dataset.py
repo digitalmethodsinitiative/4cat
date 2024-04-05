@@ -1401,7 +1401,7 @@ class DataSet(FourcatModule):
 
 		:param str|User|None user:  User to get compatibility for. If set,
 		use the user-specific config settings where available.
-		:param bool exclude_hidden:  Return processors that should be displayed
+		:param bool exclude_hidden:  Exclude processors that should be displayed
 		in the UI? If `False`, all processors are returned.
 
 		:return dict:  Available processors, `name => properties` mapping
