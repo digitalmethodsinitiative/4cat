@@ -1390,7 +1390,7 @@ class DataSet(FourcatModule):
 		processor_type = self.parameters.get("type", self.data.get("type"))
 		return backend.all_modules.processors.get(processor_type)
 
-	def get_available_processors(self, user=None, ui_only=True):
+	def get_available_processors(self, user=None, exclude_hidden=False):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1401,15 +1401,15 @@ class DataSet(FourcatModule):
 
 		:param str|User|None user:  User to get compatibility for. If set,
 		use the user-specific config settings where available.
-		:param bool ui_only:  Only return processors that should be displayed
-		in the UI. If `False`, all processors are returned.
+		:param bool exclude_hidden:  Return processors that should be displayed
+		in the UI? If `False`, all processors are returned.
 
 		:return dict:  Available processors, `name => properties` mapping
 		"""
 		if self.available_processors:
-			# Update to reflect ui_only parameter which may be different from last call
+			# Update to reflect exclude_hidden parameter which may be different from last call
 			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not ui_only or processor.display_in_ui()}
+			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not exclude_hidden or processor.is_hidden}
 
 		processors = self.get_compatible_processors(user=user)
 
@@ -1421,7 +1421,7 @@ class DataSet(FourcatModule):
 				del processors[analysis.type]
 				continue
 
-			if ui_only and not processors[analysis.type].display_in_ui():
+			if exclude_hidden and not processors[analysis.type].is_hidden:
 				del processors[analysis.type]
 
 		self.available_processors = processors

@@ -94,7 +94,7 @@ class Search(BasicProcessor, ABC):
 			for next in query_parameters.get("next"):
 				next_parameters = next.get("parameters", {})
 				next_type = next.get("type", "")
-				available_processors = self.dataset.get_available_processors(user=self.dataset.creator, ui_only=False)
+				available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
 
 				# run it only if the processor is actually available for this query
 				if next_type in available_processors:
