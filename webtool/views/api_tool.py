@@ -1049,7 +1049,7 @@ def queue_processor(key=None, processor=None):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
-	available_processors = dataset.get_available_processors(user=current_user)
+	available_processors = dataset.get_available_processors(user=current_user, exclude_hidden=True)
 	if processor not in available_processors:
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 

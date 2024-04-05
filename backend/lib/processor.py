@@ -82,6 +82,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
 
+	#: Is this processor hidden in the front-end, and only used internally/in presets?
+	is_hidden = False
+
 	#: This will be defined automatically upon loading the processor. There is
 	#: no need to override manually
 	filepath = None
