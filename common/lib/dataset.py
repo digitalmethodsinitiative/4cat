@@ -383,7 +383,7 @@ class DataSet(FourcatModule):
 				mapped_item = original_item
 
 			# yield a DatasetItem, which is a dict with some special properties
-			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **mapped_item.get_item_data())
+			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 
 	def get_item_keys(self, processor=None):
 		"""
