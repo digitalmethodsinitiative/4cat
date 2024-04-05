@@ -434,9 +434,15 @@ def manipulate_tags():
     tags = [{"tag": tag, "explicit": True} for tag in tag_priority]
     tags.extend([{"tag": tag, "explicit": False} for tag in all_tags if tag not in tag_priority])
 
-    if not tags:
+    if not [tag for tag in tags if tag["tag"] == "admin"]:
         # admin tag always exists
-        tags = [{"tag": "admin", "explicit": True}]
+        tags.append({"tag": "admin", "explicit": True})
+
+    num_admins = 0
+    for i, tag in enumerate(tags):
+        tags[i]["users"] = db.fetchone("SELECT COUNT(*) AS count FROM users WHERE tags != '[]' AND tags @> %s", ('["' + tag["tag"] + '"]',))["count"]
+        if tag["tag"] == "admin":
+            num_admins = tags[i]["users"]
 
     if request.method == "POST":
         try:
@@ -477,7 +483,7 @@ def manipulate_tags():
         # always async
         return jsonify({"success": True})
 
-    return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
+    return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
 @app.route("/admin/settings", methods=["GET", "POST"])

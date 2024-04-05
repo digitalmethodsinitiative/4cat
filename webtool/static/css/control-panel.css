@@ -182,7 +182,7 @@ ol#tag-order li:nth-child(2n) {
 
 #tag-order .tag-container {
     display: grid;
-    grid-template-columns: auto 2em 6em 6em;
+    grid-template-columns: auto 2em 6.5em 6.5em;
     grid-column-gap: 0.5em;
 }
 
@@ -191,7 +191,7 @@ ol#tag-order li:nth-child(2n) {
 }
 
 #tag-order .tag-container.global-tag {
-    grid-template-columns: auto 12.5em;
+    grid-template-columns: auto 13.5em;
 }
 
 .stats-container {

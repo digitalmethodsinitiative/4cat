@@ -33,7 +33,7 @@
                         <span class="tag tag-itself">admin</span>
                         <span></span>
                         <a class="button-like" href="{{ url_for("manipulate_settings") }}?tag=admin">Settings</a>
-                        <a class="button-like" href="{{ url_for("list_users") }}?tag=admin">Admins</a>
+                        <a class="button-like" href="{{ url_for("list_users") }}?tag=admin">{{ "{:,}".format(num_admins) }} admin{% if num_admins != 1 %}s{% endif %}</a>
                     </div>
                 </li>
                 {% for tag in tags %}{% if tag.tag != "admin" %}
@@ -44,7 +44,7 @@
                             <span class="tag-itself">{{ tag.tag }}</span>
                             <a class="button-like confirm-first remove-tag" data-confirm-action="delete this tag from all users" href="{{ url_for("remove_tag") }}?redirect&amp;tag={{ tag.tag }}"><i class="fa fa-fw fa-times" aria-hidden="true"></i><span class="sr-only"> Remove tag from all users</span></a>
                             <a class="button-like" href="{{ url_for("manipulate_settings") }}?tag={{ tag.tag }}">Settings</a>
-                            <a class="button-like" href="{{ url_for("list_users") }}?tag={{ tag.tag }}">Users</a>
+                            <a class="button-like" href="{{ url_for("list_users") }}?tag={{ tag.tag }}">{{ "{:,}".format(tag.users) }} user{% if tag.users != 1 %}s{% endif %}</a>
                         </div>
                     {% endif %}
                 </li>
