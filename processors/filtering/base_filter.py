@@ -70,6 +70,8 @@ class BaseFilter(BasicProcessor):
         if self.dataset.is_finished():
             self.dataset.log("Processor already marked dataset as finished prior to saving file!")
             return
+
+        self.dataset.update_label(f"({self.title}) {self.source_dataset.get_label()}")
         self.dataset.finish(num_posts)
 
     def after_process(self):
