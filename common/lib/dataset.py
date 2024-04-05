@@ -297,8 +297,8 @@ class DataSet(FourcatModule):
 		the DatasetItem.
 
 		Processors can define a method called `map_item` that can be used to map
-		an item from the dataset file before it is processed any further this is
-		slower than storing the data file in the right format to beginwith but
+		an item from the dataset file before it is processed any further. This is
+		slower than storing the data file in the right format to begin with but
 		not all data sources allow for easy 'flat' mapping of items, e.g. tweets
 		are nested objects when retrieved from the twitter API that are easier
 		to store as a JSON file than as a flat CSV file, and it would be a shame
