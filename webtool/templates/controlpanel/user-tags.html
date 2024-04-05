@@ -27,22 +27,34 @@
                 configuration always has the least priority.</p>
 
             <ol id="tag-order" data-url="{{ url_for("manipulate_tags") }}">
-                <li data-tag="admin">
+                <li data-tag="admin" class="default-tag">
                     <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
-                    admin (<a href="{{ url_for("manipulate_settings") }}?tag=admin">settings</a>)
+                    <div class="tag-container">
+                        <span class="tag tag-itself">admin</span>
+                        <span></span>
+                        <a class="button-like" href="{{ url_for("manipulate_settings") }}?tag=admin">Settings</a>
+                        <a class="button-like" href="{{ url_for("list_users") }}?tag=admin">Admins</a>
+                    </div>
                 </li>
                 {% for tag in tags %}{% if tag.tag != "admin" %}
                 <li class="{% if tag.explicit %}ex{% else %}im{% endif %}plicit" data-tag="{{ tag.tag }}">
                     <i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
-                    <a class="button-like confirm remove-tag" data-confirm-action="delete this tag from all users" href="{{ url_for("remove_tag") }}?redirect&amp;tag={{ tag.tag }}"><i class="fa fa-fw fa-times" aria-hidden="true"></i><span class="sr-only"> Remove tag from all users</span></a>
                     {% if tag.tag %}
-                        {{ tag.tag }} (<a href="{{ url_for("manipulate_settings") }}?tag={{ tag.tag }}">settings</a>)
+                        <div class="tag-container">
+                            <span class="tag-itself">{{ tag.tag }}</span>
+                            <a class="button-like confirm remove-tag" data-confirm-action="delete this tag from all users" href="{{ url_for("remove_tag") }}?redirect&amp;tag={{ tag.tag }}"><i class="fa fa-fw fa-times" aria-hidden="true"></i><span class="sr-only"> Remove tag from all users</span></a>
+                            <a class="button-like" href="{{ url_for("manipulate_settings") }}?tag={{ tag.tag }}">Settings</a>
+                            <a class="button-like" href="{{ url_for("list_users") }}?tag={{ tag.tag }}">Users</a>
+                        </div>
                     {% endif %}
                 </li>
                 {% endif %}{% endfor %}
-                <li>
+                <li class="default-tag">
                     <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
-                    (<a href="{{ url_for("manipulate_settings") }}">global configuration</a>)
+                    <div class="tag-container global-tag">
+                        <span class="tag-itself">(global)</span>
+                        <a class="button-like" href="{{ url_for("manipulate_settings") }}">Global settings</a>
+                    </div>
                 </li>
             </ol>
         </section>
