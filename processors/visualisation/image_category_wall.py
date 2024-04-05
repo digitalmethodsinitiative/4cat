@@ -191,7 +191,7 @@ class ImageWallGenerator(BasicProcessor):
 		categories = {}
 		post_values = []  # used for numeric categories
 		self.dataset.update_status("Collecting categories")
-		for i, post in enumerate(category_dataset.iterate_mapped_items(self)):
+		for i, post in enumerate(category_dataset.iterate_items(self)):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while collecting categories")
 

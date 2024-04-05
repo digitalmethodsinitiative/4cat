@@ -136,19 +136,18 @@ class DatasetMerger(BasicProcessor):
                 warnings[dataset.key] = {}
 
                 try:
-                    for original_item, mapped_item in dataset.iterate_mapped_objects():
+                    for mapped_item in dataset.iterate_items():
                         if self.interrupted:
                             raise ProcessorInterruptedException("Interrupted while mapping duplicates")
 
-                        if type(mapped_item) is MappedItem:
+                        if type(mapped_item.mapped_object) is MappedItem:
                             # use the item data, but also store the warning if
                             # one was raised during mapping
-                            warning = mapped_item.get_message()
+                            warning = mapped_item.mapped_object.get_message()
                             if warning:
                                 if warning not in warnings[dataset.key]:
                                     warnings[dataset.key][warning] = 0
                                 warnings[dataset.key][warning] += 1
-                            mapped_item = mapped_item.get_item_data()
 
                         if not canonical_fieldnames:
                             canonical_fieldnames = set(mapped_item.keys())
@@ -173,10 +172,10 @@ class DatasetMerger(BasicProcessor):
                                 writer = csv.DictWriter(outfile, fieldnames=sorted_canonical_fieldnames)
                                 writer.writeheader()
 
-                            writer.writerow(original_item)
+                            writer.writerow(mapped_item.original)
 
                         elif dataset.get_extension() == "ndjson":
-                            outfile.write(json.dumps(original_item) + "\n")
+                            outfile.write(json.dumps(mapped_item.original) + "\n")
 
                         self.update_progress(processed, total_items)
 

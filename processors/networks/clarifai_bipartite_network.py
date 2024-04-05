@@ -57,7 +57,7 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
         except ValueError:
             min_confidence = 0
 
-        for annotations in self.source_dataset.iterate_mapped_items(self):
+        for annotations in self.source_dataset.iterate_items(self):
             image_id = "image-" + annotations["image"]
             network.add_node(image_id, label=annotations["image"], type="image", annotation_type="")
             for model, concepts in annotations.items():

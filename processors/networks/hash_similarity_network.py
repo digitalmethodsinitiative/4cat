@@ -94,7 +94,7 @@ class HashSimilarityNetworker(BasicProcessor):
         hashes = []
         hash_metadata = {}
         bit_length = None
-        for item in self.source_dataset.iterate_mapped_items(self):
+        for item in self.source_dataset.iterate_items(self):
             if column not in item:
                 self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
                 self.dataset.finish(0)

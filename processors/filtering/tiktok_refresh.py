@@ -40,7 +40,7 @@ class UpdateTikTok(BasicProcessor):
 
         # Loop through items and collect URLs
         urls = []
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
+        for mapped_item in self.source_dataset.iterate_items(processor=self):
             url = mapped_item.get("tiktok_url")
             if url:
                 urls.append(mapped_item.get("tiktok_url"))

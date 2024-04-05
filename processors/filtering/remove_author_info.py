@@ -85,7 +85,7 @@ class AuthorInfoRemover(BasicProcessor):
                 writer = None
                 filterable_fields = []
 
-                for item in self.source_dataset.iterate_mapped_items(self):
+                for item in self.source_dataset.iterate_items(self):
                     if not writer:
                         # initialise csv writer - we do this explicitly rather than
                         # using self.write_items_and_finish() because else we have
@@ -115,7 +115,9 @@ class AuthorInfoRemover(BasicProcessor):
 
             elif self.source_file.suffix.lower() == ".ndjson":
                 # Iterating through items
-                for item in self.source_dataset.iterate_mapped_items(self, item_to_yield="original"):
+                for item in self.source_dataset.iterate_items(self):
+                    item = item.original
+
                     # Filter author data
                     if mode == "anonymise":
                         item = dict_search_and_update(item, fields, lambda v: "REDACTED")

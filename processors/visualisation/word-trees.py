@@ -173,7 +173,7 @@ class MakeWordtree(BasicProcessor):
 		# find matching posts
 		processed = 0
 		punkt_replace = re.compile(r"[" + re.escape(string.punctuation) + "]")
-		for post in self.source_dataset.iterate_mapped_items(self):
+		for post in self.source_dataset.iterate_items(self):
 			processed += 1
 			if processed % 500 == 0:
 				self.dataset.update_status("Processing and tokenising post %i" % processed)

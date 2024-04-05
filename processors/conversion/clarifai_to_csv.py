@@ -49,7 +49,7 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
             return
 
         # recreate CSV file with the new dialect
-        for annotations in self.source_dataset.iterate_mapped_items(self):
+        for annotations in self.source_dataset.iterate_items(self):
             for model, model_annotations in annotations.items():
                 if model == "image":
                     continue

@@ -102,8 +102,8 @@ class ColumnFilter(BaseFilter):
     def filter_items(self):
         """
         Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
-        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
-        and yield `original_item`.
+        `for item in self.source_dataset.iterate_items(self)` to iterate through items and access the
+        underlying data item via item.original.
 
         :return generator:
         """
@@ -151,7 +151,7 @@ class ColumnFilter(BaseFilter):
         matching_items = 0
         processed_items = 0
         date_compare = None
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
+        for mapped_item in self.source_dataset.iterate_items(processor=self):
             processed_items += 1
             if processed_items % 500 == 0:
                 self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
@@ -223,7 +223,7 @@ class ColumnFilter(BaseFilter):
                     pass
 
             if matches:
-                yield original_item
+                yield mapped_item.original
                 matching_items += 1
 
     def filter_top(self, column, top_n, bottom=False):
@@ -237,15 +237,15 @@ class ColumnFilter(BaseFilter):
         """
         possible_values = set()
         top_n = convert_to_int(top_n, 10)
-        for item in self.source_dataset.iterate_mapped_items():
+        for item in self.source_dataset.iterate_items():
             possible_values.add(item.get(column))
 
         ranked_items = 0
         top_values = sorted(list(possible_values), reverse=(not bottom))[:top_n]
-        for original_item, item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
+        for item in self.source_dataset.iterate_items(processor=self):
             if item.get(column) in top_values:
                 ranked_items = 0
-                yield original_item
+                yield item.original
 
             if ranked_items >= top_n:
                 return

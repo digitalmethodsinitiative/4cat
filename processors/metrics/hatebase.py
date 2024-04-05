@@ -87,7 +87,7 @@ class HatebaseAnalyser(BasicProcessor):
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
 			writer.writeheader()
 
-			for post in self.source_dataset.iterate_mapped_items(self):
+			for post in self.source_dataset.iterate_items(self):
 				# stop processing if worker has been asked to stop
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while processing posts")

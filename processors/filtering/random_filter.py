@@ -82,14 +82,15 @@ class RandomFilter(BaseFilter):
 		match_row = posts_to_keep[0]  # The row count of the first matching row
 
 		# Iterate through posts and keep those in the match list
-		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(processor=self, item_to_yield="both"):
+		for mapped_item in self.source_dataset.iterate_items(processor=self):
 
 			# Yield on match
 			if count == match_row:
 				written += 1
 				if count != (dataset_size - 1) and written < sample_size:
 					match_row = posts_to_keep[written]
-				yield original_item
+
+				yield mapped_item.original
 
 				if written % max(int(sample_size/10), 1) == 0:
 					self.dataset.update_status("Wrote %i posts" % written)

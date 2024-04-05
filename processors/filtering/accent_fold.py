@@ -77,7 +77,7 @@ class AccentFoldingFilter(BasicProcessor):
             processed_items = 0
             writer = None
 
-            for item in self.source_dataset.iterate_mapped_items(self):
+            for item in self.source_dataset.iterate_items(self):
                 if not writer:
                     # initialise csv writer - we do this explicitly rather than
                     # using self.write_items_and_finish() because else we have

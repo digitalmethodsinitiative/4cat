@@ -214,7 +214,7 @@ def get_mapped_result(key):
         """
         writer = None
         buffer = io.StringIO()
-        for item in dataset.iterate_mapped_items(processor=dataset.get_own_processor(), warn_unmappable=False):
+        for item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
                 fieldnames = list(item.keys())
                 if annotation_labels:
@@ -315,7 +315,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_mapped_items(dataset.get_own_processor(), warn_unmappable=False):
+            for row in dataset.iterate_items(dataset.get_own_processor(), warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 

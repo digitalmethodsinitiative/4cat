@@ -51,7 +51,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
             return
 
         # recreate CSV file with the new dialect
-        for annotations in self.source_dataset.iterate_mapped_items(self):
+        for annotations in self.source_dataset.iterate_items(self):
             file_result = {}
 
             # special case format

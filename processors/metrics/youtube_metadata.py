@@ -102,7 +102,7 @@ class YouTubeMetadata(BasicProcessor):
 		link_regex = re.compile(r"https?://[^\s]+")
 		www_regex = re.compile(r"^www\.")
 
-		for post in self.source_dataset.iterate_mapped_items(self):
+		for post in self.source_dataset.iterate_items(self):
 
 			if not post:
 				continue

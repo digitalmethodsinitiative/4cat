@@ -38,10 +38,10 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
         # This handles and writes one Tweet at a time
         with self.dataset.get_results_path().open("w") as output:
-            for post in self.source_dataset.iterate_mapped_items(self, item_to_yield="original"):
+            for post in self.source_dataset.iterate_items(self):
                 posts += 1
 
-                post = self.map_to_TCAT(post)
+                post = self.map_to_TCAT(post.original)
 
                 # TCAT has a check on line 62 of /import/import-jsondump.php
                 # that rejects strings large than 40960

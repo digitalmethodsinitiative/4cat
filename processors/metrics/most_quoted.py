@@ -45,7 +45,7 @@ class QuoteRanker(BasicProcessor):
 		link = re.compile(r">>([0-9]+)")
 
 		self.dataset.update_status("Reading source file")
-		for post in self.source_dataset.iterate_mapped_items(self):
+		for post in self.source_dataset.iterate_items(self):
 			quotes = re.findall(link, post["body"])
 			if quotes:
 				if quotes[0] not in quoted:

@@ -49,11 +49,11 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 		self.dataset.update_status("Converting file")
 		staging_area = self.dataset.get_staging_area()
 		with staging_area.joinpath('temp.ndjson').open("w") as output:
-			for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+			for mapped_item in self.source_dataset.iterate_items(self):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
 				# Flatten the dict
-				item = flatten_dict(original_item)
+				item = flatten_dict(mapped_item.original)
 				# Add any new keys to all_keys
 				for field in item.keys():
 					if field not in all_keys:

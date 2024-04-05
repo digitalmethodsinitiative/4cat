@@ -148,7 +148,7 @@ class AttributeRanker(BasicProcessor):
 				self.dataset.update_status(f"Determining overall top-{cutoff} items")
 			else:
 				self.dataset.update_status("Determining overall top items")
-			for post in self.source_dataset.iterate_mapped_items(self):
+			for post in self.source_dataset.iterate_items(self):
 				values = self.get_values(post, columns, filter, split_comma, extract)
 				for value in values:
 					if to_lowercase:
@@ -164,7 +164,7 @@ class AttributeRanker(BasicProcessor):
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
-		for post in self.source_dataset.iterate_mapped_items(self):
+		for post in self.source_dataset.iterate_items(self):
 			# determine where to put this data
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)

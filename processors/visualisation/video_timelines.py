@@ -218,7 +218,7 @@ class VideoTimelines(BasicProcessor):
             else:
                 mapper = lambda item: item.get("id")
 
-            for item in dataset.iterate_mapped_items(self):
+            for item in dataset.iterate_items(self):
                 for filename in urls:
                     if item["id"] in mapping_ids[filename]:
                         labels[filename] = mapper(item)

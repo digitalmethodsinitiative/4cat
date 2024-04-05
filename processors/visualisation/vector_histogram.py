@@ -59,7 +59,7 @@ class SVGHistogramRenderer(BasicProcessor):
 		# collect post numbers per month
 		intervals = {}
 		have_float = False
-		for post in self.source_dataset.iterate_mapped_items(self):
+		for post in self.source_dataset.iterate_items(self):
 			value = float(post["value"])
 			if value != int(value):
 				have_float = True

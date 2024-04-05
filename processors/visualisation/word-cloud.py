@@ -94,7 +94,7 @@ class MakeWordCloud(BasicProcessor):
 			self.finish(0)
 			return
 
-		for post in self.source_dataset.iterate_mapped_items(self):
+		for post in self.source_dataset.iterate_items(self):
 
 			word = post[word_column]
 			if to_lower:
