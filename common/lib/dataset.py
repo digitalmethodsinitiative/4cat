@@ -1409,7 +1409,7 @@ class DataSet(FourcatModule):
 		if self.available_processors:
 			# Update to reflect exclude_hidden parameter which may be different from last call
 			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not exclude_hidden or processor.is_hidden}
+			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not exclude_hidden or not processor.is_hidden}
 
 		processors = self.get_compatible_processors(user=user)
 
