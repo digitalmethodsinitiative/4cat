@@ -793,7 +793,8 @@ def add_dataset_owner(key=None, username=None, role=None):
 	is potentially updated.
 
 	:request-param str key:  ID of the dataset to add an owner to
-	:request-param str username:  Username to add as owner
+	:request-param str username:  Username to add as owner, or a
+	comma-separated of usernames
 	:request-param str role?:  Role to add. Defaults to 'owner'.
 
 	:return: A dictionary with a successful `status`.
@@ -808,7 +809,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 	:param str role:  Role; `None` will use the GET parameter
 	"""
 	dataset_key = request.form.get("key", "") if not key else key
-	username = request.form.get("name", "") if not username else username
+	usernames = request.form.get("name", "") if not username else username
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
@@ -818,15 +819,18 @@ def add_dataset_owner(key=None, username=None, role=None):
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, message="Not allowed")
 
-	new_owner = User.get_by_name(db, username)
-	if new_owner is None and not username.startswith("tag:"):
-		return error(404, error=f"The user '{username}' does not exist. Use tag:example to add a tag as an owner.")
+	for username in usernames.split(","):
+		username = username.strip()
+		new_owner = User.get_by_name(db, username)
+		if new_owner is None and not username.startswith("tag:"):
+			return error(404, error=f"The user '{username}' does not exist. Use tag:example to add a tag as an owner.")
 
-	role = request.form.get("role", "owner") if not role else role
-	if role not in ("owner", "viewer"):
-		role = "owner"
+		role = request.form.get("role", "owner") if not role else role
+		if role not in ("owner", "viewer"):
+			role = "owner"
 
-	dataset.add_owner(username, role)
+		dataset.add_owner(username, role)
+
 	html = render_template("components/dataset-owner.html", owner=username, role=role,
 								  current_user=current_user, dataset=dataset)
 
