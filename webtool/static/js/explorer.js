@@ -596,14 +596,14 @@ const annotations = {
 			data: json_annotations,
 
 			success: function (response) {
-				// If the query is rejected by the server.
+				// If the query is accepted by the server.
 				if (response == 'success') {
 					$("#annotations-editor-container").hide();
 					$("#save-annotation-fields").addClass("invalid")
 					$("#save-annotation-fields").prop("disabled", true);
 				}
 
-				// If the query is accepted by the server.
+				// If the query is rejected by the server.
 				else {
 					annotations.warnEditor("Couldn't save annotation fields");
 				}

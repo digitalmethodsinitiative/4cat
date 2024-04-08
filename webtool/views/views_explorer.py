@@ -1,5 +1,6 @@
 """
-4CAT Data API - endpoints to get post and thread data from
+4CAT Explorer views - pages that display datasets akin to
+the 'native' appearance of the platform they were retrieved from.
 """
 
 import datetime
@@ -35,7 +36,7 @@ api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 @openapi.endpoint("explorer")
 def explorer_dataset(key, page):
 	"""
-	Show posts from a specific dataset
+	Show posts from a dataset
 
 	:param str dataset_key:  Dataset key
 
@@ -54,20 +55,20 @@ def explorer_dataset(key, page):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:
-		return error(404, error="Exporer only available for top-level datasets")
+		return error(404, error="Unavailable for top-level datasets")
 
 	results_path = dataset.check_dataset_finished()
 	if not results_path:
-		return error(404, error="This dataset didn't finish executing (yet)")
+		return error(404, error="This dataset didn't finish executing")
 
 	# The amount of posts to show on a page
-	limit = config.get("explorer.posts_per_page", 50)
+	posts_per_page = config.get("explorer.posts_per_page", 50)
 
 	# The amount of posts that may be included (limit for large datasets)
 	max_posts = config.get('explorer.max_posts', 500000)
 
 	# The offset for posts depending on the current page
-	offset = ((page - 1) * limit) if page else 0
+	offset = ((page - 1) * posts_per_page) if page else 0
 
 	# Load some variables
 	parameters = dataset.get_parameters()
@@ -83,7 +84,7 @@ def explorer_dataset(key, page):
 	if datasource in list(all_modules.datasources.keys()):
 		is_local = True if all_modules.datasources[datasource].get("is_local") else False
 
-	# Check if we have to sort the data in a specific way.
+	# Check if we have to sort the data.
 	sort_by = request.args.get("sort")
 	if sort_by == "dataset-order":
 		sort_by = None
@@ -107,27 +108,25 @@ def explorer_dataset(key, page):
 	posts = []
 	count = 0
 
-	first_post = False
+	try:
+		for row in dataset.iterate_items(warn_unmappable=False):
 
-	for post in iterate_items(results_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
+			count += 1
 
-		count += 1
+			# Use an offset if we're showing a page beyond the first.
+			if count <= offset:
+				continue
 
-		# Use an offset if we're showing a page beyond the first.
-		if count <= offset:
-			continue
+			# Attribute column names and collect dataset's posts.
+			post_ids.append(row["id"])
+			posts.append(row)
 
-		# Attribute column names and collect dataset's posts.
-		post_ids.append(post["id"])
-		posts.append(post)
+			# Stop if we exceed the allowed posts per page or max. posts.
+			if count >= (offset + posts_per_page) or count > max_posts:
+				break
 
-		if "link_id" in post:
-			if post["link_id"][2] == "_":
-				post["link_id"] = post["link_id"][3:]
-
-		# Stop if we exceed the max posts per page.
-		if count >= (offset + limit) or count > max_posts:
-			break
+	except NotImplementedError:
+		return error(404)
 
 	# Include custom css if it exists in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.css'.
@@ -160,16 +159,17 @@ def explorer_dataset(key, page):
 		annotations = json.loads(annotations["annotations"])
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=post_count, max_posts=max_posts)
+	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_thread(datasource, board, thread_id):
+def explorer_local_thread(datasource, board, thread_id):
 	"""
-	Show a thread in the explorer
+	Show a thread. This is only available for local data sources,
+	and will be depracated/changed in future updates.
 
 	:param str datasource:  Data source ID
 	:param str board:  Board name
@@ -191,7 +191,7 @@ def explorer_thread(datasource, board, thread_id):
 	max_posts = config.get('explorer.max_posts', 500000)
 
 	# Get the posts with this thread ID.
-	posts = get_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+	posts = get_local_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	if not posts:
 		return error(404, error="No posts available for this thread")
@@ -207,16 +207,18 @@ def explorer_thread(datasource, board, thread_id):
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_post(datasource, board, thread_id):
+def explorer_local_posts(datasource, board, thread_id):
 	"""
-	Show a thread in the explorer
+	Show a posts from a local data source.
+	This is only available for local data sources,
+	and will be depracated/changed in future updates.
 
 	:param str datasource:  Data source ID
 	:param str board:  Board name
@@ -235,7 +237,7 @@ def explorer_post(datasource, board, thread_id):
 		return error(404, error="No thread ID provided")
 
 	# Get the posts with this thread ID.
-	posts = get_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+	posts = get_local_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
@@ -248,7 +250,7 @@ def explorer_post(datasource, board, thread_id):
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts))
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts))
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
@@ -482,7 +484,7 @@ def get_boards(datasource):
 	Get available boards in datasource
 
 	:param datasource:  The datasource for which to acquire the list of available
-	                  boards.
+					  boards.
 	:return:  A list containing a list of `boards`, as string IDs.
 
 	:return-schema: {type=object,properties={
@@ -503,7 +505,7 @@ def get_boards(datasource):
 @app.route('/api/imagefile/<img_file>')
 @login_required
 @setting_required("privileges.can_use_explorer")
-def get_image_file(img_file, limit=0):
+def get_image_file(img_file):
 	"""
 	Returns an image based on filename
 	Request should hex the md5 hashes first (e.g. with hexdigest())
@@ -518,7 +520,7 @@ def get_image_file(img_file, limit=0):
 
 	return send_file(str(image_path))
 
-def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_int=False):
+def iterate_items_with_sort(in_file, max_rows=None, sort_by=None, descending=False, force_int=False):
 	"""
 	Loop through both csv and NDJSON files.
 	:param in_file, str:		The input file to read.
@@ -582,7 +584,10 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 
 	return Exception("Can't loop through file with extension %s" % suffix)
 
-def get_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
+def get_local_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
+	"""
+	Retrieve posts from a local data source based on post IDs.
+	"""
 
 	if not ids:
 		return None
