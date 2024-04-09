@@ -94,9 +94,7 @@ class SearchBitChute(Search):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Bitchute CSS",
                 "default": "",
-                "tooltip":  "Custom CSS for Bitchute posts in the the Explorer. This allows to "
-                            "mimic the original platform appearance. If empty, use the default "
-                            "CSS template (which is also editable on this page)."
+                "tooltip":  "Add custom styling for Bitchute posts in the the Explorer."
         }
     }
 

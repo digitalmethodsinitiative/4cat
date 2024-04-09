@@ -133,8 +133,6 @@ def explorer_dataset(key, page):
 	# can also be changed in the 4CAT control panel under the 'Explorer'
 	# settings.
 	css = get_custom_css(datasource)
-	print(datasource)
-	print("CSS", css)
 
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.

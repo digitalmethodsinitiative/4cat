@@ -112,12 +112,10 @@ class Search8Kun(Search4Chan):
 			"default": [],
 			"global": True
 		},
-		"explorer.eightkun-explorer-css": {
+		"explorer.eightkun-search-explorer-css": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "8kun CSS",
                 "default": "",
-                "tooltip":  "Custom CSS for 8kun posts in the the Explorer. This allows to "
-                            "mimic the original platform appearance. If empty, use the default "
-                            "CSS template (which is also editable on this page)."
+                "tooltip":  "Add custom styling for 8kun posts in the the Explorer."
             }
 	}

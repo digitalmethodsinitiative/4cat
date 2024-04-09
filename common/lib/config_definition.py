@@ -305,7 +305,7 @@ config_definition = {
         "global": True
     },
     # Explorer settings
-    "explorer.max_posts": {
+    "explorer.__max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
         "help": "Amount of posts",
@@ -313,12 +313,25 @@ config_definition = {
         "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
-    "explorer.posts_per_page": {
+    "explorer.__posts_per_page": {
         "type": UserInput.OPTION_TEXT,
         "default": 50,
         "help": "Posts per page",
         "coerce_type": int,
         "tooltip": "Number of posts to display per page"
+    },
+    "explorer._explanation_custom_fields": {
+        "type": UserInput.OPTION_INFO,
+        "help": "You can customise how posts per data source appear in the Explorer. "
+                "This involves *custom fields* via a JSON that points to what fields should "
+                "be displayed. These fields can also be formatted in a specific ways, for "
+                "instance as a URL or together with specific icons. If this JSON is absent, "
+                "the Explorer by default shows the `author`, `subject`, `timestamp`, `body`, and"
+                " `image` fields. *Custom CSS* can be added to change the appearance of posts. "
+                "This allows to mimic the original platform appearance. Custom CSS can be inserted "
+                "below. For some data sources, pre-made templates are available. These be toggled "
+                "below. If no custom or pre-made CSS is available, a general template is used."
+                "<a href='tst'>tsts</a>"
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py

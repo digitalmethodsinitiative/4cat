@@ -78,11 +78,9 @@ class SearchDouban(Search):
     config = {
         "explorer.douban-search-explorer-css": {
                 "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "TCAT CSS",
+                "help": "Douban CSS",
                 "default": "",
-                "tooltip":  "Custom CSS for Douban posts in the the Explorer. This allows to "
-                            "mimic the original platform appearance. If empty, use the default "
-                            "CSS template (which is also editable on this page)."
+                "tooltip":  "Add custom styling for Douban posts in the the Explorer."
         }
     }
 
