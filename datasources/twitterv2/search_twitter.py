@@ -61,7 +61,15 @@ class SearchWithTwitterAPIv2(Search):
             "tooltip": "If enabled, allow users to enter a list of tweet IDs "
                        "to retrieve. This is disabled by default because it "
                        "can be confusing to novice users."
-        }
+        },
+        "explorer.twitter-search-explorer-css": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Twitter CSS",
+                "default": "",
+                "tooltip":  "Custom CSS for Twitter posts in the the Explorer. This allows to "
+                            "mimic the original platform appearance. If empty, use the default "
+                            "CSS template (which is also editable on this page)."
+            }
     }
 
     def get_items(self, query):

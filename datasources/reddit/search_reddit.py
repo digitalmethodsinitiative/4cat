@@ -115,7 +115,15 @@ class SearchReddit(Search):
 			"help": "Can query without keyword",
 			"default": False,
 			"tooltip": "Allows users to query Pushshift without specifying a keyword. This can lead to HUGE datasets!"
-		}
+		},
+        "explorer.reddit-search-explorer-css": {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "Reddit CSS",
+            "default": "",
+            "tooltip":  "Custom CSS for Reddit posts in the the Explorer. This allows to "
+                        "mimic the original platform appearance. If empty, use the default "
+                        "CSS template (which is also editable on this page)."
+        }
 	}
 
 	# These change depending on the API type used,

@@ -10,6 +10,7 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.exceptions import WorkerInterruptedException, MapItemException
+from common.lib.helpers import UserInput
 
 
 class SearchInstagram(Search):
@@ -29,6 +30,17 @@ class SearchInstagram(Search):
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
         "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok) (also covers usage with Instagram)"
     ]
+
+    config = {
+        "explorer.instagram-search-explorer-css": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Instagram CSS",
+                "default": "",
+                "tooltip":  "Custom CSS for Instagram posts in the the Explorer. This allows to "
+                            "mimic the original platform appearance. If empty, use the default "
+                            "CSS template (which is also editable on this page)."
+            }
+    }
 
     # some magic numbers instagram uses
     MEDIA_TYPE_PHOTO = 1

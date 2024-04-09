@@ -443,6 +443,14 @@ class Search4Chan(SearchWithScope):
 			"default": False,
 			"tooltip": "Allows users to query the 4chan data without specifying a keyword. This can lead to HUGE datasets!"
 		},
+		"explorer.fourchan-explorer-css": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "4chan CSS",
+                "default": "",
+                "tooltip":  "Custom CSS for 4chan posts in the the Explorer. This allows to "
+                            "mimic the original platform appearance. If empty, use the default "
+                            "CSS template (which is also editable on this page)."
+            }
 	}
 
 	def get_items_simple(self, query):

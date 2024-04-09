@@ -79,7 +79,7 @@ def explorer_dataset(key, page):
 
 	# If the dataset is local, we can add some more features
 	# (like the ability to navigate to threads)
-	is_local = False
+	is_local = False # CHANGE LATER /////////////////////
 
 	if datasource in list(all_modules.datasources.keys()):
 		is_local = True if all_modules.datasources[datasource].get("is_local") else False
@@ -128,9 +128,13 @@ def explorer_dataset(key, page):
 	except NotImplementedError:
 		return error(404)
 
-	# Include custom css if it exists in the datasource's 'explorer' dir.
-	# The file's naming format should e.g. be 'reddit-explorer.css'.
+	# Retrieve custom CSS if it is present in the datasource's config.
+	# If not given, we use a standard template. This standard CSS template
+	# can also be changed in the 4CAT control panel under the 'Explorer'
+	# settings.
 	css = get_custom_css(datasource)
+	print(datasource)
+	print("CSS", css)
 
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
@@ -609,46 +613,20 @@ def get_local_posts(db, datasource, ids, board="", threads=False, limit=0, offse
 
 def get_custom_css(datasource):
 	"""
-	Check if there's a custom css file for this dataset.
-	If so, return the text.
-	Custom css files should be placed in an 'explorer' directory in the the datasource folder and named
-	'<datasourcename>-explorer.css' (e.g. 'reddit/explorer/reddit-explorer.css').
-	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
+	Check if there's custom CSS for this data source.
+	These can be inserted and edited on the Explorer settings page.
+	If these are absent, we revert to a standard template.
 
 	:param datasource, str: Datasource name
 
 	:return: The css as string.
 	"""
 
-	# Set the directory name of this datasource.
-	# Some naming inconsistensies are caught here
-	if datasource == "twitter":
-		datasource_dir = "twitter-import"
-		datasource = "twitter-import"
-	else:
-		datasource_dir = datasource
+	custom_css = config.get("explorer." + datasource + "-explorer-css", "")
+	if not custom_css:
+		custom_css = config.get("explorer." + datasource + "-search-explorer-css", "")
 
-
-	css_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
-	
-	print(css_path)
-	read = False
-	if css_path.exists():
-		read = True
-	else:
-		# Allow both hypens and underscores in datasource name (to avoid some legacy issues)
-		css_path = re.sub(datasource, datasource.replace("-", "_"), str(css_path.absolute()))
-		if Path(css_path).exists():
-			read = True
-
-	# Read the css file if it exists
-	if read:
-		with open(css_path, "r", encoding="utf-8") as css:
-			css = css.read()
-	else:
-		css = None
-
-	return css
+	return custom_css
 
 def get_custom_fields(datasource, filetype=None):
 	"""

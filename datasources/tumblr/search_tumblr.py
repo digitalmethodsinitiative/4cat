@@ -73,6 +73,14 @@ class SearchTumblr(Search):
 			'help': 'Tumblr API Secret Key',
 			'tooltip': "",
 		},
+		"explorer.tumblr-search-explorer-css": {
+			"type": UserInput.OPTION_TEXT_LARGE,
+			"help": "CSS Tumblr",
+			"default": "",
+			"tooltip":  "Custom CSS for Tumblr posts in the the Explorer. This allows to "
+						"mimic the original platform appearance. If empty, use the default "
+						"CSS template (which is also editable on this page)."
+		}
 	}
 	references = ["[Tumblr API documentation](https://www.tumblr.com/docs/en/api/v2)"]
 
@@ -484,9 +492,9 @@ class SearchTumblr(Search):
 		Get Tumblr posts posts with a certain blog
 		:param tag, str: the name of the blog you want to look for
 		:param min_date: a unix timestamp, indicates posts should be min_date this date.
-	    :param max_date: a unix timestamp, indicates posts should be max_date this date.
+		:param max_date: a unix timestamp, indicates posts should be max_date this date.
 
-	    :returns: a dict created from the JSON response
+		:returns: a dict created from the JSON response
 		"""
 		blog = blog + ".tumblr.com"
 

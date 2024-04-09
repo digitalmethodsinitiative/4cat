@@ -11,6 +11,7 @@ import re
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
+from common.lib.helpers import UserInput
 
 class SearchLinkedIn(Search):
     """
@@ -29,6 +30,17 @@ class SearchLinkedIn(Search):
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
         "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok) (also explains general usage of Zeeschuimer)"
     ]
+
+    config = {
+        "explorer.linkedin-search-explorer-css": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "LinkedIn CSS",
+                "default": "",
+                "tooltip":  "Custom CSS for LinkedIn posts in the the Explorer. This allows to "
+                            "mimic the original platform appearance. If empty, use the default "
+                            "CSS template (which is also editable on this page)."
+            }
+    }
 
     def get_items(self, query):
         """
