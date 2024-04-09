@@ -102,8 +102,8 @@ config_definition = {
     "privileges.can_use_explorer": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
-        "help": "Can use explorer",
-        "tooltip": "Controls whether users can use the Explorer feature to navigate datasets."
+        "help": "Can use Explorer",
+        "tooltip": "Controls whether users can use the Explorer feature to analyse and annotate datasets."
     },
     "privileges.can_export_datasets": {
         "type": UserInput.OPTION_TOGGLE,
@@ -305,13 +305,12 @@ config_definition = {
         "global": True
     },
     # Explorer settings
-    # The maximum allowed amount of rows (prevents timeouts and memory errors)
     "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
         "help": "Amount of posts",
         "coerce_type": int,
-        "tooltip": "Amount of posts to show in Explorer. The maximum allowed amount of rows (prevents timeouts and "
+        "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
     "explorer.posts_per_page": {
@@ -319,7 +318,7 @@ config_definition = {
         "default": 50,
         "help": "Posts per page",
         "coerce_type": int,
-        "tooltip": "Posts to display per page"
+        "tooltip": "Number of posts to display per page"
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
@@ -515,7 +514,7 @@ categories = {
     "4cat": "4CAT Tool settings",
     "api": "API credentials",
     "flask": "Flask settings",
-    "explorer": "Data Explorer",
+    "explorer": "Explorer",
     "datasources": "Data sources",
     "expire": "Dataset expiration settings",
     "mail": "Mail settings & credentials",
