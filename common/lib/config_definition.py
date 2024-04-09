@@ -331,7 +331,6 @@ config_definition = {
                 "This allows to mimic the original platform appearance. Custom CSS can be inserted "
                 "below. For some data sources, pre-made templates are available. These be toggled "
                 "below. If no custom or pre-made CSS is available, a general template is used."
-                "<a href='tst'>tsts</a>"
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py

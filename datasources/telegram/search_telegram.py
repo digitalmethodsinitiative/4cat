@@ -69,9 +69,9 @@ class SearchTelegram(Search):
         },
         "explorer.telegram-search-explorer-default-css": {
             "type": UserInput.OPTION_TOGGLE,
-            "help": "Use Telegram default CSS",
-            "default": "",
-            "tooltip":  "Add custom styling for Telegram posts in the the Explorer."
+            "help": "Use default Telegram CSS",
+            "default": True
+            "tooltip":  "See "
         },
         "explorer.telegram-search-explorer-css": {
             "type": UserInput.OPTION_TEXT_LARGE,
