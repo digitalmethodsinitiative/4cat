@@ -36,7 +36,7 @@ class SearchInstagram(Search):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Instagram CSS",
                 "default": "",
-                "tooltip":  "Add custom styling for Instagram posts in the the Explorer."
+                "tooltip":  "Add custom styling for Instagram posts in the Explorer."
             }
     }
 

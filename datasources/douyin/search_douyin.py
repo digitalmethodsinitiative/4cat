@@ -33,7 +33,7 @@ class SearchDouyin(Search):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Douyin CSS",
                 "default": "",
-                "tooltip":  "Add custom styling for Douyin posts in the the Explorer."
+                "tooltip":  "Add custom styling for Douyin posts in the Explorer."
             }
         }
 

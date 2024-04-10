@@ -116,6 +116,6 @@ class Search8Kun(Search4Chan):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "8kun CSS",
                 "default": "",
-                "tooltip":  "Add custom styling for 8kun posts in the the Explorer."
+                "tooltip":  "Add custom styling for 8kun posts in the Explorer."
             }
 	}

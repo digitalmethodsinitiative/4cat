@@ -36,7 +36,7 @@ class SearchVK(Search):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "VK import CSS",
                 "default": "",
-                "tooltip":  "Custom CSS for VK import posts in the the Explorer. This allows to "
+                "tooltip":  "Custom CSS for VK import posts in the Explorer. This allows to "
                             "mimic the original platform appearance. If empty, use the default "
                             "CSS template (which is also editable on this page)."
             }

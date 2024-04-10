@@ -113,6 +113,6 @@ class Search8Chan(Search4Chan):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "8chan CSS",
                 "default": "",
-                "tooltip":  "Add custom styling for 8chan posts in the the Explorer."
+                "tooltip":  "Add custom styling for 8chan posts in the Explorer."
             }
 	}

@@ -323,14 +323,14 @@ config_definition = {
     "explorer._explanation_custom_fields": {
         "type": UserInput.OPTION_INFO,
         "help": "You can customise how posts per data source appear in the Explorer. "
-                "This involves *custom fields* via a JSON that points to what fields should "
-                "be displayed. These fields can also be formatted in a specific ways, for "
-                "instance as a URL or together with specific icons. If this JSON is absent, "
-                "the Explorer by default shows the `author`, `subject`, `timestamp`, `body`, and"
-                " `image` fields. *Custom CSS* can be added to change the appearance of posts. "
-                "This allows to mimic the original platform appearance. Custom CSS can be inserted "
-                "below. For some data sources, pre-made templates are available. These be toggled "
-                "below. If no custom or pre-made CSS is available, a general template is used."
+                "This involves *custom fields*; a JSON that points to what fields should "
+                "be displayed. These fields can be formatted, for instance as a URL or together "
+                " with specific icons. If this JSON is absent, the Explorer by default shows the "
+                "`author`, `subject`, `timestamp`, `body`, and `image` fields. *Custom CSS* can be "
+                "added to change the appearance of posts. This allows to mimic the original platform "
+                "appearance. Custom CSS can be inserted below. For some data sources, pre-made templates "
+                "are available. These can be toggled below. If no custom or pre-made CSS is available, a "
+                "general template is used."
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py

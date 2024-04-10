@@ -80,7 +80,7 @@ class SearchDouban(Search):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Douban CSS",
                 "default": "",
-                "tooltip":  "Add custom styling for Douban posts in the the Explorer."
+                "tooltip":  "Add custom styling for Douban posts in the Explorer."
         }
     }
 

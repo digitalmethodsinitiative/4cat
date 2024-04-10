@@ -77,7 +77,7 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_TEXT_LARGE,
             "help": "Custom Telegram CSS",
             "default": "",
-            "tooltip":  "Add custom styling for Telegram posts in the the Explorer."
+            "tooltip":  "Add custom styling for Telegram posts in the Explorer."
         }
     }
 

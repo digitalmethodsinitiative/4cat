@@ -447,7 +447,7 @@ class Search4Chan(SearchWithScope):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "4chan CSS",
                 "default": "",
-                "tooltip":  "Add custom styling for 4chan posts in the the Explorer."
+                "tooltip":  "Add custom styling for 4chan posts in the Explorer."
             }
 	}
 

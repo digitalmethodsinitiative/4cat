@@ -36,7 +36,7 @@ class SearchLinkedIn(Search):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "LinkedIn CSS",
                 "default": "",
-                "tooltip":  "Custom CSS for LinkedIn posts in the the Explorer. This allows to "
+                "tooltip":  "Custom CSS for LinkedIn posts in the Explorer. This allows to "
                             "mimic the original platform appearance. If empty, use the default "
                             "CSS template (which is also editable on this page)."
             }
