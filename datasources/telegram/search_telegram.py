@@ -39,6 +39,7 @@ class SearchTelegram(Search):
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    has_explorer_preset = True # Whether this data source has preset CSS and field settings for the Explorer 
 
     # cache
     details_cache = None
@@ -66,18 +67,6 @@ class SearchTelegram(Search):
             "default": 25,
             "tooltip": "Amount of entities that can be queried at a time. Entities are groups or channels. 0 to "
                        "disable limit."
-        },
-        "explorer.telegram-search-explorer-default-css": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Use default Telegram CSS",
-            "default": True
-            "tooltip":  "See "
-        },
-        "explorer.telegram-search-explorer-css": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Custom Telegram CSS",
-            "default": "",
-            "tooltip":  "Add custom styling for Telegram posts in the Explorer."
         }
     }
 
