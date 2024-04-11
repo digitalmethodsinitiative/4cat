@@ -1294,7 +1294,7 @@ const multichoice = {
      */
     init: function () {
         // Multichoice inputs need to be loaded dynamically
-        $(document).on('click', '.toggle-button', function () {
+        $(document).on('click', '.toggle-button, .processor-queue-button', function () {
             if ($(".multichoice-wrapper, .multi-select-wrapper").length > 0) {
                 multichoice.makeMultichoice();
                 multichoice.makeMultiSelect();
