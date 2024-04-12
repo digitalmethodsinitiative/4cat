@@ -1369,7 +1369,7 @@ class DataSet(FourcatModule):
 				del processors[analysis.type]
 				continue
 
-			if exclude_hidden and not processors[analysis.type].is_hidden:
+			if exclude_hidden and processors[analysis.type].is_hidden:
 				del processors[analysis.type]
 
 		self.available_processors = processors
