@@ -36,13 +36,7 @@
                                 <li class="{% if tab.name in changed %}changed{% endif %}{% if (tab.first and not current_tab) or tab.name == current_tab %} highlighted{% set tab.first = False %}{% endif %}">
                                     <a href="#tab-{{ tab.name }}" id="tablabel-{{ tab.name }}"
                                        aria-controls="tab-{{ tab.name }}">
-                                        {% if tab.name in categories %}
-                                            {{ categories[tab.name] }}
-                                        {% elif tab.name in modules %}
-                                            {{ modules[tab.name] }}
-                                        {% else %}
-                                            {{ tab.name }}
-                                        {% endif %}
+                                        {{ options[option].tabname }}
                                     </a>
                                 </li>
                             {% endif %}
