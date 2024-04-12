@@ -121,6 +121,17 @@ table td[colspan] {
     color: var(--accent-alternate)
 }
 
+.settings.tab-controls li a {
+    padding: 0.25em 1em;
+}
+
+article .settings h3:not(.blocktitle) {
+    margin: 0;
+    padding: 0.5em;
+    background: var(--contrast-dark);
+    color: var(--always-white);
+}
+
 .config-tag-info {
     text-align: center;
     border-bottom: 2px solid var(--contrast-dark);

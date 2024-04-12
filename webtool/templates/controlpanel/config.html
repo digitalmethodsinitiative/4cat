@@ -23,11 +23,13 @@
             </div>
             {% set tab = namespace(name="", open=False, first=True) %}
             <form action="{{ url_for("manipulate_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
-                <nav class="tab-controls">
+                <nav class="tab-controls settings">
                     <input type="hidden" name="current-tab" value="{{ current_tab }}">
+                    {% for submenu in ("core", "datasources", "processors", "other") %}
+                    <h3>{{ {"core": "4CAT Core", "datasources": "Data sources", "processors": "Processors", "other": "Other"}[submenu] }}</h3>
                     <ul>
                         {% set tab.name = '' %}
-                        {% for option in options %}
+                        {% for option in options if options[option].submenu == submenu %}
                             {% set option_category = option.split(".")[0] %}
                             {% if option_category != tab.name %}
                                 {% set tab.name = option_category %}
@@ -46,6 +48,7 @@
                             {% endif %}
                         {% endfor %}
                     </ul>
+                    {% endfor %}
                 </nav>
 
                 {% set tab = namespace(name="", open=False, first=True) %}

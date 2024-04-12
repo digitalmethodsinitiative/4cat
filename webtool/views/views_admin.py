@@ -570,13 +570,32 @@ def manipulate_settings():
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
             default = json.dumps(default)
 
+        # this is used for organising things in the UI
+        option_owner = option.split(".")[0]
+        submenu = "other"
+        if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
+                                    "logging", "ui"):
+            submenu = "core"
+        elif option_owner.endswith("-search"):
+            submenu = "datasources"
+        elif option_owner in backend.all_modules.processors:
+            submenu = "processors"
+
+        tabname = config_definition.categories.get(option_owner)
+        if not tabname:
+            tabname = modules.get(option_owner)
+        if not tabname:
+            tabname = option_owner
+
         options[option] = {
             **definition.get(option, {
                 "type": UserInput.OPTION_TEXT,
                 "help": option,
                 "default": all_settings.get(option)
             }),
+            "submenu": submenu,
             "default": default,
+            "tabname": tabname,
             "is_changed": is_changed
         }
 
@@ -584,6 +603,7 @@ def manipulate_settings():
             changed_categories.add(option.split(".")[0])
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
+    options = {k: options[k] for k in sorted(options, key=lambda o: options[o]["tabname"])}
 
     # 'data sources' is one setting but we want to be able to indicate
     # overrides per sub-item
