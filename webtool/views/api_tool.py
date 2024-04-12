@@ -755,6 +755,7 @@ def remove_tag():
 
 	tagged_users = db.fetchall("SELECT * FROM users WHERE tags @> %s ", (json.dumps([tag]),))
 	all_tags = list(set(itertools.chain(*[u["tags"] for u in db.fetchall("SELECT DISTINCT tags FROM users")])))
+	all_tags += [s["tag"] for s in db.fetchall("SELECT DISTINCT tag FROM settings WHERE tag LIKE 'user:%'")]
 
 	for user in tagged_users:
 		user = User.get_by_name(db, user["name"])
@@ -771,6 +772,8 @@ def remove_tag():
 		if configured_tag and configured_tag not in all_tags:
 			db.delete("settings", where={"tag": configured_tag})
 
+	# we do not re-sort here, since we are preserving the original order, just
+	# without any of the deleted or orphaned tags
 	config.set("flask.tag_order", all_tags, tag="")
 
 	if request.args.get("redirect") is not None:

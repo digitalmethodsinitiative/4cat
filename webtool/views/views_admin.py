@@ -105,8 +105,12 @@ def list_users(page):
         replacements.append("%" + filter_name + "%")
 
     if tag:
-        filter_bits.append("tags != '[]' AND tags @> %s")
-        replacements.append('["' + tag + '"]')
+        if tag.startswith("user:"):
+            filter_bits.append("name LIKE %s")
+            replacements.append(re.sub("^user:", "", tag))
+        else:
+            filter_bits.append("tags != '[]' AND tags @> %s")
+            replacements.append('["' + tag + '"]')
 
     filter_bit = "WHERE " + (" AND ".join(filter_bits)) if filter_bits else ""
     order_bit = "name ASC"
@@ -443,6 +447,8 @@ def manipulate_tags():
         tags[i]["users"] = db.fetchone("SELECT COUNT(*) AS count FROM users WHERE tags != '[]' AND tags @> %s", ('["' + tag["tag"] + '"]',))["count"]
         if tag["tag"] == "admin":
             num_admins = tags[i]["users"]
+        elif tag["tag"].startswith("user:"):
+            tags[i]["users"] = 1  # by definition
 
     if request.method == "POST":
         try:
