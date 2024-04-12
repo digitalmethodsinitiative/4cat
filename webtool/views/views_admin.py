@@ -100,7 +100,7 @@ def list_users(page):
     filter_bits = []
     replacements = []
     if filter_name:
-        filter_bits.append("(name LIKE %s OR userdata::json->>'notes' LIKE %s)")
+        filter_bits.append("(name ILIKE %s OR userdata::json->>'notes' ILIKE %s)")
         replacements.append("%" + filter_name + "%")
         replacements.append("%" + filter_name + "%")
 
