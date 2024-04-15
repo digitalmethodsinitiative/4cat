@@ -305,7 +305,7 @@ config_definition = {
         "global": True
     },
     # Explorer settings
-    "explorer.__max_posts": {
+    "explorer._max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
         "help": "Amount of posts",
@@ -313,12 +313,45 @@ config_definition = {
         "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
-    "explorer.__posts_per_page": {
+    "explorer._posts_per_page": {
         "type": UserInput.OPTION_TEXT,
         "default": 50,
         "help": "Posts per page",
         "coerce_type": int,
         "tooltip": "Number of posts to display per page"
+    },
+    "explorer.explorer_config": {
+        "type": UserInput.OPTION_DATASOURCES_TABLE,
+        "help": "Explorer settings per data source",
+        "default": {"fourchan": {"enabled": True, "css": "preset", "fields": "custom", "test": "TEST"}, "tumblr": {"enabled": True, "css": "preset", "fields": "custom"}},
+        "columns": {
+            "enabled": {
+                "type": "toggle",
+                "help": "Enable Explorer"
+            },
+            "name": {
+                "type": "text",
+                "help": "Test"
+            },
+            "fields": {
+                "type": "choice",
+                "help": "Fields",
+                "options": {
+                    "general": "Default fields",
+                    "preset": "Data source preset",
+                    "custom": "Custom (insert below)"
+                }
+            },
+            "css": {
+                "type": "choice",
+                "help": "CSS",
+                "options": {
+                    "general": "Default template",
+                    "preset": "Data source preset",
+                    "custom": "Custom (insert below)"
+                }
+            }
+        }
     },
     "explorer._explanation_custom_fields": {
         "type": UserInput.OPTION_INFO,

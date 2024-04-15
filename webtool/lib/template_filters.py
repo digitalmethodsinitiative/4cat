@@ -230,8 +230,8 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
 
 
-@app.template_filter('post_field')
-def _jinja2_filter_post_field(field, post):
+@app.template_filter('dict_field')
+def _jinja2_filter_dict_field(field, post):
 	# Extracts string values between {{ two curly brackets }} and uses that
 	# as a dictionary key for the given dict. It then returns the corresponding value.
 	# Mainly used in the Explorer.

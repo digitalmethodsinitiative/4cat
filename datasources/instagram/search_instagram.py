@@ -31,15 +31,6 @@ class SearchInstagram(Search):
         "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok) (also covers usage with Instagram)"
     ]
 
-    config = {
-        "explorer.instagram-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Instagram CSS",
-                "default": "",
-                "tooltip":  "Add custom styling for Instagram posts in the Explorer."
-            }
-    }
-
     # some magic numbers instagram uses
     MEDIA_TYPE_PHOTO = 1
     MEDIA_TYPE_VIDEO = 2

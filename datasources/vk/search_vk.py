@@ -30,18 +30,7 @@ class SearchVK(Search):
         "[VK API documentation](https://vk.com/dev/first_guide)",
         "[Python API wrapper](https://github.com/python273/vk_api)"
     ]
-
-    config = {
-        "explorer.vk-import-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "VK import CSS",
-                "default": "",
-                "tooltip":  "Custom CSS for VK import posts in the Explorer. This allows to "
-                            "mimic the original platform appearance. If empty, use the default "
-                            "CSS template (which is also editable on this page)."
-            }
-    }
-
+    
     expanded_profile_fields = "id,screen_name,first_name,last_name,name,deactivated,is_closed,is_admin,sex,city,country,photo_200,photo_100,photo_50,followers_count,members_count"  # https://vk.com/dev/objects/user & https://vk.com/dev/objects/group
 
     @classmethod

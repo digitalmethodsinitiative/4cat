@@ -35,6 +35,8 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
+    OPTION_DATASOURCES_TABLE = "datasources_table" # a table with settings per data source
+    OPTION_DATASOURCES_TEXT = "datasources_text" # text input per data source (via dropdown)
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
@@ -142,6 +144,9 @@ class UserInput:
 
                 parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
                 parsed_input[option.split(".")[0] + ".expiration"] = datasources
+            elif settings.get("type") == UserInput.OPTION_DATASOURCES_TABLE:
+                # special case, loop through a table to generate a JSON
+                print("yea")
 
             elif option not in input:
                 # not provided? use default
@@ -337,6 +342,9 @@ class UserInput:
                     return settings.get("default")
             else:
                 return choice
+
+        elif input_type == UserInput.DATASOURCES_TABLE:
+            return "weeird"
 
         else:
             # no filtering

@@ -46,15 +46,7 @@ class SearchTikTokByID(Search):
             "default": 1.0,
             "help": "Request wait",
             "tooltip": "Time to wait before sending a new request from the same IP"
-        },
-        "explorer.tiktok-urls-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Tiktok URLs CSS",
-                "default": "",
-                "tooltip":  "Custom CSS for Tiktok URLs posts in the Explorer. This allows to "
-                            "mimic the original platform appearance. If empty, use the default "
-                            "CSS template (which is also editable on this page)."
-            }
+        }
     }
 
     options = {

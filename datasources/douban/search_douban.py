@@ -75,15 +75,6 @@ class SearchDouban(Search):
         }
     }
 
-    config = {
-        "explorer.douban-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Douban CSS",
-                "default": "",
-                "tooltip":  "Add custom styling for Douban posts in the Explorer."
-        }
-    }
-
     def get_items(self, query):
         """
         Get Douban posts

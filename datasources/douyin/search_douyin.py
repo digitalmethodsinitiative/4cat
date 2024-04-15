@@ -27,16 +27,7 @@ class SearchDouyin(Search):
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
         "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)"
     ]
-
-    config = {
-            "explorer.douyin-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Douyin CSS",
-                "default": "",
-                "tooltip":  "Add custom styling for Douyin posts in the Explorer."
-            }
-        }
-
+    
     def get_items(self, query):
         """
         Run custom search

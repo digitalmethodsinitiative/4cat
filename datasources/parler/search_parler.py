@@ -27,17 +27,6 @@ class SearchParler(Search):
     # not available as a processor for existing datasets
     accepts = [None]
 
-    config = {
-        "explorer.parler-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Parler CSS",
-                "default": "",
-                "tooltip":  "Custom CSS for Parler posts in the Explorer. This allows to "
-                            "mimic the original platform appearance. If empty, use the default "
-                            "CSS template (which is also editable on this page)."
-            }
-    }
-
     def get_items(self, query):
         """
         Run custom search

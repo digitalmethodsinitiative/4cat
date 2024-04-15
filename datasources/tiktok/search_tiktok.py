@@ -30,17 +30,6 @@ class SearchTikTok(Search):
         "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)"
     ]
 
-    config = {
-        "explorer.tiktok-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Tiktok CSS",
-                "default": "",
-                "tooltip":  "Custom CSS for Tiktok posts in the Explorer. This allows to "
-                            "mimic the original platform appearance. If empty, use the default "
-                            "CSS template (which is also editable on this page)."
-            }
-    }
-
     def get_items(self, query):
         """
         Run custom search

@@ -89,15 +89,6 @@ class SearchBitChute(Search):
 
     }
 
-    config =  {
-            "explorer.bitchute-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Bitchute CSS",
-                "default": "",
-                "tooltip":  "Add custom styling for Bitchute posts in the Explorer."
-        }
-    }
-
     def get_items(self, query):
         """
         Run custom search

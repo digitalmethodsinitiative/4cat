@@ -66,18 +66,6 @@ class SearchTelegram(Search):
             "default": 25,
             "tooltip": "Amount of entities that can be queried at a time. Entities are groups or channels. 0 to "
                        "disable limit."
-        },
-        "explorer.telegram-search-explorer-default-css": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Use default Telegram CSS",
-            "default": True
-            "tooltip":  "See "
-        },
-        "explorer.telegram-search-explorer-css": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Custom Telegram CSS",
-            "default": "",
-            "tooltip":  "Add custom styling for Telegram posts in the Explorer."
         }
     }
 

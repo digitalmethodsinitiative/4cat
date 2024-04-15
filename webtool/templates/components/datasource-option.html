@@ -147,6 +147,56 @@
                 <p role="tooltip" class="multiple" id="tooltip-setting-timeout" aria-hidden="true">In seconds; time after which datasets are automatically deleted. 0 or empty for no expiration. WARNING: after changing, newly eligible datasets will be deleted immediately!</p>
                 <p role="tooltip" class="multiple" id="tooltip-setting-optout" aria-hidden="true">Can users opt out of expiration? Overrides global setting.</p>
             </div>
+        {% elif settings.type == "datasources_table" %}
+            {{settings}}
+            <br>
+            {{option}}
+            <br>
+            {{options.option}}
+            <div class="datasource-toggle-form">
+                <input name="option-{{ option }}" type="hidden" value="{{ datasources_config|list|join(",") }}">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data source</th>
+                            {% for column_id, column in settings.columns.items() %}
+                                <th>{{ column.help }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for datasource, datasource_config in datasources_config.items() %}
+                        {% if datasource_config.enabled %}
+
+                        {% if datasource in settings.default %}
+                            {% set default_settings = settings.default[datasource] %}
+                        {% else %}
+                            {% default_settings = None %}
+                        {% endif %}
+                        <tr>
+                            <td>{{ datasource_config.name }}</td>
+                            {% for column_id, column in settings.columns.items() %}
+                            <td>
+                                {% if column.type == "text" %}
+                                    <input type="text" name="option-{{ option }}-{{ datasource }}" value="{{ default_settings[column_id] if def }}">
+                                }
+                                {% elif column.type == "toggle" %}
+                                    <input type="checkbox" name="option-{{ option }}-{{ datasource }}" value="">
+                                {% elif column.type == "choice" %}
+                                    <select name="option-{{ option }}-{{ datasource }}">
+                                    {% for value, label in column.options.items() %}
+                                        <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                    </select>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% endif %}
             </div>
         </div>

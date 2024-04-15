@@ -111,11 +111,5 @@ class Search8Kun(Search4Chan):
 			"tooltip": "These boards will not be scraped, but can still be indexed if added to 'Boards to index'",
 			"default": [],
 			"global": True
-		},
-		"explorer.eightkun-search-explorer-css": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "8kun CSS",
-                "default": "",
-                "tooltip":  "Add custom styling for 8kun posts in the Explorer."
-            }
+		}
 	}
