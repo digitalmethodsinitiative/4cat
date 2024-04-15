@@ -1206,3 +1206,8 @@ ol.result-list li.has_results .property-container.analysis a {
     padding: 0;
     margin: 0.5em 0 0 0;
 }
+
+#explorer-posts, #explorer-posts > ol li {
+    all: initial;
+    padding: 0;
+}

@@ -1,0 +1,54 @@
+	
+<article class="result" data-dataset-key="{{ dataset.key }}">
+	<h2>
+		{{ dataset.get_label() }}
+	</h2>
+	<div class="fullwidth-notice">
+	<span class="return">
+		<a href="/results/{{ key }}"><i class="fas fa-arrow-left"></i> Return to dataset overview</a>
+	</span>
+	</div>
+	{% if key %}
+		<div id="dataset-info">
+			{% if post_count > max_posts %}
+				<p><strong>Large dataset - only showing the first {{ max_posts }} posts. Use filter processors to limit the dataset.</strong></p>
+				{% set post_count = max_posts %}
+			{% endif %}
+		</div>
+		<!-- <div id="parameters">
+		{% set primary_fields = ("datasource", "board", "body_match", "min_date", "max_date") %}
+		{% for field in primary_fields %}
+			<span>{{ field }}: {{ parameters[field] }}</span>
+		{% endfor%}
+		{% for other_field, value in parameters.items() %}
+			{% if other_field not in primary_fields and value %}
+				<span>{{ other_field }}: {{ value }}</span>
+			{% endif %}
+		{% endfor%}
+		</div> -->
+	{% elif thread %}
+		<p>Showing {{ post_count }} posts from {{ datasource }}/{{ board }} thread {{ thread }}.</p>
+		<p>Note that the archived posts may not be complete.</p>
+	{% endif %}
+
+</article>
+
+	<p>Showing posts {{ offset + 1 }} - {{ post_count if (offset + posts_per_page) > post_count else (offset + posts_per_page) }} ({{ post_count }} in total).</p>
+{% if custom_fields and custom_fields[0] == "invalid" %}
+	<p><strong>Invalid custom fields JSON - can't show posts properly ({{ custom_fields[1] }}).</strong></p>
+{% endif %}
+{% if custom_fields and 'sort_options' in custom_fields %}
+<div id="sort-options">
+	<p>Sort posts by:
+		<select id="sort-select" name="sort-select">
+			<option class="sort-option" value="dataset-order">Dataset order</option>
+			
+			{% for sort_option in custom_fields['sort_options'] %}
+
+				<option class="sort-option" value="{{ sort_option.key }}" {% if "descending" in sort_option %}data-desc={{ sort_option.descending }}{% endif %} {% if "force_int" in sort_option %}data-force-int={{ sort_option.force_int }}{% endif %}>{{ sort_option.label }}</option>
+			
+			{% endfor %}
+		</select>
+	</p>
+</div>
+{% endif %}

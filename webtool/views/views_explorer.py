@@ -28,8 +28,8 @@ from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
-@app.route('/explorer/dataset/<string:key>/', defaults={'page': 0})
-@app.route('/explorer/dataset/<string:key>/<int:page>')
+@app.route('/results/<string:key>/explorer/', defaults={'page': 0})
+@app.route('/results/<string:key>/explorer/<int:page>')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
@@ -50,7 +50,14 @@ def explorer_dataset(key, page):
 		dataset = DataSet(key=key, db=db)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
+	
+	# Load some variables
+	parameters = dataset.get_parameters()
+	datasource = parameters["datasource"]
+	post_count = int(dataset.data["num_rows"])
+	annotation_fields = dataset.get_annotation_fields()
 
+	# See if we can actually serve this page
 	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
 		return error(403, error="This dataset is private.")
 
@@ -61,6 +68,9 @@ def explorer_dataset(key, page):
 	if not results_path:
 		return error(404, error="This dataset didn't finish executing")
 
+	if datasource not in config.get("explorer.config") and not config["explorer.config"][datasource]["enabled"]:
+		return error(404, error="Explorer functionality disabled for %s" % datasource)
+
 	# The amount of posts to show on a page
 	posts_per_page = config.get("explorer.posts_per_page", 50)
 
@@ -70,19 +80,10 @@ def explorer_dataset(key, page):
 	# The offset for posts depending on the current page
 	offset = ((page - 1) * posts_per_page) if page else 0
 
-	# Load some variables
-	parameters = dataset.get_parameters()
-	datasource = parameters["datasource"]
-	board = parameters.get("board", "")
-	post_count = int(dataset.data["num_rows"])
-	annotation_fields = dataset.get_annotation_fields()
 
-	# If the dataset is local, we can add some more features
-	# (like the ability to navigate to threads)
-	is_local = False # CHANGE LATER /////////////////////
-
-	if datasource in list(all_modules.datasources.keys()):
-		is_local = True if all_modules.datasources[datasource].get("is_local") else False
+	# f the dataset is generated from an API-accessible database, we can add 
+	# extra features like the ability to navigate across posts.
+	has_database = False # CHANGE LATER /////////////////////
 
 	# Check if we have to sort the data.
 	sort_by = request.args.get("sort")
@@ -121,7 +122,7 @@ def explorer_dataset(key, page):
 			post_ids.append(row["id"])
 			posts.append(row)
 
-			# Stop if we exceed the allowed posts per page or max. posts.
+			# Stop if we exceed the allowed posts per page or max posts.
 			if count >= (offset + posts_per_page) or count > max_posts:
 				break
 
@@ -161,7 +162,7 @@ def explorer_dataset(key, page):
 		annotations = json.loads(annotations["annotations"])
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
+	return render_template("explorer/explorer.html", key=key, datasource=datasource, has_database=has_database, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, dataset=dataset, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
