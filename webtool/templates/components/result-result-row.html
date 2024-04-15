@@ -45,9 +45,9 @@
         </li>
     {% endif %}
     <li>
-    {% if __user_config("privileges.can_use_explorer") %}
+    {% if __user_config("privileges.can_use_explorer") and has_explorer %}
         <a href="{{ url_for('explorer_dataset', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
-            <i class="fa fa-binoculars" aria-hidden="true"></i> Explore
+            <i class="fa fa-binoculars" aria-hidden="true"></i> Explorer
         </a>
         <p role="tooltip" id="tooltip-explore-items-{{ dataset.key }}" aria-hidden="true">Explore, sort, and add annotations to data interactively</p>
     {% endif %}
