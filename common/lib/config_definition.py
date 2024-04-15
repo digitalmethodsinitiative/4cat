@@ -305,7 +305,13 @@ config_definition = {
         "global": True
     },
     # Explorer settings
-    "explorer._max_posts": {
+    "explorer.__basic-explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT's Explorer feature lets you navigate and annotate datasets as if they "
+                "appared on their original platform. This is intended to facilitate qualitative "
+                "exploration and manual coding."
+    },
+    "explorer.__max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
         "help": "Amount of posts",
@@ -313,58 +319,65 @@ config_definition = {
         "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
-    "explorer._posts_per_page": {
+    "explorer.__posts_per_page": {
         "type": UserInput.OPTION_TEXT,
         "default": 50,
         "help": "Posts per page",
         "coerce_type": int,
         "tooltip": "Number of posts to display per page"
     },
+    "explorer._config_explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "Per data source, you can enable/disable the Explorer and customise how posts appear. "
+                "The latter involves *what fields to show* and *how posts are styled*. Many data sources have tailored "
+                "[presets for this](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/"
+                "explorer-presets). If presets are unavailable, a general template for [fields](https://github.com/"
+                "digitalmethodsinitiative/4cat/tree/master/webtool/static/explorer-presets/default-fields.json) "
+                "and [CSS styling](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/"
+                "explorer-presets/default-css.css) is used. You can also toggle between data source presets and the general "
+                "template via the table below."
+    },
+    # "explorer._config_explanation2": {
+    #     "type": UserInput.OPTION_INFO,
+    #     "help": "Alternatively, you can also *customise fields and CSS yourself* by choosing the `Custom` setting in the "
+    #             "table below and inserting JSON and CSS values in the text boxes underneath. See the [wiki for instructions "
+    #             "on how to format custom fields and CSS](https://github.com/digitalmethodsinitiative/4cat/wiki/"
+    #             "Exploring-and-annotating-datasets#add-custom-fields)."
+    # },
     "explorer.explorer_config": {
         "type": UserInput.OPTION_DATASOURCES_TABLE,
         "help": "Explorer settings per data source",
-        "default": {"fourchan": {"enabled": True, "css": "preset", "fields": "custom", "test": "TEST"}, "tumblr": {"enabled": True, "css": "preset", "fields": "custom"}},
+        "default": {"fourchan": {"enabled": True, "css": "preset", "fields": "general"}, "eightchan": {"enabled": True, "css": "general", "fields": "general"}, "eightkun": {"enabled": True, "css": "general", "fields": "general"}, "ninegag": {"enabled": True, "css": "general", "fields": "general"}, "bitchute": {"enabled": True, "css": "general", "fields": "general"}, "dmi-tcat": {"enabled": True, "css": "general", "fields": "general"}, "dmi-tcatv2": {"enabled": True, "css": "general", "fields": "general"}, "douban": {"enabled": True, "css": "general", "fields": "general"}, "douyin": {"enabled": False, "css": "general", "fields": "general"}, "imgur": {"enabled": True, "css": "general", "fields": "general"}, "upload": {"enabled": True, "css": "general", "fields": "general"}, "instagram": {"enabled": True, "css": "preset", "fields": "preset"}, "linkedin": {"enabled": True, "css": "general", "fields": "general"}, "parler": {"enabled": True, "css": "general", "fields": "general"}, "reddit": {"enabled": True, "css": "preset", "fields": "preset"}, "telegram": {"enabled": True, "css": "general", "fields": "general"}, "tiktok": {"enabled": True, "css": "preset", "fields": "preset"}, "tiktok-urls": {"enabled": True, "css": "preset", "fields": "preset"}, "tumblr": {"enabled": True, "css": "preset", "fields": "preset"}, "twitter": {"enabled": True, "css": "preset", "fields": "preset"}, "twitterv2": {"enabled": True, "css": "preset", "fields": "preset"}, "usenet": {"enabled": True, "css": "general", "fields": "general"}, "vk": {"enabled": True, "css": "general", "fields": "general"}},
         "columns": {
             "enabled": {
-                "type": "toggle",
-                "help": "Enable Explorer"
-            },
-            "name": {
-                "type": "text",
-                "help": "Test"
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Enable",
+                "tooltip": "Whether the Explorer is available for this data source",
+                "default": True
             },
             "fields": {
-                "type": "choice",
+                "type": UserInput.OPTION_CHOICE,
                 "help": "Fields",
                 "options": {
-                    "general": "Default fields",
-                    "preset": "Data source preset",
-                    "custom": "Custom (insert below)"
-                }
+                    "general": "General",
+                    "preset": "Preset"
+                },
+                "default": "general",
+                "tooltip": "What fields to use (see explanation above)"
             },
             "css": {
-                "type": "choice",
+                "type": UserInput.OPTION_CHOICE,
                 "help": "CSS",
                 "options": {
-                    "general": "Default template",
-                    "preset": "Data source preset",
-                    "custom": "Custom (insert below)"
-                }
+                    "general": "General",
+                    "preset": "Preset"
+                },
+                "default": "general",
+                "tooltip": "What CSS styling to use (see explanation above)"
             }
         }
     },
-    "explorer._explanation_custom_fields": {
-        "type": UserInput.OPTION_INFO,
-        "help": "You can customise how posts per data source appear in the Explorer. "
-                "This involves *custom fields*; a JSON that points to what fields should "
-                "be displayed. These fields can be formatted, for instance as a URL or together "
-                " with specific icons. If this JSON is absent, the Explorer by default shows the "
-                "`author`, `subject`, `timestamp`, `body`, and `image` fields. *Custom CSS* can be "
-                "added to change the appearance of posts. This allows to mimic the original platform "
-                "appearance. Custom CSS can be inserted below. For some data sources, pre-made templates "
-                "are available. These can be toggled below. If no custom or pre-made CSS is available, a "
-                "general template is used."
-    },
+    "explorer"
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
     # Flask may require a restart to update them

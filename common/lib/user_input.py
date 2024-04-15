@@ -144,9 +144,21 @@ class UserInput:
 
                 parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
                 parsed_input[option.split(".")[0] + ".expiration"] = datasources
+
             elif settings.get("type") == UserInput.OPTION_DATASOURCES_TABLE:
-                # special case, loop through a table to generate a JSON
-                print("yea")
+                # special case, parse table values to generate a dict
+                columns = list(settings["columns"].keys())
+                table_input = {}
+
+                for datasource in list(settings["default"].keys()):
+                    table_input[datasource] = {}
+                    for column in columns:
+
+                        choice = input.get(option + "-" + datasource + "-" + column, False)
+                        column_settings = settings["columns"][column] # sub-settings per column
+                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
+
+                parsed_input[option] = table_input
 
             elif option not in input:
                 # not provided? use default
@@ -342,9 +354,6 @@ class UserInput:
                     return settings.get("default")
             else:
                 return choice
-
-        elif input_type == UserInput.DATASOURCES_TABLE:
-            return "weeird"
 
         else:
             # no filtering
