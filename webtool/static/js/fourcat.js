@@ -505,6 +505,11 @@ const query = {
     },
 
     check_resultpage: function () {
+        if (!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         let unfinished = $('.dataset-unfinished');
         if (unfinished.length === 0) {
             return;
