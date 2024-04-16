@@ -45,7 +45,7 @@ class SearchGab(Search):
             "created_at": post["ca"],
             "body": post["c"],
             "url": post["ul"],
-            "reaction_count": post["fc"] if post["fc"] else 0,
+            "reaction_count": post.get("fc", 0),
             "reposts_count": post["rbc"],
             "replies_count": post["rc"],
             "group_id": post["g"]["id"] if "g" in post else None,
@@ -53,7 +53,6 @@ class SearchGab(Search):
             "group_description": post["g"]["description"] if "g" in post else None,
             "group_member_count": post["g"]["member_count"] if "g" in post else None,
             "group_is_private": post["g"]["is_private"] if "g" in post else None,
-            "group_member_count": post["g"]["url"] if "g" in post else None,
             "group_url": post["g"]["url"] if "g" in post else None,
             "group_created_at": post["g"]["created_at"] if "g" in post else None,
 
