@@ -1047,7 +1047,7 @@ def queue_processor(key=None, processor=None):
 
 	processor_worker = available_processors[processor]
 	try:
-		sanitised_query = UserInput.parse_all(processor_worker.get_options(None, current_user), request.form,
+		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, current_user), request.form,
 											  silently_correct=False)
 
 		if hasattr(processor_worker, "validate_query"):

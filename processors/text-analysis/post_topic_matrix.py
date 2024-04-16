@@ -34,9 +34,9 @@ class TopicModelWordExtractor(BasicProcessor):
             "tooltip": 'This may be useful in better understanding your topics.',
         },
         "columns": {
-            "type": UserInput.OPTION_TEXT,
+            "type": UserInput.OPTION_MULTI,
             "help": "Extra column(s) to include from original data",
-            "default": "id",
+            "default": ["id"],
             "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always included."
         },
     }
