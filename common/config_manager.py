@@ -2,16 +2,14 @@ import itertools
 import pickle
 import time
 import json
-
+import configparser
+import os
 from pathlib import Path
-from common.lib.database import Database
 
+from common.lib.database import Database
 from common.lib.exceptions import ConfigException
 from common.lib.config_definition import config_definition
 from common.lib.user_input import UserInput
-
-import configparser
-import os
 
 
 class ConfigManager:
