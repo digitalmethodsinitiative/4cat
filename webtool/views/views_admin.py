@@ -72,7 +72,7 @@ def admin_frontpage():
     disk_stats = {k: v["count"] if v else 0 for k, v in disk_stats.items()}
 
     upgrade_available = not not db.fetchone(
-        "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+        "SELECT * FROM users_notifications WHERE username = '!admin' AND notification LIKE 'A new version of 4CAT%'")
 
     tags = config.get_active_tags(current_user)
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
@@ -654,7 +654,7 @@ def manipulate_notifications():
             incomplete.append("username")
 
         recipient = User.get_by_name(db, params["username"])
-        if not recipient and params["username"] not in ("!everyone", "!admins"):
+        if not recipient and not params["username"].startswith("!"):
             flash("User '%s' does not exist" % params["username"])
             incomplete.append("username")
 
