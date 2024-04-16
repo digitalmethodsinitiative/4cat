@@ -709,7 +709,7 @@ const annotations = {
 			error: function (error) {
 				annotations.enableSaving();
 				$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
-				alert("Could't save annotations");
+				//alert("Could't save annotations");
 				console.log(error)
 			}
 		});
@@ -854,7 +854,9 @@ const page_functions = {
 				force_int = ""
 			}
 
-			window.location.href = getRelativeURL('explorer/dataset/' + $("#dataset-key").text() + "?sort=" + $(this).val() + sort_order + force_int);
+			let dataset_key = $("#dataset-key").text();
+			alert(dataset_key)
+			window.location.href = getRelativeURL("result/" + dataset_key + "/explorer/?sort=" + $(this).val() + sort_order + force_int);
 		});
 
 		// Change the dropdown sort option based on the URL parameter

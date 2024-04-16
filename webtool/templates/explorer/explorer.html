@@ -23,20 +23,25 @@ var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}
 	</style>
 {% endif %}
 
+<span id="dataset-key">{{ key }}</span>
+
 {% include "explorer/controls.html" %}
+
+{% include "explorer/pagination.html" %}
 
 {% if not thread %}
 	{% include "explorer/annotations.html" %}
 {% endif %}
 
+
 <div class="content">
-	{% include "explorer/nav-pages.html" %}
 	<ol class="posts" id="explorer-posts">
 	{% for post in posts %}
 		{% include "explorer/post.html" %}
 	{% endfor %}
 	</ol>
-	{% include "explorer/nav-pages.html" %}
 </div>
+
+{% include "explorer/pagination.html" %}
 
 {% endblock %}

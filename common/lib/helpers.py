@@ -206,6 +206,22 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
+def convert_to_float(value, default=0):
+    """
+    Convert a value to a floating point, with a fallback
+
+    The fallback is used if an Error is thrown during converstion to float.
+    This is a convenience function, but beats putting try-catches everywhere
+    we're using user input as a floating point number.
+
+    :param value:  Value to convert
+    :param int default:  Default value, if conversion not possible
+    :return int:  Converted value
+    """
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
 
 def timify_long(number):
     """
@@ -789,7 +805,7 @@ def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     Lists will be converted to json strings via json.dumps()
 
     :param MutableMapping d:  Dictionary like object
-    :param str partent_key: The original parent key prepending future nested keys
+    :param str parent_key: The original parent key prepending future nested keys
     :param str sep: A seperator string used to combine parent and child keys
     :return dict:  A new dictionary with the no nested values
     """

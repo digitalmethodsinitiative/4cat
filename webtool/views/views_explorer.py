@@ -28,13 +28,13 @@ from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
-@app.route('/results/<string:key>/explorer/', defaults={'page': 0})
-@app.route('/results/<string:key>/explorer/<int:page>')
+@app.route('/result/<string:key>/explorer/', defaults={'page': 1})
+@app.route('/result/<string:key>/explorer/page/<int:page>')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_dataset(key, page):
+def explorer_dataset(key, page=1):
 	"""
 	Show posts from a dataset
 
@@ -80,15 +80,14 @@ def explorer_dataset(key, page):
 	# The offset for posts depending on the current page
 	offset = ((page - 1) * posts_per_page) if page else 0
 
-
-	# f the dataset is generated from an API-accessible database, we can add 
+	# If the dataset is generated from an API-accessible database, we can add 
 	# extra features like the ability to navigate across posts.
-	has_database = False # CHANGE LATER /////////////////////
+	has_database = False # INTEGRATE LATER /////////////////////
 
 	# Check if we have to sort the data.
-	sort_by = request.args.get("sort")
-	if sort_by == "dataset-order":
-		sort_by = None
+	sort = request.args.get("sort")
+	if sort == "dataset-order":
+		sort = None
 
 	# Check if we have to reverse the order.
 	descending = request.args.get("desc")
@@ -109,8 +108,10 @@ def explorer_dataset(key, page):
 	posts = []
 	count = 0
 
+	sort = "id"
+
 	try:
-		for row in dataset.iterate_items(warn_unmappable=False):
+		for row in dataset.iterate_items(warn_unmappable=False, sort=sort):
 
 			count += 1
 
@@ -164,15 +165,14 @@ def explorer_dataset(key, page):
 	# Generate the HTML page
 	return render_template("explorer/explorer.html", key=key, datasource=datasource, has_database=has_database, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, dataset=dataset, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
 
-@app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
+@app.route('/result/<datasource>/<string:thread_id>/explorer')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_local_thread(datasource, board, thread_id):
+def explorer_database_thread(datasource, board, thread_id):
 	"""
-	Show a thread. This is only available for local data sources,
-	and will be depracated/changed in future updates.
+	Show a thread from an API-accessible database.
 
 	:param str datasource:  Data source ID
 	:param str board:  Board name
@@ -217,11 +217,9 @@ def explorer_local_thread(datasource, board, thread_id):
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_local_posts(datasource, board, thread_id):
+def explorer_database_posts(datasource, board, thread_id):
 	"""
-	Show a posts from a local data source.
-	This is only available for local data sources,
-	and will be depracated/changed in future updates.
+	Show posts from an API-accessible database.
 
 	:param str datasource:  Data source ID
 	:param str board:  Board name
@@ -535,34 +533,25 @@ def iterate_items_with_sort(in_file, max_rows=None, sort_by=None, descending=Fal
 
 	suffix = in_file.name.split(".")[-1].lower()
 
-	if suffix == "csv":
+	# Sort on data date by default
+	# Unix timestamp integers are not always saved in the same field.
+	reader = csv.reader(dataset_file)
+	columns = next(reader)
+	if sort_by:
+		try:
+			print("YES")
+		except (ValueError, IndexError) as e:
+			pass
 
-		with open(in_file, "r", encoding="utf-8") as dataset_file:
+	for item in reader:
 
-			# Sort on date by default
-			# Unix timestamp integers are not always saved in the same field.
-			reader = csv.reader(dataset_file)
-			columns = next(reader)
-			if sort_by:
-				try:
-					# Get index number of sort_by value
-					sort_by_index = columns.index(sort_by)
+		# Add columns
+		#item = {columns[i]: item[i] for i in range(len(item))}
 
-					# Generate reader on the basis of sort_by value
-					reader = sorted(reader, key=lambda x: to_float(x[sort_by_index], convert=force_int) if len(x) >= sort_by_index else 0, reverse=descending)
+		yield item
 
-				except (ValueError, IndexError) as e:
-					pass
-
-			for item in reader:
-
-				# Add columns
-				item = {columns[i]: item[i] for i in range(len(item))}
-
-				yield item
-
-	elif suffix == "ndjson":
-
+	if suffix == "ndjson":
+		print("TRUEE")
 		# In this format each line in the file is a self-contained JSON
 		# file
 		with open(in_file, "r", encoding="utf-8") as dataset_file:
@@ -577,13 +566,7 @@ def iterate_items_with_sort(in_file, max_rows=None, sort_by=None, descending=Fal
 			# If a sort order is given explicitly, we're sorting anyway.
 			else:
 				keys = sort_by.split(".")
-
-				if max_rows:
-					for item in sorted([json.loads(line) for i, line in enumerate(dataset_file) if i < max_rows], key=lambda x: to_float(get_nested_value(x, keys), convert=force_int), reverse=descending):
-							yield item
-				else:
-					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: to_float(get_nested_value(x, keys), convert=force_int), reverse=descending):
-							yield item
+				yield item
 
 	return Exception("Can't loop through file with extension %s" % suffix)
 
@@ -688,14 +671,6 @@ def get_nested_value(di, keys):
 		if not di:
 			return 0
 	return di
-
-def to_float(value, convert=False):
-	if convert:
-		if not value:
-			value = 0
-		else:
-			value = float(value)
-	return value
 
 def strip_html(post):
 	post["body"] = strip_tags(post.get("body", ""))
