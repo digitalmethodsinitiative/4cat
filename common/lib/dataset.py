@@ -235,7 +235,7 @@ class DataSet(FourcatModule):
 		with log_path.open("a", encoding="utf-8") as outfile:
 			outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
 
-	def _iterate_items(self, processor=None, sort=None):
+	def _iterate_items(self, processor=None):
 		"""
 		A generator that iterates through a CSV or NDJSON file
 
@@ -268,14 +268,6 @@ class DataSet(FourcatModule):
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
 				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
-				# In some cases, we want to sort the dataset first.
-				if sort:
-					# Generate reader on the basis of sort value
-					# At the moment, this is very inefficient, but
-					# suffices for the few cases where `sort` is used.
-					sort_by_index = next(reader).index(sort)
-					reader = sorted(reader, key=lambda x: convert_to_float(x[sort_by_index]) if len(x) >= sort_by_index else 0, reverse=True)
-
 				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
@@ -283,30 +275,19 @@ class DataSet(FourcatModule):
 					yield item
 
 		elif path.suffix.lower() == ".ndjson":
-			# In NDJSON format each line in the file is a self-contained JSON
+
 			with path.open(encoding="utf-8") as infile:
 
-				# Sorting can't be done easily here,
-				# we have to loop through the entire JSON first.
-				# Don't enable for large files!
-				if sort:
-					
-					for line in sorted([json.loads(line) for line in infile], key=lambda x: convert_to_float(flatten_dict(x)[sort]), reverse=True):
-						if hasattr(processor, "interrupted") and processor.interrupted:
-							raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
-						yield line
+				for line in infile:
+					if hasattr(processor, "interrupted") and processor.interrupted:
+						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
-				else:
-					for line in infile:
-						if hasattr(processor, "interrupted") and processor.interrupted:
-							raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
-					
 					yield json.loads(line)
 
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_items(self, processor=None, warn_unmappable=True, map_missing="default", sort=None):
+	def iterate_items(self, processor=None, warn_unmappable=True, map_missing="default"):
 		"""
 		Generate mapped dataset items
 
@@ -358,7 +339,7 @@ class DataSet(FourcatModule):
 			item_mapper = True
 
 		# Loop through items
-		for i, item in enumerate(self._iterate_items(processor, sort=sort)):
+		for i, item in enumerate(self._iterate_items(processor)):
 			# Save original to yield
 			original_item = item.copy()
 

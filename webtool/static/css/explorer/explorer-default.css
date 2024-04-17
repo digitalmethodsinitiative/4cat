@@ -133,6 +133,10 @@ span.divider {
 /** --------------------- *
      Annotations editor
   * --------------------- */
+#annotations-editor-container {
+    display: hidden;
+}
+
 /*#annotations-editor-container {
     background: rgba(0, 0, 0, .4);
     display: none;

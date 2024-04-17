@@ -31,11 +31,15 @@
     <p>Sort posts by:
         <select id="sort-select" name="sort-select">
             <option class="sort-option" value="dataset-order">Dataset order</option>
-            {% set sort_options = [{"key": "ids","label": "ID"}] %}
-            {% for sort_option in sort_options %}
-                <option class="sort-option" value="{{ sort_option.key }}" {% if "descending" in sort_option %}data-desc={{ sort_option.descending }}{% endif %} {% if "force_int" in sort_option %}data-force-int={{ sort_option.force_int }}{% endif %}>{{ sort_option.label }}</option>
-            
-            {% endfor %}
+            {% if not custom_fields %}
+	            {% for column in dataset.get_columns() %}
+	            	<option class="sort-option" value="{{ column }}">{{ column }}</option>
+	            {% endfor %}
+            {% else %}
+            	{% for sort_option in sort_options %}
+                	<option class="sort-option" value="{{ sort_option.value() }}" {% if "descending" in sort_option %}data-desc={{ sort_option.descending }}{% endif %} {% if "force_int" in sort_option %}data-force-int={{ sort_option.force_int }}{% endif %}>{{ sort_option.key() }}</option>
+            	{% endfor %}
+            {% endif %}
         </select>
     </p>
 </div>

@@ -90,28 +90,20 @@ def explorer_dataset(key, page=1):
 		sort = None
 
 	# Check if we have to reverse the order.
-	descending = request.args.get("desc")
-	if descending == "true" or descending == True:
-		descending = True
-	else:
-		descending = False
+	reverse = True if request.args.get("desc") in ("true", True) else False
 
 	# Check if we have to convert the sort value to an integer.
-	force_int = request.args.get("int")
-	if force_int == "true" or force_int == True:
-		force_int = True
-	else:
-		force_int = False
+	force_number = True if request.args.get("int") in ("true", True) else False
 
 	# Load posts
 	post_ids = []
 	posts = []
 	count = 0
 
-	sort = "id"
-
-	try:
-		for row in dataset.iterate_items(warn_unmappable=False, sort=sort):
+	# If we're sorting, we need to iterate over the entire
+	# dataset first. Else we can simply use `iterate_items`.
+	if not sort:
+		for row in dataset.iterate_items(warn_unmappable=False):
 
 			count += 1
 
@@ -126,9 +118,15 @@ def explorer_dataset(key, page=1):
 			# Stop if we exceed the allowed posts per page or max posts.
 			if count >= (offset + posts_per_page) or count > max_posts:
 				break
-
-	except NotImplementedError:
-		return error(404)
+	else:
+		for row in sort_and_iterate_items(dataset, sort, reverse=reverse, warn_unmappable=False):
+			count += 1
+			if count <= offset:
+				continue
+			post_ids.append(row["id"])
+			posts.append(row)
+			if count >= (offset + posts_per_page) or count > max_posts:
+				break
 
 	# Retrieve custom CSS if it is present in the datasource's config.
 	# If not given, we use a standard template. This standard CSS template
@@ -238,7 +236,7 @@ def explorer_database_posts(datasource, board, thread_id):
 		return error(404, error="No thread ID provided")
 
 	# Get the posts with this thread ID.
-	posts = get_local_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+	posts = get_database_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
@@ -521,58 +519,41 @@ def get_image_file(img_file):
 
 	return send_file(str(image_path))
 
-def iterate_items_with_sort(in_file, max_rows=None, sort_by=None, descending=False, force_int=False):
+def sort_and_iterate_items(dataset, sort=None, reverse=False, force_number=False, **kwargs):
 	"""
 	Loop through both csv and NDJSON files.
-	:param in_file, str:		The input file to read.
-	:param sort_by, str:		The key that determines the sort order.
-	:param descending, bool:	Whether to sort by descending values.
-	:param force_int, bool:		Whether the sort value should be converted to an
-								integer.
+	This is basically a wrapper function for `iterate_items()` with the
+	added functionality of sorting a dataset. Because the Explorer is (currently)
+	the only feature that requires sorting, we define it here.
+	This first iterates through the entire file (with a max limit) to determine
+	an order. Then it yields items based on this order.
+
+	:param key, str:			The dataset object.
+	:param sort_by, str:		The item key that determines the sort order.
+	:param reverse, bool:		Whether to sort by largest values first.
+	:param force_number, bool:	Whether the sort value should be converted to a
+								floating point number.
 	"""
 
-	suffix = in_file.name.split(".")[-1].lower()
+	# Storing posts in the right order here
+	posts = []
 
-	# Sort on data date by default
-	# Unix timestamp integers are not always saved in the same field.
-	reader = csv.reader(dataset_file)
-	columns = next(reader)
-	if sort_by:
-		try:
-			print("YES")
-		except (ValueError, IndexError) as e:
-			pass
+	# Generate reader on the basis of sort value
+	# At the moment, this is very inefficient, but
+	# suffices for the few cases where `sort` is used.
+	#sort_by_index = next(reader).index(sort)
+	#reader = sorted(reader, key=lambda x: convert_to_float(x[sort_by_index]) if len(x) >= sort_by_index else 0, reverse=True)
+	#sorted([json.loads(line) for line in infile], key=lambda x: convert_to_float(flatten_dict(x)[sort]), reverse=True)
 
-	for item in reader:
+	for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x[sort]):
+		posts.append(item)
 
-		# Add columns
-		#item = {columns[i]: item[i] for i in range(len(item))}
+	for post in posts:
+		yield post
 
-		yield item
-
-	if suffix == "ndjson":
-		print("TRUEE")
-		# In this format each line in the file is a self-contained JSON
-		# file
-		with open(in_file, "r", encoding="utf-8") as dataset_file:
-
-			# Unfortunately we can't easily sort here.
-			# We're just looping through the file if no sort is given.
-			if not sort_by:
-				for line in dataset_file:
-					item = json.loads(line)
-					yield item
-
-			# If a sort order is given explicitly, we're sorting anyway.
-			else:
-				keys = sort_by.split(".")
-				yield item
-
-	return Exception("Can't loop through file with extension %s" % suffix)
-
-def get_local_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
+def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
 	"""
-	Retrieve posts from a local data source based on post IDs.
+	Retrieve posts by ID from a database-accessible data source.
 	"""
 
 	if not ids:
