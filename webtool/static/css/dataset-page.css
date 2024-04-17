@@ -198,6 +198,12 @@ article.result > section:first-child {
     line-height: 1.3em;
 }
 
+.button-like-small.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+
 .dataset-owner-list li {
     display: inline-block;
 }
@@ -225,6 +231,7 @@ article.result > section:first-child {
     background: var(--gray-light);
     border: 1px solid var(--gray-dark);
     font-size: 0.8em;
+    cursor: pointer;
 }
 
 .dataset-toolbox a:hover, a.button-like-small:hover {

@@ -37,7 +37,15 @@ const annotations = {
 		$("#add-annotation-field").on("click", function(){$("#annotation-fields").append(annotations.getAnnotationsDiv);});
 
 		// Show and hide the annotations editor
-		$("#toggle-annotation-fields").on("click", function(){$("#annotations-editor-container").toggle();});
+		$("#toggle-annotation-fields").on("click", function(){
+			$("#annotations-editor-container").toggle();
+			if ($("#annotation-controls-buttons").hasClass("hidden")) {
+				$(this).html("<i class='fas fa-chevron-up'>");
+			}
+			else {
+				$(this).html("<i class='fas fa-chevron-left'>");
+			}
+		});
 		$("#annotations-editor").click(function(e) {
 		   e.stopPropagation();
 		});
@@ -599,8 +607,7 @@ const annotations = {
 				// If the query is accepted by the server.
 				if (response == 'success') {
 					$("#annotations-editor-container").hide();
-					$("#save-annotation-fields").addClass("invalid")
-					$("#save-annotation-fields").prop("disabled", true);
+					$("#save-annotation-fields").addClass("disabled");
 				}
 
 				// If the query is rejected by the server.
@@ -695,7 +702,7 @@ const annotations = {
 
 					annotations.enableSaving();
 					$("#save-annotations").html("<i class='fas fa-save'></i> Annotations saved");
-					$("#save-annotations").addClass("invalid").prop("disabled", true);
+					$("#save-annotations").addClass("disabled");
 					old_annotation_fields = $("#annotation-fields").html();
 					// alert(alert_message);
 				}
@@ -746,24 +753,24 @@ const annotations = {
 		// So we just need to check whether they're there.
 
 		if (Object.keys(annotation_fields).length < 1) {
-			$("#toggle-annotations").addClass("invalid");
+			$("#toggle-annotations").addClass("disabled");
 			return false;
 		}
 		else {
-			$("#toggle-annotations").removeClass("invalid");
+			$("#toggle-annotations").removeClass("disabled");
 			return true;
 		}
 	},
 
 	enableSaving: function(){
 		// Enable saving annotations to the database
-		$("#save-annotations, #save-to-dataset").removeClass("invalid").removeAttr("disabled");
+		$("#save-annotations, #save-to-dataset").removeClass("disabled");
 		$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
 	},
 
 	disableSaving: function(){
 		// Disable saving annotations to the database
-		$("#save-annotations, #save-to-dataset").addClass("invalid").prop("disabled", true);
+		$("#save-annotations, #save-to-dataset").addClass("disabled");
 	},
 
 	warnEditor: function(warning) {
@@ -778,13 +785,13 @@ const annotations = {
 
 	toggleAnnotations: function() {
 		let ta = $("#toggle-annotations");
-		if (ta.hasClass("hidden")) {
-			ta.removeClass("hidden");
+		if (ta.hasClass("shown")) {
+			ta.removeClass("shown");
 			ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
 			$(".post-annotations").show(200);
 		}
 		else {
-			ta.addClass("hidden");
+			ta.addClass("shown");
 			ta.html("<i class='fas fa-eye'></i> Show annotations");
 			$(".post-annotations").hide(200);
 		}
@@ -832,51 +839,29 @@ const page_functions = {
 		}));
 
 		// Reorder the dataset when the sort type is changed
-		$("#sort-select").on("change", function(){
+		$(".sort-select").on("change", function(){
 			
-			let selected = $(this).find("option:selected");
+			// Get the column to sort on, an whether we should sort in reverse.
+			let selected = $("#column-sort-select").find("option:selected").val();
+			let order = $("#column-sort-order").find("option:selected").val();
 
-			// Pass whether the order should be reversed or not
-			let sort_order = selected.data("desc");	
-			if (sort_order){
-				sort_order = "&desc=true"
-			}
-			else {
-				sort_order = ""
-			}
-
-			// Pass whether we should treat this value as an integer
-			let force_int = selected.data("force-int");	
-			if (force_int){
-				force_int = "&int=true"
-			}
-			else {
-				force_int = ""
+			sort_order = ""
+			if (order == "reverse"){
+				sort_order = "&order=reverse"
 			}
 
 			let dataset_key = $("#dataset-key").text();
-			alert(dataset_key)
-			window.location.href = getRelativeURL("result/" + dataset_key + "/explorer/?sort=" + $(this).val() + sort_order + force_int);
+			window.location.href = getRelativeURL("results/" + dataset_key + "/explorer/?sort=" + selected + sort_order);
 		});
 
 		// Change the dropdown sort option based on the URL parameter
 		let searchParams = new URLSearchParams(window.location.search)
-		let sort_order = searchParams.get("sort");
-		let desc = searchParams.get("desc");
-
+		let selected = searchParams.get("sort");
+		let sort_order = searchParams.get("order");
+		$("#column-sort-select").find("option[value='" + selected + "']").attr("selected", "selected");
 		if (sort_order) {
-			// There can be multiple options with the same key since
-			// one of them might be reversed and the other not (e.g. 
-			// timestamps sorted by new to old and vice versa).
-			// So select the sort order with the right desc attribute.
-			if (desc == "true") {
-				$("#sort-select").find("option[value='" + sort_order + "'][data-desc='True']").attr("selected", "selected");
-			}
-			else {
-				$("#sort-select").val(sort_order);
-			}
+			$("#column-sort-order").find("option[value='" + sort_order + "']").attr("selected", "selected");
 		}
-
 	}
 };
 

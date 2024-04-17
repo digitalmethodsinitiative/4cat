@@ -21,15 +21,15 @@ from flask_login import login_required, current_user
 from webtool import app, db, openapi, limiter, config
 from webtool.lib.helpers import format_chan_post, error, setting_required
 from common.lib.dataset import DataSet
-from common.lib.helpers import strip_tags
+from common.lib.helpers import strip_tags, convert_to_float
 from common.lib.exceptions import DataSetException
 
 from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
-@app.route('/result/<string:key>/explorer/', defaults={'page': 1})
-@app.route('/result/<string:key>/explorer/page/<int:page>')
+@app.route('/results/<string:key>/explorer/', defaults={'page': 1})
+@app.route('/results/<string:key>/explorer/page/<int:page>')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
@@ -62,14 +62,14 @@ def explorer_dataset(key, page=1):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:
-		return error(404, error="Unavailable for top-level datasets")
+		return error(404, error="Only available for top-level datasets.")
 
 	results_path = dataset.check_dataset_finished()
 	if not results_path:
-		return error(404, error="This dataset didn't finish executing")
+		return error(404, error="This dataset didn't finish executing.")
 
 	if datasource not in config.get("explorer.config") and not config["explorer.config"][datasource]["enabled"]:
-		return error(404, error="Explorer functionality disabled for %s" % datasource)
+		return error(404, error="Explorer functionality disabled for %s." % datasource)
 
 	# The amount of posts to show on a page
 	posts_per_page = config.get("explorer.posts_per_page", 50)
@@ -90,10 +90,9 @@ def explorer_dataset(key, page=1):
 		sort = None
 
 	# Check if we have to reverse the order.
-	reverse = True if request.args.get("desc") in ("true", True) else False
-
-	# Check if we have to convert the sort value to an integer.
-	force_number = True if request.args.get("int") in ("true", True) else False
+	reverse = True if request.args.get("order") == "reverse" else False
+	print(request.args.get("order"))
+	print(reverse)
 
 	# Load posts
 	post_ids = []
@@ -161,9 +160,9 @@ def explorer_dataset(key, page=1):
 		annotations = json.loads(annotations["annotations"])
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", key=key, datasource=datasource, has_database=has_database, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, dataset=dataset, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
+	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, parameters=parameters, posts=posts, annotation_fields=annotation_fields, annotations=annotations, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
 
-@app.route('/result/<datasource>/<string:thread_id>/explorer')
+@app.route('/results/<datasource>/<string:thread_id>/explorer')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
@@ -519,7 +518,7 @@ def get_image_file(img_file):
 
 	return send_file(str(image_path))
 
-def sort_and_iterate_items(dataset, sort=None, reverse=False, force_number=False, **kwargs):
+def sort_and_iterate_items(dataset, sort=None, reverse=False, **kwargs):
 	"""
 	Loop through both csv and NDJSON files.
 	This is basically a wrapper function for `iterate_items()` with the
@@ -531,24 +530,22 @@ def sort_and_iterate_items(dataset, sort=None, reverse=False, force_number=False
 	:param key, str:			The dataset object.
 	:param sort_by, str:		The item key that determines the sort order.
 	:param reverse, bool:		Whether to sort by largest values first.
-	:param force_number, bool:	Whether the sort value should be converted to a
-								floating point number.
 	"""
 
 	# Storing posts in the right order here
-	posts = []
+	sorted_posts = []
 
-	# Generate reader on the basis of sort value
-	# At the moment, this is very inefficient, but
-	# suffices for the few cases where `sort` is used.
-	#sort_by_index = next(reader).index(sort)
-	#reader = sorted(reader, key=lambda x: convert_to_float(x[sort_by_index]) if len(x) >= sort_by_index else 0, reverse=True)
-	#sorted([json.loads(line) for line in infile], key=lambda x: convert_to_float(flatten_dict(x)[sort]), reverse=True)
+	try:
+		for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x[sort], reverse=reverse):
+			sorted_posts.append(item)
+	except TypeError:
+		# Dataset fields can contain integers and empty strings.
+		# Since these cannot be compared, we will convert every
+		# empty string to 0.
+		for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: convert_to_float(x[sort]), reverse=reverse):
+			sorted_posts.append(item)
 
-	for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x[sort]):
-		posts.append(item)
-
-	for post in posts:
+	for post in sorted_posts:
 		yield post
 
 def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
