@@ -6,8 +6,6 @@
 
 {% block body %}
 
-<!-- <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer.css')}}"> -->
-<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
 
 <script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
 
@@ -16,18 +14,25 @@
 var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %}
 </script>
 
-<!-- Include datasource-specific css if it exists -->
-{% if custom_css %}
-	<style>
-		{{ custom_css | safe }}"
-	</style>
-{% endif %}
 
 {% set key = dataset.data.key %}
 
 {% include "explorer/controls.html" %}
 
 {% include "explorer/pagination.html" %}
+
+<!-- CSS: Use generic template, data source preset, or custom -->
+{% if "css" in datasource_config %}
+	{% if datasource_config.css == "preset" %}
+		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer/')}}{{ datasource}}.css">
+	{% elif datasource_config.css == "custom" %}
+		<style>{{ datasource_config.custom_css | safe }}</style>
+	{% else %}
+		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer/default.css')}}">
+	{% endif %}
+{% endif %}
+
+<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
 
 <div class="content">
 	<ol class="posts" id="explorer-posts">

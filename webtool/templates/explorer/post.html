@@ -6,7 +6,7 @@
 
 	<!-- Possible external link if not pseudonymised -->
 	{% if custom_fields and "external_url" in custom_fields %}
-		{% set external_url = custom_fields.external_url | post_field(post) %}
+		{% set external_url = custom_fields.external_url | dict_field(post) %}
 		{% if external_url and pseudonymised %}
 			<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
 		{% elif external_url and not pseudonymised %}
@@ -22,7 +22,7 @@
 		{% else %}
 			<span title="Author" class="author">
 			{% if custom_fields and custom_fields.get("author") %}
-				{% set author = custom_fields.author | post_field(post) | safe %}
+				{% set author = custom_fields.author | dict_field(post) | safe %}
 			{% else %}
 				{% set author = post.author %}
 			{% endif %}
@@ -48,7 +48,7 @@
 
 				{% if custom_field not in special_fields %}
 					
-					{% set custom_value = custom_fields[custom_field] | post_field(post) | safe %}
+					{% set custom_value = custom_fields[custom_field] | dict_field(post) | safe %}
 					{% if custom_value and custom_value != "None" %}
 						{% if not ("author" in custom_field and pseudonymised) %}
 							<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
@@ -65,7 +65,7 @@
 	<article>
 		<!-- Singular image -->
 		{% if custom_fields and 'image' in custom_fields %}
-			{% set img_link = custom_fields['image'] | post_field(post) %}
+			{% set img_link = custom_fields['image'] | dict_field(post) %}
 			<!-- We'll display a not-found image if 'not-found:' is in the image link -->
 			{% if 'not-found:' in img_link %}
 				<div class="post-image">
@@ -90,7 +90,7 @@
 		
 		<!-- Multiple images -->
 		{% elif custom_fields and 'images' in custom_fields %}
-			{% set img_links = custom_fields['images'] | post_field(post) %}
+			{% set img_links = custom_fields['images'] | dict_field(post) %}
 			{% if img_links %}
 				{% set img_links = img_links.split(",") %}
 				<div class="post-images">
@@ -107,7 +107,7 @@
 
 	<span class="post-content">
 		{% if custom_fields and 'body' in custom_fields %}
-			{{ custom_fields.body | post_field(post) | safe }}
+			{{ custom_fields.body | dict_field(post) | safe }}
 		{% else %}
 			{{ post.body | safe }}
 		{% endif %}
@@ -116,7 +116,7 @@
 	</article>
 
 	<!-- Annotations -->
-	<div class="post-annotations">
+	<div class="post-annotations hidden">
 		
 		{% if annotation_fields %}
 			{% set old_annotations = None %}

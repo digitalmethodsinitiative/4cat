@@ -22,57 +22,33 @@ const annotations = {
 
 	init: function() {
 
-		// Show and hide the annotation controls
-		$("#toggle-annotation-controls").on("click", function() {
-			$("#annotation-controls-buttons").toggleClass("hidden");
-			if ($("#annotation-controls-buttons").hasClass("hidden")) {
-				$(this).html("<i class='fas fa-chevron-up'>");
-			}
-			else {
-				$(this).html("<i class='fas fa-chevron-left'>");
-			}
-		});
+		let edit_field_box = $("#edit-annotation-fields");
+		let editor = $("#annotation-fields-editor");
+		let editor_controls = $("#annotation-fields-editor-controls");
 
 		// Add a new annotation field when clicking the plus icon
-		$("#add-annotation-field").on("click", function(){$("#annotation-fields").append(annotations.getAnnotationsDiv);});
+		$("#new-annotation-field").on("click", function(){
+			let annotations_div = annotations.getAnnotationsDiv();
+			$(annotations_div).insertBefore(edit_field_box);});
 
 		// Show and hide the annotations editor
 		$("#toggle-annotation-fields").on("click", function(){
-			$("#annotations-editor-container").toggle();
-			if ($("#annotation-controls-buttons").hasClass("hidden")) {
-				$(this).html("<i class='fas fa-chevron-up'>");
+			editor.toggleClass("hidden");
+			if (editor.hasClass("hidden")) {
+				$("#toggle-annotation-fields").html("<i class='fas fa-edit'></i> Edit fields");
 			}
 			else {
-				$(this).html("<i class='fas fa-chevron-left'>");
+				$("#toggle-annotation-fields").html("<i class='fas fa-eye-slash'></i> Hide editor");
 			}
-		});
-		$("#annotations-editor").click(function(e) {
-		   e.stopPropagation();
 		});
 
 		// Keep track of when the annotation fields were edited.
-		$("#annotation-fields").on("click", "#add-annotation-field, .delete-input, .delete-input i, .delete-option-field, .delete-option-field i", function() {
-			$("#save-annotation-fields").removeClass("invalid").removeAttr("disabled");
+		editor_controls.on("click", "#apply-annotation-fields, .delete-input, .delete-option-field", function() {
+			$("#apply-annotation-fields").removeClass("disabled");
 		});
-		$("#annotation-fields").on("change keydown", "input, select", function() {
-			$("#save-annotation-fields").removeClass("invalid").removeAttr("disabled");
-		});
-
-		// Close the annotation field editor (ask whether unsaved changes can be discarded)
-		$("#annotations-editor-container, #close-annotation-fields").click(function(e){
-			e.preventDefault();
-			if (!$("#save-annotation-fields").prop("disabled")) {
-				let conf = confirm("Close without applying input fields?");
-				if (conf) {
-					$("#annotations-editor-container").hide();
-					$("#annotation-fields").html(old_annotation_fields);
-					$("#save-annotation-fields").addClass("invalid").prop("disabled", true);
-				}
-			}
-			else {
-				$("#annotations-editor-container").hide();
-			}
-		});
+		editor_controls.on("change keydown", "input, select", function() {
+			$("#apply-annotation-fields").removeClass("disabled");
+		});	
 
 		// Show and hide annotations
 		$("#toggle-annotations").on("click", function(){
@@ -82,26 +58,32 @@ const annotations = {
 		});
 
 		// Delete an entire annotation input
-		$("#annotation-fields").on("click", ".annotation-field > .delete-input", function(e){$(this).parent().remove();});
+		// We're in a grid of threes, so this involves three divs
+		editor_controls.on("click", ".annotation-field > .delete-input", function(e){
+				let parent_div = $(this).parent().parent();
+				parent_div.next().remove(); // Input type
+				parent_div.next().remove(); // Options
+				parent_div.remove();		// Label
+			});
 
 		// Make saving available when annotation fields are changed
-		$("#annotation-fields").on("click", ".annotation-field > .option-fields > .option-field > .delete-option-field", function() {
+		editor_controls.on("click", ".delete-option-field", function() {
 			annotations.deleteOption(this);
 		});
-		$("#annotation-fields").on("change", ".annotation-field > .annotation-field-type", function(e) {annotations.toggleField(e.target);});
+		editor_controls.on("change", ".annotation-field-type", function(e) {annotations.toggleField(e.target);});
 		
-		// Make enter add a new option field
-		$("#annotation-fields").on("keypress", "input", function(e){
+		// Make enter apply the option fields
+		editor_controls.on("keypress", "input", function(e){
 			if (e.which == 13) {
 				annotations.applyAnnotationFields();
 			}
 		});
 
-		// Save the annotations fields to the database
-		$("#save-annotation-fields").on("click", annotations.applyAnnotationFields);
+		// Save the annotation fields to the database
+		$("#apply-annotation-fields").on("click", annotations.applyAnnotationFields);
 
 		// Dynamically add a new option field when another is edited
-		$("#annotation-fields").on("keyup", ".annotation-field > .option-fields > .option-field > input", function(e) {
+		editor_controls.on("keyup", ".option-field > input", function(e) {
 			if ($(this).val().length > 0) {
 				annotations.addOptions(e.target);
 			}
@@ -131,7 +113,7 @@ const annotations = {
 		// Ask whether the next page should be opened without saving annotations
 		$('a > .page').click(function(){
 			if (!$("#save-annotations").prop('disabled')) {
-				return confirm("You'll lose unsaved annotations for this page if you don't save first.\nDo you still want to continue?");
+				return confirm("Unsaved annotations are lost if you don't save before leaving the page.\nLeave anyway?");
 			}
 		})
 
@@ -148,18 +130,20 @@ const annotations = {
 	},
 
 	toggleField: function (el) {
-
 		// Change the type of input fields when switching in the dropdown
+
 		let type = $(el).val();
 		let old_type = $(el).attr("data-val");
 
+		let options = $(el).parent().parent().next();
+		let option_fields = options.find(".option-field");
+
 		if (type == "text" || type == "textarea") {
-			$(el).parent().find(".option-fields").remove();
+			option_fields.remove();
 		}
 		else if (type == "dropdown" || type == "checkbox") {
-			if (!($(el).siblings(".option-fields").length) > 0) {
-				$(el).after("<div class='option-fields'></div>");
-				$(el).next().append(annotations.getInputField);
+			if (option_fields.length == 0) {
+				options.append(annotations.getInputField);
 			}
 		}
 	},
@@ -171,7 +155,7 @@ const annotations = {
 		// no empty fields available, add a new one.
 		let no_empty_fields = true;
 		let input_fields = $(el).parent().siblings();
-
+		console.log(input_fields)
 		if (!$(el).val().length > 0) {
 				no_empty_fields = false;
 			}
@@ -183,6 +167,7 @@ const annotations = {
 				no_empty_fields = false;
 			}
 		});
+		// Add a new field if there's no empty ones
 		if (no_empty_fields) {
 			$(el).parent().after(annotations.getInputField);
 		}
@@ -204,7 +189,7 @@ const annotations = {
 					return false;
 				}
 				$(this).append(`
-					<button class='delete-option-field'><i class='fas fa-trash'></i></button>`);
+					<a class="button-like-small delete-option-field"><i class='fas fa-trash'></i></a>`);
 			});
 		}
 	},
@@ -223,7 +208,7 @@ const annotations = {
 		// Validates and converts the fields in the annotations editor.
 		// Returns an object with the set annotation fields.
 
-		annotation_fields = {};
+		var annotation_fields = {};
 		var warning = "";
 		var labels_added = []
 
@@ -233,9 +218,14 @@ const annotations = {
 
 		// Parse information from the annotations editor.
 		$(".annotation-field").each(function(){
-
+			// To align the input form, we're in a grid of threes:
+			// label, input type, options.
+			// Navigate the DOM to get these elements:
 			let label_field = $(this).children(".annotation-field-label");
-			let label = label_field.val().replace(/\s+/g, ' ');;
+			let type_field = $(this).parent().next();
+			let options_field = $(this).parent().next().next();
+
+			let label = label_field.val().replace(/\s+/g, ' ');
 
 			// Get the random identifier of the field, so we
 			// can later check if it already exists.
@@ -253,7 +243,7 @@ const annotations = {
 			}
 
 			// Set the types and values of the annotation
-			type = $(this).children(".annotation-field-type").val();
+			type = type_field.find(".annotation-field-type").val();
 
 			// Keep track of the labels we've added
 			labels_added.push(label)
@@ -268,8 +258,8 @@ const annotations = {
 				let no_options_added = true;
 				let option_id = ""
 
-				$(this).find(".option-field > input").each(function(){
-					
+				options_field.find(".option-field > input").each(function(){
+					console.log(this)
 					let option_label = $(this).val();
 					let option_id = this.id.replace("input-", "");
 
@@ -306,10 +296,10 @@ const annotations = {
 			}
 		});
 
+		console.log(annotation_fields)
 		if (warning.length > 0) {
 			return warning;
 		}
-		console.log(annotation_fields)
 		return annotation_fields;
 	},
 
@@ -320,9 +310,8 @@ const annotations = {
 		var annotation_fields = annotations.parseAnnotationFields(e);
 		var fields_to_add = {};
 
-		
 		// Show an error message if the annotation fields were not valid.
-		if (typeof annotation_fields == 'string') {
+		if (typeof annotation_fields == "string") {
 			annotations.warnEditor(annotation_fields);
 			return
 		}
@@ -331,11 +320,11 @@ const annotations = {
 		// the annotation fields to each post on the page.
 		else {
 
-			$("#save-annotation-fields").html("<i class='fas fa-circle-notch spinner'></i> Applying")
+			$("#apply-annotation-fields").html("<i class='fas fa-circle-notch spinner'></i> Applying")
 			
 			// Remove warnings
 			annotations.warnEditor("")
-			$("#annotation-fields").find("input").each(function(){
+			$("#annotation-field").find("input").each(function(){
 				$(this).removeClass("invalid");
 			});
 			$(".option-fields").find("input").each(function(){
@@ -579,7 +568,7 @@ const annotations = {
 			}
 		}
 
-		$("#save-annotation-fields").html("<i class='fas fa-save'></i> Apply")
+		$("#apply-annotation-fields").html("<i class='fas fa-check'></i> Apply")
 	},
 
 	saveAnnotationFields: function (annotation_fields){
@@ -607,7 +596,7 @@ const annotations = {
 				// If the query is accepted by the server.
 				if (response == 'success') {
 					$("#annotations-editor-container").hide();
-					$("#save-annotation-fields").addClass("disabled");
+					$("#apply-annotation-fields").addClass("disabled");
 				}
 
 				// If the query is rejected by the server.
@@ -703,7 +692,7 @@ const annotations = {
 					annotations.enableSaving();
 					$("#save-annotations").html("<i class='fas fa-save'></i> Annotations saved");
 					$("#save-annotations").addClass("disabled");
-					old_annotation_fields = $("#annotation-fields").html();
+					old_annotation_fields = $("#annotation-field").each();
 					// alert(alert_message);
 				}
 				else {
@@ -775,7 +764,7 @@ const annotations = {
 
 	warnEditor: function(warning) {
 		
-		let warn_field = $("#annotations-input-warning");
+		let warn_field = $("#input-warning");
 		warn_field.html(warning);
 		if (warn_field.hasClass("hidden")) {
 			warn_field.removeClass("hidden");
@@ -787,13 +776,13 @@ const annotations = {
 		let ta = $("#toggle-annotations");
 		if (ta.hasClass("shown")) {
 			ta.removeClass("shown");
-			ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
-			$(".post-annotations").show(200);
+			ta.html("<i class='fas fa-eye'></i> Show annotations");
+			$(".post-annotations").addClass("hidden");
 		}
 		else {
 			ta.addClass("shown");
-			ta.html("<i class='fas fa-eye'></i> Show annotations");
-			$(".post-annotations").hide(200);
+			ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
+			$(".post-annotations").removeClass("hidden");
 		}
 	},
 
@@ -802,17 +791,25 @@ const annotations = {
 		if (id == undefined || id == 0) {
 			id = annotations.randomInt();
 		}
+		
 		// Returns an annotation div element with a pseudo-random ID
-		return `<div class='annotation-fields-row annotation-field' id='field-{{FIELD_ID}}'>
-		<input type='text' class='annotation-field-label' name='annotation-field-label' placeholder='Field name'>
-		<button class='delete-input'><i class='fas fa-trash'></i></button>
-		<select name='annotation-field-type' class='annotation-field-type'>
-		<option class='annotation-field-option' value='text'>Text</option>
-		<option class='annotation-field-option' value='textarea'>Textarea</option>
-		<option class='annotation-field-option' value='dropdown'>Dropdown</option>
-		<option class='annotation-field-option' value='checkbox'>Checkbox</option>
-		</select>
-		</div>`.replace("{{FIELD_ID}}", id);
+		return `<div>
+			<dd class="annotation-fields-row annotation-field" id="field-{{FIELD_ID}}">
+				<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Field label">
+				<a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
+			</dd>
+		</div>
+		<div>
+			<dd>
+				<select name="annotation-field-type" class="annotation-field-type">
+					<option class="annotation-field-option" value="text" selected>Text</option>
+					<option class="annotation-field-option" value="textarea">Text (large)</option>
+					<option class="annotation-field-option" value="checkbox">Checkbox</option>
+					<option class="annotation-field-option" value="dropdown">Dropdown</option>
+				</select>
+			</dd>
+		</div>
+		<div></div>`.replace("{{FIELD_ID}}", id);
 	},
 
 	getInputField: function(id){

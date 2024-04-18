@@ -695,3 +695,25 @@ body.image-preview {
     max-height: none;
     cursor: zoom-out;
 }
+
+/* Explorer view */
+#annotation-fields-editor-controls {
+    display: grid;
+    grid-template-columns: auto auto auto;
+}
+
+#annotation-fields-editor-controls>div {
+    border-bottom: 1px solid var(--contrast-bright);
+}
+
+#edit-annotation-fields #input-warning {
+    color: var(--accent-error);
+}
+
+/* Remove all styles for explorer posts */
+/* these ought to be defined specifically */
+/* and 4CAT styles shouldn't interfere. */
+#explorer-posts, #explorer-posts > ol li {
+    all: initial;
+    padding: 0;
+}

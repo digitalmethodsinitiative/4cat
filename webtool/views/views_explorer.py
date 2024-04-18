@@ -68,8 +68,10 @@ def explorer_dataset(key, page=1):
 	if not results_path:
 		return error(404, error="This dataset didn't finish executing.")
 
-	if datasource not in config.get("explorer.config") and not config["explorer.config"][datasource]["enabled"]:
+	if not config.get("explorer.config", {}).get(datasource,{}).get("enabled"):
 		return error(404, error="Explorer functionality disabled for %s." % datasource)
+
+	datasource_config = config.get("explorer.config", {}).get(datasource,{})
 
 	# The amount of posts to show on a page
 	posts_per_page = config.get("explorer.posts_per_page", 50)
@@ -91,8 +93,6 @@ def explorer_dataset(key, page=1):
 
 	# Check if we have to reverse the order.
 	reverse = True if request.args.get("order") == "reverse" else False
-	print(request.args.get("order"))
-	print(reverse)
 
 	# Load posts
 	post_ids = []
@@ -127,12 +127,6 @@ def explorer_dataset(key, page=1):
 			if count >= (offset + posts_per_page) or count > max_posts:
 				break
 
-	# Retrieve custom CSS if it is present in the datasource's config.
-	# If not given, we use a standard template. This standard CSS template
-	# can also be changed in the 4CAT control panel under the 'Explorer'
-	# settings.
-	css = get_custom_css(datasource)
-
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	# For some datasources (e.g. Twitter) we also have to explicitly set
@@ -160,7 +154,7 @@ def explorer_dataset(key, page=1):
 		annotations = json.loads(annotations["annotations"])
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, parameters=parameters, posts=posts, annotation_fields=annotation_fields, annotations=annotations, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
+	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, parameters=parameters, posts=posts, annotation_fields=annotation_fields, annotations=annotations, datasource_config=datasource_config, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
 
 @app.route('/results/<datasource>/<string:thread_id>/explorer')
 @api_ratelimit
@@ -199,15 +193,11 @@ def explorer_database_thread(datasource, board, thread_id):
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post, datasource=datasource) for post in posts]
 
-	# Include custom css if it exists in the datasource's 'explorer' dir.
-	# The file's naming format should e.g. be 'reddit-explorer.css'.
-	css = get_custom_css(datasource)
-
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
@@ -240,15 +230,11 @@ def explorer_database_posts(datasource, board, thread_id):
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
 
-	# Include custom css if it exists in the datasource's 'explorer' dir.
-	# The file's naming format should e.g. be 'reddit-explorer.css'.
-	css = get_custom_css(datasource)
-
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts))
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts))
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
@@ -570,23 +556,6 @@ def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, of
 		return False
 
 	return posts
-
-def get_custom_css(datasource):
-	"""
-	Check if there's custom CSS for this data source.
-	These can be inserted and edited on the Explorer settings page.
-	If these are absent, we revert to a standard template.
-
-	:param datasource, str: Datasource name
-
-	:return: The css as string.
-	"""
-
-	custom_css = config.get("explorer." + datasource + "-explorer-css", "")
-	if not custom_css:
-		custom_css = config.get("explorer." + datasource + "-search-explorer-css", "")
-
-	return custom_css
 
 def get_custom_fields(datasource, filetype=None):
 	"""

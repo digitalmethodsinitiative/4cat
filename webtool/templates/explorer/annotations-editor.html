@@ -1,55 +1,80 @@
-<div id="annotations-editor" class="fullwidth saved">
-	<span class="helper"></span>
+<!-- <div id="annotations-editor" class="saved">
+<span class="helper"></span> -->
+<!-- <p id="notice"><em>Note: Changing input types will overwrite existing annotations for the field</em></p> -->
+<!-- <span id="annotation-fields"></span> -->
+<div id="annotation-fields-editor-controls">
+	<div>
+		<dd>
+			<em>Label</em>
+			<button class="tooltip-trigger" aria-controls="tooltip-annotation-editor-label">?</button>
+			<p role="tooltip" id="tooltip-annotation-editor-label" aria-hidden="true">The label of the annotation field</p>
+		</dd>
+	</div>
+	<div>
+		<dd>
+			<em>Input type</em>
+			<button class="tooltip-trigger" aria-controls="tooltip-annotation-editor-type">?</button>
+			<p role="tooltip" id="tooltip-annotation-editor-type" aria-hidden="true">The type of annotation field. Available types
+			include a text field, a large text field, a checkbox, and a dropdown menu.</p>
+		</dd>
+	</div>
+	<div>
+		<dd>
+			<em>Options</em>
+			<button class="tooltip-trigger" aria-controls="tooltip-annotation-editor-options">?</button>
+			<p role="tooltip" id="tooltip-annotation-editor-options" aria-hidden="true">Available options for checkbox and dropdown fields.</p>
+		</dd>
+	</div>
 
-	<div id="annotation-fields-container">
-		<div class="annotation-headers">
-			<div class="annotation-header" id="ah-label">Label</div>
-			<div class="annotation-header" id="ah-type">Input type</div>
-			<div class="annotation-header" id="ah-options">Options</div>
-		</div>
+	{% if annotation_fields %}
 
-		<div id="annotation-fields">
-		{% if annotation_fields %}
-			
-		{% for field in annotation_fields %}
+	{% for field in annotation_fields %}
+	{% set annotation_type = annotation_fields[field]["type"] %}
+	{% set label = annotation_fields[field]["label"] %}
 
-			{% set annotation_type = annotation_fields[field]["type"] %}
-			{% set label = annotation_fields[field]["label"] %}
-			<div class="annotation-fields-row annotation-field" id="field-{{ field }}">
+	<div>
+		<dd class="annotation-fields-row annotation-field" id="field-{{ field }}">
 			<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Field label" value="{{ label }}">
-			<button class="delete-input"><i class="fas fa-trash"></i></button>
+			<a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
+		</dd>
+	</div>
+	<div>
+		<dd>
 			<select name="annotation-field-type" class="annotation-field-type">
 				<option class="annotation-field-option" value="text" {% if annotation_type == "text" %}selected{% endif %}>Text</option>
-				<option class="annotation-field-option" value="textarea" {% if annotation_type == "textarea" %}selected{% endif %}>Textarea</option>
-				<option class="annotation-field-option" value="dropdown" {% if annotation_type == "dropdown" %}selected{% endif %}>Dropdown</option>
+				<option class="annotation-field-option" value="textarea" {% if annotation_type == "textarea" %}selected{% endif %}>Text (large)</option>
 				<option class="annotation-field-option" value="checkbox" {% if annotation_type == "checkbox" %}selected{% endif %}>Checkbox</option>
+				<option class="annotation-field-option" value="dropdown" {% if annotation_type == "dropdown" %}selected{% endif %}>Dropdown</option>
 			</select>
-
-			{% if annotation_type == "dropdown" or annotation_type == "checkbox" %}
-				<div class="option-fields">
-				{% for option in annotation_fields[field]["options"] %}
-					{% set option_id = option.keys() | first %}
-					{% set option_label = option.values() | first %}
-					<div class="option-field">
-						<input type="text" id="input-{{ option_id }}" value="{{ option_label }}">
-						<button class="delete-option-field"><i class="fas fa-trash"></i></button>
-					</div>
-				{% endfor %}
-					<div class="option-field">
-						<input type="text" id="input-{{ range(1, 100000000) | random }}" placeholder="Value">
-						
-					</div>
-				</div>
-			{% endif %}
-			</div>
-		{% endfor %}
-		{% endif %}
-		</div>
+		</dd>
 	</div>
-	<div id="add-annotation-fields">
-		<span id="annotations-input-warning" class="hidden"></span>
-		<button id="add-annotation-field"><i class="fas fa-plus"></i> New field</button>
-		<button id="save-annotation-fields" class="invalid" disabled><i class="fas fa-save"></i> Apply</button>
-	<p id="notice"><em>Note: Changing input types will overwrite existing annotations for the field</em></p>
+
+	{% if annotation_type == "dropdown" or annotation_type == "checkbox" %}
+	<div class="option-fields">
+		<dd>
+				{% for option in annotation_fields[field]["options"] %}
+				{% set option_id = option.keys() | first %}
+				{% set option_label = option.values() | first %}
+				<div class="option-field">
+					<input type="text" id="input-{{ option_id }}" value="{{ option_label }}">
+					<a class="button-like-small delete-option-field"><i class="fas fa-trash"></i></a>
+				</div>
+				{% endfor %}
+				<div class="option-field">
+					<input type="text" id="input-{{ range(1, 100000000) | random }}" placeholder="Value">
+				</div>
+		</dd>
+	</div>
+	{% else %}
+	<div class="option-fields"></div>
+	{% endif %}
+	{% endfor %}
+	{% endif %}
+	<div id="edit-annotation-fields">
+		<dd>
+			<a class="button-like-small" id="new-annotation-field"><i class="fas fa-plus"></i> New field</a>
+			<a class="button-like-small disabled" id="apply-annotation-fields"><i class="fa-solid fa-check"></i> Apply</a>
+			<br><span class="hidden" id="input-warning"></span>
+		</dd>
 	</div>
 </div>
