@@ -56,6 +56,8 @@ def explorer_dataset(key, page=1):
 	datasource = parameters["datasource"]
 	post_count = int(dataset.data["num_rows"])
 	annotation_fields = dataset.get_annotation_fields()
+	print("AAAAAAAAA", annotation_fields)
+	datasource_config = config.get("explorer.config", {}).get(datasource,{})
 
 	# See if we can actually serve this page
 	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
@@ -71,7 +73,6 @@ def explorer_dataset(key, page=1):
 	if not config.get("explorer.config", {}).get(datasource,{}).get("enabled"):
 		return error(404, error="Explorer functionality disabled for %s." % datasource)
 
-	datasource_config = config.get("explorer.config", {}).get(datasource,{})
 
 	# The amount of posts to show on a page
 	posts_per_page = config.get("explorer.posts_per_page", 50)
@@ -127,12 +128,11 @@ def explorer_dataset(key, page=1):
 			if count >= (offset + posts_per_page) or count > max_posts:
 				break
 
-	# Include custom fields if it they are in the datasource's 'explorer' dir.
-	# The file's naming format should e.g. be 'reddit-explorer.json'.
-	# For some datasources (e.g. Twitter) we also have to explicitly set
-	# what data type we're working with.
-	filetype = dataset.get_extension()
-	custom_fields = get_custom_fields(datasource, filetype=filetype)
+	# Include custom fields if it they are in the 'explorer' dir.
+	custom_fields = get_custom_fields(datasource)
+
+	# Include CSS: a generic template, a data source preset, or custom.
+	posts_css = get_css(datasource, css_type=datasource_config.get("css", "general"))
 
 	# Convert posts from markdown to HTML
 	if custom_fields and "markdown" in custom_fields and custom_fields.get("markdown"):
@@ -152,9 +152,9 @@ def explorer_dataset(key, page=1):
 		annotations = None
 	else:
 		annotations = json.loads(annotations["annotations"])
-
+	
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, parameters=parameters, posts=posts, annotation_fields=annotation_fields, annotations=annotations, datasource_config=datasource_config, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
+	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, parameters=parameters, posts=posts, annotation_fields=annotation_fields, annotations=annotations, datasource_config=datasource_config, posts_css=posts_css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
 
 @app.route('/results/<datasource>/<string:thread_id>/explorer')
 @api_ratelimit
@@ -579,7 +579,7 @@ def get_custom_fields(datasource, filetype=None):
 	else:
 		datasource_dir = datasource
 
-	json_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
+	json_path = Path(config.get('PATH_ROOT'), "webtool/static/js/explorer/", datasource + ".json")
 	read = False
 
 	if json_path.exists():
@@ -598,15 +598,36 @@ def get_custom_fields(datasource, filetype=None):
 				return ("invalid", e)
 	else:
 		custom_fields = None
-
-	filetype = filetype.replace(".", "")
-	if filetype and custom_fields:
-		if filetype in custom_fields:
-			custom_fields = custom_fields[filetype]
-	else:
-		custom_fields = None
 		
 	return custom_fields
+
+def get_css(datasource, css_type):
+	"""
+	Check if there's a custom css file for this dataset.
+	If so, return the text.
+	Custom css files should be placed in the webtool/static/css/explorer/ folder with the name of the datasource (e.g. 'webtool/static/css/explorer/reddit.css').
+
+	:param datasource, str:	Datasource name
+	:param css_type, str:		`general` or `preset`.
+
+	:return: The css as string.
+
+	"""
+
+	if css_type == "preset":
+		css_path = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/", datasource + ".css")
+	elif css_type == "general":
+		css_path = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/default.css")
+	else:
+		return ""
+
+	if not css_path.exists():
+		return ""
+
+	with open(css_path, "r", encoding="utf-8") as css:
+		css = css.read()
+
+	return css
 
 def get_nested_value(di, keys):
 	"""

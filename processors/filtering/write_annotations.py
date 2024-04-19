@@ -17,7 +17,7 @@ class WriteAnnotations(BasicProcessor):
 	type = "write-annotations"  # job type ID
 	category = "Filtering"  # category
 	title = "Write annotations"  # title displayed in UI
-	description = "Writes annotations from the Explorer to the dataset. Each input field will get a column. This creates a new dataset."  # description displayed in UI
+	description = "Writes annotations from the Explorer to the existing dataset. Each input field will get a column."  # description displayed in UI
 
 	options = {
 		"to-lowercase": {

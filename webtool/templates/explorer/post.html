@@ -27,7 +27,6 @@
 				{% set author = post.author %}
 			{% endif %}
 			{{ author }}
-
 		{% endif %}
 		</span>
 		{% if 'thread_id' in post %}
@@ -120,7 +119,6 @@
 		
 		{% if annotation_fields %}
 			{% set old_annotations = None %}
-
 			{% if annotations and post.id in annotations %}
 				{% set old_annotations = annotations[post.id] %}
 			{% endif %}
@@ -130,13 +128,13 @@
 				{% set type = annotation_fields[field]["type"] %}
 				{% set label = annotation_fields[field]["label"] %}
 				{% set old_annotation = "" %}
-
 				{% if old_annotations and label in old_annotations %}
 					{% set old_annotation = old_annotations[label] %}
 				{% endif %}
 				
 				<div class="post-annotation field-{{ field }} {{ type }}"><label class="annotation-label">{{ label }}</label>
 				{% if type == 'text' %}
+				{{ old_annotation }}
 					<input type="text" class="post-annotation-input text-{{ field }}" value="{{ old_annotation }}">
 
 				{% elif type == 'textarea' %}

@@ -1,12 +1,11 @@
 {% extends "layout.html" %}
 
-{% block title %}Datasets &amp; previous results{% endblock %}
-{% block body_class %}result-list plain-page{% endblock %}
-{% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
+{% block title %}Explorer: {{ dataset.get_label() }} • 4CAT{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "explorer" %}{% endblock %}
 
 {% block body %}
 
-
+<!-- Some custom behaviour here -->
 <script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
 
 <!-- Possible annotation fields -->
@@ -14,32 +13,35 @@
 var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %}
 </script>
 
-
 {% set key = dataset.data.key %}
 
+<!-- Control toolbox, with annotation editor -->
 {% include "explorer/controls.html" %}
 
+<!-- Page numbers -->
 {% include "explorer/pagination.html" %}
 
-<!-- CSS: Use generic template, data source preset, or custom -->
-{% if "css" in datasource_config %}
-	{% if datasource_config.css == "preset" %}
-		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer/')}}{{ datasource}}.css">
-	{% elif datasource_config.css == "custom" %}
-		<style>{{ datasource_config.custom_css | safe }}</style>
-	{% else %}
-		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer/default.css')}}">
-	{% endif %}
-{% endif %}
+<!-- CSS: Use generic template, data source preset, or custom. -->
+<!-- Use a nested class so the style is only applied to posts. -->
+<style type="text/css">
+	.explorer-content-container {
+		{{ posts_css | safe }}
+	}
+</style>
 
+<!-- Flags for chan posts -->
 <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
 
-<div class="content">
-	<ol class="posts" id="explorer-posts">
-	{% for post in posts %}
-		{% include "explorer/post.html" %}
-	{% endfor %}
-	</ol>
+
+<!-- The actual dataset posts -->
+<div class="explorer-content-container">
+	<div class="explorer-content">
+		<ol class="posts" id="explorer-posts">
+		{% for post in posts %}
+			{% include "explorer/post.html" %}
+		{% endfor %}
+		</ol>
+	</div>
 </div>
 
 {% include "explorer/pagination.html" %}

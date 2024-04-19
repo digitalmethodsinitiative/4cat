@@ -52,8 +52,13 @@ const annotations = {
 
 		// Show and hide annotations
 		$("#toggle-annotations").on("click", function(){
-			if (!$(this).hasClass("invalid")) {
-				annotations.toggleAnnotations();
+			if (!$(this).hasClass("disabled")) {
+				if ($(this).hasClass("shown")) {
+					annotations.hideAnnotations();
+				}
+				else {
+					annotations.showAnnotations();
+				}
 			}
 		});
 
@@ -155,7 +160,7 @@ const annotations = {
 		// no empty fields available, add a new one.
 		let no_empty_fields = true;
 		let input_fields = $(el).parent().siblings();
-		console.log(input_fields)
+
 		if (!$(el).val().length > 0) {
 				no_empty_fields = false;
 			}
@@ -237,7 +242,7 @@ const annotations = {
 				warning  = "Input names can't be empty";
 			}
 			// Make sure the names can't be duplicates.
-			if (labels_added.includes(label)) {
+			else if (labels_added.includes(label)) {
 				warning = "Fields must be unique";
 				label_field.addClass("invalid");
 			}
@@ -259,7 +264,6 @@ const annotations = {
 				let option_id = ""
 
 				options_field.find(".option-field > input").each(function(){
-					console.log(this)
 					let option_label = $(this).val();
 					let option_id = this.id.replace("input-", "");
 
@@ -563,9 +567,13 @@ const annotations = {
 		// Hide annotations if there's no fields leftover
 		var leftover_annotations = $(".post-annotations").first().find(".post-annotation");
 		if (leftover_annotations.length < 1) {
-			if ($(".post-annotations").first().is(':visible')) {
-				annotations.toggleAnnotations();
-			}
+			annotations.hideAnnotations();
+			$("#toggle-annotations").addClass("disabled");
+		}
+		// Else we're showing 'em
+		else {
+			annotations.showAnnotations();
+			$("#toggle-annotations").removeClass("disabled");
 		}
 
 		$("#apply-annotation-fields").html("<i class='fas fa-check'></i> Apply")
@@ -620,7 +628,7 @@ const annotations = {
 
 		$(".posts > li").each(function(){
 
-			let post_id = this.id.split("-")[1];
+			let post_id = this.id.replace("post-", "");
 			let vals_changed = false;
 			let post_annotations = $(this).find(".post-annotations");
 
@@ -772,18 +780,19 @@ const annotations = {
 		}
 	},
 
-	toggleAnnotations: function() {
+	showAnnotations: function() {
 		let ta = $("#toggle-annotations");
-		if (ta.hasClass("shown")) {
-			ta.removeClass("shown");
-			ta.html("<i class='fas fa-eye'></i> Show annotations");
-			$(".post-annotations").addClass("hidden");
-		}
-		else {
-			ta.addClass("shown");
-			ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
-			$(".post-annotations").removeClass("hidden");
-		}
+		ta.addClass("shown");
+		ta.removeClass("disabled");
+		ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
+		$(".post-annotations").removeClass("hidden");
+	},
+
+	hideAnnotations: function() {
+		let ta = $("#toggle-annotations");
+		ta.removeClass("shown");
+		ta.html("<i class='fas fa-eye'></i> Show annotations");
+		$(".post-annotations").addClass("hidden");
 	},
 
 	getAnnotationsDiv: function(id){

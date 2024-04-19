@@ -717,3 +717,20 @@ body.image-preview {
     all: initial;
     padding: 0;
 }
+
+.explorer-content-container {
+    margin-top: 1em;
+}
+
+#explorer-content {
+    all: initial;
+    padding: 0;
+}
+
+#explorer-content .hidden {
+    min-height: 0;
+    max-height: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    border-width: 0;
+}
