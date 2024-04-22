@@ -338,6 +338,10 @@ class DataSet(FourcatModule):
 		if own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
+		# Annotation fields are dynamically added,
+		# so we're always going to accept these.
+		annotation_fields = self.get_annotation_fields()
+
 		# Loop through items
 		for i, item in enumerate(self._iterate_items(processor)):
 			# Save original to yield
@@ -382,6 +386,15 @@ class DataSet(FourcatModule):
 
 			else:
 				mapped_item = original_item
+			
+			# Re-add annotation fields to a mapped item.
+			if annotation_fields:
+				for annotation_field in annotation_fields.values():
+					label = annotation_field["label"]
+					if type(mapped_item) is MappedItem:
+						mapped_item.data[label] = original_item.get(label, "")
+					else:
+						mapped_item[label] = original_item.get(label, "")
 
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))

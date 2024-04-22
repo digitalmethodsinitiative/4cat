@@ -24,14 +24,13 @@ var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}
 <!-- CSS: Use generic template, data source preset, or custom. -->
 <!-- Use a nested class so the style is only applied to posts. -->
 <style type="text/css">
-	.explorer-content-container {
-		{{ posts_css | safe }}
-	}
+.explorer-content-container {
+	{{ posts_css | safe }}
+}
 </style>
 
 <!-- Flags for chan posts -->
 <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
-
 
 <!-- The actual dataset posts -->
 <div class="explorer-content-container">

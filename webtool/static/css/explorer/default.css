@@ -30,11 +30,12 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     src: url("../fonts/OpenSans-BoldItalic.ttf")
 }
 
-
 /** --------------------- *
      Posts
   * --------------------- */
-.posts {
+
+.post {
+    font-family: "Open Sans";
     list-style: none;
     padding: 0;
 }
@@ -61,8 +62,8 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 }
 
 .posts article .post-content {
-    display: inline;
-    vertical-align: top;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
 .posts header .author {
@@ -78,14 +79,8 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     margin-left: 0.5em;
 }
 
-.posts li.post.op {
-    border: 2px solid #000;
-    background: #485ba6;
-    color: #FFF;
-}
-
-.posts li.post.op header {
-    border-color: #FFF;
+.tags, .metrics, .external-url {
+    color: #3b4f9d;
 }
 
 .posts li.post .post-content a {
@@ -104,24 +99,9 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     cursor: not-allowed;
 }
 
-.quote {
-    color: #ff5750;
-}
-
-.highlight, :target {
-    outline: 2px solid #ff5750;
-}
-li a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.posts li .post-image img {
+.post-media img {
     width: 100%;
-}
-
-.clear {
-    clear: both;
+    max-width: 300px;
 }
 
 span.divider {
@@ -138,15 +118,15 @@ span.divider {
 }
 
 .post-annotation {
-    padding-top: 5px;
+    padding: 15px;
 }
 
-.post-annotation .annotation-label {
+.post-annotation > .annotation-label {
     display: inline-block;
     vertical-align: middle;
     font-weight: bold;
     text-align: right;
-    width: 130px;
+    min-width: 150px;
     margin-right: 5px;
     line-height: 1.6em;
     overflow-x: hidden;
@@ -166,4 +146,4 @@ span.divider {
 }
 
 .posts .external-url {
-}*/
+}

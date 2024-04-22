@@ -4,21 +4,19 @@
 			{{ dataset.get_label() }} - Explorer
 		</h2>
 		<span style="display: none" id="dataset-key">{{ key }}</span>
-		{% if custom_fields and custom_fields[0] == "invalid" %}
-		<div class="fullwidth-notice">
-			Invalid custom fields JSON - can't show posts properly ({{ custom_fields[1] }}).
-		</div>
-		{% endif %}
-		{% if key and post_count > max_posts %}
-		<div class="fullwidth-notice">Large dataset - only showing the first {{ max_posts }} posts. Use filter processors to limit the dataset.</div>
-		{% set post_count = max_posts %}
-		{% endif %}
 
 		<div class="card-content">
 			<dl class="metadata-wrapper">
 				<div class="fullwidth notice">
 					<a href="/results/{{ key }}"><i class="fas fa-arrow-left"></i> Return to dataset overview</a>
 				</div>
+				{% if warning %}
+				<div class="fullwidth notice">{{ warning }}</div>
+				{% endif %}
+				{% if key and post_count > max_posts %}
+				<div class="fullwidth notice">Large dataset - only showing the first {{ max_posts }} posts. Use filter processors to limit the dataset.</div>
+				{% set post_count = max_posts %}
+				{% endif %}
 				<div class="fullwidth dataset-toolbox">
 					<dt>Annotations</dt>
 					<ul>

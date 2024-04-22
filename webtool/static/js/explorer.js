@@ -826,7 +826,7 @@ const annotations = {
 		if (id == undefined || id == 0) {
 			id = annotations.randomInt();
 		}
-		return "<div class='option-field'><input type='text' id='input-" + id + "' placeholder='Value'></div>";
+		return "<dd class='option-field'><input type='text' id='input-" + id + "' placeholder='Value'></dd>";
 	},
 
 	randomInt: function(){

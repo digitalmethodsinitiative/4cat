@@ -17,7 +17,7 @@ class WriteAnnotations(BasicProcessor):
 	type = "write-annotations"  # job type ID
 	category = "Filtering"  # category
 	title = "Write annotations"  # title displayed in UI
-	description = "Writes annotations from the Explorer to the existing dataset. Each input field will get a column."  # description displayed in UI
+	description = "Writes annotations from the Explorer to the existing dataset. Each input field will get a new column."  # description displayed in UI
 
 	options = {
 		"to-lowercase": {
@@ -101,7 +101,7 @@ class WriteAnnotations(BasicProcessor):
 
 		# Write to top dataset
 		for label, values in new_data.items():
-			self.add_field_to_parent("annotation_" + label, values, which_parent=self.source_dataset, update_existing=True)
+			self.add_field_to_parent(label, values, which_parent=self.source_dataset, update_existing=True)
 		
 		self.dataset.update_status("Annotations written to parent dataset.")
 		self.dataset.finish(self.source_dataset.num_rows)

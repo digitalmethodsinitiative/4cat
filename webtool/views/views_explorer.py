@@ -56,8 +56,8 @@ def explorer_dataset(key, page=1):
 	datasource = parameters["datasource"]
 	post_count = int(dataset.data["num_rows"])
 	annotation_fields = dataset.get_annotation_fields()
-	print("AAAAAAAAA", annotation_fields)
 	datasource_config = config.get("explorer.config", {}).get(datasource,{})
+	warning = ""
 
 	# See if we can actually serve this page
 	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
@@ -72,7 +72,6 @@ def explorer_dataset(key, page=1):
 
 	if not config.get("explorer.config", {}).get(datasource,{}).get("enabled"):
 		return error(404, error="Explorer functionality disabled for %s." % datasource)
-
 
 	# The amount of posts to show on a page
 	posts_per_page = config.get("explorer.posts_per_page", 50)
@@ -128,22 +127,21 @@ def explorer_dataset(key, page=1):
 			if count >= (offset + posts_per_page) or count > max_posts:
 				break
 
-	# Include custom fields if it they are in the 'explorer' dir.
-	custom_fields = get_custom_fields(datasource)
+	if not posts:
+		return error(404, error="No posts available for this datasource")
+
+	# We can use either a generic or a pre-made template 
+	# for Explorer posts. Get the choice as set in the config,
+	# and if it's a preset data source template , verify it exists.
+	template = datasource_config.get("template", "general")
+	if template == "preset":
+		template_path = Path(config.get('PATH_ROOT'), "webtool/templates/explorer/datasource_templates/" + datasource + ".html")
+		if not template_path.exists():
+			template = "general"
+			warning += "No preset template found for this data source. Using the general template instead."
 
 	# Include CSS: a generic template, a data source preset, or custom.
 	posts_css = get_css(datasource, css_type=datasource_config.get("css", "general"))
-
-	# Convert posts from markdown to HTML
-	if custom_fields and "markdown" in custom_fields and custom_fields.get("markdown"):
-		posts = [convert_markdown(post) for post in posts]
-	# Clean up HTML
-	else:
-		posts = [strip_html(post) for post in posts]
-		posts = [format(post, datasource=datasource) for post in posts]
-
-	if not posts:
-		return error(404, error="No posts available for this datasource")
 
 	# Check whether there's already annotations inserted already.
 	# If so, also pass these to the template.
@@ -154,7 +152,7 @@ def explorer_dataset(key, page=1):
 		annotations = json.loads(annotations["annotations"])
 	
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, parameters=parameters, posts=posts, annotation_fields=annotation_fields, annotations=annotations, datasource_config=datasource_config, posts_css=posts_css, custom_fields=custom_fields, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts)
+	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, posts_css=posts_css, template=template, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
 
 @app.route('/results/<datasource>/<string:thread_id>/explorer')
 @api_ratelimit
@@ -557,50 +555,6 @@ def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, of
 
 	return posts
 
-def get_custom_fields(datasource, filetype=None):
-	"""
-	Check if there are custom fields that need to be showed for this datasource.
-	If so, return a dictionary of those fields.
-	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named
-	'<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
-	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
-
-	:param datasource, str: Datasource name
-	:param filetype, str:	The filetype that is handled. This can fluctuate
-							between e.g. NDJSON and csv files.
-
-	:return: Dictionary of custom fields that should be shown.
-	"""
-
-	# Set the directory name of this datasource.
-	if datasource == "twitter":
-		datasource_dir = "twitter-import"
-		datasource = "twitter-import"
-	else:
-		datasource_dir = datasource
-
-	json_path = Path(config.get('PATH_ROOT'), "webtool/static/js/explorer/", datasource + ".json")
-	read = False
-
-	if json_path.exists():
-		read = True
-	else:
-		# Allow both hypens and underscores in datasource name (to avoid some legacy issues)
-		json_path = re.sub(datasource, datasource.replace("-", "_"), str(json_path.absolute()))
-		if Path(json_path).exists():
-			read = True
-	
-	if read:
-		with open(json_path, "r", encoding="utf-8") as json_file:
-			try:
-				custom_fields = json.load(json_file)
-			except ValueError as e:
-				return ("invalid", e)
-	else:
-		custom_fields = None
-		
-	return custom_fields
-
 def get_css(datasource, css_type):
 	"""
 	Check if there's a custom css file for this dataset.
@@ -628,29 +582,3 @@ def get_css(datasource, css_type):
 		css = css.read()
 
 	return css
-
-def get_nested_value(di, keys):
-	"""
-	Gets a nested value on the basis of a dictionary and a list of keys.
-	"""
-
-	for key in keys:
-		di = di.get(key)
-		if not di:
-			return 0
-	return di
-
-def strip_html(post):
-	post["body"] = strip_tags(post.get("body", ""))
-	return post
-
-def format(post, datasource=""):
-	if "chan" in datasource or datasource == "8kun":
-		post["body"] = format_chan_post(post.get("body", ""))
-	post["body"] = post.get("body", "").replace("\n", "<br>")
-	return post
-
-def convert_markdown(post):
-	post["body"] = post.get("body", "").replace("\n", "\n\n").replace("&gt;", ">").replace("] (", "](")
-	post["body"] = markdown2.markdown(post.get("body", ""), extras=["nofollow","target-blank-links"])
-	return post

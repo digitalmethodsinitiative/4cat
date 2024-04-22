@@ -1,0 +1,11 @@
+<header>
+	<img src="{{ post.get('author_avatar_url') }}">
+	<span class="author"><strong><a href="https://instagram.com/{{ post.get("author") }}">{{ post.get("author") }}</strong></a>
+		{% if post.get("is_verified") %} <i class="fa-solid fa-circle-check verified"></i>{% endif %}</span>
+	<span class="time">{{ post.get("timestamp") }}</span>
+</header>
+
+<article>
+	
+	<div class="body">{{ post.get("body") }}</div>
+</article>

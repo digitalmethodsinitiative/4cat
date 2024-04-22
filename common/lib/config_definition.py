@@ -347,7 +347,7 @@ config_definition = {
     "explorer.config": {
         "type": UserInput.OPTION_DATASOURCES_TABLE,
         "help": "Explorer settings per data source",
-        "default": {"fourchan": {"enabled": True, "css": "preset", "fields": "general"}, "eightchan": {"enabled": True, "css": "general", "fields": "general"}, "eightkun": {"enabled": True, "css": "general", "fields": "general"}, "ninegag": {"enabled": True, "css": "general", "fields": "general"}, "bitchute": {"enabled": True, "css": "general", "fields": "general"}, "dmi-tcat": {"enabled": True, "css": "general", "fields": "general"}, "dmi-tcatv2": {"enabled": True, "css": "general", "fields": "general"}, "douban": {"enabled": True, "css": "general", "fields": "general"}, "douyin": {"enabled": False, "css": "general", "fields": "general"}, "imgur": {"enabled": True, "css": "general", "fields": "general"}, "upload": {"enabled": True, "css": "general", "fields": "general"}, "instagram": {"enabled": True, "css": "preset", "fields": "preset"}, "linkedin": {"enabled": True, "css": "general", "fields": "general"}, "parler": {"enabled": True, "css": "general", "fields": "general"}, "reddit": {"enabled": True, "css": "preset", "fields": "preset"}, "telegram": {"enabled": True, "css": "general", "fields": "general"}, "tiktok": {"enabled": True, "css": "preset", "fields": "preset"}, "tiktok-urls": {"enabled": True, "css": "preset", "fields": "preset"}, "tumblr": {"enabled": True, "css": "preset", "fields": "preset"}, "twitter": {"enabled": True, "css": "preset", "fields": "preset"}, "twitterv2": {"enabled": True, "css": "preset", "fields": "preset"}, "usenet": {"enabled": True, "css": "general", "fields": "general"}, "vk": {"enabled": True, "css": "general", "fields": "general"}},
+        "default": {"fourchan": {"enabled": True, "css": "preset", "template": "general"}, "eightchan": {"enabled": True, "css": "general", "template": "general"}, "eightkun": {"enabled": True, "css": "general", "template": "general"}, "ninegag": {"enabled": True, "css": "general", "template": "general"}, "bitchute": {"enabled": True, "css": "general", "template": "general"}, "dmi-tcat": {"enabled": True, "css": "general", "template": "general"}, "dmi-tcatv2": {"enabled": True, "css": "general", "template": "general"}, "douban": {"enabled": True, "css": "general", "template": "general"}, "douyin": {"enabled": False, "css": "general", "template": "general"}, "imgur": {"enabled": True, "css": "general", "template": "general"}, "upload": {"enabled": True, "css": "general", "template": "general"}, "instagram": {"enabled": True, "css": "preset", "template": "preset"}, "linkedin": {"enabled": True, "css": "general", "template": "general"}, "parler": {"enabled": True, "css": "general", "template": "general"}, "reddit": {"enabled": True, "css": "preset", "template": "preset"}, "telegram": {"enabled": True, "css": "general", "template": "general"}, "tiktok": {"enabled": True, "css": "preset", "template": "preset"}, "tiktok-urls": {"enabled": True, "css": "preset", "template": "preset"}, "tumblr": {"enabled": True, "css": "preset", "template": "preset"}, "twitter": {"enabled": True, "css": "preset", "template": "preset"}, "twitterv2": {"enabled": True, "css": "preset", "template": "preset"}, "usenet": {"enabled": True, "css": "general", "template": "general"}, "vk": {"enabled": True, "css": "general", "template": "general"}},
         "columns": {
             "enabled": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -355,15 +355,15 @@ config_definition = {
                 "tooltip": "Whether the Explorer is available for this data source",
                 "default": True
             },
-            "fields": {
+            "template": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": "Fields",
+                "help": "Template",
                 "options": {
                     "general": "General",
                     "preset": "Preset"
                 },
                 "default": "general",
-                "tooltip": "What fields to use (see explanation above)"
+                "tooltip": "What template to use (see explanation above)"
             },
             "css": {
                 "type": UserInput.OPTION_CHOICE,

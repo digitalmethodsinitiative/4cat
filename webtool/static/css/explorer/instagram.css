@@ -2,24 +2,33 @@
 	color: black;
 }
 
-h1 span {
-	color: white;
-}
-
-body {
-	background-color: white;
-}
-
 .posts li.post {
-	max-width: 225px;
+	margin: 0 auto;
+	max-width: 500px;
 	background-color: white;
 	font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	font-size: 14px;
 	border-bottom: 1px solid grey;
+	list-style-type: none;
+	padding-top: 30px;
+	padding-bottom: 30px;
 }
 
 .posts header {
 	border: none;
+}
+
+.posts header span:not(:last-child)::after {
+    content: '\2022';
+    margin-left: 0.5em;
+}
+
+.posts header i.verified {
+	color: #0095f6;
+}
+
+.time {
+	color: #7b7b7b;
 }
 
 .posts .alt, .posts .alt time {
