@@ -5,13 +5,13 @@
 .posts li.post {
 	margin: 0 auto;
 	max-width: 500px;
+	position: relative;
 	background-color: white;
 	font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	font-size: 14px;
-	border-bottom: 1px solid grey;
+	border-bottom: 1px solid #e3e3e3;
 	list-style-type: none;
-	padding-top: 30px;
-	padding-bottom: 30px;
+	padding: 0;
 }
 
 .posts header {
@@ -27,12 +27,35 @@
 	color: #0095f6;
 }
 
-.time {
-	color: #7b7b7b;
+.posts header .location {
+	font-size: 12px;
 }
 
-.posts .alt, .posts .alt time {
-	color: grey;
+.posts article {
+	min-width: auto;
+}
+
+.posts .media-container {
+    width: 100%;
+}
+
+.posts .media-container > img {
+    width: 100%;
+}
+
+.posts header, .posts .post-content {
+	padding: 20px;
+}
+
+.posts .external-url {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    padding: 10px;
+}
+
+.time, .comments a {
+	color: #7b7b7b;
 }
 
 .posts .post-image {
@@ -40,4 +63,38 @@
 	margin: 0 auto;
 	margin-top: 30px;
 	margin-bottom: 30px;
+}
+
+/** --------------------- *
+     Annotation post elements
+  * --------------------- */
+.post-annotations {
+	border-top: 1px solid #e3e3e3;
+}
+
+.post-annotation {
+    padding: 15px;
+}
+
+.post-annotation > .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    min-width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.post-annotation.checkbox > .post-annotation-options {
+    display: inline-block;
+}
+
+.post-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.post-annotation-options > input {
+    display: inline-block;
 }

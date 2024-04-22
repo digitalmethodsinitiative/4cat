@@ -175,6 +175,11 @@ def _jinja2_filter_extension_to_noun(ext):
 	else:
 		return "item"
 
+
+@app.template_filter('post_media')
+def _jinja2_filter_post_media(url):
+	return url
+
 @app.template_filter('4chan_image')
 def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
@@ -227,7 +232,6 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 		return "retrieve:http://archive.4plebs.org/_/search/image/" + image_md5
 	# Archivedmoe as a last resort - has a lot of boards
 	return "retrieve:https://archived.moe/_/search/image/" + image_md5
-
 
 @app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):

@@ -87,6 +87,7 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     color: #215bc6;
 }
 
+
 .posts .external-url {
     position: absolute;
     bottom: 0;
@@ -143,7 +144,4 @@ span.divider {
 
 .post-annotation-options > input {
     display: inline-block;
-}
-
-.posts .external-url {
 }

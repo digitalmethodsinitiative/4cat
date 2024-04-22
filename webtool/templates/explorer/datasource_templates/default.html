@@ -102,22 +102,22 @@ set all_known_fields = {
 	<div class="metrics">
 		{% if fields.get("views") %}
 			<span class="views">
-				<i class="fa-solid fa-eye"></i> {{ fields.views | safe }}
+				<i class="fa-solid fa-eye"></i> {{ fields.views | commafy }}
 			</span>
 		{% endif %}
 		{% if fields.get("likes") %}
 			<span class="likes">
-				<i class="fa-solid fa-heart"></i> {{ fields.likes | safe }}
+				<i class="fa-solid fa-heart"></i> {{ fields.likes | commafy }}
 			</span>
 		{% endif %}
 		{% if fields.get("shares") %}
 			<span class="shares">
-				<i class="fa-solid fa-share"></i> {{ fields.shares | safe }}
+				<i class="fa-solid fa-share"></i> {{ fields.shares | commafy }}
 			</span>
 		{% endif %}
 		{% if fields.get("comments") %}
 			<span class="comments">
-				<i class="fa-solid fa-comment"></i> {{ fields.comments | safe }}
+				<i class="fa-solid fa-comment"></i> {{ fields.comments | commafy }}
 			</span>
 		{% endif %}
 	</div>
