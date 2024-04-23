@@ -19,7 +19,7 @@ config_definition = {
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
         "default": ["ninegag", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
-                    "telegram", "tiktok", "twitter"],
+                    "telegram", "tiktok", "twitter", "tiktok-comments", "gab"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },

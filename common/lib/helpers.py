@@ -121,7 +121,7 @@ def get_software_commit():
         return ""
 
     if not versionpath.exists():
-        # try github command line within the 4CAT root folder
+        # try git command line within the 4CAT root folder
         # if it is a checked-out git repository, it will tell us the hash of
         # the currently checked-out commit
         try:

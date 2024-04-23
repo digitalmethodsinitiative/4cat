@@ -39,76 +39,6 @@ class SearchReddit(Search):
 	rate_limit = 0
 	request_timestamps = []
 
-	options = {
-		"wildcard-warning": {
-			"type": UserInput.OPTION_INFO,
-			"help": "The requirement for searching by keyword has been lifted for your account; you can search by "
-					"date range only. This can potentially return hundreds of millions of posts, so **please be "
-					"careful** when using this privilege."
-		},
-		"pushshift_track": {
-			"type": UserInput.OPTION_CHOICE,
-			"help": "API version",
-			"options": {
-				"beta": "Beta (new version)",
-				"regular": "Regular"
-			},
-			"default": "beta",
-			"tooltip": "The beta version retrieves more comments per request but may be incomplete."
-		},
-		"board": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Subreddit(s)",
-			"tooltip": "Comma-separated"
-		},
-		"divider": {
-			"type": UserInput.OPTION_DIVIDER
-		},
-		"intro": {
-			"type": UserInput.OPTION_INFO,
-			"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io) (see also [this "
-					"paper](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)). Note that Pushshift's dataset "
-					"*may not be complete* depending on the parameters used,"
-					" data from the last few days might not be there yet,"
-					" and post scores can be out of date. "
-					"See [this paper](https://arxiv.org/pdf/1803.05046.pdf) for an overview of the gaps in data. "
-					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
-					"documentation ([beta](https://beta.pushshift.io/redoc), [regular](https://github.com/pushshift/api)) for "
-					"more information (e.g. query syntax)."
-		},
-		"body_match": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Message search",
-			"tooltip": "Matches anything in the body of a comment or post."
-		},
-		"subject_match": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Subject search",
-			"tooltip": "Matches anything in the title of a post."
-		},
-		"subject_url": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "URL/domain in post",
-			"tooltip": "Regular API only; Filter for posts that link to certain sites or domains (e.g. only posts linking to reddit.com)",
-		},
-		"divider-2": {
-			"type": UserInput.OPTION_DIVIDER
-		},
-		"daterange": {
-			"type": UserInput.OPTION_DATERANGE,
-			"help": "Date range"
-		},
-		"search_scope": {
-			"type": UserInput.OPTION_CHOICE,
-			"help": "Search scope",
-			"options": {
-				"op-only": "Opening posts only (no replies/comments)",
-				"posts-only": "All matching posts",
-			},
-			"default": "posts-only"
-		}
-	}
-
 	config = {
 		"reddit-search.can_query_without_keyword": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -136,7 +66,75 @@ class SearchReddit(Search):
 		:param user:
 		:return dict:  Options definition
 		"""
-		options = cls.options
+		options = {
+			"wildcard-warning": {
+				"type": UserInput.OPTION_INFO,
+				"help": "The requirement for searching by keyword has been lifted for your account; you can search by "
+						"date range only. This can potentially return hundreds of millions of posts, so **please be "
+						"careful** when using this privilege."
+			},
+			"pushshift_track": {
+				"type": UserInput.OPTION_CHOICE,
+				"help": "API version",
+				"options": {
+					"beta": "Beta (new version)",
+					"regular": "Regular"
+				},
+				"default": "beta",
+				"tooltip": "The beta version retrieves more comments per request but may be incomplete."
+			},
+			"board": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Subreddit(s)",
+				"tooltip": "Comma-separated"
+			},
+			"divider": {
+				"type": UserInput.OPTION_DIVIDER
+			},
+			"intro": {
+				"type": UserInput.OPTION_INFO,
+				"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io) (see also [this "
+						"paper](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)). Note that Pushshift's dataset "
+						"*may not be complete* depending on the parameters used,"
+						" data from the last few days might not be there yet,"
+						" and post scores can be out of date. "
+						"See [this paper](https://arxiv.org/pdf/1803.05046.pdf) for an overview of the gaps in data. "
+						"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
+						"documentation ([beta](https://beta.pushshift.io/redoc), [regular](https://github.com/pushshift/api)) for "
+						"more information (e.g. query syntax)."
+			},
+			"body_match": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Message search",
+				"tooltip": "Matches anything in the body of a comment or post."
+			},
+			"subject_match": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Subject search",
+				"tooltip": "Matches anything in the title of a post."
+			},
+			"subject_url": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "URL/domain in post",
+				"tooltip": "Regular API only; Filter for posts that link to certain sites or domains (e.g. only posts linking to reddit.com)",
+			},
+			"divider-2": {
+				"type": UserInput.OPTION_DIVIDER
+			},
+			"daterange": {
+				"type": UserInput.OPTION_DATERANGE,
+				"help": "Date range"
+			},
+			"search_scope": {
+				"type": UserInput.OPTION_CHOICE,
+				"help": "Search scope",
+				"options": {
+					"op-only": "Opening posts only (no replies/comments)",
+					"posts-only": "All matching posts",
+				},
+				"default": "posts-only"
+			}
+		}
 
 		# this warning isn't needed if the user can't search for everything
 		# anyway

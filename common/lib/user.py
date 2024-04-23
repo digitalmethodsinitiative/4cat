@@ -389,13 +389,15 @@ class User:
         """
         Dismiss a notification
 
-        The user can only dismiss their own notifications!
+        The user can only dismiss notifications they can see!
 
         :param int notification_id:  ID of the notification to dismiss
         """
-        self.db.execute("DELETE FROM users_notifications WHERE id IN ( SELECT n.id FROM users_notifications AS n, users AS u "
-            "WHERE u.name = %s AND n.id = %s "
-            "AND (u.name = n.username OR (u.tags @> '[\"admin\"]' AND n.username = '!admins') OR n.username = '!everyone'))", (self.get_id(), notification_id))
+        current_notifications = [n["id"] for n in self.get_notifications() if n["allow_dismiss"]]
+        if notification_id not in current_notifications:
+            return
+
+        self.db.delete("users_notifications", where={"id": notification_id})
 
     def get_notifications(self):
         """
@@ -406,10 +408,15 @@ class User:
 
         :return list:  Notifications, as a list of dictionaries
         """
+        tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.data["tags"]]]
+        if self.is_admin:
+            # for backwards compatibility - used to be called '!admins' even if the tag is 'admin'
+            tag_recipients.append("!admins")
+
         notifications = self.db.fetchall(
             "SELECT n.* FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s "
-            "AND (u.name = n.username OR (u.tags @> '[\"admin\"]' AND n.username = '!admins') OR n.username = '!everyone')", (self.get_id(),))
+            "AND (u.name = n.username OR n.username IN %s)", (self.get_id(), tuple(tag_recipients)))
 
         return notifications
 
@@ -463,8 +470,6 @@ class User:
 
         self.data["tags"] = sorted_tags
         self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
-
-
 
     def delete(self, also_datasets=True):
         from common.lib.dataset import DataSet

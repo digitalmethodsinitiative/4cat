@@ -72,7 +72,7 @@ def admin_frontpage():
     disk_stats = {k: v["count"] if v else 0 for k, v in disk_stats.items()}
 
     upgrade_available = not not db.fetchone(
-        "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+        "SELECT * FROM users_notifications WHERE username = '!admin' AND notification LIKE 'A new version of 4CAT%'")
 
     tags = config.get_active_tags(current_user)
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
@@ -100,13 +100,17 @@ def list_users(page):
     filter_bits = []
     replacements = []
     if filter_name:
-        filter_bits.append("(name LIKE %s OR userdata::json->>'notes' LIKE %s)")
+        filter_bits.append("(name ILIKE %s OR userdata::json->>'notes' ILIKE %s)")
         replacements.append("%" + filter_name + "%")
         replacements.append("%" + filter_name + "%")
 
     if tag:
-        filter_bits.append("tags != '[]' AND tags @> %s")
-        replacements.append('["' + tag + '"]')
+        if tag.startswith("user:"):
+            filter_bits.append("name LIKE %s")
+            replacements.append(re.sub("^user:", "", tag))
+        else:
+            filter_bits.append("tags != '[]' AND tags @> %s")
+            replacements.append('["' + tag + '"]')
 
     filter_bit = "WHERE " + (" AND ".join(filter_bits)) if filter_bits else ""
     order_bit = "name ASC"
@@ -434,9 +438,17 @@ def manipulate_tags():
     tags = [{"tag": tag, "explicit": True} for tag in tag_priority]
     tags.extend([{"tag": tag, "explicit": False} for tag in all_tags if tag not in tag_priority])
 
-    if not tags:
+    if not [tag for tag in tags if tag["tag"] == "admin"]:
         # admin tag always exists
-        tags = [{"tag": "admin", "explicit": True}]
+        tags.append({"tag": "admin", "explicit": True})
+
+    num_admins = 0
+    for i, tag in enumerate(tags):
+        tags[i]["users"] = db.fetchone("SELECT COUNT(*) AS count FROM users WHERE tags != '[]' AND tags @> %s", ('["' + tag["tag"] + '"]',))["count"]
+        if tag["tag"] == "admin":
+            num_admins = tags[i]["users"]
+        elif tag["tag"].startswith("user:"):
+            tags[i]["users"] = 1  # by definition
 
     if request.method == "POST":
         try:
@@ -477,7 +489,7 @@ def manipulate_tags():
         # always async
         return jsonify({"success": True})
 
-    return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
+    return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
 @app.route("/admin/settings", methods=["GET", "POST"])
@@ -564,13 +576,32 @@ def manipulate_settings():
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
             default = json.dumps(default)
 
+        # this is used for organising things in the UI
+        option_owner = option.split(".")[0]
+        submenu = "other"
+        if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
+                                    "logging", "ui"):
+            submenu = "core"
+        elif option_owner.endswith("-search"):
+            submenu = "datasources"
+        elif option_owner in backend.all_modules.processors:
+            submenu = "processors"
+
+        tabname = config_definition.categories.get(option_owner)
+        if not tabname:
+            tabname = modules.get(option_owner)
+        if not tabname:
+            tabname = option_owner
+
         options[option] = {
             **definition.get(option, {
                 "type": UserInput.OPTION_TEXT,
                 "help": option,
                 "default": all_settings.get(option)
             }),
+            "submenu": submenu,
             "default": default,
+            "tabname": tabname,
             "is_changed": is_changed
         }
 
@@ -578,6 +609,7 @@ def manipulate_settings():
             changed_categories.add(option.split(".")[0])
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
+    options = {k: options[k] for k in sorted(options, key=lambda o: options[o]["tabname"])}
 
     # 'data sources' is one setting but we want to be able to indicate
     # overrides per sub-item
@@ -622,7 +654,7 @@ def manipulate_notifications():
             incomplete.append("username")
 
         recipient = User.get_by_name(db, params["username"])
-        if not recipient and params["username"] not in ("!everyone", "!admins"):
+        if not recipient and not params["username"].startswith("!"):
             flash("User '%s' does not exist" % params["username"])
             incomplete.append("username")
 

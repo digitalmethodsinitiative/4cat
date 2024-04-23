@@ -335,7 +335,7 @@ class DataSet(FourcatModule):
 		# Collect item_mapper for use with filter
 		item_mapper = False
 		own_processor = self.get_own_processor()
-		if own_processor.map_item_method_available(dataset=self):
+		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
 		# Annotation fields are dynamically added,
@@ -1383,7 +1383,7 @@ class DataSet(FourcatModule):
 				del processors[analysis.type]
 				continue
 
-			if exclude_hidden and not processors[analysis.type].is_hidden:
+			if exclude_hidden and processors[analysis.type].is_hidden:
 				del processors[analysis.type]
 
 		self.available_processors = processors
