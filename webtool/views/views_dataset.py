@@ -201,7 +201,7 @@ def get_mapped_result(key):
     annotation_labels = None
     annotation_fields = dataset.get_annotation_fields()
     if annotation_fields:
-        annotation_labels = ["annotation_" + v["label"] for v in annotation_fields.values()]
+        annotation_labels = [v["label"] for v in annotation_fields.values()]
         annotations = dataset.get_annotations()
 
     def map_response():
