@@ -183,8 +183,7 @@ class ColumnFilter(BaseFilter):
                 else:
                     # Int/Float/Date
                     # If date, user may not be aware we normally store dates as timestamps
-                    column_value = mapped_item.get(column)
-                    # TODO: in order to use these match_styles on numerical data (e.g. "views == 1") we need to attempt to convert the match_values from strings
+                    column_value = str(mapped_item.get(column))
             else:
                 # Numerical
                 pass
