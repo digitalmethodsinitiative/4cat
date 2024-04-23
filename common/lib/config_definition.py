@@ -328,52 +328,23 @@ config_definition = {
     },
     "explorer._config_explanation": {
         "type": UserInput.OPTION_INFO,
-        "help": "Per data source, you can enable/disable the Explorer and customise how posts appear. "
-                "The latter involves *what fields to show* and *how posts are styled*. Many data sources have tailored "
-                "[presets for this](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/"
-                "explorer-presets). If presets are unavailable, a general template for [fields](https://github.com/"
-                "digitalmethodsinitiative/4cat/tree/master/webtool/static/explorer-presets/default-fields.json) "
-                "and [CSS styling](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/"
-                "explorer-presets/default-css.css) is used. You can also toggle between data source presets and the general "
-                "template via the table below."
+        "help": "Per data source, you can enable or disable the Explorer. Posts will be formatted through a <em>generic</em> template "
+                "made of [this HTML file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/templates/explorer/"
+                "templates/generic.html) and [this CSS file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/"
+                "static/css/explorer/generic.css). For various data sources, <em>data source-specific</em> templates are also available. "
+                "These are made of a custom HTML template in [this directory](https://github.com/digitalmethodsinitiative/4cat/tree/master/"
+                "webtool/datasource-templates/explorer/templates) and a custom CSS file [in this directory](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer)."
     },
-    # "explorer._config_explanation2": {
-    #     "type": UserInput.OPTION_INFO,
-    #     "help": "Alternatively, you can also *customise fields and CSS yourself* by choosing the `Custom` setting in the "
-    #             "table below and inserting JSON and CSS values in the text boxes underneath. See the [wiki for instructions "
-    #             "on how to format custom fields and CSS](https://github.com/digitalmethodsinitiative/4cat/wiki/"
-    #             "Exploring-and-annotating-datasets#add-custom-fields)."
-    # },
     "explorer.config": {
         "type": UserInput.OPTION_DATASOURCES_TABLE,
         "help": "Explorer settings per data source",
-        "default": {"fourchan": {"enabled": True, "css": "preset", "template": "general"}, "eightchan": {"enabled": True, "css": "general", "template": "general"}, "eightkun": {"enabled": True, "css": "general", "template": "general"}, "ninegag": {"enabled": True, "css": "general", "template": "general"}, "bitchute": {"enabled": True, "css": "general", "template": "general"}, "dmi-tcat": {"enabled": True, "css": "general", "template": "general"}, "dmi-tcatv2": {"enabled": True, "css": "general", "template": "general"}, "douban": {"enabled": True, "css": "general", "template": "general"}, "douyin": {"enabled": False, "css": "general", "template": "general"}, "imgur": {"enabled": True, "css": "general", "template": "general"}, "upload": {"enabled": True, "css": "general", "template": "general"}, "instagram": {"enabled": True, "css": "preset", "template": "preset"}, "linkedin": {"enabled": True, "css": "general", "template": "general"}, "parler": {"enabled": True, "css": "general", "template": "general"}, "reddit": {"enabled": True, "css": "preset", "template": "preset"}, "telegram": {"enabled": True, "css": "general", "template": "general"}, "tiktok": {"enabled": True, "css": "preset", "template": "preset"}, "tiktok-urls": {"enabled": True, "css": "preset", "template": "preset"}, "tumblr": {"enabled": True, "css": "preset", "template": "preset"}, "twitter": {"enabled": True, "css": "preset", "template": "preset"}, "twitterv2": {"enabled": True, "css": "preset", "template": "preset"}, "usenet": {"enabled": True, "css": "general", "template": "general"}, "vk": {"enabled": True, "css": "general", "template": "general"}},
+        "default": {"fourchan": {"enabled": True}, "eightchan": {"enabled": True}, "eightkun": {"enabled": True}, "ninegag": {"enabled": True}, "bitchute": {"enabled": True}, "dmi-tcat": {"enabled": True}, "dmi-tcatv2": {"enabled": True}, "douban": {"enabled": True}, "douyin": {"enabled": False}, "imgur": {"enabled": True}, "upload": {"enabled": True}, "instagram": {"enabled": True}, "linkedin": {"enabled": True}, "parler": {"enabled": True}, "reddit": {"enabled": True}, "telegram": {"enabled": True}, "tiktok": {"enabled": True}, "tiktok-urls": {"enabled": True}, "tumblr": {"enabled": True}, "twitter": {"enabled": True}, "twitterv2": {"enabled": True}, "usenet": {"enabled": True}, "vk": {"enabled": True}},
         "columns": {
             "enabled": {
                 "type": UserInput.OPTION_TOGGLE,
-                "help": "Enable",
+                "help": "Enable Explorer",
                 "tooltip": "Whether the Explorer is available for this data source",
                 "default": True
-            },
-            "template": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Template",
-                "options": {
-                    "general": "General",
-                    "preset": "Preset"
-                },
-                "default": "general",
-                "tooltip": "What template to use (see explanation above)"
-            },
-            "css": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "CSS",
-                "options": {
-                    "general": "General",
-                    "preset": "Preset"
-                },
-                "default": "general",
-                "tooltip": "What CSS styling to use (see explanation above)"
             }
         }
     },

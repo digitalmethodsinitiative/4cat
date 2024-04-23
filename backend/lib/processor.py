@@ -418,7 +418,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		parent_path = which_parent.get_results_path()
 
 		if len(new_data) != which_parent.num_rows:
-			raise ProcessorException('Must have new data point for each record: parent dataset: %i, new data points: %i' % (which_parent.num_rows, len(new_data)))
+			self.dataset.update_status('The amount of new data points and existing records don\'t match; data may be misaligned (parent dataset: %i, new data points: %i)' % (which_parent.num_rows, len(new_data)))
 
 		self.dataset.update_status("Adding new field %s to the source file" % field_name)
 

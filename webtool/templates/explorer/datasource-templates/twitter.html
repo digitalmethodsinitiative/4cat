@@ -1,0 +1,53 @@
+<div class="post-table">
+	<div class="post-table-row">
+		<div class="profile-picture">
+			{% if not pseudonymised %}
+			<img src="{{ post.get('author_profile_img') }}">
+			{% else %}
+			<span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+			{% endif %}
+		</div>
+		<div class="post-content">
+			<header>
+				{% if not pseudonymised %}
+					<span class="author"><strong><a href="https://twitter.com/{{ post.get('author') }}">{{ post.get("author_fullname")}}</strong> {% if post.get("verified") %} <i class="fa-solid fa-circle-check verified"></i> {% endif %}<span class="atname">@{{ post.get("author") }}</span></a>
+						</span>
+				{% else %}
+					<span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+				{% endif %}
+					<span class="time">{{ post.get("timestamp") }}</span>
+
+			</header>
+
+			<div class="body">{{ post.body }}</div>
+			<!-- Media item -->
+			{% if post.get("images") %}
+				{% set media_url = post.get("images") %}
+			{% elif post.get("videos") %}
+				{% set media_url = post.get("videos") %}
+			{% endif %}
+			{% if media_url %}
+			<div class="media-container">
+				{% for url in media_url.split(",") %}
+					<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+				{% endfor %}
+			</div>
+			{% endif %}
+			{% if post.get("quoted_user") %}
+			<div class="quoted-user">
+				Tweet by @{{ post.quoted_user }}
+			</div>
+			{% endif %}
+			<div class="metrics">
+				<span class="comments"><i class="fa-solid fa-comment"></i> {{ post.get("reply_count") | numberify }}</span>
+				<span class="retweets"><i class="fa-solid fa-retweet"></i> {{ post.get("retweet_count") }}</span>
+				<span class="likes"><i class="fa-solid fa-heart"></i> {{ post.get("like_count") | numberify }}</span>
+				{% if post.get("impression_count") %}<span class="impressions"><i class="fa-solid fa-chart-simple"></i> {{ post.get("impression_count") | numberify }}</span>{% endif %}
+			</div>
+		</div>
+	<!-- Possible external link, if not pseudonymised -->
+	{% if not pseudonymised %}
+		<a href="https://twitter.com/{{ post.author }}/status/{{ post.id }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
+	{% endif %}
+	</div>
+</div>

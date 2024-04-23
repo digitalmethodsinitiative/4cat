@@ -130,18 +130,15 @@ def explorer_dataset(key, page=1):
 	if not posts:
 		return error(404, error="No posts available for this datasource")
 
-	# We can use either a generic or a pre-made template 
-	# for Explorer posts. Get the choice as set in the config,
-	# and if it's a preset data source template , verify it exists.
-	template = datasource_config.get("template", "general")
-	if template == "preset":
-		template_path = Path(config.get('PATH_ROOT'), "webtool/templates/explorer/datasource_templates/" + datasource + ".html")
-		if not template_path.exists():
-			template = "general"
-			warning += "No preset template found for this data source. Using the general template instead."
-
-	# Include CSS: a generic template, a data source preset, or custom.
-	posts_css = get_css(datasource, css_type=datasource_config.get("css", "general"))
+	# We can use either a generic or a pre-made data source-specific template.
+	template = "datasource" if has_datasource_template(datasource) else "generic"
+	if template == "generic":
+		posts_css = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/generic.css")
+	else:
+		posts_css = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css")
+	# Read CSS and pass as a string
+	with open(posts_css, "r", encoding="utf-8") as css:
+		posts_css = css.read()
 
 	# Check whether there's already annotations inserted already.
 	# If so, also pass these to the template.
@@ -152,7 +149,7 @@ def explorer_dataset(key, page=1):
 		annotations = json.loads(annotations["annotations"])
 	
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, posts_css=posts_css, template=template, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
+	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, template=template, posts_css=posts_css, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
 
 @app.route('/results/<datasource>/<string:thread_id>/explorer')
 @api_ratelimit
@@ -191,11 +188,7 @@ def explorer_database_thread(datasource, board, thread_id):
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post, datasource=datasource) for post in posts]
 
-	# Include custom fields if it they are in the datasource's 'explorer' dir.
-	# The file's naming format should e.g. be 'reddit-explorer.json'.
-	custom_fields = get_custom_fields(datasource)
-
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
@@ -228,11 +221,7 @@ def explorer_database_posts(datasource, board, thread_id):
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
 
-	# Include custom fields if it they are in the datasource's 'explorer' dir.
-	# The file's naming format should e.g. be 'reddit-explorer.json'.
-	custom_fields = get_custom_fields(datasource)
-
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, custom_fields=custom_fields, posts_per_page=len(posts), post_count=len(posts))
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts))
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
@@ -555,30 +544,19 @@ def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, of
 
 	return posts
 
-def get_css(datasource, css_type):
+def has_datasource_template(datasource):
 	"""
-	Check if there's a custom css file for this dataset.
-	If so, return the text.
-	Custom css files should be placed in the webtool/static/css/explorer/ folder with the name of the datasource (e.g. 'webtool/static/css/explorer/reddit.css').
+	Check if the data source has a data source-specific template.
+	This requires HTML and CSS files.
+	Custom HTML files should be placed in `webtool/templates/explorer/datasource-templates/<datasource name>.html`.
+	Custom CSS files should be placed in `webtool/static/css/explorer/<datasource name>.css`.
 
-	:param datasource, str:	Datasource name
-	:param css_type, str:		`general` or `preset`.
-
-	:return: The css as string.
-
+	:param datasource, str:	Datasource name.
+	:return: bool, Whether the required files are present.
 	"""
+	css_exists = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css").exists()
+	html_exists = Path(config.get('PATH_ROOT'), "webtool/templates/explorer/datasource-templates/" + datasource + ".html").exists()
 
-	if css_type == "preset":
-		css_path = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/", datasource + ".css")
-	elif css_type == "general":
-		css_path = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/default.css")
-	else:
-		return ""
-
-	if not css_path.exists():
-		return ""
-
-	with open(css_path, "r", encoding="utf-8") as css:
-		css = css.read()
-
-	return css
+	if css_exists and html_exists:
+		return True
+	return False

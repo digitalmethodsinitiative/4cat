@@ -37,10 +37,21 @@
 
 .posts .media-container {
     width: 100%;
+    position: relative;
 }
 
-.posts .media-container > img {
+.posts .media-container img {
     width: 100%;
+}
+
+.posts .media-container .media-bullets {
+    position: absolute;
+    width: 100%;
+    bottom: 5px;
+    text-align: center;
+    font-size: 17px;
+    color: white;
+    opacity: .6;
 }
 
 .posts header, .posts .post-content {

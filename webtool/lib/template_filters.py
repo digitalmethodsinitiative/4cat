@@ -12,6 +12,7 @@ from webtool import app, config
 from common.lib.helpers import timify_long
 from common.config_manager import ConfigWrapper
 
+from pathlib import Path
 from flask import request
 from flask_login import current_user
 
@@ -175,11 +176,6 @@ def _jinja2_filter_extension_to_noun(ext):
 	else:
 		return "item"
 
-
-@app.template_filter('post_media')
-def _jinja2_filter_post_media(url):
-	return url
-
 @app.template_filter('4chan_image')
 def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
@@ -267,7 +263,6 @@ def inject_now():
 			version = infile.readline().strip()
 	else:
 		version = "???"
-
 
 	return {
 		"__has_https": wrapped_config.get("flask.https"),

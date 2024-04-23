@@ -3,6 +3,7 @@ Write annotations to a dataset
 """
 from processors.filtering.base_filter import BasicProcessor
 from common.lib.helpers import UserInput
+from common.lib.exceptions import MapItemException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -71,7 +72,7 @@ class WriteAnnotations(BasicProcessor):
 		# Create dictionary with annotation labels as keys and lists of data as values
 		new_data = {annotation_label: [] for annotation_label in annotation_labels}
 
-		for item in self.source_dataset.iterate_items(self):
+		for item in self.source_dataset.iterate_items(self, warn_unmappable=True):
 			post_count += 1
 
 			# Do some loops so we have empty data for all annotation fields
@@ -98,9 +99,11 @@ class WriteAnnotations(BasicProcessor):
 			if post_count % 2500 == 0:
 				self.dataset.update_status("Processed %i posts" % post_count)
 				self.dataset.update_progress(post_count / self.source_dataset.num_rows)
+			print(post_count, item)
 
 		# Write to top dataset
 		for label, values in new_data.items():
+			print(label, len(values))
 			self.add_field_to_parent(label, values, which_parent=self.source_dataset, update_existing=True)
 		
 		self.dataset.update_status("Annotations written to parent dataset.")
