@@ -348,7 +348,6 @@ config_definition = {
             }
         }
     },
-    "explorer"
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
     # Flask may require a restart to update them
