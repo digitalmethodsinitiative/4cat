@@ -1,23 +1,125 @@
-body {
+.explorer-content {
+	background-color: white;
+	padding-top: 30px;
+}
+
+.posts .post {
+	font-family: Arial, sans-serif;
+	font-size: 15px;
+	width: 580px;
+	margin: 0 auto;
+	background-color: white;
+	list-style-type: none;
+	border: 1px solid #efefef;
+	border-radius: 10px;
+	min-height: 50px;
+	margin-bottom: 20px;
+}
+
+.posts .post .post-table {
+	position: relative;
+	display: table;
+	table-layout: fixed;
+}
+
+.posts .post .post-table-row {
+	display: table-row;
+}
+
+.posts .post .profile-picture {
+	display: table-cell;
+	width: 11%;
+	vertical-align: top;
+}
+
+.posts .post .profile-picture img {
+	border-radius: 100%;
+}
+
+.posts .post .post-content {
+	display: table-cell;
+	width: 93%;
+}
+
+.posts .post header {
+	color: black;
+	margin-top: 5px;
+	margin-bottom: 5px;
+}
+
+.posts .post header a {
 	color: black;
 }
 
-.posts header span.post_id {
-	display: none;
+.posts .post .post-content {
+	display: inline-block;
 }
 
-.posts li.post {
+.posts .post .post-media {
+	margin-top: 10px;
+	width: 100%;
+}
+
+.posts .post .post-media img {
+	width: 100%;
 	border-radius: 10px;
-	padding: 20px;
-	max-width: 200px;
-	background-color: white;
-	border-bottom: 1px grey;
+}
+
+.metrics {
+	display: table-cell;
+	width: 5%;
+	vertical-align: top;
+	margin-top: 40px;
+}
+
+.metrics span {
+	display: inline-block;
+	width: 100%;
+	margin-bottom: 20px;
+}
+
+.posts .external-url {
+	color: rgb(104, 119, 130);
+}
+
+span.hashtag {
+	color: rgb(29, 155, 240);
 }
 
 
-.posts li.post .preview {
-	display: block;
-	margin: 0 auto;
-	max-width: 300px;
+/** --------------------- *
+     Annotation post elements
+  * --------------------- */
+.post-annotations {
+    background-color: rgb(254, 44, 85);
+    margin-top: 10px;
+    color: white;
+    border-radius: 10px;
 }
 
+.post-annotation {
+    padding: 15px;
+}
+
+.post-annotation > .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    min-width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.post-annotation.checkbox > .post-annotation-options {
+    display: inline-block;
+}
+
+.post-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.post-annotation-options > input {
+    display: inline-block;
+}
