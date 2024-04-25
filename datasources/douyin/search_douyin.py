@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 class SearchDouyin(Search):
     """
@@ -96,14 +96,14 @@ class SearchDouyin(Search):
             mix_name_key = "mixName"
 
             # Stats
-            collect_count = stats["collectCount"]
-            comment_count = stats["commentCount"]
-            digg_count = stats["diggCount"]
-            download_count = stats["downloadCount"]
-            forward_count = stats["forwardCount"]
-            play_count = stats["playCount"]
-            share_count = stats["shareCount"]
-            live_watch_count = stats["liveWatchCount"]
+            collect_count = stats.get("collectCount", MissingMappedField(0))
+            comment_count = stats.get("commentCount", MissingMappedField(0))
+            digg_count = stats.get("diggCount", MissingMappedField(0))
+            download_count = stats.get("downloadCount", MissingMappedField(0))
+            forward_count = stats.get("forwardCount", MissingMappedField(0))
+            play_count = stats.get("playCount", MissingMappedField(0))
+            share_count = stats.get("shareCount", MissingMappedField(0))
+            live_watch_count = stats.get("liveWatchCount", MissingMappedField(0))
 
             # This is a guess, I have not encountered it
             video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if "tagName" in tag])
@@ -198,9 +198,10 @@ class SearchDouyin(Search):
                     image_urls.append(img["urlList"][0])
 
         # Music
-        music_author = item.get('music').get('author') if item.get('music') else ""
-        music_title = item.get('music').get('title') if item.get('music') else ""
-        music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') else ""
+        music_author = item.get('music').get('author') if item.get('music') and item.get("music") != "$undefined" else ""
+        music_title = item.get('music').get('title') if item.get('music') and item.get("music") != "$undefined" else ""
+        music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') and item.get("music") != "$undefined" else ""
+
 
         return MappedItem({
             "id": item[aweme_id_key],
