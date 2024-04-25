@@ -211,7 +211,7 @@ def import_dataset():
 		.replace("9", "nine")
 
 	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
-		return error(404, message="Unknown platform or source format")
+		return error(404, message=f"Unknown platform or source format '{platform}'")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
 	worker = None
