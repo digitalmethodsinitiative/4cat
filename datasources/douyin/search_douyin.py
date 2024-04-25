@@ -44,7 +44,7 @@ class SearchDouyin(Search):
         if "ZS_collected_from_embed" in item and item["ZS_collected_from_embed"]:
             # HTML embedded posts formated differently than JSON posts
 
-            stream_data = item.get("cellRoom", {}).get("rawdata")
+            stream_data = item.get("cellRoom", {}).get("rawdata") if item.get("cellRoom") != "$undefined" else {}
             if stream_data:
                 # These appear to be streams
                 subject = "Stream"
