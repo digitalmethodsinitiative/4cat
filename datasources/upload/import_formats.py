@@ -5,6 +5,7 @@ import re
 
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import ProcessorException
+from common.lib.helpers import convert_to_int
 
 
 class InvalidCustomFormat(ProcessorException):
@@ -121,7 +122,7 @@ def import_crowdtangle_facebook(reader, columns, dataset, parameters):
             "page_followers": item["Followers at Posting"],
             "page_shared_from": shared_page,
             "type": item["Type"],
-            "interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])) if item[
+            "interactions": convert_to_int(re.sub(r"[^0-9]", "", item["Total Interactions"]), 0) if item[
                 "Total Interactions"] else 0,
             "comments": item["Comments"],
             "shares": item["Shares"],
