@@ -50,8 +50,8 @@ following tools are explicitly supported but other data can also be uploaded as
 long as it is formatted as CSV:
 
 * Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) or [Facepager](https://github.com/strohne/Facepager) exports)
-* YouTube videos and comments (via the [YouTube Data Tools](https://ytdt.digitalmethods.net/)
-* Weibo (via [Bazhuayu](https://www.bazhuayu.com/)))
+* YouTube videos and comments (via the [YouTube Data Tools](https://ytdt.digitalmethods.net/))
+* Weibo (via [Bazhuayu](https://www.bazhuayu.com/))
 
 A number of other platforms have built-in support that is untested, or requires
 e.g. special API access. You can view the [data sources in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-data-sources) or review [the data
