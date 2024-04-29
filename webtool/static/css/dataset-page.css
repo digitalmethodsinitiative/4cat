@@ -734,3 +734,7 @@ body.image-preview {
     box-sizing: border-box;
     border-width: 0;
 }
+
+.annotation-field-label.invalid {
+    border: 1px solid red;
+}
