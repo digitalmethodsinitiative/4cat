@@ -133,7 +133,7 @@ class URLFetcher(BasicProcessor):
         self.dataset.update_status("Finding URLs in dataset")
         for item in self.source_dataset.iterate_items(self):
             # combine column contents that we need to extract URLs from
-            source_text = " ".join([item[1][column] for column in columns])
+            source_text = " ".join([item[column] for column in columns])
             urls = ural.urls_from_text(source_text)
 
             for url in urls:
@@ -150,7 +150,7 @@ class URLFetcher(BasicProcessor):
                 # used in multiple items. so save references to all items per
                 # URL; save item ID and timestamp, which we will include in the
                 # output later
-                all_urls[url]["items"].append({k: v for k, v in item[1].items() if k in ("id", "thread_id", "timestamp")})
+                all_urls[url]["items"].append({k: v for k, v in item.items() if k in ("id", "thread_id", "timestamp")})
 
         # now start fetching things
         with self.dataset.get_results_path().open("w", newline="") as outfile:
