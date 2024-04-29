@@ -246,34 +246,36 @@ def save_annotation_fields(key):
 	# Do some preperations
 	new_fields = request.get_json()
 	new_field_ids = set(new_fields.keys())
+	new_field_labels = [new_field["label"] for new_field in new_fields.values()]
 	text_fields = ["textarea", "text"]
 	option_fields = set()
 
 	# Get dataset info.
-	dataset = db.fetchone("SELECT key, annotation_fields FROM datasets WHERE key = %s;", (key,))
+	# Get dataset info.
+	try:
+		dataset = DataSet(key=key, db=db)
+	except DataSetException:
+		return error(404, error="Dataset not found.")
+	
 
-	if not dataset:
-		return error(404, error="Dataset not found")
+	# Get the annotation fields that were already saved to check what's changed.
+	old_fields = dataset.get_annotation_fields()
 
-	# We're saving the annotation fields as-is
+	# Can't overwrite existing column names
+	old_field_labels = [l["label"] for l in old_fields.values()]
+	existing_columns = dataset.get_columns()
+	for new_field_label in new_field_labels:
+		if new_field_label not in old_field_labels and new_field_label in existing_columns:
+			return error(403, error="Can't overwrite existing column name %s" % new_field_label)
+
+	# We're saving new annotation fields as-is
 	db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), key))
 
 	# If fields and annotations were saved before, we must also check whether we need to
 	# change old annotation data, for instance when a field is deleted or its label has changed.
 
-	# Get the annotation fields that were already saved to check what's changed.
-	old_fields = dataset.get("annotation_fields")
-	if old_fields:
-		old_fields = json.loads(old_fields)
-
 	# Get the annotations
-	if old_fields:
-		annotations = db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (key,))
-		if annotations and "annotations" in annotations:
-			if not annotations["annotations"]:
-				annotations = None
-			else:
-				annotations = json.loads(annotations["annotations"])
+	annotations = dataset.get_annotations()
 
 	# If there's old fields *and* annotations saved, we need to check if we need to update stuff.
 	if old_fields and annotations:

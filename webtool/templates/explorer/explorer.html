@@ -5,13 +5,27 @@
 
 {% block body %}
 
-<!-- Some custom behaviour here -->
+<!-- Custom JavaScript for Explorer-specific functions -->
 <script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
 
-<!-- Possible annotation fields -->
+<!-- Load some variables for which we need Jinja2 -->
 <script type="text/javascript">
+// Annotation fields
 var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %}
+
+// We're getting the dataset column names to make sure that
+// new annotation fields cannot overwrite these.
+var original_columns = {{ dataset.get_columns() | safe }}
+for (a in annotation_fields) {
+	let annotation_label = annotation_fields[a]["label"]
+	if (original_columns.includes(annotation_label)) {
+		i = original_columns.indexOf(annotation_label)
+		original_columns.splice(i, 1)
+	}
+}
+
 </script>
+
 
 {% set key = dataset.data.key %}
 
@@ -30,7 +44,9 @@ var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}
 </style>
 
 <!-- Flags for chan posts -->
-<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
+{% if datasource == '4chan' %}
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
+{% endif %}
 
 <!-- The actual dataset posts -->
 <div class="explorer-content-container">
