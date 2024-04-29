@@ -201,7 +201,15 @@ class SearchDouyin(Search):
         music_author = item.get('music').get('author') if item.get('music') and item.get("music") != "$undefined" else ""
         music_title = item.get('music').get('title') if item.get('music') and item.get("music") != "$undefined" else ""
         music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') and item.get("music") != "$undefined" else ""
-
+        
+        # Collection
+        mix_current_episode = mix_current_episode if mix_current_episode != "$undefined" else "N/A"
+        collection_id = item.get(mix_info_key, {}).get(mix_id_key, "N/A")
+        collection_id = collection_id if collection_id != "$undefined" else "N/A"
+        collection_name = item.get(mix_info_key, {}).get(mix_name_key, "N/A")
+        collection_name = collection_name if collection_name != "$undefined" else "N/A"
+        part_of_collection = "yes" if mix_info_key in item and mix_id_key in item[
+            mix_info_key] and collection_id != "N/A" else "no"
 
         return MappedItem({
             "id": item[aweme_id_key],
@@ -246,11 +254,11 @@ class SearchDouyin(Search):
             "author_region": author.get("region"),
             "author_is_ad_fake": author.get(is_fake_key),
             # Collection/Mix
-            "part_of_collection": "yes" if mix_info_key in item and mix_id_key in item[mix_info_key] else "no",
+            "part_of_collection": part_of_collection,
             "4CAT_first_video_displayed": "yes" if displayed else "no",
             # other videos may have been viewed, but this is unknown to us
-            "collection_id": item.get(mix_info_key, {}).get(mix_id_key, "N/A"),
-            "collection_name": item.get(mix_info_key, {}).get(mix_name_key, "N/A"),
+            "collection_id": collection_id,
+            "collection_name": collection_name,
             "place_in_collection": mix_current_episode,
             "unix_timestamp": int(post_timestamp.timestamp()),
         })
