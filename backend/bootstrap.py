@@ -1,6 +1,7 @@
 """
 4CAT Backend init - used to start the backend!
 """
+import pickle
 import shutil
 import os
 
@@ -10,7 +11,6 @@ from common.lib.queue import JobQueue
 from common.lib.database import Database
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
-
 from common.config_manager import config
 
 def run(as_daemon=True):
@@ -65,6 +65,16 @@ def run(as_daemon=True):
 	# ensure database consistency for settings table
 	config.with_db(db)
 	config.ensure_database()
+
+	# Load all modules and update config with module-specific settings
+	from backend import all_modules
+	module_config = {}
+	for worker in all_modules.workers.values():
+		if hasattr(worker, "config") and type(worker.config) is dict:
+			module_config.update(worker.config)
+	with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+		pickle.dump(module_config, outfile)
+	config.load_user_settings()
 
 	# make it happen
 	# this is blocking until the back-end is shut down
