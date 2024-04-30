@@ -243,7 +243,13 @@ const annotations = {
 			}
 			// Make sure the names can't be duplicates.
 			else if (labels_added.includes(label)) {
-				warning = "Fields must be unique";
+				warning = "Field labels must be unique";
+				label_field.addClass("invalid");
+			}
+
+			// We can't add field labels that are also existing column names
+			else if (original_columns.includes(label)) {
+				warning = "Fields labels cannot be an existing column name";
 				label_field.addClass("invalid");
 			}
 
