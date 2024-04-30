@@ -148,8 +148,10 @@ def explorer_dataset(key, page=1):
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_database_thread(datasource, board, thread_id):
+def explorer_api_thread(datasource, thread_id):
 	"""
+	/// INTEGRATE LATER!
+
 	Show a thread from an API-accessible database.
 
 	:param str datasource:  Data source ID
@@ -163,8 +165,6 @@ def explorer_database_thread(datasource, board, thread_id):
 		return error(404, error="No datasource provided")
 	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
-	if not board:
-		return error(404, error="No board provided")
 	if not thread_id:
 		return error(404, error="No thread ID provided")
 
@@ -172,7 +172,7 @@ def explorer_database_thread(datasource, board, thread_id):
 	max_posts = config.get('explorer.max_posts', 500000)
 
 	# Get the posts with this thread ID.
-	posts = get_local_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+	posts = get_local_posts(db, datasource, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	if not posts:
 		return error(404, error="No posts available for this thread")
@@ -180,20 +180,22 @@ def explorer_database_thread(datasource, board, thread_id):
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post, datasource=datasource) for post in posts]
 
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
+	return render_template("explorer/explorer.html", datasource=datasource, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_database_posts(datasource, board, thread_id):
+def explorer_api_posts(datasource, post_ids):
 	"""
+	/// INTEGRATE LATER
+
 	Show posts from an API-accessible database.
 
 	:param str datasource:  Data source ID
 	:param str board:  Board name
-	:param int thread_id:  Thread ID
+	:param int post_ids:  Post IDs
 
 	:return-error 404:  If the thread ID does not exist for the given data source.
 	"""
@@ -202,13 +204,11 @@ def explorer_database_posts(datasource, board, thread_id):
 		return error(404, error="No datasource provided")
 	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
-	if not board:
-		return error(404, error="No board provided")
-	if not thread_id:
+	if not post_ids:
 		return error(404, error="No thread ID provided")
 
 	# Get the posts with this thread ID.
-	posts = get_database_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+	posts = get_database_posts(db, datasource, board=board, ids=tuple([post_ids]), threads=True, order_by=["id"])
 
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
@@ -221,169 +221,27 @@ def explorer_database_posts(datasource, board, thread_id):
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def save_annotation_fields(key):
+def explorer_save_annotation_fields(key):
 	"""
-	Save the annotation fields of a dataset to the datasets table.
-	If the changes to the annotation fields affect existing annotations,
-	this function also updates or deleted those old values.
+	Save teh annotation fields of a dataset to the datasets table.
 
-	:param str key:  The dataset key
+	:param str key:  	The dataset key.
 
 	:return-error 404:  If the dataset ID does not exist.
+	:return int:		The number of annotation fields saved.
 	"""
 
+	# Get dataset.
 	if not key:
 		return error(404, error="No dataset key provided")
+	try:
+		dataset = DataSet(key=key, db=db)
+	except DataSetException:
+		return error(404, error="Dataset not found.")
 
-	# Do some preperations
-	new_fields = request.get_json()
-	new_field_ids = set(new_fields.keys())
-	text_fields = ["textarea", "text"]
-	option_fields = set()
-
-	# Get dataset info.
-	dataset = db.fetchone("SELECT key, annotation_fields FROM datasets WHERE key = %s;", (key,))
-
-	if not dataset:
-		return error(404, error="Dataset not found")
-
-	# We're saving the annotation fields as-is
-	db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), key))
-
-	# If fields and annotations were saved before, we must also check whether we need to
-	# change old annotation data, for instance when a field is deleted or its label has changed.
-
-	# Get the annotation fields that were already saved to check what's changed.
-	old_fields = dataset.get("annotation_fields")
-	if old_fields:
-		old_fields = json.loads(old_fields)
-
-	# Get the annotations
-	if old_fields:
-		annotations = db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (key,))
-		if annotations and "annotations" in annotations:
-			if not annotations["annotations"]:
-				annotations = None
-			else:
-				annotations = json.loads(annotations["annotations"])
-
-	# If there's old fields *and* annotations saved, we need to check if we need to update stuff.
-	if old_fields and annotations:
-
-		fields_to_delete = set()
-		labels_to_update = {}
-		options_to_delete = set()
-		options_to_update = {}
-
-		for field_id, field in old_fields.items():
-
-			# We'll delete all prior annotations for a field if its input field is deleted
-			if field_id not in new_field_ids:
-
-				# Labels are used as keys in the annotations table
-				# They should already be unique, so that's okay.
-				fields_to_delete.add(field["label"])
-				continue
-
-			# If the type has changed, also delete prior references (except between text and textarea)
-			new_type = new_fields[field_id]["type"]
-			if field["type"] != new_type:
-
-				if not field["type"] in text_fields and not new_type in text_fields:
-					fields_to_delete.add(field["label"])
-					continue
-
-			# If the label has changed, change it in the old annotations
-			old_label = old_fields[field_id]["label"]
-			new_label = new_fields[field_id]["label"]
-
-			if old_label != new_label:
-				labels_to_update[old_label] = new_label
-
-			# Check if the options for dropdowns or checkboxes have changed
-			if new_type == "checkbox" or new_type == "dropdown":
-
-				if "options" in old_fields[field_id]:
-
-					option_fields.add(old_fields[field_id]["label"])
-					new_options = new_fields[field_id]["options"]
-
-					new_ids = [list(v.keys())[0] for v in new_options]
-					new_ids = [list(v.keys())[0] for v in new_options]
-
-					# If it's a dropdown or checkbox..
-					for option in old_fields[field_id]["options"]:
-						option_id = list(option.keys())[0]
-						option_label = list(option.values())[0]
-
-						# If this ID is not present anymore, delete it
-						if option_id not in new_ids:
-							options_to_delete.add(option_label)
-							continue
-
-						# Change the label if it has changed. Bit ugly but it works.
-						new_label = [list(new_option.values())[0] for i, new_option in enumerate(new_options) if list(new_options[i].keys())[0] == option_id][0]
-
-						if option_label != new_label:
-							options_to_update[option_label] = new_label
-
-		# Loop through the old annotations if things need to be changed
-		if fields_to_delete or labels_to_update or options_to_update or options_to_delete:
-
-			for post_id in list(annotations.keys()):
-
-				for field_label in list(annotations[post_id].keys()):
-
-					# Delete the field entirely
-					if field_label in fields_to_delete:
-						del annotations[post_id][field_label]
-						continue
-
-					# Update the label
-					if field_label in labels_to_update:
-						annotations[post_id][labels_to_update[field_label]] = annotations[post_id].pop(field_label)
-						field_label = labels_to_update[field_label]
-
-					# Update or delete option values
-					if field_label in option_fields:
-						options_inserted = annotations[post_id][field_label]
-
-						# We can just delete/change the entire annotation if its a string
-						if type(options_inserted) == str:
-
-							# Delete the option if it's not present anymore
-							if options_inserted in options_to_delete:
-								del annotations[post_id][field_label]
-
-							# Update the option label if it has changed
-							elif options_inserted in options_to_update:
-								annotations[post_id][field_label] = options_to_update[options_inserted]
-
-						# For lists (i.e. checkboxes), we have to loop
-						elif type(options_inserted) == list:
-
-							for option_inserted in options_inserted:
-
-								# Delete the option if it's not present anymore
-								if option_inserted in options_to_delete:
-									annotations[post_id][field_label].remove(option_inserted)
-
-								# Update the option label if it has changed
-								elif option_inserted in options_to_update:
-									annotations[post_id][field_label] = options_to_update[option_inserted]
-
-				# Delete entire post dict if there's nothing left
-				if not annotations[post_id]:
-					del annotations[post_id]
-
-			# Save annotations as an empty string if there's none.
-			if not annotations:
-				annotations = ""
-			else:
-				annotations = json.dumps(annotations)
-
-			# Insert into the annotations table.
-			db.execute("INSERT INTO annotations(key, annotations) VALUES(%s, %s) ON CONFLICT (key) DO UPDATE SET annotations = %s ", (key, annotations, annotations))
+	# Save it!
+	annotation_fields = request.get_json()
+	dataset.save_annotation_fields(annotation_fields)
 
 	return "success"
 
@@ -393,47 +251,27 @@ def save_annotation_fields(key):
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def save_annotations(key):
+def explorer_save_annotations(key):
 	"""
 	Save the annotations of a dataset to the annotations table.
 
-	:param str key:  The dataset key
+	:param str key: 	The dataset key.
 
 	:return-error 404:  If the dataset ID does not exist.
+	:return int:		The number of posts with annotations saved.
 	"""
 
+	# Get dataset.
 	if not key:
 		return error(404, error="No dataset key provided")
+	try:
+		dataset = DataSet(key=key, db=db)
+	except DataSetException:
+		return error(404, error="Dataset not found.")
 
+	# Save it!
 	new_annotations = request.get_json()
-
-	# If there were already annotations added, we need to make sure
-	# we're not incorrectly overwriting any.
-	# We also need to check whether any of the input fields have changed.
-	# If so, we're gonna edit or remove their old values.
-	old_annotations = db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (key,))
-
-	if old_annotations:
-
-		if "annotations" in old_annotations and old_annotations["annotations"]:
-			old_annotations = json.loads(old_annotations["annotations"])
-
-			# Loop through all new annotations and add/overwrite them
-			# with the old annotations dict.
-			for post_id in list(new_annotations.keys()):
-				old_annotations[post_id] = new_annotations[post_id]
-				if not old_annotations[post_id]:
-					del old_annotations[post_id]
-
-			new_annotations = old_annotations
-
-	if not new_annotations:
-		new_annotations = ""
-	else:
-		new_annotations = json.dumps(new_annotations)
-
-	# We're saving all annotations as a JSON string in one go
-	db.execute("INSERT INTO annotations(key, annotations) VALUES(%s, %s) ON CONFLICT (key) DO UPDATE SET annotations = %s ", (key, new_annotations, new_annotations))
+	dataset.save_annotations(new_annotations)
 
 	return "success"
 
