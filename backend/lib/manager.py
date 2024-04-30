@@ -123,21 +123,30 @@ class WorkerManager:
 				self.looping = False
 
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
-		for jobtype in self.worker_pool:
+		# request shutdown from all workers except the API
+		# this allows us to use the API to figure out if a certain worker is
+		# hanging during shutdown, for example
+		for jobtype in [jobtype for jobtype in self.worker_pool if jobtype != "api"]:
 			for worker in self.worker_pool[jobtype]:
 				if hasattr(worker, "request_interrupt"):
 					worker.request_interrupt()
 				else:
 					worker.abort()
 
+
 		# wait for all workers to finish
 		self.log.info("Waiting for all workers to finish...")
-		for jobtype in self.worker_pool:
+		for jobtype in [jobtype for jobtype in self.worker_pool if jobtype != "api"]:
 			for worker in self.worker_pool[jobtype]:
 				self.log.info("Waiting for worker %s..." % jobtype)
 				worker.join()
 
-		time.sleep(3)
+		# shut down API last
+		for worker in self.worker_pool.get("api", []):
+			worker.request_interrupt()
+			worker.join()
+
+		time.sleep(1)
 
 		# abort
 		self.log.info("Bye!")
