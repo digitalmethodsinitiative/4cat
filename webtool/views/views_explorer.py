@@ -1,30 +1,22 @@
 """
-4CAT Explorer views - pages that display datasets akin to
-the 'native' appearance of the platform they were retrieved from.
+4CAT Explorer views - pages that display datasets in a legible
+format and lets users annotate the data.
 """
 
-import datetime
 import json
-import csv
 import re
-import operator
-#import markdown
-import markdown2
-
-from backend import all_modules
 
 from pathlib import Path
 
-from flask import jsonify, abort, send_file, request, render_template
+from flask import request, render_template
 from flask_login import login_required, current_user
-
 from webtool import app, db, openapi, limiter, config
-from webtool.lib.helpers import format_chan_post, error, setting_required
+from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
-from common.lib.helpers import strip_tags, convert_to_float
+from common.lib.helpers import convert_to_float
 from common.lib.exceptions import DataSetException
-
 from common.config_manager import ConfigWrapper
+
 config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
@@ -444,52 +436,6 @@ def save_annotations(key):
 	db.execute("INSERT INTO annotations(key, annotations) VALUES(%s, %s) ON CONFLICT (key) DO UPDATE SET annotations = %s ", (key, new_annotations, new_annotations))
 
 	return "success"
-
-@app.route('/api/<datasource>/boards.json')
-@api_ratelimit
-@login_required
-@setting_required("privileges.can_use_explorer")
-@openapi.endpoint("data")
-def get_boards(datasource):
-	"""
-	Get available boards in datasource
-
-	:param datasource:  The datasource for which to acquire the list of available
-					  boards.
-	:return:  A list containing a list of `boards`, as string IDs.
-
-	:return-schema: {type=object,properties={
-		boards={type=array,items={type=object,properties={
-			board={type=string}
-		}}}
-	}}
-
-	:return-error 404: If the datasource does not exist.
-	"""
-	if datasource not in config.get('datasources.enabled'):
-		return error(404, error="Invalid data source")
-
-	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + datasource)
-	return jsonify({"boards": [{"board": board["board"]} for board in boards]})
-
-@app.route('/api/image/<img_file>')
-@app.route('/api/imagefile/<img_file>')
-@login_required
-@setting_required("privileges.can_use_explorer")
-def get_image_file(img_file):
-	"""
-	Returns an image based on filename
-	Request should hex the md5 hashes first (e.g. with hexdigest())
-
-	"""
-	if not re.match(r"([a-zA-Z0-9]+)\.([a-z]+)", img_file):
-		abort(404)
-
-	image_path = Path(config.get('PATH_ROOT'), config.get('PATH_IMAGES'), img_file)
-	if not image_path.exists():
-		abort(404)
-
-	return send_file(str(image_path))
 
 def sort_and_iterate_items(dataset, sort=None, reverse=False, **kwargs):
 	"""
