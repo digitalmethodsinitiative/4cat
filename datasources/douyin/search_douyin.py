@@ -96,14 +96,14 @@ class SearchDouyin(Search):
             mix_name_key = "mixName"
 
             # Stats
-            collect_count = stats.get("collectCount", MissingMappedField(0))
-            comment_count = stats.get("commentCount", MissingMappedField(0))
-            digg_count = stats.get("diggCount", MissingMappedField(0))
-            download_count = stats.get("downloadCount", MissingMappedField(0))
-            forward_count = stats.get("forwardCount", MissingMappedField(0))
-            play_count = stats.get("playCount", MissingMappedField(0))
-            share_count = stats.get("shareCount", MissingMappedField(0))
-            live_watch_count = stats.get("liveWatchCount", MissingMappedField(0))
+            collect_count = stats.get("collectCount", MissingMappedField("Unknown"))
+            comment_count = stats.get("commentCount", MissingMappedField("Unknown"))
+            digg_count = stats.get("diggCount", MissingMappedField("Unknown"))
+            download_count = stats.get("downloadCount", MissingMappedField("Unknown"))
+            forward_count = stats.get("forwardCount", MissingMappedField("Unknown"))
+            play_count = stats.get("playCount", MissingMappedField("Unknown"))
+            share_count = stats.get("shareCount", MissingMappedField("Unknown"))
+            live_watch_count = stats.get("liveWatchCount", MissingMappedField("Unknown"))
 
             # This is a guess, I have not encountered it
             video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if "tagName" in tag])
@@ -163,14 +163,14 @@ class SearchDouyin(Search):
             is_fake_key = "is_ad_fake"
 
             # Stats
-            collect_count = stats.get("collect_count") if stats else "Unknown"
-            comment_count = stats.get("comment_count") if stats else "Unknown"
-            digg_count = stats.get("digg_count") if stats else "Unknown"
-            download_count = stats.get("download_count") if stats else "Unknown"
-            forward_count = stats.get("forward_count") if stats else "Unknown"
-            play_count = stats.get("play_count") if stats else "Unknown"
-            share_count = stats.get("share_count") if stats else "Unknown"
-            live_watch_count = stats.get("live_watch_count") if stats else "Unknown"
+            collect_count = stats.get("collect_count") if stats else MissingMappedField("Unknown")
+            comment_count = stats.get("comment_count") if stats else MissingMappedField("Unknown")
+            digg_count = stats.get("digg_count") if stats else MissingMappedField("Unknown")
+            download_count = stats.get("download_count") if stats else MissingMappedField("Unknown")
+            forward_count = stats.get("forward_count") if stats else MissingMappedField("Unknown")
+            play_count = stats.get("play_count") if stats else MissingMappedField("Unknown")
+            share_count = stats.get("share_count") if stats else MissingMappedField("Unknown")
+            live_watch_count = stats.get("live_watch_count") if stats else MissingMappedField("Unknown")
 
             video_tags = ",".join(
                 [tag["tag_name"] for tag in (item["video_tag"] if item["video_tag"] is not None else []) if
@@ -180,7 +180,6 @@ class SearchDouyin(Search):
 
         # Stream Stats
         count_total_streams_viewers = stats.get("total_user", "N/A")
-        stream_viewers = stats.get("user_count_str", "")
         count_current_stream_viewers = SearchDouyin.get_chinese_number(stats.get("user_count_str")) if "user_count_str" in stats else "N/A"
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
@@ -201,7 +200,7 @@ class SearchDouyin(Search):
         music_author = item.get('music').get('author') if item.get('music') and item.get("music") != "$undefined" else ""
         music_title = item.get('music').get('title') if item.get('music') and item.get("music") != "$undefined" else ""
         music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') and item.get("music") != "$undefined" else ""
-        
+
         # Collection
         mix_current_episode = mix_current_episode if mix_current_episode != "$undefined" else "N/A"
         collection_id = item.get(mix_info_key, {}).get(mix_id_key, "N/A")
