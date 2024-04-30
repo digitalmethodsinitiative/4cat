@@ -346,7 +346,7 @@ def map_csv_items(reader, columns, dataset, parameters):
         # already exist! but it is necessary for 4CAT to handle the
         # data in processors etc and should be an equivalent value.
         try:
-            if mapped_row["timestamp"].isdecimal():
+            if mapped_row["timestamp"].replace(".", "").isdecimal() and mapped_row["timestamp"].count(".") <= 1:  # ignore . for floats
                 timestamp = datetime.datetime.fromtimestamp(float(mapped_row["timestamp"]))
             else:
                 timestamp = parse_datetime(mapped_row["timestamp"])
@@ -360,11 +360,11 @@ def map_csv_items(reader, columns, dataset, parameters):
                 if field not in mapped_row and field:
                     mapped_row[field] = value
 
-        except (ValueError, OSError, AttributeError):
+        except (ValueError, OSError, AttributeError) as e:
             # skip rows without a valid timestamp - this may happen
             # despite validation because only a sample is validated
             # this is an OSError on Windows sometimes???
-            yield InvalidImportedItem()
+            yield InvalidImportedItem(f"{e.__class__.__name__} - {e} (value was '{mapped_row['timestamp']}')")
             continue
 
         yield mapped_row
