@@ -49,7 +49,7 @@
     width: 100%;
     bottom: 5px;
     text-align: center;
-    font-size: 17px;
+    font-size: 22px;
     color: white;
     opacity: .6;
 }
@@ -58,15 +58,20 @@
 	padding: 20px;
 }
 
+.posts .post .body a, .posts .post a:hover {
+    color: #00376B;
+    text-decoration: none;
+}
+
+.time, .posts .post .comments a {
+	color: #7b7b7b;
+}
+
 .posts .external-url {
     position: absolute;
     bottom: 0;
     right: 0;
     padding: 10px;
-}
-
-.time, .comments a {
-	color: #7b7b7b;
 }
 
 .posts .post-image {

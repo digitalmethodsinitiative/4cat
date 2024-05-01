@@ -28,8 +28,8 @@
 			</header>
 
 			<!-- Post body -->
-			<span class="body">{{ post.body | safe }}</span>
-
+			<span class="body">{{ post.body | social_mediafy(datasource='tiktok') | safe }}</span>
+			
 			<!-- Video thumbnail item -->
 			<div class="post-media">
 				<a href="{{ post.tiktok_url }}" target="_blank"><img src="{{ url_for('static', filename='img/go-to-media.jpg') }}"></a>

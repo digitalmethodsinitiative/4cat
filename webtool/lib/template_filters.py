@@ -213,11 +213,11 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		body = re.sub("<a href='%s' target='_blank'>%s</a>" % (url, url))
 
 	# Add hashtag links
-	for tag in re.findall(r"#[\w0-9]+[^>]", body):
+	for tag in re.findall(r"#[\w0-9]+[^>@#]", body):
 		body = re.sub(tag, "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
 		
 	# Add @-mention links
-	for mention in re.findall(r"@[\w0-9_]+[^>]", body):
+	for mention in re.findall(r"@[\w0-9_]+[^>@#]", body):
 		body = re.sub(mention, "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
 
 	return body
