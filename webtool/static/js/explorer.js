@@ -318,7 +318,6 @@ const annotations = {
 			}
 		});
 
-		console.log(annotation_fields)
 		if (warning.length > 0) {
 			return warning;
 		}

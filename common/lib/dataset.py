@@ -1003,7 +1003,7 @@ class DataSet(FourcatModule):
 		# If so, we're gonna edit or remove their old values.
 		old_annotations = self.get_annotations()
 
-		if old_annotations:
+		if old_annotations and annotations:
 			# Loop through all new annotations and add/overwrite them
 			# with the old annotations dict.
 			for post_id in list(annotations.keys()):
