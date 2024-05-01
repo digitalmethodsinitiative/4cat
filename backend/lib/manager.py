@@ -126,17 +126,21 @@ class WorkerManager:
 		# request shutdown from all workers except the API
 		# this allows us to use the API to figure out if a certain worker is
 		# hanging during shutdown, for example
-		for jobtype in [jobtype for jobtype in self.worker_pool if jobtype != "api"]:
+		for jobtype in self.worker_pool:
+			if jobtype == "api":
+				continue
+
 			for worker in self.worker_pool[jobtype]:
 				if hasattr(worker, "request_interrupt"):
 					worker.request_interrupt()
 				else:
 					worker.abort()
 
-
-		# wait for all workers to finish
+		# wait for all workers that we just asked to quit to finish
 		self.log.info("Waiting for all workers to finish...")
-		for jobtype in [jobtype for jobtype in self.worker_pool if jobtype != "api"]:
+		for jobtype in self.worker_pool:
+			if jobtype == "api":
+				continue
 			for worker in self.worker_pool[jobtype]:
 				self.log.info("Waiting for worker %s..." % jobtype)
 				worker.join()
@@ -146,9 +150,8 @@ class WorkerManager:
 			worker.request_interrupt()
 			worker.join()
 
-		time.sleep(1)
-
 		# abort
+		time.sleep(1)
 		self.log.info("Bye!")
 
 	def validate_datasources(self):
