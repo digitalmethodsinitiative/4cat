@@ -290,7 +290,7 @@ def sort_and_iterate_items(dataset, sort=None, reverse=False, **kwargs):
 	# Storing posts in the right order here
 	sorted_posts = []
 
-	# Just use sorted(reverse=True) if we're reading from back to front.
+	# Use reversed() if we're reading the dataset from back to front.
 	if sort == "dataset-order" and reverse == True:
 		for item in reversed(list(dataset.iterate_items(**kwargs))):
 			sorted_posts.append(item)

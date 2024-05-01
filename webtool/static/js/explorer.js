@@ -25,6 +25,7 @@ const annotations = {
 		let edit_field_box = $("#edit-annotation-fields");
 		let editor = $("#annotation-fields-editor");
 		let editor_controls = $("#annotation-fields-editor-controls");
+		var edits_made = false;
 
 		// Add a new annotation field when clicking the plus icon
 		$("#new-annotation-field").on("click", function(){
@@ -32,13 +33,22 @@ const annotations = {
 			$(annotations_div).insertBefore(edit_field_box);});
 
 		// Show and hide the annotations editor
-		$("#toggle-annotation-fields").on("click", function(){
-			editor.toggleClass("hidden");
-			if (editor.hasClass("hidden")) {
+		let toggle_fields = $("#toggle-annotation-fields")
+		toggle_fields.on("click", function(){
+			if (toggle_fields.hasClass("shown")) {
 				$("#toggle-annotation-fields").html("<i class='fas fa-edit'></i> Edit fields");
+				toggle_fields.removeClass("shown");
+				editor.animate({"height": 0}, 250);
 			}
 			else {
 				$("#toggle-annotation-fields").html("<i class='fas fa-eye-slash'></i> Hide editor");
+				toggle_fields.addClass("shown");
+				// Bit convoluted, but necessary to restore auto height
+				current_height = editor.height();
+				auto_height = editor.css("height", "auto").height();
+				editor.height(current_height).animate({"height": auto_height}, 250, function(){
+					editor.height("auto");
+				});
 			}
 		});
 
@@ -95,21 +105,21 @@ const annotations = {
 		});
 		
 		// Make saving available when annotations are changed
-		$(".post-annotations").on("keydown", "input, textarea", function() { annotations.enableSaving(); });
-		$(".post-annotations").on("click", "option, input[type=checkbox], label", function() { annotations.enableSaving(); });
+		$(".post-annotations").on("keydown", "input, textarea", function() { annotations.enableSaving(); edits_made = true;});
+		$(".post-annotations").on("click", "option, input[type=checkbox], label", function() { annotations.enableSaving(); edits_made = true;});
 
 		// Keep track of whether the annotations are edited or not.
 		$(".post-annotations").on("change", ".post-annotation-input, .post-annotation input, .post-annotation textarea", function(){$(this).addClass("edited")});
 
 		// Save the annotations to the database
 		$("#save-annotations").on("click", function(){
-			if (!$(this).hasClass("invalid")) {
+			if (!$(this).hasClass("disabled")) {
 				annotations.saveAnnotations();
 			}
 		});
 
 		$("#save-to-dataset").on("click", function(){
-			if (!$(this).hasClass("invalid")) {
+			if (!$(this).hasClass("disabled")) {
 				annotations.saveAnnotations();
 				annotations.writeAnnotations();
 			}
@@ -129,7 +139,9 @@ const annotations = {
 
 		// Save annotations every 10 seconds
 		setInterval(function() {
-			annotations.saveAnnotations();
+			if (!$("#save-annotations").hasClass("disabled") && edits_made) {
+				annotations.saveAnnotations();
+			}
 		}, 10000);
 
 	},
@@ -791,14 +803,21 @@ const annotations = {
 		ta.addClass("shown");
 		ta.removeClass("disabled");
 		ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
-		$(".post-annotations").removeClass("hidden");
+		// Bit convoluted, but necessary to have auto height
+		let pa = $(".post-annotations");
+		current_height = pa.height();
+		auto_height = pa.css("height", "auto").height();
+		pa.height(current_height).animate({"height": auto_height}, 250, function(){
+			pa.height("auto");
+		});
 	},
 
 	hideAnnotations: function() {
 		let ta = $("#toggle-annotations");
 		ta.removeClass("shown");
 		ta.html("<i class='fas fa-eye'></i> Show annotations");
-		$(".post-annotations").addClass("hidden");
+		let pa = $(".post-annotations");
+		pa.animate({"height": 0}, 250);
 	},
 
 	getAnnotationsDiv: function(id){

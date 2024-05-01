@@ -697,6 +697,11 @@ body.image-preview {
 }
 
 /* Explorer view */
+#annotation-fields-editor {
+    height: 0;
+    overflow: hidden;
+}
+
 #annotation-fields-editor-controls {
     display: grid;
     grid-template-columns: auto auto auto;
@@ -711,7 +716,7 @@ body.image-preview {
 }
 
 /* Remove all styles for explorer posts */
-/* these ought to be defined specifically */
+/* these ought to be defined specifically, */
 /* and 4CAT styles shouldn't interfere. */
 #explorer-posts, #explorer-posts > ol li {
     all: initial;
@@ -727,12 +732,15 @@ body.image-preview {
     padding: 0;
 }
 
-#explorer-content .hidden {
-    min-height: 0;
-    max-height: 0;
+.post-annotations {
+    height: 0;
     overflow: hidden;
     box-sizing: border-box;
     border-width: 0;
+}
+
+.annotation-control-button {
+    min-width: 140px;
 }
 
 .annotation-field-label.invalid {

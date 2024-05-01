@@ -20,16 +20,16 @@
 				<div class="fullwidth dataset-toolbox">
 					<dt>Annotations</dt>
 					<ul>
-						<li>
+						<li class="annotation-control-button">
 							<a class="button-like-small" id="toggle-annotation-fields"><i class="fas fa-edit"></i> Edit fields</a>
 						</li>
-						<li><a class="button-like-small {% if not annotation_fields %}disabled{% endif %}" id="toggle-annotations"><i class="fas fa-eye"></i> Show annotations</li></a>
-						<li><a class="button-like-small {% if annotation_fields and annotations %}disabled{% endif %}" id="save-annotations"><i class="fas fa-save"></i> Save annotations</li></a>
-						<li><a class="button-like-small {% if annotation_fields and annotations %}disabled{% endif %}" id="save-to-dataset"><i class="fa-solid fa-right-from-bracket"></i> Write to dataset</li></a>
+						<li class="annotation-control-button"><a class="button-like-small{% if not annotation_fields %}disabled{% endif %}" id="toggle-annotations"><i class="fas fa-eye"></i> Show annotations</li></a>
+						<li class="annotation-control-button"><a class="button-like-small{% if annotation_fields and annotations %}disabled{% endif %}" id="save-annotations"><i class="fas fa-save"></i> Save annotations</li></a>
+						<li class="annotation-control-button"><a class="button-like-small{% if annotation_fields and annotations %}disabled{% endif %}" id="save-to-dataset"><i class="fa-solid fa-right-from-bracket"></i> Write to dataset</li></a>
 					</ul>
 				</div>
 				
-				<div class="fullwidth hidden" id ="annotation-fields-editor">
+				<div class="fullwidth" id ="annotation-fields-editor">
 					<dt>Edit annotation fields</dt>	
 					{% include "explorer/annotations-editor.html" %}
 				</div>
