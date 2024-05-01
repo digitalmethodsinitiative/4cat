@@ -80,8 +80,6 @@ def explorer_dataset(key, page=1):
 
 	# Check if we have to sort the data.
 	sort = request.args.get("sort")
-	if sort == "dataset-order":
-		sort = None
 
 	# Check if we have to reverse the order.
 	reverse = True if request.args.get("order") == "reverse" else False
@@ -91,9 +89,9 @@ def explorer_dataset(key, page=1):
 	posts = []
 	count = 0
 
-	# If we're sorting, we need to iterate over the entire
-	# dataset first. Else we can simply use `iterate_items`.
-	if not sort:
+	# We don't need to sort if we're showing the existing dataset order (the default).
+	# If we're sorting, we need to iterate over the entire dataset first.
+	if not sort or (sort == "dataset-order" and reverse == False):
 		for row in dataset.iterate_items(warn_unmappable=False):
 
 			count += 1
@@ -292,15 +290,22 @@ def sort_and_iterate_items(dataset, sort=None, reverse=False, **kwargs):
 	# Storing posts in the right order here
 	sorted_posts = []
 
-	try:
-		for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x[sort], reverse=reverse):
+	# Just use sorted(reverse=True) if we're reading from back to front.
+	if sort == "dataset-order" and reverse == True:
+		for item in reversed(list(dataset.iterate_items(**kwargs))):
 			sorted_posts.append(item)
-	except TypeError:
-		# Dataset fields can contain integers and empty strings.
-		# Since these cannot be compared, we will convert every
-		# empty string to 0.
-		for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: convert_to_float(x[sort]), reverse=reverse):
-			sorted_posts.append(item)
+
+	# Sort on the basis of a column value
+	else:
+		try:
+			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x[sort], reverse=reverse):
+				sorted_posts.append(item)
+		except TypeError:
+			# Dataset fields can contain integers and empty strings.
+			# Since these cannot be compared, we will convert every
+			# empty string to 0.
+			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: convert_to_float(x[sort]), reverse=reverse):
+				sorted_posts.append(item)
 
 	for post in sorted_posts:
 		yield post
