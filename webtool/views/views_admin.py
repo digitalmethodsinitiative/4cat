@@ -79,7 +79,6 @@ def admin_frontpage():
     current_branch = get_git_branch()
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
         "captured": num_items, "datasets": num_datasets, "disk": disk_stats
-    }, upgrade_available=upgrade_available, tags=tags)
     }, upgrade_available=upgrade_available, tags=tags, current_branch=current_branch)
 
 
