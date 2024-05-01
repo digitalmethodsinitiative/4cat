@@ -203,6 +203,7 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
+	pseudonymise_mode = request.args.get("pseudonymise", "none")
 
 	# data source identifiers cannot start with a number but some do (such as
 	# 9gag and 4chan) so sanitise those numbers to account for this...
@@ -231,6 +232,19 @@ def import_dataset():
 		extension=worker.extension
 	)
 	dataset.update_status("Importing uploaded file...")
+
+	# if indicated that pseudonymisation is needed, immediately queue the
+	# relevant worker so that it will pseudonymise the dataset before anything
+	# else can be done with it
+	if pseudonymise_mode in ("pseudonymise", "anonymise"):
+		filterable_fields = worker.pseudonymise_fields if hasattr(worker, "pseudonymise_fields") else ["author*", "user*"]
+		dataset.next = [{
+			"type": "author-info-remover",
+			"parameters": {
+				"mode": pseudonymise_mode,
+				"fields": filterable_fields
+			}
+		}]
 
 	# store the file at the result path for the dataset, but with a different suffix
 	# since the dataset was only just created, this file is guaranteed to not exist yet
