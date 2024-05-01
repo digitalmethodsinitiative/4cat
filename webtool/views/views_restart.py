@@ -24,7 +24,7 @@ from flask_login import login_required, current_user
 from webtool import app, queue, config
 from webtool.lib.helpers import setting_required, check_restart_request
 
-from common.lib.helpers import get_github_version
+from common.lib.helpers import get_github_version, get_git_branch
 
 from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
@@ -102,9 +102,10 @@ def trigger_restart():
         queue.add_job("restart-4cat", details, mode)
         flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
 
+    current_branch = get_git_branch()
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
-                           release_notes=release_notes)
+                           release_notes=release_notes, current_branch=current_branch)
 
 
 @app.route("/admin/trigger-frontend-upgrade/", methods=["POST"])
