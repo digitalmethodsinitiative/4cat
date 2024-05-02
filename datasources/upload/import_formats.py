@@ -5,6 +5,7 @@ import re
 
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import ProcessorException
+from common.lib.helpers import convert_to_int
 
 
 class InvalidCustomFormat(ProcessorException):
@@ -121,7 +122,7 @@ def import_crowdtangle_facebook(reader, columns, dataset, parameters):
             "page_followers": item["Followers at Posting"],
             "page_shared_from": shared_page,
             "type": item["Type"],
-            "interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])) if item[
+            "interactions": convert_to_int(re.sub(r"[^0-9]", "", item["Total Interactions"]), 0) if item[
                 "Total Interactions"] else 0,
             "comments": item["Comments"],
             "shares": item["Shares"],
@@ -345,7 +346,7 @@ def map_csv_items(reader, columns, dataset, parameters):
         # already exist! but it is necessary for 4CAT to handle the
         # data in processors etc and should be an equivalent value.
         try:
-            if mapped_row["timestamp"].isdecimal():
+            if mapped_row["timestamp"].replace(".", "").isdecimal() and mapped_row["timestamp"].count(".") <= 1:  # ignore . for floats
                 timestamp = datetime.datetime.fromtimestamp(float(mapped_row["timestamp"]))
             else:
                 timestamp = parse_datetime(mapped_row["timestamp"])
@@ -359,11 +360,11 @@ def map_csv_items(reader, columns, dataset, parameters):
                 if field not in mapped_row and field:
                     mapped_row[field] = value
 
-        except (ValueError, OSError, AttributeError):
+        except (ValueError, OSError, AttributeError) as e:
             # skip rows without a valid timestamp - this may happen
             # despite validation because only a sample is validated
             # this is an OSError on Windows sometimes???
-            yield InvalidImportedItem()
+            yield InvalidImportedItem(f"{e.__class__.__name__} - {e} (value was '{mapped_row['timestamp']}')")
             continue
 
         yield mapped_row
@@ -407,13 +408,13 @@ tools = {
         "name": "YouTube videos (via YouTube Data Tools' Video List module)",
         "columns": {"publishedAt", "videoId", "channelId", "channelTitle", "videoDescription"},
         "mapper": import_ytdt_videolist,
-        "csv_dialect": {"doublequote": True}
+        "csv_dialect": {"doublequote": True, "escapechar": "\\"},
     },
     "youtube_comment_list": {
         "name": "YouTube comments (via YouTube Data Tools' Video Info module)",
         "columns": {"id", "isReplyTo", "authorName", "text", "publishedAt"},
         "mapper": import_ytdt_commentlist,
-        "csv_dialect": {"doublequote": True}
+        "csv_dialect": {"doublequote": True, "escapechar": "\\"},
     },
     "bazhuayu_weibo": {
         "name": "Sina Weibo (via Bazhuayu)",

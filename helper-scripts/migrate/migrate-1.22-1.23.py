@@ -5,7 +5,7 @@ import os
 
 from psycopg2.errors import UniqueViolation
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 from common.lib.database import Database
 from common.lib.logger import Logger
 

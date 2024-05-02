@@ -11,7 +11,7 @@ import psycopg2
 import psycopg2.extras
 import configparser
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 
 def set_or_create_setting(attribute_name, value, connection, cursor, keep_connection_open=False):
     """

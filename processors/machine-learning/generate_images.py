@@ -150,7 +150,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
         prompt_c = self.parameters["prompt-column"]
         neg_c = self.parameters.get("negative-prompt-column")
-        for item in self.source_dataset.iterate_items():
+        for item in self.source_dataset.iterate_items(self):
             if max_prompts and len(prompts) >= max_prompts:
                 break
 
@@ -202,7 +202,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
                                                                            results_folder_name)
 
         # interface.py args
-        data = {"args": ['--output-dir', f"data/{path_to_results}",
+        data = {"timeout": (86400 * 7), "args": ['--output-dir', f"data/{path_to_results}",
                          "--prompts-file",
                          f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(prompts_file.name))}"]
                 }

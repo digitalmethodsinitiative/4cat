@@ -203,8 +203,16 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
+	pseudonymise_mode = request.args.get("pseudonymise", "none")
+
+	# data source identifiers cannot start with a number but some do (such as
+	# 9gag and 4chan) so sanitise those numbers to account for this...
+	platform = platform.replace("1", "one").replace("2", "two").replace("3", "three").replace("4", "four") \
+		.replace("5", "five").replace("6", "six").replace("7", "seven").replace("8", "eight") \
+		.replace("9", "nine")
+
 	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
-		return error(404, message="Unknown platform or source format")
+		return error(404, message=f"Unknown platform or source format '{platform}'")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
 	worker = None
@@ -224,6 +232,19 @@ def import_dataset():
 		extension=worker.extension
 	)
 	dataset.update_status("Importing uploaded file...")
+
+	# if indicated that pseudonymisation is needed, immediately queue the
+	# relevant worker so that it will pseudonymise the dataset before anything
+	# else can be done with it
+	if pseudonymise_mode in ("pseudonymise", "anonymise"):
+		filterable_fields = worker.pseudonymise_fields if hasattr(worker, "pseudonymise_fields") else ["author*", "user*"]
+		dataset.next = [{
+			"type": "author-info-remover",
+			"parameters": {
+				"mode": pseudonymise_mode,
+				"fields": filterable_fields
+			}
+		}]
 
 	# store the file at the result path for the dataset, but with a different suffix
 	# since the dataset was only just created, this file is guaranteed to not exist yet
@@ -748,6 +769,7 @@ def remove_tag():
 
 	tagged_users = db.fetchall("SELECT * FROM users WHERE tags @> %s ", (json.dumps([tag]),))
 	all_tags = list(set(itertools.chain(*[u["tags"] for u in db.fetchall("SELECT DISTINCT tags FROM users")])))
+	all_tags += [s["tag"] for s in db.fetchall("SELECT DISTINCT tag FROM settings WHERE tag LIKE 'user:%'")]
 
 	for user in tagged_users:
 		user = User.get_by_name(db, user["name"])
@@ -764,6 +786,8 @@ def remove_tag():
 		if configured_tag and configured_tag not in all_tags:
 			db.delete("settings", where={"tag": configured_tag})
 
+	# we do not re-sort here, since we are preserving the original order, just
+	# without any of the deleted or orphaned tags
 	config.set("flask.tag_order", all_tags, tag="")
 
 	if request.args.get("redirect") is not None:
@@ -786,7 +810,8 @@ def add_dataset_owner(key=None, username=None, role=None):
 	is potentially updated.
 
 	:request-param str key:  ID of the dataset to add an owner to
-	:request-param str username:  Username to add as owner
+	:request-param str username:  Username to add as owner, or a
+	comma-separated of usernames
 	:request-param str role?:  Role to add. Defaults to 'owner'.
 
 	:return: A dictionary with a successful `status`.
@@ -801,7 +826,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 	:param str role:  Role; `None` will use the GET parameter
 	"""
 	dataset_key = request.form.get("key", "") if not key else key
-	username = request.form.get("name", "") if not username else username
+	usernames = request.form.get("name", "") if not username else username
 
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
@@ -811,15 +836,18 @@ def add_dataset_owner(key=None, username=None, role=None):
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, message="Not allowed")
 
-	new_owner = User.get_by_name(db, username)
-	if new_owner is None and not username.startswith("tag:"):
-		return error(404, error=f"The user '{username}' does not exist. Use tag:example to add a tag as an owner.")
+	for username in usernames.split(","):
+		username = username.strip()
+		new_owner = User.get_by_name(db, username)
+		if new_owner is None and not username.startswith("tag:"):
+			return error(404, error=f"The user '{username}' does not exist. Use tag:example to add a tag as an owner.")
 
-	role = request.form.get("role", "owner") if not role else role
-	if role not in ("owner", "viewer"):
-		role = "owner"
+		role = request.form.get("role", "owner") if not role else role
+		if role not in ("owner", "viewer"):
+			role = "owner"
 
-	dataset.add_owner(username, role)
+		dataset.add_owner(username, role)
+
 	html = render_template("components/dataset-owner.html", owner=username, role=role,
 								  current_user=current_user, dataset=dataset)
 
@@ -1011,22 +1039,7 @@ def queue_processor(key=None, processor=None):
 		messages={type=array,items={type=string}}
 	}}}
 	"""
-	if request.files and "input_file" in request.files:
-		input_file = request.files["input_file"]
-		if not input_file:
-			return error(400, error="No file input provided")
-
-		if input_file.filename[-4:] != ".csv":
-			return error(400, error="File input is not a csv file")
-
-		test_csv_file = csv.DictReader(input_file.stream)
-		if "body" not in test_csv_file.fieldnames:
-			return error(400, error="File must contain a 'body' column")
-
-		filename = secure_filename(input_file.filename)
-		input_file.save(str(config.get('PATH_DATA')) + "/")
-
-	elif not key:
+	if not key:
 		key = request.form.get("key", "")
 
 	if not processor:
@@ -1042,22 +1055,30 @@ def queue_processor(key=None, processor=None):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
-	available_processors = dataset.get_available_processors(user=current_user)
+	available_processors = dataset.get_available_processors(user=current_user, exclude_hidden=True)
 	if processor not in available_processors:
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 
-	# create a dataset now
+	processor_worker = available_processors[processor]
 	try:
-		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form, silently_correct=False)
+		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, current_user), request.form,
+											  silently_correct=False)
+
+		if hasattr(processor_worker, "validate_query"):
+			# validate_query is optional for processors
+			sanitised_query = processor_worker.validate_query(sanitised_query, request, current_user)
+
 	except QueryParametersException as e:
-		return error(400, error=str(e))
+		# parameters need amending
+		return jsonify({"status": "error", "message": (str(e) if e else "Cannot run the processor with these settings.")})
+
 
 	if request.form.to_dict().get("email-complete", False):
-		options["email-complete"] = request.form.to_dict().get("email-user", False)
+		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
 
 	# private or not is inherited from parent dataset
 	analysis = DataSet(parent=dataset.key,
-					   parameters=options,
+					   parameters=sanitised_query,
 					   db=db,
 					   extension=available_processors[processor].get_extension(parent_dataset=dataset),
 					   type=processor,
