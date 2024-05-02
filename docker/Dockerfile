@@ -1,6 +1,6 @@
 FROM python:3.8-slim AS compile-image
 
-RUN apt-get update && apt install -y \
+RUN apt-get update && apt install -y --fix-missing \
     # General requirements:
     libpq-dev \
     python3-dev \

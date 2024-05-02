@@ -132,6 +132,17 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
+		finally:
+			# Clean up after work successfully completed or terminates
+			self.clean_up()
+
+	def clean_up(self):
+		"""
+		Clean up after a processor runs successfully or results in error.
+		Workers should override this method to implement any procedures
+		to run to clean up a worker; by default this does nothing.
+		"""
+		pass
 
 	def abort(self):
 		"""

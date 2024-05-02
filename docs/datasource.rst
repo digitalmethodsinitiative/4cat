@@ -59,7 +59,7 @@ needs to function (e.g. queueing any recurring workers). A default implementatio
 ------------------
 The `Search` class
 ------------------
-.. autoclass:: backend.abstract.search.Search
+.. autoclass:: backend.lib.search.Search
     :members:
     :undoc-members:
     :show-inheritance:
@@ -67,7 +67,7 @@ The `Search` class
 ---------------------------
 The `SearchWithScope` class
 ---------------------------
-.. autoclass:: backend.abstract.search.SearchWithScope
+.. autoclass:: backend.lib.search.SearchWithScope
     :members:
     :undoc-members:
     :show-inheritance:

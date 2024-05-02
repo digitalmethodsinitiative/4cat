@@ -155,7 +155,7 @@ class ImageWallGenerator(BasicProcessor):
 		self.dataset.log(f"Found {image_dataset.type} w/ {image_dataset.num_rows} images and {category_dataset.type} w/ {category_dataset.num_rows} items")
 
 		category_column = self.parameters.get("category")
-		if category_column is None:
+		if not category_column:
 			self.dataset.finish_with_error("No category provided.")
 			return
 

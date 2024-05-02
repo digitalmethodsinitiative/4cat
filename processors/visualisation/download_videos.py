@@ -231,7 +231,7 @@ class VideoDownloaderPlus(BasicProcessor):
         in principle, but any links to videos are likely to come from the top
         dataset anyway.
 
-        :param str module:  Module ID to determine compatibility with
+        :param module:  Module to determine compatibility with
         :return bool:
         """
         return ((module.type.endswith("-search") or module.is_from_collector())
