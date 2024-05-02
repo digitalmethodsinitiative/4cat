@@ -19,7 +19,7 @@
 
 			</header>
 
-			<div class="body">{{ post.body }}</div>
+			<div class="body">{{ post.body | social_mediafy(datasource='twitter') | safe }}</div>
 			<!-- Media item -->
 			{% if post.get("images") %}
 				{% set media_url = post.get("images") %}

@@ -185,10 +185,12 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 	if not datasource:
 		return body
 
-	known_datasources = ["twitter", "tiktok", "instagram", "tumblr"]
+	# Supported data sources
+	known_datasources = set("twitter", "tiktok", "instagram", "tumblr")
 	if datasource not in known_datasources:
 		return body
 
+	# Base URLs after which tags and @-mentions follow, per platform
 	base_urls = {
 		"twitter": {
 			"hashtag": "https://twitter.com/hashtag/",
@@ -210,15 +212,19 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 
 	# Add URL links
 	for url in urls_from_text(body):
-		body = re.sub("<a href='%s' target='_blank'>%s</a>" % (url, url))
+		body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
 
 	# Add hashtag links
-	for tag in re.findall(r"#[\w0-9]+[^>@#]", body):
-		body = re.sub(tag, "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
-		
+	tags = re.findall(r"#[\w0-9]+", body)
+	for tag in tags:
+		# Match the string, but not if it's preceded by a >, which indicates that we've already added an <a> tag.
+		# This fixes problems with substrings (e.g. #Dog and #DogOwners).
+		body = re.sub(r"(?<!>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
+
 	# Add @-mention links
-	for mention in re.findall(r"@[\w0-9_]+[^>@#]", body):
-		body = re.sub(mention, "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
+	mentions = re.findall(r"@[\w0-9]+", body)
+	for mention in mentions:
+		body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
 
 	return body
 

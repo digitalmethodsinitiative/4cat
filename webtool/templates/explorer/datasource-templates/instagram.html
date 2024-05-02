@@ -36,7 +36,7 @@
 	{% if post.num_likes %} 
 	<div class="likes"><strong>{{ post.get("num_likes") | commafy }} likes</strong></div>
 	{% endif %}
-	<div class="body">{{ post.get("body") | social_mediafy(datasource='twitter') | safe }}</div>
+	<div class="body">{{ post.get("body") | social_mediafy(datasource='instagram') | safe }}</div>
 	{% if post.num_comments %}
 		{% if pseudonymised %}
 		<div class="comments">{{ post.get("num_comments") | commafy }} comments</span>
