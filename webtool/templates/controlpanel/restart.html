@@ -65,7 +65,7 @@
             branch. Only use this if you know what you're doing. Don't say we didn't warn you! </p>
             <div class="form-element">
                 <label for="update-branch">Branch</label>
-                <input type="text" name="branch" id="update-branch" value="master">
+                <input type="text" name="branch" id="update-branch" value="{% if current_branch == "" %}master{% else %}{{ current_branch }}{% endif %}">
             </div>
 
             <div class="submit-container">

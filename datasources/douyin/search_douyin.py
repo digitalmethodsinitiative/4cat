@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 class SearchDouyin(Search):
     """
@@ -44,7 +44,7 @@ class SearchDouyin(Search):
         if "ZS_collected_from_embed" in item and item["ZS_collected_from_embed"]:
             # HTML embedded posts formated differently than JSON posts
 
-            stream_data = item.get("cellRoom", {}).get("rawdata")
+            stream_data = item.get("cellRoom", {}).get("rawdata") if item.get("cellRoom") != "$undefined" else {}
             if stream_data:
                 # These appear to be streams
                 subject = "Stream"
@@ -96,14 +96,14 @@ class SearchDouyin(Search):
             mix_name_key = "mixName"
 
             # Stats
-            collect_count = stats["collectCount"]
-            comment_count = stats["commentCount"]
-            digg_count = stats["diggCount"]
-            download_count = stats["downloadCount"]
-            forward_count = stats["forwardCount"]
-            play_count = stats["playCount"]
-            share_count = stats["shareCount"]
-            live_watch_count = stats["liveWatchCount"]
+            collect_count = stats.get("collectCount", MissingMappedField("Unknown"))
+            comment_count = stats.get("commentCount", MissingMappedField("Unknown"))
+            digg_count = stats.get("diggCount", MissingMappedField("Unknown"))
+            download_count = stats.get("downloadCount", MissingMappedField("Unknown"))
+            forward_count = stats.get("forwardCount", MissingMappedField("Unknown"))
+            play_count = stats.get("playCount", MissingMappedField("Unknown"))
+            share_count = stats.get("shareCount", MissingMappedField("Unknown"))
+            live_watch_count = stats.get("liveWatchCount", MissingMappedField("Unknown"))
 
             # This is a guess, I have not encountered it
             video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if "tagName" in tag])
@@ -163,14 +163,14 @@ class SearchDouyin(Search):
             is_fake_key = "is_ad_fake"
 
             # Stats
-            collect_count = stats.get("collect_count") if stats else "Unknown"
-            comment_count = stats.get("comment_count") if stats else "Unknown"
-            digg_count = stats.get("digg_count") if stats else "Unknown"
-            download_count = stats.get("download_count") if stats else "Unknown"
-            forward_count = stats.get("forward_count") if stats else "Unknown"
-            play_count = stats.get("play_count") if stats else "Unknown"
-            share_count = stats.get("share_count") if stats else "Unknown"
-            live_watch_count = stats.get("live_watch_count") if stats else "Unknown"
+            collect_count = stats.get("collect_count") if stats else MissingMappedField("Unknown")
+            comment_count = stats.get("comment_count") if stats else MissingMappedField("Unknown")
+            digg_count = stats.get("digg_count") if stats else MissingMappedField("Unknown")
+            download_count = stats.get("download_count") if stats else MissingMappedField("Unknown")
+            forward_count = stats.get("forward_count") if stats else MissingMappedField("Unknown")
+            play_count = stats.get("play_count") if stats else MissingMappedField("Unknown")
+            share_count = stats.get("share_count") if stats else MissingMappedField("Unknown")
+            live_watch_count = stats.get("live_watch_count") if stats else MissingMappedField("Unknown")
 
             video_tags = ",".join(
                 [tag["tag_name"] for tag in (item["video_tag"] if item["video_tag"] is not None else []) if
@@ -180,7 +180,6 @@ class SearchDouyin(Search):
 
         # Stream Stats
         count_total_streams_viewers = stats.get("total_user", "N/A")
-        stream_viewers = stats.get("user_count_str", "")
         count_current_stream_viewers = SearchDouyin.get_chinese_number(stats.get("user_count_str")) if "user_count_str" in stats else "N/A"
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
@@ -198,9 +197,18 @@ class SearchDouyin(Search):
                     image_urls.append(img["urlList"][0])
 
         # Music
-        music_author = item.get('music').get('author') if item.get('music') else ""
-        music_title = item.get('music').get('title') if item.get('music') else ""
-        music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') else ""
+        music_author = item.get('music').get('author') if item.get('music') and item.get("music") != "$undefined" else ""
+        music_title = item.get('music').get('title') if item.get('music') and item.get("music") != "$undefined" else ""
+        music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') and item.get("music") != "$undefined" else ""
+
+        # Collection
+        mix_current_episode = mix_current_episode if mix_current_episode != "$undefined" else "N/A"
+        collection_id = item.get(mix_info_key, {}).get(mix_id_key, "N/A")
+        collection_id = collection_id if collection_id != "$undefined" else "N/A"
+        collection_name = item.get(mix_info_key, {}).get(mix_name_key, "N/A")
+        collection_name = collection_name if collection_name != "$undefined" else "N/A"
+        part_of_collection = "yes" if mix_info_key in item and mix_id_key in item[
+            mix_info_key] and collection_id != "N/A" else "no"
 
         return MappedItem({
             "id": item[aweme_id_key],
@@ -245,11 +253,11 @@ class SearchDouyin(Search):
             "author_region": author.get("region"),
             "author_is_ad_fake": author.get(is_fake_key),
             # Collection/Mix
-            "part_of_collection": "yes" if mix_info_key in item and mix_id_key in item[mix_info_key] else "no",
+            "part_of_collection": part_of_collection,
             "4CAT_first_video_displayed": "yes" if displayed else "no",
             # other videos may have been viewed, but this is unknown to us
-            "collection_id": item.get(mix_info_key, {}).get(mix_id_key, "N/A"),
-            "collection_name": item.get(mix_info_key, {}).get(mix_name_key, "N/A"),
+            "collection_id": collection_id,
+            "collection_name": collection_name,
             "place_in_collection": mix_current_episode,
             "unix_timestamp": int(post_timestamp.timestamp()),
         })

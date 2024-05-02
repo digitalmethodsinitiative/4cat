@@ -82,6 +82,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
 
+	#: Is this processor hidden in the front-end, and only used internally/in presets?
+	is_hidden = False
+
 	#: This will be defined automatically upon loading the processor. There is
 	#: no need to override manually
 	filepath = None
@@ -437,13 +440,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				writer = csv.DictWriter(output, fieldnames=fieldnames)
 				writer.writeheader()
 
-				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_items(self)):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing CSV file")
 
-					post[field_name] = new_data[count]
-					writer.writerow(post)
+					post.original[field_name] = new_data[count]
+					writer.writerow(post.original)
 
 		elif parent_path.suffix.lower() == ".ndjson":
 			# JSON cannot encode sets
@@ -452,18 +455,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				new_data = [list(datapoint) for datapoint in new_data]
 
 			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_items(self)):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
 
-					if not update_existing and field_name in post.keys():
+					if not update_existing and field_name in post.original.keys():
 						raise ProcessorException('field_name %s already exists!' % field_name)
 
 					# Update data
-					post[field_name] = new_data[count]
+					post.original[field_name] = new_data[count]
 
-					output.write(json.dumps(post) + "\n")
+					output.write(json.dumps(post.original) + "\n")
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % parent_path.suffix)
 

@@ -127,7 +127,7 @@ class VideoStack(BasicProcessor):
             return self.dataset.finish_with_error("Video data missing. Cannot stack videos.")
 
         # a staging area to store the videos we're reading from
-        video_staging_area = video_dataset.get_staging_area()
+        video_staging_area = self.dataset.get_staging_area()
 
         # command to stack input videos
         transparency_filter = []
