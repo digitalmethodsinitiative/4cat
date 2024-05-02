@@ -52,6 +52,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 "default": "viewport"
             },
             "resolution": {
+                "requires": "capture==viewport",
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Window size",
                 "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). "
@@ -78,10 +79,10 @@ class ScreenshotWithSelenium(SeleniumSearch):
             "pause-time": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Pause time",
-                "tooltip": "Before each screenshot, wait this many seconds before taking the screenshot. This can help "
-                           "with images loading or if a site seems to be blocking the screenshot generator due to "
+                "tooltip": "Wait this many seconds between navigating to the page and making the screenshot. This can "
+                           "help with images loading or if a site seems to be blocking the screenshot generator due to "
                            "repeat requests. Wayback Machine captures and other slow sites often require longer waits "
-                           "(suggest 15 seconds).",
+                           "(at least 15 seconds is suggested).",
                 "default": 0,
                 "min": 0,
                 "max": 30,
@@ -94,6 +95,11 @@ class ScreenshotWithSelenium(SeleniumSearch):
                "default": False,
                "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically via https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies.'
             }
+
+
+        max_sites = config.get("selenium.max_sites", user=user)
+        if max_sites > 0:
+            options["intro-1"]["help"] += f"\n\nYou can capture up to {max_sites:,} URLs per dataset."
 
         return options
 
@@ -244,7 +250,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
         preprocessed_urls = [url for url in urls if ural.is_url(url, require_protocol=True, tld_aware=True, only_http_https=True, allow_spaces_in_path=False)]
 
         max_sites = config.get("selenium.max_sites", user=user)
-        if len(preprocessed_urls) > max_sites:
+        if max_sites and len(preprocessed_urls) > max_sites:
             raise QueryParametersException(f"You cannot collect more than {max_sites} screenshots per dataset. If you have more URLs, consider limiting your dataset first by either decreasing the resolution (i.e. fewer screenshots per year) or the length of the dataset (i.e. covering a shorter period of time).")
 
         # wayback machine toolbar remover

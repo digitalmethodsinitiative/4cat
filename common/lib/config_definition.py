@@ -437,9 +437,9 @@ config_definition = {
     "selenium.max_sites": {
         "type": UserInput.OPTION_TEXT,
         "default": 120,
-        "help": "Posts per page",
+        "help": "URLs per dataset",
         "coerce_type": int,
-        "tooltip": "Posts to display per page"
+        "tooltip": "Max amount of URLs to visit with Selenium per dataset. Set to 0 for unlimited."
     },
     "selenium.selenium_executable_path": {
         "type": UserInput.OPTION_TEXT,
