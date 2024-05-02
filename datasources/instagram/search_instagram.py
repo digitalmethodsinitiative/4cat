@@ -223,6 +223,14 @@ class SearchInstagram(Search):
             if user.get("username") != owner.get("username"):
                 raise MapItemException("Unable to parse item: different user and owner")
 
+        # Instagram posts also allow 'Collabs' with up to one co-author
+        coauthor = {"coauthor": "", "coauthor_fullname": "", "coauthor_id": ""}
+        if node.get("coauthor_producers"):
+            coauthor_node = node["coauthor_producers"][0]
+            coauthor["coauthor"] = coauthor_node.get("username")
+            coauthor["coauthor_fullname"] = coauthor_node.get("full_name")
+            coauthor["coauthor_id"] = coauthor_node.get("id")
+
         mapped_item = {
             "id": node["code"],
             "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"), # Zeeschuimer metadata
@@ -231,8 +239,11 @@ class SearchInstagram(Search):
             "body": caption,
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
-            "is_verified": True if user.get("is_verified") else False,
+            "verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
+            "coauthor": coauthor["coauthor"],
+            "coauthor_fullname": coauthor["coauthor_fullname"],
+            "coauthor_id": coauthor["coauthor_id"],
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["code"],

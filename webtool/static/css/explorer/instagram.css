@@ -18,11 +18,6 @@
 	border: none;
 }
 
-.posts header span:not(:last-child)::after {
-    content: '\2022';
-    margin-left: 0.5em;
-}
-
 .posts header i.verified {
 	color: #0095f6;
 }

@@ -1,10 +1,14 @@
 <header>
 
-	<!-- Possible external link, if not pseudonymised -->
 	{% if not pseudonymised %}
+		<!-- Possible external link, if not pseudonymised -->
 		<a href="{{ post.url }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
+		<!-- Author and co-author -->
 		<span class="author"><strong><a href="https://instagram.com/{{ post.get('author') }}">{{ post.get("author") }}</strong></a>
-			{% if post.get("is_verified") %} <i class="fa-solid fa-circle-check verified"></i>{% endif %}</span>
+		{% if post.get("is_verified") %} <i class="fa-solid fa-circle-check verified"></i>{% endif %}</span>
+		{% if post.get("coauthor") %}
+		and <span class="author"><strong><a href="https://instagram.com/{{ post.get('coauthor') }}">{{ post.get("coauthor") }}</strong></a>
+		{% endif %}
 		<span class="time">{{ post.get("timestamp") }}</span>
 	{% else %}
 		<span title="Pseudonymous author" class="author">
