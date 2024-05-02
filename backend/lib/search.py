@@ -48,7 +48,8 @@ class Search(BasicProcessor, ABC):
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'body', 'subject', 'timestamp']
 
-	flawless = 0
+	import_error_count = 0
+	import_warning_count = 0
 
 	def process(self):
 		"""
@@ -89,35 +90,10 @@ class Search(BasicProcessor, ABC):
 		elif items is not None:
 			self.dataset.update_status("Query finished, no results found.")
 
-		# queue predefined processors
-		if num_items > 0 and query_parameters.get("next", []):
-			for next in query_parameters.get("next"):
-				next_parameters = next.get("parameters", {})
-				next_type = next.get("type", "")
-				available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
-
-				# run it only if the processor is actually available for this query
-				if next_type in available_processors:
-					next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db,
-											parent=self.dataset.key,
-											extension=available_processors[next_type]["extension"])
-					self.queue.add_job(next_type, remote_id=next_analysis.key)
-
-		# see if we need to register the result somewhere
-		if query_parameters.get("copy_to", None):
-			# copy the results to an arbitrary place that was passed
-			if self.dataset.get_results_path().exists():
-				# but only if we actually have something to copy
-				shutil.copyfile(str(self.dataset.get_results_path()), query_parameters.get("copy_to"))
-			else:
-				# if copy_to was passed, that means it's important that this
-				# file exists somewhere, so we create it as an empty file
-				with open(query_parameters.get("copy_to"), "w") as empty_file:
-					empty_file.write("")
-		if self.flawless == 0:
+		if self.import_warning_count == 0 and self.import_error_count == 0:
 			self.dataset.finish(num_rows=num_items)
 		else:
-			self.dataset.update_status(f"Unexpected data format for {self.flawless} items. All data can be downloaded, but only data with expected format will be available to 4CAT processors; check logs for details", is_final=True)
+			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=True)
 			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
@@ -179,6 +155,8 @@ class Search(BasicProcessor, ABC):
 		if not path.exists():
 			return []
 
+		import_warnings = {}
+
 		# Check if processor and dataset can use map_item
 		check_map_item = self.map_item_method_available(dataset=self.dataset)
 		if not check_map_item:
@@ -199,17 +177,41 @@ class Search(BasicProcessor, ABC):
 					**item["data"],
 					"__import_meta": {k: v for k, v in item.items() if k != "data"}
 				}
+
 				# Check map item here!
 				if check_map_item:
 					try:
-						self.get_mapped_item(new_item)
+						mapped_item = self.get_mapped_item(new_item)
+
+						# keep track of items that raised a warning
+						# this means the item could be mapped, but there is
+						# some information the user should take note of
+						warning = mapped_item.get_message()
+						if not warning and mapped_item.get_missing_fields():
+							# usually this would have an explicit warning, but
+							# if not it's still useful to know
+							warning = f"The following fields are missing for this item and will be replaced with a default value: {', '.join(mapped_item.get_missing_fields())}"
+
+						if warning:
+							if warning not in import_warnings:
+								import_warnings[warning] = 0
+							import_warnings[warning] += 1
+							self.import_warning_count += 1
+
 					except MapItemException as e:
 						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
-						self.flawless += 1
+						self.import_error_count += 1
 						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e, warn_admins=unmapped_items is False)
 						unmapped_items = True
 
 				yield new_item
+
+		# warnings were raised about some items
+		# log these, with the number of items each warning applied to
+		if sum(import_warnings.values()) > 0:
+			self.dataset.log("While importing, the following issues were raised:")
+			for warning, num_items in import_warnings.items():
+				self.dataset.log(f"  {warning} (for {num_items:,} item(s))")
 
 		path.unlink()
 		self.dataset.delete_parameter("file")

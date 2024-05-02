@@ -78,7 +78,7 @@ class TempFileCleaner(BasicWorker):
                 # if the dataset is finished, the staging area should have been
                 # compressed into a zip file, or deleted, so this is also safe
                 # to clean up
-                self.log.debug("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
+                self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
                 dataset.key, str(file)))
                 shutil.rmtree(file)
 

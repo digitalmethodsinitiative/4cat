@@ -5,10 +5,10 @@ It's prohibitively difficult to scrape data from Twitter within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
 from datetime import datetime
-import json
 
 from backend.lib.search import Search
 from common.lib.helpers import strip_tags
+from common.lib.item_mapping import MappedItem
 
 
 class SearchTwitterViaZeeschuimer(Search):
@@ -38,11 +38,11 @@ class SearchTwitterViaZeeschuimer(Search):
         raise NotImplementedError("Twitter datasets can only be created by importing data from elsewhere")
 
     @staticmethod
-    def map_item(tweet):
-        if tweet.get("rest_id"):
-            return SearchTwitterViaZeeschuimer.map_item_modern(tweet)
-        elif tweet.get("type") == "adaptive":
-            return SearchTwitterViaZeeschuimer.map_item_legacy(tweet)
+    def map_item(item):
+        if item.get("rest_id"):
+            return MappedItem(SearchTwitterViaZeeschuimer.map_item_modern(item))
+        elif item.get("type") == "adaptive":
+            return MappedItem(SearchTwitterViaZeeschuimer.map_item_legacy(item))
         else:
             raise NotImplementedError
 
@@ -97,7 +97,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "replied_user": tweet["legacy"].get("in_reply_to_screen_name", ""),
             "is_withheld": "yes" if withheld else "no",
             "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
-            "urls": ",".join([url["expanded_url"] for url in tweet["legacy"]["entities"]["urls"]]),
+            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"]["urls"]]),
             "images": ",".join([media["media_url_https"] for media in tweet["legacy"]["entities"].get("media", []) if
                                 media["type"] == "photo"]),
             "videos": ",".join([media["media_url_https"] for media in tweet["legacy"]["entities"].get("media", []) if
@@ -158,7 +158,7 @@ class SearchTwitterViaZeeschuimer(Search):
                 "in_reply_to_screen_name") else "",
             "is_withheld": "yes" if withheld else "no",
             "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
-            "urls": ",".join([url["expanded_url"] for url in tweet["legacy"]["entities"]["urls"]]),
+            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"]["urls"]]),
             "images": ",".join(
                 [media["media_url_https"] for media in tweet["legacy"].get("extended_entities", {}).get("media", []) if
                  media["type"] == "photo"]),

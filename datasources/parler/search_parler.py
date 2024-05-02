@@ -9,6 +9,7 @@ import datetime
 import re
 
 from backend.lib.search import Search
+from common.lib.item_mapping import MappedItem
 
 
 class SearchParler(Search):
@@ -44,7 +45,7 @@ class SearchParler(Search):
         post = node["data"]
         post_time = datetime.datetime.strptime(post["date_created"], "%Y-%m-%dT%H:%M:%S.000000Z")
 
-        mapped_item = {
+        return MappedItem({
             "id": post["postuuid"],
             "thread_id": post["postuuid"],
             "body": post["body"],
@@ -62,6 +63,4 @@ class SearchParler(Search):
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", post["body"])),
             "image_url": post["image"] if post["image"] else "",
             "unix_timestamp": int(post_time.timestamp())
-        }
-
-        return mapped_item
+        })

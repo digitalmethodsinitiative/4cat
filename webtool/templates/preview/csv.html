@@ -8,11 +8,24 @@
 <p class="warning">Note: only the first {{ "{:,}".format(max_items) }} of {{ "{:,}".format(dataset.num_rows) }} total items of this dataset are shown in this preview (~{{ ((max_items / dataset.num_rows) * 100)|round(0)|int }}%)</p>
 {% endif %}
 <table>
+    {% set ns = namespace(links=[]) %}
     {% for row in rows %}
         {% set outer_loop = loop %}
         <tr>
         {% for cell in row %}
-            <t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>{{ cell }}</t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
+            {% set inner_loop = loop %}
+            {% if outer_loop.index == 1 %}
+                {% if "link" in cell or "url" in cell %}
+                    {% set ns.links = ns.links + [inner_loop.index] %}
+                {% endif %}
+            {% endif %}
+            <t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
+                {% if inner_loop.index in ns.links and outer_loop.index != 1 %}
+                    <a href="{{ cell }}" target="_blank">{{ cell }}</a>
+                {% else %}
+                    {{ cell }}
+                {% endif %}
+            </t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
         {% endfor %}
         </tr>
     {% endfor %}

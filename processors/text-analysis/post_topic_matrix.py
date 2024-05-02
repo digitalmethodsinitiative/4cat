@@ -34,9 +34,9 @@ class TopicModelWordExtractor(BasicProcessor):
             "tooltip": 'This may be useful in better understanding your topics.',
         },
         "columns": {
-            "type": UserInput.OPTION_TEXT,
+            "type": UserInput.OPTION_MULTI,
             "help": "Extra column(s) to include from original data",
-            "default": "id",
+            "default": ["id"],
             "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always included."
         },
     }
@@ -141,6 +141,10 @@ class TopicModelWordExtractor(BasicProcessor):
                     raise ProcessorInterruptedException("Interrupted while writing results file")
 
                 # Grab metadata related to post
+                if post.get('id') not in token_metadata:
+                    # post has no tokens...
+                    continue
+
                 token_data = token_metadata[str(post.get('id'))]
                 model_data = model_metadata[token_data.get('filename')]
                 interval = token_data['interval']

@@ -18,8 +18,8 @@ config_definition = {
     },
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
-        "default": ["ninegag", "douban", "douyin", "gab", "imgur", "upload", "instagram", "linkedin", "parler",
-                    "telegram", "tiktok", "truthsocial", "twitter"],
+        "default": ["ninegag", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
+                    "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
@@ -395,8 +395,9 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": ["admin"],
         "help": "Tag priority",
-        "tooltip": "User tag priority order. It is recommended to manipulate this with the 'User tags' panel instead of directly.",
-        "global": True
+        "tooltip": "User tag priority order. This can be manipulated from the 'User tags' panel instead of directly.",
+        "global": True,
+        "indirect": True
     },
     "flask.proxy_secret": {
         "type": UserInput.OPTION_TEXT,

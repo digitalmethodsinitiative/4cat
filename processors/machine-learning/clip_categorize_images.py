@@ -10,6 +10,7 @@ from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerE
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
+from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -246,7 +247,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             top_cats.append(cat)
             percent += cat[1]
         all_cats = {cat[0]: cat[1] for cat in item.get("categories", [])}
-        return {
+        return MappedItem({
             "id": item.get("id"),
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),
             "original_url": image_metadata.get("url", ""),
@@ -254,7 +255,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
             **all_cats
-        }
+        })
 
     @staticmethod
     def count_result_files(directory):

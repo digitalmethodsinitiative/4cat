@@ -234,7 +234,8 @@ class VideoDownloaderPlus(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return (module.type.endswith("-search") or module.is_from_collector()) and module.type not in ["tiktok-search", "tiktok-urls-search"]
+        return ((module.type.endswith("-search") or module.is_from_collector())
+                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"])
 
     def process(self):
         """
@@ -388,7 +389,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 }]
                 success = True
                 self.videos_downloaded_from_url = 1
-            except (requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, FilesizeException, FailedDownload, NotAVideo) as e:
+            except (requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects, FilesizeException, FailedDownload, NotAVideo) as e:
                 # FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
                 # FailedDownload raised when response other than 200 received
                 # NotAVideo raised due to specific Content-Type known to not be a video (and not a webpage/html that could lead to a video via YT-DLP)
@@ -570,9 +571,12 @@ class VideoDownloaderPlus(BasicProcessor):
                 # Verify video
                 # YT-DLP will download images; so we raise them differently
                 # TODO: test/research other possible ways to verify video links; watch for additional YT-DLP oddities
-                if "image" in response.headers["Content-Type"].lower():
+                content_type = response.headers.get("Content-Type")
+                if not content_type:
+                    raise VideoStreamUnavailable(f"Unable to verify video; no Content-Type provided: {url}")
+                elif "image" in content_type.lower():
                     raise NotAVideo("Not a Video (%s): %s" % (response.headers["Content-Type"], url))
-                elif "video" not in response.headers["Content-Type"].lower():
+                elif "video" not in content_type.lower():
                     raise VideoStreamUnavailable(f"Does not appear to be a direct to video link: {url}; "
                                                  f"Content-Type: {response.headers['Content-Type']}")
 

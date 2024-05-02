@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, HTTPHandler
-from importlib.machinery import SourceFileLoader
 
 from common.config_manager import config
 
@@ -128,18 +127,8 @@ class SlackLogHandler(WebHookLogHandler):
                     "value": "```" + infile.readlines()[record.frame.lineno - 1].strip() + "```",
                     "short": False
                 })
-        except IndexError:
-            pass
-
-        try:
-            module = SourceFileLoader(record.frame.filename.split("/")[-1].split(".")[0], record.frame.filename).load_module()
-            if "__maintainer__" in dir(module):
-                fields.append({
-                    "title": "Code maintainer:",
-                    "value": module.__maintainer__,
-                    "short": False
-                })
-        except ImportError:
+        except (IndexError, AttributeError):
+            # the file is not readable, or the line number is out of bounds
             pass
 
         return {

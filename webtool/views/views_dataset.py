@@ -146,10 +146,7 @@ def show_results(page):
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"]}
-
-    return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
+    return render_template("results.html", filter=filters, depth=depth, datasources=backend.all_modules.datasources,
                            datasets=filtered, pagination=pagination, favourites=favourites)
 
 
@@ -193,13 +190,11 @@ def get_mapped_result(key):
 
     if dataset.get_extension() == ".csv":
         # if it's already a csv, just return the existing file
-        return url_for(get_result, query_file=dataset.get_results_path().name)
+        return url_for("get_result", query_file=dataset.get_results_path().name)
 
     if not hasattr(dataset.get_own_processor(), "map_item"):
         # cannot map without a mapping method
         return error(404, error="File not found.")
-
-    mapper = dataset.get_own_processor().map_item
 
     # Also add possibly added annotation items.
     # These cannot be added to the static `map_item` function.
@@ -207,6 +202,7 @@ def get_mapped_result(key):
     annotation_fields = dataset.get_annotation_fields()
     if annotation_fields:
         annotation_labels = ["annotation_" + v["label"] for v in annotation_fields.values()]
+        annotations = dataset.get_annotations()
 
     def map_response():
         """
@@ -218,15 +214,15 @@ def get_mapped_result(key):
         """
         writer = None
         buffer = io.StringIO()
-        for mapped_item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
+        for item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
-                fieldnames = mapped_item.keys()
+                fieldnames = list(item.keys())
                 if annotation_labels:
                     for label in annotation_labels:
                         if label not in fieldnames:
                             fieldnames.append(label)
 
-                writer = csv.DictWriter(buffer, fieldnames=tuple(fieldnames))
+                writer = csv.DictWriter(buffer, fieldnames=fieldnames)
                 writer.writeheader()
                 yield buffer.getvalue()
                 buffer.truncate(0)
@@ -234,9 +230,9 @@ def get_mapped_result(key):
 
             if annotation_fields:
                 for label in annotation_labels:
-                    mapped_item[label] = item[label]
+                    item[label] = annotations.get(item.get("id"), {}).get(label, "")
 
-            writer.writerow(mapped_item)
+            writer.writerow(item)
             yield buffer.getvalue()
             buffer.truncate(0)
             buffer.seek(0)
@@ -319,7 +315,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_items(warn_unmappable=False):
+            for row in dataset.iterate_items(dataset.get_own_processor(), warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 
