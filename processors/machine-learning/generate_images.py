@@ -172,20 +172,14 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
         # Check GPU memory available
         try:
-            gpu_memory, info = dmi_service_manager.check_gpu_memory_available("stable_diffusion")
+            gpu_response = dmi_service_manager.check_gpu_memory_available("stable_diffusion")
         except DmiServiceManagerException as e:
             return self.dataset.finish_with_error(str(e))
-            staging_area.unlink()
-            output_dir.unlink()
 
-        if not gpu_memory:
-            if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
-                self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
-            elif int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
-                return self.dataset.finish_with_error(
-                    "DMI Service Manager currently too busy; no GPU memory available. Please try again later.")
-                shutil.rmtree(staging_area)
-                shutil.rmtree(output_dir)
+        if int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+            self.dataset.finish_with_error(
+                "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
+            return
 
         # Results should be unique to this dataset
         results_folder_name = f"images_{self.dataset.key}"
