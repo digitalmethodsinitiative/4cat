@@ -31,7 +31,8 @@ class SearchMedia(BasicProcessor):
                     "the 4CAT will be able to run various processors on these files. "
         },
         "data_upload": {
-            "type": UserInput.OPTION_FILES,
+            "type": UserInput.OPTION_FILE,
+            "multiple": True,
             "help": "Files"
         },
         "media_type": {

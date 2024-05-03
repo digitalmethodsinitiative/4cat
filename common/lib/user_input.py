@@ -33,7 +33,6 @@ class UserInput:
     OPTION_DATERANGE = "daterange"  # a beginning and end date
     OPTION_DIVIDER = "divider"  # meta-option, divides related sets of options
     OPTION_FILE = "file"  # file upload
-    OPTION_FILES = "files"  # multiple files upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
 
