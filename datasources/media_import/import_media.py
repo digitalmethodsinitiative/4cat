@@ -1,6 +1,7 @@
 import re
 import time
 import zipfile
+import mimetypes
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException
@@ -19,6 +20,7 @@ class SearchMedia(BasicProcessor):
     max_workers = 1
 
     disallowed_characters = re.compile(r"[^a-zA-Z0-9._+-]")
+    accepted_file_types = ["audio", "video", "image"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -27,23 +29,13 @@ class SearchMedia(BasicProcessor):
             "type": UserInput.OPTION_INFO,
             "help": "You can upload files here that will be available for further analysis "
                     "and processing. "
-                    "You can indicate what type of files are uploaded (image, audio, or video) and based on that, "
+                    "Please include only one type of file per dataset (image, audio, or video) and based on that, "
                     "the 4CAT will be able to run various processors on these files. "
         },
         "data_upload": {
             "type": UserInput.OPTION_FILE,
             "multiple": True,
             "help": "Files"
-        },
-        "media_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Media type",
-            "options": {
-                "audio": "Audio",
-                "video": "Videos",
-                "image": "Images",
-            },
-            "default": "image"
         },
     }
 
@@ -66,15 +58,31 @@ class SearchMedia(BasicProcessor):
         if len(files) < 1:
             raise QueryParametersException("No files were offered for upload.")
 
-        # do we have a media type?
-        if query.get("media_type") not in ["audio", "video", "image"]:
-            raise QueryParametersException(f"Cannot import files of type {query.get('media_type')}.")
+        # Check file types to ensure all are same type of media
+        media_type = None
+        for file in request.files.getlist("option-data_upload"):
+            # python-magic sniffs files to determine their type, but from request stream always seems to return
+            # application/octet-stream. if appears that we would need to save the whole files first so here we guess
+            # mime_type = magic.from_buffer(file.stream.read(2048), mime=True).split('/')[0]
+            mime_type = mimetypes.guess_type(file.filename)[0]
+            if mime_type is None:
+                raise QueryParametersException(f"Could not determine the type of file {file.filename}.")
+            else:
+                mime_type = mime_type.split('/')[0]
 
-        # TODO: check file types against media type
+            if mime_type not in SearchMedia.accepted_file_types:
+                raise QueryParametersException(f"This datasource only accepts files of {SearchMedia.accepted_file_types} (file {file.filename} detected type {mime_type}.")
+
+            if media_type is None:
+                media_type = mime_type
+            elif media_type != mime_type:
+                raise QueryParametersException(f"All files must be of the same type. {file.filename} is not of type {media_type}")
+
+        # TODO: if media_type is zip...
 
         return {
             "time": time.time(),
-            "media_type": query.get("media_type"),
+            "media_type": media_type,
             "num_files": len(files),
         }
 
