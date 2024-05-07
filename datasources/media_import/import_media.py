@@ -65,11 +65,7 @@ class SearchMedia(BasicProcessor):
         media_type = None
         for file in request.files.getlist("option-data_upload"):
             # Allow metadata files and log files to be uploaded
-            if file.filename == ".metadata.json":
-                # 4CAT metadata files
-                continue
-            elif file.filename.split(".")[-1] == ".log":
-                # log files
+            if file.filename == ".metadata.json" or file.filename.endswith(".log"):
                 continue
 
             # Guess mime type from filename; we only have partial files at this point
@@ -134,7 +130,8 @@ class SearchMedia(BasicProcessor):
                             new_filename = SearchMedia.get_safe_filename(inner_file.filename, new_zip_archive)
                             new_zip_archive.writestr(new_filename, inner_zip_archive.read(inner_file))
 
-                            saved_files += 1
+                            if not new_filename == ".metadata.json" or not new_filename.endswith(".log"):
+                                saved_files += 1
                     continue
 
                 new_filename = SearchMedia.get_safe_filename(file.filename, new_zip_archive)
@@ -145,7 +142,9 @@ class SearchMedia(BasicProcessor):
                         if len(chunk) == 0:
                             break
                         dest_file.write(chunk)
-                saved_files += 1
+
+                if not new_filename == ".metadata.json" or not new_filename.endswith(".log"):
+                    saved_files += 1
 
         # update the number of files in the dataset
         dataset.num_files = saved_files
