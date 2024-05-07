@@ -1,7 +1,10 @@
+import os
 import re
 import time
 import zipfile
+import magic
 import mimetypes
+from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException
@@ -29,8 +32,8 @@ class SearchMedia(BasicProcessor):
             "type": UserInput.OPTION_INFO,
             "help": "You can upload files here that will be available for further analysis "
                     "and processing. "
-                    "Please include only one type of file per dataset (image, audio, or video) and based on that, "
-                    "the 4CAT will be able to run various processors on these files. "
+                    "Please include only one type of file per dataset (image, audio, or video) and "
+                    "4CAT will be able to run various processors on these files. "
         },
         "data_upload": {
             "type": UserInput.OPTION_FILE,
@@ -61,24 +64,34 @@ class SearchMedia(BasicProcessor):
         # Check file types to ensure all are same type of media
         media_type = None
         for file in request.files.getlist("option-data_upload"):
-            # python-magic sniffs files to determine their type, but from request stream always seems to return
-            # application/octet-stream. if appears that we would need to save the whole files first so here we guess
-            # mime_type = magic.from_buffer(file.stream.read(2048), mime=True).split('/')[0]
+            # Allow metadata files and log files to be uploaded
+            if file.filename == ".metadata.json":
+                # 4CAT metadata files
+                continue
+            elif file.filename.split(".")[-1] == ".log":
+                # log files
+                continue
+
+            # Guess mime type from filename; we only have partial files at this point
             mime_type = mimetypes.guess_type(file.filename)[0]
             if mime_type is None:
                 raise QueryParametersException(f"Could not determine the type of file {file.filename}.")
             else:
+                is_zip = mime_type.split('/')[0] == "application" and mime_type.split('/')[1] == "zip"
                 mime_type = mime_type.split('/')[0]
 
-            if mime_type not in SearchMedia.accepted_file_types:
+            if mime_type not in SearchMedia.accepted_file_types and not is_zip:
                 raise QueryParametersException(f"This datasource only accepts files of {SearchMedia.accepted_file_types} (file {file.filename} detected type {mime_type}.")
+
+            # We do not have the full zip archive file at this point so we cannot check the inner files' mime types
+            if is_zip:
+                # if only zip files are uploaded media_type remains None until after_create()
+                continue
 
             if media_type is None:
                 media_type = mime_type
             elif media_type != mime_type:
                 raise QueryParametersException(f"All files must be of the same type. {file.filename} is not of type {media_type}")
-
-        # TODO: if media_type is zip...
 
         return {
             "time": time.time(),
@@ -97,11 +110,35 @@ class SearchMedia(BasicProcessor):
         :param DataSet dataset:  Dataset created for this query
         :param request:  Flask request submitted for its creation
         """
+        mime_type = query.get("media_type")
         saved_files = 0
-        with zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as zip_file:
+        with zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as new_zip_archive:
             for file in request.files.getlist("option-data_upload"):
-                new_filename = SearchMedia.disallowed_characters.sub("", file.filename)
-                with zip_file.open(new_filename, mode='w') as dest_file:
+                # Check if file is zip archive
+                file_mime_type = mimetypes.guess_type(file.filename)[0]
+                if file_mime_type is not None and file_mime_type.split('/')[0] == "application" and file_mime_type.split('/')[1] == "zip":
+                    # Save inner files from zip archive to new zip archive with all files
+                    file.seek(0)
+                    zip_file_data = BytesIO(file.read())
+                    with zipfile.ZipFile(zip_file_data, "r") as inner_zip_archive:
+                        for inner_file in inner_zip_archive.infolist():
+                            if inner_file.is_dir():
+                                continue
+
+                            if mime_type is None:
+                                # Only zip files were uploaded and media type still unknown; we set media_type here
+                                # TODO: any point in checking all inner files? they've already been uploaded.
+                                dataset.media_type = mimetypes.guess_type(inner_file.filename)[0].split('/')[0]
+
+                            # save inner file from the uploaded zip archive to the new zip with all files
+                            new_filename = SearchMedia.get_safe_filename(inner_file.filename, new_zip_archive)
+                            new_zip_archive.writestr(new_filename, inner_zip_archive.read(inner_file))
+
+                            saved_files += 1
+                    continue
+
+                new_filename = SearchMedia.get_safe_filename(file.filename, new_zip_archive)
+                with new_zip_archive.open(new_filename, mode='w') as dest_file:
                     file.seek(0)
                     while True:
                         chunk = file.read(1024)
@@ -110,8 +147,23 @@ class SearchMedia(BasicProcessor):
                         dest_file.write(chunk)
                 saved_files += 1
 
+        # update the number of files in the dataset
+        dataset.num_files = saved_files
+
     def process(self):
         """
         Step 3: Ummmm, we kinda did everything
         """
         self.dataset.finish(self.parameters.get("num_files"))
+
+    @staticmethod
+    def get_safe_filename(filename, zip_archive=None):
+        new_filename = SearchMedia.disallowed_characters.sub("", filename)
+        if zip_archive:
+            # check if file is in zip archive
+            index = 1
+            while new_filename in zip_archive.namelist():
+                new_filename = new_filename + "_" + str(index)
+                index += 1
+
+        return new_filename
