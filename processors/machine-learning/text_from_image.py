@@ -175,30 +175,33 @@ class ImageTextDetector(BasicProcessor):
 
         # Load the metadata from the archive
         image_metadata = {}
-        metadata_success = False
         if metadata_file is None:
             try:
                 self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
-                metadata_success = True
+                metadata_exists = True
             except KeyError:
                 self.dataset.update_status("No metadata file found")
-                metadata_success = False
+                metadata_exists = False
+        else:
+            # Previously extracted
+            metadata_exists = True
 
-            if metadata_success:
-                with open(os.path.join(staging_area, '.metadata.json')) as file:
-                    image_data = json.load(file)
-                    for url, data in image_data.items():
-                        if data.get('success'):
-                            data.update({"url": url})
-                            image_metadata[data['filename']] = data
+        if metadata_exists:
+            with open(os.path.join(staging_area, '.metadata.json')) as file:
+                image_data = json.load(file)
+                for url, data in image_data.items():
+                    if data.get('success'):
+                        data.update({"url": url})
+                        image_metadata[data['filename']] = data
 
         # Check if we need to collect data for updating the original dataset
         update_original = self.parameters.get("update_original", False)
         if update_original:
-            if not metadata_success:
+            if not metadata_exists:
                 self.dataset.update_status("No metadata file found, cannot update original dataset")
                 update_original = False
             else:
+                # Create filename to post id mapping
                 filename_to_post_id = {}
                 for url, data in image_data.items():
                     if data.get('success'):
