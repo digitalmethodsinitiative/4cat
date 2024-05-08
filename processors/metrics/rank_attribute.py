@@ -1,6 +1,7 @@
 """
 Generate ranking per post attribute
 """
+import emoji
 import re
 
 from collections import OrderedDict
@@ -51,7 +52,8 @@ class AttributeRanker(BasicProcessor):
 				"none": "Use column value",
 				"urls": "URLs",
 				"hostnames": "Host names",
-				"hashtags": "Hashtags (words starting with #)"
+				"hashtags": "Hashtags (words starting with #)",
+				"emoji": "Emoji (each used emoji in the column is counted individually)"
 			},
 			"help": "Extract from column",
 			"tooltip": "This can be used to extract more specific values from the value of the selected column(s); for "
@@ -287,6 +289,9 @@ class AttributeRanker(BasicProcessor):
 		elif look_for == "hashtags":
 			hashtags = list(re.findall(r"#([a-zA-Z0-9_]+)", value))
 			return hashtags
+
+		elif look_for == "emoji":
+			return [e["emoji"] for e in emoji.emoji_list(value)]
 
 		else:
 			return [value]

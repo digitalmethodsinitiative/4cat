@@ -97,7 +97,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "replied_user": tweet["legacy"].get("in_reply_to_screen_name", ""),
             "is_withheld": "yes" if withheld else "no",
             "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
-            "urls": ",".join([url["expanded_url"] for url in tweet["legacy"]["entities"]["urls"]]),
+            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"]["urls"]]),
             "images": ",".join([media["media_url_https"] for media in tweet["legacy"]["entities"].get("media", []) if
                                 media["type"] == "photo"]),
             "videos": ",".join([media["media_url_https"] for media in tweet["legacy"]["entities"].get("media", []) if
@@ -158,7 +158,7 @@ class SearchTwitterViaZeeschuimer(Search):
                 "in_reply_to_screen_name") else "",
             "is_withheld": "yes" if withheld else "no",
             "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
-            "urls": ",".join([url["expanded_url"] for url in tweet["legacy"]["entities"]["urls"]]),
+            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"]["urls"]]),
             "images": ",".join(
                 [media["media_url_https"] for media in tweet["legacy"].get("extended_entities", {}).get("media", []) if
                  media["type"] == "photo"]),

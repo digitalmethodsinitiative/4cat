@@ -48,7 +48,8 @@ class Search(BasicProcessor, ABC):
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'body', 'subject', 'timestamp']
 
-	import_issues = 0
+	import_error_count = 0
+	import_warning_count = 0
 
 	def process(self):
 		"""
@@ -94,7 +95,7 @@ class Search(BasicProcessor, ABC):
 			for next in query_parameters.get("next"):
 				next_parameters = next.get("parameters", {})
 				next_type = next.get("type", "")
-				available_processors = self.dataset.get_available_processors(user=self.dataset.creator, ui_only=False)
+				available_processors = self.dataset.get_available_processors(user=self.dataset.creator, exclude_hidden=False)
 
 				# run it only if the processor is actually available for this query
 				if next_type in available_processors:
@@ -115,10 +116,10 @@ class Search(BasicProcessor, ABC):
 				with open(query_parameters.get("copy_to"), "w") as empty_file:
 					empty_file.write("")
 
-		if self.import_issues == 0:
+		if self.import_warning_count == 0 and self.import_error_count == 0:
 			self.dataset.finish(num_rows=num_items)
 		else:
-			self.dataset.update_status(f"{self.import_issues} item(s) in the dataset had an unexpected format. All data can be downloaded, but only data with the expected format will be available to 4CAT processors and in CSV exports; check the dataset log for details.", is_final=True)
+			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=True)
 			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
@@ -221,11 +222,11 @@ class Search(BasicProcessor, ABC):
 							if warning not in import_warnings:
 								import_warnings[warning] = 0
 							import_warnings[warning] += 1
-							self.import_issues += 1
+							self.import_warning_count += 1
 
 					except MapItemException as e:
 						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
-						self.import_issues += 1
+						self.import_error_count += 1
 						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e, warn_admins=unmapped_items is False)
 						unmapped_items = True
 

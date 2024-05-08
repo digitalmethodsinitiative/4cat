@@ -95,12 +95,15 @@ class TikTokVideoDownloader(BasicProcessor):
 
         self.dataset.update_status("Downloading TikTok media")
         video_ids_to_download = []
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(self):
             video_ids_to_download.append(mapped_item.get("id"))
 
+        # the downloader is an asynchronous method because we want to be able
+        # to run multiple downloads in parallel
         tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
-        results = loop.run_until_complete(tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
+        results = loop.run_until_complete(
+            tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
@@ -232,7 +235,7 @@ class TikTokImageDownloader(BasicProcessor):
         metadata = {}
 
         # Loop through items and collect URLs
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(self):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
 

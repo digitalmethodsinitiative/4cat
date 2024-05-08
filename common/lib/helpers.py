@@ -107,6 +107,25 @@ def get_html_redirect_page(url):
     """
     return f"<head><meta http-equiv='refresh' charset='utf-8' content='0; URL={url}'></head>"
 
+def get_git_branch():
+    """
+    Get current git branch
+
+    If the 4CAT root folder is a git repository, this function will return the
+    name of the currently checked-out branch. If the folder is not a git
+    repository or git is not installed an empty string is returned.
+    """
+    try:
+        cwd = os.getcwd()
+        os.chdir(config.get('PATH_ROOT'))
+        branch = subprocess.run(["git", "branch", "--show-current"], stdout=subprocess.PIPE)
+        os.chdir(cwd)
+        if branch.returncode != 0:
+            raise ValueError()
+        return branch.stdout.decode("utf-8").strip()
+    except (subprocess.SubprocessError, ValueError, FileNotFoundError):
+        return ""
+
 
 def get_software_commit():
     """
@@ -130,7 +149,7 @@ def get_software_commit():
         return ""
 
     if not versionpath.exists():
-        # try github command line within the 4CAT root folder
+        # try git command line within the 4CAT root folder
         # if it is a checked-out git repository, it will tell us the hash of
         # the currently checked-out commit
         try:
@@ -855,3 +874,15 @@ def get_archived_file(archive_path, archived_file, temp_dir):
 
         else:
             raise FileNotFoundError("File not found in archive")
+
+def folder_size(path='.'):
+    """
+    Get the size of a folder using os.scandir for efficiency
+    """
+    total = 0
+    for entry in os.scandir(path):
+        if entry.is_file():
+            total += entry.stat().st_size
+        elif entry.is_dir():
+            total += folder_size(entry.path)
+    return total

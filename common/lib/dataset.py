@@ -16,7 +16,7 @@ import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
-from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
 								   MapItemException, MappedItemIncompleteException)
@@ -229,22 +229,17 @@ class DataSet(FourcatModule):
 		with log_path.open("a", encoding="utf-8") as outfile:
 			outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
 
-	def iterate_items(self, processor=None, bypass_map_item=False, warn_unmappable=True):
+	def _iterate_items(self, processor=None):
 		"""
 		A generator that iterates through a CSV or NDJSON file
+
+		This is an internal method and should not be called directly. Rather,
+		call iterate_items() and use the generated dictionary and its properties.
 
 		If a reference to a processor is provided, with every iteration,
 		the processor's 'interrupted' flag is checked, and if set a
 		ProcessorInterruptedException is raised, which by default is caught
 		in the worker and subsequently stops execution gracefully.
-
-		Processors can define a method called `map_item` that can be used to
-		map an item from the dataset file before it is processed any further
-		this is slower than storing the data file in the right format to begin
-		with but not all data sources allow for easy 'flat' mapping of items,
-		e.g. tweets are nested objects when retrieved from the twitter API
-		that are easier to store as a JSON file than as a flat CSV file, and
-		it would be a shame to throw away that data.
 
 		There are two file types that can be iterated (currently): CSV files
 		and NDJSON (newline-delimited JSON) files. In the future, one could
@@ -253,76 +248,55 @@ class DataSet(FourcatModule):
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
-		:param bool bypass_map_item:  If set to `True`, this ignores any
-		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
-		unmapped_items = False
 		path = self.get_results_path()
 
-		# see if an item mapping function has been defined
-		# open question if 'source_dataset' shouldn't be an attribute of the dataset
-		# instead of the processor...
-		item_mapper = False
-		own_processor = self.get_own_processor()
-		if not bypass_map_item and own_processor is not None:
-			if own_processor.map_item_method_available(dataset=self):
-				item_mapper = True
-
-		# go through items one by one, optionally mapping them
+		# Yield through items one by one
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
+				# Processor (that created this dataset) may have a custom CSV dialect and parameters
+				own_processor = self.get_own_processor()
 				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
 
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
 				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
-				for i, item in enumerate(reader):
+				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
-
-					if item_mapper:
-						try:
-							item = own_processor.get_mapped_item(item).get_item_data()
-						except MapItemException as e:
-							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
-								unmapped_items = True
-							continue
 
 					yield item
 
 		elif path.suffix.lower() == ".ndjson":
-			# in this format each line in the file is a self-contained JSON
-			# file
+			# In NDJSON format each line in the file is a self-contained JSON
 			with path.open(encoding="utf-8") as infile:
-				for i, line in enumerate(infile):
+				for line in infile:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
-					item = json.loads(line)
-					if item_mapper:
-						try:
-							item = own_processor.get_mapped_item(item).get_item_data()
-						except MapItemException as e:
-							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
-								unmapped_items = True
-							continue
-
-					yield item
+					yield json.loads(line)
 
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_objects(self, processor=None, warn_unmappable=True, map_missing="default"):
+	def iterate_items(self, processor=None, warn_unmappable=True, map_missing="default"):
 		"""
 		Generate mapped dataset items
 
-		Wrapper for iterate_items that returns both the original item and the
-		mapped item (or else the same identical item). No extension check is
-		performed here as the point is to be able to handle the original
-		object and save as an appropriate filetype.
+		Wrapper for _iterate_items that returns a DatasetItem, which can be
+		accessed as a dict returning the original item or (if a mapper is
+		available) the mapped item. Mapped or original versions of the item can
+		also be accessed via the `original` and `mapped_object` properties of
+		the DatasetItem.
+
+		Processors can define a method called `map_item` that can be used to map
+		an item from the dataset file before it is processed any further. This is
+		slower than storing the data file in the right format to begin with but
+		not all data sources allow for easy 'flat' mapping of items, e.g. tweets
+		are nested objects when retrieved from the twitter API that are easier
+		to store as a JSON file than as a flat CSV file, and it would be a shame
+		to throw away that data.
 
 		Note the two parameters warn_unmappable and map_missing. Items can be
 		unmappable in that their structure is too different to coerce into a
@@ -342,24 +316,23 @@ class DataSet(FourcatModule):
 		some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
 		- 'default': fill missing fields with the default passed by map_item
 		- 'abort': raise a MappedItemIncompleteException if a field is missing
-		- a dictionary with a 'replace' key: replace missing field with the
-		  value in the dictionary for the 'replace' key
 		- a callback: replace missing field with the return value of the
 		  callback. The MappedItem object is passed to the callback as the
 		  first argument and the name of the missing field as the second.
+		- a dictionary with a key for each possible missing field: replace missing
+		  field with a strategy for that field ('default', 'abort', or a callback)
 
-		:return generator:  A generator that yields a tuple with the unmapped
-		item followed by the mapped item
+		:return generator:  A generator that yields DatasetItems
 		"""
 		unmapped_items = False
 		# Collect item_mapper for use with filter
 		item_mapper = False
 		own_processor = self.get_own_processor()
-		if own_processor.map_item_method_available(dataset=self):
+		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
 		# Loop through items
-		for i, item in enumerate(self.iterate_items(processor=processor, bypass_map_item=True)):
+		for i, item in enumerate(self._iterate_items(processor)):
 			# Save original to yield
 			original_item = item.copy()
 
@@ -379,10 +352,9 @@ class DataSet(FourcatModule):
 					default_strategy = "default"
 
 					# strategy can be for all fields at once, or per field
-					# in the former case it's a string, in the latter a dict
-					# here we make sure it's always a dict to not complicate
-					# the following code
-					if type(map_missing) is str:
+					# if it is per field, it is a dictionary with field names and their strategy
+					# if it is for all fields, it is may be a callback, 'abort', or 'default'
+					if type(map_missing) is not dict:
 						default_strategy = map_missing
 						map_missing = {}
 
@@ -404,32 +376,8 @@ class DataSet(FourcatModule):
 			else:
 				mapped_item = original_item
 
-			# Yield the two items
-			yield original_item, mapped_item
-
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="default"):
-		"""
-		Generate mapped dataset dictionaries
-
-		Identical to iterate_mapped_object, but yields the mapped item's data
-		(i.e. a dictionary) rather than the MappedItem object.
-
-		:param BasicProcessor processor:  A reference to the processor
-		iterating the dataset.
-		:param bool warn_unmappable:  If an item is not mappable, skip the item
-		and log a warning
-		:param map_missing: Indicates what to do with mapped items for which
-		some fields could not be mapped. Defaults to 'default' (see
-		`iterate_mapped_object()`).
-
-		:return generator:  A generator that yields a tuple with the unmapped
-		item followed by the mapped item
-		"""
-		for original_item, mapped_item in self.iterate_mapped_objects(processor, warn_unmappable, map_missing):
-			if type(mapped_item) is MappedItem:
-				yield original_item, mapped_item.get_item_data()
-			else:
-				yield original_item, mapped_item
+			# yield a DatasetItem, which is a dict with some special properties
+			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 
 	def get_item_keys(self, processor=None):
 		"""
@@ -441,7 +389,7 @@ class DataSet(FourcatModule):
 		these, as a list.
 
 		:param BasicProcessor processor:  A reference to the processor
-		asking for the item keys, to pass on to iterate_itesm
+		asking for the item keys, to pass on to iterate_mapped_items
 		:return list:  List of keys, may be empty if there are no items in the
 		  dataset
 		"""
@@ -469,7 +417,7 @@ class DataSet(FourcatModule):
 		"""
 		results_file = self.get_results_path()
 
-		results_dir_base = Path(results_file.parent)
+		results_dir_base = results_file.parent
 		results_dir = results_file.name.replace(".", "") + "-staging"
 		results_path = results_dir_base.joinpath(results_dir)
 		index = 1
@@ -1416,7 +1364,7 @@ class DataSet(FourcatModule):
 		processor_type = self.type if hasattr(self, "type") else self.parameters.get("type")
 		return backend.all_modules.processors.get(processor_type)
 
-	def get_available_processors(self, user=None, ui_only=True):
+	def get_available_processors(self, user=None, exclude_hidden=False):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1427,15 +1375,15 @@ class DataSet(FourcatModule):
 
 		:param str|User|None user:  User to get compatibility for. If set,
 		use the user-specific config settings where available.
-		:param bool ui_only:  Only return processors that should be displayed
-		in the UI. If `False`, all processors are returned.
+		:param bool exclude_hidden:  Exclude processors that should be displayed
+		in the UI? If `False`, all processors are returned.
 
 		:return dict:  Available processors, `name => properties` mapping
 		"""
 		if self.available_processors:
-			# Update to reflect ui_only parameter which may be different from last call
+			# Update to reflect exclude_hidden parameter which may be different from last call
 			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not ui_only or processor.display_in_ui()}
+			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not exclude_hidden or not processor.is_hidden}
 
 		processors = self.get_compatible_processors(user=user)
 
@@ -1447,7 +1395,7 @@ class DataSet(FourcatModule):
 				del processors[analysis.type]
 				continue
 
-			if ui_only and not processors[analysis.type].display_in_ui():
+			if exclude_hidden and processors[analysis.type].is_hidden:
 				del processors[analysis.type]
 
 		self.available_processors = processors
