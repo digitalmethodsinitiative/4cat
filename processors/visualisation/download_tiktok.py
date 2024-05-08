@@ -30,6 +30,7 @@ class TikTokVideoDownloader(BasicProcessor):
     title = "Download TikTok Videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
+    is_hidden = True # Hide from UI; only used in preset TikTokImageDownloaderPreset
 
     options = {
         "amount": {
@@ -191,16 +192,6 @@ class TikTokImageDownloader(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         """
         return module.type in ["tiktok-search", "tiktok-urls-search"]
-
-    @classmethod
-    def display_in_ui(cls):
-        """
-        This processor is not displayed in the UI, as it is only used by the image-download-preset.py
-        See TikTokImageDownloaderPreset in processors/presets/image-download-preset.py
-
-        :param module: Dataset or processor to determine compatibility with
-        """
-        return False
 
     def process(self):
         """

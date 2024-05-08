@@ -43,6 +43,7 @@ class ImageDownloader(BasicProcessor):
 				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
 				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	is_hidden = True # hide in UI; processor is called by ImageDownloaderPreset
 
 	options = {
 		"amount": {
@@ -131,15 +132,6 @@ class ImageDownloader(BasicProcessor):
         """
 		return (module.type == "top-images" or module.is_from_collector()) \
 			and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
-
-	@classmethod
-	def display_in_ui(cls):
-		"""
-        This processor is not displayed in the UI, as it is only used by the image-download-preset.py
-
-        :param module: Dataset or processor to determine compatibility with
-        """
-		return False
 
 	def process(self):
 		"""
@@ -276,6 +268,7 @@ class ImageDownloader(BasicProcessor):
 		downloaded_images = 0
 		processed_urls = 0
 		failures = []
+		max_images = amount if amount != 0 else len(urls)
 		for url in urls:
 			if amount != 0 and downloaded_images >= amount:
 				break
@@ -286,8 +279,8 @@ class ImageDownloader(BasicProcessor):
 
 			processed_urls += 1
 			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
-									   (downloaded_images, amount, url))
-			self.dataset.update_progress(downloaded_images / amount)
+									   (downloaded_images, max_images, url))
+			self.dataset.update_progress(downloaded_images / max_images)
 
 			try:
 				# acquire image
