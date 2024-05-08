@@ -30,7 +30,6 @@ class TikTokVideoDownloader(BasicProcessor):
     title = "Download TikTok Videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
-    is_hidden = True # Hide from UI; only used in preset TikTokImageDownloaderPreset
 
     options = {
         "amount": {
@@ -139,6 +138,7 @@ class TikTokImageDownloader(BasicProcessor):
     title = "Download TikTok Images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
+    is_hidden = True  # Hide from UI; only used in preset TikTokImageDownloaderPreset
 
     options = {
         "amount": {
