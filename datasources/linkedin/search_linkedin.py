@@ -119,7 +119,7 @@ class SearchLinkedIn(Search):
         link_url = ""
         if item.get("content") and item["content"].get("navigationContext"):
             link_url = item["content"]["navigationContext"].get("actionTarget", "")
-        elif item.get("content") and item["content"].get("articleComponent") and "navigationContext" in post["content"]["articleComponent"]:
+        elif item.get("content") and item["content"].get("articleComponent") and "navigationContext" in item["content"]["articleComponent"]:
             link_url = item["content"]["articleComponent"]["navigationContext"].get("actionTarget", "")
 
         return MappedItem({
