@@ -127,7 +127,7 @@ const annotations = {
 
 		// Ask whether the next page should be opened without saving annotations
 		$('a > .page').click(function(){
-			if (!$("#save-annotations").prop('disabled')) {
+			if (!$("#save-annotations").hassClass('disabled')) {
 				return confirm("Unsaved annotations are lost if you don't save before leaving the page.\nLeave anyway?");
 			}
 		})
@@ -724,12 +724,14 @@ const annotations = {
 					annotations.enableSaving();
 					$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
 					alert("Could't save annotations");
+					$("#save-annotations").removeClass("disabled");
 					console.log(response);
 				}
 			},
 			error: function (error) {
 				annotations.enableSaving();
 				$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
+				$("#save-annotations").removeClass("disabled");
 				//alert("Could't save annotations");
 				console.log(error)
 			}
