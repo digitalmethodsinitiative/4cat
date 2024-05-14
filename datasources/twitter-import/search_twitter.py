@@ -14,7 +14,7 @@ from common.lib.helpers import UserInput
 
 class SearchTwitterViaZeeschuimer(Search):
     """
-    Import scraped Imgur data
+    Import scraped Twitter data
     """
     type = "twitter-import"  # job ID
     category = "Search"  # category
@@ -34,7 +34,7 @@ class SearchTwitterViaZeeschuimer(Search):
         """
         Run custom search
 
-        Not available for Imgur
+        Not available for Twitter
         """
         raise NotImplementedError("Twitter datasets can only be created by importing data from elsewhere")
 
@@ -67,6 +67,7 @@ class SearchTwitterViaZeeschuimer(Search):
                 tweet["legacy"]["full_text"] = t_text
 
         quote_tweet = tweet.get("quoted_status_result")
+
         if quote_tweet and "tweet" in quote_tweet.get("result", {}):
             # sometimes this is one level deeper, sometimes not...
             quote_tweet["result"] = quote_tweet["result"]["tweet"]
@@ -94,10 +95,14 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_retweet": "yes" if retweet else "no",
             "retweeted_user": retweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if retweet else "",
             "is_quote_tweet": "yes" if quote_tweet else "no",
-            "quoted_user": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if (quote_tweet and "tombstone" not in quote_tweet["result"]) else "",
+            "quote_tweet_id": quote_tweet["result"].get("rest_id") if quote_tweet else "",
+            "quote_author": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if (quote_tweet and "tombstone" not in quote_tweet["result"]) else "",
+            "quote_body": quote_tweet["result"]["legacy"].get("full_text","") if quote_tweet else "",
+            "quote_images": ",".join([media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", []) if media["type"] == "photo"]) if quote_tweet else "",
+            "quote_videos": ",".join([media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", []) if media["type"] == "video"]) if quote_tweet else "",
             "is_quote_withheld": "yes" if (quote_tweet and "tombstone" in quote_tweet["result"]) else "no",
             "is_reply": "yes" if str(tweet["legacy"]["conversation_id_str"]) != str(tweet["rest_id"]) else "no",
-            "replied_user": tweet["legacy"].get("in_reply_to_screen_name", ""),
+            "replied_author": tweet["legacy"].get("in_reply_to_screen_name", ""),
             "is_withheld": "yes" if withheld else "no",
             "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
             "urls": ",".join([url["expanded_url"] for url in tweet["legacy"]["entities"]["urls"]]),
@@ -155,9 +160,9 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_retweet": "yes" if retweet else "no",
             "retweeted_user": retweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if retweet else "",
             "is_quote_tweet": "yes" if quote_tweet else "no",
-            "quoted_user": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if quote_tweet else "",
+            "quote_author": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if quote_tweet else "",
             "is_reply": "yes" if str(tweet["legacy"]["conversation_id_str"]) != tweet_id else "no",
-            "replied_user": tweet["legacy"].get("in_reply_to_screen_name", "") if tweet["legacy"].get(
+            "replied_author": tweet["legacy"].get("in_reply_to_screen_name", "") if tweet["legacy"].get(
                 "in_reply_to_screen_name") else "",
             "is_withheld": "yes" if withheld else "no",
             "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
