@@ -186,7 +186,7 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		return body
 
 	# Supported data sources
-	known_datasources = set("twitter", "tiktok", "instagram", "tumblr")
+	known_datasources = ["twitter", "tiktok", "instagram", "tumblr"]
 	if datasource not in known_datasources:
 		return body
 
