@@ -69,7 +69,7 @@
 	margin-top: 20px;
 }
 
-.time, .metrics {
+.time, .metrics, .atname {
 	color: #7a8a97;
 }
 
@@ -90,6 +90,12 @@
 
 span.hashtag {
 	color: rgb(29, 155, 240);
+}
+
+.post .quote-post {
+	padding: 20px;
+	border: 1px solid #efefef;
+	border-radius: 10px;
 }
 
 
