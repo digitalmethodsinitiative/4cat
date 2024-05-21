@@ -166,6 +166,7 @@ class TelegramImageDownloader(BasicProcessor):
         self.dataset.update_status("Finding messages with image attachments")
         for message in self.source_dataset.iterate_items(self):
             if self.interrupted:
+                await client.disconnect()
                 raise ProcessorInterruptedException("Interrupted while processing messages")
 
             if not message.get("attachment_data") or message.get("attachment_type") not in downloadable_types:
@@ -222,6 +223,8 @@ class TelegramImageDownloader(BasicProcessor):
             except ValueError as e:
                 self.dataset.log(f"Couldn't retrieve images for {entity}, it probably does not exist anymore ({e})")
                 self.flawless = False
+
+        await client.disconnect()
 
     @staticmethod
     def cancel_start():
