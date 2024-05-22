@@ -250,7 +250,7 @@ class VideoHasher(BasicProcessor):
 						'video_hash': video_hash.hash,
 						'video_duration': video_hash.video_duration,
 						'video_count': len(data.get('post_ids', [])),
-						"post_ids": ','.join(data.get("post_ids", [])),
+						"post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
 						'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
 					})
 					num_posts += 1
