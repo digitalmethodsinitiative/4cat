@@ -1,5 +1,5 @@
 """
-Import scraped Twitter data
+Import scraped X/Twitter data
 
 It's prohibitively difficult to scrape data from Twitter within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
@@ -17,8 +17,8 @@ class SearchTwitterViaZeeschuimer(Search):
     """
     type = "twitter-import"  # job ID
     category = "Search"  # category
-    title = "Import scraped Twitter data"  # title displayed in UI
-    description = "Import Twitter data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    title = "Import scraped X/Twitter data"  # title displayed in UI
+    description = "Import X/Twitter data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_from_extension = True
 
@@ -75,7 +75,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "thread_id": tweet["legacy"]["conversation_id_str"],
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(timestamp.timestamp()),
-            "link": f"https://twitter.com/{tweet['core']['user_results']['result']['legacy']['screen_name']}/status/{tweet['id']}",
+            "link": f"https://x.com/{tweet['core']['user_results']['result']['legacy']['screen_name']}/status/{tweet['id']}",
             "body": tweet["legacy"]["full_text"],
             "author": tweet["core"]["user_results"]["result"]["legacy"]["screen_name"],
             "author_fullname": tweet["core"]["user_results"]["result"]["legacy"]["name"],
@@ -136,7 +136,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "thread_id": tweet["legacy"]["conversation_id_str"],
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(timestamp.timestamp()),
-            "link": f"https://twitter.com/{tweet['user']['screen_name']}/status/{tweet_id}",
+            "link": f"https://x.com/{tweet['user']['screen_name']}/status/{tweet_id}",
             "body": tweet["legacy"]["full_text"],
             "author": tweet["user"]["screen_name"],
             "author_fullname": tweet["user"]["name"],
@@ -176,11 +176,11 @@ class SearchTwitterViaZeeschuimer(Search):
         """
         Get centre of a rectangular box
 
-        Convenience function for converting Twitter's bounding box coordinates
+        Convenience function for converting X/Twitter's bounding box coordinates
         to a singular coordinate - simply the centre of the box - because that
         is what is expected for mapped output.
 
-        :param list box:  The box as part of Twitter's response
+        :param list box:  The box as part of X/Twitter's response
         :return str:  Coordinate, as longitude,latitude.
         """
         box = box[0]
