@@ -183,7 +183,7 @@ class SearchInstagram(Search):
                 # no image links at all :-/
                 # video is all we have
                 display_url = media_node["video_versions"][0]["url"]
-        elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO:
+        elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO and media_node.get("image_versions2"):
             media_url = media_node["image_versions2"]["candidates"][0]["url"]
             display_url = media_url
         else:
