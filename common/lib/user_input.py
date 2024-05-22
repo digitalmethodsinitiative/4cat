@@ -1,8 +1,16 @@
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import QueryParametersException
+from werkzeug.datastructures import ImmutableMultiDict
 import json
 
 import re
+
+class RequirementsNotMetException(Exception):
+    """
+    If this is raised while parsing, that option is not included in the parsed
+    output. Used with the "requires" option setting.
+    """
+    pass
 
 class UserInput:
     """
@@ -26,6 +34,9 @@ class UserInput:
     OPTION_DIVIDER = "divider"  # meta-option, divides related sets of options
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
+    OPTION_DATASOURCES = "datasources"  # data source toggling
+
+    OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
     @staticmethod
     def parse_all(options, input, silently_correct=True):
@@ -48,15 +59,35 @@ class UserInput:
 
         :return dict:  Sanitised form input
         """
+        from common.lib.helpers import convert_to_int
         parsed_input = {}
+
+        if type(input) is not dict and type(input) is not ImmutableMultiDict:
+            raise TypeError("input must be a dictionary or ImmutableMultiDict")
+
+        if type(input) is ImmutableMultiDict:
+            # we are not using to_dict, because that messes up multi-selects
+            input = {key: input.getlist(key) for key in input}
+            for key, value in input.items():
+                if type(value) is list and len(value) == 1:
+                    input[key] = value[0]
 
         # all parameters are submitted as option-[parameter ID], this is an 
         # artifact of how the web interface works and we can simply remove the
         # prefix
         input = {re.sub(r"^option-", "", field): input[field] for field in input}
 
+        # re-order input so that the fields relying on the value of other
+        # fields are parsed last
+        options = {k: options[k] for k in sorted(options, key=lambda k: options[k].get("requires") is not None)}
+
         for option, settings in options.items():
-            if settings.get("type") in (UserInput.OPTION_DIVIDER, UserInput.OPTION_INFO):
+            if settings.get("indirect"):
+                # these are settings that are derived from and set by other
+                # settings
+                continue
+
+            if settings.get("type") in UserInput.OPTIONS_COSMETIC:
                 # these are structural form elements and never have a value
                 continue
 
@@ -74,20 +105,43 @@ class UserInput:
                     option_max += "_proxy"
 
                 # save as a tuple of unix timestamps (or None)
-                after, before = (UserInput.parse_value(settings, input.get(option_min), silently_correct), UserInput.parse_value(settings, input.get(option_max), silently_correct))
+                try:
+                    after, before = (UserInput.parse_value(settings, input.get(option_min), parsed_input, silently_correct), UserInput.parse_value(settings, input.get(option_max), parsed_input, silently_correct))
 
-                if before and after and after > before:
-                    if not silently_correct:
-                        raise QueryParametersException("End of date range must be after beginning of date range.")
-                    else:
-                        before = after
+                    if before and after and after > before:
+                        if not silently_correct:
+                            raise QueryParametersException("End of date range must be after beginning of date range.")
+                        else:
+                            before = after
 
-                parsed_input[option] = (after, before)
+                    parsed_input[option] = (after, before)
+                except RequirementsNotMetException:
+                    pass
 
             elif settings.get("type") == UserInput.OPTION_TOGGLE:
                 # special case too, since if a checkbox is unchecked, it simply
                 # does not show up in the input
-                parsed_input[option] = option in input
+                try:
+                    if option in input:
+                        # Toggle needs to be parsed
+                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
+                    else:
+                        # Toggle was left blank
+                        parsed_input[option] = False
+                except RequirementsNotMetException:
+                    pass
+
+            elif settings.get("type") == UserInput.OPTION_DATASOURCES:
+                # special case, because this combines multiple inputs to
+                # configure data source availability and expiration
+                datasources = {datasource: {
+                    "enabled": f"{option}-enable-{datasource}" in input,
+                    "allow_optout": f"{option}-optout-{datasource}" in input,
+                    "timeout": convert_to_int(input[f"{option}-timeout-{datasource}"], 0)
+                } for datasource in input[option].split(",")}
+
+                parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
+                parsed_input[option.split(".")[0] + ".expiration"] = datasources
 
             elif option not in input:
                 # not provided? use default
@@ -95,12 +149,15 @@ class UserInput:
 
             else:
                 # normal parsing and sanitisation
-                parsed_input[option] = UserInput.parse_value(settings, input[option], silently_correct)
+                try:
+                    parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
+                except RequirementsNotMetException:
+                    pass
 
         return parsed_input
 
     @staticmethod
-    def parse_value(settings, choice, silently_correct=True):
+    def parse_value(settings, choice, other_input=None, silently_correct=True):
         """
         Filter user input
 
@@ -109,20 +166,76 @@ class UserInput:
 
         :param obj settings:  Settings, including defaults and valid options
         :param choice:  The chosen option, to be parsed
+        :param dict other_input:  Other input, as parsed so far
         :param bool silently_correct:  If true, replace invalid values with the
         given default value; else, raise a QueryParametersException if a value
         is invalid.
 
         :return:  Validated and parsed input
         """
+        # short-circuit if there is a requirement for the field to be parsed
+        # and the requirement isn't met
+        if settings.get("requires"):
+            try:
+                field, operator, value = re.findall(r"([a-zA-Z0-9_]+)([!=$~^]+)(.*)", settings.get("requires"))[0]
+            except IndexError:
+                # invalid condition, interpret as 'does the field with this name have a value'
+                field, operator, value = (choice, "!=", "")
+
+            if field not in other_input:
+                raise RequirementsNotMetException()
+
+            other_value = other_input.get(field)
+            if type(other_value) is bool:
+                # evalues to a boolean, i.e. checkboxes etc
+                if operator == "!=":
+                    if (other_value and value in ("", "false")) or (not other_value and value in ("true", "checked")):
+                        raise RequirementsNotMetException()
+                else:
+                    if (other_value and value not in ("true", "checked")) or (not other_value and value not in ("", "false")):
+                        raise RequirementsNotMetException()
+
+            else:
+                if type(other_value) in (tuple, list):
+                # iterables are a bit special
+                    if len(other_value) == 1:
+                        # treat one-item lists as "normal" values
+                        other_value = other_value[0]
+                    elif operator == "~=":  # interpret as 'is in list?'
+                        if value not in other_value:
+                            raise RequirementsNotMetException()
+                    else:
+                        # condition doesn't make sense for a list, so assume it's not True
+                        raise RequirementsNotMetException()
+
+                if operator == "^=" and not str(other_value).startswith(value):
+                    raise RequirementsNotMetException()
+                elif operator == "$=" and not str(other_value).endswith(value):
+                    raise RequirementsNotMetException()
+                elif operator == "~=" and value not in str(other_value):
+                    raise RequirementsNotMetException()
+                elif operator == "!=" and value == other_value:
+                    raise RequirementsNotMetException()
+                elif operator in ("==", "=") and value != other_value:
+                    raise RequirementsNotMetException()
+
         input_type = settings.get("type", "")
-        if input_type in (UserInput.OPTION_INFO, UserInput.OPTION_DIVIDER):
+        if input_type in UserInput.OPTIONS_COSMETIC:
             # these are structural form elements and can never return a value
             return None
 
         elif input_type == UserInput.OPTION_TOGGLE:
             # simple boolean toggle
-            return choice is not None
+            if type(choice) == bool:
+                return choice
+            elif choice in ['false', 'False']:
+                # Sanitized options passed back to Flask can be converted to strings as 'false'
+                return False
+            elif choice in ['true', 'True', 'on']:
+                # Toggle will have value 'on', but may also becomes a string 'true'
+                return True
+            else:
+                raise QueryParametersException("Toggle invalid input")
 
         elif input_type in (UserInput.OPTION_DATE, UserInput.OPTION_DATERANGE):
             # parse either integers (unix timestamps) or try to guess the date
@@ -152,8 +265,13 @@ class UserInput:
             if not choice:
                 return settings.get("default", [])
 
-            chosen = choice.split(",")
-            return [item for item in chosen if item in settings.get("options", [])]
+            if type(choice) is str:
+                # should be a list if the form control was actually a multiselect
+                # but we have some client side UI helpers that may produce a string
+                # instead
+                choice = choice.split(",")
+
+            return [item for item in choice if item in settings.get("options", [])]
 
         elif input_type == UserInput.OPTION_CHOICE:
             # select box
@@ -161,20 +279,20 @@ class UserInput:
             # return option if valid, or default
             if choice not in settings.get("options"):
                 if not silently_correct:
-                    raise QueryParametersException("Invalid value selected; must be one of %s." % ", ".join(settings.get("options", {}).keys()))
+                    raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(settings.get('options', {}).keys())}. {settings}")
                 else:
                     return settings.get("default", "")
             else:
                 return choice
 
         elif input_type == UserInput.OPTION_TEXT_JSON:
-            # needs to be parsed as JSON
+            # verify that this is actually json
             try:
                 redumped_value = json.dumps(json.loads(choice))
             except json.JSONDecodeError:
                 raise QueryParametersException("Invalid JSON value '%s'" % choice)
 
-            return redumped_value
+            return json.loads(choice)
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
             # text string

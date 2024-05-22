@@ -3,15 +3,13 @@ Twitter APIv2 base stats class
 """
 import csv
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
-
-from common.lib.user_input import UserInput
 
 
 class TwitterMentionsExport(BasicProcessor):
@@ -25,7 +23,7 @@ class TwitterMentionsExport(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
@@ -46,7 +44,9 @@ class TwitterMentionsExport(BasicProcessor):
 
             counter = 0
             # Iterate through each post and collect data for each interval
-            for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+            for post in self.source_dataset.iterate_items(self):
+                post = post.original
+
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while processing Tweets")
 
@@ -150,7 +150,7 @@ class TCATMentionsExport(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
@@ -172,7 +172,8 @@ class TCATMentionsExport(BasicProcessor):
 
             counter = 0
             # Iterate through each post and collect data for each interval
-            for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+            for post in self.source_dataset.iterate_items(self):
+                post = post.original
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while processing Tweets")
 

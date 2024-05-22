@@ -4,7 +4,7 @@ Detect scenes in videos
 import json
 from scenedetect import open_video, SceneManager, VideoOpenFailure
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -140,7 +140,7 @@ class VideoSceneDetector(BasicProcessor):
 	followups = ["video-scene-frames", "video-timelines"]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on videos
 		"""
@@ -256,7 +256,7 @@ class VideoSceneDetector(BasicProcessor):
 							continue
 						# List types are not super fun for CSV
 						if 'post_ids' in video_data:
-							video_data['post_ids'] = ','.join(video_data['post_ids'])
+							video_data['post_ids'] = ','.join([str(i) for i in video_data['post_ids']])
 
 						for i, scene in enumerate(collected_scenes[file.get('filename')]):
 							rows.append({

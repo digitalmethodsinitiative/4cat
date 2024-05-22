@@ -2,6 +2,7 @@
 
 {% block title %}Datasets &amp; previous results{% endblock %}
 {% block body_class %}result-list plain-page{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
 
 {% block body %}
     <nav class="view-controls block">
@@ -36,7 +37,7 @@
             <h2><span>Recently created datasets</span></h2>
             <nav class="tabs">
                 <ul>
-                    {% if current_user.is_admin %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}
+                    {% if __user_config("privileges.can_view_all_datasets") %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}
                     <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
                     <li{% if depth == "favourites" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites only</a></li>
                 </ul>
@@ -51,20 +52,20 @@
                         <div class="property-container">
                             <div class="result">
                                 <a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
-                                <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>
+                                {% if __user_config("ui.show_datasource") %}<span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>{% endif %}
                                 <h4>{{ dataset.get_label() }}</h4>
                                 {% if dataset.is_finished() %}
                                     <span class="result">({{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %})</span>
                                 {% endif %}
                             </div>
-                            <div>{% include 'result-metadata.html' %}</div>
+                            <div>{% include 'components/result-metadata.html' %}</div>
                         </div>
 
                         <div class="property-container status">
                         {% if not dataset.is_finished() or dataset.num_rows == 0 %}
-                            <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status">{% include "result-status.html" %}</span></p>
+                            <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status"><span class="result-status">{% include "components/result-status.html" %}</span></span></p>
                         {% else %}
-                            <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file)[:-1] }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
+                            <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
                         {% endif %}
                         </div>
 

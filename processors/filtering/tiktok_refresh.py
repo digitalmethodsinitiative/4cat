@@ -5,7 +5,7 @@ import asyncio
 import json
 
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 
 __author__ = "Dale Wahl"
@@ -22,11 +22,11 @@ class UpdateTikTok(BasicProcessor):
     extension = "ndjson"
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on NDJSON and CSV files
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type in ["tiktok-search", "tiktok-urls-search"]
 
@@ -40,7 +40,7 @@ class UpdateTikTok(BasicProcessor):
 
         # Loop through items and collect URLs
         urls = []
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(processor=self):
             url = mapped_item.get("tiktok_url")
             if url:
                 urls.append(mapped_item.get("tiktok_url"))
@@ -50,7 +50,7 @@ class UpdateTikTok(BasicProcessor):
             self.dataset.finish(0)
 
         self.dataset.update_status(f"Collected {len(urls)} to refresh.")
-        tiktok_scraper = TikTokScraper(processor=self)
+        tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
         items = loop.run_until_complete(tiktok_scraper.request_metadata(urls))
 

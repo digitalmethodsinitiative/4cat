@@ -1,0 +1,25 @@
+{% if not dataset.is_finished() and dataset.get_place_in_queue() > 0 %}
+    {% if not no_icons %}<i class="fas fa-hourglass-half" aria-label="Query in progress..."></i>{% endif %} In a queue{% if dataset.get_place_in_queue() > 0 %}
+        (waiting for {{ dataset.get_place_in_queue() }} dataset{% if dataset.get_place_in_queue() != 1 %}s{% endif %} to finish).
+    {% else %}, waiting for job to be started...{% endif %}
+{% elif not dataset.is_finished() %}
+        {% if not no_icons %}<i class="fas fa-arrow-down scroll" aria-label="Query in progress..."></i>{% endif %}
+{% elif dataset.is_finished() and not no_icons %}
+    {% if dataset.num_rows == 0 %}
+        <i class="fa fa-skull" aria-hidden="true"></i> <em>No results.</em>
+    {% elif dataset.num_rows < 0 %}
+        <i class="fa fa-warning" aria-hidden="true"></i> <em>Error while capturing data.</em>
+    {% else %}
+        <i class="fa fa-check" aria-hidden="true"></i>
+    {% endif %}
+{% endif %}
+{% if dataset.get_place_in_queue() <= 0 %}
+    {% if dataset.get_status() %}
+        {{ dataset.get_status() }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
+    {% elif not dataset.is_finished() %}
+        Creating dataset
+    {% endif %}
+    {% if dataset.is_finished() and dataset.num_rows > 0 %}
+        {{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %} captured.
+    {% endif %}
+{% endif %}

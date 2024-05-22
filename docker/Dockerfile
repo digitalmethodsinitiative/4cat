@@ -36,7 +36,7 @@ ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1
 RUN apt-get update && apt install -y \
     # Called in docker-entrypoint.sh:
     curl \
-    netcat \
+    netcat-traditional \
     postgresql-client \
     postgresql-server-dev-all \
     # Called by 4CAT:

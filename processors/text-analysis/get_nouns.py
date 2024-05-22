@@ -2,16 +2,13 @@
 Extract nouns from SpaCy NLP docs.
 
 """
-
-import csv
 import pickle
-import shutil
 import spacy
 
 from collections import Counter
 from spacy.tokens import DocBin
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -49,11 +46,11 @@ class ExtractNouns(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on linguistic feature data
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "linguistic-features"
 

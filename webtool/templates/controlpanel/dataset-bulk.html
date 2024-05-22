@@ -1,0 +1,87 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}Manage user tags{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "dataset-bulk" %}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Dataset bulk management</span></h2>
+
+            <p class="intro">Here are some things you can do with all datasets (within given parameters). Use the filter
+                below to limit the effect of your changes. If you do not set any filters, all datasets will be affected.
+                You can start with a CSV export if you want to verify which individual datasets will be affected by your
+                changes.</p>
+
+            <form action="{{ url_for("dataset_bulk") }}" method="POST" class="wide dataset-bulk">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+
+                <div class="form-element{% if "filter_name" in incomplete %} missing{% endif %}">
+                    <label for="forminput-filter-name">Owner</label>
+                    <div>
+
+                        <input name="filter_name" id="forminput-filter-name" type="text" value="{{ form.filter_name }}">
+
+                        <button class="tooltip-trigger" aria-controls="tooltip-option-filter-name"
+                                aria-label="Extended help for option">?
+                        </button>
+                        <p role="tooltip" id="tooltip-option-filter-name">
+                            Can be a username or a <code>tag:example</code>. Can contain wildcards. If multiple users match, all will be added.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="form-element{% if "filter_date" in incomplete %} missing{% endif %}">
+                    <label for="forminput-filter-date">Created between</label>
+                    <div>
+                        <div class="daterange-wrapper">
+                            <input name="filter_date_from" id="forminput-filter-date" class="input-time" type="date" placeholder="dd-mm-yyyy" value="{{ form.filter_date_from }}"> to
+                            <input name="filter_date_to" class="input-time" type="date" placeholder="dd-mm-yyyy" value="{{ form.filter_date_to }}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-element{% if "filter_datasource" in incomplete %} missing{% endif %}">
+                    <label for="forminput-filter-datasource">Data source</label>
+                    <div>
+                        <div class="multi-select-wrapper">
+                            <select name="filter_datasource" id="forminput-filter-datasource" multiple="multiple">
+                                {% for datasource in datasources %}
+                                    <option value="{{ datasource }}"{% if datasource in form.filter_datasource %} selected{% endif %}>{{ datasources[datasource] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+                <button name="action-export" class="action-button"><i class="fa f-fw fa-download" aria-hidden="true"></i> Export metadata as CSV</button>
+
+                <hr>
+                <button name="action-delete" class="action-button confirm-first" data-confirm-action="DELETE all matching datasets completely"><i class="fa f-fw fa-times" aria-hidden="true"></i> Delete all</button>
+
+                <hr>
+                <button name="action-keep" class="action-button confirm-first"><i class="fa f-fw fa-check" aria-hidden="true"></i> Keep all (never expire)</button>
+                <button name="action-unkeep" class="action-button confirm-first" data-confirm-action="make all datasets eligible for deletion? If their data source is configured to expire datasets, and the datasets are older than the configured timeout, they will be deleted immediately. Can you bear this responsibility"><i class="fa f-fw fa-clock" aria-hidden="true"></i> Unkeep all (clear 'keep' status)</button>
+
+                <hr>
+                <div class="form-element{% if "bulk_owner" in incomplete %} missing{% endif %}">
+                    <label for="bulk-owner">User or <code>tag:example</code></label>
+                    <div>
+                        <input name="bulk-owner" id="bulk-owner" type="text" value="{{ form.bulk_user }}">
+                        <button class="tooltip-trigger" aria-controls="tooltip-option-bulk-user" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-option-bulk-user">Wildcards (*) allowed. If multiple users match, all will be added as owner.</p>
+                    </div>
+                </div>
+                <button name="action-owner" class="action-button confirm-first"><i class="fa f-fw fa-user-plus" aria-hidden="true"></i> Add as owner to all</button>
+
+                <hr>
+                <button name="action-public" class="action-button confirm-first"><i class="fa f-fw fa-unlock" aria-hidden="true"></i> Make all public</button>
+                <button name="action-private" class="action-button confirm-first"><i class="fa f-fw fa-lock" aria-hidden="true"></i> Make all private</button>
+            </form>
+        </section>
+    </article>
+{% endblock %}

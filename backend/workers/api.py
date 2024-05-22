@@ -2,8 +2,8 @@ import socket
 import time
 import json
 
-import common.config_manager as config
-from backend.abstract.worker import BasicWorker
+from common.config_manager import config
+from backend.lib.worker import BasicWorker
 
 
 class InternalAPI(BasicWorker):
@@ -235,7 +235,7 @@ class InternalAPI(BasicWorker):
 				else:
 					if hasattr(worker, "dataset") and worker.dataset:
 						running_key = worker.dataset.key
-						running_user = worker.dataset.owner
+						running_user = worker.dataset.creator
 						running_parent = worker.dataset.top_parent().key
 					else:
 						running_key = None

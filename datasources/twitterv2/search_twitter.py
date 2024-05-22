@@ -8,10 +8,11 @@ import time
 import json
 import re
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
-import common.config_manager as config
+from common.config_manager import config
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 
 class SearchWithTwitterAPIv2(Search):
@@ -28,7 +29,7 @@ class SearchWithTwitterAPIv2(Search):
     is_static = False   # Whether this datasource is still updated
 
     previous_request = 0
-    flawless = True
+    import_issues = True
 
     references = [
         "[Twitter API documentation](https://developer.twitter.com/en/docs/twitter-api)"
@@ -74,7 +75,7 @@ class SearchWithTwitterAPIv2(Search):
         error_report = []
         # this is pretty sensitive so delete it immediately after storing in
         # memory
-        have_api_key = config.get("twitterv2-search.academic_api_key")
+        have_api_key = self.config.get("twitterv2-search.academic_api_key")
         bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
         api_type = query.get("api_type", "all") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
@@ -108,7 +109,7 @@ class SearchWithTwitterAPIv2(Search):
             "media.fields": ",".join(media_fields),
         }
 
-        if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
+        if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
             endpoint = "https://api.twitter.com/2/tweets"
 
             tweet_ids = self.parameters.get("query", []).split(',')
@@ -317,7 +318,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     yield tweet
 
-                if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
+                if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
                     # If id_lookup return errors in collecting tweets
                     for tweet_error in api_response.get("errors", []):
                         tweet_id = str(tweet_error.get('resource_id'))
@@ -469,8 +470,8 @@ class SearchWithTwitterAPIv2(Search):
         :param user:  User to provide options for
         :return dict:  Data source options
         """
-        have_api_key = config.get("twitterv2-search.academic_api_key")
-        max_tweets = config.get("twitterv2-search.max_tweets")
+        have_api_key = config.get("twitterv2-search.academic_api_key", user=user)
+        max_tweets = config.get("twitterv2-search.max_tweets", user=user)
 
         if have_api_key:
             intro_text = ("This data source uses the full-archive search endpoint of the Twitter API (v2) to retrieve "
@@ -517,7 +518,7 @@ class SearchWithTwitterAPIv2(Search):
                 },
             })
 
-        if config.get("twitterv2.id_lookup"):
+        if config.get("twitterv2.id_lookup", user=user):
             options.update({
                 "query_type": {
                     "type": UserInput.OPTION_CHOICE,
@@ -578,8 +579,8 @@ class SearchWithTwitterAPIv2(Search):
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
-        have_api_key = config.get("twitterv2-search.academic_api_key")
-        max_tweets = config.get("twitterv2-search.max_tweets", 10_000_000)
+        have_api_key = config.get("twitterv2-search.academic_api_key", user=user)
+        max_tweets = config.get("twitterv2-search.max_tweets", 10_000_000, user=user)
 
         # this is the bare minimum, else we can't narrow down the full data set
         if not query.get("query", None):
@@ -592,7 +593,7 @@ class SearchWithTwitterAPIv2(Search):
         if len(query.get("query")) > 1024 and query.get("query_type", "query") != "id_lookup":
             raise QueryParametersException("Twitter API queries cannot be longer than 1024 characters.")
 
-        if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
+        if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup", user=user):
             # reformat queries to be a comma-separated list with no wrapping
             # whitespace
             whitespace = re.compile(r"\s+")
@@ -712,7 +713,7 @@ class SearchWithTwitterAPIv2(Search):
         return params
 
     @staticmethod
-    def map_item(tweet):
+    def map_item(item):
         """
         Map a nested Tweet object to a flat dictionary
 
@@ -724,38 +725,39 @@ class SearchWithTwitterAPIv2(Search):
         throw away valuable data and allows for later changes that e.g. store
         the tweets more efficiently as a MongoDB collection.
 
-        :param tweet:  Tweet object as originally returned by the Twitter API
+        :param item:  Tweet object as originally returned by the Twitter API
         :return dict:  Dictionary in the format expected by 4CAT
         """
-        tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
+        tweet_time = datetime.datetime.strptime(item["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
 
         # For backward compatibility
-        author_username = tweet["author_user"]["username"] if tweet.get("author_user") else tweet["author_username"]
-        author_fullname = tweet["author_user"]["name"] if tweet.get("author_user") else tweet["author_fullname"]
+        author_username = item["author_user"]["username"] if item.get("author_user") else item["author_username"]
+        author_fullname = item["author_user"]["name"] if item.get("author_user") else item["author_fullname"]
+        author_followers = item["author_user"]["public_metrics"]["followers_count"] if item.get("author_user") else ""
 
-        hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
-        mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
-        urls = [tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]
-        images = [item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-        video_items = [item for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+        hashtags = [tag["tag"] for tag in item.get("entities", {}).get("hashtags", [])]
+        mentions = [tag["username"] for tag in item.get("entities", {}).get("mentions", [])]
+        urls = [tag.get("expanded_url", tag["display_url"]) for tag in item.get("entities", {}).get("urls", [])]
+        images = [attachment["url"] for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
+        video_items = [attachment for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
         # by default, the text of retweets is returned as "RT [excerpt of
         # retweeted tweet]". Since we have the full tweet text, we can complete
         # the excerpt:
-        is_retweet = any([ref.get("type") == "retweeted" for ref in tweet.get("referenced_tweets", [])])
+        is_retweet = any([ref.get("type") == "retweeted" for ref in item.get("referenced_tweets", [])])
         if is_retweet:
-            retweeted_tweet = [t for t in tweet["referenced_tweets"] if t.get("type") == "retweeted"][0]
+            retweeted_tweet = [t for t in item["referenced_tweets"] if t.get("type") == "retweeted"][0]
             if retweeted_tweet.get("text", False):
                 retweeted_body = retweeted_tweet.get("text")
                 # Get user's username that was retweeted
                 if retweeted_tweet.get('author_user') and retweeted_tweet.get('author_user').get('username'):
-                    tweet["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
-                elif tweet.get('entities', {}).get('mentions', []):
+                    item["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
+                elif item.get('entities', {}).get('mentions', []):
                     # Username may not always be here retweeted_tweet["author_user"]["username"] when user was removed/deleted
-                    retweeting_users = [mention.get('username') for mention in tweet.get('entities', {}).get('mentions', []) if mention.get('id') == retweeted_tweet.get('author_id')]
+                    retweeting_users = [mention.get('username') for mention in item.get('entities', {}).get('mentions', []) if mention.get('id') == retweeted_tweet.get('author_id')]
                     if retweeting_users:
                         # should only ever be one, but this verifies that there IS one and not NONE
-                        tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
+                        item["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
             retweeted_user = retweeted_tweet["author_user"]["username"] if retweeted_tweet.get("author_user") else retweeted_tweet.get("author_username", "") # Reference tweets were not always enriched
 
@@ -763,13 +765,13 @@ class SearchWithTwitterAPIv2(Search):
             # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense
             [hashtags.append(tag["tag"]) for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]
             [mentions.append(tag["username"]) for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]
-            [urls.append(tag["expanded_url"]) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
+            [urls.append(tag.get("expanded_url", tag["display_url"])) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
             # Images appear to be inheritted by retweets, but just in case
-            [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-            [video_items.append(item) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+            [images.append(attachment["url"]) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
+            [video_items.append(attachment) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
-        is_quoted = any([ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])])
-        is_reply = any([ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])])
+        is_quoted = any([ref.get("type") == "quoted" for ref in item.get("referenced_tweets", [])])
+        is_reply = any([ref.get("type") == "replied_to" for ref in item.get("referenced_tweets", [])])
 
         videos = []
         for video in video_items:
@@ -777,32 +779,40 @@ class SearchWithTwitterAPIv2(Search):
             if variants:
                 videos.append(variants[0].get('url'))
 
-        return {
-            "id": tweet["id"],
-            "thread_id": tweet.get("conversation_id", tweet["id"]),
+        expected_metrics = {"impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count"}
+        public_metrics = {k: item["public_metrics"].get(k, MissingMappedField(0)) for k in expected_metrics}
+        missing_metrics = [m for m in expected_metrics if m not in item["public_metrics"]]
+        warning = ""
+        if missing_metrics:
+            warning = f"The following metrics were missing from a tweet: {', '.join(missing_metrics)}. They will have a value of '0' in any exports."
+
+        return MappedItem({
+            "id": item["id"],
+            "thread_id": item.get("conversation_id", item["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(tweet_time.timestamp()),
-            'link': "https://twitter.com/%s/status/%s" % (author_username, tweet.get('id')),
-            "subject": tweet.get('subject', ""),
-            "body": tweet["text"],
+            'link': "https://twitter.com/%s/status/%s" % (author_username, item.get('id')),
+            "subject": "",
+            "body": item["text"],
             "author": author_username,
             "author_fullname": author_fullname,
-            "author_id": tweet["author_id"],
-            "source": tweet.get("source"),
-            "language_guess": tweet.get("lang"),
-            "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
-            **tweet["public_metrics"],
+            "author_id": item["author_id"],
+            "author_followers": author_followers,
+            "source": item.get("source"),
+            "language_guess": item.get("lang"),
+            "possibly_sensitive": "yes" if item.get("possibly_sensitive") else "no",
+            **public_metrics,
             "is_retweet": "yes" if is_retweet else "no",
             "retweeted_user": "" if not is_retweet else retweeted_user,
             "is_quote_tweet": "yes" if is_quoted else "no",
-            "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
+            "quoted_user": "" if not is_quoted else [ref for ref in item["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
             "is_reply": "yes" if is_reply else "no",
-            "replied_user": tweet.get("in_reply_to_user", {}).get("username", ""),
+            "replied_user": item.get("in_reply_to_user", {}).get("username", ""),
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),
             "videos": ','.join(set(videos)),
             "mentions": ','.join(set(mentions)),
-            "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
-            'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
-        }
+            "long_lat": ', '.join([str(x) for x in item.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
+            'place_name': item.get('geo', {}).get('place', {}).get('full_name', ''),
+        }, message=warning)

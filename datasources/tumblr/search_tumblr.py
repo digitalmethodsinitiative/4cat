@@ -9,10 +9,10 @@ import pytumblr
 from requests.exceptions import ConnectionError
 from datetime import datetime
 
-import common.config_manager as config
-from backend.abstract.search import Search
+from common.config_manager import config
+from backend.lib.search import Search
 from common.lib.helpers import UserInput
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ConfigException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]
@@ -43,7 +43,9 @@ class SearchTumblr(Search):
 	api_limit_reached = False
 
 	seen_ids = set()
+	client = None
 	failed_notes = []
+	failed_reblogs = []
 
 	config = {
 		# Tumblr API keys to use for data capturing
@@ -74,53 +76,98 @@ class SearchTumblr(Search):
 	}
 	references = ["[Tumblr API documentation](https://www.tumblr.com/docs/en/api/v2)"]
 
-	options = {
-		"intro": {
-			"type": UserInput.OPTION_INFO,
-			"help": "Retrieve any kind of Tumblr posts with specific tags or from specific blogs. Gets 100.000 posts "
-					"at max. Insert tags or names of blogs, one on each line. You may insert up to ten tags or "
-					"blogs.\n\nTumblr tags may include whitespace and commas. A `#` before the tag is optional.\n\n"
-					"Tag search only get posts explicitly associated with the exact tag you insert here. Querying "
-					"`gogh` will thus not get posts only tagged with `van gogh`. Keyword search is unfortunately not "
-					"allowed by the [Tumblr API](https://api.tumblr.com).\n\nIf 4CAT reached its Tumblr API rate "
-					"limit, try again 24 hours later."
-		},
-		"search_scope": {
-			"type": UserInput.OPTION_CHOICE,
-			"help": "Search by",
-			"options": {
-				"tag": "Tag",
-				"blog": "Blog"
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Check is Tumbler keys configured and if not, requests from User
+		"""
+		options = {
+			"intro": {
+				"type": UserInput.OPTION_INFO,
+				"help": "Retrieve any kind of Tumblr posts with specific tags or from specific blogs. Gets 100.000 posts "
+						"at max. Insert tags or names of blogs, one on each line. You may insert up to ten tags or "
+						"blogs.\n\nTumblr tags may include whitespace and commas. A `#` before the tag is optional.\n\n"
+						"Tag search only get posts explicitly associated with the exact tag you insert here. Querying "
+						"`gogh` will thus not get posts only tagged with `van gogh`. Keyword search is unfortunately not "
+						"allowed by the [Tumblr API](https://api.tumblr.com).\n\nIf 4CAT reached its Tumblr API rate "
+						"limit, try again 24 hours later."
 			},
-			"default": "tag"
-		},
-		"query": {
-			"type": UserInput.OPTION_TEXT_LARGE,
-			"help": "Tags/blogs",
-			"tooltip": "Separate with commas or new lines."
-		},
-		"fetch_reblogs": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Also fetch reblogs with text? (warning: slow)"
-		},
-		"divider": {
-			"type": UserInput.OPTION_DIVIDER
-		},
-		"date-intro": {
-			"type": UserInput.OPTION_INFO,
-			"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is volatile: when fetching sporadically used "
-					"tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases "
-					"the date parameter (<code>before</code>) with six hours and sends the query again. This often "
-					"successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 "
-					"days), it checks for data up to six years before the last date, decreasing 12 times by 6 months. "
-					"If that also results in nothing, it assumes the dataset is complete. Check the oldest post in "
-					"your dataset to see if it this is indeed the case and whether any odd time gaps exists."
-		},
-		"daterange": {
-			"type": UserInput.OPTION_DATERANGE,
-			"help": "Date range"
+			"search_scope": {
+				"type": UserInput.OPTION_CHOICE,
+				"help": "Search by",
+				"options": {
+					"tag": "Tag",
+					"blog": "Blog"
+				},
+				"default": "tag"
+			},
+			"query": {
+				"type": UserInput.OPTION_TEXT_LARGE,
+				"help": "Tags/blogs",
+				"tooltip": "Separate with commas or new lines."
+			},
+			"fetch_reblogs": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Also fetch reblogs with text? (warning: slow)",
+				"default": False
+			}
 		}
-	}
+
+		try:
+			config_keys = SearchTumblr.get_tumbler_keys(user)
+		except ConfigException:
+			# No 4CAT set keys for user; let user input their own
+			options["key-info"] = {
+				"type": UserInput.OPTION_INFO,
+				"help": "In order to access the Tumblr API, you need to register an application. You can do so "
+						"[here](https://www.tumblr.com/oauth/apps) and use the keys below. You will first get the OAuth "
+						"Consumer Key and Secret, and then the User Token Key and Secret [after entering them here](ht"
+									  "tps://api.tumblr.com/console/calls/user/info) and granting access."
+			}
+			options["consumer_key"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "OAuth Consumer Key"
+			}
+			options["consumer_secret"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "OAuth Consumer Secret"
+			}
+			options["key"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "User Token Key"
+			}
+			options["secret_key"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "User Token Secret"
+			}
+
+		options["divider"] = {
+				"type": UserInput.OPTION_DIVIDER
+			}
+		options["date-intro"] = {
+				"type": UserInput.OPTION_INFO,
+				"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is volatile: when fetching sporadically used "
+						"tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases "
+						"the date parameter (<code>before</code>) with six hours and sends the query again. This often "
+						"successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 "
+						"days), it checks for data up to six years before the last date, decreasing 12 times by 6 months. "
+						"If that also results in nothing, it assumes the dataset is complete. Check the oldest post in "
+						"your dataset to see if it this is indeed the case and whether any odd time gaps exists."
+			}
+		options["daterange"] = {
+				"type": UserInput.OPTION_DATERANGE,
+				"help": "Date range"
+			}
+
+		return options
 
 	def get_items(self, query):
 		"""
@@ -132,6 +179,7 @@ class SearchTumblr(Search):
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
 		queries = parameters.get("query").split(", ")
+		fetch_reblogs = parameters.get("fetch_reblogs", False)
 
 		# Store all info here
 		results = []
@@ -149,6 +197,19 @@ class SearchTumblr(Search):
 			max_date = int(max_date)
 		else:
 			max_date = int(time.time())
+
+		# Connect to Tumblr API
+		try:
+			self.client = self.connect_to_tumblr()
+		except ConfigException as e:
+			self.log.warning(f"Could not connect to Tumblr API: API keys invalid or not set")
+			self.dataset.finish_with_error(f"Could not connect to Tumblr API: API keys invalid or not set")
+			return
+		except ConnectionRefusedError as e:
+			client_info = self.client.info()
+			self.log.warning(f"Could not connect to Tumblr API: {e}; client_info: {client_info}")
+			self.dataset.finish_with_error(f"Could not connect to Tumblr API: {client_info.get('meta', {}).get('status', '')} - {client_info.get('meta', {}).get('msg', '')}")
+			return
 
 		# for each tag or blog, get post
 		for query in queries:
@@ -175,7 +236,7 @@ class SearchTumblr(Search):
 					break
 
 		# If we also want the posts that reblogged the fetched posts:
-		if parameters.get("fetch_reblogs") and not self.max_posts_reached and not self.api_limit_reached:
+		if fetch_reblogs and not self.max_posts_reached and not self.api_limit_reached:
 			self.dataset.update_status("Getting notes from all posts")
 
 			# Reblog information is already returned for blog-level searches
@@ -200,11 +261,22 @@ class SearchTumblr(Search):
 
 			# Get the full data for text reblogs.
 			if text_reblogs:
-
+				connection_retries = 0
 				for i, text_reblog in enumerate(text_reblogs):
 					self.dataset.update_status("Got %i/%i text reblogs" % (i, len(text_reblogs)))
+					if connection_retries >= 5:
+						self.dataset.update_status("Multiple connection refused errors; unable to continue collection of reblogs.")
+						break
 					for key, value in text_reblog.items():
-						reblog_post = self.get_post_by_id(key, value)
+						if connection_retries >= 5:
+							break
+						try:
+							reblog_post = self.get_post_by_id(key, value)
+						except ConnectionRefusedError:
+							connection_retries += 1
+							self.failed_reblogs.append(key)
+							self.dataset.update_status(f"ConnectionRefused: Unable to collect reblogs for post {key}")
+							continue
 						if reblog_post:
 							reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
 							results.append(reblog_post[0])
@@ -217,13 +289,10 @@ class SearchTumblr(Search):
 		Get Tumblr posts posts with a certain tag
 		:param tag, str: the tag you want to look for
 		:param min_date: a unix timestamp, indicates posts should be min_date this date.
-	    :param max_date: a unix timestamp, indicates posts should be max_date this date.
+		:param max_date: a unix timestamp, indicates posts should be max_date this date.
 
-	    :returns: a dict created from the JSON response
+		:returns: a dict created from the JSON response
 		"""
-
-		client = self.connect_to_tumblr()
-
 		# Store all posts in here
 		all_posts = []
 
@@ -234,7 +303,7 @@ class SearchTumblr(Search):
 		# We're gonna change max_date, so store a copy for reference.
 		max_date_original = max_date
 
-		# We use the averag time difference between posts to spot possible gaps in the data.
+		# We use the average time difference between posts to spot possible gaps in the data.
 		all_time_difs = []
 		avg_time_dif = 0
 		time_difs_len = 0
@@ -256,7 +325,7 @@ class SearchTumblr(Search):
 
 			try:
 				# Use the pytumblr library to make the API call
-				posts = client.tagged(tag, before=max_date, limit=20, filter="raw")
+				posts = self.client.tagged(tag, before=max_date, limit=20, filter="raw")
 			except ConnectionError:
 				self.update_status("Encountered a connection error, waiting 10 seconds.")
 				time.sleep(10)
@@ -270,7 +339,7 @@ class SearchTumblr(Search):
 			for check_post in posts:
 				# Sometimes the API repsonds just with "meta", "response", or "errors".
 				if isinstance(check_post, str):
-					self.dataset.update_status("Couldnt add post:", check_post)
+					self.dataset.update_status("Couldn't add post:", check_post)
 					retries += 1
 					break
 				else:
@@ -419,9 +488,7 @@ class SearchTumblr(Search):
 
 	    :returns: a dict created from the JSON response
 		"""
-
 		blog = blog + ".tumblr.com"
-		client = self.connect_to_tumblr()
 
 		if not max_date:
 			max_date = int(time.time())
@@ -448,7 +515,7 @@ class SearchTumblr(Search):
 
 			try:
 				# Use the pytumblr library to make the API call
-				posts = client.posts(blog, before=max_date, limit=20, reblog_info=True, notes_info=True, filter="raw")
+				posts = self.client.posts(blog, before=max_date, limit=20, reblog_info=True, notes_info=True, filter="raw")
 				posts = posts["posts"]
 
 				#if (max_date - posts[0]["timestamp"]) > 500000:
@@ -515,9 +582,6 @@ class SearchTumblr(Search):
 		:param di_blogs_ids, dict: A dictionary with blog names as keys and post IDs as values.
 		:param only_text_reblogs, bool: Whether to only keep notes that are text reblogs.
 		"""
-
-		client = self.connect_to_tumblr()
-
 		# List of dict to get reblogs. Items are: [{"blog_name": post_id}]
 		text_reblogs = []
 
@@ -543,7 +607,7 @@ class SearchTumblr(Search):
 			while True:
 
 				# Requests a post's notes
-				notes = client.notes(key, id=value, before_timestamp=max_date)
+				notes = self.client.notes(key, id=value, before_timestamp=max_date)
 
 				if only_text_reblogs:
 
@@ -588,10 +652,8 @@ class SearchTumblr(Search):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post from Tumblr")
 
-		client = self.connect_to_tumblr()
-
 		# Request the specific post.
-		post = client.posts(blog_name, id=post_id)
+		post = self.client.posts(blog_name, id=post_id)
 
 		# Tumblr API can sometimes return with this kind of error:
 		# {'meta': {'status': 500, 'msg': 'Server Error'}, 'response': {'error': 'Malformed JSON or HTML was returned.'}}
@@ -603,27 +665,41 @@ class SearchTumblr(Search):
 
 		return result
 
+	@staticmethod
+	def get_tumbler_keys(user):
+		config_keys = [
+			config.get("api.tumblr.consumer_key", user=user),
+			config.get("api.tumblr.consumer_secret", user=user),
+			config.get("api.tumblr.key", user=user),
+			config.get("api.tumblr.secret_key", user=user)]
+		if not all(config_keys):
+			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
+		return config_keys
+
 	def connect_to_tumblr(self):
 		"""
 		Returns a connection to the Tumblr API using the pytumblr library.
 
 		"""
-		client = pytumblr.TumblrRestClient(
-			config.get("api.tumblr.consumer_key"),
-			config.get("api.tumblr.consumer_secret"),
-			config.get("api.tumblr.key"),
-			config.get("api.tumblr.secret_key")
-		)
-		client_info = client.info()
+		# User input keys
+		config_keys = [self.parameters.get("consumer_key"),
+			self.parameters.get("consumer_secret"),
+			self.parameters.get("key"),
+			self.parameters.get("secret_key")]
+		if not all(config_keys):
+			# No user input keys; attempt to use 4CAT config keys
+			config_keys = self.get_tumbler_keys(self.owner)
+
+		self.client = pytumblr.TumblrRestClient(*config_keys)
+
+		client_info = self.client.info()
 
 		# Check if there's any errors
 		if client_info.get("meta"):
 			if client_info["meta"].get("status") == 429:
-				self.log.info("Tumblr API timed out during query %s" % self.dataset.key)
-				self.dataset.update_status("Tumblr API timed out during query '%s', try again in 24 hours." % self.dataset.key)
-				raise ConnectionRefusedError("Tumblr API timed out during query %s" % self.dataset.key)
+				raise ConnectionRefusedError("Tumblr API timed out")
 
-		return client
+		return self.client
 
 	def validate_query(query, request, user):
 		"""
@@ -786,5 +862,12 @@ class SearchTumblr(Search):
 
 		"""
 		super().after_process()
+		self.client = None
+		errors = []
 		if len(self.failed_notes) > 0:
-			self.dataset.update_status("API error(s) when fetching notes %s" % ", ".join(self.failed_notes))
+			errors.append("API error(s) when fetching notes %s" % ", ".join(self.failed_notes))
+		if len(self.failed_reblogs) > 0:
+			errors.append("API error(s) when fetching reblogs %s" % ", ".join(self.failed_reblogs))
+		if errors:
+			self.dataset.log(";\n ".join(errors))
+			self.dataset.update_status(f"Dataset completed but failed to capture some notes/reblogs; see log for details.")

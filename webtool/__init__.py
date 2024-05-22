@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 import logging
 
 from functools import partial
@@ -20,26 +21,36 @@ from flask import Flask
 from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
 
-from webtool.lib.user import User
+from common.lib.user import User
 from webtool.lib.helpers import generate_css_colours
 
 # initialize global objects for interacting with all the things
-database_name = config.get('DB_NAME')
 login_manager = LoginManager()
 app = Flask(__name__)
 
-# Set up logging for Gunicorn; only run w/ Docker
+# this ensures that HTTPS is properly applied to built URLs even if the app
+# is running behind a proxy
+# see https://stackoverflow.com/a/45333882
+proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
+app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
+
 if config.get("USING_DOCKER"):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
     log = Logger(filename='frontend_4cat.log')
 
+else:
+    log = Logger()
+
+# Set up logging for Gunicorn
+if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     # Add Gunicorn error log to main app logger
     gunicorn_logger = logging.getLogger('gunicorn.error')
     app.logger.handlers = gunicorn_logger.handlers
@@ -56,10 +67,10 @@ if config.get("USING_DOCKER"):
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
 
-else:
-    log = Logger()
-
-db = Database(logger=log, dbname=database_name, appname="frontend")
+db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
+              password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
+              port=config.get("DB_PORT"), appname="frontend")
+config.with_db(db)
 queue = JobQueue(logger=log, database=db)
 
 # initialize openapi endpoint collector for later specification generation
@@ -82,6 +93,7 @@ app.config.from_mapping({
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
     "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
+    "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http"
 })
 login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
 login_manager.init_app(app)
@@ -92,9 +104,8 @@ import webtool.views.views_admin
 import webtool.views.views_restart
 import webtool.views.views_user
 
-import webtool.views.views_misc
 import webtool.views.views_dataset
-import webtool.views.views_processors
+import webtool.views.views_misc
 
 import webtool.views.api_explorer
 import webtool.views.api_standalone

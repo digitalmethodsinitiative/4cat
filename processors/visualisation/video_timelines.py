@@ -13,7 +13,7 @@ from svgwrite.image import Image as ImageElement
 
 from ural import is_url
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
@@ -52,7 +52,7 @@ class VideoTimelines(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine compatibility
 
@@ -141,7 +141,7 @@ class VideoTimelines(BasicProcessor):
 
                 if looping:
                     # Only prep for new timeline if still looping
-                    self.dataset.update_status(f"Rendering video timeline for collection {video}")
+                    self.dataset.update_status(f"Rendering video timeline for collection {video} ({len(timeline_widths)}/{self.source_dataset.num_rows})")
                     self.dataset.update_progress(len(timeline_widths) / self.source_dataset.num_rows)
                     # reset and ready for the next timeline
                     offset_y += base_height
@@ -198,7 +198,7 @@ class VideoTimelines(BasicProcessor):
 
         for url, data in metadata.items():
             if data.get('success'):
-                for filename in [f["filename"] for f in data["files"]]:
+                for filename in [f["filename"] for f in data.get("files", [])]:
                     filename = ".".join(filename.split(".")[:-1])
                     mapping_ids[filename] = data["post_ids"]
                     if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:

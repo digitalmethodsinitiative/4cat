@@ -116,6 +116,7 @@ cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help=
 cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
 cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate. Currently only skips check for if 4CAT is running when set to 'frontend'")
+cli.add_argument("--branch", "-b", default=False, help="Which branch to check out from GitHub. By default, check out the latest release.")
 args = cli.parse_args()
 
 print("")
@@ -137,6 +138,7 @@ logger.info("           4CAT migration agent           ")
 logger.info("------------------------------------------")
 logger.info("Interactive:             " + ("yes" if not args.yes else "no"))
 logger.info("Pull latest release:     " + ("yes" if args.release else "no"))
+logger.info("Pull branch:             " + (args.branch if args.branch else "no"))
 logger.info("Restart after migration: " + ("yes" if args.restart else "no"))
 logger.info("Repository URL:          " + args.repository)
 logger.info(".current-version path:   " + args.current_version)
@@ -158,6 +160,9 @@ if not current_version_file.exists():
 #      Try to stop 4CAT if it is running
 # ---------------------------------------------
 interpreter = sys.executable
+
+# this sleep is here to give anything automating migrate the chance to keep up
+time.sleep(2)
 
 logger.info("\nWARNING: Migration can take quite a while. 4CAT will not be available during migration.")
 logger.info("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
@@ -191,30 +196,44 @@ migrate_to_run = []
 # ---------------------------------------------
 #          Check out latest release
 # ---------------------------------------------
-if args.release:
-	logger.info("- Finding latest release in remote git repository %s..." % args.repository)
-	repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
+if args.release or args.branch:
+	logger.info("- Interfacing with git repository %s..." % args.repository)
+	if args.repository[:4] == "git@":
+		repo_id = "/".join(args.repository.split(":")[1].split("/")[-2:]).split(".git")[0]
+	else:
+		repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
+
 	api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
 
-	try:
-		tag = requests.get(api_url, timeout=5).json()["tag_name"]
-		logger.info("  ...latest release is tagged %s." % tag)
-	except (requests.RequestException, json.JSONDecodeError, KeyError):
-		logger.info("Error while retrieving latest release tag via GitHub API. Check that the repository URL is correct.")
-		exit(1)
+	if args.release:
+		try:
+			tag = requests.get(api_url, timeout=5).json()["tag_name"]
+			logger.info("  ...latest release is tagged %s." % tag)
+		except (requests.RequestException, json.JSONDecodeError, KeyError):
+			logger.info("Error while retrieving latest release tag via GitHub API. Check that the repository URL is correct.")
+			exit(1)
 
-	tag_version = make_version_comparable(re.sub(r"^v", "", tag))
-	if tag_version <= current_version_c:
-		logger.info("  ...latest release available from GitHub (%s) is older than or equivalent to currently checked out version "
-			  "(%s)." % (tag_version, current_version_c))
-		logger.info("  ...upgrade not necessary, skipping.")
-		finish(args, logger)
+		tag_version = make_version_comparable(re.sub(r"^v", "", tag))
+		if tag_version <= current_version_c:
+			logger.info("  ...latest release available from GitHub (%s) is older than or equivalent to currently checked out version "
+				  "(%s)." % (tag_version, current_version_c))
+			logger.info("  ...upgrade not necessary, skipping.")
+			finish(args, logger)
 
 	logger.info("  ...ensuring repository %s is a known remote" % args.repository)
 	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd, text=True)
 	if remote.stderr:
-		if remote.stderr.strip() != "error: remote 4cat_migrate already exists.":
+		if remote.stderr.strip() == "error: remote 4cat_migrate already exists.":
+			# Update URL
+			remote = subprocess.run(shlex.split("git remote set-url 4cat_migrate %s" % args.repository),
+									stdout=subprocess.PIPE,
+									stderr=subprocess.PIPE, cwd=cwd, text=True)
+			if remote.stderr:
+				logger.info("Error while updating git remote for %s" % args.repository)
+				logger.info(remote.stderr)
+				exit(1)
+		else:
 			logger.info("Error while adding git remote for %s" % args.repository)
 			logger.info(remote.stderr)
 			exit(1)
@@ -223,18 +242,39 @@ if args.release:
 	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
-		logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
-		logger.info(fetch.stderr)
-		exit(1)
+		if "fatal: could not read Username" in fetch.stderr:
+			# git requiring login
+			from common.config_manager import config
+			if config.get("USING_DOCKER"):
+				# update git config setting
+				unset_authorization = subprocess.run(shlex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+				fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
+									   stdout=subprocess.PIPE, cwd=cwd, text=True)
+				if fetch.returncode != 0:
+					logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
+					logger.info(fetch.stderr)
+					exit(1)
+		else:
+			logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
+			logger.info(fetch.stderr)
+			exit(1)
 
-	logger.info("  ...checking out latest release")
-	tag_ref = shlex.quote("refs/tags/" + tag)
-	command = "git checkout --force %s" % tag_ref
+	if args.branch:
+		logger.info(f"  ...checking out branch '{args.branch}'")
+		command = f"git checkout --force 4cat_migrate/{args.branch}"
+	else:
+		logger.info("  ...checking out latest release")
+		tag_ref = shlex.quote("refs/tags/" + tag)
+		command = "git checkout --force %s" % tag_ref
+
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
-		logger.info("Error while pulling latest release with git. Check that the repository URL is correct.")
+		if args.branch:
+			logger.info("Error while pulling latest release with git. Check that the repository URL and branch name are correct.")
+		else:
+			logger.info("Error while pulling latest release with git. Check that the repository URL is correct.")
 		logger.info(result.stderr.decode("ascii"))
 		exit(1)
 
@@ -289,9 +329,10 @@ else:
 # ---------------------------------------------
 #                    Run pip
 # ---------------------------------------------
-logger.info("- Running pip to install any new dependencies (this could take a moment)...")
+logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
+logger.info("  (this could take a moment)...")
 try:
-	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt"],
+	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
 								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
 	for line in pip.stdout.decode("utf-8").split("\n"):
 		if line.startswith("Requirement already satisfied:"):

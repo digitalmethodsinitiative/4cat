@@ -51,11 +51,11 @@ class UniqueFilter(BaseFilter):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on NDJSON and CSV files
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
@@ -87,7 +87,7 @@ class UniqueFilter(BaseFilter):
 		known_items = set()
 
 		# iterate through posts and see if they match
-		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+		for mapped_item in self.source_dataset.iterate_items(processor=self):
 			unique_item = False
 
 			if match_mode == "all":
@@ -114,7 +114,7 @@ class UniqueFilter(BaseFilter):
 
 			if unique_item:
 				unique += 1
-				yield original_item
+				yield mapped_item.original
 
 			if processed % 500 == 0:
 				self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))

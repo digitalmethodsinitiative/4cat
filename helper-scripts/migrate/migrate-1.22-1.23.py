@@ -5,7 +5,7 @@ import os
 
 from psycopg2.errors import UniqueViolation
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 from common.lib.database import Database
 from common.lib.logger import Logger
 
@@ -14,7 +14,7 @@ try:
     import config
     db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
 except (SyntaxError, ImportError, AttributeError) as e:
-    import common.config_manager as config
+    from common.config_manager import config
     db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
 # Add 'annotation_fields' column to datasets table.

@@ -5,20 +5,16 @@ It's prohibitively difficult to scrape data from 9gag within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
 from datetime import datetime
-from pathlib import Path
-from urllib.parse import urlparse, parse_qs
-import json
-import time
 
-from backend.abstract.search import Search
-from common.lib.exceptions import WorkerInterruptedException
+from backend.lib.search import Search
+from common.lib.item_mapping import MappedItem
 
 
 class SearchNineGag(Search):
     """
     Import scraped 9gag data
     """
-    type = "9gag-search"  # job ID
+    type = "ninegag-search"  # job ID
     category = "Search"  # category
     title = "Import scraped 9gag data"  # title displayed in UI
     description = "Import 9gag data collected with an external tool such as Zeeschuimer."  # description displayed in UI
@@ -70,7 +66,7 @@ class SearchNineGag(Search):
                 "isVerifiedAccount": ""
             }
 
-        return {
+        return MappedItem({
             "id": post["id"],
             "url": post["url"],
             "subject": post["title"],
@@ -96,4 +92,4 @@ class SearchNineGag(Search):
             "tags": ",".join([tag["key"] for tag in post["tags"]]),
             "tags_annotated": ",".join(post["annotationTags"]),
             "unix_timestamp": int(post_timestamp.timestamp()),
-        }
+        })

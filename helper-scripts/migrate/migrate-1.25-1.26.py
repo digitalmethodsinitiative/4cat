@@ -11,7 +11,7 @@ import psycopg2
 import psycopg2.extras
 import configparser
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 
 def set_or_create_setting(attribute_name, value, connection, cursor, keep_connection_open=False):
     """
@@ -54,7 +54,7 @@ try:
     transfer_settings = True
     print("  ...Yes, prexisting settings exist.")
 except (SyntaxError, ImportError, AttributeError) as e:
-    import common.config_manager as config
+    from common.config_manager import config
     connection = psycopg2.connect(dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), application_name="4cat-migrate")
     print("  ...No prexisting settings exist.")
 

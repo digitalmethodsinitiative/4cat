@@ -4,9 +4,8 @@ Get regular and 'debate' thread metadata
 import datetime
 import time
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
-import common.config_manager as config
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
@@ -32,15 +31,13 @@ class DebateMetrics(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor if dataset is a 'top level' dataset
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
-		if module.is_dataset():
-			return module.parameters.get("datasource") in ("4chan", "8chan", "8kun")
-		return False
+		return module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
 
 	def process(self):
 		"""

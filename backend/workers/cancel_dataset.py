@@ -1,8 +1,8 @@
 """
 Delete and cancel a dataset
 """
-from backend.abstract.worker import BasicWorker
-from common.lib.exceptions import JobNotFoundException
+from backend.lib.worker import BasicWorker
+from common.lib.exceptions import JobNotFoundException, DataSetException
 from common.lib.dataset import DataSet
 from common.lib.job import Job
 
@@ -27,7 +27,7 @@ class DatasetCanceller(BasicWorker):
 		try:
 			dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
 			jobtype = dataset.data["type"]
-		except TypeError:
+		except DataSetException:
 			# dataset already deleted, apparently
 			self.job.finish()
 			return

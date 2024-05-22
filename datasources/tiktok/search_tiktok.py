@@ -7,7 +7,8 @@ to its aggressive rate limiting. Instead, import data collected elsewhere.
 from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
+from common.lib.item_mapping import MappedItem
 
 
 class SearchTikTok(Search):
@@ -75,7 +76,7 @@ class SearchTikTok(Search):
         thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [now])[0]) >= now]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
-        return {
+        return MappedItem({
             "id": post["id"],
             "thread_id": post["id"],
             "author": user_nickname,
@@ -91,7 +92,7 @@ class SearchTikTok(Search):
             "is_ad": "yes" if post.get("isAd", False) else "no",
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
-            "music_url": post["music"]["playUrl"],
+            "music_url": post["music"].get("playUrl", ""),
             "music_thumbnail": post["music"].get("coverLarge", ""),
             "music_author": post["music"].get("authorName", ""),
             "video_url": post["video"].get("downloadAddr", ""),
@@ -108,4 +109,4 @@ class SearchTikTok(Search):
             "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "effects": ",".join([e["name"] for e in post.get("effectStickers", [])]),
             "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])
-        }
+        })

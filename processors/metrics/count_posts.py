@@ -1,10 +1,9 @@
 """
 Collapse post bodies into one long string
 """
-import datetime
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -17,8 +16,8 @@ class CountPosts(BasicProcessor):
 	"""
 	type = "count-posts"  # job type ID
 	category = "Post metrics" # category
-	title = "Count posts"  # title displayed in UI
-	description = "Counts how many posts are in the dataset (overall or per timeframe)."  # description displayed in UI
+	title = "Count items"  # title displayed in UI
+	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	options = {
@@ -32,7 +31,7 @@ class CountPosts(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Include dates where the count is zero",
-			"tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
+			"tooltip": "Makes the counts continuous. For example, if there are items from May and July but not June, June will be included with 0 items."
 		}
 	}
 
@@ -52,7 +51,7 @@ class CountPosts(BasicProcessor):
 		first_interval = "9999"
 		last_interval = "0000"
 
-		self.dataset.update_status("Processing posts")
+		self.dataset.update_status("Processing items")
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
 
@@ -60,7 +59,7 @@ class CountPosts(BasicProcessor):
 				try:
 					date = get_interval_descriptor(post, timeframe)
 				except ValueError as e:
-					self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+					self.dataset.update_status(f"{e}, cannot count items per {timeframe}", is_final=True)
 					self.dataset.update_status(0)
 					return
 
@@ -77,7 +76,7 @@ class CountPosts(BasicProcessor):
 				counter += 1
 
 				if counter % 2500 == 0:
-					self.dataset.update_status("Counted through " + str(counter) + " posts.")
+					self.dataset.update_status(f"Counted {counter:,} of {self.source_dataset.num_rows:,} items.")
 					self.dataset.update_progress(counter / self.source_dataset.num_rows)
 
 			# pad interval if needed, this is useful if the result is to be
@@ -96,8 +95,8 @@ class CountPosts(BasicProcessor):
 				self.dataset.update_status("Calculating relative counts.")
 
 				# Set a board, if used for this dataset
-				board = self.source_dataset.parameters["board"]
-				datasource = self.source_dataset.parameters["datasource"]
+				board = self.source_dataset.parameters.get("board")
+				datasource = self.source_dataset.parameters.get("datasource")
 				board_sql = "AND board = '" + board + "'" if board else ""
 
 				# Make sure we're using the same right date format.
@@ -158,12 +157,12 @@ class CountPosts(BasicProcessor):
 		if not parent_dataset:
 			return options
 	
-		if parent_dataset.parameters.get("datasource") in ("4chan", "8kun", "8chan", "parliaments", "usenet", "breitbart"):
+		if parent_dataset.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun"):
 			options["add_relative"] = {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
 				"help": "Add relative counts",
-				"tooltip": "Divides the absolute count by the total amount of posts for this timeframe."
+				"tooltip": "Divides the absolute count by the total amount of items for this timeframe."
 			}
 		
 		return options

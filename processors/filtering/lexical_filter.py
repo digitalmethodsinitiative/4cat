@@ -6,8 +6,7 @@ from pathlib import Path
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
-
-import common.config_manager as config
+from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -67,11 +66,11 @@ class LexicalFilter(BaseFilter):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on NDJSON and CSV files
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
@@ -137,7 +136,7 @@ class LexicalFilter(BaseFilter):
         # keep some stats
         processed = 0
         matching_items = 0
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(processor=self):
             if not mapped_item.get("body", None):
                 continue
 
@@ -170,7 +169,7 @@ class LexicalFilter(BaseFilter):
 
             # if one does, record which match, and save it to the output
             # TODO: this is a conversion and will not show via map_items() for NDJSONs
-            original_item["4cat_matching_lexicons"] = ",".join(matching_lexicons)
+            mapped_item.original["4cat_matching_lexicons"] = ",".join(matching_lexicons)
 
             matching_items += 1
-            yield original_item
+            yield mapped_item.original

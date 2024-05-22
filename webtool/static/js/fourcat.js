@@ -58,8 +58,8 @@ const result_page = {
             }, 25);
         }
 
-        $('<label class="filter-processors"><i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Filter:</span> <input type="text" id="processor-filter" placeholder="Filter"></label>').appendTo('.available-processors .section-subheader:first-child');
-        $('body').on('keyup', '#processor-filter', result_page.filterProcessors);
+        $('<label class="inline-search"><i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Filter:</span> <input type="text" placeholder="Filter"></label>').appendTo('.available-processors .section-subheader:first-child');
+        $(document).on('keyup', '.result-page .inline-search input', result_page.filterProcessors);
     },
 
     filterProcessors: function (e) {
@@ -138,10 +138,11 @@ const processor = {
         e.preventDefault();
 
         if ($(this).text().includes('Run')) {
-            let form = $(this).parents('form');
+            const run_button = $(this);
+            let form = run_button.parents('form');
 
             // if it's a big dataset, ask if the user is *really* sure
-            let parent = $(this).parents('li.child-wrapper');
+            let parent = run_button.parents('li.child-wrapper');
             if (parent.length === 0) {
                 parent = $('.result-tree');
             }
@@ -153,12 +154,21 @@ const processor = {
                 }
             }
 
-            $.ajax(form.attr('data-async-action') + '?async', {
-                'method': form.attr('method'),
-                'data': form.serialize(),
-                'success': function (response) {
+            let reset_form = true;
+            fetch(form.attr('data-async-action') + '?async', {method: form.attr('method'), body: new FormData(form[0])})
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (response) {
                     if (response.hasOwnProperty("messages") && response.messages.length > 0) {
                         popup.alert(response.messages.join("\n\n"));
+                    } else if(response.hasOwnProperty('message')) {
+                        popup.alert(response.message);
+                    }
+
+                    if(response.hasOwnProperty('status') && response['status'] === 'error') {
+                        reset_form = false;
+                        return;
                     }
 
                     if (response.html.length > 0) {
@@ -196,27 +206,29 @@ const processor = {
                             expand();
                         }
                     }
-                },
-                'error': function (response) {
+                })
+                .catch(function (response) {
                     try {
                         response = JSON.parse(response.responseText);
                         popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
-                    } catch (Exception) {
+                    } catch {
                         popup.alert('The analysis could not be queued: ' + response.responseText, 'Warning');
                     }
-                }
-            });
-
-            if ($(this).data('original-content')) {
-                $(this).html($(this).data('original-content'));
-                $(this).trigger('click');
-                $(this).html($(this).data('original-content'));
-                form.trigger('reset');
-            }
+                })
+                .finally(() => {
+                    if (reset_form && run_button.data('original-content')) {
+                        run_button.html(run_button.data('original-content'));
+                        run_button.trigger('click');
+                        run_button.html(run_button.data('original-content'));
+                        form.trigger('reset');
+                        ui_helpers.toggleButton({target: run_button});
+                    }
+                });
         } else {
             $(this).data('original-content', $(this).html());
             $(this).find('.byline').html('Run');
             $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
+            ui_helpers.toggleButton({target: $(this)[0]});
         }
     },
 
@@ -227,7 +239,7 @@ const processor = {
             return;
         }
 
-        $.ajax(getRelativeURL('api/delete-query/'), {
+        $.ajax(getRelativeURL('api/delete-dataset/' + $(this).attr('data-key') + '/'), {
             method: 'DELETE',
             data: {key: $(this).attr('data-key')},
             success: function (json) {
@@ -237,7 +249,7 @@ const processor = {
                 if ($('.child-list.top-level li').length === 0) {
                     $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
                 }
-                query.enable_form();
+                query.reset_form();
             },
             error: function (json) {
                 popup.alert('Could not delete dataset: ' + json.status, 'Error');
@@ -261,7 +273,7 @@ const query = {
         // Check status of query
         if ($('body.result-page').length > 0) {
             query.update_status();
-            setInterval(query.update_status, 1000);
+            setInterval(query.update_status, 1500);
 
             // Check processor queue
             query.check_processor_queue();
@@ -299,18 +311,28 @@ const query = {
 
         // convert dataset
         $(document).on('change', '#convert-dataset', query.convert_dataset)
+
+        // dataset ownership
+        $(document).on('click', '#add-dataset-owner', query.add_owner);
+        $(document).on('click', '.remove-dataset-owner', query.remove_owner);
     },
 
     /**
      * Enable query form, so settings may be changed
      */
-    enable_form: function () {
-        $('#query-status .delete-link').remove();
-        $('#query-status .status_message .dots').html('');
-        $('#query-status .message').html('Enter dataset parameters to begin.');
+    enable_form: function (reset=false) {
+        if(reset) {
+            $('#query-status .delete-link').remove();
+            $('#query-status .status_message .dots').html('');
+            $('#query-status .message').html('Enter dataset parameters to begin.');
+            $('#query-form .datasource-extra-input').remove();
+        }
         $('#query-form fieldset').prop('disabled', false);
-        $('#query-form .datasource-extra-input').remove();
         $('#query-status').removeClass('active');
+    },
+
+    reset_form: function() {
+        query.enable_form(true);
     },
 
     /**
@@ -332,6 +354,7 @@ const query = {
 
         // Show loader
         query.check_search_queue();
+        query.enable_form();
 
         let form = $('#query-form');
         let formdata = new FormData(form[0]);
@@ -342,12 +365,13 @@ const query = {
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    let content = await FileReaderPromise(pair[1]);
-                    if (content.byteLength > snippet_size) {
-                        content = content.slice(0, snippet_size);
-                        let snippet = new File([content], pair[1].name);
-                        formdata.set(pair[0], snippet)
-                    }
+                    const sample_size = Math.min(pair[1].size, snippet_size);
+                    const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
+
+                    // make sure we're submitting utf-8 - read and then re-encode to be sure
+                    const blobAsText = await FileReaderPromise(blob);
+                    const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
+                    formdata.set(pair[0], snippet);
                 }
             }
         }
@@ -367,6 +391,7 @@ const query = {
 
         // Disable form
         $('html,body').scrollTop(200);
+        query.disable_form();
 
         // AJAX the query to the server
         // first just to validate - then for real (if validated)
@@ -382,8 +407,10 @@ const query = {
             })
             .then(function (response) {
                 if (response['status'] === 'error') {
+                    query.reset_form();
                     popup.alert(response['message'], 'Error');
                 } else if (response['status'] === 'confirm') {
+                    query.enable_form();
                     popup.confirm(response['message'], 'Confirm', function () {
                         // re-send, but this time for real
                         query.start({'frontend-confirm': true}, true);
@@ -394,6 +421,7 @@ const query = {
                 } else if (response['status'] === 'extra-form') {
                     // new form elements to fill in
                     // some fancy css juggling to make it obvious that these need to be completed
+                    query.enable_form();
                     $('#query-status .message').html('Enter dataset parameters to continue.');
                     let target_top = $('#datasource-form')[0].offsetTop + $('#datasource-form')[0].offsetHeight - 50;
 
@@ -408,7 +436,6 @@ const query = {
                         });
                     });
                 } else {
-                    query.disable_form();
                     $('#query-status .message').html('Query submitted, waiting for results');
                     query.query_key = response['key'];
                     query.check(query.query_key);
@@ -422,7 +449,8 @@ const query = {
                 }
             })
             .catch(function (e) {
-                popup.alert('4CAT could not process the file you are trying to upload.', 'Error');
+                query.enable_form();
+                popup.alert('4CAT could not process your dataset.', 'Error');
             });
     },
 
@@ -453,7 +481,7 @@ const query = {
                     let keyword = json.label;
 
                     $('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
-                    query.enable_form();
+                    query.reset_form();
                     popup.alert('Query for \'' + keyword + '\' complete!', 'Success');
                 } else {
                     let dots = '';
@@ -477,6 +505,11 @@ const query = {
     },
 
     check_resultpage: function () {
+        if (!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         let unfinished = $('.dataset-unfinished');
         if (unfinished.length === 0) {
             return;
@@ -521,7 +554,9 @@ const query = {
             return;
         }
 
-        let queued = $('.child-wrapper.running');
+        // first selector is top-level child datasets (always visible)
+        // second selector is children of children (only visible when expanded)
+        let queued = $('.top-level > .child-wrapper.running, div[aria-expanded=true] > ol > li.child-wrapper.running');
         if (queued.length === 0) {
             return;
         }
@@ -547,6 +582,7 @@ const query = {
                     $('#dataset-results').html(child.resultrow_html);
 
                     target.replaceWith(update);
+                    ui_helpers.conditional_form.init();
                     update.addClass('updated');
                     target.remove();
                 });
@@ -694,9 +730,7 @@ const query = {
                 $('#query-form').removeClass();
                 $('#query-form').addClass(datasource);
                 $('#datasource-form').html(data.html);
-                if (data.has_javascript) {
-                    $('<script id="query-form-script">').attr('src', getRelativeURL('api/datasource-script/' + data.datasource + '/')).appendTo('body');
-                }
+
                 //automatically fill in cached parameters
                 $('#datasource-form .cacheable input').each(function () {
                     let item_name = datasource + '.' + $(this).attr('name');
@@ -721,6 +755,8 @@ const query = {
                     multichoice.makeMultichoice();
                     multichoice.makeMultiSelect();
                 }
+
+                ui_helpers.conditional_form.manage(document.getElementById('query-form'));
             },
             'error': function () {
                 $('#datasource-select').parents('form').trigger('reset');
@@ -737,13 +773,13 @@ const query = {
 
         let dense_toggle = (scope === 'dense-threads');
         $('#query-form #forminput-scope_density').prop('disabled', !dense_toggle);
-        $('#query-form #forminput-scope_density').parent().toggle(dense_toggle);
+        $('#query-form #forminput-scope_density').parent().parent().toggle(dense_toggle);
         $('#query-form #forminput-scope_length').prop('disabled', !dense_toggle);
-        $('#query-form #forminput-scope_length').parent().toggle(dense_toggle);
+        $('#query-form #forminput-scope_length').parent().parent().toggle(dense_toggle);
 
         let ids_toggle = (scope === 'match-ids')
         $('#query-form #forminput-valid_ids').prop('disabled', !ids_toggle);
-        $('#query-form #forminput-valid_ids').parent().toggle(ids_toggle);
+        $('#query-form #forminput-valid_ids').parent().parent().toggle(ids_toggle);
     },
 
     custom_board_options: function () {
@@ -762,6 +798,16 @@ const query = {
             $(board_specific).prop('disabled', true);
             $('.form-element[data-board-specific*="' + board + '"]').prop('disabled', false);
             $('.form-element[data-board-specific*="' + board + '"]').show();
+        }
+
+        // there is one data source where the anonymisation and labeling
+        // controls are of no use...
+        if($('#query-form').hasClass('import_4cat')) {
+            $('.dataset-anonymisation').hide();
+            $('.dataset-labeling').hide();
+        } else {
+            $('.dataset-anonymisation').show();
+            $('.dataset-labeling').show();
         }
     },
 
@@ -872,7 +918,85 @@ const query = {
                 }
             });
         }
+    },
+
+    add_owner: function (e) {
+        e.preventDefault();
+        let target = e.target;
+        if(target.tagName !== 'A') {
+            target = $(target).parents('a')[0];
+        }
+
+        popup.dialog(
+            '<p>Owners have full privileges; viewers can only view a dataset. You can add users as owners, or all ' +
+            'users with a given tag by adding <samp>tag:example</samp> as username.</p>' +
+            '<label>Username: <input type="text" id="new-dataset-owner" name="owner"></label>' +
+            '<label>Role: ' +
+            '  <select id="new-dataset-role" name="role"><option value="owner">Owner</option><option value="viewer">Viewer</option>' +
+            '</select></label>',
+            'Grant access to dataset',
+            function () {
+                let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
+                let name = document.querySelector('#new-dataset-owner').value;
+                let role = document.querySelector('#new-dataset-role').value;
+                let body = new FormData();
+                body.append('name', name);
+                body.append('key', dataset_key);
+                body.append('role', role);
+                fetch(target.getAttribute('href').replace(/redirect/, ''), {
+                    method: 'POST',
+                    body: body
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if(!data['html']) {
+                            popup.alert('There was an error adding the owner to the dataset. ' + data['error']);
+                        } else {
+                            document.querySelector('.dataset-owner-list ul').insertAdjacentHTML('beforeend', data['html']);
+                        }
+                    })
+                    .catch((error) => {
+                        document.querySelector('.dataset-owner-list').classList.add('flash-once-error');
+                        popup.alert('There was an error adding the owner to the dataset. Refresh and try again later.');
+                    })
+            }
+        );
+    },
+
+    remove_owner: function (e) {
+        e.preventDefault();
+        let target = e.target;
+        if(target.tagName !== 'A') {
+            target = $(target).parents('a')[0];
+        }
+
+        popup.confirm('Are you sure you want to remove access from the dataset for this user or tag? This cannot be undone.', 'Confirm', function () {
+            let owner = target.parentNode.getAttribute('data-owner');
+            let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
+            let body = new FormData();
+            body.append('name', owner);
+            body.append('key', dataset_key);
+            fetch(target.getAttribute('href').replace(/redirect/, ''), {
+                method: 'DELETE',
+                body: body
+            })
+                .then((response) => response.json())
+                .then(data => {
+                    console.log(data);
+                    if (data['error']) {
+                        popup.alert('There was an error removing the owner from the dataset. ' + data['error']);
+                    } else {
+                        document.querySelector('[data-owner="' + owner + '"]').remove();
+                    }
+                })
+                .catch((error) => {
+                    console.log(error);
+                    document.querySelector('.dataset-owner-list').classList.add('flash-once-error');
+                    popup.alert('There was an error removing the owner from the dataset. Refresh and try again later.');
+                })
+        });
     }
+
 };
 
 /**
@@ -962,11 +1086,6 @@ const tooltip = {
      * @param e  Event that triggered the toggle
      */
     toggle: function (e) {
-        if (this.tagName.toLowerCase() !== 'a') {
-            // Allow links to have tooltips and still work
-            e.preventDefault();
-        }
-
         let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
         if (tooltip_container.is(':hidden')) {
             tooltip.show(e, this);
@@ -1009,7 +1128,7 @@ const popup = {
             popup.init();
         }
 
-        $('#popup').removeClass('confirm').removeClass('render').addClass('alert');
+        $('#popup').removeClass('confirm').removeClass('render').removeClass('dialog').addClass('alert');
 
         let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
         popup.render(wrapper.html(), false, false);
@@ -1024,8 +1143,22 @@ const popup = {
             popup.current_callback = callback;
         }
 
-        $('#popup').removeClass('alert').removeClass('render').addClass('confirm');
+        $('#popup').removeClass('alert').removeClass('render').removeClass('dialog').addClass('confirm');
         let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
+        popup.render(wrapper.html(), false, false);
+    },
+
+    dialog: function(body, title = 'Confirm', callback = false) {
+        if (!popup.is_initialised) {
+            popup.init();
+        }
+
+        if (callback) {
+            popup.current_callback = callback;
+        }
+
+        $('#popup').removeClass('alert').removeClass('render').removeClass('confirm').addClass('dialog');
+        let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><div id="popup-dialog">' + body + '</div><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
         popup.render(wrapper.html(), false, false);
     },
 
@@ -1166,7 +1299,7 @@ const multichoice = {
      */
     init: function () {
         // Multichoice inputs need to be loaded dynamically
-        $(document).on('click', '.toggle-button', function () {
+        $(document).on('click', '.toggle-button, .processor-queue-button', function () {
             if ($(".multichoice-wrapper, .multi-select-wrapper").length > 0) {
                 multichoice.makeMultichoice();
                 multichoice.makeMultiSelect();
@@ -1328,6 +1461,21 @@ const ui_helpers = {
         //long texts with '...more' link
         $(document).on('click', 'div.expandable a', ui_helpers.expandExpandable);
 
+        //autocomplete text boxes
+        $(document).on('input', 'input.autocomplete', ui_helpers.autocomplete);
+
+        //tabbed interfaces
+        $(document).on('click', '.tabbed .tab-controls a', ui_helpers.tabs);
+
+        //table controls
+        $(document).on('input', '.copy-from', ui_helpers.table_control);
+
+        //mighty morphing web forms
+        $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select, #query-form input, #query-form select', ui_helpers.conditional_form.manage);
+        ui_helpers.conditional_form.init();
+
+        //iframe flexible sizing
+        $('iframe').on('load', ui_helpers.fit_iframe);
 
         // Controls to change which results show up in overview
         $('.view-controls button').hide();
@@ -1350,20 +1498,19 @@ const ui_helpers = {
             $('.datasource-extra-input').remove();
         });
 
-        // special case - first-run colour picker for the interface
+        // special case - colour picker for the interface
         $('body').on('input', '.hue-picker', function() {
-            let h = $(this).val();
-            let s = $(this).attr('data-saturation') ? $(this).attr('data-saturation') : 77;
-            let l = $(this).attr('data-luminance') ? $(this).attr('data-luminance') : 46;
+            let h = parseInt($(this).val());
+            let s = $(this).attr('data-saturation') ? parseInt($(this).attr('data-saturation')) : 87;
+            let v = $(this).attr('data-value') ? parseInt($(this).attr('data-value')) : 81;
             let target = $(this).attr('data-update-background');
-            let sl = ', ' + s + '%, ' + l + '%';
-            let hsl = 'hsl(' + h + sl + ')';
+
             if($(this).attr('data-update-layout')) {
-                document.querySelector(':root').style.setProperty('--accent', hsl);
-                document.querySelector(':root').style.setProperty('--accent-alternate', 'hsl(' + h + ', 100%, 46%');
-                document.querySelector(':root').style.setProperty('--highlight', 'hsl(' + ((h + 180) % 360) + ', 100%, 46%');
+                document.querySelector(':root').style.setProperty('--accent', hsv2hsl(h, s, v));
+                document.querySelector(':root').style.setProperty('--highlight', hsv2hsl(h, s, 100));
+                document.querySelector(':root').style.setProperty('--accent-alternate', hsv2hsl((h + 180) % 360, s, 90));
             }
-            $(target).css('background-color', hsl);
+            $(target).css('background-color', hsv2hsl(h, s, v));
         });
         $('.hue-picker').trigger('input');
 
@@ -1373,6 +1520,73 @@ const ui_helpers = {
             $('h1 span a').text(label);
         });
         $('#request-4cat_name').trigger('input');
+
+        // special case - settings panel filter
+        $(document).on('input', '.settings .inline-search input', function(e) {
+            let matching_tabs = [];
+            let query = e.target.value.toLowerCase();
+            document.querySelectorAll('.tab-content').forEach((tab) => {
+                let tab_id = tab.getAttribute('id').replace(/^tab-/, 'tablabel-');
+                if(document.querySelector('#' + tab_id).textContent.toLowerCase().indexOf(query) >= 0) {
+                    matching_tabs.push(tab_id);
+                    return;
+                }
+
+                tab.querySelectorAll('.form-element').forEach((element) => {
+                    let label = element.querySelector('label').textContent;
+                    let help = element.querySelector('[role=tooltip]');
+                    if(
+                        element.querySelector('[name]').getAttribute('name').indexOf(query) >= 0
+                        || label.toLowerCase().indexOf(query) >= 0
+                        || (help && help.textContent.toLowerCase().indexOf(query) >= 0)
+                    ) {
+                        matching_tabs.push(tab_id);
+                    }
+                })
+            });
+            document.querySelectorAll('.tab-controls .matching').forEach((e) => e.classList.remove('matching'));
+            if(query) {
+                matching_tabs.forEach((tab_id) => document.querySelector('#' + tab_id).classList.add('matching'));
+            }
+        });
+
+        // special case - admin user tags sorting
+        $('#tag-order').sortable({
+            cursor: 'ns-resize',
+            handle: '.handle',
+            items: '.implicit, .explicit',
+            axis: 'y',
+            update: function(e, ui) {
+                let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
+                let body = new FormData();
+                body.append('order', tag_order);
+                fetch(document.querySelector('#tag-order').getAttribute('data-url'), {
+                    method: 'POST',
+                    body: body
+                }).then(response => {
+                    if(response.ok) {
+                        ui.item.addClass('flash-once');
+                    } else {
+                        ui.item.addClass('flash-once-error');
+                    }
+                });
+            }
+        });
+
+        // special case - restart 4cat front-end
+        $('button[name=action][value=restart-frontend]').on('click', function(e) {
+            e.preventDefault();
+            const button = $('button[name=action][value=restart-frontend]');
+            const url = button.attr('data-url');
+            $('.button-container button').attr('disabled', 'disabled');
+            button.find('i').removeClass('fa-power-off').addClass('fa-sync-alt').addClass('fa-spin');
+            fetch(url, {method: 'POST'}).then(response => response.json()).then(response => {
+                popup.alert(response['message'], 'Front-end restart: ' + response['status']);
+            }).catch(e => {}).finally(() => {
+                button.find('i').removeClass('fa-sync-alt').removeClass('fa-spin').addClass('fa-power-off');
+                $('.button-container button').removeAttr('disabled');
+            });
+        });
     },
 
     /**
@@ -1413,7 +1627,11 @@ const ui_helpers = {
 
             e.preventDefault();
             popup.confirm(message, 'Please confirm', () => {
-                form.submit();
+                // we trigger a click, because else the BUTTON name is not
+                // sent with the form
+                $(this).removeClass('confirm-first');
+                $(this).click();
+                $(this).addClass('confirm-first');
             })
         }
     },
@@ -1476,13 +1694,15 @@ const ui_helpers = {
      * @param force_close  Assume the event is un-toggling something regardless of current state
      */
     toggleButton: function (e, force_close = false) {
-        if (!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') {
+        if ((!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') && typeof e.preventDefault === "function") {
             e.preventDefault();
         }
 
-        target = '#' + $(this).attr('aria-controls');
+        const button_target = $(e.target).is('.toggle-button, .processor-queue-button') ? $(e.target) : $(e.target).parents('.toggle-button, .processor-queue-button')[0];
 
-        is_open = $(target).attr('aria-expanded') !== 'false';
+        let target = '#' + $(button_target).attr('aria-controls');
+        let is_open = $(target).attr('aria-expanded') !== 'false';
+
         if (is_open || force_close) {
             $(target).animate({'height': 0}, 250, function () {
                 $(this).attr('aria-expanded', false).css('height', '');
@@ -1506,6 +1726,162 @@ const ui_helpers = {
                 $(this).find('i.fa.fa-plus').addClass('fa-minus').removeClass('fa-plus');
             }
         }
+    },
+
+    autocomplete: function(e) {
+        let source = e.target.getAttribute('data-url');
+        if(!source) { return; }
+
+        let datalist = e.target.getAttribute('list');
+        if(!datalist) { return; }
+
+        datalist = document.querySelector('#' + datalist);
+        if(!datalist) { return; }
+
+        let value = e.target.value;
+        fetch(source, {method: 'POST', body: value})
+            .then(e => e.json())
+            .then(response => {
+                datalist.querySelectorAll('option').forEach(o => o.remove());
+                response.forEach(o => {
+                    let option = document.createElement('option');
+                    option.innerText = o;
+                    datalist.appendChild(option);
+                });
+            });
+    },
+
+    tabs: function(e) {
+        e.preventDefault();
+        let link = e.target;
+        let target_id = link.getAttribute('aria-controls');
+        let controls = find_parent(link, '.tab-controls');
+        controls.querySelector('.highlighted').classList.remove('highlighted');
+        link.parentNode.classList.add('highlighted');
+        controls.parentNode.parentNode.querySelector('.tab-container *[aria-expanded=true]').setAttribute('aria-expanded', 'false');
+        document.querySelector('#' + target_id).setAttribute('aria-expanded', 'true');
+        let current_tab = controls.parentNode.querySelector('input[name="current-tab"]');
+        if(!current_tab) {
+            controls.parentNode.insertAdjacentHTML('afterbegin', '<input type="hidden" name="current-tab" value="">');
+            current_tab = controls.parentNode.querySelector('input[name="current-tab"]');
+        }
+        current_tab.value = target_id.replace(/^tab-/, '');
+    },
+
+    table_control: function(e) {
+        let control = e.target;
+        let value = control.getAttribute('type') === 'checkbox' ? control.checked : control.value;
+        let table = $(control).parents('table');
+        let class_match = [...e.target.classList].filter((e) => e.indexOf('d-') === 0);
+        table[0].querySelectorAll('.copy-to.' + class_match).forEach((element) => {
+            if ($(element).parents('.d-ignore').length > 0) {
+                return;
+            }
+            if (element.getAttribute('type') === 'checkbox') {
+                element.checked = value;
+            } else {
+                element.value = value;
+            }
+        })
+    },
+
+    conditional_form: {
+        /**
+         * Set visibility of form elements when they are loaded
+         */
+        init: function(form=null) {
+            document.querySelectorAll('*[data-requires]').forEach((element) => {
+                const form = $(element).parents('form')[0];
+                if(form.getAttribute('data-form-managed')) {
+                    return;
+                }
+                ui_helpers.conditional_form.manage({target: element});
+            });
+        },
+
+        /**
+         * Manage visibility of form elements when forms are interacted with
+
+         * @param e  Event, or a form object
+         */
+        manage: function (e) {
+            let form;
+
+            if('tagName' in e && e.tagName === 'FORM') {
+                form = e;
+            } else {
+                form = $(e.target).parents('form')[0];
+            }
+
+            form.setAttribute('data-form-managed', true);
+            const conditionals = form.querySelectorAll('*[data-requires]');
+
+            if (!conditionals) {
+                return;
+            }
+
+            conditionals.forEach((element) => {
+                let requirement = RegExp(/([a-zA-Z0-9_]+)([!=$~^]+)(.*)/g).exec(element.getAttribute('data-requires'));
+                if (!requirement || requirement.length !== 4) { // assume 'field is not empty'
+                    requirement = [null, element.getAttribute('data-requires'), '!=', ''];
+                }
+
+                const negate = requirement[2] === '!=';
+                const other_field = 'option-' + requirement[1];
+                const other_element = form.querySelector("*[name='" + other_field + "']");
+
+                if (!other_element) { //invalid reference
+                    return;
+                }
+
+                const other_value = other_element.value;
+
+                let requirement_met = false;
+                if (other_element.getAttribute('type') === 'checkbox') {
+                    // checkboxes are a bit different (and simpler)
+                    const checked = other_element.checked;
+                    if(requirement[2] === '!=') {
+                        if((checked && ['', 'false'].includes(requirement[3])) || (!checked && ['checked', 'true'].includes(requirement[3]))) {
+                            requirement_met = true;
+                        }
+                    } else {
+                        if((checked && ['checked', 'true'].includes(requirement[3])) || (!checked && ['', 'false'].includes(requirement[3]))) {
+                            requirement_met = true;
+                        }
+                    }
+                } else {
+                    if(requirement[2] === '!=') {
+                        requirement_met = other_value !== requirement[3];
+                    } else if(requirement[2] === '^=') {
+                        requirement_met = other_value.startsWith(requirement[3]);
+                    } else if(requirement[2] === '~=') {
+                        requirement_met = other_value.indexOf(requirement[3]) >= 0;
+                    } else if(requirement[2] === '$=') {
+                        requirement_met = other_value.endsWith(requirement[3]);
+                    } else if(['==', '='].includes(requirement[2])) {
+                        requirement_met = other_value === requirement[3];
+                    }
+                }
+
+                if (requirement_met) {
+                    $(element).show();
+                } else {
+                    $(element).hide();
+                }
+            });
+        }
+    },
+
+    /**
+     * Fit an iframe to its content's offsetHeight
+     *
+     * Use max-height on iframe element to add an upper limit!
+     *
+     * @param e
+     */
+    fit_iframe: function(e) {
+        let iframe_height = e.target.contentWindow.document.documentElement.offsetHeight;
+        e.target.style.height = iframe_height + 'px';
     }
 }
 
@@ -1558,6 +1934,44 @@ function FileReaderPromise(file) {
         fr.onload = () => {
             resolve(fr.result);
         }
-        fr.readAsArrayBuffer(file);
+        fr.readAsText(file);
     });
+}
+
+/**
+ * Convert HSV colour to HSL
+ *
+ * Expects a {0-360}, {0-100}, {0-100} value.
+ *
+ * @param h
+ * @param s
+ * @param v
+ * @returns {(*|number)[]}
+ */
+function hsv2hsl(h, s, v) {
+    s /= 100;
+    v /= 100;
+    const vmin = Math.max(v, 0.01);
+    let sl;
+    let l;
+
+    l = (2 - s) * v;
+    const lmin = (2 - s) * vmin;
+    sl = s * vmin;
+    sl /= (lmin <= 1) ? lmin : 2 - lmin;
+    sl = sl || 0;
+    l /= 2;
+
+    return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
+}
+
+function find_parent(element, selector) {
+    while(element.parentNode) {
+        element = element.parentNode;
+        if(element.matches(selector)) {
+            return element;
+        }
+    }
+
+    return null;
 }

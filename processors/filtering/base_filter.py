@@ -5,7 +5,7 @@ import abc
 import csv
 import json
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -25,11 +25,11 @@ class BaseFilter(BasicProcessor):
     description = "This should not be available."
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         This is meant to be inherited by other child classes
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return False
 
@@ -70,6 +70,8 @@ class BaseFilter(BasicProcessor):
         if self.dataset.is_finished():
             self.dataset.log("Processor already marked dataset as finished prior to saving file!")
             return
+
+        self.dataset.update_label(f"({self.title}) {self.source_dataset.get_label()}")
         self.dataset.finish(num_posts)
 
     def after_process(self):
@@ -89,8 +91,8 @@ class BaseFilter(BasicProcessor):
     def filter_items(self):
         """
         Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
-        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
-        and yield `original_item`.
+        `for item in self.source_dataset.iterate_items(self)` to iterate through items and access the
+        underlying data item via item.original.
 
         :return generator:
         """

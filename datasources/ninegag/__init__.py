@@ -8,5 +8,5 @@ Initialize 9gag data source
 from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "9gag"
+DATASOURCE = "ninegag"
 NAME = "9Gag"

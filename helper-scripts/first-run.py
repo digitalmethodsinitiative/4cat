@@ -11,7 +11,11 @@ in the 4CAT root folder. The file is created if it does not exist yet, ensuring
 the set-up actions in this file are only ever run once.
 
 It should not be necessary to run this file directly; it is run automatically
-by 4CAT while starting up.
+by 4CAT while starting up. Note that it never runs in a Docker context, since
+Docker runs migrate.py whenever a container starts, and that essentially does
+the same job as this script (and a lot more, which is why this lightweight
+version also exists, since we don't need that extra code to also run when
+running 4CAT from the command line manually).
 """
 import shutil
 import sys

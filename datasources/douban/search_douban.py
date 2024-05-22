@@ -8,7 +8,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.helpers import convert_to_int, strip_tags, UserInput
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
@@ -205,7 +205,7 @@ class SearchDouban(Search):
                             "timestamp": int(datetime.datetime.strptime(comment.select_one(".pubtime").text.strip()[:19],
                                                                         "%Y-%m-%d %H:%M:%S").timestamp()),
                             "likes": convert_to_int(
-                                re.sub(r"[^0-9]", "", comment.select_one(".comment-vote.lnk-fav").text), 0),
+                                re.sub(r"[^0-9]", "", comment.select_one(".comment-vote.lnk-fav").text), 0) if comment.select_one(".comment-vote.lnk-fav") else "Unknown",
                             "is_highlighted": "yes" if comment.get("data-cid") in [hl.get("data-cid") for hl in
                                                                                    comment.select(
                                                                                        "ul#popular-comments li")] else "no",

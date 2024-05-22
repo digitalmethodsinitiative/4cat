@@ -1,42 +1,52 @@
-<section class="result-list">
-    <h2><span>Notifications</span></h2>
-    <div class="user-panel">
-        <nav class="view-controls block">
-            <ul>
-                <li><a href="{{ url_for("create_notification") }}" class="button-like"><i class="fa fa-comment" aria-hidden="true"></i> Add notification</a></li>
-            </ul>
-        </nav>
-        <table class="fullwidth notification-table cp-table">
-            <colgroup>
-                <col>
-                <col>
-                <col class="actions">
-            </colgroup>
-            <tr>
-                <th>User</th>
-                <th>Notification</th>
-                <th>Actions</th>
-            </tr>
-        {% if notifications %}
-            {% for notification in notifications %}
-                <tr>
-                    <td>{{ notification.username }}</td>
-                    <td>
-                        {% if notification.timestamp_expires %}
-                            <i class="fa fa-clock tooltip-trigger" aria-controls="tooltip-expires-{{ notification.id }}" aria-hidden="true"></i><span class="sr-only">Notification will expire at {{ notification.timestamp_expires|datetime("%-d %b %Y %H:%M", wrap=True) }}</span>
-                            <p role="tooltip" class="multiple" id="tooltip-expires-{{ notification.id }}" aria-hidden="true">Notification will expire at {{ notification.timestamp_expires|datetime("%-d %b %Y %H:%M", wrap=False) }}</p>
-                        {% endif %}
-                        <span class="has-more" data-max-length="75">{{ notification.notification|markdown|safe }}</span>
-                    </td>
-                    <td><a class="button-like" href="{{ url_for("delete_notification", notification_id=notification.id) }}"><i
-                                    class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete notification</span></a>
-                </tr>
-            {% endfor %}
-        {% else %}
-        <tr>
-            <td colspan="3">No active notifications.</td>
-        </tr>
-        {% endif %}
-        </table>
-    </div>
-</section>
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}Add notification{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "notifications" %}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section class="result-list">
+            <h2><span>Notifications</span></h2>
+
+            {% include "controlpanel/notifications-list.html" %}
+        </section>
+
+        <section>
+            <h2><span>Add notification</span></h2>
+            <p>You can use Markdown in notifications. You can use '!everyone' as a recipient to show the notification to
+                everyone, or '!tag' to show the notification to users with a specific tag (e.g. '!admin' or
+                '!student').</p>
+            <p>For expiration time, enter amount of seconds. When empty, the notification will not expire. Note that
+                if a notification is sent to !everyone or a specific tag and made dismissable, any user can dismiss
+                it and that will delete the notification for all other users (so you probably shouldn't do that).</p>
+
+            <form action="{{ url_for("manipulate_notifications") }}" method="POST" class="wide">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                <div class="form-element{% if "username" in incomplete %} missing{% endif %}">
+                    <label for="notification-username">Username</label>
+                    <input type="text" name="username" id="notification-username" value="{% if notification.username %}{{ notification.username }}{% else %}!everyone{% endif %}">
+                </div>
+                <div class="form-element{% if "notification" in incomplete %} missing{% endif %}">
+                    <label for="notification-notification">Notification</label>
+                    <textarea rows="10" cols="50" id="notification-notification" name="notification">{{ notification.notification }}</textarea>
+                </div>
+                <div class="form-element">
+                    <label for="notification-allow_dismiss">Dismissable?</label>
+                    <input type="checkbox" id="notification-allow_dismiss" name="allow_dismiss"{% if notification.allow_dismiss %} checked{% endif %}>
+                </div>
+                <div class="form-element{% if "expires" in incomplete %} missing{% endif %}">
+                    <label for="notification-expires">Expire after</label>
+                    <input type="text" name="expires" id="notification-expires" value="{{ notification.expires }}">
+                </div>
+                <div class="submit-container">
+                    <button>
+                        <i class="fa fa-comment" aria-hidden="true"></i> Create
+                    </button>
+                </div>
+            </form>
+        </section>
+    </article>
+{% endblock %}

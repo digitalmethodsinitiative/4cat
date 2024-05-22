@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.config_manager import config
 from chan_flags import get_country_name, get_troll_names
 
 
@@ -84,7 +85,7 @@ if args.board not in boards:
 	sys.exit(1)
 
 logger = Logger()
-db = Database(logger=logger, appname="4chan-import")
+db = Database(logger=logger, appname="4chan-import", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 
 csvnone = re.compile(r"^N$")
 
@@ -313,11 +314,11 @@ db.commit()
 
 print("Updating thread statistics.")
 db.execute(
-	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s AND board = %s",
-	(tuple(thread_ids), args.board,))
+	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND board = %s) WHERE t.id IN %s AND board = %s",
+	(args.boards, tuple(thread_ids), args.board,))
 db.execute(
-	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s AND board = %s",
-	(tuple(thread_ids), args.board,))
+	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '' AND board = %s) WHERE t.id IN %s AND board = %s",
+	(args.boards, tuple(thread_ids), args.board,))
 
 db.commit()
 print("Done!")

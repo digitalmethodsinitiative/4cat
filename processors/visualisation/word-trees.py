@@ -5,7 +5,7 @@ import string
 import jieba
 import re
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int
 
 from nltk.tokenize import word_tokenize
@@ -188,14 +188,18 @@ class MakeWordtree(BasicProcessor):
 				body = punkt_replace.sub("", body)
 
 			body = tokeniser(body, **tokeniser_args)
-			positions = [(i, x) for i, x in enumerate(body) if x.lower() == query.lower()]
+			if type(body) != list:
+				# Convert generator to list
+				body = list(body)
+
+			positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
 
 			# get lists of tokens for both the left and right side of the tree
 			# on the left side, all lists end with the query, on the right side,
 			# they start with the query
-			for position, body_tokens in positions:
-				right_branches.append(body_tokens[position:position + window])
-				left_branches.append(body_tokens[max(0, position - window):position + 1])
+			for position in positions:
+				right_branches.append(body[position:position + window])
+				left_branches.append(body[max(0, position - window):position + 1])
 
 		# Some settings for rendering the tree later
 		self.step = self.fontsize * 0.6  # approximately the width of a monospace char
@@ -215,7 +219,7 @@ class MakeWordtree(BasicProcessor):
 		tokens_right = []
 
 		# for each "level" (each branching point representing a level), turn
-		# tokens into nodes, record the max amount of occurences for any
+		# tokens into nodes, record the max amount of occurrences for any
 		# token in that level, and keep track of what nodes are in which level.
 		# The latter is needed because a token may occur multiple times, at
 		# different points in the graph. Do this for both the left and right
@@ -288,6 +292,8 @@ class MakeWordtree(BasicProcessor):
 
 			filtered_tokens_left.append(token)
 
+		self.dataset.log(f"Collected {len(filtered_tokens_left)} left tokens and {len(filtered_tokens_right)} right tokens")
+
 		# now we know which nodes are left, and can therefore determine how
 		# large the canvas needs to be - this is based on the max number of
 		# branches found on any level of the tree, in other words, the number
@@ -301,6 +307,7 @@ class MakeWordtree(BasicProcessor):
 				self.dataset.finish(0)
 				return None
 			elif sides == "both":
+				self.dataset.log("No data available to the left of the query")
 				sides = "right"
 				breadths_left = [0]
 
@@ -310,6 +317,7 @@ class MakeWordtree(BasicProcessor):
 				self.dataset.finish(0)
 				return None
 			elif sides == "both":
+				self.dataset.log("No data available to the right of the query")
 				sides = "left"
 				breadths_right = [0]
 
@@ -332,10 +340,12 @@ class MakeWordtree(BasicProcessor):
 
 		self.dataset.update_status("Rendering tree to SVG file")
 		if sides != "right":
+			self.dataset.update_status("Adding left side of tree to SVG file")
 			wrapper = self.render(wrapper, [token for token in filtered_tokens_left if token.is_root and token.children],
 								  height=height, side=self.SIDE_LEFT)
 
 		if sides != "left":
+			self.dataset.update_status("Adding right side of tree to SVG file")
 			wrapper = self.render(wrapper, [token for token in filtered_tokens_right if token.is_root and token.children],
 								  height=height, side=self.SIDE_RIGHT)
 

@@ -1,19 +1,64 @@
-{% extends "layout.html" %}
+{% extends "controlpanel/layout.html" %}
 
 {% block title %}Control Panel{% endblock %}
 {% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
 
 {% block body %}
-    <article class="with-aside">
+    <article{% if __user_config("privileges.admin.can_view_status") %} class="with-aside"{% endif %}>
         <section>
-        {% for notice in flashes %}
-            <p class="form-notice">{{ notice|safe }}</p>
-        {% endfor %}
-            {% include "controlpanel/controls.html" %}
-            {% include "controlpanel/notifications.html" %}
-            {% include "controlpanel/users.html" %}
+            <h2><span>Control panel</span></h2>
+            {% for notice in flashes %}
+                <p class="form-notice">{{ notice|safe }}</p>
+            {% endfor %}
+            <ul class="stats-container">
+                <div class="cp-stats">
+                    <h3>Items captured or imported</h3>
+                    <dl>
+                        <div><dt>Past 24 hours</dt>
+                        <dd>{{ stats.captured.day|numberify }}</dd></div>
+                        <div><dt>Past week</dt>
+                        <dd>{{ stats.captured.week|numberify }}</dd></div>
+                        <div><dt>All time</dt>
+                        <dd>{{ stats.captured.overall|numberify }}</dd></div>
+                    </dl>
+                </div>
+                <div class="cp-stats">
+                    <h3>Datasets created</h3>
+                    <dl>
+                        <div><dt>Past 24 hours</dt>
+                        <dd>{{ stats.datasets.day|numberify }}</dd></div>
+                        <div><dt>Past week</dt>
+                        <dd>{{ stats.datasets.week|numberify }}</dd></div>
+                        <div><dt>All time</dt>
+                        <dd>{{ stats.datasets.overall|numberify }}</dd></div>
+                    </dl>
+                </div>
+                <div class="cp-stats">
+                    <h3>Disk usage</h3>
+                    <dl>
+                        <div><dt>Data files</dt>
+                        <dd>{% if stats.disk.data %}{{ stats.disk.data|filesizeformat }}{% else %}N/A{% endif %}</dd></div>
+                        <div><dt>Database</dt>
+                        <dd>{% if stats.disk.db %}{{ stats.disk.db|filesizeformat }}{% else %}N/A{% endif %}</dd></div>
+                        <div><dt>Logs</dt>
+                        <dd>{% if stats.disk.logs %}{{ stats.disk.logs|filesizeformat }}{% else %}N/A{% endif %}</dd></div>
+                    </dl>
+                </div>
+                <div class="cp-stats">
+                    <h3>Configuration</h3>
+                    <dl>
+                        <div><dt>Up to date?</dt>
+                        <dd>{% if upgrade_available %}<a href="{{ url_for("trigger_restart") }}">Upgrade now</a>{% else %}<i class="fa fa-check" aria-hidden="true"></i><span class="sr-only">Yes</span>{% endif %}</dd></div>
+                        <div><dt>4CAT branch</dt>
+                            <dd>{{ current_branch }}</dd></div>
+                        <div class="tag-list"><dt>Active tags</dt>
+                        <dd>{% if tags %}{% for tag in tags %}<span class="property-badge">{{ tag }}</span> {% endfor %}{% else%}None{% endif %}</dd></div>
+                    </dl>
+                </div>
+            </ul>
         </section>
 
+        {% if __user_config("privileges.admin.can_view_status") %}
         <aside>
             <h2><span>Active workers</span></h2>
             <div class="content-container" data-source="{{ url_for('get_worker_status') }}" data-interval="5">
@@ -25,5 +70,6 @@
                 <p class="content-placeholder">Loading worker status...</p>
             </div>
         </aside>
+        {% endif %}
     </article>
 {% endblock %}

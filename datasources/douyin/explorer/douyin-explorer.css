@@ -1,0 +1,44 @@
+body {
+	background-color: #161823;
+	color: #b8b9bc;
+}
+
+.posts header span.post_id {
+	display: none;
+}
+
+.posts li.post {
+	border-radius: 10px;
+	padding: 20px;
+	max-width: 200px;
+	color: #b8b9bc;
+	background-color: #292b35;
+	border-bottom: 1px grey;
+}
+
+
+.posts li.post .preview {
+	display: block;
+	margin: 0 auto;
+	max-width: 300px;
+}
+
+
+.posts .post header .author_picture {
+	float: left;
+	margin-right: 15px;
+}
+
+.posts .post header .author_picture img {
+	border-radius: 100px;
+	width: 50px;
+}
+
+.posts .post header .author_picture:after {
+	display: none;
+}
+
+.posts .post .post-annotations {
+	background-color: black;
+	color: white;
+}

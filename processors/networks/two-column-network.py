@@ -3,7 +3,7 @@ Generate network of values from two columns
 """
 from dateutil.relativedelta import relativedelta
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 import networkx as nx
@@ -123,13 +123,12 @@ class ColumnNetworker(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor to run on all csv and NDJSON datasets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
-
         return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
@@ -253,9 +252,10 @@ class ColumnNetworker(BasicProcessor):
 
                         edge = (node_a, node_b)
                         if edge not in network.edges():
-                            network.add_edge(node_a, node_b, frequency=1)
+                            network.add_edge(node_a, node_b, frequency=1, weight=1)
                         else:
                             network.edges[edge]['frequency'] += 1
+                            network.edges[edge]['weight'] += 1
 
         if not network.edges():
             self.dataset.update_status("No edges could be created for the given parameters", is_final=True)

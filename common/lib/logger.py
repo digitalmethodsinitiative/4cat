@@ -2,7 +2,6 @@
 Log handler
 """
 import traceback
-import importlib
 import platform
 import logging
 import time
@@ -11,9 +10,8 @@ import json
 from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, HTTPHandler
-from importlib.machinery import SourceFileLoader
 
-import common.config_manager as config
+from common.config_manager import config
 
 
 class WebHookLogHandler(HTTPHandler):
@@ -129,18 +127,8 @@ class SlackLogHandler(WebHookLogHandler):
                     "value": "```" + infile.readlines()[record.frame.lineno - 1].strip() + "```",
                     "short": False
                 })
-        except IndexError:
-            pass
-
-        try:
-            module = SourceFileLoader(record.frame.filename.split("/")[-1].split(".")[0], record.frame.filename).load_module()
-            if "__maintainer__" in dir(module):
-                fields.append({
-                    "title": "Code maintainer:",
-                    "value": module.__maintainer__,
-                    "short": False
-                })
-        except ImportError:
+        except (IndexError, AttributeError):
+            # the file is not readable, or the line number is out of bounds
             pass
 
         return {
@@ -204,10 +192,15 @@ class Logger:
 
         # the slack webhook has its own handler, and is only active if the
         # webhook URL is set
-        if config.get("logging.slack.webhook"):
-            slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
-            slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
-            self.logger.addHandler(slack_handler)
+        try:
+            if config.get("logging.slack.webhook"):
+                slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
+                slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
+                self.logger.addHandler(slack_handler)
+        except Exception:
+            # we *may* need the logger before the database is in working order
+            if config.db is not None:
+                config.db.rollback()
 
     def log(self, message, level=logging.INFO, frame=None):
         """
@@ -218,9 +211,6 @@ class Logger:
         :param frame:  Traceback frame. If no frame is given, it is
         extrapolated
         """
-        if self.print_logs and level > logging.DEBUG:
-            print("LOG: %s" % message)
-
         # logging can include the full stack trace in the log, but that's a
         # bit excessive - instead, only include the location the log was called
         if not frame:

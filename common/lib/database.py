@@ -4,15 +4,13 @@ Database wrapper
 import itertools
 import psycopg2.extras
 import psycopg2
+import logging
 import time
 
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 
 from common.lib.exceptions import DatabaseQueryInterruptedException
-
-
-import common.config_manager as config
 
 class Database:
 	"""
@@ -42,21 +40,14 @@ class Database:
 		:param port:  Database port
 		:param appname:  App name, mostly useful to trace connections in pg_stat_activity
 		"""
-		dbname = config.get('DB_NAME') if not dbname else dbname
-		user = config.get('DB_USER') if not user else user
-		password = config.get('DB_PASSWORD') if not password else password
-		host = config.get('DB_HOST') if not host else host
-		port = config.get('DB_PORT') if not port else port
-
 		self.appname = "4CAT" if not appname else "4CAT-%s" % appname
 
 		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=self.appname)
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 
-
 		if self.log is None:
-			raise NotImplementedError
+			self.log = logging
 
 		self.commit()
 
@@ -264,7 +255,7 @@ class Database:
 		protoquery += " ON CONFLICT"
 
 		if constraints:
-			protoquery += "(" + ", ".join(["{}" for each in constraints]) + ")"
+			protoquery += " (" + ", ".join(["{}" for each in constraints]) + ")"
 			identifiers.extend([sql.Identifier(column) for column in constraints])
 
 		protoquery += " DO UPDATE SET "
@@ -302,6 +293,14 @@ class Database:
 			result = cursor.fetchall()
 		except AttributeError:
 			result = []
+		except psycopg2.ProgrammingError as e:
+			# there seems to be a bug with psycopg2 where it sometimes raises
+			# this for empty query results even though it shouldn't. this
+			# doesn't seem to indicate an actual problem so we catch the
+			# exception and return an empty list
+			self.rollback()
+			result = []
+			self.log.warning("Caught ProgrammingError: %s" % e)
 
 		cursor.close()
 		self.commit()
@@ -326,6 +325,7 @@ class Database:
 			# no results to fetch
 			self.rollback()
 			result = None
+			self.log.warning("Caught ProgrammingError: %s" % e)
 
 		cursor.close()
 		self.commit()
@@ -375,8 +375,11 @@ class Database:
 		# collect results
 		try:
 			result = cursor.fetchall()
-		except (AttributeError, psycopg2.ProgrammingError) as e:
+		except AttributeError as e:
 			result = []
+		except psycopg2.ProgrammingError as e:
+			result = []
+			self.log.warning("Caught ProgrammingError: %s" % e)
 
 		# clean up cancelling job when we have the data
 		self.interruptable_job.finish()

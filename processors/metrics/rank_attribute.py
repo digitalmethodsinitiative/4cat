@@ -1,12 +1,13 @@
 """
 Generate ranking per post attribute
 """
+import emoji
 import re
 
 from collections import OrderedDict
 from itertools import islice, chain
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -51,7 +52,8 @@ class AttributeRanker(BasicProcessor):
 				"none": "Use column value",
 				"urls": "URLs",
 				"hostnames": "Host names",
-				"hashtags": "Hashtags"
+				"hashtags": "Hashtags (words starting with #)",
+				"emoji": "Emoji (each used emoji in the column is counted individually)"
 			},
 			"help": "Extract from column",
 			"tooltip": "This can be used to extract more specific values from the value of the selected column(s); for "
@@ -96,11 +98,11 @@ class AttributeRanker(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on top image rankings
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.get_extension() in ["csv", "ndjson"]
 
@@ -144,7 +146,10 @@ class AttributeRanker(BasicProcessor):
 		# inspected to determine those overall top-scoring items
 		overall_top = {}
 		if rank_style == "overall":
-			self.dataset.update_status("Determining overall top-%i items" % cutoff)
+			if cutoff:
+				self.dataset.update_status(f"Determining overall top-{cutoff} items")
+			else:
+				self.dataset.update_status("Determining overall top items")
 			for post in self.source_dataset.iterate_items(self):
 				values = self.get_values(post, columns, filter, split_comma, extract)
 				for value in values:
@@ -155,7 +160,9 @@ class AttributeRanker(BasicProcessor):
 
 					overall_top[value] += convert_to_int(post.get(weighby, 1), 1)
 
-			overall_top = sorted(overall_top, key=lambda item: overall_top[item], reverse=True)[0:cutoff]
+			overall_top = sorted(overall_top, key=lambda item: overall_top[item], reverse=True)
+			if cutoff:
+				overall_top = overall_top[:cutoff]
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
@@ -164,7 +171,7 @@ class AttributeRanker(BasicProcessor):
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)
 			except ValueError as e:
-				self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+				self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
 				self.dataset.update_status(0)
 				return
 
@@ -218,7 +225,7 @@ class AttributeRanker(BasicProcessor):
 		if rows:
 			self.write_csv_items_and_finish(rows)
 		else:
-			self.dataset.update_status("No posts contain the requested attributes.")
+			self.dataset.update_status("No items contain the requested attributes.")
 			self.dataset.finish(0)
 
 	def get_values(self, post, attributes, filter, split_comma, extract):
@@ -282,6 +289,9 @@ class AttributeRanker(BasicProcessor):
 		elif look_for == "hashtags":
 			hashtags = list(re.findall(r"#([a-zA-Z0-9_]+)", value))
 			return hashtags
+
+		elif look_for == "emoji":
+			return [e["emoji"] for e in emoji.emoji_list(value)]
 
 		else:
 			return [value]

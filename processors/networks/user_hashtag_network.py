@@ -1,9 +1,9 @@
 """
 Generate bipartite user-hashtag graph of posts
 """
-import csv
+from backend.lib.preset import ProcessorPreset
+from common.lib.user_input import UserInput
 
-from backend.abstract.preset import ProcessorPreset
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -22,19 +22,26 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     extension = "gexf"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def get_options(cls, parent_dataset=None, user=None):
+        return {
+            "to-lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Convert values to lowercase",
+                "tooltip": "Merges values with varying cases"
+                }
+        }
+
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on datasets containing a tags column
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         usable_columns = {"tags", "hashtags", "groups"}
-
-        if module.is_dataset():
-            columns = module.get_columns()
-            return bool(set(columns) & usable_columns) if columns else False
-        else:
-            return False
+        columns = module.get_columns()
+        return bool(set(columns) & usable_columns) if columns else False
 
     def get_processor_pipeline(self):
         """
@@ -64,7 +71,8 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
                     "directed": False,
                     "split-comma": True,
                     "categorise": True,
-                    "allow-loops": False
+                    "allow-loops": False,
+                    "to-lowercase": self.parameters.get("to-lowercase", False),
                 }
             }
         ]

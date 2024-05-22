@@ -5,7 +5,7 @@ import abc
 import datetime
 
 from common.lib.helpers import pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -28,7 +28,7 @@ class TwitterStatsBase(BasicProcessor):
 
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
@@ -52,7 +52,9 @@ class TwitterStatsBase(BasicProcessor):
         counter = 0
         data_types = None
         # Iterate through each post and collect data for each interval
-        for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+        for post in self.source_dataset.iterate_items(self):
+            post = post.original
+
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while processing Tweets")
 

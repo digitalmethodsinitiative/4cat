@@ -5,8 +5,8 @@
 {% endif %}
 
 {% block title %}{% if datasource_id %}{{ datasource_name }} data source{% else %}Data sources{% endif %}{% endblock %}
-
 {% block body_class %}plain-page {{ body_class }}{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "datasources" %}{% endblock %}
 
 
 {% block body %}
@@ -24,12 +24,12 @@
                 {% endif %}
             
             {% if labels and "local" in labels %}
-                {% include "query-syntax.html" %}
+                {% include "components/query-syntax.html" %}
             {% endif %}
             </div>
             <h3>Metadata</h3>
             {% if daily_counts %}
-                {% include "day-graph.html" %}
+                {% include "components/day-graph.html" %}
             {% endif %}
             <div class="card-content">
                 <dl class="metadata-wrapper">
@@ -69,11 +69,11 @@
                         </dd>
                     </div>
                     {% endif %}
-                    {% if datasources[datasource_id]['expire-datasets'] %}
+                    {% if datasources[datasource_id]['expire-datasets'] and datasources[datasource_id]['expire-datasets']['timeout'] != 0 %}
                     <div class="fullwidth">
                         <dt>Dataset expiration</dt>
                         <dd>
-                            After {{ datasources[datasource_id]['expire-datasets']|timify_long|safe }}
+                            After {{ datasources[datasource_id]['expire-datasets']['timeout']|timify_long|safe }}
                         </dd>
                     </div>
                     {% endif %}

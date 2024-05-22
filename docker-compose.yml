@@ -3,7 +3,7 @@ version: '3.6'
 services:
   db:
     container_name: 4cat_db
-    image: postgres:latest
+    image: postgres:${POSTGRES_TAG}
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -12,6 +12,11 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
       - 4cat_db:/var/lib/postgresql/data/
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
@@ -20,12 +25,13 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - ${PUBLIC_API_PORT}:4444
     volumes:
       - 4cat_data:/usr/src/app/data/
-      - 4cat_share:/usr/src/app/config/
+      - 4cat_config:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
     entrypoint: docker/docker-entrypoint.sh
 
@@ -33,6 +39,8 @@ services:
     image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
     container_name: 4cat_frontend
     restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       - db
       - backend
@@ -41,12 +49,16 @@ services:
       - ${TELEGRAM_PORT}:443
     volumes:
       - 4cat_data:/usr/src/app/data/
-      - 4cat_share:/usr/src/app/config/
+      - 4cat_config:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
-    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
+    command: ["docker/wait-for-backend.sh"]
 
 volumes:
-  4cat_db: {}
-  4cat_data: {}
-  4cat_share: {}
-  4cat_logs: {}
+  4cat_db:
+    name: ${DOCKER_DB_VOL}
+  4cat_data:
+    name: ${DOCKER_DATA_VOL}
+  4cat_config:
+    name: ${DOCKER_CONFIG_VOL}
+  4cat_logs:
+    name: ${DOCKER_LOGS_VOL}

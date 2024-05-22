@@ -4,7 +4,7 @@ Twitter APIv2 base stats class
 import datetime
 
 from common.lib.helpers import get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
@@ -35,7 +35,7 @@ class TwitterUserVisibility(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine if processor is compatible with dataset
 
@@ -58,7 +58,9 @@ class TwitterUserVisibility(BasicProcessor):
 
         counter = 0
         # Iterate through each post and collect data for each interval
-        for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+        for post in self.source_dataset.iterate_items(self):
+            post = post.original
+
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while processing Tweets")
 

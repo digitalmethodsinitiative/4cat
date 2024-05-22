@@ -8,7 +8,7 @@ import pandas as pd
 import itertools
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import TfidfModel
@@ -89,11 +89,11 @@ class TfIdf(BasicProcessor):
 	]
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on token sets
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "tokenise-posts"
 
@@ -279,7 +279,7 @@ class TfIdf(BasicProcessor):
 		results = []
 		for index, document in enumerate(df_matrix):
 			df_tim = (df_matrix.sort_values(by=[document], ascending=False))[:top_n]
-			for i in range(top_n):
+			for i in range(min(top_n, len(df_tim.index))):
 				result = {}
 				result["item"] = df_tim.index.values[i]
 				result["value"] = df_tim[document].values[i].tolist()

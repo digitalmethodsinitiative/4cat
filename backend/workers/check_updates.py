@@ -1,11 +1,10 @@
 import packaging.version
 import requests
 import json
-import re
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import add_notification, get_github_version
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from pathlib import Path
 
 
@@ -33,12 +32,16 @@ class UpdateChecker(BasicWorker):
             # need something to compare against...
             return
 
+        timeout = 15
         try:
-            (latest_tag, release_url) = get_github_version()
+            (latest_tag, release_url) = get_github_version(timeout)
             if latest_tag == "unknown":
                 raise ValueError()
         except ValueError:
             self.log.warning("'4cat.github_url' may be misconfigured - repository does not exist or is private")
+            return
+        except requests.Timeout:
+            self.log.warning(f"GitHub URL '4cat.github_url' did not respond within {timeout} seconds - not checking for new version")
             return
         except (requests.RequestException, json.JSONDecodeError):
             # some issue with the data, or the GitHub API, but not something we
@@ -52,12 +55,12 @@ class UpdateChecker(BasicWorker):
             # update available!
             # show a notification for all admins (normal users can't update
             # after all)
-            add_notification(self.db, "!admins",
+            add_notification(self.db, "!admin",
                              "A new version of 4CAT is [available](%s). The latest version is %s; you are running version %s." % (
                                  release_url, latest_tag, current_version
                              ), allow_dismiss=True)
 
         else:
             # up to date? dismiss any notifications about new versions
-            self.db.execute("DELETE FROM users_notifications WHERE username = '!admins' "
+            self.db.execute("DELETE FROM users_notifications WHERE username = '!admin' "
                             "AND notification LIKE 'A new version of 4CAT%'")

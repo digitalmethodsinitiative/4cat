@@ -31,11 +31,11 @@ class RandomFilter(BaseFilter):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None):
+	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on NDJSON and CSV files
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
@@ -82,14 +82,15 @@ class RandomFilter(BaseFilter):
 		match_row = posts_to_keep[0]  # The row count of the first matching row
 
 		# Iterate through posts and keep those in the match list
-		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+		for mapped_item in self.source_dataset.iterate_items(processor=self):
 
 			# Yield on match
 			if count == match_row:
 				written += 1
 				if count != (dataset_size - 1) and written < sample_size:
 					match_row = posts_to_keep[written]
-				yield original_item
+
+				yield mapped_item.original
 
 				if written % max(int(sample_size/10), 1) == 0:
 					self.dataset.update_status("Wrote %i posts" % written)

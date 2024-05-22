@@ -30,11 +30,11 @@ class DateFilter(BaseFilter):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor on NDJSON and CSV files
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
@@ -65,7 +65,7 @@ class DateFilter(BaseFilter):
         matching_items = 0
 
         # Loop through items
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(processor=self):
             # Update 4CAT and user on status
             processed_items += 1
             if processed_items % 500 == 0:
@@ -86,4 +86,4 @@ class DateFilter(BaseFilter):
 
             # Must be a good date!
             matching_items += 1
-            yield original_item
+            yield mapped_item.original
