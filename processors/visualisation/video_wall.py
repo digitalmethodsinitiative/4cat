@@ -1,23 +1,20 @@
 """
-Create an image wall of the most-used images
+Create a collage of videos playing side by side
 """
-import colorsys
 import random
 import shutil
 import math
 import shlex
 import subprocess
 
-from PIL import Image, ImageFile, ImageOps, ImageDraw, UnidentifiedImageError
-from sklearn.cluster import KMeans
 from operator import mul
+from packaging import version
 from functools import reduce
 from random import random
 
-import common.config_manager as config
-
-from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from common.config_manager import config
+from common.lib.helpers import UserInput, get_ffmpeg_version
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
@@ -86,7 +83,7 @@ class VideoWallGenerator(BasicProcessor):
     TARGET_HEIGHT = 1440
 
     @classmethod
-    def is_compatible_with(cls, module=None):
+    def is_compatible_with(cls, module=None, user=None):
         """
         Determine compatibility
 
@@ -99,12 +96,12 @@ class VideoWallGenerator(BasicProcessor):
 
         # also need ffprobe to determine video lengths
         # is usually installed in same place as ffmpeg
-        ffmpeg_path = shutil.which(config.get("video_downloader.ffmpeg-path"))
+        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         return module.type.startswith("video-downloader") and \
-               ffmpeg_path and \
-               ffprobe_path
+            ffmpeg_path and \
+            ffprobe_path
 
     def process(self):
         """
@@ -116,7 +113,7 @@ class VideoWallGenerator(BasicProcessor):
         sort_mode = self.parameters.get("sort-mode")
         sound = self.parameters.get("audio")
 
-        ffmpeg_path = shutil.which(config.get("video_downloader.ffmpeg-path"))
+        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack
@@ -152,7 +149,7 @@ class VideoWallGenerator(BasicProcessor):
             probe_error = probe.stderr.decode("utf-8")
             if probe_error:
                 shutil.rmtree(video_staging_area, ignore_errors=True)
-                return self.dataset.finish_with_error("Cannot determine dimensions of video {video.name}. Cannot tile "
+                return self.dataset.finish_with_error(f"Cannot determine dimensions of video {video.name}. Cannot tile "
                                                       "videos without knowing the video dimensions.")
             else:
                 bits = probe_output.split(",")
@@ -183,6 +180,10 @@ class VideoWallGenerator(BasicProcessor):
 
         self.dataset.update_status("Determining canvas and tile sizes")
 
+        # why not use the xstack filter that ffmpeg has for this purpose?
+        # the xstack filter does not cope well with videos of different sizes,
+        # which are often abundant in 4CAT datasets
+
         # calculate 'tile sizes' (a tile is an image) and also the size of the
         # canvas we will need to fit them all. The canvas can never be larger than
         # this:
@@ -192,27 +193,27 @@ class VideoWallGenerator(BasicProcessor):
             # assuming every image has the overall average height, how wide would
             # the canvas need to be (if everything is on a single row)?
             full_width = 0
-            tile_y = average_size[1]
+            tile_h = average_size[1]
             for dimension in dimensions.values():
                 # ideally, we make everything the average height
                 optimal_ratio = average_size[1] / dimension[1]
                 full_width += dimension[0] * optimal_ratio
 
             # now we can calculate the total amount of pixels needed
-            fitted_pixels = full_width * tile_y
+            fitted_pixels = full_width * tile_h
             if fitted_pixels > max_pixels:
                 # try again with a lower height
                 area_ratio = max_pixels / fitted_pixels
-                tile_y = int(tile_y * math.sqrt(area_ratio))
+                tile_h = int(tile_h * math.sqrt(area_ratio))
                 fitted_pixels = max_pixels
 
             # find the canvas size that can fit this amount of pixels at the
             # required proportions, provided that y = multiple of avg height
             ideal_height = math.sqrt(fitted_pixels / (self.TARGET_WIDTH / self.TARGET_HEIGHT))
-            size_y = math.ceil(ideal_height / tile_y) * tile_y
+            size_y = math.ceil(ideal_height / tile_h) * tile_h
             size_x = fitted_pixels / size_y
 
-            tile_x = -1  # varies
+            tile_w = -1  # varies
 
         elif sizing_mode == "square":
             # assuming each image is square, find a canvas with the right
@@ -232,33 +233,37 @@ class VideoWallGenerator(BasicProcessor):
             size_x = math.ceil(ideal_width / tile_size) * tile_size
             size_y = math.ceil(fitted_pixels / size_x / tile_size) * tile_size
 
-            tile_x = tile_y = tile_size
+            tile_w = tile_h = tile_size
 
         elif sizing_mode == "average":
-            tile_x = int(average_size[0])
-            tile_y = int(average_size[1])
+            tile_w = int(average_size[0])
+            tile_h = int(average_size[1])
 
-            fitted_pixels = tile_x * tile_y * len(videos)
+            fitted_pixels = tile_w * tile_h * len(videos)
             if fitted_pixels > max_pixels:
                 area_ratio = max_pixels / fitted_pixels
-                tile_x = int(tile_x * math.sqrt(area_ratio))
-                tile_y = int(tile_y * math.sqrt(area_ratio))
-                fitted_pixels = tile_x * tile_y * len(videos)
+                tile_w = int(tile_w * math.sqrt(area_ratio))
+                tile_h = int(tile_h * math.sqrt(area_ratio))
+                fitted_pixels = tile_w * tile_h * len(videos)
 
             ideal_width = math.sqrt(fitted_pixels / (self.TARGET_HEIGHT / self.TARGET_WIDTH))
-            size_x = math.ceil(ideal_width / tile_x) * tile_x
-            size_y = math.ceil(fitted_pixels / size_x / tile_y) * tile_y
+            size_x = math.ceil(ideal_width / tile_w) * tile_w
+            size_y = math.ceil(fitted_pixels / size_x / tile_h) * tile_h
 
         else:
             raise NotImplementedError("Sizing mode '%s' not implemented" % sizing_mode)
+
+        # round up to avoid annoying issues and because we don't need subpixels
+        tile_h = round(tile_h)
+        tile_w = round(tile_w)
 
         self.dataset.log("Canvas size is %ix%i" % (size_x, size_y))
 
         # now we are ready to render the video wall
         command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
         # construct an ffmpeg filter for this
-        # basically, stack videos vertically until the max width is reached
-        # then stack those vertical stacks horizontally
+        # basically, stack videos horizontally until the max width is reached
+        # then stack those horizontal stacks vertically
         # resize the videos first
         index = 0
         resize = []  # resize filters to make tiles from videos
@@ -269,57 +274,77 @@ class VideoWallGenerator(BasicProcessor):
         row_width = 0
         row_widths = []
 
+        # todo: periodically check if we still need to support ffmpeg < 5.1
+        fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
+
         # go through each video and transform as needed
-        for video, path in videos.items():
-            if tile_x < 0:
-                video_width = dimensions[video][0] * (tile_y / dimensions[video][1])
+        looping = True
+        video_queue = list(videos.items())
+        while True:
+            try:
+                video, path = video_queue.pop(0)
+            except IndexError:
+                looping = False
+
+            if tile_w < 0:
+                video_width = round(dimensions[video][0] * (tile_h / dimensions[video][1])) if looping else 0
             else:
-                video_width = tile_x
+                video_width = tile_w
 
-            row_width += video_width
-
-            # make into tile - with resizing (if proportional) or cropping (if not)
-            if sizing_mode == "fit-height":
-                resize.append(f"scale={video_width}:{tile_y}[scaled{index}]")
-            elif sizing_mode in ("square", "average"):
-                if dimensions[video][0] > dimensions[video][1]:
-                    cropscale = f"scale={dimensions[video][0] * (tile_y / dimensions[video][1])}:{tile_y}[cropped{index}]"
-                else:
-                    cropscale = f"scale={tile_x}:{dimensions[video][1] * (tile_x / dimensions[video][0])}[cropped{index}]"
-
-                cropscale += f";[cropped{index}]crop={tile_x}:{tile_y}"
-                resize.append(f"[{index}]{cropscale}[scaled{index}]")
-
-            command += ["-i", str(path)]
-            if row_width + video_width >= size_x or (index == len(videos) - 1 and row):
+            if row and (not looping or (row_width + video_width) >= size_x):
+                # adding this video would make the row too wide
+                # so add current row to buffer and start a new one
                 if len(row) > 1:
                     # use hstack to tile the videos in the row horizontally
                     rows.append("".join(row) + f"hstack=inputs={len(row)}[stack{len(rows)}]")
                 else:
                     # hstack needs more than one video as input, but we need
                     # *something* to rename the stream to stack[whatever]
-                    # so just pad it to the size it already is
-                    rows.append(row[0] + f"pad={row_width}:{tile_y}:0:0[stack{len(rows)}]")
+                    # so just scale it to the size it already is
+                    rows.append(row[0] + f"scale=iw:ih[stack{len(rows)}]")
                 row = []
                 row_widths.append(row_width)
                 row_width = 0
 
-            row.append(f"[scaled{index}]")
+                if not looping:
+                    break
 
+            # if we have a video, continue filling the grid
+            # make into tile - with resizing (if proportional) or cropping (if not)
+            row_width += video_width
+
+            if sizing_mode == "fit-height":
+                resize.append(f"scale={video_width}:{tile_h}[scaled{index}]")
+            elif sizing_mode in ("square", "average"):
+                if dimensions[video][0] > dimensions[video][1]:
+                    cropscale = f"scale={dimensions[video][0] * (tile_h / dimensions[video][1])}:{tile_h}[cropped{index}]"
+                else:
+                    cropscale = f"scale={tile_w}:{dimensions[video][1] * (tile_w / dimensions[video][0])}[cropped{index}]"
+
+                cropscale += f";[cropped{index}]crop={tile_w}:{tile_h}"
+                resize.append(f"{cropscale}[scaled{index}]")
+            else:
+                raise NotImplementedError(f"Unknown sizing mode {sizing_mode}")
+
+            command += ["-i", str(path)]
+            row.append(f"[scaled{index}]")
             index += 1
 
         for row, width in enumerate(row_widths):
             if width != max(row_widths):
                 # pad so that each row is the same width
-                padding.append(f"[stack{row}]pad={max(row_widths)}:{tile_y}:0:0[stack{row}]")
+                padding.append(f"[stack{row}]pad={max(row_widths) + 1}:ih:0:0[stack{row}]")
 
         # now create the ffmpeg filter from this
-        filter_chain = ";".join(resize) + ";"
+        filter_chain = ""
+        if resize:
+            filter_chain += ";".join(resize) + ";"
         filter_chain += ";".join(rows) + ";"
-        filter_chain += ";".join(padding) + ";"
+        if padding:
+            filter_chain += ";".join(padding) + ";"
         filter_chain += "".join([f"[stack{i}]" for i in range(0, len(rows))]) + f"vstack=inputs={len(rows)}[final]"
         ffmpeg_filter = shlex.quote(filter_chain)[1:-1]
-        command += ["-fps_mode", "drop", "-filter_complex", ffmpeg_filter]
+        command += [fps_command, "cfr", "-filter_complex", ffmpeg_filter]
 
         # ensure mixed audio
         if sound == "none":
