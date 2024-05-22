@@ -152,7 +152,7 @@ class VideoSceneFrames(BasicProcessor):
             processed_frames += len(scenes[video.name])
 
             self.dataset.update_status(f"Captured frames for {processed_frames} of {num_scenes} scenes")
-            self.dataset.update_progress(processed_frames / self.source_dataset.num_rows)
+            self.dataset.update_progress(processed_frames / num_scenes)
 
         # Finish up
         # We've created a directory and folder structure here as opposed to a single folder with single files as
