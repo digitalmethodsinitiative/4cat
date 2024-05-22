@@ -119,8 +119,8 @@ class VideoHasher(BasicProcessor):
 	"""
 	type = "video-hasher-1"  # job type ID
 	category = "Visual"  # category
-	title = "Create Video colleges"  # title displayed in UI
-	description = "Creates colleges from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
+	title = "Create Video collages"  # title displayed in UI
+	description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
