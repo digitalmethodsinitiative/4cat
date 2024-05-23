@@ -17,7 +17,7 @@ packages = [
 	"cssselect~=1.1.0",
 	"datedelta~=1.4.0",
 	"dateparser~=1.1.0",
-	"emoji",
+	"emoji>=2.12.1",
 	"flag",
 	"Flask~=2.2",
 	"Flask_Limiter==1.0.1",
