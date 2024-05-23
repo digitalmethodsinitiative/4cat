@@ -37,7 +37,7 @@ packages = [
 	"opencv-python>=4.6.0.66",
 	"packaging",
 	"pandas==1.5.3",
-	"Pillow~=9.1",
+	"Pillow>=10.3",
 	"praw~=7.0",
 	"prawcore~=2.0",
 	"psutil~=5.0",
