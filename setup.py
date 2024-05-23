@@ -53,7 +53,6 @@ packages = [
 	"shapely",
 	"spacy==3.7.2",
 	"svgwrite~=1.4.0",
-	"typing_extensions<4.6.0",
 	"tailer",
 	"Telethon~=1.25.2",
 	"ural~=1.3",
