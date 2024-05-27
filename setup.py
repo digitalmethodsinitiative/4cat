@@ -17,7 +17,7 @@ packages = [
 	"cssselect~=1.1.0",
 	"datedelta~=1.4.0",
 	"dateparser~=1.1.0",
-	"emoji",
+	"emoji>=2.12.1",
 	"flag",
 	"Flask~=2.2",
 	"Flask_Limiter==1.0.1",
@@ -37,7 +37,7 @@ packages = [
 	"opencv-python>=4.6.0.66",
 	"packaging",
 	"pandas==1.5.3",
-	"Pillow~=9.1",
+	"Pillow>=10.3",
 	"praw~=7.0",
 	"prawcore~=2.0",
 	"psutil~=5.0",
@@ -51,12 +51,10 @@ packages = [
 	"scikit-learn",
 	"scipy==1.10.1",
 	"shapely",
-	"spacy==3.4.3",
+	"spacy==3.7.2",
 	"svgwrite~=1.4.0",
-	"typing_extensions<4.6.0",
 	"tailer",
 	"Telethon~=1.25.2",
-	"typing_extensions<4.6.0",
 	"ural~=1.3",
 	"unidecode~=1.3",
 	"Werkzeug~=2.2",
@@ -64,7 +62,7 @@ packages = [
 	"videohash @ https://github.com/dale-wahl/videohash/archive/refs/heads/main.zip",
 	"vk_api",
 	"yt-dlp",
-	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.1/en_core_web_sm-3.4.1.tar.gz#egg=en_core_web_sm"
+	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm"
 ]
 
 # Some packages don't run on Windows
