@@ -35,7 +35,7 @@ class Scheduler(BasicWorker):
 		details: additional details for the job (potentially different for each job)
 		"""
 		# create the table if it doesn't exist
-		self.db.execute("CREATE TABLE IF NOT EXISTS scheduled_jobs (job_id int PRIMARY KEY, scheduler_id int NOT NULL, jobtype text NOT NULL, dataset_id text NOT NULL, status text NOT NULL, created_at timestamp, details jsonb)")
+		self.db.execute("CREATE TABLE IF NOT EXISTS scheduled_jobs (job_id int PRIMARY KEY, scheduler_id int NOT NULL, jobtype text NOT NULL, dataset_id text NOT NULL, status text NOT NULL, created_at integer, details jsonb)")
 
 	def work(self):
 		"""
@@ -57,9 +57,6 @@ class Scheduler(BasicWorker):
 			# No jobs, schedule first one
 			self.schedule_job(first=True)
 		else:
-			# Update incomplete jobs
-			self.update_jobs(jobs)
-
 			# Check to see if jobs need to be rescheduled and do so
 			self.reschedule_jobs(jobs)
 
@@ -67,7 +64,7 @@ class Scheduler(BasicWorker):
 			if self.check_schedule(jobs):
 				self.schedule_job()
 
-		if self.last_run():
+		if self.check_last_run():
 			# If last job has been scheduled, all jobs completed and updated, delete this Scheduler job
 			self.job.finish(delete=True)
 		else:
@@ -116,6 +113,7 @@ class Scheduler(BasicWorker):
 				"extension": processor.get_extension(dataset.get_parent()),
 				"is_private": dataset.is_private,
 				"parameters": parameters,
+				"label": dataset.get_label(),
 				"last_dataset": dataset.key
 			})
 
@@ -132,7 +130,8 @@ class Scheduler(BasicWorker):
 			self.update_details({"last_dataset": dataset.key})
 
 		# Create new job; interval is 0 as this scheduler is responsible for scheduling the next job
-		self.queue.add_job(jobtype=self.details.get("processor_type"), remote_id=dataset.key, interval=0)
+		# Job details contains the scheduler_id for job to update scheduler table on finish
+		self.queue.add_job(jobtype=self.details.get("processor_type"), remote_id=dataset.key, interval=0, details={"scheduler_id": self.job.data["id"]})
 		# Get new job w/ ID
 		new_job = Job.get_by_remote_ID(dataset.key, self.db)
 
@@ -146,7 +145,7 @@ class Scheduler(BasicWorker):
 			"jobtype": self.details.get("processor_type"),
 			"dataset_id": dataset.key,
 			"status": "scheduled",
-			"created_at": datetime.now().timestamp(),
+			"created_at": int(datetime.now().timestamp()),
 			"details": json.dumps(self.details)
 		})
 		self.log.info(f"Scheduler created {self.details.get('processor_type')} job: dataset {self.details.get('last_dataset')}")
@@ -161,16 +160,6 @@ class Scheduler(BasicWorker):
 		self.db.update("jobs", where={"jobtype": self.job.data["jobtype"], "remote_id": self.job.data["remote_id"]},
 					   data={"details": json.dumps(self.details)})
 
-	def update_jobs(self, jobs):
-		"""
-		Update any job statuses
-
-		:param list jobs: List of jobs
-		"""
-		# TODO: update statuses
-		# TODO: remove sensitive parameters
-		pass
-
 	def reschedule_jobs(self, jobs):
 		"""
 		Reschedule jobs that need it
@@ -179,14 +168,14 @@ class Scheduler(BasicWorker):
 		"""
 		pass
 
-	def last_run(self):
+	def check_last_run(self):
 		"""
 		Check if the last job has been run
 
 		:return bool:
 		"""
 		end_date = self.details.get("enddate")
-		if datetime.now() >= datetime.strptime(end_date, "%Y-%m-%d"):
+		if end_date and datetime.now() >= datetime.strptime(end_date, "%Y-%m-%d"):
 			return True
 		else:
 			return False
