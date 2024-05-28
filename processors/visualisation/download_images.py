@@ -50,7 +50,7 @@ class ImageDownloader(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"help": "No. of images (max 1000)",
 			"default": 100,
-			"min": 0,
+			"min": 1,
 			"max": 1000
 		},
 		"columns": {
@@ -100,8 +100,14 @@ class ImageDownloader(BasicProcessor):
 
 		# Update the amount max and help from config
 		max_number_images = int(config.get('image-downloader.max', 1000, user=user))
-		options['amount']['max'] = max_number_images
-		options['amount']['help'] = "No. of images (max %s)" % max_number_images
+		if max_number_images > 0:
+			options['amount']['max'] = max_number_images
+			options['amount']['help'] = "No. of images (max %s)" % max_number_images
+		else:
+			options['amount']['help'] = "No. of images"
+			options['amount']['tooltip'] = "'0' will use all available images"
+			options['amount']['min'] = 0
+			options['amount'].pop('max')
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():

@@ -62,11 +62,10 @@ class ImageWallGenerator(BasicProcessor):
 		options = {
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "No. of images" + (f" (max {max_number_images})" if max_number_images != 0 else ""),
+				"help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
 				"default": 100 if max_number_images == 0 else min(max_number_images, 100),
 				"min": 0 if max_number_images == 0 else 1,
 				"max": max_number_images,
-				"tooltip": "'0' uses as many images as available in the archive" + (f" (up to {max_number_images})" if max_number_images != 0 else "")
 			},
 			"tile-size": {
 				"type": UserInput.OPTION_CHOICE,
@@ -95,6 +94,9 @@ class ImageWallGenerator(BasicProcessor):
 				"default": ""
 			}
 		}
+		if max_number_images == 0:
+			options["amount"].pop("max")
+			options['amount']['tooltip'] = "'0' will use all available images"
 		return options
 	def process(self):
 		"""

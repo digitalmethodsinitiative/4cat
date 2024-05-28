@@ -140,25 +140,6 @@ class TikTokImageDownloader(BasicProcessor):
     extension = "zip"
     is_hidden = True  # Hide from UI; only used in preset TikTokImageDownloaderPreset
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of items (max 1000)",
-            "default": 100,
-            "min": 0,
-            "max": 1000
-        },
-        "thumb_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Media type",
-            "options": {
-                "thumbnail": "Video Thumbnail",
-                "music": "Music Thumbnail",
-            },
-            "default": "thumbnail"
-        }
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -175,12 +156,31 @@ class TikTokImageDownloader(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        options = cls.options
-
         # Update the amount max and help from config
         max_number_images = int(config.get("image-downloader.max", 1000, user=user))
-        options['amount']['max'] = max_number_images
-        options['amount']['help'] = f"No. of images (max {max_number_images:,})"
+
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
+                "default": 100,
+                "min": 0 if max_number_images == 0 else 1,
+                "max": max_number_images
+            },
+            "thumb_type": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Media type",
+                "options": {
+                    "thumbnail": "Video Thumbnail",
+                    "music": "Music Thumbnail",
+                },
+                "default": "thumbnail"
+            }
+        }
+
+        if max_number_images == 0:
+            options['amount']['tooltip'] = "'0' will use all available images"
+            options['amount'].pop('max')
 
         return options
 
