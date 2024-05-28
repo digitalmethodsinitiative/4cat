@@ -140,7 +140,12 @@ def list_users(page):
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_worker_status():
-    workers = call_api("worker-status")["response"]["running"]
+    workers = [
+        {
+            **worker,
+            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=db)
+        } for worker in call_api("worker-status")["response"]["running"]
+    ]
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
                            now=time.time())
 

@@ -9,12 +9,12 @@ https://ffmpeg.org/
 import shutil
 import subprocess
 import shlex
+from packaging import version
 
-from backend.lib.preset import ProcessorPreset
 from common.config_manager import config
-
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
+from common.lib.helpers import get_ffmpeg_version
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -60,7 +60,7 @@ class VideoSceneFrames(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return  module.type in ["video-scene-detector"] and \
+        return module.type in ["video-scene-detector"] and \
                config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
@@ -99,7 +99,6 @@ class VideoSceneFrames(BasicProcessor):
         video_staging_area = self.dataset.get_staging_area()
         staging_area = self.dataset.get_staging_area()
 
-        # now go through videos and get the relevant frames
         errors = 0
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
@@ -114,34 +113,45 @@ class VideoSceneFrames(BasicProcessor):
             video_folder = staging_area.joinpath(video.stem)
             video_folder.mkdir(exist_ok=True)
 
-            for scene in scenes[video.name]:
-                scene_index = scene["id"].split("_").pop()
-                scene_filename = video.stem + "_scene_" + str(scene_index) + ".jpeg"
-                command = [
-                    shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-                    "-i", shlex.quote(str(video)),
-                    "-vf", "select='eq(n\\," + scene["start_frame"] + ")'",
-                    "-vframes", "1",
-                    shlex.quote(str(video_folder.joinpath(scene_filename)))
-                ]
+            ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
+            fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
 
-                if frame_size != "no_modify":
-                    command += ["-s", shlex.quote(frame_size)]
+            # we use a single command per video and get all frames in one go
+            # previously we had a separate command per frame, which is slower
+            frames = [s["start_frame"] for s in scenes[video.name]]
+            vf_param = "+".join([f"eq(n\\,{frame})" for frame in frames])
 
-                result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE)
+            command = [
+                ffmpeg_path,
+                "-i", shlex.quote(str(video)),
+                "-vf", f"select='{vf_param}'",
+                fps_command, "passthrough",
+                shlex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
+            ]
 
-                # some ffmpeg error - log but continue
-                if result.returncode != 0:
-                    self.dataset.log(
-                        f"Error extracting frame for scene {scene_index} of video file {video.name}, skipping.")
+            if frame_size != "no_modify":
+                command += ["-s", shlex.quote(frame_size)]
 
-                    errors += 1
+            result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
 
-                processed_frames += 1
+            # some ffmpeg error - log but continue
+            if result.returncode != 0:
+                self.dataset.log(
+                    f"Error extracting frames for video file {video.name}, skipping.")
 
-            self.dataset.update_status(f"Captured frames for {processed_frames} of {num_scenes} scenes")
-            self.dataset.update_progress(processed_frames / self.source_dataset.num_rows)
+                errors += 1
+
+            # the default filenames can be improved - use scene ID instead of frame #
+            for i in range(0, len(scenes[video.name])):
+                frame_file = video_folder.joinpath(f"{video.stem}_frame_{i+1}.jpeg")
+                scene_id = scenes[video.name][i]["id"].split("_").pop()
+                frame_file.rename(frame_file.with_stem(f"{video.stem}_scene_{scene_id}"))
+
+            processed_frames += len(scenes[video.name])
+
+            self.dataset.update_status(f"Captured frames for {processed_frames:,} of {num_scenes:,} scenes")
+            self.dataset.update_progress(processed_frames / num_scenes)
 
         # Finish up
         # We've created a directory and folder structure here as opposed to a single folder with single files as

@@ -13,7 +13,7 @@ from common.lib.logger import Logger
 
 from common.config_manager import config
 
-def run(as_daemon=True):
+def run(as_daemon=True, log_level="INFO"):
 	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
 
 	if as_daemon:
@@ -49,9 +49,9 @@ def run(as_daemon=True):
 	if config.get("USING_DOCKER"):
 		as_daemon = True
 		# Rename log if Docker setup
-		log = Logger(output=True, filename='backend_4cat.log')
+		log = Logger(output=True, filename='backend_4cat.log', log_level=log_level)
 	else:
-		log = Logger(output=not as_daemon)
+		log = Logger(output=not as_daemon, filename='4cat.log', log_level=log_level)
 
 	log.info("4CAT Backend started, logger initialised")
 	db = Database(logger=log, appname="main",
