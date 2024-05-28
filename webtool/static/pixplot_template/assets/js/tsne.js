@@ -621,6 +621,7 @@ Layout.prototype.showHideUmapInputs = function() {
 }
 
 Layout.prototype.getNNeighborsOptions = function() {
+  if (!data.layouts.umap) return [];
   var options = data.layouts.umap.variants.reduce(function(obj, i) {
     obj[i.n_neighbors] = true;
     return obj;
@@ -631,6 +632,7 @@ Layout.prototype.getNNeighborsOptions = function() {
 }
 
 Layout.prototype.getMinDistOptions = function() {
+  if (!data.layouts.umap) return [];
   var options = data.layouts.umap.variants.reduce(function(obj, i) {
     obj[i.min_dist] = true;
     return obj;

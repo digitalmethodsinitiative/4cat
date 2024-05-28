@@ -52,7 +52,7 @@ class ImagePlotGenerator(BasicProcessor):
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
-        # Update the amount max and help from config
+        # Update the amount max and help from config`
         options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
@@ -61,6 +61,16 @@ class ImagePlotGenerator(BasicProcessor):
                 "default": 1000,
                 "tooltip": "0 will use all images."
             },
+            # "image_size": {
+            #     "type": UserInput.OPTION_CHOICE,
+            #     "help": "Thumbnail Size",
+            #     "options": {
+            #         "64": "64px small",
+            #         "128": "128px medium",
+            #         "256": "256px large",
+            #     },
+            #     "default": "128"
+            # },
         }
 
         # If we have a parent dataset and this dataset has metadata, we can use the metadata to create a category layout
@@ -156,14 +166,15 @@ class ImagePlotGenerator(BasicProcessor):
 
         # Create the UMAP map
         # TODO: Create a UMAP. And add options for different types.
-        # TODO: hide UMAP view somehow if not used; currently it is just the grid map repeated
-        # We'll use the gridmap in place of the UMAP map for now.
+        # This uses the gridmap in place of the UMAP map, but we do not need it.
         umap_maps = [{
                     "n_neighbors": 3,
                     "min_dist": 1,
                     "positions": grid_map,
                     "positions_jittered": grid_map,
                     }]
+        # TODO: Add UMAP options
+        umap_maps = []
 
         mappings = {"grid": grid_map}
         labels = {}
@@ -282,9 +293,7 @@ class ImagePlotGenerator(BasicProcessor):
             "plot_id": plot_id,
             "output_directory": root,
             "layouts": {
-                "umap": {
-                    "variants": []
-                },
+                "umap": False,
                 "alphabetic": False,
                 "grid": False,
                 "categorical": False,
@@ -292,7 +301,7 @@ class ImagePlotGenerator(BasicProcessor):
                 "geographic": None,
                 "custom": None
             },
-            "initial_layout": "umap",
+            "initial_layout": "grid",
             "point_sizes": {},
             "imagelist": f"{root}/data/imagelists/imagelist-{plot_id}.json",
             "atlas_dir": f"{root}/data/atlases/{plot_id}",
@@ -309,6 +318,11 @@ class ImagePlotGenerator(BasicProcessor):
             },
             "creation_data": datetime.datetime.now().strftime("%d-%B-%Y-%H:%M:%S")
         }
+
+        if umap:
+            manifest["layouts"]["umap"] = {
+                "variants": []
+            }
 
         # create atlases
         imagelist = {
