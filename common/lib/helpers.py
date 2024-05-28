@@ -20,6 +20,7 @@ from collections.abc import MutableMapping
 from html.parser import HTMLParser
 from pathlib import Path
 from calendar import monthrange
+from packaging import version
 
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -207,6 +208,24 @@ def get_github_version(timeout=5):
         latest_tag = re.sub(r"^v", "", latest_tag)
 
     return (latest_tag, response.get("html_url"))
+
+def get_ffmpeg_version(ffmpeg_path):
+    """
+    Determine ffmpeg version
+
+    This can be necessary when using commands that change name between versions.
+
+    :param ffmpeg_path: ffmpeg executable path
+    :return packaging.version:  Comparable ersion
+    """
+    command = [ffmpeg_path, "-version"]
+    ffmpeg_version = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+
+    ffmpeg_version = ffmpeg_version.stdout.decode("utf-8").split("\n")[0].strip().split(" version ")[1]
+    ffmpeg_version = re.split(r"[^0-9.]", ffmpeg_version)[0]
+
+    return version.parse(ffmpeg_version)
 
 
 def convert_to_int(value, default=0):

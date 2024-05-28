@@ -25,6 +25,8 @@ class TempFileCleaner(BasicWorker):
     type = "clean-temp-files"
     max_workers = 1
 
+    ensure_job = {"remote_id": "localhost", "interval": 10800}
+
     def work(self):
         """
         Go through result files, and for each one check if it should still

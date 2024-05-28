@@ -256,7 +256,7 @@ class VideoSceneDetector(BasicProcessor):
 							continue
 						# List types are not super fun for CSV
 						if 'post_ids' in video_data:
-							video_data['post_ids'] = ','.join(video_data['post_ids'])
+							video_data['post_ids'] = ','.join([str(i) for i in video_data['post_ids']])
 
 						for i, scene in enumerate(collected_scenes[file.get('filename')]):
 							rows.append({

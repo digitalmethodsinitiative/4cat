@@ -43,7 +43,7 @@ which you can collect data to import into 4CAT for analysis:
 * LinkedIn
 * Gab
 * Douyin
-* Twitter
+* X/Twitter
 
 It is also possible to upload data collected with other tools as CSV files. The
 following tools are explicitly supported but other data can also be uploaded as

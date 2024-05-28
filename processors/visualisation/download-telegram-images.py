@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from telethon import TelegramClient
+from telethon.errors import TimedOutError
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
@@ -165,6 +166,7 @@ class TelegramImageDownloader(BasicProcessor):
         self.dataset.update_status("Finding messages with image attachments")
         for message in self.source_dataset.iterate_items(self):
             if self.interrupted:
+                await client.disconnect()
                 raise ProcessorInterruptedException("Interrupted while processing messages")
 
             if not message.get("attachment_data") or message.get("attachment_type") not in downloadable_types:
@@ -204,7 +206,7 @@ class TelegramImageDownloader(BasicProcessor):
                             await client.download_media(message, str(path), thumb=-1)
                         msg_id = message.id
                         success = True
-                    except (AttributeError, RuntimeError, ValueError, TypeError) as e:
+                    except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError) as e:
                         filename = f"{entity}-index-{media_done}"
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download image for message {msg_id} ({e})")
@@ -221,6 +223,8 @@ class TelegramImageDownloader(BasicProcessor):
             except ValueError as e:
                 self.dataset.log(f"Couldn't retrieve images for {entity}, it probably does not exist anymore ({e})")
                 self.flawless = False
+
+        await client.disconnect()
 
     @staticmethod
     def cancel_start():

@@ -68,7 +68,7 @@ class Tokenise(BasicProcessor):
 		"""
 		options = {
 			"columns": {
-				"type": UserInput.OPTION_TEXT,
+				"type": UserInput.OPTION_MULTI,
 				"help": "Column(s) to tokenise",
 				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
 			},

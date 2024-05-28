@@ -53,7 +53,7 @@ class SearchTikTokComments(Search):
             "timestamp": item_datetime,
             "unix_timestamp": item["create_time"],
             "likes": item["digg_count"],
-            "replies": item["reply_comment_total"],
+            "replies": item.get("reply_comment_total", 0),
             "post_id": item["aweme_id"],
             "post_url": item["share_info"]["url"].split(".html")[0],
             "post_body": item["share_info"]["title"],
