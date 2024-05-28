@@ -10,6 +10,7 @@ from pathlib import Path
 cli = argparse.ArgumentParser()
 cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
                  action="store_true")
+cli.add_argument("--log-level", "-l", default="INFO", help="Set log level (\"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
 cli.add_argument("--no-version-check", "-n", default=False,
                  help="Skip version check that may prompt the user to migrate first.", action="store_true")
 cli.add_argument("command")
@@ -81,14 +82,14 @@ if os.name not in ("posix",):
     print("Running backend in interactive mode instead.")
     import backend.bootstrap as bootstrap
 
-    bootstrap.run(as_daemon=False)
+    bootstrap.run(as_daemon=False, log_level=args.log_level)
     sys.exit(0)
 
 if args.interactive:
     print("Running backend in interactive mode.")
     import backend.bootstrap as bootstrap
 
-    bootstrap.run(as_daemon=False)
+    bootstrap.run(as_daemon=False, log_level=args.log_level)
     sys.exit(0)
 else:
     # if so, import necessary modules
@@ -129,7 +130,7 @@ def start():
                 detach_process=True
         ) as context:
             import backend.bootstrap as bootstrap
-            bootstrap.run(as_daemon=True)
+            bootstrap.run(as_daemon=True, log_level=args.log_level)
 
         sys.exit(0)
 
