@@ -37,7 +37,7 @@ def show_scheduler(page):
     # Most recent schedulers w/ pagination
     if depth == "all":
         # Get all scheduler jobs
-        query = "SELECT scheduler_id, max(created_at) last_created, jobtype FROM scheduled_jobs GROUP BY scheduler_id, jobtype LIMIT %s OFFSET %s"
+        query = "SELECT scheduler_id, max(created_at) last_created, jobtype FROM scheduled_jobs GROUP BY scheduler_id, jobtype ORDER BY last_created DESC LIMIT %s OFFSET %s"
         replacements = [page_size, offset]
         scheduler_results = db.fetchall(query, tuple(replacements))
 
@@ -47,7 +47,7 @@ def show_scheduler(page):
 
     elif depth == "current" and scheduler_job_ids:
         # Get current scheduler results
-        query = "SELECT scheduler_id, max(created_at) last_created, jobtype FROM scheduled_jobs WHERE scheduler_id IN %s GROUP BY scheduler_id, jobtype LIMIT %s OFFSET %s"
+        query = "SELECT scheduler_id, max(created_at) last_created, jobtype FROM scheduled_jobs WHERE scheduler_id IN %s GROUP BY scheduler_id, jobtype ORDER BY last_created DESC LIMIT %s OFFSET %s"
         replacements = [scheduler_job_ids, page_size, offset]
         scheduler_results = db.fetchall(query, tuple(replacements))
 
