@@ -4,14 +4,17 @@
 import json
 import csv
 import io
+import mimetypes
+import zipfile
 
 import flask
 import json_stream
+import markupsafe
 from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
-    url_for, stream_with_context
+    url_for, stream_with_context, Response
 from flask_login import login_required, current_user
 
-from webtool import app, db, config
+from webtool import app, db, config, log
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
@@ -23,7 +26,6 @@ from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
-
 
 @app.route('/create-dataset/')
 @login_required
@@ -153,8 +155,6 @@ def show_results(page):
 """
 Downloading results
 """
-
-
 @app.route('/result/<path:query_file>')
 def get_result(query_file):
     """
@@ -164,6 +164,33 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
+    if ".zip" in query_file and not query_file.endswith(".zip"):
+        def generate_file(archive_path, archived_file):
+            with zipfile.ZipFile(archive_path, "r") as archive:
+                archive_contents = sorted(archive.namelist())
+
+                if archived_file in archive_contents:
+                    info = archive.getinfo(archived_file)
+                    if info.is_dir():
+                        return None
+
+                    with archive.open(archived_file, "r") as temp_file:
+                        for row in temp_file:
+                            yield row
+                else:
+                    return None
+
+        archived_file = query_file.split(".zip/")[1].lstrip("/")
+        mime_type, _ = mimetypes.guess_type(archived_file)
+
+        generator = generate_file(archive_path=config.get("PATH_ROOT").joinpath(config.get("PATH_DATA")).joinpath(query_file.split(".zip")[0].split("/")[-1] + ".zip"),
+                                      archived_file= archived_file)
+        first_value = next(generator, None)
+        if first_value is None:
+            return error(404, error="File not found.")
+
+        return Response((first_value, *generator), mimetype=mime_type)
+
     return send_from_directory(directory=config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')), path=query_file)
 
 
@@ -284,8 +311,8 @@ def preview_items(key):
             config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
-    preview_size = 1000
-    preview_bytes = (1024 * 1024 * 1)  # 1MB
+    preview_size = int(request.args.get('max_items', 1000))
+    preview_bytes = (1024 * 1024 * int(request.args.get('mb', 1)))  # 1MB
 
     processor = dataset.get_own_processor()
     if not processor:
@@ -297,7 +324,39 @@ def preview_items(key):
     has_mapper = hasattr(processor, "map_item")
     use_mapper = has_mapper and config.get("ui.prefer_mapped_preview")
 
-    if dataset.get_extension() == "gexf":
+    if dataset.get_extension() == "html":
+        # html files
+        return get_result(dataset.get_results_path().name)
+
+    elif dataset.get_extension() == "zip":
+        # Check if zip can use pixplot template
+        if hasattr(processor, "is_plot") and processor.is_plot:
+            return view_image_plot(dataset.key)
+
+        # Check if a children are plotable (e.g., a plot was created from the zip)
+        for child in dataset.get_children(instantiate_datasets=True):
+            child_processor = child.get_own_processor()
+            if hasattr(child_processor, "is_plot") and child_processor.is_plot:
+                return view_image_plot(child.key)
+            # TODO: Better way to identify this edge case?
+            elif child.type.startswith("image-downloader"):
+                # Images were downloaded from this zip; this is the case for presets
+                for grandkid in child.get_children(instantiate_datasets=True):
+                    grandkid_processor = grandkid.get_own_processor()
+                    if hasattr(grandkid_processor, "is_plot") and grandkid_processor.is_plot:
+                        return view_image_plot(grandkid.key)
+
+        # List files in zip w/ links
+        rows = [["Files"]]
+        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive:
+            archive_contents = sorted(archive.namelist())
+            [rows.append([markupsafe.Markup(f"<a href='{url_for('get_result', query_file=dataset.get_results_path().name + '/' + file)}'>{file}</a>")]) for file in archive_contents]
+
+        return render_template("preview/csv.html", rows=rows, max_items=preview_size,
+                               dataset=dataset)
+
+
+    elif dataset.get_extension() == "gexf":
         # network files
         # use GEXF preview panel which loads full data file client-side
         hostname = config.get("flask.server_name").split(":")[0]
@@ -561,3 +620,20 @@ def keep_dataset(key):
 
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
     return redirect(url_for("show_result", key=key))
+
+@app.route("/results/<string:key>/plot/")
+@login_required
+def view_image_plot(key):
+    try:
+        dataset = DataSet(key=key, db=db)
+    except DataSetException:
+        return error(404, error="Dataset not found.")
+
+    if dataset.is_private and not (
+            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+        return error(403, error="This dataset is private.")
+
+    if not dataset.type.startswith("image-downloader") and not dataset.type.startswith("custom-image-plot") and not dataset.type.startswith("pix-plot"):
+        return error(403, error="This dataset is not an image dataset.")
+
+    return render_template("pixplot.html", dataset=dataset)

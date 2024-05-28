@@ -83,11 +83,10 @@ class ImageWallGenerator(BasicProcessor):
 			},
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "Max images per category",
+				"help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
 				"default": 10 if max_number_images == 0 else min(max_number_images, 10),
 				"min": 0 if max_number_images == 0 else 1,
 				"max": max_number_images,
-				"tooltip": "'0' uses as many images as available in the archive" + (f" (up to {max_number_images})" if max_number_images != 0 else "")
 			},
 			"height": {
 				"type": UserInput.OPTION_TEXT,
@@ -99,6 +98,9 @@ class ImageWallGenerator(BasicProcessor):
 				"max": max_pixels
 			}
 		}
+		if max_number_images == 0:
+			options['amount']['tooltip'] = "'0' will use all available images"
+			options['amount'].pop('max')
 
 		if parent_dataset is None:
 			return options

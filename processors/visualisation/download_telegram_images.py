@@ -36,6 +36,7 @@ class TelegramImageDownloader(BasicProcessor):
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     flawless = True
+    is_hidden = True # hide from UI; this processor is called by the preset TelegramImageDownloaderPreset
 
     config = {
         "image-downloader-telegram.max": {
@@ -61,12 +62,12 @@ class TelegramImageDownloader(BasicProcessor):
         """
         max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
 
-        return {
+        options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": f"No. of images (max {max_number_images:,})",
+                "help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
                 "default": 100,
-                "min": 0,
+                "min": 0 if max_number_images == 0 else 1,
                 "max": max_number_images
             },
             "video-thumbnails": {
@@ -81,7 +82,11 @@ class TelegramImageDownloader(BasicProcessor):
                 "tooltip": "This includes e.g. thumbnails for linked YouTube videos"
             }
         }
+        if max_number_images == 0:
+            options['amount']['tooltip'] = "'0' will use all available images"
+            options['amount'].pop('max')
 
+        return options
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
@@ -94,9 +99,9 @@ class TelegramImageDownloader(BasicProcessor):
             # we need these to actually instantiate a telegram client and
             # download the images
             return module.type == "telegram-search" and \
-                   "api_phone" in module.parameters and \
-                   "api_id" in module.parameters and \
-                   "api_hash" in module.parameters
+                "api_phone" in module.parameters and \
+                "api_id" in module.parameters and \
+                "api_hash" in module.parameters
         else:
             return module.type == "telegram-search"
 

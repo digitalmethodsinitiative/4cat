@@ -9,7 +9,6 @@ https://ffmpeg.org/
 import shutil
 import subprocess
 import shlex
-
 from packaging import version
 
 from common.config_manager import config

@@ -28,6 +28,9 @@ __email__ = "4cat@oilab.eu"
 
 class ImageDownloader(BasicProcessor):
 	"""
+	NOTE: The image-download-preset.py file is a preset for this processor and automatically runs the cartographer in
+	addition to downloading the images. This processor is marked as "not compatible" so it does not appear in the UI.
+
 	Image downloader
 
 	Downloads top images and saves as zip archive
@@ -40,13 +43,14 @@ class ImageDownloader(BasicProcessor):
 				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
 				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	is_hidden = True # hide in UI; processor is called by ImageDownloaderPreset
 
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "No. of images (max 1000)",
 			"default": 100,
-			"min": 0,
+			"min": 1,
 			"max": 1000
 		},
 		"columns": {
@@ -96,8 +100,14 @@ class ImageDownloader(BasicProcessor):
 
 		# Update the amount max and help from config
 		max_number_images = int(config.get('image-downloader.max', 1000, user=user))
-		options['amount']['max'] = max_number_images
-		options['amount']['help'] = "No. of images (max %s)" % max_number_images
+		if max_number_images > 0:
+			options['amount']['max'] = max_number_images
+			options['amount']['help'] = "No. of images (max %s)" % max_number_images
+		else:
+			options['amount']['help'] = "No. of images"
+			options['amount']['tooltip'] = "'0' will use all available images"
+			options['amount']['min'] = 0
+			options['amount'].pop('max')
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():
@@ -121,12 +131,13 @@ class ImageDownloader(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow processor on top image rankings
+        Allow processor on top image rankings, collectors, but not specific collectors with their own image
+        collection methods
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
+        :param module: Dataset or processor to determine compatibility with
+        """
 		return (module.type == "top-images" or module.is_from_collector()) \
-			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
+			and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
 
 	def process(self):
 		"""
@@ -263,6 +274,7 @@ class ImageDownloader(BasicProcessor):
 		downloaded_images = 0
 		processed_urls = 0
 		failures = []
+		max_images = amount if amount != 0 else len(urls)
 		for url in urls:
 			if amount != 0 and downloaded_images >= amount:
 				break
@@ -273,8 +285,8 @@ class ImageDownloader(BasicProcessor):
 
 			processed_urls += 1
 			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
-									   (downloaded_images, amount, url))
-			self.dataset.update_progress(downloaded_images / amount)
+									   (downloaded_images, max_images, url))
+			self.dataset.update_progress(downloaded_images / max_images)
 
 			try:
 				# acquire image
