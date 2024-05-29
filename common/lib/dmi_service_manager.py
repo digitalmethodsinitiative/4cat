@@ -16,6 +16,8 @@ __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
+from common.lib.helpers import strip_tags
+
 
 class DmiServiceManagerException(Exception):
     """
@@ -29,6 +31,12 @@ class DsmOutOfMemory(DmiServiceManagerException):
     """
     pass
 
+
+class DsmConnectionError(DmiServiceManagerException):
+    """
+    Raised when there is a problem with the configuration settings.
+    """
+    pass
 
 class DmiServiceManager:
     """
@@ -60,12 +68,17 @@ class DmiServiceManager:
         api_endpoint = self.server_address + "check_gpu_mem/" + service_endpoint
         resp = requests.get(api_endpoint, timeout=30)
         if resp.status_code == 200:
-            return True, resp.json()
-        elif resp.status_code in [400, 404, 500, 503]:
-            return False, resp.json()
+            return resp.json()
+        elif resp.status_code == 503:
+            # TODO: retry later (increase delay in dmi_service_manager class and interrupt w/ retry)? DSM could possibly manage jobs in queue
+            # Processor could run CPU mode, but DSM needs to run different container (container fails if GPU enabled but not available)
+            raise DsmOutOfMemory("DMI Service Manager server out of GPU memory.")
         else:
-            self.processor.log.warning("Unknown response from DMI Service Manager: %s" % resp.text)
-            return False, None
+            try:
+                reason = resp.json()['reason']
+            except JSONDecodeError:
+                reason = strip_tags(resp.text)
+            raise DsmConnectionError(f"Connection Error {resp.status_code}: {reason}")
 
     def process_files(self, input_file_dir, filenames, output_file_dir, server_file_collection_name, server_results_folder_name):
         """

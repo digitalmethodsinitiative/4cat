@@ -119,8 +119,8 @@ class VideoHasher(BasicProcessor):
 	"""
 	type = "video-hasher-1"  # job type ID
 	category = "Visual"  # category
-	title = "Create Video colleges"  # title displayed in UI
-	description = "Creates colleges from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
+	title = "Create Video collages"  # title displayed in UI
+	description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
@@ -250,7 +250,7 @@ class VideoHasher(BasicProcessor):
 						'video_hash': video_hash.hash,
 						'video_duration': video_hash.video_duration,
 						'video_count': len(data.get('post_ids', [])),
-						"post_ids": ','.join(data.get("post_ids", [])),
+						"post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
 						'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
 					})
 					num_posts += 1

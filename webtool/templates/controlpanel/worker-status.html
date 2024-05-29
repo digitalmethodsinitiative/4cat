@@ -2,13 +2,15 @@
 {% for worker in workers %}
     {% set worker_uniqid = uniqid() %}
     <li>
-    <h4>
-        {% if worker.type in worker_types and worker_types[worker.type]|hasattr("title") %}{{ worker_types[worker.type]|attr("title") }}{% else %}{{ worker.type }}{% endif %}
-        {% if worker.is_recurring %}<i class="fa fa-recycle tooltip-trigger" aria-hidden="true" aria-controls="tooltip-recurring-{{ worker_uniqid }}"></i> <p role="tooltip" id="tooltip-recurring-{{ worker_uniqid }}">Recurring worker</p>{% endif %}
-        {% if worker.dataset_parent_key %}<a class="tooltip-trigger" href="{{ url_for('show_result', key=worker.dataset_parent_key) }}" aria-controls="tooltip-worker-{{ worker_uniqid }}"><i class="fa fa-link" aria-label="tooltip-dataset-{{ worker_uniqid }}"></i></a> <span role="tooltip" id="tooltip-worker-{{ worker_uniqid }}">Processor (click to view parent dataset)</span>{% endif %}
-        {% if worker.dataset_user %}<i class="tooltip-trigger fa fa-user" aria-controls="tooltip-user-{{ worker_uniqid }}"></i></i> <span role="tooltip" id="tooltip-user-{{ worker_uniqid }}">Processor queued by {{ worker.dataset_user }}</span>{% endif %}
-    </h4>
-    <p>Started {{ (now - worker.timestamp_claimed)|int|timify }} ago</p>
+        <div {% if worker.dataset and worker.dataset.progress and worker.dataset.progress > 0 and not worker.dataset.is_finished() %}class="progress progress-{{ (worker.dataset.progress * 100)|round(0)|int }}"{% endif %}>
+            <h4>
+                {% if worker.type in worker_types and worker_types[worker.type]|hasattr("title") %}{{ worker_types[worker.type]|attr("title") }}{% else %}{{ worker.type }}{% endif %}
+                {% if worker.is_recurring %}<i class="fa fa-recycle tooltip-trigger" aria-hidden="true" aria-controls="tooltip-recurring-{{ worker_uniqid }}"></i> <p role="tooltip" id="tooltip-recurring-{{ worker_uniqid }}">Recurring worker</p>{% endif %}
+                {% if worker.dataset_parent_key %}<a class="tooltip-trigger" href="{{ url_for('show_result', key=worker.dataset_parent_key) }}" aria-controls="tooltip-worker-{{ worker_uniqid }}"><i class="fa fa-link" aria-label="tooltip-dataset-{{ worker_uniqid }}"></i></a> <span role="tooltip" id="tooltip-worker-{{ worker_uniqid }}">Processor (click to view parent dataset)</span>{% endif %}
+                {% if worker.dataset_user %}<i class="tooltip-trigger fa fa-user" aria-controls="tooltip-user-{{ worker_uniqid }}"></i></i> <span role="tooltip" id="tooltip-user-{{ worker_uniqid }}">Processor queued by {{ worker.dataset_user }}</span>{% endif %}
+            </h4>
+            <p>Started {{ (now - worker.timestamp_claimed)|int|timify }} ago</p>
+        </div>
     </li>
 {% endfor %}
 </ol>

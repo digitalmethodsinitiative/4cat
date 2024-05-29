@@ -5,7 +5,8 @@ import os
 import json
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, \
+    DsmConnectionError
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -159,14 +160,15 @@ class AudioToText(BasicProcessor):
         # Initialize DMI Service Manager
         dmi_service_manager = DmiServiceManager(processor=self)
 
-        # Check GPU memory available
-        gpu_memory, info = dmi_service_manager.check_gpu_memory_available("whisper")
-        if not gpu_memory:
-            if info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
-                self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
-            elif int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
-                self.dataset.finish_with_error("DMI Service Manager currently busy; no GPU memory available. Please try again later.")
-                return
+        # Check connection and GPU memory available
+        try:
+            gpu_response = dmi_service_manager.check_gpu_memory_available("whisper")
+        except DmiServiceManagerException as e:
+            return self.dataset.finish_with_error(str(e))
+
+        if int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+            self.dataset.finish_with_error("DMI Service Manager currently busy; no GPU memory available. Please try again later.")
+            return
 
         # Provide audio files to DMI Service Manager
         # Results should be unique to this dataset
