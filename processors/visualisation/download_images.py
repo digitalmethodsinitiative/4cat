@@ -263,6 +263,7 @@ class ImageDownloader(BasicProcessor):
 		downloaded_images = 0
 		processed_urls = 0
 		failures = []
+		total_images = len(urls) if amount == 0 else amount
 		for url in urls:
 			if amount != 0 and downloaded_images >= amount:
 				break
@@ -273,8 +274,8 @@ class ImageDownloader(BasicProcessor):
 
 			processed_urls += 1
 			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
-									   (downloaded_images, amount, url))
-			self.dataset.update_progress(downloaded_images / amount)
+									   (downloaded_images, total_images, url))
+			self.dataset.update_progress(downloaded_images / total_images)
 
 			try:
 				# acquire image
