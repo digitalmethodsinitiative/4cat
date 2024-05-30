@@ -225,7 +225,7 @@ class ImageWallGenerator(BasicProcessor):
 
 				if category_type == str:
 					post_category = post.get(category_column)
-					if post_category == "":
+					if post_category == "" or post_category is None:
 						post_category = "None"
 					if post_category not in categories:
 						categories[post_category] = [{"id": post.get("id")}]
