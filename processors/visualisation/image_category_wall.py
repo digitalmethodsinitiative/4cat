@@ -185,7 +185,7 @@ class ImageWallGenerator(BasicProcessor):
 				image_data = json.load(file)
 			filename_map = {post_id: staging_area.joinpath(image.get("filename")) for image in image_data.values()
 							if image.get("success") for post_id in image.get("post_ids")}
-		self.dataset.log(filename_map)
+
 		# Organize posts into categories
 		category_type = None
 		categories = {}
@@ -200,10 +200,7 @@ class ImageWallGenerator(BasicProcessor):
 				continue
 
 			# Identify category type and collect post_category
-			if post.get(category_column) is None:
-				self.dataset.finish_with_error("Unable to find category column in dataset")
-				return
-			elif special_case and category_column == "top_categories":
+			if special_case and category_column == "top_categories":
 				if category_type is None:
 					category_type = float
 				# Special case
@@ -218,8 +215,11 @@ class ImageWallGenerator(BasicProcessor):
 			else:
 				if category_type is None:
 					try:
-						float(post.get(category_column))
-						category_type = float
+						if post.get(category_column) is None:
+							category_type = str
+						else:
+							float(post.get(category_column))
+							category_type = float
 					except ValueError:
 						category_type = str
 
@@ -232,6 +232,9 @@ class ImageWallGenerator(BasicProcessor):
 					else:
 						categories[post_category].append({"id": post.get("id")})
 				elif category_type == float:
+					if post.get(category_column) is None:
+						self.dataset.log(f"Post {post.get('id')} has no data; skipping")
+						continue
 					try:
 						post_category = float(post.get(category_column))
 						post_values.append((post_category, post.get("id")))
@@ -240,7 +243,7 @@ class ImageWallGenerator(BasicProcessor):
 						raise ProcessorException(
 							f"Mixed category types detected; unable to render image wall (item {i} {post_category})")
 
-		if len(categories) == 0:
+		if len(categories) == 0 and len(post_values) == 0:
 			self.dataset.finish_with_error("No categories found")
 			return
 
