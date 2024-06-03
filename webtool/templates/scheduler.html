@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+
+{% block title %}Job Scheduler{% endblock %}
+{% block body_class %}result-list plain-page{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
+
+{% block body %}
+    <article>
+        <section>
+            <h2><span>Scheduled Jobs</span></h2>
+            <nav class="tabs">
+                <ul>
+                    <li{% if depth == "current" %} class="current"{% endif %}><a href="{{ url_for('show_scheduler') }}?&amp;depth=current">Current Jobs</a></li>
+                    <li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_scheduler') }}?&amp;depth=all">All</a></li>
+                </ul>
+            </nav>
+        {% if schedulers %}
+            <ol class="result-list">
+                {% for job in schedulers %}
+                    <li id="{{ job.get('scheduler_id') }}" class="result" data-key="{{ job.get('scheduler_id') }}">
+                        <div class="property-container">
+                            <div class="result">
+                                <h4>Job type: {{ job.get('jobtype') }}</h4>
+                                <h4>Label: {{ job.get('label') }}</h4>
+
+                                {% if job.get("last_created") %}
+                                    <h5>Last dataset scheduled: {{ job.get('last_created')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h5>
+                                {% endif %}
+                                    <h5>Number of datasets: {{ job.get('number_datasets')}}</h5>
+                                    <h5>Active: {{ job.get('active') }}</h5>
+                                {% if job.get('active') %}
+                                    <a href="{{ url_for('delete_job', job_id=job.get('scheduler_id')) }}" class="confirm-first"
+                                   data-confirm-action="delete this job"><i class="fas fa-trash-alt"
+                                                                                aria-hidden="true"></i>
+                                    Delete scheduler</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if job.get('number_datasets') > 0 %}
+                        <div class="processor-container view-datasets">
+                            <a class="button-like view-datsets" href="{{ url_for('view_scheduler_datasets', scheduler_id=job.get('scheduler_id'), page=1) }}">
+                                <i class="fas fa-plus" aria-hidden="true"></i>
+                                View datasets
+                                <span class="sr-only">View datasets</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p class="banner">No{% if depth == "current" %} currently{% endif %} scheduled jobs available.</p>
+        {% endif %}
+        </section>
+    </article>
+    {% include "components/pagination.html" %}
+{% endblock %}

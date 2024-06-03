@@ -73,7 +73,7 @@ class ModuleCollector:
             if object.__name__ in("BasicProcessor", "BasicWorker") or inspect.isabstract(object):
                 # ignore abstract and base classes
                 return False
-                
+
             if hasattr(object, "is_4cat_class"):
                 if only_processors:
                     if hasattr(object, "is_4cat_processor"):
@@ -82,7 +82,7 @@ class ModuleCollector:
                         return False
                 else:
                     return object.is_4cat_class()
-        
+
         return False
 
     def load_modules(self):

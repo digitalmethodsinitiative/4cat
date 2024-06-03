@@ -1,2 +1,5 @@
-# Do not copy data files on build
 data/
+.github/
+.ipynb_checkpoints/
+.gitignore
+.idea/

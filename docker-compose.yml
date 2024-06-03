@@ -39,6 +39,8 @@ services:
     image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
     container_name: 4cat_frontend
     restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       - db
       - backend
@@ -49,7 +51,7 @@ services:
       - 4cat_data:/usr/src/app/data/
       - 4cat_config:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
-    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "4", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
+    command: ["docker/wait-for-backend.sh"]
 
 volumes:
   4cat_db:

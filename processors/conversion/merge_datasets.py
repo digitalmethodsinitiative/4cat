@@ -8,6 +8,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, DataSetException
 from common.lib.helpers import UserInput
+from common.lib.item_mapping import MappedItem
 import ural
 
 __author__ = "Stijn Peeters"
@@ -83,6 +84,8 @@ class DatasetMerger(BasicProcessor):
         """
         source_datasets = [self.source_dataset]
         total_items = self.source_dataset.num_rows
+        warnings = {}
+
         for source_dataset in self.parameters.get("source").replace("\n", ",").split(","):
             source_dataset_url = source_dataset.strip()
             try:
@@ -130,10 +133,22 @@ class DatasetMerger(BasicProcessor):
         seen_ids = set()
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
             for dataset in source_datasets:
+                warnings[dataset.key] = {}
+
                 try:
-                    for original_item, mapped_item in dataset.iterate_mapped_items():
+                    for original_item, mapped_item in dataset.iterate_mapped_objects():
                         if self.interrupted:
                             raise ProcessorInterruptedException("Interrupted while mapping duplicates")
+
+                        if type(mapped_item) is MappedItem:
+                            # use the item data, but also store the warning if
+                            # one was raised during mapping
+                            warning = mapped_item.get_message()
+                            if warning:
+                                if warning not in warnings[dataset.key]:
+                                    warnings[dataset.key][warning] = 0
+                                warnings[dataset.key][warning] += 1
+                            mapped_item = mapped_item.get_item_data()
 
                         if not canonical_fieldnames:
                             canonical_fieldnames = set(mapped_item.keys())
@@ -168,9 +183,22 @@ class DatasetMerger(BasicProcessor):
                 except NotImplementedError:
                     self.dataset.finish_with_error(f"Datasets comprising {dataset.get_extension()} files cannot be merged. You can only merge NDJSON or CSV datasets.")
 
+        # log any raised warnings to dataset log
+        num_warnings = sum([sum(w.values()) for w in warnings.values()])
+        if num_warnings > 0:
+            for dataset, dataset_warnings in warnings.items():
+                if sum(dataset_warnings.values()) == 0:
+                    continue
+
+                self.dataset.log(f"The following warning(s) were raised while processing items from dataset {dataset}:")
+                for dataset_warning, num_items in dataset_warnings.items():
+                    self.dataset.log(f"  {dataset_warning} ({num_items:,} item(s))")
+
         # phew, finally done
-        self.dataset.update_status(f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped)",
+        self.dataset.update_status(f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped, {num_warnings:,} warnings). See dataset log for details.",
                                    is_final=True)
+
+
         self.dataset.update_progress(1)
 
         self.dataset.finish(processed)

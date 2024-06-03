@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 import logging
 
 from functools import partial
@@ -40,12 +41,16 @@ app = Flask(__name__)
 proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
 app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
-# Set up logging for Gunicorn; only run w/ Docker
 if config.get("USING_DOCKER"):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
     log = Logger(filename='frontend_4cat.log')
 
+else:
+    log = Logger()
+
+# Set up logging for Gunicorn
+if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     # Add Gunicorn error log to main app logger
     gunicorn_logger = logging.getLogger('gunicorn.error')
     app.logger.handlers = gunicorn_logger.handlers
@@ -61,9 +66,6 @@ if config.get("USING_DOCKER"):
     logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
-
-else:
-    log = Logger()
 
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
               password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
@@ -104,6 +106,7 @@ import webtool.views.views_user
 
 import webtool.views.views_dataset
 import webtool.views.views_misc
+import webtool.views.views_scheduler
 
 import webtool.views.api_explorer
 import webtool.views.api_standalone

@@ -14,6 +14,7 @@ from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, Dm
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -258,4 +259,10 @@ class ImageTextDetector(BasicProcessor):
         """
         For preview frontend
         """
-        return {"filename": item.get("filename"), "model_type": item.get("model_type"), "text": item.get("simplified_text", {}).get("raw_text"), "post_ids": ", ".join([str(post_id) for post_id in item.get("image_metadata", {}).get("post_ids", [])]), "image_url": item.get("image_metadata", {}).get("url")}
+        return MappedItem({
+            "filename": item.get("filename"),
+            "model_type": item.get("model_type"),
+            "text": item.get("simplified_text", {}).get("raw_text"),
+            "post_ids": ", ".join([str(post_id) for post_id in item.get("image_metadata", {}).get("post_ids", [])]),
+            "image_url": item.get("image_metadata", {}).get("url")
+        })

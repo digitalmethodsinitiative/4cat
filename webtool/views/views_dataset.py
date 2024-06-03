@@ -199,8 +199,6 @@ def get_mapped_result(key):
         # cannot map without a mapping method
         return error(404, error="File not found.")
 
-    mapper = dataset.get_own_processor().map_item
-
     # Also add possibly added annotation items.
     # These cannot be added to the static `map_item` function.
     annotation_labels = None
@@ -319,7 +317,7 @@ def preview_items(key):
         # use map_item if the underlying data is not CSV but JSON
         rows = []
         try:
-            for row in dataset.iterate_items(warn_unmappable=False):
+            for original, row in dataset.iterate_mapped_items(dataset.get_own_processor(), warn_unmappable=False):
                 if len(rows) > preview_size:
                     break
 

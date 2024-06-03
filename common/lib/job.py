@@ -125,6 +125,11 @@ class Job:
 
 		self.is_finished = True
 
+		# Update scheduler table, if job was scheduled
+		if self.details.get("scheduler_id"):
+			self.db.update("scheduled_jobs", data={"status": "finished"},
+						   where={"job_id": self.data["id"], "scheduler_id": self.details["scheduler_id"]})
+
 	def release(self, delay=0, claim_after=0):
 		"""
 		Release a job so it may be claimed again
@@ -150,6 +155,14 @@ class Job:
 		:return bool: If the job is not claimed yet and also isn't finished.
 		"""
 		return not self.is_claimed and not self.is_finished
+
+	def update_interval(self, interval):
+		"""
+		Change the interval for a job
+		"""
+		self.db.update("jobs", data={"interval": interval},
+					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+		self.data["interval"] = interval
 
 	def get_place_in_queue(self):
 		"""

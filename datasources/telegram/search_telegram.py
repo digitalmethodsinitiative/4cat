@@ -15,6 +15,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
+from common.lib.item_mapping import MappedItem
 from common.config_manager import config
 
 from datetime import datetime
@@ -43,11 +44,12 @@ class SearchTelegram(Search):
     details_cache = None
     failures_cache = None
     eventloop = None
-    flawless = 0
+    import_issues = 0
     end_if_rate_limited = 600  # break if Telegram requires wait time above number of seconds
 
     max_workers = 1
     max_retries = 3
+    flawless = 0
 
     options = {
         "intro": {
@@ -592,7 +594,7 @@ class SearchTelegram(Search):
                         if chat["id"] == channel_id or channel_id is None:
                             forwarded_username = chat["username"]
 
-        msg = {
+        return MappedItem({
             "id": message["id"],
             "thread_id": thread,
             "chat": message["_chat"]["username"],
@@ -616,9 +618,7 @@ class SearchTelegram(Search):
             "attachment_type": attachment_type,
             "attachment_data": attachment_data,
             "attachment_filename": attachment_filename
-        }
-
-        return msg
+        })
 
     @staticmethod
     def get_media_type(media):

@@ -8,7 +8,7 @@ import datetime
 import re
 
 from backend.lib.search import Search
-from common.lib.helpers import UserInput
+from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import WorkerInterruptedException, MapItemException
 
 
@@ -67,9 +67,9 @@ class SearchInstagram(Search):
         is_graph_response = "__typename" in item and item["__typename"] not in ("XDTMediaDict",)
 
         if is_graph_response:
-            return SearchInstagram.parse_graph_item(item)
+            return MappedItem(SearchInstagram.parse_graph_item(item))
         else:
-            return SearchInstagram.parse_itemlist_item(item)
+            return MappedItem(SearchInstagram.parse_itemlist_item(item))
 
     @staticmethod
     def parse_graph_item(node):

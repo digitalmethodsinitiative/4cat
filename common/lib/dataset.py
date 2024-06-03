@@ -16,9 +16,10 @@ import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
+from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-								   MapItemException)
+								   MapItemException, MappedItemIncompleteException)
 
 
 class DataSet(FourcatModule):
@@ -219,17 +220,6 @@ class DataSet(FourcatModule):
 		with log_path.open("w") as outfile:
 			pass
 
-	def has_log_file(self):
-		"""
-		Check if a log file exists for this dataset
-
-		This should be the case, but datasets created before status logging was
-		added may not have one, so we need to be able to check this.
-
-		:return bool:  Does a log file exist?
-		"""
-		return self.get_log_path().exists()
-
 	def log(self, log):
 		"""
 		Write log message to file
@@ -244,24 +234,6 @@ class DataSet(FourcatModule):
 		log_path = self.get_log_path()
 		with log_path.open("a", encoding="utf-8") as outfile:
 			outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
-
-	def get_log_iterator(self):
-		"""
-		Return an iterator with a (time, message) tuple per line in the log
-
-		Just a convenience function!
-
-		:return iterator:  (time, message) per log message
-		"""
-		log_path = self.get_log_path()
-		if not log_path.exists():
-			return
-
-		with log_path.open(encoding="utf-8") as infile:
-			for line in infile:
-				logtime = line.split(":")[0]
-				logmsg = ":".join(line.split(":")[1:])
-				yield (logtime, logmsg)
 
 	def iterate_items(self, processor=None, bypass_map_item=False, warn_unmappable=True):
 		"""
@@ -317,7 +289,7 @@ class DataSet(FourcatModule):
 
 					if item_mapper:
 						try:
-							item = own_processor.get_mapped_item(item)
+							item = own_processor.get_mapped_item(item).get_item_data()
 						except MapItemException as e:
 							if warn_unmappable:
 								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
@@ -337,7 +309,7 @@ class DataSet(FourcatModule):
 					item = json.loads(line)
 					if item_mapper:
 						try:
-							item = own_processor.get_mapped_item(item)
+							item = own_processor.get_mapped_item(item).get_item_data()
 						except MapItemException as e:
 							if warn_unmappable:
 								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
@@ -349,15 +321,41 @@ class DataSet(FourcatModule):
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True):
+	def iterate_mapped_objects(self, processor=None, warn_unmappable=True, map_missing="default"):
 		"""
-		Wrapper for iterate_items that returns both the original item and the mapped item (or else the same identical item).
-		No extension check is performed here as the point is to be able to handle the original object and save as an appropriate
-		filetype.
+		Generate mapped dataset items
+
+		Wrapper for iterate_items that returns both the original item and the
+		mapped item (or else the same identical item). No extension check is
+		performed here as the point is to be able to handle the original
+		object and save as an appropriate filetype.
+
+		Note the two parameters warn_unmappable and map_missing. Items can be
+		unmappable in that their structure is too different to coerce into a
+		neat dictionary of the structure the data source expects. This makes it
+		'unmappable' and warn_unmappable determines what happens in this case.
+		It can also be of the right structure, but with some fields missing or
+		incomplete. map_missing determines what happens in that case. The
+		latter is for example possible when importing data via Zeeschuimer,
+		which produces unstably-structured data captured from social media
+		sites.
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
-		:return generator:  A generator that yields a tuple with the unmapped item followed by the mapped item
+		:param bool warn_unmappable:  If an item is not mappable, skip the item
+		and log a warning
+		:param map_missing: Indicates what to do with mapped items for which
+		some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
+		- 'default': fill missing fields with the default passed by map_item
+		- 'abort': raise a MappedItemIncompleteException if a field is missing
+		- a dictionary with a 'replace' key: replace missing field with the
+		  value in the dictionary for the 'replace' key
+		- a callback: replace missing field with the return value of the
+		  callback. The MappedItem object is passed to the callback as the
+		  first argument and the name of the missing field as the second.
+
+		:return generator:  A generator that yields a tuple with the unmapped
+		item followed by the mapped item
 		"""
 		unmapped_items = False
 		# Collect item_mapper for use with filter
@@ -380,11 +378,64 @@ class DataSet(FourcatModule):
 						self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
 						unmapped_items = True
 					continue
+
+				# check if fields have been marked as 'missing' in the
+				# underlying data, and treat according to the chosen strategy
+				if mapped_item.get_missing_fields():
+					default_strategy = "default"
+
+					# strategy can be for all fields at once, or per field
+					# in the former case it's a string, in the latter a dict
+					# here we make sure it's always a dict to not complicate
+					# the following code
+					if type(map_missing) is str:
+						default_strategy = map_missing
+						map_missing = {}
+
+					for missing_field in mapped_item.get_missing_fields():
+						strategy = map_missing.get(missing_field, default_strategy)
+
+						if callable(strategy):
+							# delegate handling to a callback
+							mapped_item.data[missing_field] = strategy(mapped_item.data, missing_field)
+						elif strategy == "abort":
+							# raise an exception to be handled at the processor level
+							raise MappedItemIncompleteException(f"Cannot process item, field {missing_field} missing in source data.")
+						elif strategy == "default":
+							# use whatever was passed to the object constructor
+							mapped_item.data[missing_field] = mapped_item.data[missing_field].value
+						else:
+							raise ValueError("map_missing must be 'abort', 'default', or a callback.")
+
 			else:
 				mapped_item = original_item
 
 			# Yield the two items
 			yield original_item, mapped_item
+
+	def iterate_mapped_items(self, processor=None, warn_unmappable=True, map_missing="default"):
+		"""
+		Generate mapped dataset dictionaries
+
+		Identical to iterate_mapped_object, but yields the mapped item's data
+		(i.e. a dictionary) rather than the MappedItem object.
+
+		:param BasicProcessor processor:  A reference to the processor
+		iterating the dataset.
+		:param bool warn_unmappable:  If an item is not mappable, skip the item
+		and log a warning
+		:param map_missing: Indicates what to do with mapped items for which
+		some fields could not be mapped. Defaults to 'default' (see
+		`iterate_mapped_object()`).
+
+		:return generator:  A generator that yields a tuple with the unmapped
+		item followed by the mapped item
+		"""
+		for original_item, mapped_item in self.iterate_mapped_objects(processor, warn_unmappable, map_missing):
+			if type(mapped_item) is MappedItem:
+				yield original_item, mapped_item.get_item_data()
+			else:
+				yield original_item, mapped_item
 
 	def get_item_keys(self, processor=None):
 		"""
@@ -450,18 +501,6 @@ class DataSet(FourcatModule):
 				if staging_area.is_dir():
 					shutil.rmtree(staging_area)
 
-	def get_results_dir(self):
-		"""
-		Get path to results directory
-
-		Always returns a path, that will at some point contain the dataset
-		data, but may not do so yet. Use this to get the location to write
-		generated results to.
-
-		:return str:  A path to the results directory
-		"""
-		return self.folder
-
 	def finish(self, num_rows=0):
 		"""
 		Declare the dataset finished
@@ -473,32 +512,6 @@ class DataSet(FourcatModule):
 					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
-
-	def unfinish(self):
-		"""
-		Declare unfinished, and reset status, so that it may be executed again.
-		"""
-		if not self.is_finished():
-			raise RuntimeError("Cannot unfinish an unfinished dataset")
-
-		try:
-			self.get_results_path().unlink()
-		except FileNotFoundError:
-			pass
-
-		self.data["timestamp"] = int(time.time())
-		self.data["is_finished"] = False
-		self.data["num_rows"] = 0
-		self.data["status"] = "Dataset is queued."
-		self.data["progress"] = 0
-
-		self.db.update("datasets", data={
-			"timestamp": self.data["timestamp"],
-			"is_finished": self.data["is_finished"],
-			"num_rows": self.data["num_rows"],
-			"status": self.data["status"],
-			"progress": 0
-		}, where={"key": self.key})
 
 	def copy(self, shallow=True):
 		"""
@@ -565,6 +578,12 @@ class DataSet(FourcatModule):
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
+		#TODO: remove when migrate script ensures scheduled_jobs table exists
+		scheduler = self.db.fetchone(
+			"SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )",
+			("public", "scheduled_jobs"))
+		if scheduler["exists"]:
+			self.db.delete("scheduled_jobs", where={"dataset_id": self.key}, commit=commit)
 
 		# delete from drive
 		try:
@@ -1379,7 +1398,6 @@ class DataSet(FourcatModule):
 		processor_type = self.parameters.get("type", self.data.get("type"))
 		return backend.all_modules.processors.get(processor_type)
 
-
 	def get_available_processors(self, user=None):
 		"""
 		Get list of processors that may be run for this dataset
@@ -1589,6 +1607,7 @@ class DataSet(FourcatModule):
 			if processor is not None:
 				processor.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
 			elif hasattr(self.db, "log"):
+				# borrow the database's log handler
 				self.db.log.warning(f"Unable to map item all items for dataset {closest_dataset.key}.")
 			else:
 				# No other log available
