@@ -22,7 +22,8 @@ class Scheduler(BasicWorker):
 	work_report = None
 	details = None
 
-	def ensure_database(self):
+	@staticmethod
+	def ensure_database(db):
 		"""
 		Ensure that the database is set up for this worker
 
@@ -35,14 +36,14 @@ class Scheduler(BasicWorker):
 		details: additional details for the job (potentially different for each job)
 		"""
 		# create the table if it doesn't exist
-		self.db.execute("CREATE TABLE IF NOT EXISTS scheduled_jobs (job_id int PRIMARY KEY, scheduler_id int NOT NULL, jobtype text NOT NULL, dataset_id text NOT NULL, status text NOT NULL, created_at integer, details jsonb)")
+		db.execute("CREATE TABLE IF NOT EXISTS scheduled_jobs (job_id int PRIMARY KEY, scheduler_id int NOT NULL, jobtype text NOT NULL, dataset_id text NOT NULL, status text NOT NULL, created_at integer, details jsonb)")
 
 	def work(self):
 		"""
 		Check previous scheduled jobs and schedule new ones as necessary
 		"""
 		# TODO: ensure_database could be called when workers are validated; we could even check for packages there
-		self.ensure_database()
+		self.ensure_database(self.db)
 		# Ensure clean work report
 		self.work_report = {}
 

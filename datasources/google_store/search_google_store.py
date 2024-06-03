@@ -1,5 +1,7 @@
 import re
 import datetime
+
+from common.lib.item_mapping import MappedItem
 from common.lib.user_input import UserInput
 from datasources.apple_store.search_apple_store import SearchAppleStore, collect_from_store
 
@@ -198,4 +200,4 @@ class SearchGoogleStore(SearchAppleStore):
         # some queries do not return a publishing timestamp so we use the collected at timestamp
         formatted_item["timestamp"] = datetime.datetime.fromtimestamp(item.get("published_timestamp")) if "published_timestamp" in item else datetime.datetime.strptime(item.get("published_date"), "%Y-%m-%d") if "published_date" in item else item.get("collected_at_timestamp")
 
-        return formatted_item
+        return MappedItem(formatted_item)

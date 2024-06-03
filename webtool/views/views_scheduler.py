@@ -1,14 +1,13 @@
 from flask_login import login_required, current_user
+from flask import render_template, request, jsonify
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.exceptions import JobNotFoundException, DataSetNotFoundException
 from common.lib.helpers import call_api
 from webtool.lib.helpers import Pagination, error, setting_required
-from flask import render_template, request, jsonify
-
+from backend.workers.scheduler import Scheduler
 from webtool import app, db, config, queue
-import backend
 from common.lib.job import Job
 from common.config_manager import ConfigWrapper
 
@@ -26,6 +25,9 @@ def show_scheduler(page):
 
     :return:  Rendered template
     """
+    # todo: this should be in a migrate or on startup
+    Scheduler.ensure_database(db)
+
     page_size = 10
     offset = (page - 1) * page_size
     depth = request.args.get("depth", "current")

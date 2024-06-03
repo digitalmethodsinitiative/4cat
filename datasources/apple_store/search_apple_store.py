@@ -16,6 +16,7 @@ from itunes_app_scraper.util import AppStoreCollections
 
 from backend.lib.search import Search
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.item_mapping import MappedItem
 from common.lib.user_input import UserInput
 
 
@@ -378,7 +379,7 @@ class SearchAppleStore(Search):
         if "4CAT_metadata" in item:
             fourcat_metadata = item.pop("4CAT_metadata")
             if fourcat_metadata.get("beta", False):
-                return SearchAppleStore.map_beta_item(item, fourcat_metadata)
+                return MappedItem(SearchAppleStore.map_beta_item(item, fourcat_metadata))
             else:
                 query_method = fourcat_metadata.get("query_method", "")
                 collected_timestamp = fourcat_metadata.get("collected_at_timestamp", "")
@@ -473,7 +474,7 @@ class SearchAppleStore(Search):
         # some queries do not return a publishing timestamp so we use the collected at timestamp
         formatted_item["timestamp"] = datetime.datetime.strptime(item.get("releaseDate"), "%Y-%m-%dT%H:%M:%SZ") if "releaseDate" in item else collected_timestamp
 
-        return formatted_item
+        return MappedItem(formatted_item)
 
     @staticmethod
     def collect_detailed_data_from_apple_store_by_id(app_id, country_id="us", lang="en-us"):

@@ -14,6 +14,7 @@ from dateutil.relativedelta import relativedelta
 from backend.lib.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import validate_url
+from common.lib.item_mapping import MappedItem
 from common.lib.user_input import UserInput
 
 from common.config_manager import config
@@ -339,7 +340,7 @@ class SearchWebArchiveWithSelenium(SeleniumSearch):
         # Convert list of links to comma seperated urls
         page_result['selenium_links'] = ','.join(map(str,page_result.get('selenium_links'))) if type(page_result.get('selenium_links')) == list else page_result.get('selenium_links', '')
 
-        return page_result
+        return MappedItem(page_result)
 
     @staticmethod
     def create_web_archive_urls(url, start_date, end_date, frequency):
