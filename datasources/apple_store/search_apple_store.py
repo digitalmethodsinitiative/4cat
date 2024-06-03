@@ -237,8 +237,10 @@ class SearchAppleStore(Search):
         genres, genre_ids = zip(*[(genre.get("attributes", {}).get("name"), genre.get("id", "")) for genre in item.get('relationships').get("genres").get("data")])
 
         # Supported locale info
-        locale_names, locale_tags = zip(
-            *[(locale.get("name"), locale.get("tag")) for locale in platform_data.get("supportedLocales")])
+        if platform_data.get("supportedLocales"):
+            locale_names, locale_tags = zip(*[(locale.get("name"), locale.get("tag")) for locale in platform_data.get("supportedLocales")])
+        else:
+            locale_names, locale_tags = [], []
 
         # Content rating
         if len(app_attributes.get("contentRatingsBySystem")) > 1:
