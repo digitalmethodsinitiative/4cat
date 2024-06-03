@@ -37,7 +37,7 @@ def show_scheduler(page):
     # Most recent schedulers w/ pagination
     if depth == "all":
         # Get all scheduler jobs
-        query = "SELECT scheduler_id, max(created_at) last_created, jobtype FROM scheduled_jobs GROUP BY scheduler_id, jobtype ORDER BY last_created DESC LIMIT %s OFFSET %s"
+        query = "SELECT scheduler_id, max(created_at) last_created, jobtype, count(dataset_id) datasets FROM scheduled_jobs GROUP BY scheduler_id, jobtype ORDER BY last_created DESC LIMIT %s OFFSET %s"
         replacements = [page_size, offset]
         scheduler_results = db.fetchall(query, tuple(replacements))
 
@@ -47,7 +47,7 @@ def show_scheduler(page):
 
     elif depth == "current" and scheduler_job_ids:
         # Get current scheduler results
-        query = "SELECT scheduler_id, max(created_at) last_created, jobtype FROM scheduled_jobs WHERE scheduler_id IN %s GROUP BY scheduler_id, jobtype ORDER BY last_created DESC LIMIT %s OFFSET %s"
+        query = "SELECT scheduler_id, max(created_at) last_created, jobtype, count(dataset_id) datasets FROM scheduled_jobs WHERE scheduler_id IN %s GROUP BY scheduler_id, jobtype ORDER BY last_created DESC LIMIT %s OFFSET %s"
         replacements = [scheduler_job_ids, page_size, offset]
         scheduler_results = db.fetchall(query, tuple(replacements))
 
@@ -70,43 +70,54 @@ def show_scheduler(page):
     # Collect data for each scheduled job
     scheduler_info = []
     if scheduler_results:
-        query = "SELECT * FROM scheduled_jobs WHERE scheduler_id IN %s ORDER BY created_at DESC"
-        replacements = [tuple([scheduler["scheduler_id"] for scheduler in scheduler_results])]
-        scheduled_job_results = db.fetchall(query, tuple(replacements))
-
         for scheduler in scheduler_results:
             # Check if active and collect job if so
             if scheduler.get("scheduler_id") in scheduler_job_ids:
                 active = True
+                # this can be used to update the scheduler job (e.g., change interval)
+                scheduler_master_job = [job for job in scheduler_jobs if job.data["id"] == scheduler["scheduler_id"]][0]
             else:
                 active = False
-            related_jobs = [job for job in scheduled_job_results if job["scheduler_id"] == scheduler["scheduler_id"]]
-            # datasets = []
-            # for job in scheduled_job_results:
-            #     if job["scheduler_id"] == scheduler["scheduler_id"]:
-            #         try:
-            #             datasets.append(DataSet(key=job.get('dataset_id'), db=db))
-            #         except DataSetNotFoundException:
-            #             # Dataset may have been deleted, but scheduled_job entry still exists
-            #             pass
+                scheduler_master_job = None
+
             scheduler_info.append({
                 "jobtype": scheduler.get("jobtype"),
                 "last_created": scheduler.get("last_created"),
-                # TODO: do not have these from current groupby query...
+                "scheduler_job": scheduler_master_job,
                 # "label": scheduler.get("details", {}).get("label", "Query"),
                 # "enddate": scheduler.get("details", {}).get("enddate", None),
                 "active": active,
-                "number_datasets": len(related_jobs),
+                "number_datasets": scheduler.get("datasets"),
                 "scheduler_id": scheduler.get("scheduler_id"),
-                "datasets": related_jobs,
             })
 
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"]}
+    return render_template("scheduler.html", filter={}, depth=depth,
+                           schedulers=scheduler_info, pagination=pagination)
 
-    return render_template("scheduler.html", filter={}, depth=depth, datasources=datasources,
-                           jobs=scheduler_info, pagination=pagination)
+@app.route('/scheduler/<string:scheduler_id>', defaults={'page': 1})
+@login_required
+def view_scheduler_datasets(scheduler_id, page):
+    page_size = 10
+    offset = (page - 1) * page_size
 
+    query = "SELECT dataset_id FROM scheduled_jobs WHERE scheduler_id=%s ORDER BY created_at DESC"
+    replacements = (scheduler_id,)
+    results = db.fetchall(query, replacements)
+
+    datasets = []
+    # only instantiate datasets for the current page
+    for result in results[offset:offset + page_size]:
+        try:
+            datasets.append(DataSet(key=result.get("dataset_id"), db=db))
+        except DataSetNotFoundException:
+            # Dataset may have been deleted, but scheduled_job entry still exists
+            pass
+
+    # Prepare pagination
+    pagination = Pagination(page, page_size, len(results), route="show_scheduler")
+
+    return render_template("scheduler_results.html", filter={},
+                           datasets=datasets, pagination=pagination)
 
 @app.route("/api/delete-job/", defaults={"job_id": None}, methods=["DELETE", "GET", "POST"])
 @app.route("/api/delete-job/<string:job_id>/", methods=["DELETE", "GET", "POST"])

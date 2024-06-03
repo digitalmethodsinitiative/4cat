@@ -5,33 +5,6 @@
 {% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
 
 {% block body %}
-{#    <nav class="view-controls block">#}
-{#        <form action="{{ url_for("show_results") }}" method="GET">#}
-{#            <input type="hidden" name="depth" value="{{ depth }}">#}
-{#            <ul>#}
-{#                <li><input aria-label="Filter by query or label" placeholder="Filter datasets..." name="filter"#}
-{#                           value="{{ filter.filter }}"></li>#}
-{#            {% if current_user.is_admin %}#}
-{#                <li><input aria-label="User" placeholder="User..." name="user"#}
-{#                           value="{{ filter.user }}"></li>#}
-{#                <li>#}
-{#                    <select aria-label="Sort datasets by" name="sort_by">#}
-{#                        <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>#}
-{#                        <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>#}
-{#                    </select>#}
-{#                </li>#}
-{#            {% endif %}#}
-{#                <li>#}
-{#                    <select name="datasource" aria-label="Data source">#}
-{#                        <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>#}
-{#                    {% include 'components/datasource-select.html' %}#}
-{#                    </select>#}
-{#                </li>#}
-{#                <li><label><input type="checkbox" name="hide_empty" {% if filter.hide_empty %} checked="checked"{% endif %}> Hide empty datasets</label></li>#}
-{#            </ul>#}
-{#            <button>Filter</button>#}
-{#        </form>#}
-{#    </nav>#}
     <article>
         <section>
             <h2><span>Scheduled Jobs</span></h2>
@@ -41,75 +14,37 @@
                     <li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_scheduler') }}?&amp;depth=all">All</a></li>
                 </ul>
             </nav>
-        {% if jobs %}
+        {% if schedulers %}
             <ol class="result-list">
-                {% for job in jobs %}
+                {% for job in schedulers %}
                     <li id="{{ job.get('scheduler_id') }}" class="result" data-key="{{ job.get('scheduler_id') }}">
-                        <div>
-                            <div class="property-container">
-                                <div>
-                                    <div><h4>Job type: {{ job.get('jobtype') }}</h4></div>
-                                    <div><h4>Label: {{ job.get('label') }}</h4></div>
-                                </div>
-                                <div>
-                                    {% if job.get("last_created") %}
-                                        <div><h4>Last dataset scheduled: {{ job.get('last_created')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h4></div>
-                                    {% endif %}
-                                    <div> <h4>Number of datasets: {{ job.get('number_datasets')}}</h4></div>
-                                    <div><h4>Active: {{ job.get('active') }}</h4></div>
-                                    {% if job.get('active') %}
-                                        <div><a href="{{ url_for('delete_job', job_id=job.get('scheduler_id')) }}" class="confirm-first"
-                                       data-confirm-action="delete this job"><i class="fas fa-trash-alt"
-                                                                                    aria-hidden="true"></i>
-                                    Delete scheduler</a></div>
-                                    {% endif %}
-                                </div>
-                            </div>
+                        <div class="property-container">
+                            <div class="result">
+                                <h4>Job type: {{ job.get('jobtype') }}</h4>
+                                <h4>Label: {{ job.get('label') }}</h4>
 
-                            <div>
-                            {% for dataset in job.get("datasets") %}
-                                <ul>
-{#                                    <li id="{{ dataset.key }}"#}
-{#                                    class="result{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% else %} dataset-unfinished{% endif %}"#}
-{#                                    data-numrows="{{ dataset.num_rows }}" data-key="{{ dataset.key }}">#}
-{##}
-{#                                    <div class="property-container">#}
-{#                                        <div class="result">#}
-{#                                            <a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>#}
-{#                                            {% if __user_config("ui.show_datasource") %}<span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>{% endif %}#}
-{#                                            <h4>{{ dataset.get_label() }}</h4>#}
-{#                                            {% if dataset.is_finished() %}#}
-{#                                                <span class="result">({{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %})</span>#}
-{#                                            {% endif %}#}
-{#                                        </div>#}
-{#                                        <div>{% include 'components/result-metadata.html' %}</div>#}
-{#                                    </div>#}
-{##}
-{#                                    <div class="property-container status">#}
-{#                                    {% if not dataset.is_finished() or dataset.num_rows == 0 %}#}
-{#                                        <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status">{% include "components/result-status.html" %}</span></p>#}
-{#                                    {% else %}#}
-{#                                        <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>#}
-{#                                    {% endif %}#}
-{#                                    </div>#}
-{##}
-{#                                    {% if dataset.is_finished() and dataset.num_rows > 0 %}#}
-{#                                        <div class="property-container analysis">#}
-{#                                            <a class="button-like processor-link" href="{{ url_for('show_result', key=dataset.key) }}">Analysis{% if dataset.children|length > 0 %} (+{{ dataset.children|length }}){% endif %}</a>#}
-{#                                        </div>#}
-{#                                    {% endif %}#}
-{#                                </li>#}
-                                    <li>
-                                        <div>
-                                            <span>Created at: {{ dataset.get('created_at')|datetime(fmt="%d %B %Y, %H:%M")|safe }} | </span>
-                                            <span>Status: {{ dataset.get('status') }} | </span>
-                                            <a href="{{ url_for('show_result', key=dataset.get('dataset_id')) }}"><i class="fas fa-link" aria-hidden="true"></i> View Dataset</a>
-                                        </div>
-                                    </li>
-                                </ul>
-                            {% endfor %}
+                                {% if job.get("last_created") %}
+                                    <h5>Last dataset scheduled: {{ job.get('last_created')|datetime(fmt="%d %B %Y, %H:%M")|safe }}</h5>
+                                {% endif %}
+                                    <h5>Number of datasets: {{ job.get('number_datasets')}}</h5>
+                                    <h5>Active: {{ job.get('active') }}</h5>
+                                {% if job.get('active') %}
+                                    <a href="{{ url_for('delete_job', job_id=job.get('scheduler_id')) }}" class="confirm-first"
+                                   data-confirm-action="delete this job"><i class="fas fa-trash-alt"
+                                                                                aria-hidden="true"></i>
+                                    Delete scheduler</a>
+                                {% endif %}
                             </div>
                         </div>
+                        {% if job.get('number_datasets') > 0 %}
+                        <div class="processor-container view-datasets">
+                            <a class="button-like view-datsets" href="{{ url_for('view_scheduler_datasets', scheduler_id=job.get('scheduler_id'), page=1) }}">
+                                <i class="fas fa-plus" aria-hidden="true"></i>
+                                View datasets
+                                <span class="sr-only">View datasets</span>
+                            </a>
+                        </div>
+                        {% endif %}
                     </li>
                 {% endfor %}
             </ol>
