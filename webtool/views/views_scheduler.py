@@ -1,14 +1,13 @@
 from flask_login import login_required, current_user
+from flask import render_template, request, jsonify
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.exceptions import JobNotFoundException, DataSetNotFoundException
 from common.lib.helpers import call_api
 from webtool.lib.helpers import Pagination, error, setting_required
-from flask import render_template, request, jsonify
-
+from backend.workers.scheduler import Scheduler
 from webtool import app, db, config, queue
-import backend
 from common.lib.job import Job
 from common.config_manager import ConfigWrapper
 
@@ -16,6 +15,7 @@ config = ConfigWrapper(config, user=current_user, request=request)
 
 
 @app.route('/scheduler/', defaults={'page': 1})
+@app.route('/scheduler/page/<int:page>/')
 @login_required
 @setting_required("privileges.can_schedule_datasources")
 def show_scheduler(page):
@@ -26,6 +26,9 @@ def show_scheduler(page):
 
     :return:  Rendered template
     """
+    # todo: this should be in a migrate or on startup
+    Scheduler.ensure_database(db)
+
     page_size = 10
     offset = (page - 1) * page_size
     depth = request.args.get("depth", "current")
@@ -95,6 +98,7 @@ def show_scheduler(page):
                            schedulers=scheduler_info, pagination=pagination)
 
 @app.route('/scheduler/<string:scheduler_id>', defaults={'page': 1})
+@app.route('/scheduler/<string:scheduler_id>/page/<int:page>/')
 @login_required
 def view_scheduler_datasets(scheduler_id, page):
     page_size = 10
@@ -114,9 +118,9 @@ def view_scheduler_datasets(scheduler_id, page):
             pass
 
     # Prepare pagination
-    pagination = Pagination(page, page_size, len(results), route="show_scheduler")
+    pagination = Pagination(page, page_size, len(results), route="view_scheduler_datasets", route_args={"scheduler_id": scheduler_id})
 
-    return render_template("scheduler_results.html", filter={},
+    return render_template("scheduler_results.html", filter={}, depth="all",
                            datasets=datasets, pagination=pagination)
 
 @app.route("/api/delete-job/", defaults={"job_id": None}, methods=["DELETE", "GET", "POST"])
