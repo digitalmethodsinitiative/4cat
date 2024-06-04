@@ -36,7 +36,7 @@ class Pagination(object):
 		self.per_page = per_page
 		self.total_count = total_count
 		self.route = route
-		self.route_args = route_args
+		self.route_args = route_args if route_args else {}
 
 	@property
 	def pages(self):
