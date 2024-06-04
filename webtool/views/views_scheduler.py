@@ -118,7 +118,7 @@ def view_scheduler_datasets(scheduler_id, page):
     # Prepare pagination
     pagination = Pagination(page, page_size, len(results), route="show_scheduler")
 
-    return render_template("scheduler_results.html", filter={},
+    return render_template("scheduler_results.html", filter={}, depth="all",
                            datasets=datasets, pagination=pagination)
 
 @app.route("/api/delete-job/", defaults={"job_id": None}, methods=["DELETE", "GET", "POST"])
