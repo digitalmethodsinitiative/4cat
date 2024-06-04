@@ -15,6 +15,7 @@ config = ConfigWrapper(config, user=current_user, request=request)
 
 
 @app.route('/scheduler/', defaults={'page': 1})
+@app.route('/scheduler/page/<int:page>/')
 @login_required
 @setting_required("privileges.can_schedule_datasources")
 def show_scheduler(page):
@@ -97,6 +98,7 @@ def show_scheduler(page):
                            schedulers=scheduler_info, pagination=pagination)
 
 @app.route('/scheduler/<string:scheduler_id>', defaults={'page': 1})
+@app.route('/scheduler/<string:scheduler_id>/page/<int:page>/')
 @login_required
 def view_scheduler_datasets(scheduler_id, page):
     page_size = 10
