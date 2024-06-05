@@ -1,6 +1,7 @@
 """
 Generate ranking per post attribute
 """
+import emoji
 import re
 
 from collections import OrderedDict
@@ -30,6 +31,8 @@ class AttributeRanker(BasicProcessor):
 
 	references = ["[regex010](https://regex101.com/)"]
 
+	include_missing_data = True
+
 	# the following determines the options available to the user via the 4CAT
 	# interface.
 	options = {
@@ -51,7 +54,8 @@ class AttributeRanker(BasicProcessor):
 				"none": "Use column value",
 				"urls": "URLs",
 				"hostnames": "Host names",
-				"hashtags": "Hashtags (words starting with #)"
+				"hashtags": "Hashtags (words starting with #)",
+				"emoji": "Emoji (each used emoji in the column is counted individually)"
 			},
 			"help": "Extract from column",
 			"tooltip": "This can be used to extract more specific values from the value of the selected column(s); for "
@@ -92,6 +96,12 @@ class AttributeRanker(BasicProcessor):
 			"default": True,
 			"help": "Convert values to lowercase",
 			"tooltip": "Merges values with varying cases"
+		},
+		"count_missing": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Include missing data",
+			"tooltip": "Blank fields are counted as blank (i.e. \"\") and missing fields as \"missing_data\""
 		}
 	}
 
@@ -122,6 +132,7 @@ class AttributeRanker(BasicProcessor):
 		cutoff = convert_to_int(self.parameters.get("top"), 15)
 		weighby = self.parameters.get("weigh")
 		to_lowercase = self.parameters.get("to-lowercase", True)
+		self.include_missing_data = self.parameters.get("count_missing")
 
 		try:
 			if self.parameters.get("filter"):
@@ -140,6 +151,13 @@ class AttributeRanker(BasicProcessor):
 		# and OrderedDict; all frequencies go into this variable
 		items = OrderedDict()
 
+		# this is a placeholder function to map missing values to a placeholder
+		def missing_value_placeholder(data, field_name):
+			"""
+			Check if item is missing
+			"""
+			return "missing_data"
+
 		# if we're interested in overall top-ranking items rather than a
 		# per-period ranking, we need to do a first pass in which all posts are
 		# inspected to determine those overall top-scoring items
@@ -149,7 +167,7 @@ class AttributeRanker(BasicProcessor):
 				self.dataset.update_status(f"Determining overall top-{cutoff} items")
 			else:
 				self.dataset.update_status("Determining overall top items")
-			for post in self.source_dataset.iterate_items(self):
+			for post in self.source_dataset.iterate_items(self, map_missing=missing_value_placeholder if self.include_missing_data else "default"):
 				values = self.get_values(post, columns, filter, split_comma, extract)
 				for value in values:
 					if to_lowercase:
@@ -165,7 +183,7 @@ class AttributeRanker(BasicProcessor):
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
-		for post in self.source_dataset.iterate_items(self):
+		for post in self.source_dataset.iterate_items(self, map_missing=missing_value_placeholder if self.include_missing_data else "default"):
 			# determine where to put this data
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)
@@ -242,9 +260,9 @@ class AttributeRanker(BasicProcessor):
 		values = []
 		for attribute in attributes:
 			if split_comma:
-				item_values = [v.strip() for v in str(post.get(attribute, "")).split(",") if v.strip()]
+				item_values = [v.strip() for v in str(post.get(attribute, "")).split(",") if v.strip() or self.include_missing_data]
 			else:
-				item_values = [post.get(attribute, "")] if post.get(attribute, "") else []
+				item_values = [post.get(attribute, "")] if post.get(attribute, "") or self.include_missing_data else []
 
 			if extract:
 				item_values = list(chain(*[self.extract(v, extract) for v in item_values]))
@@ -288,6 +306,9 @@ class AttributeRanker(BasicProcessor):
 		elif look_for == "hashtags":
 			hashtags = list(re.findall(r"#([a-zA-Z0-9_]+)", value))
 			return hashtags
+
+		elif look_for == "emoji":
+			return [e["emoji"] for e in emoji.emoji_list(value)]
 
 		else:
 			return [value]

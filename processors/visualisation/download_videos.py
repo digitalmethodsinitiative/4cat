@@ -234,9 +234,9 @@ class VideoDownloaderPlus(BasicProcessor):
         :param module:  Module to determine compatibility with
         :return bool:
         """
-        return (module.type.endswith("-search") or module.is_from_collector()) \
-            and module.get_extension() in ("csv", "ndjson") \
-            and module.type not in ["tiktok-search", "tiktok-urls-search"]
+        return ((module.type.endswith("-search") or module.is_from_collector())
+                and module.get_extension() in ("csv", "ndjson") \
+                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"])
 
     def process(self):
         """

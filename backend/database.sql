@@ -80,8 +80,11 @@ CREATE TABLE IF NOT EXISTS metrics (
   datasource         text,
   board              text,
   date               text,
-  count              integer
+  count              BIGINT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_metrics
+    ON metrics (metric, datasource, board, date);
 
 -- users
 CREATE TABLE IF NOT EXISTS users (

@@ -70,6 +70,9 @@ class DatasetMerger(BasicProcessor):
         :param db:  Database handler (to retrieve metadata)
         :return DataSet:  The dataset
         """
+        if not url:
+            raise DataSetException("URL empty or not provided")
+
         source_url = ural.normalize_url(url)
         source_key = source_url.split("/")[-1]
         return DataSet(key=source_key, db=db)
@@ -86,8 +89,12 @@ class DatasetMerger(BasicProcessor):
         total_items = self.source_dataset.num_rows
         warnings = {}
 
-        for source_dataset in self.parameters.get("source").replace("\n", ",").split(","):
+        for source_dataset in self.parameters.get("source").strip().replace("\n", ",").split(","):
             source_dataset_url = source_dataset.strip()
+            if not source_dataset_url:
+                # trailing commas, etc - skip
+                continue
+
             try:
                 source_dataset = self.get_dataset_from_url(source_dataset_url, self.db)
             except DataSetException:
@@ -116,6 +123,9 @@ class DatasetMerger(BasicProcessor):
                 total_items += source_dataset.num_rows
                 source_datasets.append(source_dataset)
 
+        if len(source_datasets) <= 1:
+            return self.dataset.finish_with_error(f"You need to provide at least one valid URL for a source dataset.")
+
         # clean up parameters
         self.dataset.parameters = {**self.dataset.parameters, "source": ", ".join([d.key for d in source_datasets])}
 
@@ -136,19 +146,18 @@ class DatasetMerger(BasicProcessor):
                 warnings[dataset.key] = {}
 
                 try:
-                    for original_item, mapped_item in dataset.iterate_mapped_objects():
+                    for mapped_item in dataset.iterate_items():
                         if self.interrupted:
                             raise ProcessorInterruptedException("Interrupted while mapping duplicates")
 
-                        if type(mapped_item) is MappedItem:
+                        if type(mapped_item.mapped_object) is MappedItem:
                             # use the item data, but also store the warning if
                             # one was raised during mapping
-                            warning = mapped_item.get_message()
+                            warning = mapped_item.mapped_object.get_message()
                             if warning:
                                 if warning not in warnings[dataset.key]:
                                     warnings[dataset.key][warning] = 0
                                 warnings[dataset.key][warning] += 1
-                            mapped_item = mapped_item.get_item_data()
 
                         if not canonical_fieldnames:
                             canonical_fieldnames = set(mapped_item.keys())
@@ -173,10 +182,10 @@ class DatasetMerger(BasicProcessor):
                                 writer = csv.DictWriter(outfile, fieldnames=sorted_canonical_fieldnames)
                                 writer.writeheader()
 
-                            writer.writerow(original_item)
+                            writer.writerow(mapped_item.original)
 
                         elif dataset.get_extension() == "ndjson":
-                            outfile.write(json.dumps(original_item) + "\n")
+                            outfile.write(json.dumps(mapped_item.original) + "\n")
 
                         self.update_progress(processed, total_items)
 

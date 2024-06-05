@@ -191,7 +191,7 @@
                 <p>See <a href="https://docs.google.com/document/d/1po-sOB8tDRZlvWrEayu97cGh_qsBuW0URd4md0_tv7k/edit?usp=sharing">this exercise sheet</a> for step-by-step tutorials.</p>
             </div>
             {% set cat = namespace(egory='') %}
-            {% for processor in dataset.get_available_processors().values() %}
+            {% for processor in dataset.get_available_processors(exclude_hidden=True).values() %}
                 {% if processor.category != cat.egory %}
                     {% if cat.egory != '' %}</ol>{% endif %}
                     {% set cat.egory = processor.category %}

@@ -119,22 +119,6 @@
                     <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished() %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
                 </li>
                 {% endif %}
-
-                {% if item.is_finished() and item.num_rows > 0 and item.type in processors and processors[item.type].extension in ("jpg", "jpeg", "png", "csv", "html") and processors[item.type].can_preview %}
-                <li>
-                    <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="popup-preview-{{ item.key }} tooltip-preview-{{ item.key }}"><i class="fa fa-fw fa-eye" aria-hidden="true"></i> <span class="sr-only">Preview this dataset</span></a>
-                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
-                    <div role="dialog" id="popup-preview-{{ item.key }}">
-                        {% if processors[child.type].extension == "html" %}
-                            <iframe class="query-result-iframe" src="{{ url_for('get_result', query_file=child.result_file) }}"></iframe>
-                        {% elif processors[child.type].extension in ("png", "jpg", "jpeg", "gif") %}
-                            <a href="{{ url_for('get_result', query_file=child.result_file) }}"><img class="details-only" src="{{ url_for('get_result', query_file=child.result_file) }}"></a>
-                        {% elif processors[child.type].extension == "svg" %}
-                            <embed class="query-result-svg details-only" type="image/svg+xml" src="{{ url_for('get_result', query_file=child.result_file) }}">
-                        {% endif %}
-                    </div>
-                </li>
-                {% endif %}
             {% if item.type in processors %}{% set processor_options = processors[item.type].get_options() %}{% endif %}
             {% for option in item.parameters %}
                 {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
@@ -159,7 +143,7 @@
 
     {# 'More' button to show further analysis and preview #}
     <div class="processor-expand button-wrap">
-        {% if current_user.is_authenticated and item.is_finished() and (item.children or (item.num_rows > 0  and item.get_available_processors())) %}
+        {% if current_user.is_authenticated and item.is_finished() and (item.children or (item.num_rows > 0  and item.get_available_processors(exclude_hidden=True))) %}
         <button aria-controls="child-{{ item.key }}-details" class="toggle-button">
             <span class="headline">
             <i class="fa fa-sitemap" aria-hidden="true"></i> <span class="sr-only">More info</span>
@@ -184,7 +168,7 @@
         {# Possible further analyses #}
         {% if __user_config("privileges.can_run_processors") and (__user_config("privileges.admin.can_manipulate_all_datasets") or item.is_accessible_by(current_user, role="owner")) %}
         <ol class="children-processors">
-            {% for processor in item.get_available_processors().values() %}
+            {% for processor in item.get_available_processors(exclude_hidden=True).values() %}
 
                 {% set git_url = item.get_version_url("backend/processors/" + processor.filepath)%}
                 {% set dataset = item %}
