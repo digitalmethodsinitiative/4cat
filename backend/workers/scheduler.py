@@ -113,7 +113,7 @@ class Scheduler(BasicWorker):
 				"processor_type": processor.type,
 				"extension": processor.get_extension(dataset.get_parent()),
 				"is_private": dataset.is_private,
-				"parameters": parameters,
+				"parameters": dataset.parameters.copy(),
 				"label": dataset.get_label(),
 				"last_dataset": dataset.key
 			})
