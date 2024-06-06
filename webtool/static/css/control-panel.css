@@ -7,11 +7,15 @@
     margin: 0;
 }
 
-.worker-list li > * {
+.worker-list li {
+    padding: 0;
+}
+
+.worker-list li div > * {
     display: inline-block
 }
 
-.worker-list li {
+.worker-list li div {
     padding: 0.75em 1em 0.5em 1em;
 }
 

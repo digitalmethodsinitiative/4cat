@@ -29,6 +29,7 @@ from common.lib.user import User
 from common.lib.dataset import DataSet
 
 from common.lib.helpers import call_api, send_email, UserInput, folder_size
+from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -75,9 +76,10 @@ def admin_frontpage():
         "SELECT * FROM users_notifications WHERE username = '!admin' AND notification LIKE 'A new version of 4CAT%'")
 
     tags = config.get_active_tags(current_user)
+    current_branch = get_git_branch()
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
         "captured": num_items, "datasets": num_datasets, "disk": disk_stats
-    }, upgrade_available=upgrade_available, tags=tags)
+    }, upgrade_available=upgrade_available, tags=tags, current_branch=current_branch)
 
 
 @app.route("/admin/users/", defaults={"page": 1})
@@ -138,7 +140,12 @@ def list_users(page):
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_worker_status():
-    workers = call_api("worker-status")["response"]["running"]
+    workers = [
+        {
+            **worker,
+            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=db)
+        } for worker in call_api("worker-status")["response"]["running"]
+    ]
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
                            now=time.time())
 

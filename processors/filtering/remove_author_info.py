@@ -1,6 +1,7 @@
 """
 Blank all columns containing author information
 """
+import itertools
 import fnmatch
 import hashlib
 import secrets
@@ -34,27 +35,6 @@ class AuthorInfoRemover(BasicProcessor):
         "[What is Blake2?](https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2)"
     ]
 
-    options = {
-        "mode": {
-            "help": "Filtering mode",
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "anonymise": "Replace values with 'REDACTED'",
-                "pseudonymise": "Replace values with a salted hash"
-            },
-            "tooltip": "When replacing values with a hash, a Blake2b hash is calculated for the value with a "
-                       "randomised salt, so it is no longer possible to derive the original value from the hash but it "
-                       "remains possible to see if two fields contain the same value.",
-            "default": "anonymise"
-        },
-        "fields": {
-            "help": "Fields to update",
-            "type": UserInput.OPTION_TEXT,
-            "tooltip": "Separate with commas. You can use wildcards (e.g. 'author_*').",
-            "default": "author*,user*"
-        }
-    }
-
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
@@ -63,6 +43,55 @@ class AuthorInfoRemover(BasicProcessor):
         :param module: Module to determine compatibility with
         """
         return module.is_top_dataset() and module.get_extension() in ["csv", 'ndjson']
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        options = {
+            "mode": {
+                "help": "Filtering mode",
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "anonymise": "Replace values with 'REDACTED'",
+                    "pseudonymise": "Replace values with a salted hash"
+                },
+                "tooltip": "When replacing values with a hash, a Blake2b hash is calculated for the value with a "
+                           "randomised salt, so it is no longer possible to derive the original value from the hash but it "
+                           "remains possible to see if two fields contain the same value.",
+                "default": "anonymise"
+            },
+            "fields": {
+                "help": "Fields to update",
+                "type": UserInput.OPTION_TEXT,
+                "tooltip": "Separate with commas. You can use wildcards (e.g. 'author_*').",
+                "default": "author*, user*"
+            }
+        }
+
+        if not parent_dataset:
+            return options
+
+        parent_processor = parent_dataset.get_own_processor()
+        default_fields = ["author*", "user*"]
+        if parent_processor and hasattr(parent_processor, "pseudonymise_fields"):
+            default_fields = parent_processor.pseudonymise_fields
+            options["fields"]["default"] = default_fields
+
+        if parent_dataset and parent_dataset.get_extension() == "csv":
+            parent_columns = parent_dataset.get_columns()
+            parent_columns = {c: c for c in sorted(parent_columns)}
+
+            default_fields = itertools.chain(*[[c for c in parent_columns if fnmatch.fnmatch(c, d)] for d in default_fields])
+
+            options["fields"] = {
+                "type": UserInput.OPTION_MULTI_SELECT,
+                "options": parent_columns,
+                "help": "Columns to process",
+                "default": default_fields,
+                "tooltip": "Values in these columns will be replaced"
+            }
+
+        return options
+
 
     def process(self):
         """
@@ -141,34 +170,3 @@ class AuthorInfoRemover(BasicProcessor):
 
         self.dataset.update_status("Data filtered, parent dataset updated.", is_final=True)
         self.dataset.finish(processed_items)
-
-    @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
-        """
-        Get processor options
-
-        These are dynamic for this processor: the 'column names' option is
-        populated with the column names from the parent dataset, if available.
-
-        :param DataSet parent_dataset:  Parent dataset
-        :param user:  Flask User to which the options are shown, if applicable
-        :return dict:  Processor options
-        """
-        options = cls.options
-        if parent_dataset is None:
-            return options
-
-        parent_columns = parent_dataset.get_columns()
-
-        if parent_dataset.get_extension() == "csv":
-            parent_columns = {c: c for c in sorted(parent_columns)}
-            defaults = [c for c in parent_columns if c.startswith("author")]
-            options["fields"] = {
-                "type": UserInput.OPTION_MULTI_SELECT,
-                "options": parent_columns,
-                "help": "Columns to process",
-                "default": defaults,
-                "tooltip": "Values in these columns will be replaced"
-            }
-
-        return options

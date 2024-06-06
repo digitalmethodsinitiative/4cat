@@ -9,12 +9,15 @@ assumes that ffprobe is also present in the same location.
 import shutil
 import subprocess
 import shlex
+import re
+
+from packaging import version
 
 from common.config_manager import config
-
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
+from common.lib.helpers import get_ffmpeg_version
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -125,6 +128,13 @@ class VideoStack(BasicProcessor):
         # a staging area to store the videos we're reading from
         video_staging_area = self.dataset.get_staging_area()
 
+        # determine ffmpeg version
+        # -fps_mode is not in older versions and we can use -vsync instead
+        # but -vsync will be deprecated so only use it if needed
+        # todo: periodically check if we still need to support ffmpeg < 5.1
+        # at the time of writing, 4.* is still distributed with various OSes
+        fps_params = ["-fps_mode", "vfr"] if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else ["-vsync", "vfr"]
+
         # command to stack input videos
         transparency_filter = []
         merge_filter = []
@@ -218,7 +228,7 @@ class VideoStack(BasicProcessor):
         elif sound == "longest":
             command += ["-map", f"0:a"]
 
-        command += ["-map", "[final]", "-fps_mode", "vfr"]
+        command += ["-map", "[final]", *fps_params]
 
         # output file
         command.append(shlex.quote(str(self.dataset.get_results_path())))

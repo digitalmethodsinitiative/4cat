@@ -78,7 +78,7 @@ class SearchLinkedIn(Search):
                 images.append(url)
 
         # or alternatively they are stored here:
-        if not images and item["content"] and item["content"]["articleComponent"] and item["content"]["articleComponent"].get("largeImage"):
+        if not images and item["content"] and item["content"].get("articleComponent") and item["content"]["articleComponent"].get("largeImage"):
             image = item["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
             images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
 
