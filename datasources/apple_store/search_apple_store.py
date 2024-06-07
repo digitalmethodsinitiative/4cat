@@ -52,7 +52,9 @@ class SearchAppleStore(Search):
         options = {
             "intro-1": {
                 "type": UserInput.OPTION_INFO,
-                "help": "This data source allows you to query Apple's app store to retrieve data on applications and developers."
+                "help": ("This data source allows you to query Apple's app store to retrieve data on applications and developers."
+                         "\nCountry options can be found [here](https://osf.io/8pn7w) and represent different [app \"stores\"](https://www.apple.com/choose-country-region/)."
+                         " For the Apple Store, language does not appear to affect which results are returned for queries, but does affect the language of the results for beta details .")
             },
             "method": {
                 "type": UserInput.OPTION_CHOICE,

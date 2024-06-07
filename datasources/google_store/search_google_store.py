@@ -11,7 +11,7 @@ class SearchGoogleStore(SearchAppleStore):
     Search Google Store data source
 
 
-    Defines methods to fetch data from Apples application store on demand
+    Defines methods to fetch data from Google's application store on demand
     """
     type = "google-store-search"  # job ID
     category = "Search"  # category
@@ -27,7 +27,8 @@ class SearchGoogleStore(SearchAppleStore):
         options = {
             "intro-1": {
                 "type": UserInput.OPTION_INFO,
-                "help": "This data source allows you to query Apple's app store to retrieve data on applications and developers."
+                "help": ("This data source allows you to query Google's app store to retrieve data on applications and developers."
+                        "\nCountry options can be found [here](https://osf.io/gbjnu).")
             },
             "method": {
                 "type": UserInput.OPTION_CHOICE,
@@ -85,7 +86,7 @@ class SearchGoogleStore(SearchAppleStore):
         # Updated method from options to match the method names in the collect_from_store function
         method = self.option_to_method.get(self.parameters.get('method'))
         if method is None:
-            self.log.warning(f"Apple store unknown query method; check option_to_method dictionary matches method options.")
+            self.log.warning(f"Google store unknown query method; check option_to_method dictionary matches method options.")
 
         params = {}
         if method == 'search':
