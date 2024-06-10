@@ -4,7 +4,7 @@ import re
 import json
 import requests
 from bs4 import BeautifulSoup
-
+from common.config_manager import config
 
 from backend.lib.search import Search
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
@@ -25,6 +25,21 @@ class SearchAzureStore(Search):
     is_static = False  # Whether this datasource is still updated
 
     base_url = "https://azuremarketplace.microsoft.com"
+
+    config = {
+        "azure.categories": {
+            "type": UserInput.OPTION_TEXT_JSON,
+            "help": "Azure Categories",
+            "tooltip": "automatically updated",
+            "default": {}
+        },
+        "azure.categories_updated_at": {
+            "type": UserInput.OPTION_DATE,
+            "help": "Azure Categories Updated At",
+            "tooltip": "automatically updated",
+            "default": None
+        }
+    }
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -48,12 +63,18 @@ class SearchAzureStore(Search):
                 "help": "Query Type",
                 "options": {
                     "search": "Search",
+                    "category": "Category",
                 },
                 "default": "search"
             },
+            "category": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Apple Store App Collection",
+                "requires": "method^=category",  # starts with list
+            },
             "query": {
                 "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "List of queries to search",
+                "help": "List of queries to search (leave blank for all).",
                 "default": "", # need default else regex will fail
             },
             "full_details": {
@@ -63,6 +84,15 @@ class SearchAzureStore(Search):
                 "tooltip": "If enabled, the full details of each application will be included in the output.",
             },
         }
+        categories = cls.get_categories()
+        if categories:
+            formatted_categories = {f"{key}": f"{cat.get('cat_title')} - {cat.get('sub_title')}" for key, cat in
+                                    categories.items()}
+            formatted_categories["4CAT_all_categories"] = "All Categories"
+            options["category"]["options"] = formatted_categories
+            options["category"]["default"] = "all_categories"
+        else:
+            options.pop("category")
         
         return options
 
@@ -74,47 +104,58 @@ class SearchAzureStore(Search):
         :return:
         """
         queries = re.split(',|\n', self.parameters.get('query', ''))
-        # Updated method from options to match the method names in the collect_from_store function
-        method = self.parameters.get('method')
+        if not queries:
+            # can search all
+            queries = [""]
         max_results = int(self.parameters.get('amount', 60))
         full_details = self.parameters.get('full_details', False)
+        main_category = None
+        sub_category = None
 
-        if method == "search":
-            for query in queries:
-                self.dataset.update_status(f"Processing query {query}")
-                if self.interrupted:
-                    raise ProcessorInterruptedException(f"Processor interrupted while fetching query {query}")
-                page = 1
-                num_results = 0
-                while True:
-                    results = self.get_query_results(query, previous_results=num_results, page=page)
-                    if not results:
-                        self.dataset.update_status(f"No additional results found for query {query}")
-                        break
+        if self.parameters.get('category'):
+            category = self.parameters.get('category')
+            if category == "4CAT_all_categories":
+                # default app URL is used for all categories
+                pass
+            else:
+                main_category = category.split("_--_")[0]
+                sub_category = category.split("_--_")[1]
 
-                    for result in results:
-                        if full_details:
-                            if self.interrupted:
-                                # Only interrupting if we are collecting full details as otherwise we have already collected everything
-                                raise ProcessorInterruptedException(f"Processor interrupted while fetching details for {result.get('title')}")
+        for query in queries:
+            self.dataset.update_status(f"Processing query {query}")
+            if self.interrupted:
+                raise ProcessorInterruptedException(f"Processor interrupted while fetching query {query}")
+            page = 1
+            num_results = 0
+            while True:
+                results = self.get_query_results(query, category=main_category, sub_category=sub_category, previous_results=num_results, page=page)
+                if not results:
+                    self.dataset.update_status(f"No additional results found for query {query}")
+                    break
 
-                            if num_results >= max_results:
-                                break
-                            result = self.get_app_details(result)
+                for result in results:
+                    if full_details:
+                        if self.interrupted:
+                            # Only interrupting if we are collecting full details as otherwise we have already collected everything
+                            raise ProcessorInterruptedException(f"Processor interrupted while fetching details for {result.get('title')}")
 
-                        result["query"] = query
-                        yield result
-                        num_results += 1
+                        if num_results >= max_results:
+                            break
+                        result = self.get_app_details(result)
 
-                        self.dataset.update_status(f"Processed {num_results}{' of ' + str(max_results) if max_results > 0 else ''}")
-                        if max_results > 0:
-                            self.dataset.update_progress(num_results / max_results)
+                    result["4CAT_metadata"] = {"query": query, "category": main_category, "sub_category": sub_category, "page": page, "collected_at_timestamp": datetime.datetime.now().timestamp()}
+                    yield result
+                    num_results += 1
 
-                    if num_results >= max_results:
-                        # We may have extra result as results are batched
-                        break
+                    self.dataset.update_status(f"Processed {num_results}{' of ' + str(max_results) if max_results > 0 else ''}")
+                    if max_results > 0:
+                        self.dataset.update_progress(num_results / max_results)
 
-                    page += 1
+                if num_results >= max_results:
+                    # We may have extra result as results are batched
+                    break
+
+                page += 1
 
     def get_app_details(self, app):
         """
@@ -142,7 +183,7 @@ class SearchAzureStore(Search):
 
         # Details block
         details_block = soup.find("div", attrs={"class": "imageDetailsContainer"})
-        regex = re.compile('.*appLargeIcon*')
+        regex = re.compile('.*appLargeIcon.*')
         app["icon_link"] = details_block.find("div", attrs={"class": regex}).get_text()
         detail_categories = {}
         for header in details_block.find_all("header"):
@@ -152,11 +193,11 @@ class SearchAzureStore(Search):
         app["details"] = detail_categories
 
         # App tabs
-        app["tabs"] = self.collect_additional_tabs(soup)
+        app["tabs"] = self.collect_additional_tabs(soup, app_title=app.get("title"))
 
         return app
 
-    def collect_additional_tabs(self, soup):
+    def collect_additional_tabs(self, soup, app_title=None):
         """
         There are tabs beyond "Overview" that contain additional information.
 
@@ -165,7 +206,7 @@ class SearchAzureStore(Search):
         #TODO become clever
         # There are additional tabs to be collected
         app_tabs = {}
-        regex = re.compile('.*defaultTab*')
+        regex = re.compile('.*defaultTab.*')
         tabs = soup.find_all("a", attrs={"class": regex})
         for tab in tabs:
             tab_label = tab.find("label").get_text().lower()
@@ -178,11 +219,11 @@ class SearchAzureStore(Search):
                     tab_request = requests.get(self.base_url + tab.get("href"), timeout=30)
                 except requests.exceptions.RequestException as e:
                     self.dataset.log(
-                        f"Failed to fetch additional tab {tab_label} for app {app.get('title')} from Azure Store: {e}")
+                        f"Failed to fetch additional tab {tab_label} for app {app_title} from Azure Store: {e}")
                     continue
                 if tab_request.status_code != 200:
                     self.dataset.log(
-                        f"Failed to fetch additional tab {tab_label} for app {app.get('title')} from Azure Store: {tab_request.status_code} {tab_request.reason}")
+                        f"Failed to fetch additional tab {tab_label} for app {app_title} from Azure Store: {tab_request.status_code} {tab_request.reason}")
                     continue
                 tab_soup = BeautifulSoup(tab_request.content, "html.parser")
                 tab_content = tab_soup.find("div", attrs={"class": "tabContent"})
@@ -194,15 +235,22 @@ class SearchAzureStore(Search):
 
         return app_tabs
 
-    def get_query_results(self, query, previous_results=0, page=1, store="en-us"):
+    def get_query_results(self, query, category=None, sub_category=None, previous_results=0, page=1, store="en-us"):
         """
         Fetch query results from Azure Store
         """
         query_url = self.base_url + f"/{store}/marketplace/apps"
+        if category:
+            query_url += f"/category/{category}"
         params = {
-            "search": query,
             "page": page
         }
+        if query:
+            params["search"] = query
+
+        if sub_category:
+            params["subcategories"] = sub_category
+
         try:
             response = requests.get(query_url, params, timeout=30)
         except requests.exceptions.RequestException as e:
@@ -261,7 +309,10 @@ class SearchAzureStore(Search):
         additional_details = [{detail_label: detail.get("text")} for detail_label, detail in item.get("details", {}).items() if detail_label.lower() not in detail_groups]
 
         formatted_item = {
-            "query": item.get("query"),
+            "query": item.get("4CAT_metadata", {}).get("query", ""),
+            "category": item.get("4CAT_metadata", {}).get("category", ""),
+            "sub_category": item.get("4CAT_metadata", {}).get("sub_category", ""),
+            "collected_at": datetime.datetime.fromtimestamp(item.get("4CAT_metadata", {}).get("collected_at_timestamp", "")).strftime("%Y-%m-%d %H:%M:%S"),
             "rank": item.get("rank"),
             "title": item.get("title", ""),
             "developer_name": item.get("developer_name", ""),
@@ -278,6 +329,61 @@ class SearchAzureStore(Search):
             "details": additional_details,
             "additional_tabs": additional_tabs,
             "body": item.get("tabs", {}).get("overview", {}).get("text", ""),
+            "timestamp": item.get("4CAT_metadata", {}).get("collected_at_timestamp", ""),
         }
 
         return MappedItem(formatted_item)
+
+    @classmethod
+    def get_categories(cls, store="en-us", force_update=False):
+        """
+        Get categories from Azure Store
+        """
+        last_updated = config.get("azure.categories_updated_at")
+        if last_updated:
+            if (datetime.datetime.fromtimestamp(last_updated) > datetime.datetime.now() - datetime.timedelta(days=1)) and not force_update:
+                # Do not re-fetch unless forced or older than one day
+                return config.get("azure.categories")
+
+        config.db.log.info("Fetching categories from Azure Store")
+        categories_url = cls.base_url + f"/{store}/marketplace/apps"
+        try:
+            response = requests.get(categories_url, timeout=30)
+        except requests.exceptions.RequestException as e:
+            raise ProcessorException(f"Failed to fetch data from Azure Store: {e}")
+        if response.status_code != 200:
+            raise ProcessorException(f"Failed to fetch data from Azure Store: {response.status_code} {response.reason}")
+
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Only main categories are loaded in HTML; we can extract more from a JSON object
+        json_data = cls.parse_azure_json(soup)
+        category_map = None
+        if json_data:
+            category_map = {}
+            # we need both the main and sub categories keys
+            for cat_key, cat in json_data.get("apps").get("dataMap").get("category").items():
+                main_key = cat.get("urlKey")
+                cat_title = cat.get("title")
+                sub_cats = cat.get("subCategoryDataMapping")
+                for sub_key, sub_cat in sub_cats.items():
+                    sub_title = sub_cat.get("title")
+                    sub_key = sub_cat.get("urlKey")
+                    # We only pass the key to the backend; so make a unique key that can be parsed (otherwise we could re-request)
+                    category_map[main_key + "_--_" + sub_key] = {"cat_key": main_key, "cat_title": cat_title,
+                                                              "sub_key": sub_key, "sub_title": sub_title}
+        config.set("azure.categories", category_map)
+        config.set("azure.categories_updated_at", datetime.datetime.now().timestamp())
+        return category_map
+
+    @staticmethod
+    def parse_azure_json(soup):
+        """
+        Parse JSON object from Azure Store
+        """
+        # JSON object is stored in a script tag
+        scripts = soup.find_all("script")
+        for script in scripts:
+            if "window.__INITIAL_STATE__" in str(script):
+                return json.loads(str(script).split("window.__INITIAL_STATE__ =")[1].rstrip("</script>").strip())
+        return None
