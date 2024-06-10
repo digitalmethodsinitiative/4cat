@@ -34,10 +34,11 @@ class SearchAzureStore(Search):
             "default": {}
         },
         "azure.categories_updated_at": {
-            "type": UserInput.OPTION_DATE,
+            "type": UserInput.OPTION_TEXT,
             "help": "Azure Categories Updated At",
             "tooltip": "automatically updated",
-            "default": None
+            "default": 0,
+            "coerce_type": int
         }
     }
 
@@ -90,7 +91,7 @@ class SearchAzureStore(Search):
                                     categories.items()}
             formatted_categories["4CAT_all_categories"] = "All Categories"
             options["category"]["options"] = formatted_categories
-            options["category"]["default"] = "all_categories"
+            options["category"]["default"] = "4CAT_all_categories"
         else:
             options.pop("category")
         
@@ -143,7 +144,7 @@ class SearchAzureStore(Search):
                             break
                         result = self.get_app_details(result)
 
-                    result["4CAT_metadata"] = {"query": query, "category": main_category, "sub_category": sub_category, "page": page, "collected_at_timestamp": datetime.datetime.now().timestamp()}
+                    result["4CAT_metadata"] = {"query": query, "category": main_category if main_category is not None else "all", "sub_category": sub_category, "page": page, "collected_at_timestamp": datetime.datetime.now().timestamp()}
                     yield result
                     num_results += 1
 
@@ -340,10 +341,9 @@ class SearchAzureStore(Search):
         Get categories from Azure Store
         """
         last_updated = config.get("azure.categories_updated_at")
-        if last_updated:
-            if (datetime.datetime.fromtimestamp(last_updated) > datetime.datetime.now() - datetime.timedelta(days=1)) and not force_update:
-                # Do not re-fetch unless forced or older than one day
-                return config.get("azure.categories")
+        if (datetime.datetime.fromtimestamp(last_updated) > datetime.datetime.now() - datetime.timedelta(days=1)) and not force_update:
+            # Do not re-fetch unless forced or older than one day
+            return config.get("azure.categories")
 
         config.db.log.info("Fetching categories from Azure Store")
         categories_url = cls.base_url + f"/{store}/marketplace/apps"
