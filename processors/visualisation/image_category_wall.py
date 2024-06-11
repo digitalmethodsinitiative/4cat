@@ -24,7 +24,7 @@ __credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
-class ImageWallGenerator(BasicProcessor):
+class ImageCategoryWallGenerator(BasicProcessor):
 	"""
 	Image wall generator
 
@@ -51,7 +51,7 @@ class ImageWallGenerator(BasicProcessor):
 		"image-visuals.max_pixels_per_image": {
 			"type": UserInput.OPTION_TEXT,
 			"coerce_type": int,
-			"default": 300,
+			"default": 400,
 			"min": 25,
 			"help": "Max pixels for each images when visualising",
 		}
@@ -141,10 +141,10 @@ class ImageWallGenerator(BasicProcessor):
 		"""
 		Identify dataset types that are compatible with this processor
 		"""
-		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
+		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageCategoryWallGenerator.image_datasets]):
 			image_dataset = source_dataset
 			category_dataset = source_dataset.top_parent()
-		elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
+		elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in ImageCategoryWallGenerator.image_datasets]):
 			image_dataset = source_dataset.get_parent()
 			category_dataset = source_dataset
 		else:
