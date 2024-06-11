@@ -216,13 +216,17 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 
 	# Add hashtag links
 	tags = re.findall(r"#[\w0-9]+", body)
+	# We're sorting tags by length so we don't incorrectly
+	# replace tags that are a substring of another, longer tag.
+	tags = sorted(tags, key=lambda x: len(x), reverse=True)
 	for tag in tags:
 		# Match the string, but not if it's preceded by a >, which indicates that we've already added an <a> tag.
-		# This fixes problems with substrings (e.g. #Dog and #DogOwners).
-		body = re.sub(r"(?<!>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
+		# This avoids problems with repeated substrings (e.g. #Dog and #DogOwners).
+		body = re.sub(r"(?<!'>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
 
 	# Add @-mention links
 	mentions = re.findall(r"@[\w0-9]+", body)
+	mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
 	for mention in mentions:
 		body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
 

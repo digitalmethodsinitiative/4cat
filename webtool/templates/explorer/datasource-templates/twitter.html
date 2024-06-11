@@ -20,6 +20,7 @@
 			</header>
 
 			<div class="body">{{ post.body | social_mediafy(datasource='twitter') | safe }}</div>
+			
 			<!-- Media item -->
 			{% if post.get("images") %}
 				{% set media_url = post.get("images") %}
@@ -33,9 +34,37 @@
 				{% endfor %}
 			</div>
 			{% endif %}
-			{% if post.get("quoted_user") %}
-			<div class="quoted-user">
-				Tweet by @{{ post.quoted_user }}
+
+			<!-- Quote tweet -->
+			{% if post.get("quote_author") %}
+			<div class="quote-post">
+				<header>
+					
+				{% if not pseudonymised %}
+					<a href="https://twitter.com/{{ post.get('quote_author') }}"><span class="quote-author atname">@{{ post.get("quote_author") }}</span></a>
+				{% else %}
+					<span title="Pseudonymous author" class="quote-author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+				{% endif %}
+				</header>
+
+				{% if post.quote_body %}
+				<div class="body">
+					{{ post.quote_body | social_mediafy(datasource='twitter') | safe }}
+				</div>
+				{% endif %}
+				<!-- Quote tweet media item -->
+				{% if post.get("quote_images") %}
+					{% set media_url = post.get("quote_images") %}
+				{% elif post.get("quote_videos") %}
+					{% set media_url = post.get("quote_videos") %}
+				{% endif %}
+				{% if media_url %}
+				<div class="media-container">
+					{% for url in media_url.split(",") %}
+						<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+					{% endfor %}
+				</div>
+				{% endif %}
 			</div>
 			{% endif %}
 			<div class="metrics">

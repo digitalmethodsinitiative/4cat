@@ -1,5 +1,5 @@
 """
-Initialize Twitter data source
+Initialize Truth Social data source
 """
 
 # An init_datasource function is expected to be available to initialize this
@@ -8,5 +8,5 @@ Initialize Twitter data source
 from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "twitter"
-NAME = "X/Twitter (via Zeeschuimer)"
+DATASOURCE = "truthsocial"
+NAME = "Truthsocial"

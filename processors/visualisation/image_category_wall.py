@@ -83,11 +83,10 @@ class ImageWallGenerator(BasicProcessor):
 			},
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "Max images per category",
+				"help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
 				"default": 10 if max_number_images == 0 else min(max_number_images, 10),
 				"min": 0 if max_number_images == 0 else 1,
 				"max": max_number_images,
-				"tooltip": "'0' uses as many images as available in the archive" + (f" (up to {max_number_images})" if max_number_images != 0 else "")
 			},
 			"height": {
 				"type": UserInput.OPTION_TEXT,
@@ -99,6 +98,9 @@ class ImageWallGenerator(BasicProcessor):
 				"max": max_pixels
 			}
 		}
+		if max_number_images == 0:
+			options['amount']['tooltip'] = "'0' will use all available images"
+			options['amount'].pop('max')
 
 		if parent_dataset is None:
 			return options
@@ -161,8 +163,6 @@ class ImageWallGenerator(BasicProcessor):
 
 		# 0 = use as many images as in the archive, up to the max
 		images_per_category = convert_to_int(self.parameters.get("amount"), 100)
-		if images_per_category == 0:
-			images_per_category = self.get_options()["amount"]["max"]
 
 		# Some processors may have a special category type to extract categories
 		special_case = category_dataset.type == "image-to-categories"
@@ -185,7 +185,7 @@ class ImageWallGenerator(BasicProcessor):
 				image_data = json.load(file)
 			filename_map = {post_id: staging_area.joinpath(image.get("filename")) for image in image_data.values()
 							if image.get("success") for post_id in image.get("post_ids")}
-		self.dataset.log(filename_map)
+
 		# Organize posts into categories
 		category_type = None
 		categories = {}
@@ -200,10 +200,7 @@ class ImageWallGenerator(BasicProcessor):
 				continue
 
 			# Identify category type and collect post_category
-			if post.get(category_column) is None:
-				self.dataset.finish_with_error("Unable to find category column in dataset")
-				return
-			elif special_case and category_column == "top_categories":
+			if special_case and category_column == "top_categories":
 				if category_type is None:
 					category_type = float
 				# Special case
@@ -218,20 +215,26 @@ class ImageWallGenerator(BasicProcessor):
 			else:
 				if category_type is None:
 					try:
-						float(post.get(category_column))
-						category_type = float
+						if post.get(category_column) is None:
+							category_type = str
+						else:
+							float(post.get(category_column))
+							category_type = float
 					except ValueError:
 						category_type = str
 
 				if category_type == str:
 					post_category = post.get(category_column)
-					if post_category == "":
+					if post_category == "" or post_category is None:
 						post_category = "None"
 					if post_category not in categories:
 						categories[post_category] = [{"id": post.get("id")}]
 					else:
 						categories[post_category].append({"id": post.get("id")})
 				elif category_type == float:
+					if post.get(category_column) is None:
+						self.dataset.log(f"Post {post.get('id')} has no data; skipping")
+						continue
 					try:
 						post_category = float(post.get(category_column))
 						post_values.append((post_category, post.get("id")))
@@ -240,7 +243,7 @@ class ImageWallGenerator(BasicProcessor):
 						raise ProcessorException(
 							f"Mixed category types detected; unable to render image wall (item {i} {post_category})")
 
-		if len(categories) == 0:
+		if len(categories) == 0 and len(post_values) == 0:
 			self.dataset.finish_with_error("No categories found")
 			return
 

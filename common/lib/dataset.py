@@ -342,6 +342,14 @@ class DataSet(FourcatModule):
 		# so we're always going to accept these.
 		annotation_fields = self.get_annotation_fields()
 
+    # missing field strategy can be for all fields at once, or per field
+		# if it is per field, it is a dictionary with field names and their strategy
+		# if it is for all fields, it is may be a callback, 'abort', or 'default'
+		default_strategy = "default"
+		if type(map_missing) is not dict:
+			default_strategy = map_missing
+			map_missing = {}
+
 		# Loop through items
 		for i, item in enumerate(self._iterate_items(processor)):
 			# Save original to yield
@@ -360,15 +368,6 @@ class DataSet(FourcatModule):
 				# check if fields have been marked as 'missing' in the
 				# underlying data, and treat according to the chosen strategy
 				if mapped_item.get_missing_fields():
-					default_strategy = "default"
-
-					# strategy can be for all fields at once, or per field
-					# if it is per field, it is a dictionary with field names and their strategy
-					# if it is for all fields, it is may be a callback, 'abort', or 'default'
-					if type(map_missing) is not dict:
-						default_strategy = map_missing
-						map_missing = {}
-
 					for missing_field in mapped_item.get_missing_fields():
 						strategy = map_missing.get(missing_field, default_strategy)
 
@@ -847,7 +846,7 @@ class DataSet(FourcatModule):
 	def save_annotation_fields(self, annotation_fields):
 		"""
 		Save the annotation fields of a dataset to the datasets table.
-		If changes to the annotation fields affect existing annotations,
+		If changes to the annotation fields affect older, existing annotations,
 		this function also updates or deleted those values.
 
 		:param dict annotation_fields:  Annotation fields, with a field ID as key
@@ -889,7 +888,7 @@ class DataSet(FourcatModule):
 					continue
 
 				# If the type has changed, also delete prior references (except between text and textarea)
-				new_type = new_fields[field_id]["type"]
+				new_type = annotation_fields[field_id]["type"]
 				if field["type"] != new_type:
 
 					if not field["type"] in text_fields and not new_type in text_fields:
@@ -898,7 +897,7 @@ class DataSet(FourcatModule):
 
 				# If the label has changed, change it in the old annotations
 				old_label = old_fields[field_id]["label"]
-				new_label = new_fields[field_id]["label"]
+				new_label = annotation_fields[field_id]["label"]
 
 				if old_label != new_label:
 					labels_to_update[old_label] = new_label
@@ -909,7 +908,7 @@ class DataSet(FourcatModule):
 					if "options" in old_fields[field_id]:
 
 						option_fields.add(old_fields[field_id]["label"])
-						new_options = new_fields[field_id]["options"]
+						new_options = annotation_fields[field_id]["options"]
 
 						new_ids = [list(v.keys())[0] for v in new_options]
 						new_ids = [list(v.keys())[0] for v in new_options]
