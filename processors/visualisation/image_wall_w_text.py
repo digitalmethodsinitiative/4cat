@@ -36,7 +36,7 @@ class ImageTextWallGenerator(BasicProcessor):
 	extension = "svg"  # extension of result file, used internally and in UI
 
 	image_datasets = ["image-downloader", "video-hasher-1"]
-
+	caption_datasets = ["image-captions", "text-from-images"]
 
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
@@ -45,7 +45,8 @@ class ImageTextWallGenerator(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type.startswith("image-captions")
+		image_dataset, text_dataset = cls.identity_dataset_types(module)
+		return image_dataset is not None and text_dataset is not None
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -96,7 +97,7 @@ class ImageTextWallGenerator(BasicProcessor):
         """
 		# TODO: use `media_type` method to identify image datasets after merge
 		# TODO: do we have additional text datasets we would like to support?
-		if source_dataset.type.startswith("image-captions"):
+		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.caption_datasets]):
 			text_dataset = source_dataset
 			image_dataset = source_dataset.get_parent()
 			if not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.image_datasets]):
@@ -137,10 +138,11 @@ class ImageTextWallGenerator(BasicProcessor):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while collecting text")
 
-			if item.get("image_filename") is not None:
+			if item.get("image_filename", item.get("filename")) is not None:
 				# For image-caption datasets
-				max_text_len = max(max_text_len, len(item.get("text")))
-				filename_to_text_mapping[item.get("image_filename")] = item.get("text")
+				image_text = item.get("text") if item.get("text") is not None else ""
+				max_text_len = max(max_text_len, len(image_text))
+				filename_to_text_mapping[item.get("image_filename", item.get("filename"))] = image_text
 
 		# Create SVG with categories and images
 		# Base sizes for each image

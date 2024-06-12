@@ -34,6 +34,9 @@ class CategorizeImagesCLIP(BasicProcessor):
         "[BLIP-2 documentation](https://huggingface.co/docs/transformers/main/model_doc/blip-2)",
         ]
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     config = {
         "dmi-service-manager.fb_blip2-intro-1": {
             "type": UserInput.OPTION_INFO,
