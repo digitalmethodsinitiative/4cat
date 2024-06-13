@@ -25,7 +25,7 @@ packages = [
 	"gensim>=4.1.0, <4.2",
 	"google_api_python_client==2.0.2",
 	"html2text==2020.*",
-	"ImageHash~=4.2.0",
+	"ImageHash>4.2.0",
 	"jieba~=0.42",
 	"json_stream",
 	"lxml~=4.9.0",
@@ -59,6 +59,8 @@ packages = [
 	"unidecode~=1.3",
 	"Werkzeug~=2.2",
 	"wordcloud~=1.8",
+	# The https://github.com/akamhy/videohash is not being maintained anymore; these are two patches
+	"imagedominantcolor @ https://github.com/albertopasqualetto/imagedominantcolor/archive/refs/heads/pillow10.zip",
 	"videohash @ https://github.com/dale-wahl/videohash/archive/refs/heads/main.zip",
 	"vk_api",
 	"yt-dlp",
