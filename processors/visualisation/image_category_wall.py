@@ -187,10 +187,10 @@ class ImageCategoryWallGenerator(BasicProcessor):
 		# Map post IDs to filenames
 		if image_dataset.type == "video-hasher-1":
 			# We know the post ID is the filename.stem as this dataset is derived from the image dataset
-			filename_map = {filename.stem + ".mp4": filename for filename in staging_area.iterdir()}
+			filename_map = {filename.stem + ".mp4": [filename] for filename in staging_area.iterdir()}
 		elif special_case:
 			# We know the post ID is the filename.stem as this dataset is derived from the image dataset
-			filename_map = {filename.stem: filename for filename in staging_area.iterdir()}
+			filename_map = {filename.stem: [filename] for filename in staging_area.iterdir()}
 		else:
 			# Use image metadata to map post IDs to filenames
 			with open(staging_area.joinpath('.metadata.json')) as file:
