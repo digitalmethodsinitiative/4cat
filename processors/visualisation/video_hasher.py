@@ -34,7 +34,7 @@ class VideoHasherPreset(ProcessorPreset):
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
     title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
     description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
-    extension = "csv"
+    extension = "gexf"
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
