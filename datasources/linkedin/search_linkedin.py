@@ -123,20 +123,35 @@ class SearchLinkedIn(Search):
                     mention = mention["*miniProfile"]
                     author_mentions.append(mention["publicIdentifier"])         
                     author_name_mentions.append(" ".join([mention.get("firstName", ""), mention.get("lastName", "")]))
+                elif mention["type"] == "COMPANY_NAME":
+                    mention = mention["*miniCompany"]
+                    author_mentions.append(mention["universalName"])         
+                    author_name_mentions.append(mention.get("name", ""))
 
         # same for metrics
         if "*totalSocialActivityCounts" in item["*socialDetail"]:
             metrics = {
-                "likes": item["*socialDetail"]["*totalSocialActivityCounts"]["numLikes"],
                 "comments": item["*socialDetail"]["*totalSocialActivityCounts"]["numComments"],
-                "shares": item["*socialDetail"]["*totalSocialActivityCounts"]["numShares"]
-            }
+                "shares": item["*socialDetail"]["*totalSocialActivityCounts"]["numShares"],
+                "reactions": item["*socialDetail"]["*totalSocialActivityCounts"]["numLikes"],
+                "reaction_like": 0,
+                "reaction_empathy": 0,
+                "reaction_praise": 0,
+                "reaction_entertainment": 0,
+                "reaction_appreciation": 0,
+                "reaction_interest": 0
+                }
+            # There's different kind of reaction metrics
+            for reaction_type in item["*socialDetail"]["*totalSocialActivityCounts"].get("reactionTypeCounts", []):
+                metrics["reaction_" + reaction_type["reactionType"].lower()] = reaction_type["count"]
+
         else:
             metrics = {
-                "likes": item["*socialDetail"]["likes"]["paging"]["total"],
                 "comments": item["*socialDetail"]["comments"]["paging"]["total"],
                 "shares": item["*socialDetail"]["totalShares"],
+                "reactions": item["*socialDetail"]["likes"]["paging"]["total"]
             }
+
 
         # and links
         link_url = ""
