@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, HTTPHandler
-from importlib.machinery import SourceFileLoader
 
 from common.config_manager import config
 
@@ -132,17 +131,6 @@ class SlackLogHandler(WebHookLogHandler):
             # the file is not readable, or the line number is out of bounds
             pass
 
-        try:
-            module = SourceFileLoader(record.frame.filename.split("/")[-1].split(".")[0], record.frame.filename).load_module()
-            if "__maintainer__" in dir(module):
-                fields.append({
-                    "title": "Code maintainer:",
-                    "value": module.__maintainer__,
-                    "short": False
-                })
-        except ImportError:
-            pass
-
         return {
             "text": ":bell: 4CAT %s logged on `%s`:" % (record.levelname.lower(), platform.uname().node),
             "mrkdwn_in": ["text"],
@@ -175,7 +163,7 @@ class Logger:
     }
     alert_level = "FATAL"
 
-    def __init__(self, output=False, filename='4cat.log'):
+    def __init__(self, output=False, filename='4cat.log', log_level="INFO"):
         """
         Set up log handler
 
@@ -183,6 +171,7 @@ class Logger:
         """
         if self.logger:
             return
+        log_level = self.levels.get(log_level, logging.INFO)
 
         self.print_logs = output
         log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
@@ -193,11 +182,11 @@ class Logger:
         self.previous_report = time.time()
 
         self.logger = logging.getLogger("4cat-backend")
-        self.logger.setLevel(logging.INFO)
+        self.logger.setLevel(log_level)
 
         # this handler manages the text log files
         handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
-        handler.setLevel(logging.INFO)
+        handler.setLevel(log_level)
         handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
                                                "%d-%m-%Y %H:%M:%S"))
         self.logger.addHandler(handler)

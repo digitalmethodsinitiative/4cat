@@ -77,7 +77,7 @@ class SearchLinkedIn(Search):
                 images.append(url)
 
         # or alternatively they are stored here:
-        if not images and item["content"] and item["content"]["articleComponent"] and item["content"]["articleComponent"].get("largeImage"):
+        if not images and item["content"] and item["content"].get("articleComponent") and item["content"]["articleComponent"].get("largeImage"):
             image = item["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
             images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
 
@@ -118,7 +118,7 @@ class SearchLinkedIn(Search):
         link_url = ""
         if item.get("content") and item["content"].get("navigationContext"):
             link_url = item["content"]["navigationContext"].get("actionTarget", "")
-        elif item.get("content") and item["content"].get("articleComponent") and "navigationContext" in post["content"]["articleComponent"]:
+        elif item.get("content") and item["content"].get("articleComponent") and "navigationContext" in item["content"]["articleComponent"]:
             link_url = item["content"]["articleComponent"]["navigationContext"].get("actionTarget", "")
 
         return MappedItem({

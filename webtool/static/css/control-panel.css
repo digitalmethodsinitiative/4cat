@@ -7,11 +7,15 @@
     margin: 0;
 }
 
-.worker-list li > * {
+.worker-list li {
+    padding: 0;
+}
+
+.worker-list li div > * {
     display: inline-block
 }
 
-.worker-list li {
+.worker-list li div {
     padding: 0.75em 1em 0.5em 1em;
 }
 
@@ -119,6 +123,17 @@ table td[colspan] {
 
 .tab-controls .changed {
     color: var(--accent-alternate)
+}
+
+.settings.tab-controls li a {
+    padding: 0.25em 1em;
+}
+
+article .settings h3:not(.blocktitle) {
+    margin: 0;
+    padding: 0.5em;
+    background: var(--contrast-dark);
+    color: var(--always-white);
 }
 
 .config-tag-info {

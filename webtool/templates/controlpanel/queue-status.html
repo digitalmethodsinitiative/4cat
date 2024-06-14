@@ -1,10 +1,12 @@
 <ol class="worker-list">
 {% for worker in queue %}
     <li>
-    <h4>
-        {% if worker in worker_types and worker_types[worker]|hasattr("title") %}{{ worker_types[worker]|attr("title") }}{% else %}{{ worker }}{% endif %}
-    </h4>
-    <p>x {{ queue[worker] }}</p>
+        <div>
+            <h4>
+                {% if worker in worker_types and worker_types[worker]|hasattr("title") %}{{ worker_types[worker]|attr("title") }}{% else %}{{ worker }}{% endif %}
+            </h4>
+            <p>x {{ queue[worker] }}</p>
+        </div>
     </li>
 {% endfor %}
 </ol>

@@ -505,6 +505,11 @@ const query = {
     },
 
     check_resultpage: function () {
+        if (!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         let unfinished = $('.dataset-unfinished');
         if (unfinished.length === 0) {
             return;
@@ -1294,7 +1299,7 @@ const multichoice = {
      */
     init: function () {
         // Multichoice inputs need to be loaded dynamically
-        $(document).on('click', '.toggle-button', function () {
+        $(document).on('click', '.toggle-button, .processor-queue-button', function () {
             if ($(".multichoice-wrapper, .multi-select-wrapper").length > 0) {
                 multichoice.makeMultichoice();
                 multichoice.makeMultiSelect();
@@ -1750,7 +1755,7 @@ const ui_helpers = {
         e.preventDefault();
         let link = e.target;
         let target_id = link.getAttribute('aria-controls');
-        let controls = link.parentNode.parentNode;
+        let controls = find_parent(link, '.tab-controls');
         controls.querySelector('.highlighted').classList.remove('highlighted');
         link.parentNode.classList.add('highlighted');
         controls.parentNode.parentNode.querySelector('.tab-container *[aria-expanded=true]').setAttribute('aria-expanded', 'false');
@@ -1958,4 +1963,15 @@ function hsv2hsl(h, s, v) {
     l /= 2;
 
     return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
+}
+
+function find_parent(element, selector) {
+    while(element.parentNode) {
+        element = element.parentNode;
+        if(element.matches(selector)) {
+            return element;
+        }
+    }
+
+    return null;
 }

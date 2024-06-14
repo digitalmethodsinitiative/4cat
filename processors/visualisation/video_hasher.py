@@ -34,11 +34,18 @@ class VideoHasherPreset(ProcessorPreset):
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
     title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
     description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
-    extension = "csv"
+    extension = "gexf"
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         return {
+			"amount": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "No. of videos",
+				"default": 100,
+				"min": 0,
+				"tooltip": "Increasing this can easily lead to very long-running processors. '0; allows as many videos as available."
+			},
 			"frame_interval": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Number of frames extracted per second to extract from video",
@@ -84,6 +91,7 @@ class VideoHasherPreset(ProcessorPreset):
                 "type": "video-hasher-1",
 				"parameters": {
 					"frame_interval": self.parameters.get("frame_interval", 1),
+					"amount": self.parameters.get("amount", 100),
 				}
             },
 			# then create hash similarity network
@@ -119,22 +127,37 @@ class VideoHasher(BasicProcessor):
 	"""
 	type = "video-hasher-1"  # job type ID
 	category = "Visual"  # category
-	title = "Create Video colleges"  # title displayed in UI
-	description = "Creates colleges from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
+	title = "Create Video collages"  # title displayed in UI
+	description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	options = {
-		"frame_interval": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Number of frames extracted per second to extract from video",
-			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision when creating hashes (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
-			"coerce_type": float,
-			"default": 1,
-			"min": 0,
-			"max": 5,
-		},
-	}
+	followups = ["video-hash-network", "video-hash-similarity-matrix"]
 
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Options for the processor
+			"""
+		options = {
+			"amount": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "No. of videos",
+				"default": 100,
+				"min": 0,
+				"tooltip": "Increasing this can easily lead to very long-running processors. '0; allows as many videos as available."
+			},
+			"frame_interval": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Number of frames extracted per second to extract from video",
+				"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision when creating hashes (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
+				"coerce_type": float,
+				"default": 1,
+				"min": 0,
+				"max": 5,
+			},
+		}
+
+		return options
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
@@ -155,6 +178,7 @@ class VideoHasher(BasicProcessor):
 
 		# Collect parameters
 		frame_interval = self.parameters.get("frame_interval", 1)
+		max_videos = self.parameters.get("amount", 100)
 		self.dataset.log('Frames per seconds: %f' % frame_interval)
 
 		# Prepare staging area for videos and video tracking
@@ -163,13 +187,16 @@ class VideoHasher(BasicProcessor):
 
 		video_hashes = {}
 		video_metadata = None
-		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
 		processed_videos = 0
 
 		self.dataset.update_status("Creating video hashes")
 		for path in self.iterate_archive_contents(self.source_file, staging_area):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while creating video hashes")
+
+			if max_videos != 0 and processed_videos >= max_videos:
+				break
 
 			if path.name == '.metadata.json':
 				# Keep it and move on
@@ -209,6 +236,13 @@ class VideoHasher(BasicProcessor):
 		# This file is held here and then copied as its own dataset via VideoHasherTwo
 		num_posts = 0
 		rows = []
+		if video_metadata is None:
+			# Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
+			metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+			if metadata_path:
+				with open(metadata_path) as file:
+					video_metadata = json.load(file)
+
 		if video_metadata is None:
 			# Not good, but let's store the video_hashes and note the error
 			self.dataset.update_status("Error connecting video hashes to original dataset", is_final=True)
@@ -250,7 +284,7 @@ class VideoHasher(BasicProcessor):
 						'video_hash': video_hash.hash,
 						'video_duration': video_hash.video_duration,
 						'video_count': len(data.get('post_ids', [])),
-						"post_ids": ','.join(data.get("post_ids", [])),
+						"post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
 						'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
 					})
 					num_posts += 1
@@ -378,6 +412,11 @@ class VideoHashNetwork(BasicProcessor):
 					self.dataset.update_status(
 						"Calculated %i of %i hash similarities" % (comparisons, expected_comparisons))
 					self.dataset.update_progress(comparisons / expected_comparisons)
+
+		if not network.edges():
+			self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
+			self.dataset.finish(0)
+			return
 
 		self.dataset.update_status("Writing network file")
 		nx.write_gexf(network, self.dataset.get_results_path())

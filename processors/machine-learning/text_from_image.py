@@ -47,6 +47,9 @@ class ImageTextDetector(BasicProcessor):
         "[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
     ]
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     config = {
         "dmi-service-manager.ea_ocr-intro-1": {
             "type": UserInput.OPTION_INFO,
@@ -77,7 +80,7 @@ class ImageTextDetector(BasicProcessor):
         },
         "update_original": {
             "type": UserInput.OPTION_TOGGLE,
-            "help": "Update original database with detected text",
+            "help": "Update original dataset with detected text",
             "default": False,
             "tooltip": "If enabled, the original dataset will be modified to include a 'detected_text' column otherwise a seperate dataset will be created"
         }
@@ -178,27 +181,35 @@ class ImageTextDetector(BasicProcessor):
         if metadata_file is None:
             try:
                 self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
-                metadata_success = True
+                metadata_exists = True
             except KeyError:
                 self.dataset.update_status("No metadata file found")
-                metadata_success = False
+                metadata_exists = False
+        else:
+            # Previously extracted
+            metadata_exists = True
 
-            if metadata_success:
-                with open(os.path.join(staging_area, '.metadata.json')) as file:
-                    image_data = json.load(file)
-                    for url, data in image_data.items():
-                        if data.get('success'):
-                            data.update({"url": url})
-                            image_metadata[data['filename']] = data
+        if metadata_exists:
+            with open(os.path.join(staging_area, '.metadata.json')) as file:
+                image_data = json.load(file)
+                for url, data in image_data.items():
+                    if data.get('success'):
+                        data.update({"url": url})
+                        image_metadata[data['filename']] = data
 
         # Check if we need to collect data for updating the original dataset
         update_original = self.parameters.get("update_original", False)
         if update_original:
-            filename_to_post_id = {}
-            for url, data in image_data.items():
-                if data.get('success'):
-                    filename_to_post_id[data.get('filename')] = data.get('post_ids')
-            post_id_to_results = {}
+            if not metadata_exists:
+                self.dataset.update_status("No metadata file found, cannot update original dataset")
+                update_original = False
+            else:
+                # Create filename to post id mapping
+                filename_to_post_id = {}
+                for url, data in image_data.items():
+                    if data.get('success'):
+                        filename_to_post_id[data.get('filename')] = data.get('post_ids')
+                post_id_to_results = {}
 
         # Save files as NDJSON, then use map_item for 4CAT to interact
         processed = 0
@@ -251,7 +262,11 @@ class ImageTextDetector(BasicProcessor):
             except ProcessorException as e:
                 self.dataset.update_status("Error updating parent dataset: %s" % e)
 
-        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images")
+        detected_message = f"Detected speech in {processed} of {total_image_files} images."
+        if self.parameters.get("update_original", False) and not update_original:
+            self.dataset.update_status(f"{detected_message} No metadata file found, unable to update original dataset.", is_final=True)
+        else:
+            self.dataset.update_status(detected_message)
         self.dataset.finish(processed)
 
     @staticmethod
@@ -260,7 +275,7 @@ class ImageTextDetector(BasicProcessor):
         For preview frontend
         """
         return MappedItem({
-            "filename": item.get("filename"),
+            "image_filename": item.get("filename"),
             "model_type": item.get("model_type"),
             "text": item.get("simplified_text", {}).get("raw_text"),
             "post_ids": ", ".join([str(post_id) for post_id in item.get("image_metadata", {}).get("post_ids", [])]),

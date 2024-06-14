@@ -1,5 +1,5 @@
 """
-Download images from Telegram message attachments
+Download videos from Telegram message attachments
 """
 import asyncio
 import hashlib
@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 
 from telethon import TelegramClient
-from telethon.errors import TimedOutError
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
@@ -22,29 +21,35 @@ __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
 
-class TelegramImageDownloader(BasicProcessor):
+class TelegramVideoDownloader(BasicProcessor):
     """
-    Telegram image downloader
+    Telegram video downloader
 
-    Downloads attached images from Telegram messages and saves as zip archive
+    Downloads attached videos from Telegram messages and saves as zip archive
     """
-    type = "image-downloader-telegram"  # job type ID
+    type = "video-downloader-telegram"  # job type ID
     category = "Visual"  # category
-    title = "Download Telegram images"  # title displayed in UI
-    description = "Download images and store in a zip file. Downloads through the Telegram API might take a while. " \
-                  "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
+    title = "Download Telegram videos"  # title displayed in UI
+    description = "Download videos and store in a zip file. Downloads through the Telegram API might take a while. " \
+                  "Note that not always all videos can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     flawless = True
 
     config = {
-        "image-downloader-telegram.max": {
-            'type': UserInput.OPTION_TEXT,
-            'default' : "1000",
-            'help': 'Max images',
-            'tooltip': "Maxmimum number of Telegram images a user can download.",
-            },
-        }
+        "video-downloader-telegram.max_videos": {
+            "type": UserInput.OPTION_TEXT,
+            "default": 100,
+            "help": "Max videos",
+            "tooltip": "Maxmimum number of Telegram videos a user can download.",
+        },
+        "video-downloader-telegram.allow_videos": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Allow video downloads",
+            "tooltip": "Enable 'Download Telegram Videos' processor?",
+        },
+    }
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -59,26 +64,15 @@ class TelegramImageDownloader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
+        max_videos = int(config.get('video-downloader-telegram.max_videos', 100, user=user))
 
         return {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": f"No. of images (max {max_number_images:,})",
+                "help": f"Amount of videos (max {max_videos:,})",
                 "default": 100,
                 "min": 0,
-                "max": max_number_images
-            },
-            "video-thumbnails": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Include videos (as thumbnails)",
-                "default": False
-            },
-            "website-thumbnails": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Include link thumbnails",
-                "default": False,
-                "tooltip": "This includes e.g. thumbnails for linked YouTube videos"
+                "max": max_videos
             }
         }
 
@@ -90,9 +84,12 @@ class TelegramImageDownloader(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
+        if not config.get("video-downloader-telegram.allow_videos", user=user):
+            return False
+
         if type(module) is DataSet:
             # we need these to actually instantiate a telegram client and
-            # download the images
+            # download the videos
             return module.type == "telegram-search" and \
                    "api_phone" in module.parameters and \
                    "api_id" in module.parameters and \
@@ -102,24 +99,24 @@ class TelegramImageDownloader(BasicProcessor):
 
     def process(self):
         """
-        Prepare and asynchronously call method to download images
+        Prepare and asynchronously call method to download videos
         """
         self.staging_area = self.dataset.get_staging_area()
         self.eventloop = None
         self.metadata = {}
 
-        asyncio.run(self.get_images())
+        asyncio.run(self.get_videos())
 
         # finish up
         with self.staging_area.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(self.metadata, outfile)
 
-        self.dataset.update_status("Compressing images")
+        self.dataset.update_status("Compressing videos")
         self.write_archive_and_finish(self.staging_area)
 
-    async def get_images(self):
+    async def get_videos(self):
         """
-        Get images for messages
+        Get videos for messages
 
         Separate method because this needs to be run asynchronously. Looks for
         messages in the dataset with photo attachments, then loads those
@@ -132,84 +129,74 @@ class TelegramImageDownloader(BasicProcessor):
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
         session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
         amount = self.parameters.get("amount")
-        with_thumbnails = self.parameters.get("video-thumbnails")
-        with_websites = self.parameters.get("website-thumbnails")
+
         client = None
 
         # we need a session file, otherwise we can't retrieve the necessary data
         if not session_path.exists():
-            self.dataset.update_status("Telegram session file missing. Cannot download images.", is_final=True)
+            self.dataset.update_status("Telegram session file missing. Cannot download videos.", is_final=True)
             return []
 
         # instantiate client
         try:
             client = TelegramClient(str(session_path), int(query.get("api_id")), query.get("api_hash"),
                                     loop=self.eventloop)
-            await client.start(phone=TelegramImageDownloader.cancel_start)
+            await client.start(phone=TelegramVideoDownloader.cancel_start)
         except RuntimeError:
             # session is no longer usable
             self.dataset.update_status(
-                "Session is not authenticated: login security code may have expired. You need to  create a new "
-                "dataset to download images from and re-enter the security code", is_final=True)
+                "Session is not authenticated: login security code may have expired. You need to create a new "
+                "dataset to download videos from and re-enter the security code", is_final=True)
 
         # figure out which messages from the dataset we need to download media
         # for. Right now, that's everything with a non-empty `photo` attachment
         # or `video` if we're also including thumbnails
-        messages_with_photos = {}
-        downloadable_types = ["photo"]
-        if with_thumbnails:
-            downloadable_types.append("video")
-        if with_websites:
-            downloadable_types.append("url")
+        messages_with_videos = {}
+        downloadable_types = ["video"]
 
         total_media = 0
-        self.dataset.update_status("Finding messages with image attachments")
+        self.dataset.update_status("Finding messages with video attachments")
         for message in self.source_dataset.iterate_items(self):
             if self.interrupted:
-                await client.disconnect()
                 raise ProcessorInterruptedException("Interrupted while processing messages")
 
             if not message.get("attachment_data") or message.get("attachment_type") not in downloadable_types:
                 continue
 
-            if message["chat"] not in messages_with_photos:
-                messages_with_photos[message["chat"]] = []
+            if message["chat"] not in messages_with_videos:
+                messages_with_videos[message["chat"]] = []
 
-            messages_with_photos[message["chat"]].append(int(message["id"].split("-")[-1]))
+            messages_with_videos[message["chat"]].append(int(message["id"].split("-")[-1]))
             total_media += 1
 
             if amount and total_media >= amount:
                 break
 
-        # now actually download the images
+        # now actually download the videos
         # todo: investigate if we can directly instantiate a MessageMediaPhoto instead of fetching messages
         media_done = 1
-        for entity, message_ids in messages_with_photos.items():
+        for entity, message_ids in messages_with_videos.items():
             try:
                 async for message in client.iter_messages(entity=entity, ids=message_ids):
                     if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while downloading images")
+                        raise ProcessorInterruptedException("Interrupted while downloading videos")
 
                     success = False
                     try:
-                        # it's actually unclear if images are always jpegs, but this
-                        # seems to work
                         self.dataset.update_status(f"Downloading media {media_done:,}/{total_media:,}")
                         self.dataset.update_progress(media_done / total_media)
 
-                        path = self.staging_area.joinpath(f"{entity}-{message.id}.jpeg")
+                        path = self.staging_area.joinpath(f"{entity}-{message.id}.mp4")
                         filename = path.name
-                        if hasattr(message.media, "photo"):
+                        if hasattr(message.media, "document"):
                             await message.download_media(str(path))
-                        else:
-                            # video thumbnail
-                            await client.download_media(message, str(path), thumb=-1)
+
                         msg_id = message.id
                         success = True
-                    except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError) as e:
+                    except (AttributeError, RuntimeError, ValueError, TypeError) as e:
                         filename = f"{entity}-index-{media_done}"
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
-                        self.dataset.log(f"Could not download image for message {msg_id} ({e})")
+                        self.dataset.log(f"Could not download video for message {msg_id} ({e})")
                         self.flawless = False
 
                     media_done += 1
@@ -221,10 +208,8 @@ class TelegramImageDownloader(BasicProcessor):
                     }
                     
             except ValueError as e:
-                self.dataset.log(f"Couldn't retrieve images for {entity}, it probably does not exist anymore ({e})")
+                self.dataset.log(f"Couldn't retrieve video for {entity}, it probably does not exist anymore ({e})")
                 self.flawless = False
-
-        await client.disconnect()
 
     @staticmethod
     def cancel_start():
@@ -249,7 +234,7 @@ class TelegramImageDownloader(BasicProcessor):
         :yield dict:  	  iterator containing reformated metadata
         """
         row = {
-            "number_of_posts_with_image": len(data.get("post_ids", [])),
+            "number_of_posts_with_video": len(data.get("post_ids", [])),
             "post_ids": ", ".join(map(str, data.get("post_ids", []))),
             "filename": filename,
             "download_successful": data.get('success', "")

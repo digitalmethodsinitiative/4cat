@@ -334,8 +334,16 @@ class DataSet(FourcatModule):
 		# Collect item_mapper for use with filter
 		item_mapper = False
 		own_processor = self.get_own_processor()
-		if own_processor.map_item_method_available(dataset=self):
+		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
+
+		# missing field strategy can be for all fields at once, or per field
+		# if it is per field, it is a dictionary with field names and their strategy
+		# if it is for all fields, it is may be a callback, 'abort', or 'default'
+		default_strategy = "default"
+		if type(map_missing) is not dict:
+			default_strategy = map_missing
+			map_missing = {}
 
 		# Loop through items
 		for i, item in enumerate(self._iterate_items(processor)):
@@ -355,15 +363,6 @@ class DataSet(FourcatModule):
 				# check if fields have been marked as 'missing' in the
 				# underlying data, and treat according to the chosen strategy
 				if mapped_item.get_missing_fields():
-					default_strategy = "default"
-
-					# strategy can be for all fields at once, or per field
-					# if it is per field, it is a dictionary with field names and their strategy
-					# if it is for all fields, it is may be a callback, 'abort', or 'default'
-					if type(map_missing) is not dict:
-						default_strategy = map_missing
-						map_missing = {}
-
 					for missing_field in mapped_item.get_missing_fields():
 						strategy = map_missing.get(missing_field, default_strategy)
 
@@ -1369,7 +1368,7 @@ class DataSet(FourcatModule):
 				del processors[analysis.type]
 				continue
 
-			if exclude_hidden and not processors[analysis.type].is_hidden:
+			if exclude_hidden and processors[analysis.type].is_hidden:
 				del processors[analysis.type]
 
 		self.available_processors = processors

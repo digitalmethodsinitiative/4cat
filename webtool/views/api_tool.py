@@ -203,6 +203,7 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
+	pseudonymise_mode = request.args.get("pseudonymise", "none")
 
 	# data source identifiers cannot start with a number but some do (such as
 	# 9gag and 4chan) so sanitise those numbers to account for this...
@@ -211,7 +212,7 @@ def import_dataset():
 		.replace("9", "nine")
 
 	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
-		return error(404, message="Unknown platform or source format")
+		return error(404, message=f"Unknown platform or source format '{platform}'")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
 	worker = None
@@ -231,6 +232,19 @@ def import_dataset():
 		extension=worker.extension
 	)
 	dataset.update_status("Importing uploaded file...")
+
+	# if indicated that pseudonymisation is needed, immediately queue the
+	# relevant worker so that it will pseudonymise the dataset before anything
+	# else can be done with it
+	if pseudonymise_mode in ("pseudonymise", "anonymise"):
+		filterable_fields = worker.pseudonymise_fields if hasattr(worker, "pseudonymise_fields") else ["author*", "user*"]
+		dataset.next = [{
+			"type": "author-info-remover",
+			"parameters": {
+				"mode": pseudonymise_mode,
+				"fields": filterable_fields
+			}
+		}]
 
 	# store the file at the result path for the dataset, but with a different suffix
 	# since the dataset was only just created, this file is guaranteed to not exist yet
@@ -755,6 +769,7 @@ def remove_tag():
 
 	tagged_users = db.fetchall("SELECT * FROM users WHERE tags @> %s ", (json.dumps([tag]),))
 	all_tags = list(set(itertools.chain(*[u["tags"] for u in db.fetchall("SELECT DISTINCT tags FROM users")])))
+	all_tags += [s["tag"] for s in db.fetchall("SELECT DISTINCT tag FROM settings WHERE tag LIKE 'user:%'")]
 
 	for user in tagged_users:
 		user = User.get_by_name(db, user["name"])
@@ -771,6 +786,8 @@ def remove_tag():
 		if configured_tag and configured_tag not in all_tags:
 			db.delete("settings", where={"tag": configured_tag})
 
+	# we do not re-sort here, since we are preserving the original order, just
+	# without any of the deleted or orphaned tags
 	config.set("flask.tag_order", all_tags, tag="")
 
 	if request.args.get("redirect") is not None:
@@ -1044,7 +1061,7 @@ def queue_processor(key=None, processor=None):
 
 	processor_worker = available_processors[processor]
 	try:
-		sanitised_query = UserInput.parse_all(processor_worker.get_options(None, current_user), request.form,
+		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, current_user), request.form,
 											  silently_correct=False)
 
 		if hasattr(processor_worker, "validate_query"):

@@ -70,6 +70,9 @@ class DatasetMerger(BasicProcessor):
         :param db:  Database handler (to retrieve metadata)
         :return DataSet:  The dataset
         """
+        if not url:
+            raise DataSetException("URL empty or not provided")
+
         source_url = ural.normalize_url(url)
         source_key = source_url.split("/")[-1]
         return DataSet(key=source_key, db=db)
@@ -86,8 +89,12 @@ class DatasetMerger(BasicProcessor):
         total_items = self.source_dataset.num_rows
         warnings = {}
 
-        for source_dataset in self.parameters.get("source").replace("\n", ",").split(","):
+        for source_dataset in self.parameters.get("source").strip().replace("\n", ",").split(","):
             source_dataset_url = source_dataset.strip()
+            if not source_dataset_url:
+                # trailing commas, etc - skip
+                continue
+
             try:
                 source_dataset = self.get_dataset_from_url(source_dataset_url, self.db)
             except DataSetException:
@@ -115,6 +122,9 @@ class DatasetMerger(BasicProcessor):
             else:
                 total_items += source_dataset.num_rows
                 source_datasets.append(source_dataset)
+
+        if len(source_datasets) <= 1:
+            return self.dataset.finish_with_error(f"You need to provide at least one valid URL for a source dataset.")
 
         # clean up parameters
         self.dataset.parameters = {**self.dataset.parameters, "source": ", ".join([d.key for d in source_datasets])}

@@ -21,7 +21,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     NDJSON, but it can be more useful to have a CSV file. This discards some
     information to allow 'flattening' the output to a simple CSV file.
     """
-    type = "convert-vision-to-csv"  # job type ID
+    type = "convert-google-vision-to-csv"  # job type ID
     category = "Conversion"  # category
     title = "Convert Vision results to CSV"  # title displayed in UI
     description = "Convert the Vision API output to a simplified CSV file."  # description displayed in UI
