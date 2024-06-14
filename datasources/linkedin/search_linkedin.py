@@ -78,9 +78,21 @@ class SearchLinkedIn(Search):
                 images.append(url)
 
         # or alternatively they are stored here:
-        if not images and item["content"] and item["content"]["articleComponent"] and item["content"]["articleComponent"].get("largeImage"):
+        if not images and item["content"] and item["content"].get("articleComponent") and item["content"]["articleComponent"].get("largeImage"):
             image = item["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
             images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
+
+        # video thumbnails are stored similarly as image data
+        video_thumb_url = ""
+        thumb_content = None
+        if item["content"] and "*videoPlayMetadata" in item["content"]:
+            thumb_content = item["content"]["*videoPlayMetadata"]["thumbnail"]
+        elif item["content"] and "linkedInVideoComponent" in item["content"] and item["content"]["linkedInVideoComponent"]:
+            thumb_content = item["content"]["linkedInVideoComponent"]["*videoPlayMetadata"]["thumbnail"]
+        elif item["content"] and "externalVideoComponent" in item["content"] and item["content"]["externalVideoComponent"]:
+            thumb_content = item["content"]["externalVideoComponent"]["*videoPlayMetadata"]["thumbnail"]
+        if thumb_content:
+            video_thumb_url = thumb_content["rootUrl"] + thumb_content["artifacts"][0]["fileIdentifyingUrlPathSegment"]
 
         author = SearchLinkedIn.get_author(item)
 
@@ -100,6 +112,17 @@ class SearchLinkedIn(Search):
             hashtags = [tag["trackingUrn"].split(":").pop() for tag in item["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]
         elif item["commentary"] and "attributesV2" in item["commentary"]["text"]:
             hashtags = [tag["detailData"]["*hashtag"]["trackingUrn"].split(":").pop() for tag in item["commentary"]["text"].get("attributesV2", []) if "*hashtag" in tag["detailData"]]
+
+        # and mentions
+        # we're storing both usernames and full names
+        author_mentions = []
+        author_name_mentions = []
+        if item["commentary"] and "attributes" in item["commentary"]["text"]:
+            for mention in item["commentary"]["text"].get("attributes", {}):
+                if mention["type"] == "PROFILE_MENTION":
+                    mention = mention["*miniProfile"]
+                    author_mentions.append(mention["publicIdentifier"])         
+                    author_name_mentions.append(" ".join([mention.get("firstName", ""), mention.get("lastName", "")]))
 
         # same for metrics
         if "*totalSocialActivityCounts" in item["*socialDetail"]:
@@ -131,8 +154,11 @@ class SearchLinkedIn(Search):
             "timestamp_ago": time_ago.split("•")[0].strip(),
             "is_promoted": "yes" if not re.findall(r"[0-9]", time_ago) else "no",
             **{("author_" + k).replace("_username", ""): v for k, v in author.items()},
+            "author_mentions": ",".join(author_mentions),
+            "author_name_mentions": ",".join(author_name_mentions),
             "hashtags": ",".join(hashtags),
             "image_urls": ",".join(images),
+            "video_thumb_url": video_thumb_url,
             "post_url": "https://www.linkedin.com/feed/update/" + urn,
             "link_url":  link_url,
             **metrics,

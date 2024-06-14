@@ -1,0 +1,21 @@
+<header>
+	{% if post.inclusion_context %}
+		<div class="inclusion-context">{{ post.inclusion_context }}</div>
+	{% endif %}
+
+	{% if not pseudonymised %}
+		<!-- Possible external link, if not pseudonymised -->
+		<a href="{{ post.post_url }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
+		<!-- Author and co-author -->
+		<div class="author"><strong><a href="https://linkedin.com/{{ post.get('author') }}">{{ post.get("author_name") }}</strong></a></div>
+		<div class="author-description">{{ post.get("author_description") }}</div>
+		<div class="time">{{ post.get("timestamp") }}</div>
+	{% else %}
+		<span title="Pseudonymous author" class="author">
+		<i class="fa fa-user-secret tooltip-trigger"></i>
+	{% endif %}
+</header>
+
+<div class="post-content">
+	<div class="body">{{ post.get("body") | social_mediafy(datasource='linkedin') | safe }}</div>
+</div>

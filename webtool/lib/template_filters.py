@@ -186,7 +186,7 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		return body
 
 	# Supported data sources
-	known_datasources = ["twitter", "tiktok", "instagram", "tumblr"]
+	known_datasources = ["twitter", "tiktok", "instagram", "tumblr", "linkedin"]
 	if datasource not in known_datasources:
 		return body
 
@@ -207,6 +207,10 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		"tumblr": {
 			"hashtag": "https://tumblr.com/tagged/",
 			"mention": "https://tumblr.com/"
+		},
+		"linkedin": {
+			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
+			"mention": "https://linkedin.com/in/"
 		}
 	}
 
