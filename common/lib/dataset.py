@@ -338,9 +338,19 @@ class DataSet(FourcatModule):
 		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
-		# Annotation fields are dynamically added,
+		# Annotation fields are dynamically added to top-level datasets,
 		# so we're always going to accept these.
-		annotation_fields = self.get_annotation_fields()
+		annotation_fields = None
+		if self.is_top_dataset():
+			annotation_fields = self.get_annotation_fields()
+
+    	# missing field strategy can be for all fields at once, or per field
+		# if it is per field, it is a dictionary with field names and their strategy
+		# if it is for all fields, it is may be a callback, 'abort', or 'default'
+		default_strategy = "default"
+		if type(map_missing) is not dict:
+			default_strategy = map_missing
+			map_missing = {}
 
 		# Loop through items
 		for i, item in enumerate(self._iterate_items(processor)):
@@ -360,15 +370,6 @@ class DataSet(FourcatModule):
 				# check if fields have been marked as 'missing' in the
 				# underlying data, and treat according to the chosen strategy
 				if mapped_item.get_missing_fields():
-					default_strategy = "default"
-
-					# strategy can be for all fields at once, or per field
-					# if it is per field, it is a dictionary with field names and their strategy
-					# if it is for all fields, it is may be a callback, 'abort', or 'default'
-					if type(map_missing) is not dict:
-						default_strategy = map_missing
-						map_missing = {}
-
 					for missing_field in mapped_item.get_missing_fields():
 						strategy = map_missing.get(missing_field, default_strategy)
 
@@ -822,7 +823,7 @@ class DataSet(FourcatModule):
 		:return dict: The saved annotation fields.
 		"""
 
-		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
+		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.key,))
 		
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
@@ -837,7 +838,7 @@ class DataSet(FourcatModule):
 		return dict: The annotations
 		"""
 
-		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
+		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.key,))
 
 		if annotations and annotations.get("annotations"):
 			return json.loads(annotations["annotations"])

@@ -63,6 +63,7 @@
 .posts .post .media-container img {
 	width: 100%;
 	border-radius: 15px;
+	border: 1px solid #e1e7ea;
 }
 
 .metrics {

@@ -20,6 +20,7 @@ from collections.abc import MutableMapping
 from html.parser import HTMLParser
 from pathlib import Path
 from calendar import monthrange
+from packaging import version
 
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -97,6 +98,26 @@ def sniff_encoding(file):
         maybe_bom = False
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
+
+
+def get_git_branch():
+    """
+    Get current git branch
+
+    If the 4CAT root folder is a git repository, this function will return the
+    name of the currently checked-out branch. If the folder is not a git
+    repository or git is not installed an empty string is returned.
+    """
+    try:
+        cwd = os.getcwd()
+        os.chdir(config.get('PATH_ROOT'))
+        branch = subprocess.run(["git", "branch", "--show-current"], stdout=subprocess.PIPE)
+        os.chdir(cwd)
+        if branch.returncode != 0:
+            raise ValueError()
+        return branch.stdout.decode("utf-8").strip()
+    except (subprocess.SubprocessError, ValueError, FileNotFoundError):
+        return ""
 
 
 def get_software_commit():
@@ -187,6 +208,24 @@ def get_github_version(timeout=5):
         latest_tag = re.sub(r"^v", "", latest_tag)
 
     return (latest_tag, response.get("html_url"))
+
+def get_ffmpeg_version(ffmpeg_path):
+    """
+    Determine ffmpeg version
+
+    This can be necessary when using commands that change name between versions.
+
+    :param ffmpeg_path: ffmpeg executable path
+    :return packaging.version:  Comparable ersion
+    """
+    command = [ffmpeg_path, "-version"]
+    ffmpeg_version = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+
+    ffmpeg_version = ffmpeg_version.stdout.decode("utf-8").split("\n")[0].strip().split(" version ")[1]
+    ffmpeg_version = re.split(r"[^0-9.]", ffmpeg_version)[0]
+
+    return version.parse(ffmpeg_version)
 
 
 def convert_to_int(value, default=0):
