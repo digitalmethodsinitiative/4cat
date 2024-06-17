@@ -400,7 +400,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		TODO: could be improved by accepting different types of data depending on csv or ndjson.
 
-		:param str field_name: 	name of the desired
+		:param str field_name: 	Name of the desired new field
 		:param List new_data: 	List of data to be added to parent dataset
 		:param DataSet which_parent: 	DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
 		:param bool update_existing: 	False (default) will raise an error if the field_name already exists
@@ -418,7 +418,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		parent_path = which_parent.get_results_path()
 
 		if len(new_data) != which_parent.num_rows:
-			raise ProcessorException('Must have new data point for each record: parent dataset: %i, new data points: %i' % (which_parent.num_rows, len(new_data)))
+			self.dataset.update_status('The amount of new data points and existing records don\'t match; data may be misaligned (parent dataset: %i, new data points: %i)' % (which_parent.num_rows, len(new_data)))
 
 		self.dataset.update_status("Adding new field %s to the source file" % field_name)
 

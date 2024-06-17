@@ -3,6 +3,7 @@ Write annotations to a dataset
 """
 from processors.filtering.base_filter import BasicProcessor
 from common.lib.helpers import UserInput
+from common.lib.exceptions import MapItemException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -17,7 +18,7 @@ class WriteAnnotations(BasicProcessor):
 	type = "write-annotations"  # job type ID
 	category = "Filtering"  # category
 	title = "Write annotations"  # title displayed in UI
-	description = "Writes annotations from the Explorer to the dataset. Each input field will get a column. This creates a new dataset."  # description displayed in UI
+	description = "Writes annotations from the Explorer to the existing dataset. Each input field will get a new column."  # description displayed in UI
 
 	options = {
 		"to-lowercase": {
@@ -71,7 +72,7 @@ class WriteAnnotations(BasicProcessor):
 		# Create dictionary with annotation labels as keys and lists of data as values
 		new_data = {annotation_label: [] for annotation_label in annotation_labels}
 
-		for item in self.source_dataset.iterate_items(self):
+		for item in self.source_dataset.iterate_items(self, warn_unmappable=True):
 			post_count += 1
 
 			# Do some loops so we have empty data for all annotation fields
@@ -101,7 +102,7 @@ class WriteAnnotations(BasicProcessor):
 
 		# Write to top dataset
 		for label, values in new_data.items():
-			self.add_field_to_parent("annotation_" + label, values, which_parent=self.source_dataset, update_existing=True)
+			self.add_field_to_parent(label, values, which_parent=self.source_dataset, update_existing=True)
 		
 		self.dataset.update_status("Annotations written to parent dataset.")
 		self.dataset.finish(self.source_dataset.num_rows)

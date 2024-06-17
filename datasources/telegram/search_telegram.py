@@ -39,6 +39,7 @@ class SearchTelegram(Search):
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    has_explorer_preset = True # Whether this data source has preset CSS and field settings for the Explorer 
 
     # cache
     details_cache = None

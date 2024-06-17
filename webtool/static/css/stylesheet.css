@@ -956,6 +956,11 @@ article section.data-overview .description {
     color: var(--contrast-bright);
 }
 
+.pagination .details {
+    margin: 0 auto;
+    text-align: center;
+}
+
 .tabs {
     border-bottom: 1px dotted var(--contrast-dark);
     max-height: 5em;

@@ -1,10 +1,4 @@
-/* 
-
-See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
- 
- */
-
-body {
+.explorer-content {
 	background-color: #001935;
 }
 

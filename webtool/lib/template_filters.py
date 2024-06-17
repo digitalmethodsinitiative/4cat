@@ -12,8 +12,10 @@ from webtool import app, config
 from common.lib.helpers import timify_long
 from common.config_manager import ConfigWrapper
 
+from pathlib import Path
 from flask import request
 from flask_login import current_user
+from ural import urls_from_text
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
@@ -175,151 +177,64 @@ def _jinja2_filter_extension_to_noun(ext):
 	else:
 		return "item"
 
-@app.template_filter('4chan_image')
-def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
+@app.template_filter('social_mediafy')
+def _jinja2_filter_social_mediafy(body, datasource=""):
+	# Adds links to a text body with hashtags, @-mentions, and URLs
+	# A data source must be given to generate the correct URLs. 
 
-	plebs_boards = ["adv","f","hr","mlpol","mo","o","pol","s4s","sp","tg","trv","tv","x"]
-	archivedmoe_boards = ["3","a","aco","adv","an","asp","b","bant","biz","c","can","cgl","ck","cm","co","cock","con","d","diy","e","f","fa","fap","fit","fitlit","g","gd","gif","h","hc","his","hm","hr","i","ic","int","jp","k","lgbt","lit","m","mlp","mlpol","mo","mtv","mu","n","news","o","out","outsoc","p","po","pol","pw","q","qa","qb","qst","r","r9k","s","s4s","sci","soc","sp","spa","t","tg","toy","trash","trv","tv","u","v","vg","vint","vip","vm","vmg","vp","vr","vrpg","vst","vt","w","wg","wsg","wsr","x","xs","y"]
+	if not datasource:
+		return body
 
-	headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"}
+	# Supported data sources
+	known_datasources = ["twitter", "tiktok", "instagram", "tumblr", "linkedin"]
+	if datasource not in known_datasources:
+		return body
 
-	img_link = None
-	thumb_link = image_4chan.split(".")
-	thumb_link = thumb_link[0][:4] + "/" + thumb_link[0][4:6] + "/" + thumb_link[0] + "s." + thumb_link[1]
+	# Base URLs after which tags and @-mentions follow, per platform
+	base_urls = {
+		"twitter": {
+			"hashtag": "https://twitter.com/hashtag/",
+			"mention": "https://twitter.com/"
+		},
+		"tiktok": {
+			"hashtag": "https://tiktok.com/tag/",
+			"mention": "https://tiktok.com/@"
+		},
+		"instagram": {
+			"hasthag": "https://instagram.com/explore/tags/",
+			"mention": "https://instagram.com/"
+		},
+		"tumblr": {
+			"hashtag": "https://tumblr.com/tagged/",
+			"mention": "https://tumblr.com/"
+		},
+		"linkedin": {
+			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
+			"mention": "https://linkedin.com/in/"
+		}
+	}
 
-	# If the board is archived by 4plebs, check that site first
-	if board in plebs_boards:
+	# Add URL links
+	for url in urls_from_text(body):
+		body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
 
-		# First we're going to try to get the image link through the 4plebs API.
-		api_url = "https://archive.4plebs.org/_/api/chan/post/?board=%s&num=%s" % (board, post_id)
-		try:
-			api_json = requests.get(api_url, headers=headers)
-		except requests.RequestException as e:
-		 	pass
-		if api_json.status_code != 200:
-			pass
-		try:
-			api_json = json.loads(api_json.content)
-			img_link = api_json.get("media", {}).get("thumb_link", "")
-		except json.JSONDecodeError:
-			pass
-		if img_link:
-			return img_link
+	# Add hashtag links
+	tags = re.findall(r"#[\w0-9]+", body)
+	# We're sorting tags by length so we don't incorrectly
+	# replace tags that are a substring of another, longer tag.
+	tags = sorted(tags, key=lambda x: len(x), reverse=True)
+	for tag in tags:
+		# Match the string, but not if it's preceded by a >, which indicates that we've already added an <a> tag.
+		# This avoids problems with repeated substrings (e.g. #Dog and #DogOwners).
+		body = re.sub(r"(?<!'>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
 
-		# If that doesn't work, we can check whether we can retrieve the image directly.
-		# 4plebs has a back-referral system so that some filenames are translated.
-		# This means direct linking won't work for every image without API retrieval.
-		# So only show if we get a 200 status code.
-		img_page = requests.get("https://img.4plebs.org/boards/%s/thumb/%s" % (board, thumb_link), headers=headers)
-		if img_page.status_code == 200:
-			return "https://img.4plebs.org/boards/%s/thumb/%s" % (board, thumb_link)
+	# Add @-mention links
+	mentions = re.findall(r"@[\w0-9]+", body)
+	mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
+	for mention in mentions:
+		body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
 
-	# If the board is archived by archivedmoe, we can also check this resource
-	if board in archivedmoe_boards:
-		img_page = requests.get("https://archived.moe/files/%s/thumb/%s" % (board, thumb_link), headers=headers)
-		if img_page.status_code == 200:
-			return img_page
-
-	# If we couldn't retrieve the thumbnail yet, then we'll just give a search link
-	# and display it as a hidden image.
-	image_md5 = image_md5.replace("/", "_")
-	if board in plebs_boards:
-		return "retrieve:http://archive.4plebs.org/_/search/image/" + image_md5
-	# Archivedmoe as a last resort - has a lot of boards
-	return "retrieve:https://archived.moe/_/search/image/" + image_md5
-
-
-
-@app.template_filter('post_field')
-def _jinja2_filter_post_field(field, post):
-	# Extracts string values between {{ two curly brackets }} and uses that
-	# as a dictionary key for the given dict. It then returns the corresponding value.
-	# Mainly used in the Explorer.
-
-	matches = False
-	formatted_field = field
-
-	field = str(field)
-	
-	for key in re.findall(r"\{\{(.*?)\}\}", field):
-
-		original_key = key
-
-		# Remove possible slice strings so we get the original key
-		string_slice = None
-		if "[" in original_key and "]" in original_key:
-			string_slice = re.search(r"\[(.*?)\]", original_key)
-			if string_slice:
-				string_slice = string_slice.group(1)
-				key = key.replace("[" + string_slice + "]", "")
-
-		# We're also gonna extract any other filters present
-		extra_filters = []
-		if "|" in key:
-			extra_filters = key.split("|")[1:]
-			key = key.split("|")[0]
-
-		# They keys can also be subfields (e.g. "author.username")
-		# So we're splitting and looping until we get the value.
-		keys = key.split(".")
-		val = post
-
-		for k in keys:
-			if isinstance(val, list):
-				val = val[0]
-			if isinstance(val, dict):
-				val = val.get(k.strip(), "")
-
-		# Return nothing if one of the fields is not found.
-		# We see 0 as a valid value - e.g. '0 retweets'.
-		if not val and val != 0:
-			return ""
-		
-		# Support some basic string slicing
-		if string_slice:
-			field = field.replace("[" + string_slice + "]", "")
-			if ":" not in string_slice:
-				string_slice = slice(int(string_slice), int(string_slice) + 1)
-			else:
-				sl = string_slice.split(":")
-				if not sl[0] and sl[0] != "0":
-					sl1 = 0
-					sl2 = sl[1]
-				elif not sl[-1]:
-					sl1 = sl[0]
-					sl2 = len(st)
-				else:
-					sl1 = sl[0]
-					sl2 = sl[1]
-				string_slice = slice(int(sl1), int(sl2))
-
-		# Apply further filters, if present (e.g. lower)
-		for extra_filter in extra_filters:
-			
-			extra_filter = extra_filter.strip()
-
-			# We're going to parse possible parameters to pass to the filter
-			# These are passed as unnamed variables to the function.
-			params = ()
-			if "(" in extra_filter:
-				params = extra_filter.split("(")[-1][:-1].strip()
-				extra_filter = extra_filter.split("(")[0]
-				params = [p.strip() for p in params.split(",")]
-				params = [post[param] for param in params]
-			
-			val = app.jinja_env.filters[extra_filter](val, *params)
-
-		if string_slice:
-			val = val[string_slice]
-
-		# Extract single list item
-		if isinstance(val, list) and len(val) == 1:
-			val = val[0]
-
-		formatted_field = formatted_field.replace("{{" + original_key + "}}", str(val))
-
-	return formatted_field
-
+	return body
 
 @app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):
@@ -355,7 +270,6 @@ def inject_now():
 			version = infile.readline().strip()
 	else:
 		version = "???"
-
 
 	return {
 		"__has_https": wrapped_config.get("flask.https"),
