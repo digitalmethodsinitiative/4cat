@@ -1,5 +1,6 @@
 import subprocess
 import time
+import shutil
 import abc
 import os
 from urllib.parse import urljoin
@@ -544,6 +545,16 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             self.selenium_log.error(f"Error killing {browser}: {e}")
             self.quit_selenium()
             raise e
+
+    @classmethod
+    def is_selenium_available(cls):
+        """
+        Check if Selenium is available
+        """
+        if config.get("selenium.installed"):
+             return shutil.which(config.get("selenium.selenium_executable_path"))
+        else:
+            return False
 
 
 class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):

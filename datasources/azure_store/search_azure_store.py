@@ -27,13 +27,13 @@ class SearchAzureStore(Search):
     base_url = "https://azuremarketplace.microsoft.com"
 
     config = {
-        "azure.categories": {
+        "cache.azure.categories": {
             "type": UserInput.OPTION_TEXT_JSON,
             "help": "Azure Categories",
             "tooltip": "automatically updated",
             "default": {}
         },
-        "azure.categories_updated_at": {
+        "cache.azure.categories_updated_at": {
             "type": UserInput.OPTION_TEXT,
             "help": "Azure Categories Updated At",
             "tooltip": "automatically updated",
@@ -69,7 +69,7 @@ class SearchAzureStore(Search):
                 "default": "search"
             },
             "category": {
-                "type": UserInput.OPTION_CHOICE,
+                "type": UserInput.OPTION_TEXT,
                 "help": "Apple Store App Collection",
                 "requires": "method^=category",  # starts with list
             },
@@ -91,6 +91,7 @@ class SearchAzureStore(Search):
                                     categories.items()}
             formatted_categories["4CAT_all_categories"] = "All Categories"
             options["category"]["options"] = formatted_categories
+            options["category"]["type"] = UserInput.OPTION_CHOICE
             options["category"]["default"] = "4CAT_all_categories"
         else:
             options.pop("category")
@@ -99,7 +100,7 @@ class SearchAzureStore(Search):
 
     def get_items(self, query):
         """
-        Fetch items from Apple Store
+        Fetch items from Azure Store
 
         :param query:
         :return:
@@ -340,10 +341,10 @@ class SearchAzureStore(Search):
         """
         Get categories from Azure Store
         """
-        last_updated = config.get("azure.categories_updated_at")
+        last_updated = config.get("cache.azure.categories_updated_at", 0)
         if (datetime.datetime.fromtimestamp(last_updated) > datetime.datetime.now() - datetime.timedelta(days=1)) and not force_update:
             # Do not re-fetch unless forced or older than one day
-            return config.get("azure.categories")
+            return config.get("cache.azure.categories")
 
         config.db.log.info("Fetching categories from Azure Store")
         categories_url = cls.base_url + f"/{store}/marketplace/apps"
@@ -372,8 +373,8 @@ class SearchAzureStore(Search):
                     # We only pass the key to the backend; so make a unique key that can be parsed (otherwise we could re-request)
                     category_map[main_key + "_--_" + sub_key] = {"cat_key": main_key, "cat_title": cat_title,
                                                               "sub_key": sub_key, "sub_title": sub_title}
-        config.set("azure.categories", category_map)
-        config.set("azure.categories_updated_at", datetime.datetime.now().timestamp())
+        config.set("cache.azure.categories", category_map)
+        config.set("cache.azure.categories_updated_at", datetime.datetime.now().timestamp())
         return category_map
 
     @staticmethod
