@@ -66,6 +66,16 @@ class SearchTelegram(Search):
             "default": 25,
             "tooltip": "Amount of entities that can be queried at a time. Entities are groups or channels. 0 to "
                        "disable limit."
+        },
+        "telegram-search.max_crawl_depth": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Max crawl depth",
+            "coerce_type": int,
+            "min": 0,
+            "default": 0,
+            "tooltip": "If higher than 0, 4CAT can automatically add new entities to the query based on forwarded "
+                       "messages. Recommended to leave at 0 for most users since this can exponentially increase "
+                       "dataset sizes."
         }
     }
 
@@ -151,7 +161,7 @@ class SearchTelegram(Search):
                 "type": UserInput.OPTION_INFO,
                 "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
                         "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                        "figure out where or who a message was forwarded from. However, this increases query time and "
+                        "figure out where or who a message was forwarded from.\n\nHowever, this increases query time and "
                         "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
                         "to finish capturing. It will also dramatically increase the disk space needed to store the "
                         "data, so only enable this if you really need it!"
@@ -174,6 +184,36 @@ class SearchTelegram(Search):
         else:
             options["max_posts"]["help"] = (f"Messages to collect per entity. You can query up to "
                                              f"{options['max_posts']['max']:,} messages per entity.")
+
+        if config.get("telegram-search.max_crawl_depth", 0, user=user) > 0:
+            options["crawl_intro"] = {
+                "type": UserInput.OPTION_INFO,
+                "help": "Optionally, 4CAT can 'discover' new entities via forwarded messages; for example, if a "
+                        "channel X you are collecting data for contains a message forwarded from channel Y, 4CAT can "
+                        "collect messages from both channel X and Y. **Use this feature with caution**, as datasets can "
+                        "rapidly grow when adding newly discovered entities to the query this way. Note that dataset "
+                        "progress cannot be accurately tracked when you use this feature."
+            }
+            options["crawl-depth"] = {
+                "type": UserInput.OPTION_TEXT,
+                "coerce_type": int,
+                "min": 0,
+                "max": config.get("telegram-search.max_crawl_depth"),
+                "default": 0,
+                "help": "Crawl depth",
+                "tooltip": "How many 'hops' to make when crawling messages. This is the distance from an initial "
+                           "query, i.e. at most this many hops can be needed to reach the entity from one of the "
+                           "starting entities."
+            }
+            options["crawl-threshold"] = {
+                "type": UserInput.OPTION_TEXT,
+                "coerce_type": int,
+                "min": 0,
+                "default": 5,
+                "help": "Crawl threshold",
+                "tooltip": "Entities need to be references at least this many times to be added to the query. Only "
+                           "references discovered below the max crawl depth are taken into account."
+            }
 
         return options
 
@@ -308,13 +348,41 @@ class SearchTelegram(Search):
         # Adding flag to stop; using for rate limits
         no_additional_queries = False
 
+        # This is used for the 'crawl' feature so we know at which depth a
+        # given entity was discovered
+        depth_map = {
+            entity: 0 for entity in queries
+        }
+
+        crawl_max_depth = self.parameters.get("crawl-depth", 0)
+        crawl_msg_threshold = self.parameters.get("crawl-threshold", 10)
+
+        self.dataset.log(f"Max crawl depth: {crawl_max_depth}")
+        self.dataset.log(f"Crawl threshold: {crawl_msg_threshold}")
+
+        # this keeps track of how often an entity not in the original query
+        # has been mentioned. When crawling is enabled and this exceeds the
+        # given threshold, the entity is added to the query
+        crawl_references = {}
+        queried_entities = list(queries)
+        full_query = list(queries)
+
+        # we may not always know the 'entity username' for an entity ID, so
+        # keep a reference map as we go
+        entity_id_map = {}
+
         # Collect queries
+        # Use while instead of for so we can change queries during iteration
+        # this is needed for the 'crawl' feature which can discover new
+        # entities during crawl
         processed = 0
-        for query in queries:
+        while queries:
+            query = queries.pop(0)
+
             delay = 10
             retries = 0
             processed += 1
-            self.dataset.update_progress(processed / len(queries))
+            self.dataset.update_progress(processed / len(full_query))
 
             if no_additional_queries:
                 # Note that we are note completing this query
@@ -345,12 +413,42 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
+                        if "_chat" in serialized_message and query not in entity_id_map and serialized_message["_chat"]["id"] == query:
+                            # once we know what a channel ID resolves to, use the username instead so it is easier to
+                            # understand for the user
+                            entity_id_map[query] = serialized_message["_chat"]["username"]
+                            self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
+
                         if resolve_refs:
                             serialized_message = await self.resolve_groups(client, serialized_message)
 
                         # Stop if we're below the min date
                         if min_date and serialized_message.get("date") < min_date:
                             break
+
+                        # if crawling is enabled, see if we found something to add to the query
+                        if crawl_max_depth > 0 and (not crawl_msg_threshold or depth_map.get(query) < crawl_msg_threshold):
+                            message_fwd = serialized_message.get("fwd_from")
+                            fwd_from = None
+                            if message_fwd and message_fwd["from_id"] and message_fwd["from_id"]["_type"] == "PeerChannel":
+                                # even if we haven't resolved the ID, we can feed the numeric ID
+                                # to Telethon! this is nice because it means we don't have to
+                                # resolve entities to crawl iteratively
+                                fwd_from = int(message_fwd["from_id"]["channel_id"])
+
+                            if fwd_from and fwd_from not in queried_entities and fwd_from not in queries:
+                                # new entity discovered!
+                                # might be discovered (before collection) multiple times, so retain lowest depth
+                                depth_map[fwd_from] = min(depth_map.get(fwd_from, crawl_max_depth), depth_map[query] + 1)
+                                if depth_map[query] < crawl_max_depth:
+                                    if fwd_from not in crawl_references:
+                                        crawl_references[fwd_from] = 0
+
+                                    crawl_references[fwd_from] += 1
+                                    if crawl_references[fwd_from] >= crawl_msg_threshold and fwd_from not in queries:
+                                        queries.append(fwd_from)
+                                        full_query.append(fwd_from)
+                                        self.dataset.update_status(f"Discovered new entity {entity_id_map.get(fwd_from, fwd_from)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
 
                         yield serialized_message
 
@@ -590,6 +688,7 @@ class SearchTelegram(Search):
         # was the message forwarded from somewhere and if so when?
         forwarded_timestamp = ""
         forwarded_name = ""
+        forwarded_id = ""
         forwarded_username = ""
         if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (
                 type(message["fwd_from"]["from_id"]) is int):
@@ -601,7 +700,7 @@ class SearchTelegram(Search):
             from_data = message["fwd_from"]["from_id"]
 
             if from_data:
-                forwarded_from_id = from_data.get("channel_id", from_data.get("user_id", ""))
+                forwarded_id = from_data.get("channel_id", from_data.get("user_id", ""))
 
             if message["fwd_from"].get("from_name"):
                 forwarded_name = message["fwd_from"].get("from_name")
@@ -662,6 +761,7 @@ class SearchTelegram(Search):
             "unix_timestamp_edited": int(message["edit_date"]) if message["edit_date"] else "",
             "author_forwarded_from_name": forwarded_name,
             "author_forwarded_from_username": forwarded_username,
+            "author_forwarded_from_id": forwarded_id,
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
                 "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
@@ -876,7 +976,9 @@ class SearchTelegram(Search):
             "save-session": query.get("save-session"),
             "resolve-entities": query.get("resolve-entities"),
             "min_date": min_date,
-            "max_date": max_date
+            "max_date": max_date,
+            "crawl-depth": query.get("crawl-depth"),
+            "crawl-threshold": query.get("crawl-threshold")
         }
 
     @staticmethod
