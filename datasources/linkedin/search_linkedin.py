@@ -152,7 +152,6 @@ class SearchLinkedIn(Search):
                 "reactions": item["*socialDetail"]["likes"]["paging"]["total"]
             }
 
-
         # and links
         link_url = ""
         if item.get("content") and item["content"].get("navigationContext"):
