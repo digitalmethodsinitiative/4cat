@@ -195,6 +195,10 @@ class SearchAwsStore(SearchWithSelenium):
         :param query:
         :return:
         """
+        if not self.is_selenium_available():
+            self.dataset.log("Selenium not available; unable to collect from AWS Store.")
+            return
+
         queries = re.split(',|\n', self.parameters.get('query', ''))
         if not queries:
             # can search all
@@ -255,7 +259,7 @@ class SearchAwsStore(SearchWithSelenium):
         title_block = result_element.find_element(By.XPATH, './/h2[@data-semantic="title"]')
         title = title_block.text
         app_url = title_block.find_element(By.TAG_NAME, "a").get_attribute("href")
-        app_id = urllib.parse.parse_qs(urllib.parse.urlparse(app_url).query).get("applicationId", [None])[0]
+        app_id = app_url.split("prodview-")[1].split("?")[0]
         # vendor
         vendor_block = result_element.find_element(By.XPATH, './/a[@data-semantic="vendorNameLink"]')
         vendor_name = vendor_block.text
