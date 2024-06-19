@@ -135,7 +135,7 @@ def _jinja2_filter_add_ahref(content):
 		return content
 
 	for link in set(ural.urls_from_text(str(content))):
-		content = content.replace(link, f'<a href="{urllib.parse.quote(link, safe="%/")}" rel="external">{link}</a>')
+		content = content.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link}</a>')
 
 	return content
 
