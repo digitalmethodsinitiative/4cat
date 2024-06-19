@@ -34,6 +34,8 @@ class Tokenise(BasicProcessor):
 				  "tokens per sentence)."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller",]
+
 	references = [
 			"[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
 			"[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",

@@ -28,6 +28,8 @@ class HatebaseAnalyser(BasicProcessor):
 	description = "Assign scores for 'offensiveness' and hate speech propability to each post by using Hatebase."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["hatebase-frequencies"]
+
 	token_expires = 0
 	token = ""
 

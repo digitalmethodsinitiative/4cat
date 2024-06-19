@@ -20,6 +20,8 @@ class CountPosts(BasicProcessor):
 	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["histogram"]
+
 	options = {
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,

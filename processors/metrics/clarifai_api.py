@@ -33,6 +33,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
                   "requests will be credited by Clarifai to the owner of the API token you provide!"  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = ["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"]
+
     references = [
         "[Clarifai](https://www.clarifai.com/)",
         "[Clarifai API Pricing & Free Usage Limits](https://www.clarifai.com/pricing)",

@@ -23,6 +23,8 @@ class ThreadMetadata(BasicProcessor):
 				  "that this extracted only on the basis of the items present this dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

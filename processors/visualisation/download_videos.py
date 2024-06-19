@@ -53,6 +53,8 @@ class VideoDownloaderPlus(BasicProcessor):
                   "retrieved externally."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
+    followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
+
     if config.get("video-downloader.allow-indirect"):
         references = [
             "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",

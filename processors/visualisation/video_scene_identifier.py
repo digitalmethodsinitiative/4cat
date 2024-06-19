@@ -28,6 +28,8 @@ class VideoSceneDetector(BasicProcessor):
 				  "intensity or cuts and fades to black) and extract the scene metadata."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["video-scene-frames", "video-timelines"]
+
 	references = [
 		"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",
 		"[Detection Algorithms](https://scenedetect.com/projects/Manual/en/latest/api/detectors.html)"
@@ -136,8 +138,6 @@ class VideoSceneDetector(BasicProcessor):
 			"max": 1.0,
 		},
 	}
-
-	followups = ["video-scene-frames", "video-timelines"]
 
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):

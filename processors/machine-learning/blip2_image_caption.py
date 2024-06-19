@@ -28,14 +28,14 @@ class CategorizeImagesCLIP(BasicProcessor):
     description = "The BLIP2 model uses a pretrained image encoder combined with an LLM to generate image captions. The model can also be prompted and uses the image plus prompt to generate text responses."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",
         "[BLIP-2 paper: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models](https://arxiv.org/abs/2301.12597)",
         "[BLIP-2 documentation](https://huggingface.co/docs/transformers/main/model_doc/blip-2)",
         ]
-
-    # Processors designed to handle input from this Dataset
-    followups = ["image-text-wall"]
 
     config = {
         "dmi-service-manager.fb_blip2-intro-1": {

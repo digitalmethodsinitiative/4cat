@@ -9,6 +9,7 @@ import re
 import os
 
 from backend.lib.processor import BasicProcessor
+from processors.visualisation.download_images import ImageDownloader
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -29,6 +30,8 @@ class StableDiffusionImageGenerator(BasicProcessor):
     title = "Generate images from text prompts"  # title displayed in UI
     description = "Given a list of prompts, generates images for those prompts using the Stable Diffusion XL image model."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+
+    followups = ImageDownloader.followups
 
     references = [
         "[Stable Diffusion XL 1.0 model card](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)"

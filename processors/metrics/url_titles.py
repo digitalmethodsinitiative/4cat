@@ -35,6 +35,8 @@ class URLFetcher(BasicProcessor):
                    "each URL, optionally following HTTP redirects.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = []
+
     options = {
         "columns": {
             "type": UserInput.OPTION_TEXT,

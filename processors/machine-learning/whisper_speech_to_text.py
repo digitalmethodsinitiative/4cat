@@ -28,6 +28,8 @@ class AudioToText(BasicProcessor):
     description = "Detect speech in audion and convert to text."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = []
+
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
         "[Whisper paper: Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356)",

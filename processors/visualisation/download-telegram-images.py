@@ -15,6 +15,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from common.lib.dataset import DataSet
+from processors.visualisation.download_images import ImageDownloader
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -36,6 +37,8 @@ class TelegramImageDownloader(BasicProcessor):
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     flawless = True
+
+    followups = ImageDownloader.followups
 
     config = {
         "image-downloader-telegram.max": {

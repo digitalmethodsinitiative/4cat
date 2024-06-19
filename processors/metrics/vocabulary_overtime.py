@@ -23,6 +23,8 @@ class OvertimeAnalysis(BasicProcessor):
 	description = "Determines the counts over time of particular set of words or phrases."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	references = [
 		"[Hatebase.org](https://hatebase.org)"
 		"[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
