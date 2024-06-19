@@ -47,6 +47,9 @@ class ImageTextDetector(BasicProcessor):
         "[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
     ]
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     config = {
         "dmi-service-manager.ea_ocr-intro-1": {
             "type": UserInput.OPTION_INFO,
@@ -77,7 +80,7 @@ class ImageTextDetector(BasicProcessor):
         },
         "update_original": {
             "type": UserInput.OPTION_TOGGLE,
-            "help": "Update original database with detected text",
+            "help": "Update original dataset with detected text",
             "default": False,
             "tooltip": "If enabled, the original dataset will be modified to include a 'detected_text' column otherwise a seperate dataset will be created"
         }
@@ -272,7 +275,7 @@ class ImageTextDetector(BasicProcessor):
         For preview frontend
         """
         return MappedItem({
-            "filename": item.get("filename"),
+            "image_filename": item.get("filename"),
             "model_type": item.get("model_type"),
             "text": item.get("simplified_text", {}).get("raw_text"),
             "post_ids": ", ".join([str(post_id) for post_id in item.get("image_metadata", {}).get("post_ids", [])]),

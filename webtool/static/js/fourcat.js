@@ -1821,7 +1821,7 @@ const ui_helpers = {
             }
 
             conditionals.forEach((element) => {
-                let requirement = RegExp(/([a-zA-Z0-9_]+)([!=$~^]+)(.*)/g).exec(element.getAttribute('data-requires'));
+                let requirement = RegExp(/([a-zA-Z0-9_-]+)([!=$~^]+)(.*)/g).exec(element.getAttribute('data-requires'));
                 if (!requirement || requirement.length !== 4) { // assume 'field is not empty'
                     requirement = [null, element.getAttribute('data-requires'), '!=', ''];
                 }
@@ -1829,6 +1829,8 @@ const ui_helpers = {
                 const negate = requirement[2] === '!=';
                 const other_field = 'option-' + requirement[1];
                 const other_element = form.querySelector("*[name='" + other_field + "']");
+
+                console.log(other_field);
 
                 if (!other_element) { //invalid reference
                     return;
@@ -1839,13 +1841,13 @@ const ui_helpers = {
                 let requirement_met = false;
                 if (other_element.getAttribute('type') === 'checkbox') {
                     // checkboxes are a bit different (and simpler)
-                    const checked = other_element.checked;
+                    const other_is_checked = other_element.checked;
                     if(requirement[2] === '!=') {
-                        if((checked && ['', 'false'].includes(requirement[3])) || (!checked && ['checked', 'true'].includes(requirement[3]))) {
+                        if((other_is_checked && ['', 'false'].includes(requirement[3])) || (!other_is_checked && ['checked', 'true'].includes(requirement[3]))) {
                             requirement_met = true;
                         }
                     } else {
-                        if((checked && ['checked', 'true'].includes(requirement[3])) || (!checked && ['', 'false'].includes(requirement[3]))) {
+                        if((other_is_checked && ['checked', 'true'].includes(requirement[3])) || (!other_is_checked && ['', 'false'].includes(requirement[3]))) {
                             requirement_met = true;
                         }
                     }

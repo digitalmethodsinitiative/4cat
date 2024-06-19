@@ -219,7 +219,7 @@ class SearchDouyin(Search):
             "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),
             # Adding this as different Douyin pages contain different data
             "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}",
-            "region": item.get("region"),
+            "region": item.get("region", ""),
             "hashtags": ",".join(
                 [tag[hashtag_key] for tag in (item[text_extra_key] if item[text_extra_key] is not None else []) if
                  hashtag_key in tag]),
