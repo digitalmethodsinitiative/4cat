@@ -20,11 +20,7 @@
                 {% endif %}
             {% endif %}
             <t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
-                {% if inner_loop.index in ns.links and outer_loop.index != 1 %}
-                    <a href="{{ cell }}" target="_blank">{{ cell }}</a>
-                {% else %}
-                    {{ cell }}
-                {% endif %}
+                {{ cell|e|add_ahref|safe }}
             </t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
         {% endfor %}
         </tr>
