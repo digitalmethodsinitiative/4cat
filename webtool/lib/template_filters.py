@@ -1,6 +1,8 @@
+import urllib.parse
 import datetime
 import markdown
 import json
+import ural
 import uuid
 import math
 import os
@@ -116,6 +118,26 @@ def _jinja2_filter_httpquery(data):
 		return urlencode(data)
 	except TypeError:
 		return ""
+
+@app.template_filter("add_ahref")
+def _jinja2_filter_add_ahref(content):
+	"""
+	Add HTML links to text
+
+	Replaces URLs with a clickable link
+
+	:param str content:  Text to parse
+	:return str:  Parsed text
+	"""
+	try:
+		content = str(content)
+	except ValueError:
+		return content
+
+	for link in set(ural.urls_from_text(str(content))):
+		content = content.replace(link, f'<a href="{urllib.parse.quote(link, safe="%/")}" rel="external">{link}</a>')
+
+	return content
 
 @app.template_filter('markdown')
 def _jinja2_filter_markdown(text):
