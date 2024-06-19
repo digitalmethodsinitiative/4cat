@@ -233,9 +233,12 @@ class Tokenise(BasicProcessor):
 		elif self.parameters.get("tokenizer_type") == "jieba-search":
 			tokenizer = jieba.cut_for_search
 			tokenizer_args = {}
+		elif self.parameters.get("tokenizer_type") == "twitter":
+			tokenizer = TweetTokenizer(preserve_case=False).tokenize
+			tokenizer_args = {}
 		else:
-			tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
-			tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
+			tokenizer = word_tokenize
+			tokenizer_args = {"language": language} if language != "other" else {}
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
