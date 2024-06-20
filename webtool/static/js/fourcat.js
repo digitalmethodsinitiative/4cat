@@ -365,13 +365,29 @@ const query = {
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    const sample_size = Math.min(pair[1].size, snippet_size);
-                    const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
+                    if(pair[1].type !== 'application/zip') {
+                        const sample_size = Math.min(pair[1].size, snippet_size);
+                        const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
 
-                    // make sure we're submitting utf-8 - read and then re-encode to be sure
-                    const blobAsText = await FileReaderPromise(blob);
-                    const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
-                    formdata.set(pair[0], snippet);
+                        // make sure we're submitting utf-8 - read and then re-encode to be sure
+                        const blobAsText = await FileReaderPromise(blob);
+                        const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
+                        formdata.set(pair[0], snippet);
+                    } else {
+                        // if this is a zip file, don't bother with a snippet (which won't be
+                        // useful) but do send a list of files in the zip
+                        const reader = new zip.ZipReader(new zip.BlobReader(pair[1]));
+                        const entries = await reader.getEntries();
+                        formdata.set(pair[0] + '-entries', JSON.stringify(
+                           entries.map(function(e) {
+                               return {
+                                   filename: e.filename,
+                                   filesize: e.compressedSize
+                               }
+                           })
+                        ));
+                        formdata.set(pair[0], null);
+                    }
                 }
             }
         }
