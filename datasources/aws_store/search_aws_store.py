@@ -89,7 +89,7 @@ class SearchAwsStore(SearchWithSelenium):
 
         # Backend runs get_options for each processor on init; be careful here
         # TODO: fix filter collection!
-        filter_options = None #cls.get_query_options()
+        filter_options = {} #cls.get_query_options()
         for filter_name, filter_options in filter_options.items():
             if filter_name not in cls.query_param_map:
                 config.db.log.warning(f"AWS Unknown filter name: {filter_name}")
