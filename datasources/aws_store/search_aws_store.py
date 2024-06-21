@@ -99,12 +99,12 @@ class SearchAwsStore(SearchWithSelenium):
                 "default": "all",
             }
 
-        options["full_details"] = {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Include full application details",
-                "default": False,
-                "tooltip": "If enabled, the full details of each application will be included in the output.",
-            }
+        # options["full_details"] = {
+        #         "type": UserInput.OPTION_TOGGLE,
+        #         "help": "Include full application details",
+        #         "default": False,
+        #         "tooltip": "If enabled, the full details of each application will be included in the output.",
+        #     }
         return options
 
     @classmethod
@@ -112,7 +112,7 @@ class SearchAwsStore(SearchWithSelenium):
         """
         Get query options from AWS only if they have not been recently checked
         """
-        click_js_script = "arguments[0].click()"
+        click_js_script = "arguments[0].click();"
         last_updated = config.get("cache.aws.query_options_updated_at", 0)
         if (datetime.fromtimestamp(last_updated) > datetime.now() - timedelta(
                 days=1)) and not force_update:
@@ -170,7 +170,7 @@ class SearchAwsStore(SearchWithSelenium):
                             # TODO: sort why these are not appearing!
                             option_value = option.find_element(By.XPATH, "./div[@data-value]").get_attribute("data-value")
                         except selenium_exceptions.NoSuchElementException:
-                            selenium_driver.selenium_log.warning(f"Unable to extract options for {option.text}")
+                            selenium_driver.selenium_log.warning(f"Unable to extract options for {option.text} {option}")
                             continue
                         query_filters[option_name].append({
                             "name": option.text,
@@ -210,6 +210,7 @@ class SearchAwsStore(SearchWithSelenium):
         pricing_model = self.parameters.get('pricing_model', None) if self.parameters.get('pricing_model', None) != "all" else None
         fulfillment_option_type = self.parameters.get('fulfillment_option_type', None) if self.parameters.get('fulfillment_option_type', None) != "all" else None
 
+        collected = 0
         for query in queries:
             page = 1
             result_number = 1
@@ -230,23 +231,31 @@ class SearchAwsStore(SearchWithSelenium):
             except selenium_exceptions.NoSuchElementException:
                 self.dataset.log("Unknown number of results found")
 
-            results_table = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, 'tbody')))
-            # results_table = self.driver.find_element(By.TAG_NAME, "tbody")
+            while collected < max_results:
+                results_table = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, 'tbody')))
+                # results_table = self.driver.find_element(By.TAG_NAME, "tbody")
 
-            # TODO: implement pagination
-            for result_block in results_table.find_elements(By.TAG_NAME, "tr"):
-                # TODO: check full details
-                result = self.parse_search_result(result_block)
-                result["4CAT_metadata"] = {"query": query,
-                                           "category": category,
-                                           "creator": creator,
-                                           "pricing_model": pricing_model,
-                                           "fulfillment_option_type": fulfillment_option_type,
-                                           "page": page,
-                                           "rank": result_number,
-                                           "collected_at_timestamp": datetime.now().timestamp()}
-                result_number += 1
-                yield result
+                for result_block in results_table.find_elements(By.TAG_NAME, "tr"):
+                    # TODO: check full details
+                    result = self.parse_search_result(result_block)
+                    result["4CAT_metadata"] = {"query": query,
+                                               "category": category,
+                                               "creator": creator,
+                                               "pricing_model": pricing_model,
+                                               "fulfillment_option_type": fulfillment_option_type,
+                                               "page": page,
+                                               "rank": result_number,
+                                               "collected_at_timestamp": datetime.now().timestamp()}
+                    result_number += 1
+                    collected += 1
+                    yield result
+
+                if not self.click_next_page(self.driver):
+                    # No next page
+                    break
+                else:
+                    page += 1
+
 
     @staticmethod
     def parse_search_result(result_element):
@@ -308,6 +317,18 @@ class SearchAwsStore(SearchWithSelenium):
             params["filters"] = ",".join(filters)
         url += "?" + urllib.parse.urlencode(params) if params else ""
         return url
+
+    @staticmethod
+    def click_next_page(driver):
+        """"
+        Click next page button
+        """
+        next_page = driver.find_elements(By.XPATH, '//button[@aria-label="Next page"]')
+        if not next_page:
+            return False
+        driver.execute_script("arguments[0].scrollIntoView(true);", next_page[0])
+        next_page[0].click()
+        return True
 
     @staticmethod
     def map_item(item):
