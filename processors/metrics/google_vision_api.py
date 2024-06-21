@@ -34,6 +34,8 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                   "requests will be credited by Google to the owner of the API token you provide!"# description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = ["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"]
+
     references = [
         "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
         "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)"

@@ -29,6 +29,8 @@ class TopImageCounter(BasicProcessor):
     description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = ["image-downloader"]
+
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """

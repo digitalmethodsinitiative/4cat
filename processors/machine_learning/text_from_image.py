@@ -39,6 +39,9 @@ class ImageTextDetector(BasicProcessor):
     """
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     references = [
         "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
         "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)"
@@ -46,9 +49,6 @@ class ImageTextDetector(BasicProcessor):
         "[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
         "[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
     ]
-
-    # Processors designed to handle input from this Dataset
-    followups = ["image-text-wall"]
 
     config = {
         "dmi-service-manager.ea_ocr-intro-1": {

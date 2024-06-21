@@ -37,6 +37,7 @@ class ImageTextWallGenerator(BasicProcessor):
 
 	image_datasets = ["image-downloader", "video-hasher-1"]
 	caption_datasets = ["image-captions", "text-from-images"]
+	combined_dataset = ["image-downloader-stable-diffusion"]
 
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
@@ -97,7 +98,10 @@ class ImageTextWallGenerator(BasicProcessor):
         """
 		# TODO: use `media_type` method to identify image datasets after merge
 		# TODO: do we have additional text datasets we would like to support?
-		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.caption_datasets]):
+		if source_dataset.type in ImageTextWallGenerator.combined_dataset:
+			# This dataset has both images and captions
+			return source_dataset, source_dataset
+		elif any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.caption_datasets]):
 			text_dataset = source_dataset
 			image_dataset = source_dataset.get_parent()
 			if not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.image_datasets]):
@@ -134,15 +138,33 @@ class ImageTextWallGenerator(BasicProcessor):
 		# Create text mapping
 		max_text_len = 0
 		filename_to_text_mapping = {}
-		for item in text_dataset.iterate_items(self):
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while collecting text")
+		if text_dataset.type in ImageTextWallGenerator.combined_dataset:
+			# For datasets with both images and text, use .metadata.json
+			metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file)
+			if metadata_file is None:
+				self.dataset.finish_with_error("No metadata file found")
+				return
+			with metadata_file.open() as f:
+				metadata = json.load(f)
+			for item in metadata.values():
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while collecting text")
+				if "filename" in item:
+					# "image-downloader-stable-diffusion" datasets
+					image_text = item.get("prompt", "")
+					max_text_len = max(max_text_len, len(image_text))
+					filename_to_text_mapping[item["filename"]] = image_text
+		else:
+			# For datasets with separate images and text
+			for item in text_dataset.iterate_items(self):
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while collecting text")
 
-			if item.get("image_filename", item.get("filename")) is not None:
-				# For image-caption datasets
-				image_text = item.get("text") if item.get("text") is not None else ""
-				max_text_len = max(max_text_len, len(image_text))
-				filename_to_text_mapping[item.get("image_filename", item.get("filename"))] = image_text
+				if item.get("image_filename", item.get("filename")) is not None:
+					# For image-caption datasets
+					image_text = item.get("text") if item.get("text") is not None else ""
+					max_text_len = max(max_text_len, len(image_text))
+					filename_to_text_mapping[item.get("image_filename", item.get("filename"))] = image_text
 
 		# Create SVG with categories and images
 		# Base sizes for each image
@@ -226,13 +248,19 @@ class ImageTextWallGenerator(BasicProcessor):
 			self.dataset.log(f"Added image {filename}")
 			total_images_collected += 1
 
-			if images_in_row % side_length == 0 or total_images_collected == max_images:
+			if images_in_row % side_length == 0:
 				# Add completed row
 				category_image["width"] = row_widths[current_row]
 				complete_categories.append(category_image)
 
 			if total_images_collected == max_images:
 				break
+
+		# Check if last row was added
+		if len(complete_categories) < len(row_widths):
+			# Add last row
+			category_image["width"] = row_widths[current_row]
+			complete_categories.append(category_image)
 
 		# now we know all dimensions we can instantiate the canvas too
 		canvas = get_4cat_canvas(self.dataset.get_results_path(), max(row_widths.values()), row_height * len(row_widths) + fontsize * 4, header=f"Images with captions",

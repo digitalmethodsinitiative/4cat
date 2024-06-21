@@ -33,6 +33,8 @@ class PixPlotGenerator(BasicProcessor):
                   "algorithmically grouped by similarity."
     extension = "html"  # extension of result file, used internally and in UI
 
+    followups = []
+
     references = [
         "[PixPlot](https://pixplot.io/)",
         "[Parameter documentation](https://pixplot.io/docs/api/parameters.html)"

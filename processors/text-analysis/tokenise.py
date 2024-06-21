@@ -34,6 +34,8 @@ class Tokenise(BasicProcessor):
 				  "tokens per sentence)."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller",]
+
 	references = [
 			"[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
 			"[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
@@ -233,9 +235,12 @@ class Tokenise(BasicProcessor):
 		elif self.parameters.get("tokenizer_type") == "jieba-search":
 			tokenizer = jieba.cut_for_search
 			tokenizer_args = {}
+		elif self.parameters.get("tokenizer_type") == "twitter":
+			tokenizer = TweetTokenizer(preserve_case=False).tokenize
+			tokenizer_args = {}
 		else:
-			tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
-			tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
+			tokenizer = word_tokenize
+			tokenizer_args = {"language": language} if language != "other" else {}
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()

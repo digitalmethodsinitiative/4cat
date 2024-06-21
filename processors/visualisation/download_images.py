@@ -41,6 +41,8 @@ class ImageDownloader(BasicProcessor):
 				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["image-wall", "image-category-wall", "pix-plot", "image-to-categories", "image-captions", "text-from-images", "metadata-viewer", "clarifai-api", "google-vision-api"]
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,

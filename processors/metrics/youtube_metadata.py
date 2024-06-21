@@ -35,6 +35,8 @@ class YouTubeMetadata(BasicProcessor):
 	description = "Extract information from YouTube videos and channels linked-to in the dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["youtube-thumbnails"]
+
 	max_retries = 3
 	sleep_time = 20
 

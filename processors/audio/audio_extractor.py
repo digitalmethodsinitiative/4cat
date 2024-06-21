@@ -33,6 +33,8 @@ class AudioExtractor(BasicProcessor):
 	description = "Extract audio from videos"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["audio-to-text"]
+
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""

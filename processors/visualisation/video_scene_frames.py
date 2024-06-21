@@ -35,6 +35,8 @@ class VideoSceneFrames(BasicProcessor):
     description = "For each scene identified, extracts the first frame."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
+    followups = ["video-timelines"]
+
     options = {
         "frame_size": {
             "type": UserInput.OPTION_CHOICE,
@@ -48,8 +50,6 @@ class VideoSceneFrames(BasicProcessor):
             "help": "Size of extracted frames"
         },
     }
-
-    followups = ["video-timelines"]
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):

@@ -28,6 +28,8 @@ class CategorizeImagesCLIP(BasicProcessor):
     description = "Given a list of categories, the CLIP model will estimate likelihood an image is to belong to each (total of all categories per image will be 100%)."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = ["image-category-wall"]
+
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",
         "[CLIP paper: Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/pdf/2103.00020.pdf)",

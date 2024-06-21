@@ -23,6 +23,8 @@ class ThreadMetadata(BasicProcessor):
 				  "that this extracted only on the basis of the items present this dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	@staticmethod
 	def is_compatible_with(module=None, user=None):
 		"""

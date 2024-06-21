@@ -22,6 +22,8 @@ class SplitSentences(BasicProcessor):
 	description = "Split a body of posts into discrete sentences. Output file has one row per sentence, containing the sentence and post ID."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
 		"""
