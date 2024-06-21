@@ -20,6 +20,9 @@ from common.lib.item_mapping import MappedItem
 from common.lib.user_input import UserInput
 
 
+class AppStoreConnectionError(Exception):
+    pass
+
 class SearchAppleStore(Search):
     """
     Search Apple Store data source
@@ -167,7 +170,11 @@ class SearchAppleStore(Search):
                 if method != 'app':
                     lang = app.get('lang', 'en-US')
                     country = app.get('country', 'us')
-                    results.append(self.collect_detailed_data_from_apple_store_by_id(app['id'], country, lang))
+                    try:
+                        results.append(self.collect_detailed_data_from_apple_store_by_id(app['id'], country, lang))
+                    except AppStoreConnectionError as e:
+                        self.dataset.update_status(f"Error collecting app {app['id']}: {e}")
+                        continue
                 else:
                     # List of apps only contains IDs
                     # TODO: issue w/ languages and countries; likely codes
@@ -177,7 +184,11 @@ class SearchAppleStore(Search):
                     #     for language in languages:
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while getting collecting detailed results from Apple Store")
-                    results.append(self.collect_detailed_data_from_apple_store_by_id(app))#, country, language))
+                    try:
+                        results.append(self.collect_detailed_data_from_apple_store_by_id(app))#, country, language))
+                    except AppStoreConnectionError as e:
+                        self.dataset.update_status(f"Error collecting app {app['id']}: {e}")
+                        continue
         if results:
             self.dataset.log(f"Collected {len(results)} results from Apple Store")
             return [{"4CAT_metadata": {"query_method": method, "collected_at_timestamp": datetime.datetime.now().timestamp(), "item_index": i, "beta": self.parameters.get('beta_details', False)}, **result} for i, result in enumerate(results)]
@@ -524,7 +535,15 @@ class SearchAppleStore(Search):
         response = requests.get(url, headers=headers)
 
         if response.status_code != 200:
-            raise Exception(f"Unable to collect data from apps.apple.com: {response.status_code} {response.reason} - {response.text}")
+            try:
+                json_data = json.loads(response.text)
+            except json.JSONDecodeError:
+                json_data = {}
+
+            if "Invalid Parameter Value" in [error.get("title", '') for error in json_data.get("errors", [])]:
+                raise AppStoreConnectionError(f"Invalid Parameter Value: {' '.join([error.get('detail', '') for error in json_data.get('errors', [])])}")
+            else:
+                raise Exception(f"Unable to collect data from apps.apple.com: {response.status_code} {response.reason} - {response.text}")
 
         if len(response.text) == 0:
             raise ValueError(f"No result returned: app - {app_id}, country - {country_id}, lang - {lang}")
