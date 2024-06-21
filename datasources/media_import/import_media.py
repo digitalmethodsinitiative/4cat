@@ -1,12 +1,14 @@
 import re
+import json
 import time
 import zipfile
 import mimetypes
 from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import QueryParametersException
+from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
+from common.lib.helpers import andify
 
 
 class SearchMedia(BasicProcessor):
@@ -26,19 +28,19 @@ class SearchMedia(BasicProcessor):
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         return {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "You can upload files here that will be available for further analysis "
-                    "and processing. "
-                    "Please include only one type of file per dataset (image, audio, or video) and "
-                    "4CAT will be able to run various processors on these files. "
-        },
-        "data_upload": {
-            "type": UserInput.OPTION_FILE,
-            "multiple": True,
-            "help": "Files"
-        },
-    }
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "You can upload files here that will be available for further analysis "
+                        "and processing. "
+                        "Please include only one type of file per dataset (image, audio, or video) and "
+                        "4CAT will be able to run various processors on these files. "
+            },
+            "data_upload": {
+                "type": UserInput.OPTION_FILE,
+                "multiple": True,
+                "help": "Files"
+            },
+        }
 
     @staticmethod
     def validate_query(query, request, user):
@@ -53,44 +55,106 @@ class SearchMedia(BasicProcessor):
         :return dict:  Safe query parameters
         """
         # do we have uploaded files?
-        if "option-data_upload" not in request.files:
-            raise QueryParametersException("No files were offered for upload.")
-        files = request.files.getlist("option-data_upload")
-        if len(files) < 1:
+        bad_files = []
+        seen_types = set()
+        all_files = 0
+
+        uploaded_files = request.files.getlist("option-data_upload")
+        single_zip_file = uploaded_files and len(uploaded_files) == 1 and uploaded_files[0].filename.lower().endswith(".zip")
+
+        if "option-data_upload-entries" in request.form or single_zip_file:
+            # we have a zip file!
+            try:
+                if single_zip_file:
+                    # we have a single uploaded zip file
+                    # i.e. the query has already been validated (else we would have
+                    # -entries and no file) and we can get the file info from the
+                    # zip file itself
+                    uploaded_files[0].seek(0)
+                    zip_file_data = BytesIO(uploaded_files[0].read())
+                    with zipfile.ZipFile(zip_file_data, "r") as uploaded_zip:
+                        files = [{"filename": f} for f in uploaded_zip.namelist()]
+                else:
+                    # validating - get file names from entries field
+                    files = json.loads(request.form["option-data_upload-entries"])
+
+                # ignore known metadata files
+                files = [f for f in files if not (
+                        f["filename"].split("/")[-1].startswith(".")
+                        or f["filename"].endswith(".log")
+                        or f["filename"].split("/")[-1].startswith("__")
+                        or f["filename"].endswith("/")  # sub-directory
+                )]
+
+                # figure out if we have mixed media types
+                seen_types = set()
+                for file in files:
+                    try:
+                        file_type = mimetypes.guess_type(file["filename"])[0].split("/")[0]
+                        seen_types.add(file_type)
+                        all_files += 1
+                    except (AttributeError, TypeError):
+                        bad_files.append(file["filename"])
+
+            except (ValueError, zipfile.BadZipfile):
+                raise QueryParametersException("Cannot read zip file - it may be encrypted or corrupted and cannot "
+                                               "be uploaded to 4CAT.")
+
+        elif "option-data_upload" not in request.files:
             raise QueryParametersException("No files were offered for upload.")
 
-        # Check file types to ensure all are same type of media
-        media_type = None
-        for file in request.files.getlist("option-data_upload"):
-            # Allow metadata files and log files to be uploaded
-            if file.filename == ".metadata.json" or file.filename.endswith(".log"):
-                continue
+        elif len(uploaded_files) < 1:
+            raise QueryParametersException("No files were offered for upload.")
 
-            # Guess mime type from filename; we only have partial files at this point
-            mime_type = mimetypes.guess_type(file.filename)[0]
-            if mime_type is None:
-                raise QueryParametersException(f"Could not determine the type of file {file.filename}.")
-            else:
-                is_zip = mime_type.split('/')[0] == "application" and mime_type.split('/')[1] == "zip"
+        else:
+            # we just have a bunch of separate files
+            # Check file types to ensure all are same type of media
+            media_type = None
+            for file in uploaded_files:
+                # Allow metadata files and log files to be uploaded
+                if file.filename == ".metadata.json" or file.filename.endswith(".log"):
+                    continue
+
+                # when uploading multiple files, we don't want zips
+                if file.filename.lower().endswith(".zip"):
+                    raise QueryParametersException("When uploading media in a zip archive, please upload exactly one "
+                                                   "zip file; 4CAT cannot combine multiple separate zip archives.")
+
+                # Guess mime type from filename; we only have partial files at this point
+                mime_type = mimetypes.guess_type(file.filename)[0]
+                if mime_type is None:
+                    bad_files.append(file.filename)
+                    continue
+
                 mime_type = mime_type.split('/')[0]
+                if mime_type not in SearchMedia.accepted_file_types:
+                    raise QueryParametersException(f"This data source only accepts "
+                                                   f"{andify(SearchMedia.accepted_file_types)} files; "
+                                                   f"'{file.filename}' was detected as {mime_type}, which 4CAT cannot "
+                                                   f"process.")
 
-            if mime_type not in SearchMedia.accepted_file_types and not is_zip:
-                raise QueryParametersException(f"This datasource only accepts files of {SearchMedia.accepted_file_types} (file {file.filename} detected type {mime_type}.")
+            seen_types.add(media_type)
+            all_files += 1
 
-            # We do not have the full zip archive file at this point so we cannot check the inner files' mime types
-            if is_zip:
-                # if only zip files are uploaded media_type remains None until after_create()
-                continue
+        # we need to at least be able to recognise the extension to know we can
+        # do something with the file...
+        if bad_files:
+            separator = "\n- "
+            raise QueryParametersException("The type of the following files cannot be determined; rename them or "
+                                           f"remove them from the archive or rename them\n{separator.join(bad_files)}")
 
-            if media_type is None:
-                media_type = mime_type
-            elif media_type != mime_type:
-                raise QueryParametersException(f"All files must be of the same type. {file.filename} is not of type {media_type}")
+        # this is not fool-proof, but uncommon extensions are less likely to work
+        # anyway and the user can still choose to proceed
+        if len(set(seen_types)) > 1:
+            raise QueryParametersException(
+                f"The zip file contains files of multiple media types ({andify(seen_types)}). 4CAT processors require "
+                "files of a single type to work properly. Please re-upload only a single type of media to proceed."
+            )
 
         return {
             "time": time.time(),
-            "media_type": media_type,
-            "num_files": len(files),
+            "media_type": seen_types.pop(),
+            "num_files": all_files,
         }
 
     @staticmethod
@@ -110,7 +174,8 @@ class SearchMedia(BasicProcessor):
             for file in request.files.getlist("option-data_upload"):
                 # Check if file is zip archive
                 file_mime_type = mimetypes.guess_type(file.filename)[0]
-                if file_mime_type is not None and file_mime_type.split('/')[0] == "application" and file_mime_type.split('/')[1] == "zip":
+                if file_mime_type is not None and file_mime_type.split('/')[0] == "application" and \
+                        file_mime_type.split('/')[1] == "zip":
                     # Save inner files from zip archive to new zip archive with all files
                     file.seek(0)
                     zip_file_data = BytesIO(file.read())
