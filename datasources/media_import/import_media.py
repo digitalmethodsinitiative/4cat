@@ -82,7 +82,8 @@ class SearchMedia(BasicProcessor):
                 files = [f for f in files if not (
                         f["filename"].split("/")[-1].startswith(".")
                         or f["filename"].endswith(".log")
-                        or f["filename"].split("/")[-1].startswith("__")
+                        or f["filename"].split("/")[-1].startswith("__MACOSX")
+                        or f["filename"].endswith(".DS_Store")
                         or f["filename"].endswith("/")  # sub-directory
                 )]
 
@@ -170,7 +171,8 @@ class SearchMedia(BasicProcessor):
         """
         mime_type = query.get("media_type")
         saved_files = 0
-        with zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as new_zip_archive:
+        skipped_files = []
+        with (zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as new_zip_archive):
             for file in request.files.getlist("option-data_upload"):
                 # Check if file is zip archive
                 file_mime_type = mimetypes.guess_type(file.filename)[0]
@@ -184,10 +186,22 @@ class SearchMedia(BasicProcessor):
                             if inner_file.is_dir():
                                 continue
 
-                            if mime_type is None:
-                                # Only zip files were uploaded and media type still unknown; we set media_type here
-                                # TODO: any point in checking all inner files? they've already been uploaded.
-                                dataset.media_type = mimetypes.guess_type(inner_file.filename)[0].split('/')[0]
+                            guessed_file_mime_type = mimetypes.guess_type(inner_file.filename)
+                            if guessed_file_mime_type[0]:
+                                mime_type = guessed_file_mime_type[0].split('/')[0]
+
+                            # skip useless metadata files
+                            # also skip files not recognised as media files
+                            clean_file_name = inner_file.filename.split("/")[-1]
+                            if not guessed_file_mime_type[0] or (
+                                    mime_type not in SearchMedia.accepted_file_types
+                                    and not clean_file_name.endswith(".log")
+                                    and not clean_file_name == ".metadata.json"
+                            ) or clean_file_name.startswith("__MACOSX") \
+                              or inner_file.filename.startswith("__MACOSX"):
+                                print(f"skipping {clean_file_name} ({guessed_file_mime_type})")
+                                skipped_files.append(inner_file.filename)
+                                continue
 
                             # save inner file from the uploaded zip archive to the new zip with all files
                             new_filename = SearchMedia.get_safe_filename(inner_file.filename, new_zip_archive)
@@ -211,6 +225,12 @@ class SearchMedia(BasicProcessor):
 
         # update the number of files in the dataset
         dataset.num_files = saved_files
+        dataset.media_type = mime_type
+        if skipped_files:
+            # todo: this now doesn't actually get logged because the log is
+            # re-initialised after after_create runs?
+            dataset.log("The following files in the uploaded zip archive were skipped because they were not recognised"
+                        "as media files:" + "\n  -".join(skipped_files))
 
     def process(self):
         """
