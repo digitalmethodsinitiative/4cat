@@ -19,7 +19,7 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException, \
-    TimeoutException, JavascriptException, NoAlertPresentException
+    TimeoutException, JavascriptException, NoAlertPresentException, ElementClickInterceptedException
     from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
@@ -50,7 +50,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
     consecutive_errors = 0
     num_consecutive_errors_before_restart = 3
 
-    selenium_log = Logger(logger_name='selenium', filename='selenium.log')
+    selenium_log = Logger(logger_name='selenium', filename='selenium.log', log_level='DEBUG')
 
     def get_with_error_handling(self, url, max_attempts=1, wait=0, restart_browser=False):
         """
@@ -545,6 +545,38 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             self.selenium_log.error(f"Error killing {browser}: {e}")
             self.quit_selenium()
             raise e
+
+    def destroy_to_click(self, button, max_time=5):
+        """
+        A most destructive way to click a button. If something is obscuring the button, it will be removed. Repeats
+        destruction until the button is clicked or max_time is exceeded.
+
+        Probably a good idea to reload after use if additional elements are needed
+
+        :param button:  The button to click
+        :param max_time:  Maximum time to attempt to click button
+        """
+        start_time = time.time()
+        while True:
+            try:
+                button.click()
+                self.selenium_log.debug("button clicked!")
+                break
+            except ElementClickInterceptedException as e:
+                if time.time() - start_time > max_time:
+                    break
+                error = e
+                self.selenium_log.debug(f"destroy_to_click: {error.msg}")
+
+                error_element_type = error.msg.split("element <")[1].split(" ")[0].rstrip(">")
+                if len(error.msg.split("element <")[1].split("class=\"")) > 1:
+                    error_element_class = error.msg.split("element <")[1].split("class=\"")[1].split(" ")[0]
+                else:
+                    error_element_class = ""
+                self.selenium_log.info(f"destroy_to_click removing element: ({error_element_type}, {error_element_class}")
+
+                self.driver.execute_script(
+                    f"document.querySelector('{error_element_type}{'.' + error_element_class if error_element_class else ''}').remove();")
 
     @classmethod
     def is_selenium_available(cls):

@@ -52,7 +52,7 @@ class SearchAwsStore(SearchWithSelenium):
         "Pricing Models": "pricing_model",
         "Delivery Methods": "fulfillment_option_type",
     }
-    query_param_ignore = ['All pricing models', 'All delivery methods', 'All vendors', 'All categories']
+    query_param_ignore = ['All pricing models', 'All delivery methods', 'All vendors', 'All categories', 'Show all +1000 vendors']
 
 
     @classmethod
@@ -88,8 +88,7 @@ class SearchAwsStore(SearchWithSelenium):
         }
 
         # Backend runs get_options for each processor on init; be careful here
-        # TODO: fix filter collection!
-        filter_options = {} #cls.get_query_options()
+        filter_options = cls.get_query_options()
         for filter_name, filter_options in filter_options.items():
             if filter_name not in cls.query_param_map:
                 config.db.log.warning(f"AWS Unknown filter name: {filter_name}")
@@ -148,10 +147,17 @@ class SearchAwsStore(SearchWithSelenium):
             if not success:
                 self.dataset.log(f"Unable to collect AWS page {query_url}: {errors}")
                 continue
+            else:
+                self.dataset.log(f"Successfully retrieved AWS page {query_url}")
 
             try:
-                num_results = int(self.driver.find_element(By.XPATH, '//span[@data-test-selector="availableProductsCountMessage"]').text)
-                self.dataset.log(f"Found total of {num_results} results")
+                num_results = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, '//span[@data-test-selector="availableProductsCountMessage"]')))
+                num_results = int(num_results.text.lstrip('(').rstrip(" results)"))
+                if num_results == 0:
+                    self.dataset.log(f"No results found{', continuing...' if i < len(queries) - 1 else ''}")
+                    continue
+                else:
+                    self.dataset.log(f"Found total of {num_results} results")
             except selenium_exceptions.NoSuchElementException:
                 num_results = None
                 self.dataset.log("Unknown number of results found")
@@ -161,7 +167,6 @@ class SearchAwsStore(SearchWithSelenium):
                 results_table = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, 'tbody')))
                 # Wait for first result to load
                 WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, '//h2[@data-semantic="title"]')))
-                # results_table = self.driver.find_element(By.TAG_NAME, "tbody")
 
                 for result_block in results_table.find_elements(By.TAG_NAME, "tr"):
                     # TODO: check full details
@@ -308,7 +313,6 @@ class SearchAwsStore(SearchWithSelenium):
         """
         Get query options from AWS only if they have not been recently checked
         """
-        click_js_script = "arguments[0].click();"
         last_updated = config.get("cache.aws.query_options_updated_at", 0)
         if (datetime.fromtimestamp(last_updated) > datetime.now() - timedelta(
                 days=1)) and not force_update:
@@ -335,26 +339,16 @@ class SearchAwsStore(SearchWithSelenium):
                 option_name = option_container.find_element(By.XPATH, "../span").text
                 selenium_driver.selenium_log.warning(f"AWS option: {option_name}")
                 query_filters[option_name] = []
+
                 # Open option dropdown
-                # Use JS here as the dropdown is not visible (cookies popup)
-                try:
-                    button = WebDriverWait(selenium_driver.driver, 5).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, "awsui-select-trigger-icon")))
-                    # button = option_container.find_element(By.CLASS_NAME, "awsui-select-trigger-icon")
-                    # button.click()
-                except selenium_exceptions.NoSuchElementException:
-                    selenium_driver.selenium_log.warning(f"Unable to extract options for {option_name}")
-                    continue
-                selenium_driver.driver.execute_script("arguments[0].scrollIntoView(true);", button)
-                selenium_driver.driver.execute_script(click_js_script, button)
-                # time.sleep(.5)
-                try:
-                    drop_down_list = WebDriverWait(selenium_driver.driver, 5).until(
-                        EC.presence_of_element_located((By.TAG_NAME, "ul")))
-                    # drop_down_list = option_container.find_element(By.TAG_NAME, "ul")
-                except selenium_exceptions.NoSuchElementException:
-                    selenium_driver.selenium_log.warning(f"Unable to extract options for {option_name}")
-                    continue
+                button = option_container.find_element(By.CLASS_NAME, "awsui-select-trigger-icon")
+                # Click button; this is a destructive method and removed obscuring elements
+                selenium_driver.destroy_to_click(button)
+
+                # Get dropdown list (this is not visible until button is clicked)
+                drop_down_list = option_container.find_element(By.CLASS_NAME, "awsui-select-dropdown")
+                # Select list element
+                drop_down_list = drop_down_list.find_element(By.TAG_NAME, "ul")
 
                 # Check if sub lists exist
                 groups = drop_down_list.find_elements(By.TAG_NAME, "ul")
@@ -363,22 +357,19 @@ class SearchAwsStore(SearchWithSelenium):
 
                 for group in groups:
                     for option in group.find_elements(By.TAG_NAME, "li"):
-                        # Wait for first result to load
-                        WebDriverWait(selenium_driver.driver, 5).until(
-                            EC.presence_of_element_located((By.XPATH, '//div[@data-value]')))
+                        # Scrape options
                         try:
-                            # TODO: sort why these are not appearing!
                             option_value = option.find_element(By.XPATH, "./div[@data-value]").get_attribute(
                                 "data-value")
+                            query_filters[option_name].append({
+                                "name": option.text,
+                                "data-value": option_value,
+                            })
                         except selenium_exceptions.NoSuchElementException:
                             selenium_driver.selenium_log.warning(
                                 f"Unable to extract options for {option.text} {option.get_attribute('outerHTML')}")
                             continue
-                        query_filters[option_name].append({
-                            "name": option.text,
-                            "data-value": option.find_element(By.XPATH, "./div[@data-value]").get_attribute(
-                                "data-value"),
-                        })
+
             if any(query_filters.values()):
                 selenium_driver.selenium_log.info(f"Collected query options from AWS Marketplace: {query_filters}")
                 config.set("cache.aws.query_options", query_filters)
