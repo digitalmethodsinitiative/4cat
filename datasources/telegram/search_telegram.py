@@ -430,7 +430,7 @@ class SearchTelegram(Search):
                         if crawl_max_depth > 0 and (not crawl_msg_threshold or depth_map.get(query) < crawl_msg_threshold):
                             message_fwd = serialized_message.get("fwd_from")
                             fwd_from = None
-                            if message_fwd and message_fwd["from_id"] and message_fwd["from_id"]["_type"] == "PeerChannel":
+                            if message_fwd and message_fwd["from_id"] and message_fwd["from_id"].get("_type") == "PeerChannel":
                                 # even if we haven't resolved the ID, we can feed the numeric ID
                                 # to Telethon! this is nice because it means we don't have to
                                 # resolve entities to crawl iteratively
