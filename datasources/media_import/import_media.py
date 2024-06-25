@@ -172,7 +172,7 @@ class SearchMedia(BasicProcessor):
         mime_type = query.get("media_type")
         saved_files = 0
         skipped_files = []
-        with (zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as new_zip_archive):
+        with zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as new_zip_archive:
             for file in request.files.getlist("option-data_upload"):
                 # Check if file is zip archive
                 file_mime_type = mimetypes.guess_type(file.filename)[0]
@@ -236,6 +236,7 @@ class SearchMedia(BasicProcessor):
         """
         Step 3: Ummmm, we kinda did everything
         """
+        self.dataset.log(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}")
         self.dataset.finish(self.parameters.get("num_files"))
 
     @staticmethod

@@ -365,7 +365,7 @@ const query = {
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    if(pair[1].type !== 'application/zip') {
+                    if (!pair[1].type in ['application/zip', 'application/x-zip-compressed']) {
                         const sample_size = Math.min(pair[1].size, snippet_size);
                         const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
 
