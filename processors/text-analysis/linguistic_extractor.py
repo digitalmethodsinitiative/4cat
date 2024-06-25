@@ -54,6 +54,13 @@ class LinguisticFeatures(BasicProcessor):
 		}
 	}
 
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+        Allow CSV and NDJSON datasets
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
 	def process(self):
 		"""
 		Reads text and outputs entities per text body.

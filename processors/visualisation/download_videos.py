@@ -237,7 +237,8 @@ class VideoDownloaderPlus(BasicProcessor):
         :return bool:
         """
         return ((module.type.endswith("-search") or module.is_from_collector())
-                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"])
+                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]) \
+                and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """

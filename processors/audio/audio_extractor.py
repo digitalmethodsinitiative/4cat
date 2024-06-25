@@ -38,9 +38,9 @@ class AudioExtractor(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow on tiktok-search only for dev
+		Allow on videos only
 		"""
-		return module.type.startswith("video-downloader") and \
+		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
 			   config.get("video-downloader.ffmpeg_path", user=user) and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 

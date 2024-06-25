@@ -63,7 +63,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         return config.get("dmi-service-manager.fc_blip2_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("image-downloader")
+               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

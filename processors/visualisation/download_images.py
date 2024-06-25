@@ -128,7 +128,8 @@ class ImageDownloader(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		return (module.type == "top-images" or module.is_from_collector()) \
-			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
+			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"] \
+			   and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
@@ -136,6 +137,8 @@ class ImageDownloader(BasicProcessor):
 		images along with a file, .metadata.json, that contains identifying
 		information.
 		"""
+		# Set dataset media_type to image
+		self.dataset.media_type = "image"
 
 		# Get the source file data path
 		top_parent = self.dataset.get_genealogy()[0]

@@ -48,7 +48,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader") or module.type == "video-frames"
+        return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
     options = {
         "amount": {

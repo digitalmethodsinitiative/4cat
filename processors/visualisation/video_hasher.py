@@ -73,10 +73,10 @@ class VideoHasherPreset(ProcessorPreset):
         Compatible with downloaded videos, and not really anything else!
         Additionally ffmpeg needs to be available.
 
-        :param str module:  Module ID to determine compatibility with
+        :param DataSet module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type.startswith("video-downloader") and \
+        return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
                config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
@@ -163,7 +163,7 @@ class VideoHasher(BasicProcessor):
 		"""
 		Allow on videos only
 		"""
-		return module.type.startswith("video-downloader")
+		return module.get_media_type() == "video" or module.type.startswith("video-downloader")
 
 	def process(self):
 		"""
@@ -245,7 +245,7 @@ class VideoHasher(BasicProcessor):
 
 		if video_metadata is None:
 			# Not good, but let's store the video_hashes and note the error
-			self.dataset.update_status("Error connecting video hashes to original dataset", is_final=True)
+			self.dataset.log("Error connecting video hashes to original dataset")
 
 			for filename, data in video_hashes.items():
 				video_hash = data.get('videohash')
@@ -413,8 +413,8 @@ class VideoHashNetwork(BasicProcessor):
 						"Calculated %i of %i hash similarities" % (comparisons, expected_comparisons))
 					self.dataset.update_progress(comparisons / expected_comparisons)
 
-		if not network.edges():
-			self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
+		if len(network.edges) < 1:
+			self.dataset.update_status("No similar videos identified")
 			self.dataset.finish(0)
 			return
 

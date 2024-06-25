@@ -63,7 +63,7 @@ class AudioToText(BasicProcessor):
         """
         return config.get("dmi-service-manager.bc_whisper_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("audio-extractor")
+               (module.get_media_type() == 'audio' or module.type.startswith("audio-extractor"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

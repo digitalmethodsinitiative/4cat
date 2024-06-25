@@ -95,7 +95,7 @@ class ImageTextDetector(BasicProcessor):
         """
         return config.get('dmi-service-manager.eb_ocr_enabled', False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("image-downloader")
+               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):
         """

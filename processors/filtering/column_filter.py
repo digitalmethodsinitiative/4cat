@@ -79,7 +79,7 @@ class ColumnFilter(BaseFilter):
 
         :param module: Module to determine compatibility with
         """
-        return module.is_top_dataset()
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

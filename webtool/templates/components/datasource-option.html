@@ -11,7 +11,7 @@
             <input name="option-{{ option }}" id="forminput-{{ option }}" type="checkbox" {% if settings.default %} checked{% endif %}>
             {% if "tooltip" in settings %}<p class="option-help">{{ settings.tooltip }}</p>{% endif %}
         {% elif settings.type == "file" %}
-            <input name="option-{{ option }}" id="forminput-{{ option }}" type="file"{% if settings.accept %}accept=".csv"{% endif %}>
+            <input name="option-{{ option }}" id="forminput-{{ option }}" type="file"{% if settings.multiple %} multiple="true" {% endif %}{% if settings.accept %}accept=".csv"{% endif %}>
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
     	        <p role="tooltip" id="tooltip-option-{{ option }}">
