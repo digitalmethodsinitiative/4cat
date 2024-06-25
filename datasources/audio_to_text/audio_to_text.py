@@ -15,9 +15,6 @@ class AudioUploadToText(SearchMedia):
     category = "Search"  # category
     title = "Convert speech to text"  # title displayed in UI
     description = "Upload your own audio and use OpenAI's Whisper model to create transcripts"  # description displayed in UI
-    extension = "ndjson"  # extension of result file, used internally and in UI
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):

@@ -104,7 +104,7 @@ class ImageTextWallGenerator(BasicProcessor):
 		elif any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.caption_datasets]):
 			text_dataset = source_dataset
 			image_dataset = source_dataset.get_parent()
-			if not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.image_datasets]):
+			if not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageTextWallGenerator.image_datasets] + [image_dataset.get_media_type() == "image"]):
 				# Not a compatible dataset
 				return None, None
 		else:

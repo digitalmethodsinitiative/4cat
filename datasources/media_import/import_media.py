@@ -6,7 +6,7 @@ import mimetypes
 from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
+from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
 
@@ -97,7 +97,7 @@ class SearchMedia(BasicProcessor):
                     except (AttributeError, TypeError):
                         bad_files.append(file["filename"])
 
-            except (ValueError, zipfile.BadZipfile):
+            except (ValueError, zipfile.BadZipfile) as e:
                 raise QueryParametersException("Cannot read zip file - it may be encrypted or corrupted and cannot "
                                                "be uploaded to 4CAT.")
 
@@ -110,7 +110,6 @@ class SearchMedia(BasicProcessor):
         else:
             # we just have a bunch of separate files
             # Check file types to ensure all are same type of media
-            media_type = None
             for file in uploaded_files:
                 # Allow metadata files and log files to be uploaded
                 if file.filename == ".metadata.json" or file.filename.endswith(".log"):
@@ -134,8 +133,8 @@ class SearchMedia(BasicProcessor):
                                                    f"'{file.filename}' was detected as {mime_type}, which 4CAT cannot "
                                                    f"process.")
 
-            seen_types.add(media_type)
-            all_files += 1
+                seen_types.add(mime_type)
+                all_files += 1
 
         # we need to at least be able to recognise the extension to know we can
         # do something with the file...
@@ -154,7 +153,7 @@ class SearchMedia(BasicProcessor):
 
         return {
             "time": time.time(),
-            "media_type": seen_types.pop(),
+            "media_type": seen_types.pop() if seen_types else None, # first validation check may not have seen any valid files
             "num_files": all_files,
         }
 
