@@ -80,7 +80,7 @@
 			<li>Logged in {% if not current_user.is_special %} as {{ current_user.get_name() }} (<a href="{{ url_for('logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
 		{% endif %}
 		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
-		  <li><a href="{{ url_for('show_page', page='issues') }}">Report issues</a></li>
+		  <li><a href="{{ url_for('show_page', page='issues') }}">Help &amp; Bug Reports</a></li>
           <li><abbr title="Version">v</abbr>{{ __version }}</li>
 		  <li><a href="https://www.oilab.eu">OILab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
