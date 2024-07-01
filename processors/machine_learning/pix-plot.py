@@ -269,7 +269,7 @@ class PixPlotGenerator(BasicProcessor):
             return False
 
         # Check that this is not already a top dataset
-        if self.dataset.top_parent().get_key() == self.source_dataset.get_key():
+        if self.dataset.top_parent().key == self.source_dataset.key:
             # i.e. the source image dataset is not a top dataset that happens to have a metadata file from some export
             # This can happen with the Upload Media datasource if the user uploads a 4CAT results zip with images and .metadata.json
             # But there is not a top dataset with post data in this instance unfortunately
