@@ -338,11 +338,14 @@ class DataSet(FourcatModule):
 		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
-		# Annotation fields are dynamically added to top-level datasets,
-		# so we're always going to accept these.
+		# Annotations and annotation fields are dynamically added to top-level dataset
+		# and we're handling as 'extra' map_item fields.
 		annotation_fields = None
+		annotations = None
 		if self.is_top_dataset():
-			annotation_fields = self.get_annotation_fields()
+			annotation_fields = self.get_annotation_fields()	
+		if annotation_fields:
+			annotations = self.get_annotations()
 
     	# missing field strategy can be for all fields at once, or per field
 		# if it is per field, it is a dictionary with field names and their strategy
@@ -384,19 +387,31 @@ class DataSet(FourcatModule):
 							mapped_item.data[missing_field] = mapped_item.data[missing_field].value
 						else:
 							raise ValueError("map_missing must be 'abort', 'default', or a callback.")
-
 			else:
 				mapped_item = original_item
-			
-			# Re-add annotation fields to a mapped item.
+
+			# Add possible annotations
 			if annotation_fields:
 				for annotation_field in annotation_fields.values():
-					label = annotation_field["label"]
-					if type(mapped_item) is MappedItem:
-						mapped_item.data[label] = original_item.get(label, "")
-					else:
-						mapped_item[label] = original_item.get(label, "")
 
+					annotation = ""
+					annotation_label = annotation_field["label"]
+
+					# Get the annotation, if available.
+					# We're always handling annotated data as a MappedItem object,
+					# even if no map_item() function is available for the data source.
+					if not isinstance(mapped_item, MappedItem):
+						mapped_item = MappedItem(mapped_item)
+					
+					if annotations and mapped_item.data.get("id", "") in annotations:
+						annotation = annotations[mapped_item.data["id"]].get(annotation_label, "")
+						if isinstance(annotation, list):
+							annotation = ",".join(annotation)
+
+					# We're always adding an annotation value,
+					# as an empty string if it's absent.
+					mapped_item.data[annotation_label] = annotation
+						
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 

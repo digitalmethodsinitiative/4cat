@@ -177,6 +177,8 @@ def get_mapped_result(key):
     processor of the dataset has a method for mapping its data to CSV, then this
     route uses that to convert the data to CSV on the fly and serve it as such.
 
+    We also use this if there's annotation data saved.
+
     :param str key:  Dataset key
     """
     try:
@@ -187,22 +189,6 @@ def get_mapped_result(key):
     if dataset.is_private and not (
             config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
-
-    if dataset.get_extension() == ".csv":
-        # if it's already a csv, just return the existing file
-        return url_for("get_result", query_file=dataset.get_results_path().name)
-
-    if not hasattr(dataset.get_own_processor(), "map_item"):
-        # cannot map without a mapping method
-        return error(404, error="File not found.")
-
-    # Also add possibly added annotation items.
-    # These cannot be added to the static `map_item` function.
-    annotation_labels = None
-    annotation_fields = dataset.get_annotation_fields()
-    if annotation_fields:
-        annotation_labels = [v["label"] for v in annotation_fields.values()]
-        annotations = dataset.get_annotations()
 
     def map_response():
         """
@@ -217,20 +203,12 @@ def get_mapped_result(key):
         for item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
                 fieldnames = list(item.keys())
-                if annotation_labels:
-                    for label in annotation_labels:
-                        if label not in fieldnames:
-                            fieldnames.append(label)
 
                 writer = csv.DictWriter(buffer, fieldnames=fieldnames)
                 writer.writeheader()
                 yield buffer.getvalue()
                 buffer.truncate(0)
                 buffer.seek(0)
-
-            if annotation_fields:
-                for label in annotation_labels:
-                    item[label] = annotations.get(item.get("id"), {}).get(label, "")
 
             writer.writerow(item)
             yield buffer.getvalue()

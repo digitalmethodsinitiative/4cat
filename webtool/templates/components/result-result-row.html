@@ -17,22 +17,22 @@
     </div>
   {% if dataset.is_finished() and dataset.num_rows > 0 %}
     <ul class="dataset-actions">
-    <li>
-        <a href="{{ url_for('get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
-            <i class="fas fa-download" aria-hidden="true"></i>
-            {{ dataset.result_file.split(".")[-1] }} ({{ dataset.get_results_path()|filesize }})
-        </a>
-        <p role="tooltip" id="tooltip-get-result-{{ dataset.key }}" aria-hidden="true">Download original data</p>
-    </li>
-    {% if dataset.get_extension() != "csv" and dataset.get_own_processor().map_item %}
+    {% if dataset.get_own_processor().map_item or dataset.get_annotation_fields() %}
         <li>
             <a href="{{ url_for('get_mapped_result', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-get-mapped-result-{{ dataset.key }}" >
                 <i class="fas fa-download" aria-hidden="true"></i>
                 csv
             </a>
-        <p role="tooltip" id="tooltip-get-mapped-result-{{ dataset.key }}" aria-hidden="true">Download data as CSV w/ 4CAT defined columns</p>
+        <p role="tooltip" id="tooltip-get-mapped-result-{{ dataset.key }}" aria-hidden="true">Download data as CSV w/ 4CAT defined columns and annotations</p>
         </li>
     {% endif %}
+    <li>
+        <a href="{{ url_for('get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
+            <i class="fas fa-download" aria-hidden="true"></i>
+            Original {{ dataset.result_file.split(".")[-1] }} ({{ dataset.get_results_path()|filesize }})
+        </a>
+        <p role="tooltip" id="tooltip-get-result-{{ dataset.key }}" aria-hidden="true">Download original data as provided by the data source</p>
+    </li>
     {% if (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
         <li>
             <a href="{{ url_for('preview_items', key=dataset.key) }}"

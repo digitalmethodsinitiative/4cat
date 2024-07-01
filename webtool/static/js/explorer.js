@@ -118,13 +118,6 @@ const annotations = {
 			}
 		});
 
-		$("#save-to-dataset").on("click", function(){
-			if (!$(this).hasClass("disabled")) {
-				annotations.saveAnnotations();
-				annotations.writeAnnotations();
-			}
-		});
-
 		// Ask whether the next page should be opened without saving annotations
 		$('a > .page').click(function(){
 			if (!$("#save-annotations").hassClass('disabled')) {
@@ -736,31 +729,6 @@ const annotations = {
 				console.log(error)
 			}
 		});
-	},
-
-	writeAnnotations: function () {
-		// Write the annotations to the dataset.
-		var dataset_key = $("#dataset-key").text();
-
-		$.ajax({
-			url: getRelativeURL("api/queue-processor/"),
-			method: "POST",
-			data: {"key": dataset_key, "processor": "write-annotations"},
-
-			success: function (response) {
-				console.log(response)
-				if (response == "success") {
-					annotations.disableSaving();
-				}
-				else {
-					console.log(response)
-				}
-			},
-			error: function (error) {
-				console.log(error)
-			}
-		});
-		window.open(getRelativeURL("results/" + dataset_key, "__blank")); 
 	},
 
 	fieldsExist: function(){
