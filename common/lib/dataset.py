@@ -879,7 +879,7 @@ class DataSet(FourcatModule):
 		old_fields = self.get_annotation_fields()
 
 		# We're saving the new annotation fields as-is
-		self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(annotation_fields), self.top_parent().key))
+		self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(annotation_fields), self.key))
 
 		# If new annotation fields change the annotations already saved (e.g. if a field is deleted),
 		# we must also check if we should update annotation data.
@@ -1008,7 +1008,7 @@ class DataSet(FourcatModule):
 		"""
 		Saves annotations for a dataset to the annotations table.
 
-		:param dict annotations:	Annotations dict, with post IDs as keys.	
+		:param dict annotations:	Annotations dict, with post IDs as keys.
 		:return int:				The number of posts with annotations.
 
 		"""
@@ -1018,6 +1018,7 @@ class DataSet(FourcatModule):
 		# We also need to check whether any of the input fields has changed.
 		# If so, we're gonna edit or remove their old values.
 		old_annotations = self.get_annotations()
+		delete_annotations = False
 
 		if old_annotations and annotations:
 			# Loop through all new annotations and add/overwrite them
@@ -1032,19 +1033,28 @@ class DataSet(FourcatModule):
 						fields_to_delete.append(label)
 				for label in fields_to_delete:
 					del old_annotations[post_id][label]
+					delete_annotations = True
 
 				# Empty lists/dicts get removed
 				if not old_annotations[post_id]:
 					del old_annotations[post_id]
+					delete_annotations = True
 
 			annotations = old_annotations
 
-		if not annotations:
+		# If there's nothing to save or delete, do nothing
+		if not annotations and not delete_annotations:
 			return 0
 
-		# We're saving all annotations as a JSON string
+		# If the annotations are empty, remove the row from the annotations table
+		if len(annotations) == 0:
+			self.db.delete("annotations", {"key": self.key})
+			return 0
+
+		# If there's something to add or change,
+		# we're saving all annotations as a JSON string
 		annotations = json.dumps(annotations)
-		self.db.execute("INSERT INTO annotations(key, annotations) VALUES(%s, %s) ON CONFLICT (key) DO UPDATE SET annotations = %s ", (self.top_parent().key, annotations, annotations))
+		self.db.upsert("annotations", {"key": self.key, "annotations": annotations}, constraints=["key"])
 
 		return len(annotations)
 

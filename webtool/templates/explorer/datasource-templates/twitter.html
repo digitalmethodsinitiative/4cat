@@ -2,7 +2,7 @@
 	<div class="post-table-row">
 		<div class="profile-picture">
 			{% if not pseudonymised %}
-			<img src="{{ post.get('author_profile_img') }}">
+			<img src="{{ post.get('author_avatar_url') }}">
 			{% else %}
 			<span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
 			{% endif %}

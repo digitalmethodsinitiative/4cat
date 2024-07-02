@@ -109,7 +109,7 @@ const annotations = {
 		$(".post-annotations").on("click", "option, input[type=checkbox], label", function() { annotations.enableSaving(); edits_made = true;});
 
 		// Keep track of whether the annotations are edited or not.
-		$(".post-annotations").on("change", ".post-annotation-input, .post-annotation input, .post-annotation textarea", function(){$(this).addClass("edited")});
+		$(".post-annotations").on("keydown change", ".post-annotation-input, .post-annotation input, .post-annotation textarea", function(){$(this).addClass("edited")});
 
 		// Save the annotations to the database
 		$("#save-annotations").on("click", function(){
@@ -118,10 +118,10 @@ const annotations = {
 			}
 		});
 
-		// Ask whether the next page should be opened without saving annotations
-		$('a > .page').click(function(){
+		// Save unsaved annotations upon changing a page.
+		$('.page > a').click(function(){
 			if (!$("#save-annotations").hassClass('disabled')) {
-				return confirm("Unsaved annotations are lost if you don't save before leaving the page.\nLeave anyway?");
+				annotations.saveAnnotations();
 			}
 		})
 
@@ -679,7 +679,7 @@ const annotations = {
 							val = undefined;
 						}
 					}
-					if ((val != undefined) || edited) {
+					if ((val != undefined && val != "") || edited) {
 						vals_changed = true;
 						post_vals[label] = val;
 					}
@@ -689,8 +689,7 @@ const annotations = {
 					anns[post_id] = post_vals;
 				}
 			}
-		});
-
+		})
 		
 		$("#save-annotations").html("<i class='fas fa-circle-notch spinner'></i> Saving annotations")
 		annotations.disableSaving();
