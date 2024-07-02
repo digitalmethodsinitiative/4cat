@@ -679,7 +679,7 @@ const annotations = {
 							val = undefined;
 						}
 					}
-					if ((val != undefined && val != "") || edited) {
+					if ((val != undefined) || edited) {
 						vals_changed = true;
 						post_vals[label] = val;
 					}
