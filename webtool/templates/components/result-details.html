@@ -110,6 +110,22 @@
                         <dd>{% include 'components/result-metadata.html' %}</dd>
                     </div>
 
+                    {% set annotation_fields = dataset.get_annotation_fields() %}
+                    {% if annotation_fields %}
+                    <div class="fullwidth">
+                        <dt>Annotations</dt>
+                        <dd>
+                            {% set annotations = dataset.get_annotations() %}
+                            {% if annotations %}
+                                {{ annotations|length|numberify }} item{% if annotations|length > 1 %}s{% endif %} annotated with fields
+                            {% endif %}
+                            {% for annotation_field in annotation_fields.items() %}
+                                <span class="property-badge">{{ annotation_field[1].type }}</span> {{ annotation_field[1].label }}
+                            {% endfor %}
+                        </dd>
+                    </div>
+                    {% endif %}
+
                     {% if has_credentials and current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
                     <div class="fullwidth">
                       <dt>API Credentials</dt>
