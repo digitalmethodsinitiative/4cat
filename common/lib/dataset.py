@@ -864,7 +864,7 @@ class DataSet(FourcatModule):
 		"""
 		Save the annotation fields of a dataset to the datasets table.
 		If changes to the annotation fields affect older, existing annotations,
-		this function also updates or deleted those values.
+		this function also updates or deletes those values.
 
 		:param dict annotation_fields:  Annotation fields, with a field ID as key
 		:return int:					The number of annotation fields saved.
@@ -1024,6 +1024,14 @@ class DataSet(FourcatModule):
 			# with the old annotations dict.
 			for post_id in list(annotations.keys()):
 				old_annotations[post_id] = annotations[post_id]
+
+				# Empty strings, lists, or None as input values get removed
+				fields_to_delete = []
+				for label, values in old_annotations[post_id].items():
+					if not values:
+						fields_to_delete.append(label)
+				for label in fields_to_delete:
+					del old_annotations[post_id][label]
 
 				# Empty lists/dicts get removed
 				if not old_annotations[post_id]:
