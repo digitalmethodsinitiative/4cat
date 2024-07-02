@@ -6,8 +6,6 @@
 # The issue this "solves" is allowing 4CAT to be deployed on an unknown
 # IP address which is only provided by SURF after 4CAT deployment.
 
-version: '3.6'
-
 services:
   db:
     container_name: 4cat_db
