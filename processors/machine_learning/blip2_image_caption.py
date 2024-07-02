@@ -184,7 +184,10 @@ class CategorizeImagesCLIP(BasicProcessor):
 
         # Load the video metadata if available
         image_metadata = {}
-        metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+        try:
+            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+        except FileNotFoundError:
+            metadata_file = None
         if metadata_file:
             with open(metadata_file) as file:
                 image_data = json.load(file)
