@@ -2,6 +2,7 @@
 Tokenize post bodies
 """
 import ahocorasick
+import razdel
 import string
 import jieba
 import json
@@ -12,6 +13,7 @@ import nltk
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
+from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
@@ -84,8 +86,9 @@ class Tokenise(BasicProcessor):
 				"type": UserInput.OPTION_CHOICE,
 				"default": "twitter",
 				"options": {
-					"twitter": "nltk TweetTokenizer",
-					"regular": "nltk word_tokenize",
+					"twitter": "nltk TweetTokenizer (optimised for English social media)",
+					"regular": "nltk word_tokenize (optimised for general texts)",
+					"razdel": "razdel (for Russian text)",
 					"jieba-cut": "jieba (for Chinese text; accurate mode)",
 					"jieba-cut-all": "jieba (for Chinese text; full mode)",
 					"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
@@ -101,7 +104,9 @@ class Tokenise(BasicProcessor):
 							 "have no effect)"
 				},
 				"default": "english",
-				"help": "Language"
+				"help": "Language",
+				"tooltip": "This affects stemming and sentence splitting, but NOT the tokenisation itself - use the "
+						   "'Tokeniser' option for that."
 			},
 			"grouping-per": {
 				"type": UserInput.OPTION_CHOICE,
@@ -235,6 +240,9 @@ class Tokenise(BasicProcessor):
 		elif self.parameters.get("tokenizer_type") == "jieba-search":
 			tokenizer = jieba.cut_for_search
 			tokenizer_args = {}
+		elif self.parameters.get("tokenizer_type") == "razdel":
+			tokenizer = razdel.tokenize
+			tokenizer_args = {}
 		elif self.parameters.get("tokenizer_type") == "twitter":
 			tokenizer = TweetTokenizer(preserve_case=False).tokenize
 			tokenizer_args = {}
@@ -302,7 +310,11 @@ class Tokenise(BasicProcessor):
 
 		# if told so, first split the post into separate sentences
 		if grouping == "sentence":
-			if language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt')) if
+			if language == "Russian":
+				# for russian we use a special purpose splitter with better
+				# performance
+				sentence_method = razdel.sentenize
+			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt')) if
 								'pickle' in lang]:
 				self.dataset.update_status(
 					f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
@@ -348,7 +360,7 @@ class Tokenise(BasicProcessor):
 					self.dataset.update_status(0)
 					return
 
-				value = [v for v in sentence_method(post[column], language) if v is not None]
+				value = [Tokenise.normalise_segment(v) for v in sentence_method(post[column], language) if v is not None]
 				if value:
 					groupings.extend(value)
 
@@ -368,6 +380,8 @@ class Tokenise(BasicProcessor):
 
 				# stem, lemmatise and save tokens that are not in filter
 				for token in tokens:
+					token = Tokenise.normalise_segment(token)
+
 					token = token.lower()
 					token = numbers.sub("", symbol.sub("", token))
 
@@ -435,3 +449,19 @@ class Tokenise(BasicProcessor):
 
 		# create zip of archive and delete temporary files and folder
 		self.write_archive_and_finish(staging_area)
+
+	@staticmethod
+	def normalise_segment(segment):
+		"""
+		Cast token or sentence to string
+
+		Various tokenisers and splitters return tokens/segments in different
+		ways; this method ensures we always end up with a string.
+
+		:param segment:  Segment to cast to string
+		:return str:
+		"""
+		if type(segment) is Substring:
+			return segment.text
+		else:
+			return str(segment)
