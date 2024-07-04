@@ -66,10 +66,10 @@ def explorer_dataset(key, page=1):
 		return error(404, error="Explorer functionality disabled for %s." % datasource)
 
 	# The amount of posts to show on a page
-	posts_per_page = config.get("explorer.__posts_per_page", 50)
+	posts_per_page = config.get("explorer.posts_per_page", 50)
 
 	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.get('explorer.__max_posts', 500000)
+	max_posts = config.get('explorer.max_posts', 500000)
 
 	# The offset for posts depending on the current page
 	offset = ((page - 1) * posts_per_page) if page else 0

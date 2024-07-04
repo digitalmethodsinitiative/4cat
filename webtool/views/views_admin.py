@@ -571,10 +571,12 @@ def manipulate_settings():
             flash("Invalid settings: %s" % str(e))
 
     all_settings = config.get_all(user=None, tags=[tag])
+
     options = {}
 
     changed_categories = set()
-    for option in sorted({*all_settings.keys(), *definition.keys()}):
+
+    for option in {*all_settings.keys(), *definition.keys()}:
         tag_value = all_settings.get(option, definition.get(option, {}).get("default"))
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
         is_changed = tag and global_value != tag_value
@@ -616,7 +618,16 @@ def manipulate_settings():
             changed_categories.add(option.split(".")[0])
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
-    options = {k: options[k] for k in sorted(options, key=lambda o: options[o]["tabname"])}
+
+    # We are ordering the options based on how they are ordered in their dictionaries,
+    # and not the database order. To do so, we're adding a simple config order number
+    # and sort on this.
+    config_order = 0
+    for k, v in definition.items():
+        options[k]["config_order"] = config_order
+        config_order += 1
+
+    options = {k: options[k] for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))}
 
     # 'data sources' is one setting but we want to be able to indicate
     # overrides per sub-item
