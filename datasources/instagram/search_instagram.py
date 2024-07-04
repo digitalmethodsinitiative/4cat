@@ -10,7 +10,6 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.exceptions import WorkerInterruptedException, MapItemException
-from common.lib.helpers import UserInput
 
 
 class SearchInstagram(Search):

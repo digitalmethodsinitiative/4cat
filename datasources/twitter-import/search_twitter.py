@@ -9,7 +9,6 @@ from datetime import datetime
 from backend.lib.search import Search
 from common.lib.helpers import strip_tags
 from common.lib.item_mapping import MappedItem
-from common.lib.helpers import UserInput
 
 
 class SearchTwitterViaZeeschuimer(Search):

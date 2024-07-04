@@ -11,7 +11,6 @@ import re
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
-from common.lib.helpers import UserInput
 
 class SearchLinkedIn(Search):
     """
