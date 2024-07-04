@@ -60,8 +60,8 @@ packages = [
 	"Werkzeug~=2.2",
 	"wordcloud~=1.8",
 	# The https://github.com/akamhy/videohash is not being maintained anymore; these are two patches
-	"imagedominantcolor @ https://github.com/albertopasqualetto/imagedominantcolor/archive/refs/heads/pillow10.zip",
-	"videohash @ https://github.com/dale-wahl/videohash/archive/refs/heads/main.zip",
+	"imagedominantcolor @ git+https://github.com/dale-wahl/imagedominantcolor.git@pillow10",
+	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
 	"yt-dlp",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm"
