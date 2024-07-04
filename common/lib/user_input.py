@@ -36,7 +36,6 @@ class UserInput:
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
     OPTION_DATASOURCES_TABLE = "datasources_table" # a table with settings per data source
-    OPTION_DATASOURCES_TEXT = "datasources_text" # text input per data source (via dropdown)
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
