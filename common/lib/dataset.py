@@ -1739,6 +1739,20 @@ class DataSet(FourcatModule):
 		"""
 		return self.type.endswith("-search") or self.type.endswith("-import")
 
+	def file_exists(self):
+		"""
+		Checks whether the result file for this dataset (still) exists.
+		Can be useful for checking the status of old dataset files that
+		may have been deleted. 
+
+		:return bool:
+		"""
+
+		if self.get_results_path().exists():
+			return True
+		
+		return False
+
 	def get_extension(self):
 		"""
 		Gets the file extention this dataset produces.

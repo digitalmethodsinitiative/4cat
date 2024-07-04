@@ -15,7 +15,7 @@
         </div>
     {% endif %}
     </div>
-  {% if dataset.is_finished() and dataset.num_rows > 0 %}
+  {% if dataset.is_finished() and dataset.num_rows > 0 and dataset.file_exists() %}
     <ul class="dataset-actions">
     {% if dataset.get_own_processor().map_item or dataset.get_annotation_fields() %}
         <li>
@@ -29,7 +29,7 @@
     <li>
         <a href="{{ url_for('get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
             <i class="fas fa-download" aria-hidden="true"></i>
-            Original {{ dataset.result_file.split(".")[-1] }} ({{ dataset.get_results_path()|filesize }})
+            Original {{ dataset.get_extension() }} ({{ dataset.get_results_path()|filesize }})
         </a>
         <p role="tooltip" id="tooltip-get-result-{{ dataset.key }}" aria-hidden="true">Download original data as provided by the data source</p>
     </li>
