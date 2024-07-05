@@ -1529,11 +1529,18 @@ class DataSet(FourcatModule):
 
 		:return str: media type, e.g., "text"
 		"""
+		own_processor = self.get_own_processor()
 		if hasattr(self, "media_type"):
+			# media type can be defined explicitly in the dataset; this is the priority
 			return self.media_type
-		else:
-			# Default to text
-			return self.parameters.get("media_type", "text")
+		elif own_processor is not None:
+			# or media type can be defined in the processor
+			# some processors can set different media types for different datasets (e.g., import_media)
+			if hasattr(own_processor, "media_type"):
+				return own_processor.media_type
+
+		# Default to text
+		return self.parameters.get("media_type", "text")
 
 	def get_result_url(self):
 		"""

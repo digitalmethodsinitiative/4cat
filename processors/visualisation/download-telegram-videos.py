@@ -35,6 +35,7 @@ class TelegramVideoDownloader(BasicProcessor):
                   "Note that not always all videos can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "video"  # media type of the result
     flawless = True
 
     followups = VideoDownloaderPlus.followups

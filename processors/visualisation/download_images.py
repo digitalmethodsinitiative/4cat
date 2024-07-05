@@ -40,6 +40,7 @@ class ImageDownloader(BasicProcessor):
 				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
 				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	media_type = "image"  # media type of the dataset
 
 	followups = ["image-wall", "image-category-wall", "pix-plot", "image-to-categories", "image-captions", "text-from-images", "metadata-viewer", "clarifai-api", "google-vision-api"]
 
@@ -137,9 +138,6 @@ class ImageDownloader(BasicProcessor):
 		images along with a file, .metadata.json, that contains identifying
 		information.
 		"""
-		# Set dataset media_type to image
-		self.dataset.media_type = "image"
-
 		# Get the source file data path
 		top_parent = self.dataset.get_genealogy()[0]
 		datasource = top_parent.parameters.get("datasource")

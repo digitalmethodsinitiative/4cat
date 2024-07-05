@@ -36,6 +36,7 @@ class TelegramImageDownloader(BasicProcessor):
                   "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image"  # media type of the result
     flawless = True
 
     followups = ImageDownloader.followups

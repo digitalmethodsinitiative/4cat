@@ -130,6 +130,7 @@ class VideoHasher(BasicProcessor):
 	title = "Create Video collages"  # title displayed in UI
 	description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	media_type = "image" # media type of the result
 
 	followups = ["video-hash-network", "video-hash-similarity-matrix"]
 

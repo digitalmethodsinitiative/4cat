@@ -28,6 +28,7 @@ class YouTubeThumbnails(BasicProcessor):
 	title = "Download YouTube thumbnails"  # title displayed in UI
 	description = "Downloads the thumbnails of YouTube videos and stores it in a zip archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	media_type = "image"  # media type of the result
 
 	followups = ["youtube-imagewall"]
 	

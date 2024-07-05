@@ -32,6 +32,7 @@ class TikTokVideoDownloader(BasicProcessor):
     title = "Download TikTok Videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
+    media_type = "video"
 
     followups = VideoDownloaderPlus.followups
 
@@ -142,6 +143,7 @@ class TikTokImageDownloader(BasicProcessor):
     title = "Download TikTok Images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
+    media_type = "image"
 
     followups = ImageDownloader.followups
 
