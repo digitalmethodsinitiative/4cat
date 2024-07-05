@@ -238,14 +238,16 @@ class VideoHasher(BasicProcessor):
 		rows = []
 		if video_metadata is None:
 			# Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
-			metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+			try:
+				metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+			except FileNotFoundError:
+				metadata_path = None
 			if metadata_path:
 				with open(metadata_path) as file:
 					video_metadata = json.load(file)
 
 		if video_metadata is None:
-			# Not good, but let's store the video_hashes and note the error
-			self.dataset.log("Error connecting video hashes to original dataset")
+			self.dataset.log("No video metadata (i.e., from video downloader) found; unable to connect original posts. Saving video hashes only.")
 
 			for filename, data in video_hashes.items():
 				video_hash = data.get('videohash')
