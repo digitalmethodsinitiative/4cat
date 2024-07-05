@@ -105,13 +105,13 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
         max_images = convert_to_int(self.parameters.get("amount", 0), 100)
         total = self.source_dataset.num_rows if not max_images else min(max_images, self.source_dataset.num_rows)
+        processed = 0
         done = 0
 
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
 
-            done += 1
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
             self.dataset.update_progress(done / total)
 
@@ -125,6 +125,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 # cannot continue fetching, e.g. when API key is invalid
                 break
 
+            processed += 1
             if not annotations:
                 continue
 
@@ -132,11 +133,12 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:
                 outfile.write(json.dumps(annotations) + "\n")
+                done += 1
 
             if max_images and done >= max_images:
                 break
 
-        self.dataset.update_status("Annotations retrieved for %i images" % done)
+        self.dataset.update_status("Annotations retrieved for %i images (%i processed in total)" % (done, processed), is_final=True)
         self.dataset.finish(done)
 
     def annotate_image(self, image_file, api_key, features):
@@ -177,6 +179,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
         elif api_request.status_code != 200:
             self.dataset.update_status("Got response code %i from Google Vision API for image %s, skipping" % (api_request.status_code, image_file.name))
+            self.dataset.log(f"Code {api_request.status_code}; Text: {api_request.text}")
             return None
 
         try:
