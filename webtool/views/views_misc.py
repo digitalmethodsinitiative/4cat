@@ -25,8 +25,8 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.errorhandler(413)
 def request_entity_too_large(this_error):
-	message = f"File too large; try uploading as a ZIP file instead."
-	return error(413, message=message, status="error")
+    message = f"File too large; try uploading as a ZIP file instead."
+    return error(413, message=message, status="error")
 
 @app.route('/')
 @login_required

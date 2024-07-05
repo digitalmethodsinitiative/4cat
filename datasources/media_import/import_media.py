@@ -1,4 +1,5 @@
 import re
+import math
 import json
 import time
 import zipfile
@@ -6,10 +7,13 @@ import mimetypes
 from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
+from common.config_manager import config
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
 
+# approximate number of files that can be uploaded in a single request rounded to 100
+max_files_approx = int((math.floor(config.get('flask.max_form_parts', 1000)-50)/100)) * 100
 
 class SearchMedia(BasicProcessor):
     type = "media-import-search"  # job ID
@@ -30,11 +34,12 @@ class SearchMedia(BasicProcessor):
         return {
             "intro": {
                 "type": UserInput.OPTION_INFO,
+                # Large numbers of files fail possibly due to Flask request size limit (not file size)
                 "help": "Upload media files to make them be available for further analysis. "
                         "Please include only one type of file per dataset (image, audio, or video) and "
                         "4CAT will be able to run various processors on these media collections. "
-                        "\n\nFor collections **larger than a few hundred files**, please upload a single "
-                        "ZIP file. Larger numbers of files may fail (and a ZIP file will also load much faster)."
+                        f"\n\nFor collections **larger than a few hundred**, please upload a single "
+                        f"ZIP file. More than ~{max_files_approx} files will fail (and a ZIP file will also load much faster)."
             },
             "data_upload": {
                 "type": UserInput.OPTION_FILE,
