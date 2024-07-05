@@ -72,7 +72,7 @@ class VisionTagNetworker(BasicProcessor):
         except ValueError:
             min_confidence = 0
 
-        if self.source_dataset.num_items() == 0 or not self.source_dataset.get_results_path().exists():
+        if self.source_dataset.num_rows == 0 or not self.source_dataset.get_results_path().exists():
             self.dataset.finish_with_error(f"No results found from Google Vision API. Check Google Vision results and logs.")
             return
 
