@@ -30,10 +30,11 @@ class SearchMedia(BasicProcessor):
         return {
             "intro": {
                 "type": UserInput.OPTION_INFO,
-                "help": "You can upload files here that will be available for further analysis "
-                        "and processing. "
+                "help": "Upload media files to make them be available for further analysis. "
                         "Please include only one type of file per dataset (image, audio, or video) and "
-                        "4CAT will be able to run various processors on these files. "
+                        "4CAT will be able to run various processors on these media collections. "
+                        "\n\nFor collections **larger than a few hundred files**, please upload a single "
+                        "ZIP file. Larger numbers of files may fail (and a ZIP file will also load much faster)."
             },
             "data_upload": {
                 "type": UserInput.OPTION_FILE,
