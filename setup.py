@@ -45,7 +45,7 @@ packages = [
 	"pyahocorasick~=1.4.0",
 	"PyMySQL~=1.0",
 	"PyTumblr==0.1.0",
-	"razdel^=0.5.0"
+	"razdel~=0.5"
 	"requests~=2.27",
 	"requests_futures",
 	"scenedetect==0.6.0.3",
