@@ -212,10 +212,10 @@ class ImageCategoryWallGenerator(BasicProcessor):
 		mixed_types = False
 		self.dataset.update_status("Collecting categories")
 		for _i in range(2):
-			# Allows a second loop if mixed types are detected
-			categories = {}
-			post_values = []  # used for numeric categories
 			if mixed_types or category_type is None:
+				# Allows a second loop if mixed types are detected
+				categories = {}
+				post_values = []  # used for numeric categories
 				for i, post in enumerate(category_dataset.iterate_items(self)):
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while collecting categories")
