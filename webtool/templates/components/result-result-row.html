@@ -47,7 +47,7 @@
     {% if __user_config("privileges.can_use_explorer") and has_explorer %}
     <li>
         <a href="{{ url_for('explorer_dataset', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
-            <i class="fa fa-binoculars" aria-hidden="true"></i> Explorer
+            <i class="fa fa-binoculars" aria-hidden="true"></i> Explore & annotate
         </a>
         <p role="tooltip" id="tooltip-explore-items-{{ dataset.key }}" aria-hidden="true">Explore, sort, and add annotations to data interactively</p>
     </li>
