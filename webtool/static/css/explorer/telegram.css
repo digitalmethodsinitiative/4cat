@@ -1,0 +1,73 @@
+@font-face {
+    font-family: 'Open Sans';
+    src: url("../fonts/OpenSans-Regular.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    src: url("../fonts/OpenSans-Bold.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: italic;
+    src: url("../fonts/OpenSans-Italic.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    font-style: italic;
+    src: url("../fonts/OpenSans-BoldItalic.ttf")
+}
+
+* {
+	font-family: "Open Sans", Arial;
+	font-size: 16px;
+	line-height: 1.5;
+}
+
+.explorer-content ol li {
+	background-color: #6fa788;
+	padding: 1px;
+}
+
+.posts .post-content {
+	list-style-type: none;
+	background-color: white;
+	width: 450px;
+	margin: 0 auto;
+	margin-top: 2px;
+	margin-bottom: 2px;
+	border-radius: 5px 15px 15px 5px;
+	padding: 12px 17px;
+}
+
+.post-content.new-group {
+	border-radius: 0 10px 10px 10px;
+	margin-top: 10px;
+}
+
+.author {
+	color: #2984cd;
+	font-weight: bold;
+}
+
+.media-container img {
+	width: 100%;
+}
+
+.day {
+	margin: 8px;
+	text-align: center;
+	color: white;
+}
+
+.day span {
+	padding: 5px;
+	padding-left: 10px;
+	padding-right: 10px;
+	background-color: rgba(0,0,0,.3);
+	border-radius: 20px;
+}
