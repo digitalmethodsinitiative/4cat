@@ -53,6 +53,7 @@ for (a in annotation_fields) {
 	<div class="explorer-content">
 		<ol class="posts" id="explorer-posts">
 		{% for post in posts %}
+			{% set post_count = loop.index %}
 			{% include "explorer/post.html" %}
 		{% endfor %}
 		</ol>
