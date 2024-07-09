@@ -72,11 +72,11 @@
 				<span class="retweets"><i class="fa-solid fa-retweet"></i> {{ post.get("retweet_count") }}</span>
 				<span class="likes"><i class="fa-solid fa-heart"></i> {{ post.get("like_count") | numberify }}</span>
 				{% if post.get("impression_count") %}<span class="impressions"><i class="fa-solid fa-chart-simple"></i> {{ post.get("impression_count") | numberify }}</span>{% endif %}
+				<!-- Possible external link, if not pseudonymised -->
+				{% if not pseudonymised %}
+				<span class="external-url" title="Go to original post"><a href="https://twitter.com/{{ post.author }}/status/{{ post.id }}" target="_blank"><i class="fas fa-external-link-alt"></i></a></span>
+				{% endif %}
 			</div>
 		</div>
-	<!-- Possible external link, if not pseudonymised -->
-	{% if not pseudonymised %}
-		<a href="https://twitter.com/{{ post.author }}/status/{{ post.id }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
-	{% endif %}
 	</div>
 </div>

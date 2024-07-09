@@ -70,23 +70,13 @@
 	margin-top: 20px;
 }
 
-.time, .metrics, .atname {
+.time, .metrics, .atname, .external-url a {
 	color: #7a8a97;
 }
 
-.posts .post .metrics span {
-	margin-right: 60px;
-}
-
-.verified {
-	color: rgb(29, 155, 240)
-}
-
-.posts .external-url {
-	position: absolute;
-	bottom: 10px;
-	right: 10px;
-	color: rgb(104, 119, 130);
+.posts .post .metrics {
+	display: flex;
+	justify-content: space-between;
 }
 
 span.hashtag {
