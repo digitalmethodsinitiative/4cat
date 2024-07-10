@@ -218,8 +218,9 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		return body
 
 	# Add URL links
-	for url in urls_from_text(body):
-		body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
+	if datasource != "telegram": # Telegram has mardown links
+		for url in urls_from_text(body):
+			body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
 
 	# Add hashtag links
 	if "hasthag"  in base_urls[datasource]:
