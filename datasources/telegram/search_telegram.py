@@ -348,7 +348,7 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
-                        
+
                         if resolve_refs:
                             serialized_message = await self.resolve_groups(client, serialized_message)
 
@@ -759,7 +759,7 @@ class SearchTelegram(Search):
             mapped_obj["_type"] = type(input_obj).__name__
 
         # Store the markdown-formatted text
-        if hasattr(input_obj, "text"):
+        if type(input_obj).__name__ == "Message":
             mapped_obj["message"] = input_obj.text
 
         return mapped_obj
