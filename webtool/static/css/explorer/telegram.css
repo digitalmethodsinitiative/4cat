@@ -1,65 +1,186 @@
 @font-face {
-    font-family: 'Open Sans';
+    font-family: "Open Sans";
     src: url("../fonts/OpenSans-Regular.ttf")
 }
 
 @font-face {
-    font-family: 'Open Sans';
+    font-family: "Open Sans";
     font-weight: bold;
     src: url("../fonts/OpenSans-Bold.ttf")
 }
 
-@font-face {
-    font-family: 'Open Sans';
-    font-style: italic;
-    src: url("../fonts/OpenSans-Italic.ttf")
-}
-
-@font-face {
-    font-family: 'Open Sans';
-    font-weight: bold;
-    font-style: italic;
-    src: url("../fonts/OpenSans-BoldItalic.ttf")
-}
-
 * {
-	font-family: "Open Sans", Arial;
-	font-size: 16px;
-	line-height: 1.5;
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+.explorer-content {
+	background-image: linear-gradient(#6ca587, #c4d18b);
+	padding-top: 5px;
+	padding-bottom: 20px;
 }
 
 .explorer-content ol li {
-	background-color: #6fa788;
 	padding: 1px;
+	background: none;
 }
 
-.posts .post-content {
+.posts .post {
+	font-family: "Open Sans", Arial;
+	display: block;
+	position: relative;
+	max-width: 580px;
+	list-style-type: none;
+	margin: 0 auto;
+}
+
+.posts .post .post-container.new-group {
+	margin-top: 6px;
+}
+
+/* Profile picture  */
+.posts .post .profile-picture-container {
+	display: inline-block;
+	width: 60px;
+	vertical-align: top;
+}
+
+.profile-picture {
+	background-image: linear-gradient(#389ed5, #59c8e2);
+	border-radius: 100%;
+	width: 50px;
+    height: 50px;
+    line-height: 53px;
+    float: left;
+    text-align: center;
+}
+
+.profile-picture .initials {
+    color: white;
+    font-size: 23px;
+    width: 100%;
+    height: 100%;
+}
+
+/* Post content */
+.posts .post .post-content {
+	display: inline-block;
+	max-width: 80%;
 	list-style-type: none;
 	background-color: white;
-	width: 450px;
-	margin: 0 auto;
-	margin-top: 2px;
-	margin-bottom: 2px;
-	border-radius: 5px 15px 15px 5px;
+	border-radius: 5px 20px 20px 5px;
 	padding: 12px 17px;
+	z-index: -1;
+	overflow: hidden;
 }
 
-.post-content.new-group {
-	border-radius: 0 10px 10px 10px;
-	margin-top: 10px;
+.posts .post .post-content.new-group {
+	border-radius: 0px 20px 20px 5px;
 }
 
-.author {
+.bubble-left {
+	position: relative;
+	margin-right: -5px;
+	float: right;
+	z-index: 0;
+}
+
+.author, .author a, .author a:hover {
+	margin-bottom: 5px;
 	color: #2984cd;
 	font-weight: bold;
+	text-decoration: none;
+}
+
+.posts .post .body {
+	display: inline;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+
+.posts .post .body a {
+	color: #2984cd;
+}
+
+.posts .post .reply_to {
+	height: 20px;
+	padding: 5px;
+	margin-bottom: 2px;
+	background-color: #e4f1f9;
+	border-left: 4px solid #2e96d2;
+	border-radius: 5px;
+}
+
+.media-container {
+	max-height: 200px;
+	margin-top: -12px;
+	margin-left: -17px;
+	margin-right: -17px;
+	margin-bottom: 10px;
+	overflow: hidden;
 }
 
 .media-container img {
+	margin-top: -155px;
 	width: 100%;
 }
 
+.post-content.new-group .media-container {
+	margin-top: 10px;
+}
+
+.post-content.new-group .media-container img {
+	margin-top: -155px;
+	border-radius: 0px;
+}
+
+/* Emoji reaction counts */
+.reactions {
+	margin-top: 3px;
+	margin-bottom: 3px;
+}
+
+.reaction {
+	display: inline-block;
+	color: #168acd;
+	background-color: #e8f5fc;
+	font-weight: bold;
+	border-radius: 15px;
+	margin-top: 1px;
+	padding: 4px;
+	padding-left: 8px;
+	padding-right: 8px;
+	font-size: 16px;
+	vertical-align: middle;
+}
+
+.reaction .reaction-count {
+	padding-left: 4px;
+	font-size: 14px;
+}
+
+/* TOD on the bottom of the post */
+.metrics {
+	display: inline-block;
+	padding-left: 10px;
+	float: right;
+}
+
+.metrics span {
+	font-size: 14px;
+	padding-left: 3px;
+	color: #a0acb6;
+}
+
+/* External url button */
+
+.external-url i {
+	color: #168acd;
+}
+
+/* Day indicator between posts  */
 .day {
-	margin: 8px;
+	margin: 15px;
 	text-align: center;
 	color: white;
 }
@@ -70,4 +191,41 @@
 	padding-right: 10px;
 	background-color: rgba(0,0,0,.3);
 	border-radius: 20px;
+}
+
+/** --------------------- *
+     Annotation post elements
+  * --------------------- */
+.post-annotations {
+	background-image: linear-gradient(#389ed5, #59c8e2);
+    color: white;
+    border-radius: 5px 20px 20px 5px;
+    margin-left: 63px;
+}
+
+.post-annotation {
+    padding: 15px;
+}
+
+.post-annotation > .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    min-width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.post-annotation.checkbox > .post-annotation-options {
+    display: inline-block;
+}
+
+.post-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.post-annotation-options > input {
+    display: inline-block;
 }

@@ -186,11 +186,6 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 	if not datasource:
 		return body
 
-	# Supported data sources
-	known_datasources = ["twitter", "tiktok", "instagram", "tumblr", "linkedin"]
-	if datasource not in known_datasources:
-		return body
-
 	# Base URLs after which tags and @-mentions follow, per platform
 	base_urls = {
 		"twitter": {
@@ -212,38 +207,47 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		"linkedin": {
 			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
 			"mention": "https://linkedin.com/in/"
+		},
+		"telegram": {
 		}
 	}
+
+	# Supported data sources
+	known_datasources = list(base_urls.keys())
+	if datasource not in known_datasources:
+		return body
 
 	# Add URL links
 	for url in urls_from_text(body):
 		body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
 
 	# Add hashtag links
-	tags = re.findall(r"#[\w0-9]+", body)
-	# We're sorting tags by length so we don't incorrectly
-	# replace tags that are a substring of another, longer tag.
-	tags = sorted(tags, key=lambda x: len(x), reverse=True)
-	for tag in tags:
-		# Match the string, but not if it's preceded by a >, which indicates that we've already added an <a> tag.
-		# This avoids problems with repeated substrings (e.g. #Dog and #DogOwners).
-		body = re.sub(r"(?<!'>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
+	if "hasthag"  in base_urls[datasource]:
+		tags = re.findall(r"#[\w0-9]+", body)
+		# We're sorting tags by length so we don't incorrectly
+		# replace tags that are a substring of another, longer tag.
+		tags = sorted(tags, key=lambda x: len(x), reverse=True)
+		for tag in tags:
+			# Match the string, but not if it's preceded by a >, which indicates that we've already added an <a> tag.
+			# This avoids problems with repeated substrings (e.g. #Dog and #DogOwners).
+			body = re.sub(r"(?<!'>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
 
 	# Add @-mention links
-	mentions = re.findall(r"@[\w0-9]+", body)
-	mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
-	for mention in mentions:
-		body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
+	if "mention"  in base_urls[datasource]:
+		mentions = re.findall(r"@[\w0-9]+", body)
+		mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
+		for mention in mentions:
+			body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
 
 	return body
 
 @app.template_filter('string_counter')
-def _jinja2_filter_string_counter(string, is_emoji=False):
+def _jinja2_filter_string_counter(string, emoji=False):
 	# Returns a dictionary with counts of characters in a string. 
 	# Also handles emojis.
 
 	# We need to convert multi-character emojis ("graphemes") to one character.
-	if is_emoji == True:
+	if emoji == True:
 		string = regex.finditer(r"\X", string) # \X matches graphemes
 		string = [m.group(0) for m in string]
 
