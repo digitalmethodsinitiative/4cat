@@ -327,8 +327,10 @@ class SearchTelegram(Search):
                 i = 0
                 try:
                     entity_posts = 0
+
                     async for message in client.iter_messages(entity=query, offset_date=max_date):
                         entity_posts += 1
+                        
                         i += 1
                         if self.interrupted:
                             raise ProcessorInterruptedException(
@@ -346,6 +348,7 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
+                        
                         if resolve_refs:
                             serialized_message = await self.resolve_groups(client, serialized_message)
 
@@ -646,6 +649,12 @@ class SearchTelegram(Search):
                     reaction_type = reaction_type["emoticon"]
                 reactions += reaction_type * reaction["count"]
 
+        is_reply = False
+        reply_to = ""
+        if message.get("reply_to"):
+            is_reply = True
+            reply_to = message["reply_to"].get("reply_to_msg_id", "")
+
         return MappedItem({
             "id": f"{message['_chat']['username']}-{message['id']}",
             "thread_id": thread,
@@ -655,7 +664,8 @@ class SearchTelegram(Search):
             "author_name": fullname,
             "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
-            "reply_to": message.get("reply_to_msg_id", ""),
+            "is_reply": is_reply,
+            "reply_to": reply_to,
             "views": message["views"] if message["views"] else "",
             "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
@@ -728,6 +738,7 @@ class SearchTelegram(Search):
             obj = input_obj.copy()
 
         mapped_obj = {}
+
         for item, value in obj.items():
             if type(value) is datetime:
                 mapped_obj[item] = value.timestamp()
@@ -746,6 +757,11 @@ class SearchTelegram(Search):
         # Add the _type if the original object was a telethon type
         if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
             mapped_obj["_type"] = type(input_obj).__name__
+
+        # Store the markdown-formatted text
+        if hasattr(input_obj, "text"):
+            mapped_obj["message"] = input_obj.text
+
         return mapped_obj
 
     @staticmethod
