@@ -641,7 +641,10 @@ class SearchTelegram(Search):
 
         if message.get("reactions") and message["reactions"].get("results"):
             for reaction in message["reactions"]["results"]:
-                reactions += reaction["reaction"] * reaction["count"]
+                reaction_type = reaction["reaction"]
+                if isinstance(reaction_type, dict):
+                    reaction_type = reaction_type["emoticon"]
+                reactions += reaction_type * reaction["count"]
 
         return MappedItem({
             "id": f"{message['_chat']['username']}-{message['id']}",
