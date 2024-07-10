@@ -6,6 +6,7 @@ import math
 import os
 import re
 import requests
+import regex
 
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
@@ -235,6 +236,25 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
 
 	return body
+
+@app.template_filter('string_counter')
+def _jinja2_filter_string_counter(string, is_emoji=False):
+	# Returns a dictionary with counts of characters in a string. 
+	# Also handles emojis.
+
+	# We need to convert multi-character emojis ("graphemes") to one character.
+	if is_emoji == True:
+		string = regex.finditer(r"\X", string) # \X matches graphemes
+		string = [m.group(0) for m in string]
+
+	# Count 'em
+	counter = {}
+	for s in string:
+		if s not in counter:
+			counter[s] = 0
+		counter[s] += 1
+
+	return counter 
 
 @app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):
