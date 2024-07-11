@@ -40,6 +40,9 @@ class ImageDownloader(BasicProcessor):
 				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
 				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	media_type = "image"  # media type of the dataset
+
+	followups = ["image-wall", "image-category-wall", "pix-plot", "image-to-categories", "image-captions", "text-from-images", "metadata-viewer", "clarifai-api", "google-vision-api"]
 
 	options = {
 		"amount": {
@@ -126,7 +129,8 @@ class ImageDownloader(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		return (module.type == "top-images" or module.is_from_collector()) \
-			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
+			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"] \
+			   and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
@@ -134,7 +138,6 @@ class ImageDownloader(BasicProcessor):
 		images along with a file, .metadata.json, that contains identifying
 		information.
 		"""
-
 		# Get the source file data path
 		top_parent = self.dataset.get_genealogy()[0]
 		datasource = top_parent.parameters.get("datasource")
@@ -263,6 +266,7 @@ class ImageDownloader(BasicProcessor):
 		downloaded_images = 0
 		processed_urls = 0
 		failures = []
+		total_images = len(urls) if amount == 0 else amount
 		for url in urls:
 			if amount != 0 and downloaded_images >= amount:
 				break
@@ -273,8 +277,8 @@ class ImageDownloader(BasicProcessor):
 
 			processed_urls += 1
 			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
-									   (downloaded_images, amount, url))
-			self.dataset.update_progress(downloaded_images / amount)
+									   (downloaded_images, total_images, url))
+			self.dataset.update_progress(downloaded_images / total_images)
 
 			try:
 				# acquire image

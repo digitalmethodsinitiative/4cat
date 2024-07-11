@@ -2,9 +2,9 @@
 Import scraped Gab data
 """
 import datetime
-import re
 
 from backend.lib.search import Search
+from common.lib.item_mapping import MappedItem
 
 
 class SearchGab(Search):
@@ -79,4 +79,4 @@ class SearchGab(Search):
             "timestamp": post_time.strftime("%Y-%m-%d %H:%M:%S")
         }        
     
-        return mapped_item
+        return MappedItem(mapped_item)

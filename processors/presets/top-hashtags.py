@@ -41,7 +41,7 @@ class TopHashtags(ProcessorPreset):
         :return bool:
         """
         columns = module.get_columns()
-        return columns and "hashtags" in module.get_columns()
+        return columns and "hashtags" in columns
 
     def get_processor_pipeline(self):
         """

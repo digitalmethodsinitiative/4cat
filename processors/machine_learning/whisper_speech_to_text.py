@@ -28,6 +28,8 @@ class AudioToText(BasicProcessor):
     description = "Detect speech in audion and convert to text."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = []
+
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
         "[Whisper paper: Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356)",
@@ -61,7 +63,7 @@ class AudioToText(BasicProcessor):
         """
         return config.get("dmi-service-manager.bc_whisper_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("audio-extractor")
+               (module.get_media_type() == 'audio' or module.type.startswith("audio-extractor"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

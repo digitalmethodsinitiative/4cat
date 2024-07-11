@@ -80,6 +80,8 @@ class SearchTwitterViaZeeschuimer(Search):
             "author": tweet["core"]["user_results"]["result"]["legacy"]["screen_name"],
             "author_fullname": tweet["core"]["user_results"]["result"]["legacy"]["name"],
             "author_id": tweet["legacy"]["user_id_str"],
+            "author_avatar_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_image_url_https"],
+            "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_banner_url"],
             "source": strip_tags(tweet["source"]),
             "language_guess": tweet["legacy"].get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",

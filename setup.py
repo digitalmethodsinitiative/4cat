@@ -25,7 +25,7 @@ packages = [
 	"gensim>=4.1.0, <4.2",
 	"google_api_python_client==2.0.2",
 	"html2text==2020.*",
-	"ImageHash~=4.2.0",
+	"ImageHash>4.2.0",
 	"jieba~=0.42",
 	"json_stream",
 	"lxml~=4.9.0",
@@ -45,6 +45,7 @@ packages = [
 	"pyahocorasick~=1.4.0",
 	"PyMySQL~=1.0",
 	"PyTumblr==0.1.0",
+	"razdel~=0.5",
 	"requests~=2.27",
 	"requests_futures",
 	"scenedetect==0.6.0.3",
@@ -59,7 +60,9 @@ packages = [
 	"unidecode~=1.3",
 	"Werkzeug~=2.2",
 	"wordcloud~=1.8",
-	"videohash @ https://github.com/dale-wahl/videohash/archive/refs/heads/main.zip",
+	# The https://github.com/akamhy/videohash is not being maintained anymore; these are two patches
+	"imagedominantcolor @ git+https://github.com/dale-wahl/imagedominantcolor.git@pillow10",
+	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
 	"yt-dlp",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm"

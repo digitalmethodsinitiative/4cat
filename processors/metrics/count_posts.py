@@ -20,6 +20,8 @@ class CountPosts(BasicProcessor):
 	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["histogram"]
+
 	options = {
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
@@ -35,6 +37,15 @@ class CountPosts(BasicProcessor):
 		}
 	}
 
+	@staticmethod
+	def is_compatible_with(module=None, user=None):
+		"""
+        Determine compatibility
+
+        :param Dataset module:  Module ID to determine compatibility with
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""

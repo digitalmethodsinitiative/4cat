@@ -39,6 +39,9 @@ class ImageTextDetector(BasicProcessor):
     """
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     references = [
         "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
         "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)"
@@ -77,7 +80,7 @@ class ImageTextDetector(BasicProcessor):
         },
         "update_original": {
             "type": UserInput.OPTION_TOGGLE,
-            "help": "Update original database with detected text",
+            "help": "Update original dataset with detected text",
             "default": False,
             "tooltip": "If enabled, the original dataset will be modified to include a 'detected_text' column otherwise a seperate dataset will be created"
         }
@@ -92,7 +95,7 @@ class ImageTextDetector(BasicProcessor):
         """
         return config.get('dmi-service-manager.eb_ocr_enabled', False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("image-downloader")
+               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):
         """
@@ -272,7 +275,7 @@ class ImageTextDetector(BasicProcessor):
         For preview frontend
         """
         return MappedItem({
-            "filename": item.get("filename"),
+            "image_filename": item.get("filename"),
             "model_type": item.get("model_type"),
             "text": item.get("simplified_text", {}).get("raw_text"),
             "post_ids": ", ".join([str(post_id) for post_id in item.get("image_metadata", {}).get("post_ids", [])]),

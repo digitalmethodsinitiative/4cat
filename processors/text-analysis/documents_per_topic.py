@@ -24,6 +24,8 @@ class TopicModelWordExtractor(BasicProcessor):
     description = "Uses the LDA model to predict to which topic each item or sentence belongs and counts as belonging to whichever topic has the highest probability."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = []
+
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """

@@ -28,6 +28,9 @@ class CategorizeImagesCLIP(BasicProcessor):
     description = "The BLIP2 model uses a pretrained image encoder combined with an LLM to generate image captions. The model can also be prompted and uses the image plus prompt to generate text responses."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",
         "[BLIP-2 paper: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models](https://arxiv.org/abs/2301.12597)",
@@ -60,7 +63,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         return config.get("dmi-service-manager.fc_blip2_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("image-downloader")
+               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -181,7 +184,10 @@ class CategorizeImagesCLIP(BasicProcessor):
 
         # Load the video metadata if available
         image_metadata = {}
-        metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+        try:
+            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+        except FileNotFoundError:
+            metadata_file = None
         if metadata_file:
             with open(metadata_file) as file:
                 image_data = json.load(file)

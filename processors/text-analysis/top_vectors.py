@@ -24,6 +24,8 @@ class VectorRanker(BasicProcessor):
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["wordcloud"]
+
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,

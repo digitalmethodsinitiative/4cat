@@ -28,6 +28,8 @@ class HatebaseAnalyser(BasicProcessor):
 	description = "Assign scores for 'offensiveness' and hate speech propability to each post by using Hatebase."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["hatebase-frequencies"]
+
 	token_expires = 0
 	token = ""
 
@@ -52,6 +54,16 @@ class HatebaseAnalyser(BasicProcessor):
 			"tooltip": "The content of these columns will be analysed for presence of hatebase-listed words."
 		}
 	}
+
+	@staticmethod
+	def is_compatible_with(module=None, user=None):
+		"""
+        Determine compatibility
+
+        :param Dataset module:  Module ID to determine compatibility with
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""

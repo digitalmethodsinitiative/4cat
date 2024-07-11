@@ -23,6 +23,8 @@ class Vectorise(BasicProcessor):
 				  "This is also known as a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["vector-ranker"]
+
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""

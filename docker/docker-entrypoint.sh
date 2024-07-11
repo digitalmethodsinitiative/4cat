@@ -48,7 +48,7 @@ rm -f ./backend/4cat.pid
 export PYTHONPATH=/usr/src/app:$PYTHONPATH
 
 # Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
-python3 helper-scripts/migrate.py -y
+python3 helper-scripts/migrate.py -y -o logs/migrate-backend.log
 
 # Run docker_setup to update any environment variables if they were changed
 python3 -m docker.docker_setup

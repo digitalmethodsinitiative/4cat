@@ -31,6 +31,8 @@ class TfIdf(BasicProcessor):
 	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["wordcloud"]
+
 	options = {
 		"library": {
 			"type": UserInput.OPTION_CHOICE,

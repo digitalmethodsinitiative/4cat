@@ -38,6 +38,18 @@ class SimilarWords(ProcessorPreset):
 		}
 	}
 
+	@staticmethod
+	def is_compatible_with(module=None, user=None):
+		"""
+        Determine compatibility
+
+        This preset is compatible with any module that has a "body" column
+
+        :param Dataset module:  Module ID to determine compatibility with
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
 	def get_processor_pipeline(self):
 		"""
 		This queues a series of post-processors to calculate word similarities

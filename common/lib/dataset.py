@@ -337,6 +337,14 @@ class DataSet(FourcatModule):
 		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
+		# missing field strategy can be for all fields at once, or per field
+		# if it is per field, it is a dictionary with field names and their strategy
+		# if it is for all fields, it is may be a callback, 'abort', or 'default'
+		default_strategy = "default"
+		if type(map_missing) is not dict:
+			default_strategy = map_missing
+			map_missing = {}
+
 		# Loop through items
 		for i, item in enumerate(self._iterate_items(processor)):
 			# Save original to yield
@@ -355,15 +363,6 @@ class DataSet(FourcatModule):
 				# check if fields have been marked as 'missing' in the
 				# underlying data, and treat according to the chosen strategy
 				if mapped_item.get_missing_fields():
-					default_strategy = "default"
-
-					# strategy can be for all fields at once, or per field
-					# if it is per field, it is a dictionary with field names and their strategy
-					# if it is for all fields, it is may be a callback, 'abort', or 'default'
-					if type(map_missing) is not dict:
-						default_strategy = map_missing
-						map_missing = {}
-
 					for missing_field in mapped_item.get_missing_fields():
 						strategy = map_missing.get(missing_field, default_strategy)
 
@@ -1523,6 +1522,25 @@ class DataSet(FourcatModule):
 			return self.get_results_path().suffix[1:]
 
 		return False
+
+	def get_media_type(self):
+		"""
+		Gets the media type of the dataset file.
+
+		:return str: media type, e.g., "text"
+		"""
+		own_processor = self.get_own_processor()
+		if hasattr(self, "media_type"):
+			# media type can be defined explicitly in the dataset; this is the priority
+			return self.media_type
+		elif own_processor is not None:
+			# or media type can be defined in the processor
+			# some processors can set different media types for different datasets (e.g., import_media)
+			if hasattr(own_processor, "media_type"):
+				return own_processor.media_type
+
+		# Default to text
+		return self.parameters.get("media_type", "text")
 
 	def get_result_url(self):
 		"""

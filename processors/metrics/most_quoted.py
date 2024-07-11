@@ -23,6 +23,8 @@ class QuoteRanker(BasicProcessor):
 	description = "Sort posts by how often they were replied to by other posts in the dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
