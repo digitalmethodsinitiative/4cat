@@ -167,7 +167,11 @@ class ImageWallGenerator(BasicProcessor):
 			if sort_mode not in ("", "random") and (picture.height > sample_max or picture.width > sample_max):
 				sample_width = int(sample_max * picture.width / max(picture.width, picture.height))
 				sample_height = int(sample_max * picture.height / max(picture.width, picture.height))
-				picture = ImageOps.fit(picture, (sample_width, sample_height))
+				try:
+					picture = ImageOps.fit(picture, (sample_width, sample_height))
+				except ValueError:
+					# Default of BICUBIC may fail
+					picture = ImageOps.fit(picture, (sample_width, sample_height), method=Image.NEAREST)
 
 			if sort_mode not in ("", "random"):
 				# ensure we get RGB values for pixels
@@ -354,9 +358,14 @@ class ImageWallGenerator(BasicProcessor):
 
 			if tile_x == -1:
 				picture_x = max(1, int(picture.width * (tile_y / picture.height)))
-				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.BILINEAR)
 			else:
-				picture = ImageOps.fit(picture, (tile_x, tile_y), method=Image.BILINEAR)
+				picture_x = tile_x
+
+			try:
+				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.BILINEAR)
+			except ValueError:
+				# BILINEAR may also fail
+				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.NEAREST)
 
 			# simply put them side by side until the right edge is reached,
 			# then move to a new row
