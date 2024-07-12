@@ -667,6 +667,7 @@ class VideoDownloaderPlus(BasicProcessor):
         :param str text:  string that may contain URLs
         :return list:  	  list containing validated URLs to videos
         """
+        text = str(text)
         split_comma = self.parameters.get("split-comma", True)
         if split_comma:
             texts = text.split(",")
