@@ -39,8 +39,7 @@ class SearchTelegram(Search):
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
-    has_explorer_preset = True # Whether this data source has preset CSS and field settings for the Explorer 
-
+    
     # cache
     details_cache = None
     failures_cache = None
@@ -664,6 +663,7 @@ class SearchTelegram(Search):
             "author_name": fullname,
             "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
+            "body_markdown": message["message_markdown"], 
             "is_reply": is_reply,
             "reply_to": reply_to,
             "views": message["views"] if message["views"] else "",
@@ -760,7 +760,7 @@ class SearchTelegram(Search):
 
         # Store the markdown-formatted text
         if type(input_obj).__name__ == "Message":
-            mapped_obj["message"] = input_obj.text
+            mapped_obj["message_markdown"] = input_obj.text
 
         return mapped_obj
 

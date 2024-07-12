@@ -61,7 +61,7 @@
 				{% if post.reply_to %}
 					<div class="reply_to">{% if not pseudonymised %}<a href="https://t.me/{{ post.chat }}/{{ post.reply_to }}" target="_blank">{% endif %}#{{ post.reply_to }}{% if not pseudonymised %}</a>{% endif %}</div>
 				{% endif %}
-				{{ post.body | markdown | social_mediafy(datasource="telegram") | safe }}
+				{{ post.body_markdown | markdown | social_mediafy(datasource="telegram") | safe }}
 			</div>
 
 			{% if post.reactions %}
