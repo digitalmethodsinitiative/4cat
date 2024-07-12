@@ -6,13 +6,17 @@ Can fetch posts from specific blogs or with specific hashtags
 
 import time
 import pytumblr
+import requests
 from requests.exceptions import ConnectionError
 from datetime import datetime
+from ural import urls_from_text
 
 from common.config_manager import config
 from backend.lib.search import Search
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, strip_tags
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ConfigException
+from common.lib.item_mapping import MappedItem
+
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]
@@ -27,7 +31,7 @@ class SearchTumblr(Search):
 	category = "Search"  # category
 	title = "Search Tumblr"  # title displayed in UI
 	description = "Retrieve Tumblr posts by hashtag or blog."  # description displayed in UI
-	extension = "csv"  # extension of result file, used internally and in UI
+	extension = "ndjson"  # extension of result file, used internally and in UI
 	is_local = False	# Whether this datasource is locally scraped
 	is_static = False	# Whether this datasource is still updated
 
@@ -88,8 +92,8 @@ class SearchTumblr(Search):
 						"at max. Insert tags or names of blogs, one on each line. You may insert up to ten tags or "
 						"blogs.\n\nTumblr tags may include whitespace and commas. A `#` before the tag is optional.\n\n"
 						"Tag search only get posts explicitly associated with the exact tag you insert here. Querying "
-						"`gogh` will thus not get posts only tagged with `van gogh`. Keyword search is unfortunately not "
-						"allowed by the [Tumblr API](https://api.tumblr.com).\n\nIf 4CAT reached its Tumblr API rate "
+						"`gogh` will thus not get posts only tagged with `van gogh`. Keyword search is not "
+						"allowed by the [Tumblr API](https://api.tumblr.com).\n\nIf this 4CAT reached its Tumblr API rate "
 						"limit, try again 24 hours later."
 			},
 			"search_scope": {
@@ -181,6 +185,7 @@ class SearchTumblr(Search):
 		queries = parameters.get("query").split(", ")
 		fetch_reblogs = parameters.get("fetch_reblogs", False)
 
+
 		# Store all info here
 		results = []
 
@@ -211,12 +216,18 @@ class SearchTumblr(Search):
 			self.dataset.finish_with_error(f"Could not connect to Tumblr API: {client_info.get('meta', {}).get('status', '')} - {client_info.get('meta', {}).get('msg', '')}")
 			return
 
+
 		# for each tag or blog, get post
 		for query in queries:
 
 				# Get posts per tag
 				if scope == "tag":
-					new_results = self.get_posts_by_tag(query, max_date=max_date, min_date=min_date)
+					# Used for getting tagged posts, which uses requests instead.
+					api_key = self.parameters.get("consumer_key")
+					if not api_key:
+						api_key = SearchTumblr.get_tumblr_keys(self.owner)[0]
+
+					new_results = self.get_posts_by_tag(query, max_date=max_date, min_date=min_date, api_key=api_key)
 
 				# Get posts per blog
 				elif scope == "blog":
@@ -278,13 +289,22 @@ class SearchTumblr(Search):
 							self.dataset.update_status(f"ConnectionRefused: Unable to collect reblogs for post {key}")
 							continue
 						if reblog_post:
-							reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
 							results.append(reblog_post[0])
+
+		# Rename some keys so it works with anonymisation
+		for i in range(len(results)):
+			for key in list(results[i].keys()):
+				if key.startswith("blog"):
+					results[i][key.replace("blog", "author")] = results[i].pop(key)
+				elif key == "post_url":
+					results[i]["author_post_url"] = results[i].pop("post_url")
+				elif key == "slug":
+					results[i]["author_post_slug"] = results[i].pop("slug")
 
 		self.job.finish()
 		return results
 
-	def get_posts_by_tag(self, tag, max_date=None, min_date=None):
+	def get_posts_by_tag(self, tag, max_date=None, min_date=None, api_key=None):
 		"""
 		Get Tumblr posts posts with a certain tag
 		:param tag, str: the tag you want to look for
@@ -324,8 +344,21 @@ class SearchTumblr(Search):
 				break
 
 			try:
-				# Use the pytumblr library to make the API call
-				posts = self.client.tagged(tag, before=max_date, limit=20, filter="raw")
+				# PyTumblr does not allow to use the `npf` parameter yet 
+				# for the `tagged` endpoint (opened a pull request), so
+				# we're using requests here.
+				params = {
+					"tag": tag,
+					"api_key": api_key,
+					"before": max_date,
+					"limit": 20,
+					"filter": "raw",
+					"npf": True
+				}
+				url = "https://api.tumblr.com/v2/tagged"
+				response = requests.get(url, params=params)
+				posts = response.json()["response"]
+				
 			except ConnectionError:
 				self.update_status("Encountered a connection error, waiting 10 seconds.")
 				time.sleep(10)
@@ -346,6 +379,7 @@ class SearchTumblr(Search):
 					retries = 0
 					if check_post["id"] not in self.seen_ids:
 						unseen_posts.append(check_post)
+
 			posts = unseen_posts
 
 			# For no clear reason, the Tumblr API sometimes provides posts with a higher timestamp than requested.
@@ -389,8 +423,6 @@ class SearchTumblr(Search):
 
 			# Append posts to main list
 			else:
-
-				posts = self.parse_tumblr_posts(posts)
 
 				# Get all timestamps and sort them.
 				post_dates = sorted([post["timestamp"] for post in posts])
@@ -515,12 +547,8 @@ class SearchTumblr(Search):
 
 			try:
 				# Use the pytumblr library to make the API call
-				posts = self.client.posts(blog, before=max_date, limit=20, reblog_info=True, notes_info=True, filter="raw")
+				posts = self.client.posts(blog, before=max_date, limit=20, reblog_info=True, notes_info=True, filter="raw", npf=True)
 				posts = posts["posts"]
-
-				#if (max_date - posts[0]["timestamp"]) > 500000:
-					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
-					#self.dataset.update_status([post["timestamp"] for post in posts])
 
 			except Exception as e:
 
@@ -543,8 +571,6 @@ class SearchTumblr(Search):
 						if "notes" in post:
 							all_notes.append(post["notes"])
 
-				posts = self.parse_tumblr_posts(posts)
-
 				# Get the lowest date
 				max_date = sorted([post["timestamp"] for post in posts])[0]
 
@@ -564,10 +590,6 @@ class SearchTumblr(Search):
 
 				all_posts += posts
 
-				#if (max_date - posts[len(posts) - 1]["timestamp"]) > 500000:
-					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
-					#self.dataset.update_status([post["timestamp"] for post in posts])
-
 			if len(all_posts) >= self.max_posts:
 				self.max_posts_reached = True
 				break
@@ -576,10 +598,10 @@ class SearchTumblr(Search):
 
 		return all_posts, all_notes
 
-	def get_post_notes(self, di_blogs_ids, only_text_reblogs=True):
+	def get_post_notes(self, blogs_ids, only_text_reblogs=True):
 		"""
 		Gets the post notes.
-		:param di_blogs_ids, dict: A dictionary with blog names as keys and post IDs as values.
+		:param blogs_ids, dict: A dictionary with blog names as keys and post IDs as values.
 		:param only_text_reblogs, bool: Whether to only keep notes that are text reblogs.
 		"""
 		# List of dict to get reblogs. Items are: [{"blog_name": post_id}]
@@ -588,14 +610,14 @@ class SearchTumblr(Search):
 		max_date = None
 
 		# Do some counting
-		len_blogs = len(di_blogs_ids)
+		len_blogs = len(blogs_ids)
 		count = 0
 
 		# Stop trying to fetch the notes after this many retries
 		max_notes_retries = 10
 		notes_retries = 0
 
-		for key, value in di_blogs_ids.items():
+		for key, value in blogs_ids.items():
 
 			count += 1
 
@@ -653,7 +675,7 @@ class SearchTumblr(Search):
 			raise ProcessorInterruptedException("Interrupted while fetching post from Tumblr")
 
 		# Request the specific post.
-		post = self.client.posts(blog_name, id=post_id)
+		post = self.client.posts(blog_name, id=post_id, npf=True)
 
 		# Tumblr API can sometimes return with this kind of error:
 		# {'meta': {'status': 500, 'msg': 'Server Error'}, 'response': {'error': 'Malformed JSON or HTML was returned.'}}
@@ -740,120 +762,112 @@ class SearchTumblr(Search):
 		del query["daterange"]
 
 		query["query"] = items
-		query["board"] = query.get("search_scope") + "s"  # used in web interface
 
 		# if we made it this far, the query can be executed
 		return query
 
-	def parse_tumblr_posts(self, posts, reblog=False):
+	@staticmethod
+	def map_item(post):
 		"""
-		Function to parse Tumblr posts into the same dict items.
+		Parse Tumblr posts.
 		Tumblr posts can be many different types, so some data processing is necessary.
 
-		:param posts, list: List of Tumblr posts as returned form the Tumblr API.
-		:param reblog, bool: Whether the post concerns a reblog of posts from the original dataset.
-
-		returns list processed_posts, a list with dictionary items of post info.
+		:param posts, list:		List of Tumblr posts as returned form the Tumblr API.
+		:param reblog, bool:	Whether the post concerns a reblog of posts from the original dataset.
+	
+		:return dict:			Mapped item 
 		"""
 
-		# Store processed posts here
-		processed_posts = []
+		media_types = ["photo", "video", "audio"]
 
-		media_tags = ["photo", "video", "audio"]
+		# We're getting info as Neue Text Format types,
+		# so we need to loop through some 'blocks'.
+		image_urls = []
+		video_urls = []
+		video_thumb_urls = []
+		audio_urls = []
+		audio_artists = []
+		linked_urls = []
+		question = ""
+		answers = ""
+		raw_text = ""
+		formatted_text = []
 
-		# Loop through all the posts and write a row for each of them.
-		for post in posts:
-			post_type = post["type"]
+		# Loop through "blocks"
+		for block in post.get("content", []):
+			block_type = block["type"]
 
-			# The post's text is in different keys depending on the post type
-			if post_type in media_tags:
-				text = post["caption"]
-			elif post_type == "link":
-				text = post["description"]
-			elif post_type == "text" or post_type == "chat":
-				text = post["body"]
-			elif post_type == "answer":
-				text = post["question"] + "\n" + post["answer"]
-			else:
-				text = ""
+			if block_type == "image":
+				image_urls.append(block["media"][0]["url"])
+			elif block_type == "audio":
+				audio_urls.append(block["media"]["url"])
+				audio_artists.append(block["artist"])
+			elif block_type == "video":
+				video_urls.append(block["media"]["url"])
+				if "filmstrip" in block:
+					video_thumb_urls.append(block["filmstrip"]["url"])
+			elif block_type == "link":
+				linked_urls.append(block["url"])
+			elif block_type == "poll":
+				question += block["question"]
+				answers = [a["answer_text"] for a in block["answers"]]
 
-			# Different options for video types (YouTube- or Tumblr-hosted)
-			if post_type == "video":
+			# We're gonna add some formatting to the text
+			elif block_type == "text":
 
-				video_source = post["video_type"]
-				# Use `get` since some videos are deleted
-				video_url = post.get("permalink_url")
+				text = block["text"]
 
-				if video_source == "youtube":
-					# There's no URL if the YouTube video is deleted
-					if video_url:
-						video_id = post["video"]["youtube"]["video_id"]
-					else:
-						video_id = "deleted"
-				else:
-					video_id = "unknown"
+				extra_chars = 0
+				if block.get("formatting"):
+					for fmt in block["formatting"]:
+						
+						fmt_type = fmt["type"]
+						s = fmt["start"] + extra_chars	# Start of formatted substring
+						e = fmt["end"] + extra_chars	# End of formatted substring
 
-			else:
-				video_source = None
-				video_id = None
-				video_url = None
+						if fmt_type == "link":
+							text = text[:s] + "[" + text[s:e] + "](" + fmt["formatting"]["url"] + ")" + text[e:]
+							extra_chars += 4 + len(fmt["formatting"]["url"])
+						elif fmt_type == "italic":
+							text = text[:s] + "*" + text[s:e] + "*" + text[e:]
+							extra_chars += 2
+						elif fmt_type == "bold":
+							text = text[:s] + "**" + text[s:e] + "**" + text[e:]
+							extra_chars += 4
 
-			# All the fields to write
-			processed_post = {
-				# General columns
-				"type": post_type,
-				"timestamp": post["timestamp"],
-				"is_reblog": reblog,
+				if block.get("subtype") == "unordered-list-item":
+					text = "- " + text
 
-				# Blog columns
-				"author": post["blog_name"],
-				"subject": post["blog"]["title"],
-				"blog_description": post["blog"]["description"],
-				"blog_url": post["blog"]["url"],
-				"blog_uuid": post["blog"]["uuid"],
-				"blog_last_updated": post["blog"]["updated"],
+				raw_text += block["text"] + "\n"
+				formatted_text.append(text)
 
-				# Post columns
-				"id": post["id"],
-				"post_url": post["post_url"],
-				"post_slug": post["slug"],
-				"thread_id": post["reblog_key"],
-				"body": text.replace("\x00", ""),
-				"tags": ", ".join(post["tags"]) if post.get("tags") else None,
-				"notes": post["note_count"],
-				"urls": post.get("link_url"),
-				"images": ",".join([photo["original_size"]["url"] for photo in post["photos"]]) if post.get("photos") else None,
-
-				# Optional video columns
-				"video_source": video_source if post_type == "video" else None,
-				"video_url": video_url if post_type == "video" else None,
-				"video_id": video_id if post_type == "video" else None,
-				"video_thumb": post.get("thumbnail_url"), # Can be deleted
-
-				# Optional audio columns
-				"audio_type": post.get("audio_type"),
-				"audio_url": post.get("audio_source_url"),
-				"audio_plays": post.get("plays"),
-
-				# Optional link columns
-				"link_author": post.get("link_author"),
-				"link_publisher": post.get("publisher"),
-				"link_image": post.get("link_image"),
-
-				# Optional answers columns
-				"asking_name": post.get("asking_name"),
-				"asking_url": post.get("asking_url"),
-				"question": post.get("question"),
-				"answer": post.get("answer"),
-
-				# Optional chat columns
-				"chat": post.get("dialogue")
-			}
-
-			# Store the processed post
-			processed_posts.append(processed_post)
-
-		return processed_posts
+		return MappedItem({
+			"id": post["id"],
+			"author": post["author_name"],
+			"thread_id": post["reblog_key"],
+			"timestamp": post["timestamp"],
+			"author_subject": post["author"]["title"],
+			"author_description": strip_tags(post["author"]["description"]),
+			"author_url": post["author"]["url"],
+			"author_uuid": post["author"]["uuid"],
+			"author_last_updated": post["author"]["updated"],
+			"author_post_url": post["author_post_url"],
+			"author_post_slug": post["author_post_slug"],
+			"body": raw_text,
+			"body_markdown": "\n".join(formatted_text),
+			"tags": ",".join(post["tags"]) if post.get("tags") else "",
+			"notes": post["note_count"],
+			"linked_urls": ",".join(linked_urls) if linked_urls else "",
+			"image_urls": ",".join(image_urls) if image_urls else "",
+			"video_urls": ",".join(video_urls) if video_urls else "",
+			"video_thumb_urls": ",".join(video_thumb_urls) if video_thumb_urls else "",
+			"audio_urls": ",".join(audio_urls) if audio_urls else "",
+			"audio_artist": ",".join(audio_artists) if audio_artists else "",
+			"author_asking_name": post.get("asking_name", ""),
+			"author_asking_url": post.get("asking_url", ""),
+			"poll_question": question,
+			"poll_answers": ",".join(answers)
+		})
 
 	def after_process(self):
 		"""
