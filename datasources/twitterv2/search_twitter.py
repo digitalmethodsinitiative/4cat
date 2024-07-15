@@ -290,7 +290,7 @@ class SearchWithTwitterAPIv2(Search):
                     self.dataset.log('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
                 if num_missing_objects > 50:
                     # Large amount of missing objects; possible error with Twitter API
-                    self.flawless = False
+                    self.import_issues = False
                     error_report.append('%i missing objects received following tweet number %i. Possible issue with Twitter API.' % (num_missing_objects, tweets))
                     error_report.append('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
 
@@ -333,7 +333,7 @@ class SearchWithTwitterAPIv2(Search):
                 else:
                     break
 
-        if not self.flawless:
+        if not self.import_issues:
             self.dataset.log('Error Report:\n' + '\n'.join(error_report))
             self.dataset.update_status("Completed with errors; Check log for Error Report.", is_final=True)
 
