@@ -21,7 +21,7 @@ from common.config_manager import config
 from datetime import datetime
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, \
-    FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError
+    FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
@@ -940,6 +940,10 @@ class SearchTelegram(Search):
             # wrong phone number
             raise QueryParametersException(
                 "The phone number provided is not a valid phone number for these credentials.")
+        except RPCError as e:
+            # only seen this with an 'UPDATE_APP_TO_LOGIN' status
+            raise QueryParametersException(f"Could not verify your authentication. You may need to update your "
+                                           f"Telegram app(s) to the latest version to proceed ({e}).")
         except Exception as e:
             # ?
             raise QueryParametersException(
