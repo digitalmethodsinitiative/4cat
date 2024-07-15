@@ -110,9 +110,10 @@ class SearchTumblr(Search):
 				"help": "Tags/blogs",
 				"tooltip": "Separate with commas or new lines."
 			},
-			"fetch_reblogs": {
+			"get_notes": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Also fetch reblogs with text? (warning: slow)",
+				"help": "Get post notes (warning: slow)",
+				"tooltip": "Also retrieve post notes. Likes and replies are added to the original post. Text reblogs are added as new posts.",
 				"default": False
 			}
 		}
@@ -183,8 +184,7 @@ class SearchTumblr(Search):
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
 		queries = parameters.get("query").split(", ")
-		fetch_reblogs = parameters.get("fetch_reblogs", False)
-
+		get_notes = parameters.get("get_notes", False)
 
 		# Store all info here
 		results = []
@@ -216,7 +216,6 @@ class SearchTumblr(Search):
 			self.dataset.finish_with_error(f"Could not connect to Tumblr API: {client_info.get('meta', {}).get('status', '')} - {client_info.get('meta', {}).get('msg', '')}")
 			return
 
-
 		# for each tag or blog, get post
 		for query in queries:
 
@@ -231,8 +230,8 @@ class SearchTumblr(Search):
 
 				# Get posts per blog
 				elif scope == "blog":
-					new_results, notes = self.get_posts_by_blog(query, max_date=max_date, min_date=min_date)
-					all_notes.append(notes)
+					new_results = self.get_posts_by_blog(query, max_date=max_date, min_date=min_date)
+
 				else:
 					self.dataset.update_status("Invalid scope")
 					break
@@ -246,61 +245,35 @@ class SearchTumblr(Search):
 					self.dataset.update_status("API limit reached")
 					break
 
-		# If we also want the posts that reblogged the fetched posts:
-		if fetch_reblogs and not self.max_posts_reached and not self.api_limit_reached:
-			self.dataset.update_status("Getting notes from all posts")
+		# Loop through the results once to add note data and fetch text reblogs,
+		len_results = len(results) # results will change in length when we add reblogs.
+		for i in range(len_results):
 
-			# Reblog information is already returned for blog-level searches
-			if scope == "blog":
-				text_reblogs = []
+			post = results[i]
 
-				# Loop through and add the text reblogs that came with the results.
-				for post_notes in all_notes:
-					for post_note in post_notes:
-						for note in post_note:
-							if note["type"] == "reblog":
-								text_reblogs.append({note["blog_name"]: note["post_id"]})
+			# Get note information
+			if get_notes and not self.max_posts_reached and not self.api_limit_reached:
 
-			# Retrieving notes for tag-based posts should be done one-by-one.
-			# Fetching them all at once is not supported by the Tumblr API.
-			elif scope == "tag":
-				# Prepare dicts to pass to `get_post_notes`
-				posts_to_fetch = {result["author"]: result["id"] for result in results}
+				# Reblog information is already returned for blog-level searches
+				# and is stored as `notes` in the posts themselves.
+				# Retrieving notes for tag-based posts must be done one-by-one;
+				# fetching them all at once is not supported by the Tumblr API.
+				if not "notes" in post:
+					self.dataset.update_status("Getting note data for post %i/%i" % (i, len_results))
 
-				# First extract the notes of each post, and only keep text reblogs
-				text_reblogs = self.get_post_notes(posts_to_fetch)
+					# Prepare dicts to pass to `get_post_notes`
+					notes = self.get_post_notes(post["blog_name"], post["id"])
 
-			# Get the full data for text reblogs.
-			if text_reblogs:
-				connection_retries = 0
-				for i, text_reblog in enumerate(text_reblogs):
-					self.dataset.update_status("Got %i/%i text reblogs" % (i, len(text_reblogs)))
-					if connection_retries >= 5:
-						self.dataset.update_status("Multiple connection refused errors; unable to continue collection of reblogs.")
-						break
-					for key, value in text_reblog.items():
-						if connection_retries >= 5:
-							break
-						try:
-							reblog_post = self.get_post_by_id(key, value)
-						except ConnectionRefusedError:
-							connection_retries += 1
-							self.failed_reblogs.append(key)
-							self.dataset.update_status(f"ConnectionRefused: Unable to collect reblogs for post {key}")
-							continue
-						if reblog_post:
-							results.append(reblog_post[0])
+					if notes:
+						results[i]["notes"] = notes
 
-		# Rename some keys so it works with anonymisation
-		for i in range(len(results)):
-			for key in list(results[i].keys()):
-				if key.startswith("blog"):
-					results[i][key.replace("blog", "author")] = results[i].pop(key)
-				elif key == "post_url":
-					results[i]["author_post_url"] = results[i].pop("post_url")
-				elif key == "slug":
-					results[i]["author_post_slug"] = results[i].pop("slug")
-
+					# Get the full data for text reblogs and add them as new posts
+					for note in notes:
+						if note["type"] == "reblog":
+							text_reblog = self.get_post_by_id(note["blog_name"], note["post_id"])
+							if text_reblog:
+								results.append(text_reblog)
+		
 		self.job.finish()
 		return results
 
@@ -353,7 +326,8 @@ class SearchTumblr(Search):
 					"before": max_date,
 					"limit": 20,
 					"filter": "raw",
-					"npf": True
+					"npf": True,
+					"notes_info": True
 				}
 				url = "https://api.tumblr.com/v2/tagged"
 				response = requests.get(url, params=params)
@@ -528,9 +502,6 @@ class SearchTumblr(Search):
 		# Store all posts in here
 		all_posts = []
 
-		# Store notes here, if they exist and are requested
-		all_notes = []
-
 		# Some retries to make sure the Tumblr API actually returns everything
 		retries = 0
 		self.max_retries = 48 # 2 days
@@ -565,11 +536,6 @@ class SearchTumblr(Search):
 
 			# Append posts to main list
 			else:
-				# Keep the notes, if so indicated
-				if self.parameters.get("fetch_reblogs"):
-					for post in posts:
-						if "notes" in post:
-							all_notes.append(post["notes"])
 
 				# Get the lowest date
 				max_date = sorted([post["timestamp"] for post in posts])[0]
@@ -596,72 +562,61 @@ class SearchTumblr(Search):
 
 			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
 
-		return all_posts, all_notes
+		return all_posts
 
-	def get_post_notes(self, blogs_ids, only_text_reblogs=True):
+	def get_post_notes(self, blog_id, post_id):
 		"""
-		Gets the post notes.
-		:param blogs_ids, dict: A dictionary with blog names as keys and post IDs as values.
-		:param only_text_reblogs, bool: Whether to only keep notes that are text reblogs.
-		"""
-		# List of dict to get reblogs. Items are: [{"blog_name": post_id}]
-		text_reblogs = []
+		Gets data on the notes of a specific post.
+		:param blog_id, str: The ID of the blog.
+		:param post_id, str: The ID of the post.
 
+		:returns: a list with dictionaries of notes.
+		"""
+		
+		post_notes = []
 		max_date = None
 
 		# Do some counting
-		len_blogs = len(blogs_ids)
 		count = 0
 
 		# Stop trying to fetch the notes after this many retries
 		max_notes_retries = 10
 		notes_retries = 0
 
-		for key, value in blogs_ids.items():
+		count += 1
 
-			count += 1
+		if self.interrupted:
+			raise ProcessorInterruptedException("Interrupted while fetching post notes from Tumblr")
 
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while fetching post notes from Tumblr")
+		while True:
 
-			# First, get the blog names and post_ids from reblogs
-			# Keep digging till there's nothing left, or if we can fetch no new notes
-			while True:
+			# Requests a post's notes
+			notes = self.client.notes(blog_id, id=post_id, before_timestamp=max_date)
+			
+			if "notes" in notes:
+				notes_retries = 0
 
-				# Requests a post's notes
-				notes = self.client.notes(key, id=value, before_timestamp=max_date)
+				for note in notes["notes"]:
+					post_notes.append(note)
 
-				if only_text_reblogs:
+				if notes.get("_links"):
+					max_date = notes["_links"]["next"]["query_params"]["before_timestamp"]
 
-					if "notes" in notes:
-						notes_retries = 0
+				# If there's no `_links` key, that's all.
+				else:
+					break
 
-						for note in notes["notes"]:
-							# If it's a reblog, extract the data and save the rest of the posts for later
-							if note["type"] == "reblog":
-								if note.get("added_text"):
-									text_reblogs.append({note["blog_name"]: note["post_id"]})
+			# If there's no "notes" key in the returned dict, something might be up
+			else:
+				self.dataset.update_status("Couldn't get notes for Tumblr post " + str(post_id))
+				notes_retries += 1
+				pass
 
-						if notes.get("_links"):
-							max_date = notes["_links"]["next"]["query_params"]["before_timestamp"]
+			if notes_retries > max_notes_retries:
+				self.failed_notes.append(post_id)
+				break
 
-						# If there's no `_links` key, that's all.
-						else:
-							break
-
-					# If there's no "notes" key in the returned dict, something might be up
-					else:
-						self.dataset.update_status("Couldn't get notes for Tumblr request " + str(notes))
-						notes_retries += 1
-						pass
-
-					if notes_retries > max_notes_retries:
-						self.failed_notes.append(key)
-						break
-
-			self.dataset.update_status("Identified %i text reblogs in %i/%i notes" % (len(text_reblogs), count, len_blogs))
-
-		return text_reblogs
+		return post_notes
 
 	def get_post_by_id(self, blog_name, post_id):
 		"""
@@ -674,12 +629,28 @@ class SearchTumblr(Search):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post from Tumblr")
 
-		# Request the specific post.
-		post = self.client.posts(blog_name, id=post_id, npf=True)
+		connection_retries = 0
+
+		while True:
+			if connection_retries >= 5:
+				self.dataset.update_status("Multiple connection refused errors; unable to continue collection of reblogs.")
+				break
+			try:
+				# Request the specific post.
+				post = self.client.posts(blog_name, id=post_id, npf=True)
+		
+			except ConnectionRefusedError:
+				connection_retries += 1
+				self.failed_reblogs.append(note["id"])
+				self.dataset.update_status(f"ConnectionRefused: Unable to collect reblogs for post " + note["id"])
+				continue
+			
+			if post:
+				break
 
 		# Tumblr API can sometimes return with this kind of error:
 		# {'meta': {'status': 500, 'msg': 'Server Error'}, 'response': {'error': 'Malformed JSON or HTML was returned.'}}
-		if "posts" not in post:
+		if not post or "posts" not in post:
 			return None
 
 		# Get the first element of the list - it's always one post.
@@ -780,7 +751,7 @@ class SearchTumblr(Search):
 
 		media_types = ["photo", "video", "audio"]
 
-		# We're getting info as Neue Text Format types,
+		# We're getting info as Neue Post Format types,
 		# so we need to loop through some 'blocks'.
 		image_urls = []
 		video_urls = []
@@ -792,6 +763,10 @@ class SearchTumblr(Search):
 		answers = ""
 		raw_text = ""
 		formatted_text = []
+		authors_liked = []
+		authors_reblogged = []
+		authors_replied = []
+		replies = []
 
 		# Loop through "blocks"
 		for block in post.get("content", []):
@@ -841,22 +816,44 @@ class SearchTumblr(Search):
 				raw_text += block["text"] + "\n"
 				formatted_text.append(text)
 
+		# Add note data
+		for note in post.get("notes", []):
+			if note["type"] == "like":
+				authors_liked.append(note["blog_name"])
+			elif note["type"] in ("posted", "reblog"):
+				# If the original post is a text reblog, it will also show up in the notes.
+				# We can skip these since the data is already in the main post dict.
+				if note["blog_name"] != post["blog_name"] and note["timestamp"] != post["timestamp"]:
+					authors_reblogged.append(note["blog_name"])
+			elif note["type"] == "reply":
+				authors_replied.append(note["blog_name"])
+				replies.append(note["reply_text"])
+
 		return MappedItem({
+			"type": post["original_type"] if "original_type" in post else post["type"],
 			"id": post["id"],
-			"author": post["author_name"],
+			"author": post["blog_name"],
 			"thread_id": post["reblog_key"],
 			"timestamp": post["timestamp"],
-			"author_subject": post["author"]["title"],
-			"author_description": strip_tags(post["author"]["description"]),
-			"author_url": post["author"]["url"],
-			"author_uuid": post["author"]["uuid"],
-			"author_last_updated": post["author"]["updated"],
-			"author_post_url": post["author_post_url"],
-			"author_post_slug": post["author_post_slug"],
+			"author_subject": post["blog"]["title"],
+			"author_description": strip_tags(post["blog"]["description"]),
+			"author_url": post["blog"]["url"],
+			"author_uuid": post["blog"]["uuid"],
+			"author_last_updated": post["blog"]["updated"],
+			"author_post_url": post["post_url"],
+			"author_post_slug": post["slug"],
+			"is_reblog": True if post.get("original_type") == "note" else "",
 			"body": raw_text,
 			"body_markdown": "\n".join(formatted_text),
 			"tags": ",".join(post["tags"]) if post.get("tags") else "",
 			"notes": post["note_count"],
+			"like_count": len(authors_liked),
+			"authors_liked": ",".join(authors_liked),
+			"reblog_count": len(authors_reblogged),
+			"authors_reblogged": ",".join(authors_reblogged),
+			"reply_count": len(authors_replied),
+			"authors_replied": ",".join(authors_replied),
+			"replies": "\n\n".join(replies),
 			"linked_urls": ",".join(linked_urls) if linked_urls else "",
 			"image_urls": ",".join(image_urls) if image_urls else "",
 			"video_urls": ",".join(video_urls) if video_urls else "",

@@ -7,9 +7,11 @@ Be aware that the data may contain personal information. It is thus recommended 
 To comply with the Tumblr API requirements, Tumblr datasets are deleted after three days. 
 
 ### Rate limits
-4CAT uses an internal API key to get Tumblr posts. These are limited to the
+If set, 4CAT uses an internal API key to get Tumblr posts. These are limited to the
 [following rate limits](https://www.tumblr.com/docs/en/api/v2#rate-limits). However, administrators
 may request a rate limit increase via Tumblr.
+
+If no internal API key is set, you can insert your own.
 
 ### Date bugs
 The [Tumblr API](https://api.tumblr.com) is volatile: when fetching sporadically used 
