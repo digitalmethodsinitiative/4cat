@@ -55,7 +55,7 @@ packages = [
 	"spacy==3.7.2",
 	"svgwrite~=1.4.0",
 	"tailer",
-	"Telethon~=1.25.2",
+	"Telethon~=1.36.0",
 	"ural~=1.3",
 	"unidecode~=1.3",
 	"Werkzeug~=2.2",
