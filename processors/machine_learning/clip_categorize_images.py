@@ -152,9 +152,14 @@ class CategorizeImagesCLIP(BasicProcessor):
         try:
             gpu_response = dmi_service_manager.check_gpu_memory_available("clip")
         except DmiServiceManagerException as e:
-            return self.dataset.finish_with_error(str(e))
+            if "GPU not enabled on this instance of DMI Service Manager" in str(e):
+                self.dataset.update_status(
+                    "GPU not enabled on this instance of DMI Service Manager; this may be a minute...")
+                gpu_response = None
+            else:
+                return self.dataset.finish_with_error(str(e))
 
-        if int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+        if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
             self.dataset.finish_with_error(
                 "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
             return
@@ -171,7 +176,8 @@ class CategorizeImagesCLIP(BasicProcessor):
         data = {"args": ['--output_dir', f"data/{path_to_results}",
                          "--model", model,
                          "--categories", f"{','.join(categories)}",
-                         "--images"]
+                         "--images"],
+                "pass_key": True,  # This tells the DMI SM there is a status update endpoint in the clip image
                 }
 
         # Finally, add image files to args

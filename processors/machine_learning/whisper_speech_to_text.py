@@ -164,11 +164,16 @@ class AudioToText(BasicProcessor):
 
         # Check connection and GPU memory available
         try:
-            gpu_response = dmi_service_manager.check_gpu_memory_available("whisper")
+            gpu_response = dmi_service_manager.check_gpu_memory_available("blip2")
         except DmiServiceManagerException as e:
-            return self.dataset.finish_with_error(str(e))
+            if "GPU not enabled on this instance of DMI Service Manager" in str(e):
+                self.dataset.update_status(
+                    "GPU not enabled on this instance of DMI Service Manager; this may be a minute...")
+                gpu_response = None
+            else:
+                return self.dataset.finish_with_error(str(e))
 
-        if int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+        if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
             self.dataset.finish_with_error("DMI Service Manager currently busy; no GPU memory available. Please try again later.")
             return
 
