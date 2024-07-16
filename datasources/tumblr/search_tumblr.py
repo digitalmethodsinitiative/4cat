@@ -759,6 +759,7 @@ class SearchTumblr(Search):
 		audio_urls = []
 		audio_artists = []
 		linked_urls = []
+		linked_titles = []
 		question = ""
 		answers = ""
 		raw_text = ""
@@ -768,8 +769,18 @@ class SearchTumblr(Search):
 		authors_replied = []
 		replies = []
 
+		# Keep track if blocks belong to another post,
+		# which is stored in `layout`.
+		body_reblogged = []
+		reblogged_text_blocks = []
+		author_reblogged = ""
+		for layout_block in post.get("layout", []):
+			if layout_block["type"] == "ask":
+				reblogged_text_blocks += layout_block["blocks"]
+				author_reblogged = layout_block["attribution"]["blog"]["name"]
+
 		# Loop through "blocks"
-		for block in post.get("content", []):
+		for i, block in enumerate(post.get("content", [])):
 			block_type = block["type"]
 
 			if block_type == "image":
@@ -783,12 +794,18 @@ class SearchTumblr(Search):
 					video_thumb_urls.append(block["filmstrip"]["url"])
 			elif block_type == "link":
 				linked_urls.append(block["url"])
+				if "title" in block:
+					linked_titles.append(block["title"])
+				if "description" in block:
+					raw_text += block["description"] + "\n"
+					formatted_text.append(block["description"])
 			elif block_type == "poll":
 				question += block["question"]
 				answers = [a["answer_text"] for a in block["answers"]]
 
 			# We're gonna add some formatting to the text
-			elif block_type == "text":
+			# Skip text that is part of a reblogged post.
+			elif block_type == "text" and i not in reblogged_text_blocks:
 
 				text = block["text"]
 
@@ -816,23 +833,28 @@ class SearchTumblr(Search):
 				raw_text += block["text"] + "\n"
 				formatted_text.append(text)
 
+			elif block_type == "text" and i in reblogged_text_blocks:
+				body_reblogged.append(block["text"])
+
 		# Add note data
 		for note in post.get("notes", []):
 			if note["type"] == "like":
-				authors_liked.append(note["blog_name"])
+				# Inserting at the start of the list to maintain chronological order.
+				authors_liked.insert(0, note["blog_name"])
 			elif note["type"] in ("posted", "reblog"):
 				# If the original post is a text reblog, it will also show up in the notes.
 				# We can skip these since the data is already in the main post dict.
 				if note["blog_name"] != post["blog_name"] and note["timestamp"] != post["timestamp"]:
-					authors_reblogged.append(note["blog_name"])
+					authors_reblogged.insert(0, note["blog_name"])
 			elif note["type"] == "reply":
-				authors_replied.append(note["blog_name"])
-				replies.append(note["reply_text"])
+				authors_replied.insert(0, note["blog_name"])
+				replies.insert(0, note["blog_name"] + ": " + note["reply_text"])
 
 		return MappedItem({
 			"type": post["original_type"] if "original_type" in post else post["type"],
 			"id": post["id"],
 			"author": post["blog_name"],
+			"author_avatar_url": "https://api.tumblr.com/v2/blog/" + post["blog_name"] + "/avatar",
 			"thread_id": post["reblog_key"],
 			"timestamp": post["timestamp"],
 			"author_subject": post["blog"]["title"],
@@ -840,11 +862,13 @@ class SearchTumblr(Search):
 			"author_url": post["blog"]["url"],
 			"author_uuid": post["blog"]["uuid"],
 			"author_last_updated": post["blog"]["updated"],
-			"author_post_url": post["post_url"],
-			"author_post_slug": post["slug"],
+			"post_url": post["post_url"],
+			"post_slug": post["slug"],
 			"is_reblog": True if post.get("original_type") == "note" else "",
 			"body": raw_text,
 			"body_markdown": "\n".join(formatted_text),
+			"body_reblogged": "\n".join(body_reblogged) if body_reblogged else "",
+			"author_reblogged": author_reblogged,
 			"tags": ",".join(post["tags"]) if post.get("tags") else "",
 			"notes": post["note_count"],
 			"like_count": len(authors_liked),
@@ -855,13 +879,12 @@ class SearchTumblr(Search):
 			"authors_replied": ",".join(authors_replied),
 			"replies": "\n\n".join(replies),
 			"linked_urls": ",".join(linked_urls) if linked_urls else "",
+			"linked_urls_titles": "\n".join(linked_titles) if linked_titles else "",
 			"image_urls": ",".join(image_urls) if image_urls else "",
 			"video_urls": ",".join(video_urls) if video_urls else "",
 			"video_thumb_urls": ",".join(video_thumb_urls) if video_thumb_urls else "",
 			"audio_urls": ",".join(audio_urls) if audio_urls else "",
 			"audio_artist": ",".join(audio_artists) if audio_artists else "",
-			"author_asking_name": post.get("asking_name", ""),
-			"author_asking_url": post.get("asking_url", ""),
 			"poll_question": question,
 			"poll_answers": ",".join(answers)
 		})
