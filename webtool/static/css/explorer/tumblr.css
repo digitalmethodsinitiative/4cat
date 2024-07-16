@@ -1,68 +1,248 @@
+/* General stuff */
 .explorer-content {
 	background-color: #001935;
-}
-
-#metadata, footer {
-	color: white;
-}
-
-.content {
-	font-family: "Favorit", "Helvetica Neue", "HelveticaNeue", Helvetica, Arial, sans-serif;
+	padding: 20px
 }
 
 .posts li.post {
+	position: relative;
+	list-style-type: none;
+	font-family: Helvetica, sans-serif;
 	background-color: white;
 	color: black;
-	font-size: 14px;
-	left: 0;
-	border-radius: 3px;
+	font-size: 16px;
+	margin: 0 auto;
+	margin-top: 20px;
+	padding: 0px;
+	border-radius: 8px;
 	max-width: 540px;
-	padding: 0;
 }
 
-.posts li.post header {
-	display: inline-block;
-	text-decoration: none;
+.author {
+	font-size: 13px;
 	font-weight: bold;
-	border: none;
-	padding: 0px;
-	line-height: 1.7em;
-	margin: 25px;
+}
+
+.author-avatar {
+	width: 32px;
+	margin-right: 10px;
+}
+
+.author-avatar img {
+	border-radius: 3px;
+	width: 100%;
+}
+
+/* Main author info  */
+header {
+	display: flex;
+	align-items: center;
+	padding: 19px;
+	text-decoration: none;
+	color: black;
+	overflow: hidden;
+}
+
+header a {
+	color: black;
+}
+
+header .author-avatar {
+	display: inline-block;
+}
+
+header .author {
+	display: inline-block;
+}
+
+/* Media */
+.media-container {
+	width: 100%;
 	margin-bottom: 10px;
 }
 
-.posts li.post article {
-	padding: 0;
-	margin: 0;
+.media-container img {
+	width: 100%;
 }
 
-.posts li.post .post-content {
+/* Post text content */
+.post-content {
 	display: block;
-	margin: 25px;
-	margin-top: 0px;
+	padding: 0px 19px 0px 19px;
 }
 
-.posts li.post .post-tags {
+.post-content .body, .body-reblogged {
+	white-space: pre-wrap;
+	line-height: 1.5em;
+}
+
+.reblogged-content {
+	margin-bottom: 19px;
+	display: inline-block;
+	max-width: 400px;
+	padding: 25px;
+	background-color: #ededed;
+}
+
+.author-reblogged {
+	padding-bottom: 3px;
+}
+
+.author-reblogged-avatar {
+	display: inline-block;
+}
+
+.embedded-link {
+	padding: 30px;
+	background-color: #001935;
+	color: white;
+	text-align: center;
+	font-size: 18px;
+	border-radius: 15px;
+	margin-bottom: 19px;
+}
+
+.embedded-link a {
+	color: white;
+}
+
+.poll-question {
+	font-size: 18px;
+}
+
+.poll-answer {
+	color: white;
+	background-color: #001935;
+	margin: 8px;
+    padding: 8px;
+    border-radius: 15px;
+    text-align: center;
+}
+
+.posts .external-url {
+	position: absolute;
+	bottom: 0;
+	right: 0;
+	padding: 10px;
+}
+
+.tags {
+	padding-top: 19px;
+	list-style-type: none;
 	color: #5e5e5e;
-	margin-top: 20px;
 	word-break: break-all;
 }
 
-.posts li.post .author {
+.tags a {
+	color: #5e5e5e;
+}
+
+.tags li {
+	padding: 5px 5px 5px 0px;
+	display: inline-block;
+	background-color: white;
+}
+
+/* Post footer */
+footer {
+	margin: 19px;
+	padding-top: 19px;
+	border-top: 1px solid rgba(0,0,0,0.13);
+}
+
+.time {
+	color: #5e5e5e;
+}
+
+/* Note metrics  */
+.notes {
+}
+
+.note-counts {
+	padding-top: 19px;	
+}
+
+.note-count {
+	display: inline-block;
+	color: #5a5a5a;
+	border-radius: 18px;
+	border: 1px solid #ebebeb;
+	padding: 9px 18px;
+}
+
+.note-count.total {
 	font-weight: bold;
 }
 
-.posts li.post .post-image {
-	width: 100%;
-	margin-bottom: 15px;
+/* Replies */
+.replies {
+	margin-top: 12px;
+	display: table;
 }
 
-.posts li.post .external-url {
-	
-}
-
-.posts li.post .post-annotations {
+.reply {
 	background-color: white;
-	border-top: 1px solid #5e5e5e;
-	margin-right: 0;
+	display: table-row;
+}
+
+.reply .author-info {
+	display: table-cell;
+}
+
+.reply .author-replied-avatar {
+	vertical-align: middle;
+    display: table-cell;
+    padding-right: 10px;
+}
+
+.reply-content {
+	vertical-align: top;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	border-radius: 18px;
+	border: 1px solid #ebebeb;
+	padding: 9px 18px;
+}
+
+.reply-content .author {
+	margin-bottom: 5px;
+}
+
+/* Annotation fields */
+.post-annotations {
+	background-color: white;
+    color: black;
+    border-radius: 8px;
+	border-top: 1px solid #ebebeb;
+}
+
+.post-annotation {
+    padding: 15px;
+}
+
+.post-annotation input {
+    border-radius: 5px;
+}
+
+.post-annotation > .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    min-width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.post-annotation.checkbox > .post-annotation-options {
+    display: inline-block;
+}
+
+.post-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.post-annotation-options > input {
+    display: inline-block;
 }
