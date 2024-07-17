@@ -118,7 +118,7 @@ def explorer_dataset(key, page=1):
 				break
 
 	if not posts:
-		return error(404, error="No posts available for this datasource")
+		return error(404, error="No posts or posts could not be displayed")
 
 	# We can use either a generic or a pre-made data source-specific template.
 	template = "datasource" if has_datasource_template(datasource) else "generic"
