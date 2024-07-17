@@ -16,6 +16,9 @@ do
     -p ) # set public option to use public IP address as SERVER_NAME
         echo 'Setting SERVER_NAME to public IP'
         SERVER_NAME=$(curl -s https://api.ipify.org);;
+    -h ) # set public option to use server hostname as SERVER_NAME
+        echo 'Setting SERVER_NAME to server hostname'
+        SERVER_NAME=$(hostnamectl --static);;
     * )  # Invalid option
         echo "Error: Invalid option"
         exit;;
