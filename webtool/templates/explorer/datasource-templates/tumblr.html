@@ -20,23 +20,6 @@
 
 </header>
 
-<!-- MEDIA -->
-{% if post["image_urls"] or post["video_urls"] %}
-	<div class="media-container">
-	{% if post["image_urls"] %}
-		{% for image_url in post["image_urls"].split(",") %}
-			<img src="{{ image_url }}">
-		{% endfor %}
-	{% elif post["video_thumb_urls"] %}
-		{% for video_thumb_url in post["video_thumb_urls"].split(",") %}
-			{% if not pseudonymised %}<a href="{{ post['post_url'] }}" target='blank'>{% endif %}
-			<div class="video-thumb"><img src="{{ video_thumb_url }}"></div>
-			<div class="play-button"><i class="fa-solid fa-play"></i></div>
-			{% if not pseudonymised %}</a>{% endif %}
-		{% endfor %}
-	{% endif %}
-</div>
-{% endif %}
 
 <div class="post-content">
 	<!-- REBLOGGED CONTENT -->
@@ -53,26 +36,58 @@
 		{% endif %}
 	</div>
 	{% endif %}
-	<!-- EMBEDDED LINKS -->
-	{% if post.get("linked_urls") %}
-		{% for url in post["linked_urls"].split(",") %}
-		<div class="embedded-link"><a href="{{ url }}" target="_blank">{{ post["linked_urls_titles"].split("\n")[ loop.index - 1 ] }} <i class="fas fa-external-link-alt"></i></a></div>
-		{% endfor %}
-	{% endif %}
-	<!-- POLL -->
-	{% if post.get("poll_question") %}
-	<div class="poll">
-		<div class="poll-question">{{ post["poll_question"] }}</div>
-		<ul class="poll-answers">
-			{% for poll_answer in post["poll_answers"].split(",") %}
-				<li class="poll-answer">{{ poll_answer }}</li>
-			{% endfor %}
-		</ul>
 
-	</div>
-	{% endif %}
-	<!-- POST BODY -->
-	<div class="body">{{ post.get("body_markdown") | social_mediafy(datasource='tumblr') | safe }}</div>
+	<!-- CONTENT BLOCKS -->
+	<!-- Keep track of what blocks we've seen so we know what part of the strings to get -->
+	{% set block_counts = namespace({'text': 0, 'image': 0, 'video': 0, 'audio': 0, 'link': 0}) %}
+	{% for block in post.content_order.split(",") %}
+		<!-- TEXT -->
+		{% if block == "text" %}
+			<p class="body">{{ post.get("body_markdown").split("\n")[block_counts.text] | social_mediafy(datasource='tumblr') | safe }}</p>
+			{% set block_counts.text = block_counts.text + 1 %}
+		<!-- IMAGE -->
+		{% elif block == "image" %}
+			<div class="media-container image">
+				<img src="{{ post.image_urls.split(',')[block_counts.image] }}">
+			</div>
+			{% set block_counts.image = block_counts.image + 1 %}
+		<!-- VIDEO -->
+		{% elif block == "video" %}
+			<div class="media-container video">
+				<a href="{{ post.video_urls.split(',')[block_counts.video] }}" target='blank'>
+					<img src="{{ post.video_thumb_urls.split(',')[block_counts.video] }}">
+					<div class="play-button"><i class="fa-solid fa-play"></i></div>
+				</a>
+			</div>
+			{% set block_counts.video = block_counts.video + 1 %}
+		<!-- AUDIO -->
+		{% elif block == "audio" %}
+			<div class="media-container audio">
+				<a href="{{ post.audio_urls.split(',')[block_counts.audio] }}" target='blank'>
+					<div class="play-button"><i class="fa-solid fa-play"></i></div>
+				</a>
+			</div>
+			{% set block_counts.audio = block_counts.audio + 1 %}
+		<!-- EMBEDDED LINK -->
+		{% elif block == "link" %}
+			{% set url = post.linked_urls.split(",")[block_counts.link] %}
+			{% set url_title = post.linked_urls_titles.split(",")[block_counts.link] %}
+			<div class="embedded-link"><a href="{{ url }}" target="_blank">{{ url_title }} <i class="fas fa-external-link-alt"></i></a></div>
+			{% set block_counts.link = block_counts.link + 1 %}
+		<!-- POLL -->
+		{% elif block == "poll" %}
+			<!-- Only one poll can be added to posts, so no need to split -->
+			<div class="poll">
+				<div class="poll-question">{{ post["poll_question"] }}</div>
+				<ul class="poll-answers">
+					{% for poll_answer in post["poll_answers"].split(",") %}
+						<li class="poll-answer">{{ poll_answer }}</li>
+					{% endfor %}
+				</ul>
+			</div>
+		{% endif %}
+	{% endfor %}
+
 	<!-- TAGS -->
 	{% if post.get("tags") %}
 	<div class="tags">
@@ -88,7 +103,7 @@
 <footer>
 
 	<!-- DATE -->
-	<div class="time">Posted {{ post.timestamp | datetime(fmt="%d %b %Y, %H:%M", wrap=False) }} UTC</div>
+	<div class="time">{{ post.timestamp | datetime(fmt="%d %b %Y, %H:%M", wrap=False) }} UTC</div>
 
 	<!-- NOTES -->
 	{% if post.notes %} 
@@ -119,7 +134,7 @@
 				</div>
 				<div class="reply-content">
 					<div class="author author-replied">{% if not pseudonymised %}{{ author_replied }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</div>
-					<div class="reply-text">{{ post.replies.split("\n\n")[ loop.index - 1 ].replace(author_replied + ": ", "") }}</div>
+					<div class="reply-text">{{ post.replies.split("\n\n")[ loop.index - 1 ].replace(author_replied + ": ", "") | social_mediafy(datasource='tumblr') | safe }}</div>
 				</div>
 			</li>
 			{% endfor %}
