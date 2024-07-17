@@ -72,6 +72,14 @@ header .author {
 	filter: blur(1.5rem);
 }
 
+.media-container.audio {
+	margin: initial;
+}
+
+.media-container.audio audio {
+	width: 100%;
+}
+
 .play-button {
 	position: absolute;
 	width: 100%;
@@ -128,6 +136,11 @@ header .author {
 
 .embedded-link a {
 	color: white;
+}
+
+.embedded-link .link-description {
+	margin-top: 3px;
+	font-size: 14px;
 }
 
 .poll-question {
