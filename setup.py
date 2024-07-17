@@ -44,7 +44,7 @@ packages = [
 	"psycopg2~=2.9.0",
 	"pyahocorasick~=1.4.0",
 	"PyMySQL~=1.0",
-	"PyTumblr==0.1.0",
+	"PyTumblr==0.1.2",
 	"requests~=2.27",
 	"requests_futures",
 	"scenedetect==0.6.0.3",
