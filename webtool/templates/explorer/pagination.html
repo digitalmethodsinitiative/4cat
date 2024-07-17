@@ -50,7 +50,7 @@
 		{# Show upper 'edge' pages #}
 		{% elif upper_bound - 2 <= page <= upper_bound %}
 			{% for i in range(page - 1, upper_bound) %}
-			<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}"><a href="/results/{{key}}/explorer/page/{{ i - 1 }}{{ parameters }}">{{ i - 1 }}</a>{% endif %}</li>
+			<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ i - 1 }}{{ parameters }}">{{ i - 1 }}</a>{% endif %}</li>
 			{% endfor %}
 		{% endif %}
 
