@@ -7,6 +7,7 @@ Can fetch posts from specific blogs or with specific hashtags
 import time
 import pytumblr
 import requests
+import re
 from requests.exceptions import ConnectionError
 from datetime import datetime
 from ural import urls_from_text
@@ -765,22 +766,20 @@ class SearchTumblr(Search):
 		Tumblr posts can be many different types, so some data processing is necessary.
 
 		:param posts, list:		List of Tumblr posts as returned form the Tumblr API.
-		:param reblog, bool:	Whether the post concerns a reblog of posts from the original dataset.
 	
 		:return dict:			Mapped item 
 		"""
 
 		media_types = ["photo", "video", "audio"]
 
-		# We're getting info as Neue Post Format types,
-		# so we need to loop through some 'blocks'.
 		image_urls = []
 		video_urls = []
 		video_thumb_urls = []
 		audio_urls = []
 		audio_artists = []
-		linked_urls = []
-		linked_titles = []
+		link_urls = []
+		link_titles = []
+		link_descriptions = []
 		question = ""
 		answers = ""
 		raw_text = []
@@ -801,57 +800,88 @@ class SearchTumblr(Search):
 				reblogged_text_blocks += layout_block["blocks"]
 				author_reblogged = layout_block["attribution"]["blog"]["name"]
 
-		# Loop through "blocks"
+		# We're getting info as Neue Post Format types,
+		# so we need to loop through and join some content 'blocks'.
 		for i, block in enumerate(post.get("content", [])):
+			
 			block_type = block["type"]
 
+			# Image
 			if block_type == "image":
 				image_urls.append(block["media"][0]["url"])
+			# Audio file
 			elif block_type == "audio":
-				audio_urls.append(block["media"]["url"])
-				audio_artists.append(block["artist"])
+				audio_urls.append(block["url"] if "url" in block else block["media"]["url"])
+				audio_artists.append(block.get("artist", ""))
+			# Video (embedded or hosted)
 			elif block_type == "video":
-				video_urls.append(block["media"]["url"])
+				if "media" in block:
+					video_urls.append(block["media"]["url"])
+				elif "url" in block:
+					video_urls.append(block["url"])
 				if "filmstrip" in block:
 					video_thumb_urls.append(block["filmstrip"]["url"])
 				elif "poster" in block:
-					video_thumb_urls.append(block["poster"][0]["url"])				
+					video_thumb_urls.append(block["poster"][0]["url"])
+				else:
+					video_thumb_urls.append("")
+			# Embedded link
 			elif block_type == "link":
-				linked_urls.append(block["url"])
+				link_urls.append(block["url"])
 				if "title" in block:
-					linked_titles.append(block["title"])
+					link_titles.append(block["title"])
 				if "description" in block:
-					raw_text += block["description"] + "\n"
-					formatted_text.append(block["description"])
+					link_descriptions.append(block["description"])
+			# Poll
 			elif block_type == "poll":
 				# Only one poll can be added per post
 				question = block["question"]
 				answers = ",".join([a["answer_text"] for a in block["answers"]])
 
-			# We're gonna add some formatting to the text
-			# Skip text that is part of a reblogged post.
+			# Text
+			# Here we're adding Markdown formatting.
+			# We skip text that is part of a reblogged post.
 			elif block_type == "text" and i not in reblogged_text_blocks:
 
 				text = block["text"]
 
-				extra_chars = 0
 				if block.get("formatting"):
+
+					# Dict with index numbers as keys where inserts need to be made,
+					# and the replacement strings as values. Done this way so we know
+					# when multiple formatting operations need to be made at the same
+					# index position.
+					insert_indexes = set()
+					inserts = {}
+
 					for fmt in block["formatting"]:
-						
 						fmt_type = fmt["type"]
-						s = fmt["start"] + extra_chars	# Start of formatted substring
-						e = fmt["end"] + extra_chars	# End of formatted substring
+						if fmt["type"] in ("link", "bold", "italic"):
+							s = fmt["start"]
+							e = fmt["end"]
 
-						if fmt_type == "link":
-							text = text[:s] + "[" + text[s:e] + "](" + fmt["formatting"]["url"] + ")" + text[e:]
-							extra_chars += 4 + len(fmt["formatting"]["url"])
-						elif fmt_type == "italic":
-							text = text[:s] + "*" + text[s:e] + "*" + text[e:]
-							extra_chars += 2
-						elif fmt_type == "bold":
-							text = text[:s] + "**" + text[s:e] + "**" + text[e:]
-							extra_chars += 4
-
+							opening = True # So we know if the styles need to be appended or prepended
+							for i in [s, e]:
+								insert_indexes.add(i)
+								i = str(i)
+								if i not in inserts:
+									inserts[i] = ""
+								if fmt_type == "link" and opening:
+									inserts[i] = inserts[i] + "["
+								elif fmt_type == "link" and not opening:
+									inserts[i] = "](" + fmt["url"] + ")" + inserts[i]
+								elif fmt_type == "italic":
+									inserts[i] = "*" + inserts[i] if opening else inserts[i] + "*"
+								elif fmt_type == "bold":
+									inserts[i] = "**" + inserts[i] if opening else inserts[i] + "**"
+								opening = False
+					if inserts:
+						extra_chars = 0
+						for i, insert in inserts.items():
+							i = int(i) + extra_chars
+							text = text[:i] + insert + text[i:]
+							extra_chars += len(insert)
+					
 				if block.get("subtype") == "unordered-list-item":
 					text = "- " + text
 
@@ -865,6 +895,15 @@ class SearchTumblr(Search):
 				continue
 
 			content_order.append(block_type)
+
+		# Sometimes the order is reshuffled in the `layout` property...
+		if post.get("layout"):
+			if "type" in post["layout"][0]:
+				if post["layout"][0]["type"] == "rows":
+					new_content_order = []
+					for i in post["layout"][0].get("display", []):
+						new_content_order.append(content_order[i["blocks"][0]])
+					content_order = new_content_order
 
 		# Add note data
 		for note in post.get("notes", []):
@@ -909,8 +948,9 @@ class SearchTumblr(Search):
 			"reply_count": len(authors_replied),
 			"authors_replied": ",".join(authors_replied),
 			"replies": "\n\n".join(replies),
-			"linked_urls": ",".join(linked_urls),
-			"linked_urls_titles": "\n".join(linked_titles),
+			"link_urls": ",".join(link_urls),
+			"link_titles": "\n".join(link_titles),
+			"link_descriptions": "\n".join(link_descriptions),
 			"image_urls": ",".join(image_urls),
 			"video_urls": ",".join(video_urls),
 			"video_thumb_urls": ",".join(video_thumb_urls),
