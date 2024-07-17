@@ -57,12 +57,32 @@ header .author {
 
 /* Media */
 .media-container {
-	width: 100%;
-	margin-bottom: 10px;
+	position: relative;
+	margin: 3px -19px 3px -19px;
+	overflow-x: hidden;
 }
 
 .media-container img {
 	width: 100%;
+}
+
+.media-container.video img {
+	min-height: 300px;
+	width: auto;
+	filter: blur(1.5rem);
+}
+
+.play-button {
+	position: absolute;
+	width: 100%;
+	top: 38%;
+    left: 45%;
+	font-size: 80px;
+}
+
+.play-button i {
+	color: white;
+	opacity: .7;
 }
 
 /* Post text content */
@@ -74,6 +94,10 @@ header .author {
 .post-content .body, .body-reblogged {
 	white-space: pre-wrap;
 	line-height: 1.5em;
+}
+
+.post-content .body {
+	padding: 3px 0px 3px 0px;
 }
 
 .reblogged-content {
@@ -107,27 +131,21 @@ header .author {
 }
 
 .poll-question {
-	font-size: 18px;
+	font-size: 20px;
+	padding: 3px 0px 3px 0px;
 }
 
 .poll-answer {
 	color: white;
 	background-color: #001935;
 	margin: 8px;
-    padding: 8px;
-    border-radius: 15px;
-    text-align: center;
-}
-
-.posts .external-url {
-	position: absolute;
-	bottom: 0;
-	right: 0;
-	padding: 10px;
+	padding: 8px;
+	border-radius: 15px;
+	text-align: center;
 }
 
 .tags {
-	padding-top: 19px;
+	padding-top: 5px;
 	list-style-type: none;
 	color: #5e5e5e;
 	word-break: break-all;
@@ -152,6 +170,14 @@ footer {
 
 .time {
 	color: #5e5e5e;
+}
+
+.posts .external-url {
+	color: #00b4fa;
+	position: absolute;
+	top: 0;
+	right: 0;
+	padding: 15px;
 }
 
 /* Note metrics  */
@@ -191,8 +217,8 @@ footer {
 
 .reply .author-replied-avatar {
 	vertical-align: middle;
-    display: table-cell;
-    padding-right: 10px;
+	display: table-cell;
+	padding-right: 10px;
 }
 
 .reply-content {
@@ -202,47 +228,49 @@ footer {
 	border-radius: 18px;
 	border: 1px solid #ebebeb;
 	padding: 9px 18px;
+	font-size: 14px;
+	color: #5e5e5e;
 }
 
 .reply-content .author {
+	color: black;
 	margin-bottom: 5px;
 }
 
 /* Annotation fields */
 .post-annotations {
-	background-color: white;
-    color: black;
-    border-radius: 8px;
-	border-top: 1px solid #ebebeb;
+	background-color: #7c5cff;
+	color: white;
+	border-radius:  0px 0px 8px 8px;
 }
 
 .post-annotation {
-    padding: 15px;
+	padding: 15px;
 }
 
 .post-annotation input {
-    border-radius: 5px;
+	border-radius: 5px;
 }
 
 .post-annotation > .annotation-label {
-    display: inline-block;
-    vertical-align: middle;
-    text-align: right;
-    min-width: 150px;
-    margin-right: 5px;
-    line-height: 1.6em;
-    overflow-x: hidden;
+	display: inline-block;
+	vertical-align: middle;
+	text-align: right;
+	min-width: 150px;
+	margin-right: 5px;
+	line-height: 1.6em;
+	overflow-x: hidden;
 }
 
 .post-annotation.checkbox > .post-annotation-options {
-    display: inline-block;
+	display: inline-block;
 }
 
 .post-annotation-options {
-    display: inline-block;
-    vertical-align: top;
+	display: inline-block;
+	vertical-align: top;
 }
 
 .post-annotation-options > input {
-    display: inline-block;
+	display: inline-block;
 }
