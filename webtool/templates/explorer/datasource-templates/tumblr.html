@@ -41,18 +41,18 @@
 	<!-- Keep track of what blocks we've seen so we know what part of the strings to get -->
 	{% set block_counts = namespace({'text': 0, 'image': 0, 'video': 0, 'audio': 0, 'link': 0}) %}
 	{% for block in post.content_order.split(",") %}
-		<!-- TEXT -->
 		{% if block == "text" %}
-			<p class="body">{{ post.get("body_markdown").split("\n")[block_counts.text] | social_mediafy(datasource='tumblr') | safe }}</p>
+		<!-- TEXT -->
+			<p class="body">{{ post.get("body_markdown").split("\n")[block_counts.text] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
 			{% set block_counts.text = block_counts.text + 1 %}
-		<!-- IMAGE -->
 		{% elif block == "image" %}
+		<!-- IMAGE -->
 			<div class="media-container image">
 				<img src="{{ post.image_urls.split(',')[block_counts.image] }}">
 			</div>
 			{% set block_counts.image = block_counts.image + 1 %}
-		<!-- VIDEO -->
 		{% elif block == "video" %}
+		<!-- VIDEO -->
 			<div class="media-container video">
 				<a href="{{ post.video_urls.split(',')[block_counts.video] }}" target='blank'>
 					<img src="{{ post.video_thumb_urls.split(',')[block_counts.video] }}">
@@ -60,22 +60,24 @@
 				</a>
 			</div>
 			{% set block_counts.video = block_counts.video + 1 %}
-		<!-- AUDIO -->
 		{% elif block == "audio" %}
+		<!-- AUDIO -->
 			<div class="media-container audio">
-				<a href="{{ post.audio_urls.split(',')[block_counts.audio] }}" target='blank'>
-					<div class="play-button"><i class="fa-solid fa-play"></i></div>
-				</a>
+				<audio controls src="{{ post.audio_urls.split(',')[block_counts.audio] }}"></audio>
 			</div>
 			{% set block_counts.audio = block_counts.audio + 1 %}
-		<!-- EMBEDDED LINK -->
 		{% elif block == "link" %}
-			{% set url = post.linked_urls.split(",")[block_counts.link] %}
-			{% set url_title = post.linked_urls_titles.split(",")[block_counts.link] %}
-			<div class="embedded-link"><a href="{{ url }}" target="_blank">{{ url_title }} <i class="fas fa-external-link-alt"></i></a></div>
+		<!-- EMBEDDED LINK -->
+			{% set url = post.link_urls.split(",")[block_counts.link] %}
+			{% set link_title = post.link_titles.split(",")[block_counts.link] %}
+			{% set link_description = post.link_descriptions.split(",")[block_counts.link] %}
+			<div class="embedded-link">
+				<a href="{{ url }}" target="_blank">{{ link_title }}</a>
+				<div class="link-description">{{ link_description }} <i class="fas fa-external-link-alt"></i></div>
+			</div>
 			{% set block_counts.link = block_counts.link + 1 %}
-		<!-- POLL -->
 		{% elif block == "poll" %}
+		<!-- POLL -->
 			<!-- Only one poll can be added to posts, so no need to split -->
 			<div class="poll">
 				<div class="poll-question">{{ post["poll_question"] }}</div>
@@ -142,5 +144,4 @@
 		{% endif %}
 	</div>
 	{% endif %}
-
 </footer>
