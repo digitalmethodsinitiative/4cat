@@ -202,13 +202,15 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		},
 		"tumblr": {
 			"hashtag": "https://tumblr.com/tagged/",
-			"mention": "https://tumblr.com/"
+			"mention": "https://tumblr.com/",
+			"markdown": True
 		},
 		"linkedin": {
 			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
 			"mention": "https://linkedin.com/in/"
 		},
 		"telegram": {
+		"markdown": True
 		}
 	}
 
@@ -218,12 +220,12 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		return body
 
 	# Add URL links
-	if datasource != "telegram": # Telegram has mardown links
+	if not base_urls[datasource].get("markdown"):
 		for url in urls_from_text(body):
 			body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
 
 	# Add hashtag links
-	if "hasthag"  in base_urls[datasource]:
+	if "hashtag"  in base_urls[datasource]:
 		tags = re.findall(r"#[\w0-9]+", body)
 		# We're sorting tags by length so we don't incorrectly
 		# replace tags that are a substring of another, longer tag.
