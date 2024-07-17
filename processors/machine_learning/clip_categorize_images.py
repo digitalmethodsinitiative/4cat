@@ -244,14 +244,23 @@ class CategorizeImagesCLIP(BasicProcessor):
         :return:
         """
         image_metadata = item.get("image_metadata")
+        # Updates to CLIP output; categories used to be a list of categories, but now is a dict with: {"predictions": [[category_label, precent_float],]}
+        categories = item.get("categories")
+        if type(categories) == list:
+            pass
+        elif type(categories) == dict and "predictions" in categories:
+            categories = categories.get("predictions")
+        else:
+            raise KeyError("Unexpected categories format; check NDJSON")
+
         top_cats = []
         percent = 0
-        for cat in item.get("categories", []):
+        for cat in categories:
             if percent > .7:
                 break
             top_cats.append(cat)
             percent += cat[1]
-        all_cats = {cat[0]: cat[1] for cat in item.get("categories", [])}
+        all_cats = {cat[0]: cat[1] for cat in categories}
         return MappedItem({
             "id": item.get("id"),
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),
