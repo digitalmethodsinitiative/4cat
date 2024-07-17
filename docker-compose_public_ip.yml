@@ -53,7 +53,7 @@ services:
       - db
       - backend
     ports:
-      - ${TELEGRAM_PORT}:443
+      - 445:443
       - 8080:5000
     volumes:
       - 4cat_data:/usr/src/app/data/
