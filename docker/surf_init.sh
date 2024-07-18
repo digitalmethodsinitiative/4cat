@@ -8,3 +8,6 @@ sed -i 's|root /var/www/html;|location \/ {\n    \tproxy_pass http:\/\/localhost
 sed -i 's|index index.html index.htm;||' "$nginx_conf"
 
 systemctl restart nginx.service
+
+# Set the SERVER_NAME to via hostname
+SERVER_NAME=$(hostnamectl --static)
