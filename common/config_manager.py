@@ -40,9 +40,14 @@ class ConfigManager:
 
         :param db:  Database object. If None, initialise it using the core config
         """
-        self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
+        if db or not self.db:
+            # Replace w/ db if provided else only initialise if not already
+            self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
                                          port=self.get("DB_PORT"), appname="config-reader") if not db else db
+        else:
+            # self.db already initialized
+            pass
 
     def load_user_settings(self):
         """
@@ -157,6 +162,7 @@ class ConfigManager:
             if setting in known_settings:
                 continue
 
+            self.db.log.debug(f"Creating setting: {setting} with default value {parameters.get('default', '')}")
             self.set(setting, parameters.get("default", ""))
 
         # make sure settings and user table are in sync
@@ -278,6 +284,7 @@ class ConfigManager:
 
             if not is_json and value is not None:
                 value = json.loads(value)
+            # TODO: check this as it feels like it could cause a default to return even if value is not None. - Dale
             elif default is not None:
                 value = default
             elif value is None and setting_name in self.config_definition and "default" in self.config_definition[setting_name]:
@@ -285,10 +292,12 @@ class ConfigManager:
 
             final_settings[setting_name] = value
 
-        if len(final_settings) == 1:
+        if attribute_name:
+            # Single attribute requests; provide only the highest priority result
             # print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
             return list(final_settings.values())[0]
         else:
+            # All settings requested (via get_all)
             return final_settings
 
     def get_active_tags(self, user=None, tags=None):
@@ -372,6 +381,7 @@ class ConfigManager:
 
         self.db.execute(query, (attribute_name, value, tag))
         updated_rows = self.db.cursor.rowcount
+        self.db.log.debug(f"Updated setting for {attribute_name}: {value} (tag: {tag})")
 
         return updated_rows
 
