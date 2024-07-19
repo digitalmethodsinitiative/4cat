@@ -292,8 +292,10 @@ class ConfigManager:
 
             final_settings[setting_name] = value
 
-        if attribute_name:
+        if attribute_name is not None and len(attribute_name) == 1:
             # Single attribute requests; provide only the highest priority result
+            # this works because attribute_name is converted to a tuple (else already returned)
+            # if attribute_name is None, return all settings
             # print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
             return list(final_settings.values())[0]
         else:
