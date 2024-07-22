@@ -427,7 +427,7 @@ class SearchTelegram(Search):
                             break
 
                         # if crawling is enabled, see if we found something to add to the query
-                        if crawl_max_depth > 0 and (not crawl_msg_threshold or depth_map.get(query) < crawl_msg_threshold):
+                        if crawl_max_depth and (not crawl_msg_threshold or depth_map.get(query) < crawl_msg_threshold):
                             message_fwd = serialized_message.get("fwd_from")
                             fwd_from = None
                             if message_fwd and message_fwd["from_id"] and message_fwd["from_id"].get("_type") == "PeerChannel":
