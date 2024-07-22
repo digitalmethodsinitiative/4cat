@@ -734,7 +734,14 @@ class SearchTelegram(Search):
 
         if message.get("reactions") and message["reactions"].get("results"):
             for reaction in message["reactions"]["results"]:
-                reactions += reaction["reaction"] * reaction["count"]
+                if type(reaction["reaction"]) is dict and "emoticon" in reaction["reaction"]:
+                    # Updated to support new reaction datastructure
+                    reactions += reaction["reaction"]["emoticon"] * reaction["count"]
+                elif type(reaction["reaction"]) is str and "count" in reaction:
+                    reactions += reaction["reaction"] * reaction["count"]
+                else:
+                    # Failsafe; can be updated to support formatting of new datastructures in the future
+                    reactions += f"{reaction}, "
 
         return MappedItem({
             "id": f"{message['_chat']['username']}-{message['id']}",
