@@ -2,6 +2,10 @@
 Search Tumblr via its API
 
 Can fetch posts from specific blogs or with specific hashtags
+
+For Tumblr API documentation, see https://www.tumblr.com/docs/en/api/v2
+For Neue Post Format documentation, see https://github.com/tumblr/docs/blob/master/npf-spec.md
+
 """
 
 import time
@@ -790,6 +794,9 @@ class SearchTumblr(Search):
 		authors_replied = []
 		replies = []
 
+		# Keep track of list order
+		list_order = 1
+
 		# Keep track if blocks belong to another post,
 		# which is stored in `layout`.
 		body_reblogged = []
@@ -881,9 +888,23 @@ class SearchTumblr(Search):
 							i = int(i) + extra_chars
 							text = text[:i] + insert + text[i:]
 							extra_chars += len(insert)
-					
-				if block.get("subtype") == "unordered-list-item":
-					text = "- " + text
+				
+				# Some more 'subtype' formatting
+				subtype = block.get("subtype")
+				if subtype:
+					if subtype == "unordered-list-item":
+						text = "- " + text
+					if subtype == "ordered-list-item":
+						text = list_order + ". " + text
+						list_order += 1
+					elif subtype == "heading1":
+						text = "#" + 
+					elif subtype == "heading2":
+						text = "##" + text
+					elif subtype == "quote":
+						text = ">" + text
+					elif subtype == "indented":
+						text = "  " + text
 
 				raw_text.append(block["text"])
 				formatted_text.append(text)
@@ -896,7 +917,8 @@ class SearchTumblr(Search):
 
 			content_order.append(block_type)
 
-		# Sometimes the order is reshuffled in the `layout` property...
+		# Sometimes the order is reshuffled in the `layout` property,
+		# so we have to correct this.
 		if post.get("layout"):
 			if "type" in post["layout"][0]:
 				if post["layout"][0]["type"] == "rows":
