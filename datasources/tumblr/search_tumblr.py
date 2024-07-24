@@ -533,27 +533,43 @@ class SearchTumblr(Search):
 				self.dataset.update_status("No posts returned by Tumblr - checking whether this is really all (retry %s/48)" % str(retries))
 				continue
 
+			# Skip posts that we already enountered,
+			# preventing Tumblr API shenanigans or double posts because of
+			# time reductions. Make sure it's no error string, though.
+			new_posts = []
+			for post in posts:
+				# Sometimes the API repsonds just with "meta", "response", or "errors".
+				if isinstance(post, str):
+					self.dataset.update_status("Couldn't add post:", post)
+					retries += 1
+					break
+				else:
+					retries = 0
+					if post["id"] not in self.seen_ids:
+						self.seen_ids.add(post["id"])
+						new_posts.append(post)
+
+			posts = new_posts
+
 			# Append posts to main list
-			else:
+			# Get the lowest date
+			max_date = sorted([post["timestamp"] for post in posts])[0]
 
-				# Get the lowest date
-				max_date = sorted([post["timestamp"] for post in posts])[0]
+			# Manually check if we have a lower date than the min date (`min_date`) already.
+			# This functonality is not natively supported by Tumblr.
+			if min_date:
+				if max_date < min_date:
 
-				# Manually check if we have a lower date than the min date (`min_date`) already.
-				# This functonality is not natively supported by Tumblr.
-				if min_date:
-					if max_date < min_date:
+					# Get rid of all the posts that are earlier than the max_date timestamp
+					posts = [post for post in posts if post["timestamp"] >= min_date]
 
-						# Get rid of all the posts that are earlier than the max_date timestamp
-						posts = [post for post in posts if post["timestamp"] >= min_date]
+					if posts:
+						all_posts += posts
+					break
 
-						if posts:
-							all_posts += posts
-						break
+			retries = 0
 
-				retries = 0
-
-				all_posts += posts
+			all_posts += posts
 
 			if len(all_posts) >= self.max_posts:
 				self.max_posts_reached = True
@@ -782,20 +798,12 @@ class SearchTumblr(Search):
 		answers = ""
 		raw_text = []
 		formatted_text = []
+		body_asked = []
+		author_asked = ""
 		authors_liked = []
-		authors_reblogged = []
 		authors_replied = []
 		replies = []
-
-		# Keep track if blocks belong to another post,
-		# which is stored in `layout`.
-		body_reblogged = []
-		reblogged_text_blocks = []
-		author_reblogged = ""
-		for layout_block in post.get("layout", []):
-			if layout_block["type"] == "ask":
-				reblogged_text_blocks += layout_block["blocks"]
-				author_reblogged = layout_block["attribution"]["blog"]["name"]
+		unknown_blocks = []
 
 		ordered_list_count = 1
 
@@ -810,6 +818,13 @@ class SearchTumblr(Search):
 						content_order.append(display["blocks"][0])
 		if not content_order:
 			content_order = range(len(post["content"]))
+
+		# Some text blocks are 'ask' blocks
+		ask_blocks = []
+		for layout_block in post.get("layout", []):
+			if layout_block["type"] == "ask":
+				ask_blocks += layout_block["blocks"]
+				author_asked = layout_block["attribution"]["blog"]["name"]
 
 		# We're getting info as Neue Post Format types,
 		# so we need to loop through and join some content 'blocks'.
@@ -850,10 +865,8 @@ class SearchTumblr(Search):
 				question = block["question"]
 				answers = ",".join([a["answer_text"] for a in block["answers"]])
 
-			# Text
-			# Here we're adding Markdown formatting.
-			# We skip text that is part of a reblogged post.
-			elif block_type == "text" and i not in reblogged_text_blocks:
+			# Text; we're adding Markdown formatting.
+			elif block_type == "text":
 
 				text = block["text"]
 
@@ -872,26 +885,26 @@ class SearchTumblr(Search):
 							s = fmt["start"]
 							e = fmt["end"]
 
-							opening = True # So we know if the styles need to be appended or prepended
-							for i in [s, e]:
-								insert_indexes.add(i)
-								i = str(i)
-								if i not in inserts:
-									inserts[i] = ""
+							opening = True # To know if styles need to be appended or prepended
+							for n in [s, e]:
+								insert_indexes.add(n)
+								n = str(n)
+								if n not in inserts:
+									inserts[n] = ""
 								if fmt_type == "link" and opening:
-									inserts[i] = inserts[i] + "["
+									inserts[n] = inserts[n] + "["
 								elif fmt_type == "link" and not opening:
-									inserts[i] = "](" + fmt["url"] + ")" + inserts[i]
+									inserts[n] = "](" + fmt["url"] + ")" + inserts[n]
 								elif fmt_type == "italic":
-									inserts[i] = "*" + inserts[i] if opening else inserts[i] + "*"
+									inserts[n] = "*" + inserts[n] if opening else inserts[n] + "*"
 								elif fmt_type == "bold":
-									inserts[i] = "**" + inserts[i] if opening else inserts[i] + "**"
+									inserts[n] = "**" + inserts[n] if opening else inserts[n] + "**"
 								opening = False
 					if inserts:
 						extra_chars = 0
-						for i, insert in inserts.items():
-							i = int(i) + extra_chars
-							text = text[:i] + insert + text[i:]
+						for n, insert in inserts.items():
+							n = int(n) + extra_chars
+							text = text[:n] + insert + text[n:]
 							extra_chars += len(insert)
 				
 				# Some more 'subtype' formatting
@@ -911,14 +924,18 @@ class SearchTumblr(Search):
 					elif subtype == "indented":
 						text = "  " + text
 
-				raw_text.append(block["text"])
-				formatted_text.append(text)
+				# If it's an ask text, we're storing it in
+				# a different column
+				if i in ask_blocks:
+					block_type = "ask"
+					body_asked.append(block["text"])
+				else:
+					raw_text.append(block["text"])
+					formatted_text.append(text)
 
-			elif block_type == "text" and i in reblogged_text_blocks:
-				body_reblogged.append(block["text"])
-				# Reblogged text is not considered as an ordered post block,
-				# as it is always put first.
-				continue
+			# Unknown block; can be a third-party app
+			else:
+				unknown_blocks.append(json.dumps(block))
 
 			blocks.append(block_type)
 
@@ -953,15 +970,14 @@ class SearchTumblr(Search):
 			"is_reblog": True if post.get("original_type") == "note" else "",
 			"body": "\n".join(raw_text),
 			"body_markdown": "\n".join(formatted_text),
-			"body_reblogged": "\n".join(body_reblogged),
+			"body_asked": "\n".join(body_asked),
+			"author_asked": author_asked,
 			"content_order": ",".join(blocks),
-			"author_reblogged": author_reblogged,
 			"tags": ",".join(post.get("tags", "")),
 			"notes": post["note_count"],
 			"like_count": len(authors_liked),
 			"authors_liked": ",".join(authors_liked),
-			"reblog_count": len(authors_reblogged),
-			"authors_reblogged": ",".join(authors_reblogged),
+			#"reblog_count": len(authors_reblogged),
 			"reply_count": len(authors_replied),
 			"authors_replied": ",".join(authors_replied),
 			"replies": "\n\n".join(replies),
@@ -974,7 +990,8 @@ class SearchTumblr(Search):
 			"audio_urls": ",".join(audio_urls),
 			"audio_artist": ",".join(audio_artists),
 			"poll_question": question,
-			"poll_answers": answers
+			"poll_answers": answers,
+			"unknown_blocks": "\n".join(unknown_blocks)
 		})
 
 	def after_process(self):

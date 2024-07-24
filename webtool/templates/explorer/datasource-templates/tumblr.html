@@ -22,25 +22,12 @@
 
 
 <div class="post-content">
-	<!-- REBLOGGED CONTENT -->
-	{% if post.get("body_reblogged") %}
-	<div class="reblogged-content">
-		<div class="reblog-content">
-			<div class="author author-reblogged">{% if not pseudonymised %}{{ post["author_reblogged"] }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</div>
-			<div class="body-reblogged">{{ post["body_reblogged"] }}</div>
-		</div>
-	</div>
-	<div class="author-avatar author-reblogged-avatar">
-		{% if not pseudonymised %}
-			<img src="https://api.tumblr.com/v2/blog/{{ post.author_reblogged }}/avatar">
-		{% endif %}
-	</div>
-	{% endif %}
 
 	<!-- CONTENT BLOCKS -->
 	<!-- Keep track of what blocks we've seen so we know what part of the strings to get -->
-	{% set block_counts = namespace({'text': 0, 'image': 0, 'video': 0, 'audio': 0, 'link': 0}) %}
-	{% for block in post.content_order.split(",") %}
+	{% set block_counts = namespace({'text': 0, 'image': 0, 'video': 0, 'audio': 0, 'link': 0, 'ask': 0}) %}
+	{% set content_order = post.content_order.split(",") %}
+	{% for block in content_order %}
 		{% if block == "text" %}
 		<!-- TEXT -->
 			<p class="body">{{ post.get("body_markdown").split("\n")[block_counts.text] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
@@ -71,10 +58,12 @@
 			{% set url = post.link_urls.split(",")[block_counts.link] %}
 			{% set link_title = post.link_titles.split(",")[block_counts.link] %}
 			{% set link_description = post.link_descriptions.split(",")[block_counts.link] %}
-			<div class="embedded-link">
-				<a href="{{ url }}" target="_blank">{{ link_title }}</a>
+			<a class="embedded-link" href="{{ url }}" target="_blank">
+			<div class="embedded-link-box">
+				{{ link_title }}
 				<div class="link-description">{{ link_description }} <i class="fas fa-external-link-alt"></i></div>
 			</div>
+			</a>
 			{% set block_counts.link = block_counts.link + 1 %}
 		{% elif block == "poll" %}
 		<!-- POLL -->
@@ -87,6 +76,26 @@
 					{% endfor %}
 				</ul>
 			</div>
+		<!-- ASK CONTENT -->
+		{% elif block == "ask" %}
+			{% set start_ask_block = True if loop.index == 0 or content_order[loop.index - 2] != "ask" else False %}
+			{% set end_ask_block = True if loop.index == content_order|length or content_order[loop.index] != "ask" else False %}
+			{% if start_ask_block %}
+			<div class="ask-content">
+				<div class="body-ask">
+				<div class="author-ask"><strong>{% if not pseudonymised %}{{ post["author_asked"] }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</strong> asked:</div>
+			{% endif %}
+					<p>{{ post.get("body_asked").split("\n")[block_counts.ask] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
+			{% if end_ask_block %}
+				</div>
+			</div>
+			<div class="author-avatar author-ask-avatar">
+				{% if not pseudonymised %}
+					<img src="https://api.tumblr.com/v2/blog/{{ post.author_asked }}/avatar">
+				{% endif %}
+			</div>
+			{% endif %}
+			{% set block_counts.ask = block_counts.ask + 1 %}
 		{% endif %}
 	{% endfor %}
 
