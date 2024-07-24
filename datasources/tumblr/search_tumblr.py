@@ -345,22 +345,23 @@ class SearchTumblr(Search):
 				retries += 1
 				continue
 
-			# Get rid of posts that we already enountered,
+			# Skip posts that we already enountered,
 			# preventing Tumblr API shenanigans or double posts because of
-			# time reductions. Make sure it's no odd error string, though.
-			unseen_posts = []
-			for check_post in posts:
+			# time reductions. Make sure it's no error string, though.
+			new_posts = []
+			for post in posts:
 				# Sometimes the API repsonds just with "meta", "response", or "errors".
-				if isinstance(check_post, str):
-					self.dataset.update_status("Couldn't add post:", check_post)
+				if isinstance(post, str):
+					self.dataset.update_status("Couldn't add post:", post)
 					retries += 1
 					break
 				else:
 					retries = 0
-					if check_post["id"] not in self.seen_ids:
-						unseen_posts.append(check_post)
+					if post["id"] not in self.seen_ids:
+						self.seen_ids.add(post["id"])
+						new_posts.append(post)
 
-			posts = unseen_posts
+			posts = new_posts
 
 			# For no clear reason, the Tumblr API sometimes provides posts with a higher timestamp than requested.
 			# So we have to prevent this manually.
@@ -431,8 +432,6 @@ class SearchTumblr(Search):
 
 						time_str = datetime.fromtimestamp(date).strftime("%Y-%m-%d %H:%M:%S")
 						self.dataset.update_status("Time difference of %s spotted, restarting query at %s" % (str(time_dif), time_str,))
-
-						self.seen_ids.update([post["id"] for post in posts])
 						posts = [post for post in posts if post["timestamp"] >= date]
 						if posts:
 							all_posts += posts
@@ -456,7 +455,6 @@ class SearchTumblr(Search):
 
 						if posts:
 							all_posts += posts
-							self.seen_ids.update([post["id"] for post in posts])
 						break
 
 				# We got a new post, so we can reset the retry counts.
@@ -465,9 +463,6 @@ class SearchTumblr(Search):
 
 				# Add retrieved posts top the main list
 				all_posts += posts
-
-				# Add to seen ids
-				self.seen_ids.update([post["id"] for post in posts])
 
 				# Add time differences and calculate new average time difference
 				all_time_difs += time_difs
