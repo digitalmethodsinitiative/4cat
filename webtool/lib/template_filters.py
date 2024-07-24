@@ -201,16 +201,15 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 			"mention": "https://instagram.com/"
 		},
 		"tumblr": {
-			"hashtag": "https://tumblr.com/tagged/",
 			"mention": "https://tumblr.com/",
-			"markdown": True
+			"markdown": True # Hashtags aren't linked in the post body
 		},
 		"linkedin": {
 			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
 			"mention": "https://linkedin.com/in/"
 		},
 		"telegram": {
-		"markdown": True
+			"markdown": True
 		}
 	}
 
@@ -232,7 +231,6 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		tags = sorted(tags, key=lambda x: len(x), reverse=True)
 		for tag in tags:
 			# Match the string, but not if it's preceded by a >, which indicates that we've already added an anchor tag.
-			# This avoids problems with repeated substrings (e.g. #Dog and #DogOwners).
 			body = re.sub(r"(?<!'>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
 
 	# Add @-mention links
