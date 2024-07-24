@@ -775,7 +775,6 @@ class SearchTumblr(Search):
 		"""
 
 		media_types = ["photo", "video", "audio"]
-
 		image_urls = []
 		video_urls = []
 		video_thumb_urls = []
@@ -788,14 +787,10 @@ class SearchTumblr(Search):
 		answers = ""
 		raw_text = []
 		formatted_text = []
-		content_order = []	# To retain the order in which post blocks appear
 		authors_liked = []
 		authors_reblogged = []
 		authors_replied = []
 		replies = []
-
-		# Keep track of list order
-		list_order = 1
 
 		# Keep track if blocks belong to another post,
 		# which is stored in `layout`.
@@ -807,10 +802,25 @@ class SearchTumblr(Search):
 				reblogged_text_blocks += layout_block["blocks"]
 				author_reblogged = layout_block["attribution"]["blog"]["name"]
 
+		ordered_list_count = 1
+
+		# Sometimes the content order is reshuffled in the `layout` property,
+		# so we have to follow this.
+		content_order = []
+		blocks = []
+		if post.get("layout"):
+			if "type" in post["layout"][0]:
+				if post["layout"][0]["type"] == "rows":
+					for display in post["layout"][0].get("display", []):
+						content_order.append(display["blocks"][0])
+		if not content_order:
+			content_order = range(len(post["content"]))
+
 		# We're getting info as Neue Post Format types,
 		# so we need to loop through and join some content 'blocks'.
-		for i, block in enumerate(post.get("content", [])):
+		for i in content_order:
 			
+			block = post["content"][i]
 			block_type = block["type"]
 
 			# Image
@@ -895,10 +905,10 @@ class SearchTumblr(Search):
 					if subtype == "unordered-list-item":
 						text = "- " + text
 					if subtype == "ordered-list-item":
-						text = list_order + ". " + text
-						list_order += 1
+						text = str(ordered_list_count) + ". " + text
+						ordered_list_count += 1
 					elif subtype == "heading1":
-						text = "#" + 
+						text = "#" + text
 					elif subtype == "heading2":
 						text = "##" + text
 					elif subtype == "quote":
@@ -915,17 +925,7 @@ class SearchTumblr(Search):
 				# as it is always put first.
 				continue
 
-			content_order.append(block_type)
-
-		# Sometimes the order is reshuffled in the `layout` property,
-		# so we have to correct this.
-		if post.get("layout"):
-			if "type" in post["layout"][0]:
-				if post["layout"][0]["type"] == "rows":
-					new_content_order = []
-					for i in post["layout"][0].get("display", []):
-						new_content_order.append(content_order[i["blocks"][0]])
-					content_order = new_content_order
+			blocks.append(block_type)
 
 		# Add note data
 		for note in post.get("notes", []):
@@ -959,7 +959,7 @@ class SearchTumblr(Search):
 			"body": "\n".join(raw_text),
 			"body_markdown": "\n".join(formatted_text),
 			"body_reblogged": "\n".join(body_reblogged),
-			"content_order": ",".join(content_order),
+			"content_order": ",".join(blocks),
 			"author_reblogged": author_reblogged,
 			"tags": ",".join(post.get("tags", "")),
 			"notes": post["note_count"],
