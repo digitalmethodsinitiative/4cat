@@ -21,6 +21,20 @@
 </header>
 
 
+<!-- REBLOGGED CONTENT -->
+{% if post.author_trail %}
+
+{% for reblog_author in post.author_trail.split(",") %}
+<div class="post-content reblog">
+	{{ reblog_author }}
+	<p class="body reblog-body">
+		{{ post.body_reblogged.split("\n\n")[loop.index - 1] }}
+	</p>
+</div>
+{% endfor %}
+
+{% endif %}
+
 <div class="post-content">
 
 	<!-- CONTENT BLOCKS -->
@@ -83,15 +97,15 @@
 			{% if start_ask_block %}
 			<div class="ask-content">
 				<div class="body-ask">
-				<div class="author-ask"><strong>{% if not pseudonymised %}{{ post["author_asked"] }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</strong> asked:</div>
+				<div class="author-ask"><strong>{% if not pseudonymised %}{{ post["author_ask"] }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</strong> asked:</div>
 			{% endif %}
-					<p>{{ post.get("body_asked").split("\n")[block_counts.ask] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
+					<p>{{ post.get("body_ask").split("\n")[block_counts.ask] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
 			{% if end_ask_block %}
 				</div>
 			</div>
 			<div class="author-avatar author-ask-avatar">
 				{% if not pseudonymised %}
-					<img src="https://api.tumblr.com/v2/blog/{{ post.author_asked }}/avatar">
+					<img src="https://api.tumblr.com/v2/blog/{{ post.author_ask }}/avatar">
 				{% endif %}
 			</div>
 			{% endif %}

@@ -68,7 +68,7 @@ header .author {
 
 .media-container.video img {
 	min-height: 300px;
-	width: auto;
+	width: 100%;
 	filter: blur(1.5rem);
 }
 
@@ -108,37 +108,62 @@ header .author {
 	padding: 3px 0px 3px 0px;
 }
 
-.reblogged-content {
+
+.post-content h1 {
+	font-size: 20px;
+	font-weight: bold;
+	background: none;
+	text-align: left;
+	color: black;
+}
+
+.post-content h2 {
+	font-size: 16px;
+	font-weight: bold;
+}
+
+.ask-content {
 	margin-bottom: 19px;
 	display: inline-block;
-	max-width: 400px;
+	max-width: 450px;
+}
+
+.ask-content .body-ask {
 	padding: 25px;
 	background-color: #ededed;
 }
 
-.author-reblogged {
+.ask-content p {
+	margin: 5px 0px 5px 0px;
+}
+
+.ask-content {
+}
+
+.author-ask {
 	padding-bottom: 3px;
 }
 
-.author-reblogged-avatar {
+.author-ask-avatar {
 	display: inline-block;
+	vertical-align: top;
 }
 
-.embedded-link {
+a.embedded-link:hover {
+	text-decoration: none;
+}
+
+.embedded-link-box {
 	padding: 30px;
 	background-color: #001935;
 	color: white;
 	text-align: center;
 	font-size: 18px;
-	border-radius: 15px;
-	margin-bottom: 19px;
+	border-radius: 5px;
+	margin: 19px 0px 19px 0px;
 }
 
-.embedded-link a {
-	color: white;
-}
-
-.embedded-link .link-description {
+.embedded-link-box .link-description {
 	margin-top: 3px;
 	font-size: 14px;
 }
