@@ -202,7 +202,8 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		},
 		"tumblr": {
 			"mention": "https://tumblr.com/",
-			"markdown": True # Hashtags aren't linked in the post body
+			"markdown": True
+			# Hashtags aren't linked in the post body
 		},
 		"linkedin": {
 			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",

@@ -1,37 +1,85 @@
+{% set reblog = True if post.parent_post_author else False %}
 <header>
+	<div class="author-row {% if reblog %}reblog{% endif %}">
 	{% if not pseudonymised %}
 		<!-- Possible external link, if not pseudonymised -->
 		<a href="{{ post['post_url'] }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
-		<!-- PF -->
+		<!-- PFP -->
 		{% if post["author_avatar_url"] %}
-		<div class="author-avatar">
+		<div class="author-avatar {% if reblog %}reblog{% endif %}">
 			<a href="{{ post.get('author_url') }}" target="_blank">
 				<img src="{{ post.get('author_avatar_url') }}">
 			</a>
 		</div>
 		{% endif %}
 		<!-- AUTHOR -->
-		<span class="author"><a href="{{ post.get('author_url') }}">{{ post.get("author") }}</a>
+		{% if reblog %}
+			<span class="reblog-icon"><i class="fa-solid fa-repeat"></i></span>
+		{% endif %}
+		<span class="author"><a href="{{ post.get('author_url') }}">{{ post.get("author") }}</a></span>
+		{% if reblog %}<span class="reblog-notice"> reblogged </span><a href="https://tumblr.com/{{ post.parent_post_author }}"><span class="author">{{ post.parent_post_author }}</span></a>{% endif %}
 		
 	{% else %}
-		<span title="Pseudonymous author" class="author">
+		<span title="Pseudonymous author" class="author pseudonymous">
 		<i class="fa fa-user-secret tooltip-trigger"></i>
+		{% if post.parent_post_author %}</span><span class="reblog-icon"><i class="fa-solid fa-repeat"></i></span> reblogged{% endif %}
 	{% endif %}
+	</div>
 
 </header>
 
-
 <!-- REBLOGGED CONTENT -->
-{% if post.author_trail %}
+{% if reblog %}
 
-{% for reblog_author in post.author_trail.split(",") %}
-<div class="post-content reblog">
-	{{ reblog_author }}
-	<p class="body reblog-body">
-		{{ post.body_reblogged.split("\n\n")[loop.index - 1] }}
-	</p>
-</div>
-{% endfor %}
+	{% for reblog_author in post.reblog_trail.split(",") %}
+	<div class="author-row">
+		{% if not pseudonymised %}
+			<div class="author-avatar">
+				<a href="https://tumblr.com/{{ reblog_author }}" target="_blank">
+					<img src="https://api.tumblr.com/v2/blog/{{ reblog_author }}/avatar">
+				</a>
+			</div>
+			<span class="author"><a href="https://tumblr.com/{{ reblog_author }}">{{ reblog_author }}</a></span>
+		{% else %}
+			<span class="author pseudonymous" title="Pseudonymous author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+		{% endif %}
+	</div>
+	<div class="post-content reblog">
+		{% if post.get("image_urls_reblogged") %}
+			{% for image_url in post.image_urls_reblogged.split(",") %}
+			<div class="media-container image">
+				<img src="{{ image_url }}">
+			</div>
+			{% endfor %}
+		{% endif %}
+		<div class="body reblog-body">
+			{{ post.body_reblogged.split("\n\n")[loop.index - 1] }}
+		</div>
+	</div>
+	{% endfor %}
+
+	{% if post.body %}
+		<div class="author-row">
+		{% if not pseudonymised %}
+			<!-- Possible external link, if not pseudonymised -->
+			<a href="{{ post['post_url'] }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
+			<!-- PFP -->
+			{% if post["author_avatar_url"] %}
+			<div class="author-avatar">
+				<a href="{{ post.get('author_url') }}" target="_blank">
+					<img src="{{ post.get('author_avatar_url') }}">
+				</a>
+			</div>
+			{% endif %}
+			<!-- AUTHOR -->
+			<span class="author"><a href="{{ post.get('author_url') }}">{{ post.get("author") }}</a></span>
+			
+		{% else %}
+			<span title="Pseudonymous author" class="author pseudonymous">
+			<i class="fa fa-user-secret tooltip-trigger"></i>
+		{% endif %}
+		</div>
+	{% endif %}
 
 {% endif %}
 
@@ -44,7 +92,7 @@
 	{% for block in content_order %}
 		{% if block == "text" %}
 		<!-- TEXT -->
-			<p class="body">{{ post.get("body_markdown").split("\n")[block_counts.text] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
+			<div class="body">{{ post.get("body_markdown").split("\n")[block_counts.text] | markdown | social_mediafy(datasource='tumblr') | safe }}</div>
 			{% set block_counts.text = block_counts.text + 1 %}
 		{% elif block == "image" %}
 		<!-- IMAGE -->
@@ -128,24 +176,24 @@
 <footer>
 
 	<!-- DATE -->
-	<div class="time">{{ post.timestamp | datetime(fmt="%d %b %Y, %H:%M", wrap=False) }} UTC</div>
+	<div class="time">{{ post.unix_timestamp | datetime(fmt="%d %b %Y, %H:%M", wrap=False) }} UTC</div>
 
 	<!-- NOTES -->
-	{% if post.notes %} 
+	{% if post.note_count %} 
 	<div class="notes">
 		<div class="note-counts">
-			<span class="note-count total">{{ post.get("notes") | commafy }} note{% if post.get("notes", 0) > 1 %}s{% endif %}</span>
+			<span class="note-count total">{{ post.get("note_count") | commafy }} note{% if post.get("note_count", 0) > 1 %}s{% endif %}</span>
 			<!-- REBLOGS -->
 			{% if post.get("reblog_count") %}
-				<span class="note-count reblog-count"><i class="fa-solid fa-retweet"></i> {{ post.reblog_count }}</span>
+				<span class="note-count reblog-count"><i class="fa-solid fa-retweet"></i> {{ post.reblog_count | commafy }}</span>
 			{% endif %}
 			<!-- LIKES -->
 			{% if post.get("like_count") %}
-				<span class="note-count like-count"><i class="fa-solid fa-heart"></i> {{ post.get("like_count") }}</span>
+				<span class="note-count like-count"><i class="fa-solid fa-heart"></i> {{ post.get("like_count") | commafy }}</span>
 			{% endif %}
 			<!-- REPLIES -->
 			{% if post.get("reply_count") %}
-				<span class="note-count reply-count"><i class="fa-solid fa-reply"></i> {{ post.get("reply_count") }}</span>
+				<span class="note-count reply-count"><i class="fa-solid fa-reply"></i> {{ post.get("reply_count") | commafy }}</span>
 			{% endif %}
 		</div>
 		{% if post.get("authors_replied") %}

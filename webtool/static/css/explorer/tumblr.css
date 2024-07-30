@@ -18,13 +18,54 @@
 	max-width: 540px;
 }
 
+/* Author info  */
+.author-row {
+	display: flex;
+	align-items: center;
+	padding: 19px;
+	font-size: 13px;
+	text-decoration: none;
+	color: #5e5e5e;
+	overflow: hidden;
+}
+
 .author {
 	font-size: 13px;
 	font-weight: bold;
 }
 
+.author.pseudonymous {
+	width: 32px;
+	height: 32px;
+	border-radius: 3px;
+	color: white;
+	background-color: #2f4b66;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.author-row .author, .author-row a {
+	color: black;
+}
+
+.author-row .author-avatar {
+	display: inline-block;
+}
+
+.author-row .author {
+	display: inline-block;
+}
+
+.author.pseudonymous i {
+	line-height: 32px;
+	color: white;
+}
+
 .author-avatar {
 	width: 32px;
+}
+
+.author-avatar:not(.reblog) {
 	margin-right: 10px;
 }
 
@@ -33,26 +74,27 @@
 	width: 100%;
 }
 
-/* Main author info  */
-header {
-	display: flex;
-	align-items: center;
-	padding: 19px;
-	text-decoration: none;
-	color: black;
-	overflow: hidden;
+.author-row.reblog {
+	border-bottom: 1px solid rgba(0,0,0,0.13);
 }
 
-header a {
-	color: black;
+.reblog-notice {
+	padding-left: 3px;
+	padding-right: 3px;
 }
 
-header .author-avatar {
-	display: inline-block;
+.reblog-icon {
+	height: 32px;
 }
 
-header .author {
-	display: inline-block;
+.reblog-icon i {
+	background-color: #00cf35;
+	border-radius: 100%;
+	color: white;
+	font-size: 8px;
+	padding: 4px;
+	margin-top: 20px;
+	margin-left: -7px;
 }
 
 /* Media */
@@ -99,15 +141,15 @@ header .author {
 	padding: 0px 19px 0px 19px;
 }
 
-.post-content .body, .body-reblogged {
-	white-space: pre-wrap;
+.post-content.reblog {
+	padding-bottom: 19px;
 	line-height: 1.5em;
+	border-bottom: 1px solid rgba(0,0,0,0.13);
 }
 
 .post-content .body {
-	padding: 3px 0px 3px 0px;
+	padding: 10px 0px 10px 0px;
 }
-
 
 .post-content h1 {
 	font-size: 20px;
@@ -183,9 +225,13 @@ a.embedded-link:hover {
 }
 
 .tags {
-	padding-top: 5px;
+	display: flex;
+    align-items: center;
+    padding: 19px 0px 19px 0px;
+    font-size: 15px;
+    text-decoration: none;
 	list-style-type: none;
-	color: #5e5e5e;
+    color: #5e5e5e;
 	word-break: break-all;
 }
 
@@ -201,7 +247,7 @@ a.embedded-link:hover {
 
 /* Post footer */
 footer {
-	margin: 19px;
+	margin: 0px 19px 19px 19px;
 	padding-top: 19px;
 	border-top: 1px solid rgba(0,0,0,0.13);
 }

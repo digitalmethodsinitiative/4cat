@@ -1,7 +1,7 @@
 """
 Search Tumblr via its API
 
-Can fetch posts from specific blogs or with specific hashtags
+Can fetch posts from specific blogs or with specific tags
 
 For Tumblr API documentation, see https://www.tumblr.com/docs/en/api/v2
 For Neue Post Format documentation, see https://github.com/tumblr/docs/blob/master/npf-spec.md
@@ -35,7 +35,7 @@ class SearchTumblr(Search):
 	type = "tumblr-search"  # job ID
 	category = "Search"  # category
 	title = "Search Tumblr"  # title displayed in UI
-	description = "Retrieve Tumblr posts by hashtag or blog."  # description displayed in UI
+	description = "Retrieve Tumblr posts by tags or blogs."  # description displayed in UI
 	extension = "ndjson"  # extension of result file, used internally and in UI
 	is_local = False	# Whether this datasource is locally scraped
 	is_static = False	# Whether this datasource is still updated
@@ -47,6 +47,7 @@ class SearchTumblr(Search):
 	max_retries = 3 # For API and connection retries.
 	max_date_retries = 96 + 150 # For checking dates. 96 time retries of -6 hours (24 days), plus 150 extra for 150 weeks (~3 years).
 	max_posts = 1000000
+	max_reblogs = 1000
 
 	max_posts_reached = False
 	api_limit_reached = False
@@ -111,18 +112,19 @@ class SearchTumblr(Search):
 			},
 			"get_notes": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add note and reblog data (warning: slow)",
-				"tooltip": "Add post and reblog note data for every post. This includes note metrics (likes, replies, reblogs), "
-							"replies, and reblogged text. "
-							"Blog-level search includes reblogged text by default. "
-							"Enables adding reblogs as new posts",
+				"help": "Add note data (warning: slow)",
+				"tooltip": "Add note data for every post. This includes note metrics, "
+							"replies, reblogged text, and reblogged images. "
+							"Blog- and id-level search includes reblogged text by default. "
+							"Enables adding reblogs as new posts "
+							"Limited to the first 1,000 reblogs per post.",
 				"default": False
 			},
 			"get_reblogs": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add reblogs",
-				"tooltip": "Add posts that reblogged the initial results to the dataset. "
-							"Limited to 1,000 reblogs per post.",
+				"tooltip": "Add reblogs to the dataset. "
+							"",
 				"requires": "get_notes==true",
 				"default": False
 			},
@@ -131,25 +133,17 @@ class SearchTumblr(Search):
 				"help": "Reblogs to add",
 				"options": {
 					"text": "Only with added text",
-					"text_or_tag": "Only with added text and/or added hashtags"
+					"text_or_tag": "Only with added text and/or added tags (slow)"
 				},
 				"tooltip": "What type of reblogs to add to the dataset.",
 				"requires": "get_reblogs==true",
 				"default": "text"
 			},
-			"follow_reblogs": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add posts reblogged by collected posts",
-				"tooltip": "Add all posts that were reblogged by the initial results to the dataset. "
-							"This adds the entire reblog 'trail' from the initial post to the collected post. "
-							"Only affects blog-level search; tag-level search only gets original posts.",
-				"default": False
-				},
 			"reblog_outside_daterange": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Allow reblogs and reblogged posts outside of date range",
-				"tooltip": "Whether to keep reblogs or reblogged posts that fall outside the optional date range limit inserted below.",
-				"default": True
+				"help": "Retain reblogs outside of date range",
+				"requires": "get_reblogs==true",
+				"default": False
 			}
 		}
 
@@ -220,8 +214,6 @@ class SearchTumblr(Search):
 		queries = re.split(",|\n", parameters.get("query", ""))
 		get_notes = parameters.get("get_notes", False)
 		get_reblogs = parameters.get("get_reblogs", False)
-		reblog_crawl_depth = parameters.get("reblog_crawl_depth", 0)
-		follow_reblogs = parameters.get("follow_reblogs", False)
 		reblog_type = parameters.get("reblog_type", False)
 		reblog_outside_daterange = parameters.get("reblog_outside_daterange", False)
 
@@ -235,13 +227,12 @@ class SearchTumblr(Search):
 		# Get date parameters
 		min_date = parameters.get("min_date", None)
 		max_date = parameters.get("max_date", None)
+		min_date = int(min_date) if min_date else 0
+		max_date = int(max_date) if max_date else int(time.time())
 
-		if min_date:
-			min_date = int(min_date)
-		if max_date:
-			max_date = int(max_date)
-		else:
-			max_date = int(time.time())
+		if not queries:
+			self.dataset.finish_with_error("No queries given")
+			return
 
 		# Connect to Tumblr API
 		try:
@@ -256,8 +247,9 @@ class SearchTumblr(Search):
 			self.dataset.finish_with_error(f"Could not connect to Tumblr API: {client_info.get('meta', {}).get('status', '')} - {client_info.get('meta', {}).get('msg', '')}")
 			return
 
-		# for each tag or blog, get post
-		for query in queries:
+		# For each tag or blog, get posts
+		# with a limit of ten individual tasks.
+		for query in queries[:10]:
 
 			query = query.strip()
 
@@ -291,15 +283,17 @@ class SearchTumblr(Search):
 				self.dataset.update_status("API limit reached")
 				break
 
-		# Check for reblogged posts in the reblog trail
-		if follow_reblogs:
+		# Check for reblogged posts in the reblog trail;
+		# we're addingt these if we're adding reblogs.
+		if get_reblogs:
 			for result in results:
 				# The post rail is stored in the trail list
 				for trail_post in result.get("trail", []):
 					# Some posts or blogs have been deleted; skip these
 					if not "broken_blog_name" in trail_post:
-						if trail_post["post_id"] not in self.seen_ids:
-							extra_posts.add({"blog": trail_post["blog"], "id": trail_post["post_id"]})
+						if trail_post["post"]["id"] not in self.seen_ids:
+							extra_posts.append({"blog": trail_post["blog"]["name"],
+												"id": trail_post["post"]["id"]})
 
 		# Get note data.
 		# Blog-level searches already have some note data, like reblogged text,
@@ -332,32 +326,35 @@ class SearchTumblr(Search):
 					# Add some metrics, like done in `get_notes`.
 					notes = {
 						"notes": post["notes"],
-						"reply_count": len([n for n in notes if n["type"] == "reply"]),
-						"reblog_count": len([n for n in notes if n["type"] == "reblog"]),
-						"like_count": len([n for n in notes if n["type"] == "like"])
+						"reply_count": len([n for n in post["notes"] if n["type"] == "reply"]),
+						"reblog_count": len([n for n in post["notes"] if n["type"] == "reblog"]),
+						"like_count": len([n for n in post["notes"] if n["type"] == "like"])
 					}
 
 				else:
 					# Get notes via the API
-					# Only gets first 1,000 replies/text reblogs.
+					# Only gets first 1,000 replies or text/tag reblogs.
 
 					# We're using different querying modes since
 					# it'll speed up the process. The fastest is 
 					# `conversation`, which prioritises text reblogs and
 					# replies, and also provides metrics on like and reblog counts;
-					# we'll use this as default. However, if the user
-					# has indicated they want to add reblogs with hashtags,
-					# we'll also have to use the `reblogs_with_tags` mode.
+					# we'll use this as default. If the user
+					# has indicated they also want to add reblogs with tags,
+					# we'll also use the `reblogs_with_tags` mode.
 					seen_notes = set()
-					notes = self.get_notes(post["blog_name"], post["id"], mode="conversation", max_notes=1000)
+					notes = self.get_notes(post["blog_name"], post["id"], mode="conversation", max_reblogs=self.max_reblogs)
+					reblog_count = 0
 					for note in notes["notes"]:
-						if note["type"] == "reblog":
-							seen_notes.add(note["post_id"])
+						if note["type"] == "reblog" or note["type"] == "reply":
+							if note["type"] == "reblog": # Replies don't have IDs
+								reblog_count += 1
+								seen_notes.add(note["post_id"])
 
 					# Get tag-only reblogs; these aren't returned in `conversation` mode.
-					if reblog_type == "text_or_tag":
-						tag_notes = self.get_notes(post["blog_name"], post["id"], mode="reblogs_with_tags", max_notes=1000)
-						for tag_note in tag_notes:
+					if reblog_type == "text_or_tag" and reblog_count <= self.max_reblogs:
+						tag_notes = self.get_notes(post["blog_name"], post["id"], mode="reblogs_with_tags", max_reblogs=self.max_reblogs - reblog_count)
+						for tag_note in tag_notes["notes"]:
 							if tag_note["post_id"] not in seen_notes:
 								notes["notes"].append(tag_note)
 				
@@ -374,34 +371,19 @@ class SearchTumblr(Search):
 						if note["type"] != "reblog":
 							continue
 
-						elif reblog_type == "text_or_tag":
-							# Skip reblogs without tags or text
-							if not note.get("tags") and not note.get("added_text"):
-								continue
+						if note["post_id"] not in self.seen_ids:
 
-						elif reblog_type == "text":
-							# Skip reblogs without added text
-							if not note.get("added_text"):
-								continue
-
-						# Skip posts that we already collected
-						if note["post_id"] in self.seen_ids:
-							continue
-
-						# Potentially skip new posts outside of the date range
-						if reblog_outside_daterange and (max_date or min_date):
-							if not min_date:
-								if note["timestamp"] >= max_date:
-									continue
-							elif not min_date <= note["timestamp"] <= max_date:
-								continue
-
-						extra_posts.append({"blog": note["blog_name"], "id": note["post_id"]})
-
+							# Potentially skip extra posts outside of the date range
+							if not reblog_outside_daterange:
+								if note.get("timestamp"):
+									if not min_date >= note["timestamp"] >= max_date:
+										continue
+							extra_posts.append({"blog": note["blog_name"], "id": note["post_id"]})
+		
 		# Add reblogged posts and reblogs to dataset
 		for i, extra_post in enumerate(extra_posts):
 			
-			self.dataset.update_status("Adding %s/%s reblogged posts to the dataset" % (i, len(extra_posts)))
+			self.dataset.update_status("Adding %s/%s reblogs to the dataset" % (i, len(extra_posts)))
 
 			if extra_post["id"] not in self.seen_ids:
 				new_post = self.get_posts_by_blog(extra_post["blog"], extra_post["id"])
@@ -409,7 +391,15 @@ class SearchTumblr(Search):
 				if new_post:
 					new_post = new_post[0]
 
-					# Add note data; these should already be retrieved above
+					# Potentially skip new posts outside of the date range
+					# We (also) do this after the API call because a timestamp is
+					# not always present in the notes data.
+					if not reblog_outside_daterange:
+						
+						if not min_date >= new_post["timestamp"] >= max_date:
+							continue
+
+					# Add note data; these are already be retrieved above
 					if get_notes:
 						new_post = {**new_post, **retrieved_notes[new_post["reblog_key"]]}
 
@@ -517,7 +507,7 @@ class SearchTumblr(Search):
 
 				date_retries += 1
 
-				# We're first gonna check carefully if there's small timegaps by
+				# We're first gonna check carefully if there's small time gaps by
 				# decreasing by six hours.
 				# If that didn't result in any new posts, also dedicate 12 date_retries
 				# with reductions of six months, just to be sure there's no data from
@@ -530,7 +520,7 @@ class SearchTumblr(Search):
 					self.dataset.update_status("No new posts found for #%s - looking for posts before %s" % (tag, datetime.fromtimestamp(max_date).strftime("%Y-%m-%d %H:%M:%S")))
 
 				# We can stop when the max date drops below the min date.
-				if min_date:
+				if min_date != 0:
 					if max_date <= min_date:
 						break
 
@@ -583,7 +573,7 @@ class SearchTumblr(Search):
 
 				# Manually check if we have a lower date than the lowest allowed date already (min date).
 				# This functonality is not natively supported by Tumblr.
-				if min_date:
+				if min_date != 0:
 					if max_date < min_date:
 
 						# Get rid of all the posts that are earlier than the max_date timestamp
@@ -692,7 +682,7 @@ class SearchTumblr(Search):
 			# time reductions. Make sure it's no error string, though.
 			new_posts = []
 			for post in posts:
-				# Sometimes the API repsonds just with "meta", "response", or "errors".
+				# Sometimes the API reponds just with "meta", "response", or "errors".
 				if isinstance(post, str):
 					self.dataset.update_status("Couldn't add post:", post)
 					retries += 1
@@ -705,7 +695,10 @@ class SearchTumblr(Search):
 
 			posts = new_posts
 
-			if not post_id:
+			if not new_posts:
+				break
+
+			if new_posts and not post_id:
 
 				# Append posts to main list
 				# Get the lowest date
@@ -713,7 +706,7 @@ class SearchTumblr(Search):
 
 				# Manually check if we have a lower date than the min date (`min_date`) already.
 				# This functonality is not natively supported by Tumblr.
-				if min_date:
+				if min_date != 0:
 					if max_date < min_date:
 
 						# Get rid of all the posts that are earlier than the max_date timestamp
@@ -738,19 +731,18 @@ class SearchTumblr(Search):
 
 		return all_posts
 
-	def get_notes(self, blog_id, post_id, mode="conversation", max_notes=1000):
+	def get_notes(self, blog_id, post_id, mode="conversation", max_reblogs=1000):
 		"""
 		Gets data on the notes of a specific post.
 		:param blog_id, str: 	The ID of the blog.
 		:param post_id, str:	The ID of the post.
 		:param mode, str:		The type of notes that get priority.
 								`conversation` prioritises text reblogs and replies.
-		:param mode, max_notes:	Maximum amount of notes to return.
+		:param mode, max_reblogs:	Maximum amount of notes to return.
 
 		:returns: a list with dictionaries of notes.
 		"""
-		
-		note_metrics = {}
+
 		post_notes = []
 		max_date = None
 
@@ -761,18 +753,26 @@ class SearchTumblr(Search):
 		# so we'll cap this at 100
 
 		# Stop trying to fetch the notes after this many retries
-		max_notes_retries = 10
+		max_reblogs_retries = 10
 		notes_retries = 0
 
 		first_batch = True
 		note_metrics = {}
+
+		stop_collecting = False
+
+		# For status updates
+		if mode == "conversation":
+			note_type = "reblogs with text"
+		elif mode == "reblogs_with_tags":
+			note_type = "reblogs with tags"
 
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post notes from Tumblr")
 
 		while True:
 
-			if notes_retries >= max_notes_retries:
+			if notes_retries >= max_reblogs_retries:
 				self.dataset.update_status("Too many connection errors; unable to collect notes for post %s" % post_id)
 				self.failed_posts.append(post_id)
 				break
@@ -801,6 +801,7 @@ class SearchTumblr(Search):
 				notes_retries = 0
 
 				# Add some metrics for the first response
+				# These metrics are only returned in conversation mode.
 				if first_batch and mode == "conversation":
 					note_metrics = {
 						"note_count": notes["total_notes"],
@@ -812,27 +813,33 @@ class SearchTumblr(Search):
 
 				# Add notes
 				for note in notes["notes"]:
+
+					# Only count reblogs with added content (text or hashtags)
+					# towards the total count; replies are never too substantial,
+					# so we always collect them all.
 					if mode == "conversation" and note["type"] == "reply":
 						note_metrics["reply_count"] += 1
+					elif mode == "conversation":
+						count += 1
+					elif mode == "reblogs_with_tags":
+						# Skip notes without added tags
+						if not note.get("tags"):
+							continue
+						count += 1
 
-					count += 1
 					post_notes.append(note)
+					
+					if count >= max_reblogs:
+						post_notes = post_notes[:count + note_metrics.get("reply_count", 0)]
+						stop_collecting = True
 
-				# `conversation` mode groups likes and reblogs without commentary
-				# in the `rollup_notes` list. We're adding reblogs to the post notes.
-				if mode == "conversation":
-					if "rollup_notes" in notes and "notes" in notes["rollup_notes"][0]:
-						for note in notes["rollup_notes"][0]["notes"]:
-							if note["type"] == "reblog":
-								count += 1
-								post_notes.append(note)
-
-				if count >= max_notes:
+				if stop_collecting:
 					break
 
 				if notes.get("_links"):
 					max_date = notes["_links"]["next"]["query_params"]["before_timestamp"]
-					self.dataset.update_status("Added %s notes for post %s:%s" % (count, blog_id, post_id))
+					
+					self.dataset.update_status("Collected %s %s for @%s:%s" % (count, note_type, blog_id, post_id))
 					time.sleep(.2)
 
 				# If there's no `_links` key, that's all.
@@ -918,7 +925,7 @@ class SearchTumblr(Search):
 			raise QueryParametersException("Search query cannot be empty.")
 
 		# So it shows nicely in the frontend.
-		items = ", ".join([item.lstrip().rstrip() for item in items if item])
+		items = ", ".join([item.strip() for item in items if item])
 
 		# the dates need to make sense as a range to search within
 		query["min_date"], query["max_date"] = query.get("daterange")
@@ -945,6 +952,7 @@ class SearchTumblr(Search):
 
 		media_types = ["photo", "video", "audio"]
 		image_urls = []
+		image_urls_reblogged = []
 		video_urls = []
 		video_thumb_urls = []
 		audio_urls = []
@@ -1055,8 +1063,8 @@ class SearchTumblr(Search):
 				replies.insert(0, note["reply_text"])
 
 		# The API sometimes gives back a 'trail' of reblogged content
-		# This includes reblogged content, but it's not entirely complete (e.g. no hashtags)
-		# so we'll only store the original blog name and its text content.
+		# This includes reblogged content, but it's not entirely complete (e.g. no tags)
+		# so we'll only store the original blog name and its text + image content.
 		for i, reblog in enumerate(post.get("trail", [])):
 			
 			reblogged_text = []
@@ -1069,6 +1077,8 @@ class SearchTumblr(Search):
 			for reblog_block in reblog.get("content", []):
 				if reblog_block["type"] == "text":
 					reblogged_text.append(reblog_block["text"])
+				if reblog_block["type"] == "image":
+					image_urls_reblogged.append(reblog_block["media"][0]["url"])
 
 			if not reblogged_text:
 				reblogged_text = ""
@@ -1082,7 +1092,8 @@ class SearchTumblr(Search):
 			"author": post["blog_name"],
 			"author_avatar_url": "https://api.tumblr.com/v2/blog/" + post["blog_name"] + "/avatar",
 			"thread_id": post["reblog_key"],
-			"timestamp": post["timestamp"],
+			"timestamp": datetime.fromtimestamp(post["timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
+            "unix_timestamp": post["timestamp"],
 			"author_subject": post["blog"]["title"],
 			"author_description": strip_tags(post["blog"]["description"]),
 			"author_url": post["blog"]["url"],
@@ -1096,6 +1107,7 @@ class SearchTumblr(Search):
 			"body_markdown": "\n".join(formatted_text),
 			"body_reblogged": "\n\n".join(body_reblogged),
 			"reblog_trail": ",".join(reblog_trail),
+			"parent_post_author": post.get("reblogged_from_name", ""),
 			"parent_post_url": post.get("parent_post_url", ""),
 			"body_ask": "\n".join(body_ask),
 			"author_ask": author_ask,
@@ -1111,6 +1123,7 @@ class SearchTumblr(Search):
 			"link_titles": "\n".join(link_titles),
 			"link_descriptions": "\n".join(link_descriptions),
 			"image_urls": ",".join(image_urls),
+			"image_urls_reblogged": ",".join(image_urls_reblogged),
 			"video_urls": ",".join(video_urls),
 			"video_thumb_urls": ",".join(video_thumb_urls),
 			"audio_urls": ",".join(audio_urls),
