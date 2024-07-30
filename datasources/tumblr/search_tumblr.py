@@ -120,8 +120,8 @@ class SearchTumblr(Search):
 			},
 			"get_reblogs": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add reblogs of collected posts",
-				"tooltip": "Add posts that reblogged posts from the initial query to the dataset. "
+				"help": "Add reblogs",
+				"tooltip": "Add posts that reblogged the initial results to the dataset. "
 							"Limited to 1,000 reblogs per post.",
 				"requires": "get_notes==true",
 				"default": False
@@ -131,7 +131,7 @@ class SearchTumblr(Search):
 				"help": "Reblogs to add",
 				"options": {
 					"text": "Only with added text",
-					"tag_or_text": "Only with added text and/or added hashtags"
+					"text_or_tag": "Only with added text and/or added hashtags"
 				},
 				"tooltip": "What type of reblogs to add to the dataset.",
 				"requires": "get_reblogs==true",
@@ -140,7 +140,7 @@ class SearchTumblr(Search):
 			"follow_reblogs": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add posts reblogged by collected posts",
-				"tooltip": "Also include all posts that were reblogged by the posts captured in the initial query. "
+				"tooltip": "Add all posts that were reblogged by the initial results to the dataset. "
 							"This adds the entire reblog 'trail' from the initial post to the collected post. "
 							"Only affects blog-level search; tag-level search only gets original posts.",
 				"default": False
@@ -298,8 +298,8 @@ class SearchTumblr(Search):
 				for trail_post in result.get("trail", []):
 					# Some posts or blogs have been deleted; skip these
 					if not "broken_blog_name" in trail_post:
-						if trail_post["id"] not in self.seen_ids:
-							extra_posts.add({"blog": trail_post["blog"], "id": trail_post["post"]["id"]})
+						if trail_post["post_id"] not in self.seen_ids:
+							extra_posts.add({"blog": trail_post["blog"], "id": trail_post["post_id"]})
 
 		# Get note data.
 		# Blog-level searches already have some note data, like reblogged text,
@@ -355,7 +355,7 @@ class SearchTumblr(Search):
 							seen_notes.add(note["post_id"])
 
 					# Get tag-only reblogs; these aren't returned in `conversation` mode.
-					if reblog_type == "tag_or_text":
+					if reblog_type == "text_or_tag":
 						tag_notes = self.get_notes(post["blog_name"], post["id"], mode="reblogs_with_tags", max_notes=1000)
 						for tag_note in tag_notes:
 							if tag_note["post_id"] not in seen_notes:
@@ -374,7 +374,7 @@ class SearchTumblr(Search):
 						if note["type"] != "reblog":
 							continue
 
-						elif reblog_type == "tag_or_text":
+						elif reblog_type == "text_or_tag":
 							# Skip reblogs without tags or text
 							if not note.get("tags") and not note.get("added_text"):
 								continue
@@ -767,8 +767,6 @@ class SearchTumblr(Search):
 		first_batch = True
 		note_metrics = {}
 
-		count += 1
-
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post notes from Tumblr")
 
@@ -814,9 +812,10 @@ class SearchTumblr(Search):
 
 				# Add notes
 				for note in notes["notes"]:
-					if mode == "converstaion" and note["type"] == "reply":
+					if mode == "conversation" and note["type"] == "reply":
 						note_metrics["reply_count"] += 1
 
+					count += 1
 					post_notes.append(note)
 
 				# `conversation` mode groups likes and reblogs without commentary
@@ -825,10 +824,15 @@ class SearchTumblr(Search):
 					if "rollup_notes" in notes and "notes" in notes["rollup_notes"][0]:
 						for note in notes["rollup_notes"][0]["notes"]:
 							if note["type"] == "reblog":
+								count += 1
 								post_notes.append(note)
+
+				if count >= max_notes:
+					break
 
 				if notes.get("_links"):
 					max_date = notes["_links"]["next"]["query_params"]["before_timestamp"]
+					self.dataset.update_status("Added %s notes for post %s:%s" % (count, blog_id, post_id))
 					time.sleep(.2)
 
 				# If there's no `_links` key, that's all.
