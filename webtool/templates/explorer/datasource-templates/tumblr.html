@@ -203,6 +203,9 @@
 				<div class="author-avatar author-replied-avatar">
 					{% if not pseudonymised %}
 						<img src="https://api.tumblr.com/v2/blog/{{ author_replied }}/avatar">
+					{% else %}
+						<span title="Pseudonymous author" class="author pseudonymous">
+						<i class="fa fa-user-secret tooltip-trigger"></i>
 					{% endif %}
 				</div>
 				<div class="reply-content">

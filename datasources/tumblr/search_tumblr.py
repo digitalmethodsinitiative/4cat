@@ -12,6 +12,7 @@ import time
 import pytumblr
 import requests
 import re
+import json
 from requests.exceptions import ConnectionError
 from datetime import datetime
 from ural import urls_from_text
@@ -96,18 +97,18 @@ class SearchTumblr(Search):
 				"type": UserInput.OPTION_INFO,
 				"help": "Retrieve any kind of Tumblr posts with specific tags or from specific blogs. Gets 100.000 posts "
 						"at max. You may insert up to ten tags or blogs.\n\n"
-						"Blog-level search also returns reblogs. *Tag-level search only returns original posts*. "
-						"Reblogs of tagged posts can be retrieved via the options below.\n\n"
+						"*Tag-level search only returns original posts*. "
+						"Reblogs of tagged posts can be retrieved via the options below. Blog-level search also returns reblogs.\n\n"
 						"Tag search only get posts with the exact tag you insert. Querying "
-						"`gogh` will thus not get posts only tagged with `van gogh`.\n\n"
+						"`gogh` will not get posts tagged with `van gogh`.\n\n"
 						"A `#` before a tag is optional. Blog names must start with `@`.\n\n"
-						"Individual posts can be retrieved through the format `@blogname:post_id`.\n\n"
+						"Individual posts can be captured by inserting their URL or via the format `@blogname:post_id`.\n\n"
 						"Keyword search is not allowed by the [Tumblr API](https://api.tumblr.com).\n\n"
 						"If this 4CAT reached its Tumblr API rate limit, try again 24 hours later."
 			},
 			"query": {
 				"type": UserInput.OPTION_TEXT_LARGE,
-				"help": "Tags and/or blogs",
+				"help": "Tags, blogs, or post URLs. Seperate with comma or newline.",
 				"tooltip": "E.g. #research tools, @4catblog, @4catblog:12347714095"
 			},
 			"get_notes": {
@@ -188,8 +189,9 @@ class SearchTumblr(Search):
 			}
 		options["date-intro"] = {
 				"type": UserInput.OPTION_INFO,
-				"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is volatile: when fetching sporadically used "
-						"tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases "
+				"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is very volatile. Queries may not return "
+						"posts, even if posts exists. Waiting for a while and querying again can help, even with identical queries.\n\n"
+						"Additionally, older tagged posts may not be returned, even if they exist. To mitigate this, 4CAT decreases "
 						"the date parameter (<code>before</code>) with six hours and sends the query again. This often "
 						"successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 "
 						"days), it checks for data up to six years before the last date, decreasing 12 times by 6 months. "
@@ -253,13 +255,42 @@ class SearchTumblr(Search):
 
 			query = query.strip()
 
+			post_id = None
+
+			# Format @blogname:id
 			if query.startswith("@"):
-				blog_name = query[1:]
 
 				# Get a possible post ID
-				post_id = None
+				blog_name = query[1:]
 				if ":" in query:
 					blog_name, post_id = blog_name.split(":")
+
+				new_results = self.get_posts_by_blog(blog_name, post_id=post_id, max_date=max_date, min_date=min_date)
+
+			# Post URL
+			elif "tumblr.com/" in query:
+					
+				try:
+					# Format https://{blogname}.tumblr.com/post/{post_id}
+					if "/post/" in query:
+						blog_name = query.split(".tumblr.com")[0].replace("https://", "").replace("www.", "").strip()
+						post_id = query.split("/")[-1].strip()
+						# May also be a slug string..
+						if not post_id.isdigit():
+							post_id = query.split("/")[-2].strip()
+
+					# Format https://tumblr.com/{blogname}/{post_id}
+					else:
+						blog_and_id = query.split("tumblr.com/")[-1]
+						blog_and_id = blog_and_id.replace("blog/view/", "") # Sometimes present in the URL
+						blog_name, post_id = blog_and_id.split("/")
+						if not post_id.isdigit():
+							post_id = query.split("/")[-2].strip()
+
+				except IndexError:
+					self.dataset.update_status("Invalid post URL: %s" % query)
+					continue
+
 				new_results = self.get_posts_by_blog(blog_name, post_id=post_id, max_date=max_date, min_date=min_date)
 
 			# Get tagged post
@@ -284,7 +315,7 @@ class SearchTumblr(Search):
 				break
 
 		# Check for reblogged posts in the reblog trail;
-		# we're addingt these if we're adding reblogs.
+		# we're storing their post IDs and blog names for later, if we're adding reblogs.
 		if get_reblogs:
 			for result in results:
 				# The post rail is stored in the trail list
@@ -322,7 +353,7 @@ class SearchTumblr(Search):
 
 				# In the case of posts with just a few notes,
 				# we may have all the possible notes in the retrieved JSON.
-				elif len(post["notes"]) == post["note_count"]:
+				elif "notes" in post and (len(post["notes"]) == post["note_count"]):
 					# Add some metrics, like done in `get_notes`.
 					notes = {
 						"notes": post["notes"],
@@ -346,10 +377,9 @@ class SearchTumblr(Search):
 					notes = self.get_notes(post["blog_name"], post["id"], mode="conversation", max_reblogs=self.max_reblogs)
 					reblog_count = 0
 					for note in notes["notes"]:
-						if note["type"] == "reblog" or note["type"] == "reply":
-							if note["type"] == "reblog": # Replies don't have IDs
-								reblog_count += 1
-								seen_notes.add(note["post_id"])
+						if note["type"] == "reblog": # Replies don't have IDs
+							reblog_count += 1
+							seen_notes.add(note["post_id"])
 
 					# Get tag-only reblogs; these aren't returned in `conversation` mode.
 					if reblog_type == "text_or_tag" and reblog_count <= self.max_reblogs:
@@ -362,7 +392,7 @@ class SearchTumblr(Search):
 				results[i] = {**results[i], **notes}
 				retrieved_notes[post["reblog_key"]] = notes
 				
-				# Get the full data for certain reblogs and add them as new posts
+				# Identify which notes/reblogs we can collect as new posts
 				if get_reblogs:
 
 					for note in notes["notes"]:
@@ -378,6 +408,7 @@ class SearchTumblr(Search):
 								if note.get("timestamp"):
 									if not min_date >= note["timestamp"] >= max_date:
 										continue
+
 							extra_posts.append({"blog": note["blog_name"], "id": note["post_id"]})
 		
 		# Add reblogged posts and reblogs to dataset
@@ -386,19 +417,17 @@ class SearchTumblr(Search):
 			self.dataset.update_status("Adding %s/%s reblogs to the dataset" % (i, len(extra_posts)))
 
 			if extra_post["id"] not in self.seen_ids:
-				new_post = self.get_posts_by_blog(extra_post["blog"], extra_post["id"])
+				
+				# Potentially skip new posts outside of the date range
+				# not always present in the notes data.
+				if not reblog_outside_daterange and (max_date and min_date):
+					new_post = self.get_posts_by_blog(extra_post["blog"], extra_post["id"], max_date=max_date, min_date=min_date)		
+				else:
+					new_post = self.get_posts_by_blog(extra_post["blog"], extra_post["id"])
 
 				if new_post:
 					new_post = new_post[0]
-
-					# Potentially skip new posts outside of the date range
-					# We (also) do this after the API call because a timestamp is
-					# not always present in the notes data.
-					if not reblog_outside_daterange:
 						
-						if not min_date >= new_post["timestamp"] >= max_date:
-							continue
-
 					# Add note data; these are already be retrieved above
 					if get_notes:
 						new_post = {**new_post, **retrieved_notes[new_post["reblog_key"]]}
@@ -693,32 +722,20 @@ class SearchTumblr(Search):
 						self.seen_ids.add(post["id"])
 						new_posts.append(post)
 
-			posts = new_posts
-
+			# Possibly only keep posts within the date range.
+			if max_date and min_date:
+				new_posts = [p for p in new_posts if min_date <= p["timestamp"] <= max_date]
+	
 			if not new_posts:
 				break
 
-			if new_posts and not post_id:
+			# Append posts to main list
+			all_posts += new_posts
 
-				# Append posts to main list
-				# Get the lowest date
-				max_date = sorted([post["timestamp"] for post in posts])[0]
-
-				# Manually check if we have a lower date than the min date (`min_date`) already.
-				# This functonality is not natively supported by Tumblr.
-				if min_date != 0:
-					if max_date < min_date:
-
-						# Get rid of all the posts that are earlier than the max_date timestamp
-						posts = [post for post in posts if post["timestamp"] >= min_date]
-
-						if posts:
-							all_posts += posts
-						break
+			# Get the lowest date for next loop
+			max_date = sorted([post["timestamp"] for post in posts])[0]
 
 			retries = 0
-
-			all_posts += posts
 
 			if len(all_posts) >= self.max_posts:
 				self.max_posts_reached = True
@@ -798,6 +815,7 @@ class SearchTumblr(Search):
 				break
 
 			if "notes" in notes:
+
 				notes_retries = 0
 
 				# Add some metrics for the first response
@@ -805,8 +823,8 @@ class SearchTumblr(Search):
 				if first_batch and mode == "conversation":
 					note_metrics = {
 						"note_count": notes["total_notes"],
-						"reblog_count": notes["total_reblogs"],
-						"like_count": notes["total_likes"],
+						"reblog_count": notes.get("total_reblogs", 0),
+						"like_count": notes.get("total_likes", 0),
 						"reply_count": 0
 					}
 					first_batch = False
