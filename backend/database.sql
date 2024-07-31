@@ -67,11 +67,39 @@ CREATE TABLE datasets_owners (
 
 CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("name" text_ops,key text_ops);
 
-
 -- annotations
-CREATE TABLE IF NOT EXISTS annotations (
-  key               text UNIQUE PRIMARY KEY,
-  annotations       text DEFAULT ''
+CREATE TABLE IF NOT EXISTS annotations_new (
+  id                SERIAL PRIMARY KEY,
+  post_id           TEXT,
+  dataset           TEXT,
+  timestamp         INT DEFAULT 0,
+  timestamp_created INT DEFAULT 0,
+  label             TEXT,
+  type              TEXT,
+  options           TEXT,
+  value             TEXT,
+  author            TEXT,
+  is_processor      BOOLEAN DEFAULT FALSE,
+  metadata          TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS annotation_id
+  ON annotations_new (
+    id
+);
+CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
+  ON annotations_new (
+    label,
+    dataset,
+    post_id
+);
+CREATE INDEX IF NOT EXISTS annotation_value
+  ON annotations_new (
+    value
+);
+CREATE INDEX IF NOT EXISTS annotation_timestamp
+  ON annotations_new (
+    timestamp
 );
 
 -- metrics
