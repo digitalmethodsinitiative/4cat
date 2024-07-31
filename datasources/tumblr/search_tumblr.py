@@ -108,8 +108,8 @@ class SearchTumblr(Search):
 			},
 			"query": {
 				"type": UserInput.OPTION_TEXT_LARGE,
-				"help": "Tags, blogs, or post URLs. Seperate with comma or newline.",
-				"tooltip": "E.g. #research tools, @4catblog, @4catblog:12347714095"
+				"help": "Tags, blogs, or post URLs.",
+				"tooltip": " Seperate with comma or newline. Example:\n#research tools, @4catblog, https://tumblr.com/4catblog/12347714095"
 			},
 			"get_notes": {
 				"type": UserInput.OPTION_TOGGLE,
@@ -190,7 +190,8 @@ class SearchTumblr(Search):
 		options["date-intro"] = {
 				"type": UserInput.OPTION_INFO,
 				"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is very volatile. Queries may not return "
-						"posts, even if posts exists. Waiting for a while and querying again can help, even with identical queries.\n\n"
+						"posts, even if posts exists. Waiting for a while and querying again can help, even with identical queries. "
+						"Consider carrying out multiple queries and using the 'Merge datasets' processor to limit false negatives.\n\n"
 						"Additionally, older tagged posts may not be returned, even if they exist. To mitigate this, 4CAT decreases "
 						"the date parameter (<code>before</code>) with six hours and sends the query again. This often "
 						"successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 "
