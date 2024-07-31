@@ -850,15 +850,10 @@ class DataSet(FourcatModule):
 	def get_annotations(self):
 		"""
 		Retrieves the annotations for this dataset.
-		return dict: The annotations
+		return list: All annotations, each in their own dictionary.
 		"""
 
-		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.key,))
-
-		if annotations and annotations.get("annotations"):
-			return json.loads(annotations["annotations"])
-		else:
-			return None
+		return self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
 
 	def save_annotation_fields(self, annotation_fields):
 		"""
