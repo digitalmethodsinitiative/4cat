@@ -74,7 +74,7 @@ const annotations = {
 
 		// Delete an entire annotation input
 		// We're in a grid of threes, so this involves three divs
-		editor_controls.on("click", ".annotation-field > .delete-input", function(e){
+		editor_controls.on("click", ".annotation-field > .delete-input", function(){
 				let parent_div = $(this).parent().parent();
 				parent_div.next().remove(); // Input type
 				parent_div.next().remove(); // Options
@@ -105,11 +105,12 @@ const annotations = {
 		});
 		
 		// Make saving available when annotations are changed
-		$(".post-annotations").on("keydown", "input, textarea", function() { annotations.enableSaving(); edits_made = true;});
-		$(".post-annotations").on("click", "option, input[type=checkbox], label", function() { annotations.enableSaving(); edits_made = true;});
+		let post_annotations = $(".post-annotations");
+		post_annotations.on("keydown", "input, textarea", function() { annotations.enableSaving(); edits_made = true;});
+		post_annotations.on("click", "option, input[type=checkbox], label", function() { annotations.enableSaving(); edits_made = true;});
 
 		// Keep track of whether the annotations are edited or not.
-		$(".post-annotations").on("keydown change", ".post-annotation-input, .post-annotation input, .post-annotation textarea", function(){$(this).addClass("edited")});
+		post_annotations.on("keydown change", ".post-annotation-input, .post-annotation input, .post-annotation textarea", function(){$(this).addClass("edited")});
 
 		// Save the annotations to the database
 		$("#save-annotations").on("click", function(){
@@ -124,8 +125,6 @@ const annotations = {
 				annotations.saveAnnotations();
 			}
 		})
-
-		var old_annotation_fields = $("#annotation-fields").html();
 
 		// Check whether there's already fields saved for this dataset
 		annotations.fieldsExist();
@@ -143,7 +142,6 @@ const annotations = {
 		// Change the type of input fields when switching in the dropdown
 
 		let type = $(el).val();
-		let old_type = $(el).attr("data-val");
 
 		let options = $(el).parent().parent().next();
 		let option_fields = options.find(".option-field");
