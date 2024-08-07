@@ -68,9 +68,9 @@ CREATE TABLE datasets_owners (
 CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("name" text_ops,key text_ops);
 
 -- annotations
-CREATE TABLE IF NOT EXISTS annotations_new (
+CREATE TABLE IF NOT EXISTS annotations (
   id                SERIAL PRIMARY KEY,
-  post_id           TEXT,
+  item_id           TEXT,
   dataset           TEXT,
   timestamp         INT DEFAULT 0,
   timestamp_created INT DEFAULT 0,

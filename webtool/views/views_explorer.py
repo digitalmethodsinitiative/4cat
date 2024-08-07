@@ -4,7 +4,6 @@ format and lets users annotate the data.
 """
 
 import json
-import re
 
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from flask_login import login_required, current_user
 from webtool import app, db, openapi, limiter, config
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
+from common.lib.annotation import Annotation
 from common.lib.helpers import convert_to_float
 from common.lib.exceptions import DataSetException
 from common.config_manager import ConfigWrapper
@@ -132,9 +132,7 @@ def explorer_dataset(key, page=1):
 
 	# Check whether there's already annotations inserted already.
 	# If so, also pass these to the template.
-	annotations = db.fetchall("SELECT * FROM annotations WHERE key = %s", (key,))
-	if annotations:
-		annotations = json.loads(annotations)
+	annotations = dataset.get_annotations()
 	
 	# Generate the HTML page
 	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, template=template, posts_css=posts_css, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
@@ -247,7 +245,7 @@ def explorer_save_annotation_fields(key):
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_save_annotations(key):
+def explorer_save_annotations(key=None):
 	"""
 	Save the annotations of a dataset to the annotations table.
 
@@ -257,19 +255,20 @@ def explorer_save_annotations(key):
 	:return int:		The number of posts with annotations saved.
 	"""
 
-	# Get dataset.
+	# Save it!
+	annotations = request.get_json()
+
+	# Annotations are always associated with a dataset.
+	if not key and annotations:
+		key = annotations[0].get("dataset", "")
 	if not key:
 		return error(404, error="No dataset key provided")
 	try:
 		dataset = DataSet(key=key, db=db)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
-
-	# Save it!
-	new_annotations = request.get_json()
-	dataset.save_annotations(new_annotations)
-
-	return "success"
+	
+	return dataset.save_annotations(annotations)
 
 def sort_and_iterate_items(dataset, sort=None, reverse=False, **kwargs):
 	"""

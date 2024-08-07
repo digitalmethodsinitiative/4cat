@@ -122,7 +122,6 @@ else:
         annotation_fields = json.loads(dataset["annotation_fields"])
         author = dataset.get("creator", "")
 
-        
         if not row.get("annotations"):
             print("      No annotations for dataset %s, skipping..." % row["dataset"])
             skipped_count += 1

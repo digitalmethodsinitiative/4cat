@@ -2,7 +2,7 @@ $(document).ready(function(){
 
 $(init);
 
-/**
+/*
  * Page init
  */
 function init() {
@@ -15,7 +15,7 @@ function init() {
 
 }
 
-/**
+/*
  * Handle annotations
  */
 const annotations = {
@@ -334,7 +334,7 @@ const annotations = {
 		let edited = false
 		let timestamp = Date.now() / 100
 
-		if (annotation_type == "text" || annotation_type == "textarea") {
+		if (annotation_type === "text" || annotation_type === "textarea") {
 			val = $(this).find(".post-annotation-input").val();
 			// It can be the case that the input text is deleted
 			// In this case we *do* want to push new data, so we check
@@ -343,11 +343,11 @@ const annotations = {
 				edited = true
 			}
 		}
-		else if (annotation_type == "dropdown") {
+		else if (annotation_type === "dropdown") {
 			let selected = $(this).find(".post-annotation-options").val();
 			val = selected;
 		}
-		else if (annotation_type == "checkbox") {
+		else if (annotation_type === "checkbox") {
 			val = [];
 			$(this).find(".post-annotation-options > input").each(function(){
 				if ($(this).is(":checked")) {
@@ -361,7 +361,7 @@ const annotations = {
 				val = undefined;
 			}
 		}
-		if ((val != undefined && val != "") || edited) {
+		if ((val !== undefined && val !== "") || edited) {
 			vals_changed = true;
 			val = "";
 		}
@@ -375,7 +375,7 @@ const annotations = {
 			"timestamp_created": "",
 			"label": label,
 			"type": annotation_type,
-			"options": ,
+			"options": "",
 			"value": "",
 			"author": "",
 			"by_processor": "",

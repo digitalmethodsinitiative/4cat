@@ -3,6 +3,7 @@ Collapse post bodies into one long string
 """
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
+from common.lib.annotation import Annotation
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
@@ -51,11 +52,17 @@ class CountPosts(BasicProcessor):
 		first_interval = "9999"
 		last_interval = "0000"
 
+		annotations = []
+
 		self.dataset.update_status("Processing items")
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
 
 			for post in self.source_dataset.iterate_items(self):
+
+				annotation = Annotation(value="test", label="count_posts_test", dataset=self.source_dataset)
+				annotations.append(annotation)
+
 				try:
 					date = get_interval_descriptor(post, timeframe)
 				except ValueError as e:
