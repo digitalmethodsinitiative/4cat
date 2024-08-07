@@ -62,6 +62,7 @@ class ThingExpirer(BasicWorker):
 				dataset = DataSet(key=dataset["key"], db=self.db)
 				if dataset.is_expired():
 					self.log.info(f"Deleting dataset {dataset.key} (expired)")
+					dataset.delete_annotations(dataset_key=dataset.key)
 					dataset.delete()
 
 			except DataSetNotFoundException:

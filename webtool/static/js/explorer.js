@@ -213,8 +213,10 @@ const annotations = {
 	},
 
 	parseAnnotationFields: function (e) {
-		// Validates and converts the fields in the annotations editor.
-		// Returns an object with the set annotation fields.
+		/*
+		Validates and converts the fields in the annotations editor.
+		Returns an object with the set annotation fields.
+		*/
 
 		var annotation_fields = {};
 		var warning = "";
@@ -235,7 +237,7 @@ const annotations = {
 
 			let label = label_field.val().replace(/\s+/g, ' ');
 
-			// Get the random identifier of the field, so we
+			// Get the ID of the field, so we
 			// can later check if it already exists.
 			let field_id = parseInt(this.id.split("-")[1]);
 
@@ -244,7 +246,7 @@ const annotations = {
 				label_field.addClass("invalid");
 				warning  = "Input names can't be empty";
 			}
-			// Make sure the names can't be duplicates.
+			// Make sure the names can't be duplicates
 			else if (labels_added.includes(label)) {
 				warning = "Field labels must be unique";
 				label_field.addClass("invalid");
@@ -278,7 +280,7 @@ const annotations = {
 
 					if (!option_labels.includes(option_label) && option_label.length > 0) {
 
-						// We're using a unique key for these to match input fields.
+						// We're using a unique key for options as well.
 						option = {}
 						option[option_id] = option_label
 						options.push(option);
@@ -313,6 +315,74 @@ const annotations = {
 			return warning;
 		}
 		return annotation_fields;
+	},
+
+	parseAnnotation: function(e) {
+		/*
+		Converts the DOM objects of an annotation field
+		to an annotation Object.
+
+		Must be given an input field element
+
+		*/
+
+		annotation = {}
+
+		let label = $(this).find(".annotation-label").text();
+		let annotation_type = $(this).attr("class").split(" ").pop();
+		let val = undefined;
+		let edited = false
+		let timestamp = Date.now() / 100
+
+		if (annotation_type == "text" || annotation_type == "textarea") {
+			val = $(this).find(".post-annotation-input").val();
+			// It can be the case that the input text is deleted
+			// In this case we *do* want to push new data, so we check
+			// whether there's an 'edited' class present and save if so.
+			if ($(this).find(".post-annotation-input").hasClass("edited")) {
+				edited = true
+			}
+		}
+		else if (annotation_type == "dropdown") {
+			let selected = $(this).find(".post-annotation-options").val();
+			val = selected;
+		}
+		else if (annotation_type == "checkbox") {
+			val = [];
+			$(this).find(".post-annotation-options > input").each(function(){
+				if ($(this).is(":checked")) {
+					val.push($(this).val());
+				}
+				if ($(this).hasClass("edited")) {
+					edited = true
+				}
+			});
+			if (!val.length > 0) {
+				val = undefined;
+			}
+		}
+		if ((val != undefined && val != "") || edited) {
+			vals_changed = true;
+			val = "";
+		}
+
+		// Create an annotation object and add them to the array.
+		let annotation = {
+			"field_id": "",
+			"post_id": post_id,
+			"dataset": "",
+			"timestamp": timestamp,
+			"timestamp_created": "",
+			"label": label,
+			"type": annotation_type,
+			"options": ,
+			"value": "",
+			"author": "",
+			"by_processor": "",
+			"metadata": ""
+		}
+
+		return annotation
 	},
 
 	applyAnnotationFields: function (e){
@@ -629,9 +699,9 @@ const annotations = {
 	saveAnnotations: function (e){
 		// Write the annotations to the dataset and annotations table.
 
-		// First we're gonna collect the data for this page.
-		// Loop through each post's annotation field.
-		var anns = {};
+		// First we're going to collect the data for this page.
+		// Loop through each post's annotation fields.
+		var anns = [];
 		var dataset_key = $("#dataset-key").text();
 
 		$(".posts > li").each(function(){
@@ -642,50 +712,20 @@ const annotations = {
 
 			if (post_annotations.length > 0) {
 
-				let post_vals = {};
 				post_annotations.find(".post-annotation").each(function(){
 					
-					let label = $(this).find(".annotation-label").text();
-					let annotation_type = $(this).attr("class").split(" ").pop();
-					let val = "";
-					let edited = false
+					// Extract annotation object from the element
+					let annotation = parseAnnotation(this);
 
-					if (annotation_type == "text" || annotation_type == "textarea") {
-						val = $(this).find(".post-annotation-input").val();
-						// It can be the case that the input text is deleted
-						// In this case we *do* want to push new data, so we check
-						// whether there's an 'edited' class present and save if so.
-						if ($(this).find(".post-annotation-input").hasClass("edited")) {
-							edited = true
-						}
-					}
-					else if (annotation_type == "dropdown") {
-						let selected = $(this).find(".post-annotation-options").val();
-						val = selected;
-					}
-					else if (annotation_type == "checkbox") {
-						val = [];
-						$(this).find(".post-annotation-options > input").each(function(){
-							if ($(this).is(":checked")) {
-								val.push($(this).val());
-							}
-							if ($(this).hasClass("edited")) {
-								edited = true
-							}
-						});
-						if (!val.length > 0) {
-							val = undefined;
-						}
-					}
-					if ((val != undefined && val != "") || edited) {
-						vals_changed = true;
-						post_vals[label] = val;
+					if (annotation) {
+						annotations.push(annotation);
 					}
 				});
 
 				if (vals_changed){
-					anns[post_id] = post_vals;
+					annotation[post_id] = post_vals;
 				}
+
 			}
 		})
 		

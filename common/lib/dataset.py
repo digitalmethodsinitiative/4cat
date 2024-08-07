@@ -19,7 +19,7 @@ from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, conv
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-								   MapItemException, MappedItemIncompleteException)
+								   MapItemException, MappedItemIncompleteException, AnnotationException)
 
 
 class DataSet(FourcatModule):
@@ -835,6 +835,8 @@ class DataSet(FourcatModule):
 	def get_annotation_fields(self):
 		"""
 		Retrieves the saved annotation fields for this dataset.
+		These are stored in the annotations table.
+
 		:return dict: The saved annotation fields.
 		"""
 
@@ -847,218 +849,12 @@ class DataSet(FourcatModule):
 
 		return annotation_fields
 
-	def get_annotations(self):
-		"""
-		Retrieves the annotations for this dataset.
-		return list: All annotations, each in their own dictionary.
-		"""
-
-		return self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
-
-	def save_annotation_fields(self, annotation_fields):
-		"""
-		Save the annotation fields of a dataset to the datasets table.
-		If changes to the annotation fields affect older, existing annotations,
-		this function also updates or deletes those values.
-
-		:param dict annotation_fields:  Annotation fields, with a field ID as key
-		:return int:					The number of annotation fields saved.
-		"""
-
-		# Do some preparations
-		new_field_ids = set(annotation_fields.keys())
-		text_fields = ["textarea", "text"]
-		option_fields = set()
-
-		# Get existing annotation fields.
-		old_fields = self.get_annotation_fields()
-
-		# We're saving the new annotation fields as-is
-		self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(annotation_fields), self.key))
-
-		# If new annotation fields change the annotations already saved (e.g. if a field is deleted),
-		# we must also check if we should update annotation data.
-		# This can get quite complex!
-		if old_fields:
-			annotations = self.get_annotations()
-
-		if old_fields and annotations:
-
-			fields_to_delete = set()
-			labels_to_update = {}
-			options_to_delete = set()
-			options_to_update = {}
-
-			for field_id, field in old_fields.items():
-
-				# We'll delete all prior annotations for a field if its input field is deleted
-				if field_id not in new_field_ids:
-
-					# Labels are used as keys in the annotations table
-					# They should already be unique, so that's okay.
-					fields_to_delete.add(field["label"])
-					continue
-
-				# If the type has changed, also delete prior references (except between text and textarea)
-				new_type = annotation_fields[field_id]["type"]
-				if field["type"] != new_type:
-
-					if not field["type"] in text_fields and not new_type in text_fields:
-						fields_to_delete.add(field["label"])
-						continue
-
-				# If the label has changed, change it in the old annotations
-				old_label = old_fields[field_id]["label"]
-				new_label = annotation_fields[field_id]["label"]
-
-				if old_label != new_label:
-					labels_to_update[old_label] = new_label
-
-				# Check if the options for dropdowns or checkboxes have changed
-				if new_type == "checkbox" or new_type == "dropdown":
-
-					if "options" in old_fields[field_id]:
-
-						option_fields.add(old_fields[field_id]["label"])
-						new_options = annotation_fields[field_id]["options"]
-
-						new_ids = [list(v.keys())[0] for v in new_options]
-						new_ids = [list(v.keys())[0] for v in new_options]
-
-						# If it's a dropdown or checkbox..
-						for option in old_fields[field_id]["options"]:
-							option_id = list(option.keys())[0]
-							option_label = list(option.values())[0]
-
-							# If this ID is not present anymore, delete it
-							if option_id not in new_ids:
-								options_to_delete.add(option_label)
-								continue
-
-							# Change the label if it has changed. Bit ugly but it works.
-							new_label = [list(new_option.values())[0] for i, new_option in enumerate(new_options) if list(new_options[i].keys())[0] == option_id][0]
-
-							if option_label != new_label:
-								options_to_update[option_label] = new_label
-
-			# Loop through the old annotations if things need to be changed
-			if fields_to_delete or labels_to_update or options_to_update or options_to_delete:
-
-				for post_id in list(annotations.keys()):
-
-					for field_label in list(annotations[post_id].keys()):
-
-						# Delete the field entirely
-						if field_label in fields_to_delete:
-							del annotations[post_id][field_label]
-							continue
-
-						# Update the label
-						if field_label in labels_to_update:
-							annotations[post_id][labels_to_update[field_label]] = annotations[post_id].pop(field_label)
-							field_label = labels_to_update[field_label]
-
-						# Update or delete option values
-						if field_label in option_fields:
-							options_inserted = annotations[post_id][field_label]
-
-							# We can just delete/change the entire annotation if its a string
-							if type(options_inserted) == str:
-
-								# Delete the option if it's not present anymore
-								if options_inserted in options_to_delete:
-									del annotations[post_id][field_label]
-
-								# Update the option label if it has changed
-								elif options_inserted in options_to_update:
-									annotations[post_id][field_label] = options_to_update[options_inserted]
-
-							# For lists (i.e. checkboxes), we have to loop
-							elif type(options_inserted) == list:
-
-								for option_inserted in options_inserted:
-
-									# Delete the option if it's not present anymore
-									if option_inserted in options_to_delete:
-										annotations[post_id][field_label].remove(option_inserted)
-
-									# Update the option label if it has changed
-									elif option_inserted in options_to_update:
-										annotations[post_id][field_label] = options_to_update[option_inserted]
-
-					# Delete entire post dict if there's nothing left
-					if not annotations[post_id]:
-						del annotations[post_id]
-
-				# Save annotations as an empty string if there's none.
-				if not annotations:
-					annotations = ""
-				
-				# Save to the annotations table.
-				self.save_annotations(annotations)
-
-		return len(annotation_fields)
-
-	def save_annotations(self, annotations):
-		"""
-		Saves annotations for a dataset to the annotations table.
-
-		:param dict annotations:	Annotations dict, with post IDs as keys.
-		:return int:				The number of posts with annotations.
-
-		"""
-
-		# If there were already annotations added, we need to make sure
-		# we're not incorrectly overwriting existing ones.
-		# We also need to check whether any of the input fields has changed.
-		# If so, we're gonna edit or remove their old values.
-		old_annotations = self.get_annotations()
-		delete_annotations = False
-
-		if old_annotations and annotations:
-			# Loop through all new annotations and add/overwrite them
-			# with the old annotations dict.
-			for post_id in list(annotations.keys()):
-				old_annotations[post_id] = annotations[post_id]
-
-				# Empty strings, lists, or None as input values get removed
-				fields_to_delete = []
-				for label, values in old_annotations[post_id].items():
-					if not values:
-						fields_to_delete.append(label)
-				for label in fields_to_delete:
-					del old_annotations[post_id][label]
-					delete_annotations = True
-
-				# Empty lists/dicts get removed
-				if not old_annotations[post_id]:
-					del old_annotations[post_id]
-					delete_annotations = True
-
-			annotations = old_annotations
-
-		# If there's nothing to save or delete, do nothing
-		if not annotations and not delete_annotations:
-			return 0
-
-		# If the annotations are empty, remove the row from the annotations table
-		if len(annotations) == 0:
-			self.db.delete("annotations", {"key": self.key})
-			return 0
-
-		# If there's something to add or change,
-		# we're saving all annotations as a JSON string
-		annotations = json.dumps(annotations)
-		self.db.upsert("annotations", {"key": self.key, "annotations": annotations}, constraints=["key"])
-
-		return len(annotations)
-
 	def update_label(self, label):
 		"""
 		Update label for this dataset
 
-		:param str label:  New label
-		:return str:  The new label, as returned by get_label
+		:param str label:  	New label
+		:return str: 		The new label, as returned by get_label
 		"""
 		self.parameters["label"] = label
 
@@ -1797,6 +1593,332 @@ class DataSet(FourcatModule):
 			else:
 				# No other log available
 				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
+
+	# Annotation features
+	def get_annotations(self):
+		"""
+		Retrieves the annotations for this dataset.
+		return list: All annotations, each in their own dictionary.
+		"""
+		annotations = self.db.fetchall("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+
+		if not annotations:
+			annotations = None
+
+		return annotations
+
+	def has_annotations(self):
+		""" 
+		Returns True if there's one or more annotations found
+		"""
+
+		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+
+		return True if annotation else False
+
+	def has_annotation_fields(self):
+		""" 
+		Returns True if there's annotation fields saved tot the dataset table
+		"""
+
+		annotation_fields = self.get_annotation_fields()
+
+		return True if annotation_fields else False
+
+	def save_annotation_fields(self, new_fields, add=False):
+		"""
+		Save annotation field data to the datasets table (in the `annotation_fields` column).
+		If changes to the annotation fields affect existing annotations,
+		this function will also call `update_annotations_via_fields()` to change them.
+
+		:param dict new_fields:  Annotation fields, with a field ID as key.
+
+		:param bool add:				Wether we're merely adding new fields
+										or replacing the whole batch. If add is false,
+										`new_fields` should contain all fields.
+
+		:return int:					The number of annotation fields saved.
+
+		"""
+
+		# Get existing annotation fields to see if stuff changed.
+		old_fields = self.get_annotation_fields()
+		changes = False
+
+		# Do some validation
+		# Annotation field must be valid JSON.
+		try:
+			s = json.dumps(new_fields)
+		except ValueError:
+			raise AnnotationException("Can't save annotation fields: not valid JSON (%s)" % new_fields)
+
+		# Annotation fields must at minimum have `type` and `label` keys.
+		for field_id, annotation_field in new_fields.items():
+			if not isinstance(field_id, str):
+				raise AnnotationException("Can't save annotation fields: field ID %s is not a valid string" % field_id)
+			if not "label" in annotation_field:
+				raise AnnotationException("Can't save annotation fields: all fields must have a label" % field_id)
+			if not "type" in annotation_field:
+				raise AnnotationException("Can't save annotation fields: all fields must have a type" % field_id)
+
+			# Keep track of whether existing fields have changed; if so, we're going to
+			# update the annotations table.
+			if field_id in old_fields:
+				if old_fields[field_id] != annotation_field:
+					changes = True
+
+		# If we're just adding fields, add them to the old fields
+		# If the field already exists, overwrite the old field.
+		if add and old_fields:
+			all_fields = old_fields
+			for field_id, annotation_field in new_fields.items():
+				all_fields[field_id] = annotation_field
+			new_fields = all_fields
+
+		# We're saving the new annotation fields as-is.
+		# Ordering of fields is preserved this way.
+		self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
+
+		# If we're adding but the field already exists, update/delete annotations with that ID.
+		add_and_overlap = add and any([True for k in list(new_fields.keys()) if k in old_fields])
+
+		if changes or add_and_overlap:
+			update_annotations_via_fields(old_fields, new_fields)
+
+		return len(new_fields)
+
+	def update_annotations_via_fields(self, old_fields, new_fields):
+		"""
+		Updates annotations in the annotations table if the input field
+		itself has been changed, for instance if a dropdown label is renamed.
+	
+		:param di old_fields:	Old annotation fields
+		:param di new_fields:	New annotation fields; this should contain not just
+								additions, but all fields, changed or otherwise.
+		
+		"""
+
+		new_field_ids = set(annotation_fields.keys())
+		text_fields = ["textarea", "text"]
+		
+		# If old and new fields are identical, do nothing.
+		if old_fields == new_fields:
+			return
+
+		# Only update annotations if they, in fact, exist.
+		annotations = self.get_annotations()
+		if not annotations:
+			return
+
+		fields_to_delete = set()	# Delete all annotations with this field ID
+		fields_to_update = {} 		# Update values of annotations with this field ID
+
+		# Loop through the old annotation fields
+		for old_field_id, old_field in old_fields.items():
+
+			# Delete all annotations of this type if the field is deleted.
+			if old_field_id not in new_fields:
+				fields_to_delete.add(old_field_id)
+				continue
+
+			new_field = annotation_fields[old_field_id]
+
+			# If the annotation type has changed, also delete existing annotations,
+			# except between text and textarea, where we can just change the type and keep the text.
+			if old_field["type"] != new_field["type"]:
+				if not old_field["type"] in text_fields and not new_field["type"] in text_fields:
+					fields_to_delete.add(field_id)
+					continue
+
+			# Loop through all the key/values in the new field data
+			# and update in case it's different from the old values.
+			update_data = {}
+			for field_key, field_value in new_field.items():
+
+				# Update if values don't match
+				if field_value != old_field.get(field_key):
+
+					# Special case: option values that are removed/renamed.
+					# Here we only have to change specific values within the 
+					# values column.
+					if field_key == "options":
+
+						new_options = field_value
+						# Delete annotations of this type if all option fields are deleted
+						# (even though this should not be possible in the Explorer front-end)
+						if not new_options:
+							fields_to_delete.add(field_id)
+							continue
+
+						old_options = old_field["options"]
+						
+						options_to_update = {}
+
+						# Options are saved in a dict with IDs and labels as keys/values.
+						for old_option_id, old_option in old_options.items():
+							# Renamed option label
+							if old_option_id in new_options and old_option != new_options[old_option_id]:
+								options_to_update[old_option] = new_options[option] # Old label -> new label
+							# Deleted option
+							elif old_option_id not in new_options:
+								options_to_update[old_option] = None # Remove None labels
+
+						if options_to_update:
+							update_data[field_key] = {}
+							update_data[field_key]["options"] = options_to_update
+
+					# For all other changes, just overwrite with new data.
+					else:
+						update_data[field_key] = field_value
+
+			if update_data:
+				fields_to_update[new_field_id] = update_data
+
+		# Delete annotations
+		if fields_to_delete:
+			self.delete_annotations(field_id=list(fields_to_delete))
+
+		# Change annotations based on changes in update fields
+		if fields_to_update:
+			new_annotations = []
+			for annotation in annotations:
+				if annotation["field_id"] in fields_to_update:
+					for k, update_field in fields_to_update[annotation["field_id"]]:
+
+						# Special case: Changed options
+						if k == "options":
+							new_values = []
+							for inserted_option in annotations["value"].split(","):
+								if inserted_option in update_field:
+									if update_field[inserted_option] == None:
+										# Don't add
+										continue
+									elif inserted_option in update_field:
+										# Replace with new value
+										new_values.append(annotation["value"][old_option])
+									else:
+										# Keep old value
+										new_values.append(inserted_option)
+
+							update_field = new_values
+
+						annotation[k] = update_field
+
+				new_annotations.append(annotation)
+
+			# Save updated annotations
+			self.save_annotations(new_annotations)
+
+	def save_annotations(self, annotations, overwrite=True):
+		"""		
+		Takes a list of annotations and saves them to the annotations table.
+		If a field is not yet present in the datasets table, it also adds it there.
+
+		:param list annotations:		List of dictionaries with annotation items.
+		:param bool overwrite:			Whether to overwrite annotation if the label is already present
+										for the dataset.
+
+		:returns int:					How many annotations were saved.
+
+		"""
+
+		# Should be present for all annotation fields
+		mandatory_keys = ["post_id", "label", "value"]
+
+		field_keys = {}
+		annotations_to_delete = set()
+
+		# We're going to add the annotation metadata to the datasets table
+		# based on the annotations themselves.
+		annotation_fields = self.get_annotation_fields()
+		existing_annotations = self.get_annotations()
+		existing_labels = set(a["label"] for a in existing_annotations) if existing_annotations else []
+
+		timestamp = time.time()
+
+		new_annotations = []
+		for annotation in annotations:
+
+			# Do some validation; dataset key, post_id, label, and value need to be present.
+			missing_keys = []
+			for mandatory_key in mandatory_keys:
+				if mandatory_key not in annotation:
+					missing_keys.append(mandatory_key)
+			if missing_keys:
+				raise AnnotationException("Couldn't add annotations; missing field(s) %s" % ",".join(missing_keys))
+
+			# Add dataset key
+			annotation["dataset"] = self.key
+
+			# Raise exception if this label is already present for this dataset
+			# and we're not overwriting
+			if not overwrite and annotation["label"] in existing_labels:
+				raise AnnotationException("Couldn't save annotations; label %s already present")
+
+			# If there's no type given, use 'text'
+			if not annotation.get("type"):
+				annotation["type"] = "text"
+
+			# If there's no timestamp given, set it to the current time.
+			if not "timestamp" in annotation:
+				annotation["timestamp"] = timestamp
+				annotation["timestamp_created"] = timestamp
+
+			# If not already given, create an ID for this annotation
+			# based on the label, type, and dataset key.
+			if "field_id" not in annotation:
+				field_id_base = "-".join(annotation["dataset"], annotation["label"], annotation.get("type", ""))
+				field_id = int.from_bytes(field_id_base.encode(), "little")
+				annotation["field_id"] = field_id
+
+			# Add annotation metadata if it is not saved to the datasets table yet.
+			# This is just a simple dict with a field ID, type, label, and possible options. 
+			if annotation["field_id"] not in annotation_fields:
+				annotation_fields[annotation["field_id"]] = {
+					"label": annotation["label"],
+					"type": annotation["type"]
+				}
+				if "options" in annotation:
+					annotation_fields[annotation["field_id"]]["options"] = annotation["options"]
+
+			new_annotations.append(annotation)
+
+		# Save annotation fields if they're not present yet.
+		if annotation_fields != self.get_annotation_fields():
+			self.save_annotation_fields(annotation_fields)
+
+		# If there's nothing to save or delete, do nothing
+		if not new_annotations:
+			return 0
+
+		# Overwrite old annotations with upsert. Else add.
+		self.db.upsert("annotations", new_annotations, constraints=["dataset", "post_id", "label"])
+
+		return len(new_annotations)
+
+	def delete_annotations(self, dataset_key=None, id=None, field_id=None):
+		"""
+		Deletes all annotations for an entire dataset or by a list of (field) IDs.
+
+		:param str dataset_key: A dataset key.
+		:param li id:			A list or string of unique annotation IDs.
+		:param li field_id:		A list or string of IDs for annotation fields.
+
+		:return int: The number of removed records.
+		"""
+
+		if not dataset and not ids and not field_ids:
+			return 0
+
+		where = {}
+		if dataset_key:
+			where["dataset"] = dataset_key
+		if ids:
+			where["id"] = ids
+		if field_ids:
+			where["field_id"] = field_ids
+
+		return self.db.delete("annotations", where)
 
 	def __getattr__(self, attr):
 		"""
