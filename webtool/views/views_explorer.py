@@ -132,11 +132,9 @@ def explorer_dataset(key, page=1):
 
 	# Check whether there's already annotations inserted already.
 	# If so, also pass these to the template.
-	annotations = db.fetchone("SELECT * FROM annotations WHERE key = %s", (key,))
-	if not annotations or not annotations.get("annotations"):
-		annotations = None
-	else:
-		annotations = json.loads(annotations["annotations"])
+	annotations = db.fetchall("SELECT * FROM annotations WHERE key = %s", (key,))
+	if annotations:
+		annotations = json.loads(annotations)
 	
 	# Generate the HTML page
 	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, template=template, posts_css=posts_css, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
@@ -221,7 +219,7 @@ def explorer_api_posts(datasource, post_ids):
 @openapi.endpoint("explorer")
 def explorer_save_annotation_fields(key):
 	"""
-	Save teh annotation fields of a dataset to the datasets table.
+	Save the annotation fields of a dataset to the datasets table.
 
 	:param str key:  	The dataset key.
 
@@ -255,7 +253,7 @@ def explorer_save_annotations(key):
 
 	:param str key: 	The dataset key.
 
-	:return-error 404:  If the dataset ID does not exist.
+	:return-error 404:  If the dataset key does not exist.
 	:return int:		The number of posts with annotations saved.
 	"""
 

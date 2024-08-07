@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS annotations_new (
   options           TEXT,
   value             TEXT,
   author            TEXT,
-  is_processor      BOOLEAN DEFAULT FALSE,
+  by_processor      BOOLEAN DEFAULT FALSE,
   metadata          TEXT
 );
 
