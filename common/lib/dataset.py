@@ -1605,6 +1605,20 @@ class DataSet(FourcatModule):
 
 		return True if annotation_fields else False
 
+	def make_annotations(self, annotations):
+		"""
+		Generates a list of annotation objects from annotation JSON.
+		:param annotations: A list of dicts or JSON string with annotations 
+		"""
+		if not annotations:
+			return None
+		if isinstance(annotations, str):
+			annotaitons = json.loads(annotations)
+
+		annotations = [Annotation(annotation, self) for annotation in annotations]
+
+		return annotations
+
 	def get_annotation_fields(self):
 		"""
 		Retrieves the saved annotation fields for this dataset.
@@ -1822,17 +1836,17 @@ class DataSet(FourcatModule):
 		if not annotations:
 			return 0
 
-		# Add dataset info to annotations
-		key = self.key
-		owner = self.get_owners()[0]
-		if "dataset"
-			for i in range(len(annotations)):
-				if not annotations[i].get("dataset"):
-					annotations[i]["dataset"] = key
-				if not annotations[i].get("author"):
-					annotations[i]["author"] = owner
+		# Add some dataset data to annotations, if not present
+		for annotation in annotations:
+			# Set dataset key
+			if not annotation.get("dataset"):
+				annotation["dataset"] = self.key
+			# Set default author to this dataset owner
+			if not annotation.get("author"):
+				annotation["author"] = self.get_owners()[0]
 
-		return Annotation.save_many(annotations, overwrite=overwrite)
+			# Create Annotation object, which saves it to the database
+			Annotation(data=annotation, db=self.db)
 
 	def delete_annotations(self, dataset_key=None, id=None, field_id=None):
 		"""

@@ -2,13 +2,18 @@
 Annotation class
 """
 
-from common.config_manager import config
+
+import time
+import json
+
+from common.lib.exceptions import AnnotationException
 
 class Annotation:
     """
     Annotation class
 
-    Annotations are always tied to a dataset and an item ID.
+    Annotations are always tied to a dataset, a dataset item (e.g. a csv row),
+    an annotation label, and a type ('text', 'multichoice', etc.).
 
     """
 
@@ -17,88 +22,166 @@ class Annotation:
     data = None
     db = None
 
-    id = ""                 # Unique ID for this annotation
-    parent_id = ""          # ID of the data for this annotation, e.g. post ID
-    dataset = ""            # Dataset key this annotation is generated from
-    timestamp = 0           # When this annotation was edited
-    timestamp_created = 0   # When this timestamp was created
-    label = ""              # Label of annotation
-    options = []            # Possible options
-    value = ""              # The actual annotation value
-    author = ""             # Who made the annotation
-    by_processor = False    # Whether the annotation was made by a processor
-    metadata = {}           # Misc metadata
+    id = None                 # Unique ID for this annotation
+    item_id = None            # ID of the item for this annotation, e.g. post ID
+    field_id = None           # If of this type of annotation field for this dataset
+    dataset = None            # Dataset key this annotation is generated from
+    timestamp = None          # When this annotation was edited
+    timestamp_created = None  # When this timestamp was created
+    label = None              # Label of annotation
+    options = None            # Possible options
+    value = None              # The actual annotation value
+    author = None             # Who made the annotation
+    by_processor = None       # Whether the annotation was made by a processor
+    metadata = None           # Misc metadata
 
-    def __init__(self, db, data, id=None, item_id=None, label=None, dataset_key=None):
+    def __init__(self, data=None, id=None, db=None):
         """
         Instantiate annotation object.
 
-        :param db:  Database connection object
-        :param dict data:  Annotation data; should correspond to the annotations table records.
-
+        :param data:    Annotation data; should correspond to the annotations table record.
+        :param id:      The ID of an annotation. If given, it retrieves the annotation
+                        from the database.
+        :param db:      Database connection object
         """
 
-        self.db = db
-        self.data = data
-        self.item_id = item_id
+        required_fields = ["label", "item_id", "dataset"]
 
-        if id is not None:
-            self.id = id
-            current = self.db.fetchone("SELECT * FROM annotations WHERE key = %s", (self.id,))
+        # Must have an ID or data
+        if id is None and (data is None or not isinstance(data, dict)):
+            raise AnnotationException("Annotation() requires either a `data` dictionary or ID.")
+
+        if not db:
+            raise AnnotationException("Annotation() needs a `db` database object")
+
+        self.db = db
+
+        current = None
+        new_or_updated = False
+
+        # Get the annotation data if the ID is given; if an annotation has
+        # an ID, it is guaranteed to be in the database.
+        # IDs can both be explicitly given or present in the data dict.
+        if id is not None or "id" in data:
+            if "id" in data:
+                id = data["id"]
+            self.id = id # IDs correspond to unique serial numbers in the database.
+            current = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % (self.id))
             if not current:
                 raise AnnotationException(
-                    "Annotation() requires a valid ID for its 'id' argument, \"%s\" given" % id)
+                    "Annotation() requires a valid ID for its 'id' argument, %s given" % id)
 
-        # Should be present for all annotation fields
-        mandatory_keys = ["post_id", "label", "value"]
+        # If an ID is not given, get or create an Annotation object from its data.
+        # First check if required fields are present in `data`.
+        else:
+            for required_field in required_fields:
+                if required_field not in data or not data[required_field]:
+                    raise AnnotationException("Annotation() requires a %s field" % required_field)
 
+            # Check if this annotation already exists, based on the data
+            current = self.get_by_field(data["dataset"], data["item_id"], data["label"])
 
-        if dataset_key is not None and label is not None and dataset_key is not None:
-            current = self.db.fetchone("SELECT * FROM annotations WHERE key = %s", (self.key,))
-            if not current:
-                raise DataSetNotFoundException(
-                    "DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
+        # If we were able to retrieve an annotation from the db, it already exists
+        if current:
+            # Check if we have to overwrite old data with new data
+            if data:
+                for key, value in data.items():
+                    # Save unknown fields in metadata
+                    if key not in current:
+                        current["metadata"][key] = value
+                        new_or_updated = True
+                    # Else update the value
+                    elif current[key] != value:
+                        current[key] = value
+                        new_or_updated = True
 
+            self.data = current
 
-    def get_by_id(db, id):
+        # If this is a new annotation, set all the properties.
+        else:
+            # Keep track of when the annotation was made
+            created_timestamp = int(time.time())
+            # Store unknown properties in `metadata`
+            metadata = {k: v for k, v in data.items() if k not in self.__dict__}
+            print(self.__dict__)
+            print(metadata)
+            new_data = {
+                "item_id": data["item_id"],
+                "field_id": data["field_id"] if data.get("field_id") else self.get_field_id(data["dataset"], data["label"]),
+                "dataset": data["dataset"],
+                "timestamp_created": timestamp,
+                "label": data["label"],
+                "type": data.get("type", "text"),
+                "options": data.get("options", ""),
+                "value": data.get("value", ""),
+                "author": data.get("author", ""),
+                "by_processor": data.get("by_processor", False),
+                "metadata": metadata
+            }
+            self.data = new_data
+            new_or_updated = True
+
+        # Write to db if anything changed
+        if new_or_updated:
+            timestamp = int(time.time())
+            self.timestamp = timestamp
+            self.write_to_db()
+
+    def get_by_id(self, id):
         """
         Get annotation by ID
 
-        :param db:  Database connection object
         :param str name:  ID of annotation
         :return:  Annotation object, or `None` for invalid annotation ID
         """
-        data = db.fetchone("SELECT * FROM annotations WHERE id = %s", (id,))
-        if not annotation:
+
+        try:
+            int(id)
+        except ValueError:
+            raise AnnotationException("Id '%s' is not valid" % id)
+
+        return Annotation(id=id)
+
+    def get_by_field(self, dataset_key, item_id, label):
+        """
+        Get the annotation information via its dataset key, item ID, and label.
+        This is always a unique comibination.
+
+        :param dataset_key:     The key of the dataset this annotation was made for.
+        :param item_id:         The ID of the item this annotation was made for.
+        :param label:           The label of the annotation.
+
+        :return data: A dict with data of the retrieved annotation, or None if it doesn't exist.
+        """
+
+        data = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND label = %s",
+                         (dataset_key, item_id, label))
+        if not data:
             return None
-        else:
-            return Annotation.get_by_data(db, data)
 
-    def get_by_data(db, data):
+        data["metadata"] = json.loads(data["metadata"])
+        return data
+
+    def get_field_id(self, dataset_key, label):
         """
-        Instantiate annotation object with given data
+        Sets a `field_id` based on the dataset key and label.
+        This combination should be unique.
 
-        :param db:          Database handler
-        :param dict data:   Annotation data, should correspond to a database row
-        :return Annotation: Annotation object
+        :param dataset_key: The dataset key
+        :param label:       The label of the dataset.
         """
-        return Annotation(db, data)
+        field_id_base = "-".join([dataset_key, label])
+        field_id = int.from_bytes(field_id_base.encode(), "little")
+        self.field_id = field_id
+        return field_id
 
-    def set_id_by_data(self, item):
+    def write_to_db(self):
         """
-        Creates an ID based on the data of the item it has annotated.
-
-
+        Write an annotation to the database.
         """
-
-
-        return True
-
-    def save(self):
-        """
-        Save an annotation to the database.
-        """
-        return True
+        data = self.data
+        data["metadata"] = json.dumps(data["metadata"])
+        return self.db.upsert("annotations", data=data, constraints=["dataset", "label", "item_id"])
 
     @staticmethod
     def save_many(self, annotations, overwrite=True):
@@ -112,53 +195,8 @@ class Annotation:
         :returns int:					How many annotations were saved.
 
         """
-
-        field_keys = {}
-        annotations_to_delete = set()
-
-        # We're going to add the annotation metadata to the datasets table
-        # based on the annotations themselves.
-        annotation_fields = self.get_annotation_fields()
-        existing_annotations = self.get_annotations()
-        existing_labels = set(a["label"] for a in existing_annotations) if existing_annotations else []
-
-        timestamp = time.time()
-
         new_annotations = []
         for annotation in annotations:
-
-            # Do some validation; dataset key, post_id, label, and value need to be present.
-            missing_keys = []
-            for mandatory_key in mandatory_keys:
-                if mandatory_key not in annotation:
-                    missing_keys.append(mandatory_key)
-            if missing_keys:
-                raise AnnotationException("Couldn't add annotations; missing field(s) %s" % ",".join(missing_keys))
-
-            # Add dataset key
-            annotation["dataset"] = self.key
-
-            # Raise exception if this label is already present for this dataset
-            # and we're not overwriting
-            if not overwrite and annotation["label"] in existing_labels:
-                raise AnnotationException("Couldn't save annotations; label %s already present")
-
-            # If there's no type given, use 'text'
-            if not annotation.get("type"):
-                annotation["type"] = "text"
-
-            # If there's no timestamp given, set it to the current time.
-            if not "timestamp" in annotation:
-                annotation["timestamp"] = timestamp
-                annotation["timestamp_created"] = timestamp
-
-            # If not already given, create an ID for this annotation
-            # based on the label, type, and dataset key.
-            if "field_id" not in annotation:
-                field_id_base = "-".join(annotation["dataset"], annotation["label"], annotation.get("type", ""))
-                field_id = int.from_bytes(field_id_base.encode(), "little")
-                annotation["field_id"] = field_id
-
             # Add annotation metadata if it is not saved to the datasets table yet.
             # This is just a simple dict with a field ID, type, label, and possible options.
             if annotation["field_id"] not in annotation_fields:
@@ -213,7 +251,6 @@ class Annotation:
             where["field_id"] = field_id
 
         return self.db.delete("annotations", where)
-
 
     def __getattr__(self, attr):
         """
