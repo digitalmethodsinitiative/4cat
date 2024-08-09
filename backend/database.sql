@@ -70,9 +70,9 @@ CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("name" text_
 -- annotations
 CREATE TABLE IF NOT EXISTS annotations (
   id                SERIAL PRIMARY KEY,
-  item_id           TEXT,
-  field_id          TEXT,
   dataset           TEXT,
+  field_id          TEXT,
+  item_id           TEXT,
   timestamp         INT DEFAULT 0,
   timestamp_created INT DEFAULT 0,
   label             TEXT,

@@ -334,14 +334,10 @@ class DataSet(FourcatModule):
 		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
-		# Annotations and annotation fields are dynamically added to top-level dataset
-		# and we're handling as 'extra' map_item fields.
-		annotation_fields = None
-		annotations = None
-		if self.is_top_dataset():
-			annotation_fields = self.get_annotation_fields()	
-		if annotation_fields:
-			annotations = self.get_annotations()
+		# Annotations are dynamically added
+		# and we're handling them as 'extra' map_item fields.
+		has_annotations = self.has_annotations()
+		annotation_labels = self.get_annotation_field_labels()
 
 		# missing field strategy can be for all fields at once, or per field
 		# if it is per field, it is a dictionary with field names and their strategy
@@ -387,27 +383,30 @@ class DataSet(FourcatModule):
 				mapped_item = original_item
 
 			# Add possible annotations
-			if annotation_fields:
-				for annotation_field in annotation_fields.values():
+			if has_annotations:
+
+				# Get the annotation, if available.
+				post_annotations = self.get_annotations(item_ids=[mapped_item.data["id"]])
+
+				# We're always handling annotated data as a MappedItem object,
+				# even if no map_item() function is available for the data source.
+				if not isinstance(mapped_item, MappedItem):
+					mapped_item = MappedItem(mapped_item)
+
+				for annotation_label in annotation_labels:
 
 					annotation = ""
-					annotation_label = annotation_field["label"]
 
-					# Get the annotation, if available.
-					# We're always handling annotated data as a MappedItem object,
-					# even if no map_item() function is available for the data source.
-					if not isinstance(mapped_item, MappedItem):
-						mapped_item = MappedItem(mapped_item)
-					
-					if annotations and mapped_item.data.get("id", "") in annotations:
-						annotation = annotations[mapped_item.data["id"]].get(annotation_label, "")
-						if isinstance(annotation, list):
-							annotation = ",".join(annotation)
+					for post_annotation in post_annotations:
+						if post_annotation.label == annotation_label:
+							annotation = post_annotation.value
+							if isinstance(annotation, list):
+								annotation = ",".join(annotation)
 
 					# We're always adding an annotation value,
 					# as an empty string if it's absent.
 					mapped_item.data[annotation_label] = annotation
-						
+
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 
@@ -658,7 +657,7 @@ class DataSet(FourcatModule):
 
 		# owners that are owner by being part of a tag
 		owners.extend(itertools.chain(*[tagged_owners for tag, tagged_owners in self.tagged_owners.items() if
-									   role is None or self.owners[f"tag:{tag}"]["role"] == role]))
+										role is None or self.owners[f"tag:{tag}"]["role"] == role]))
 
 		# de-duplicate before returning
 		return set(owners)
@@ -1519,7 +1518,7 @@ class DataSet(FourcatModule):
 
 		if self.get_results_path().exists():
 			return True
-		
+
 		return False
 
 	def get_extension(self):
@@ -1545,7 +1544,7 @@ class DataSet(FourcatModule):
 		"""
 		filename = self.get_results_path().name
 		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
-						config.get("flask.server_name") + '/result/' + filename
+					  config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
 	def warn_unmappable_item(self, item_count, processor=None, error_message=None, warn_admins=True):
@@ -1572,31 +1571,40 @@ class DataSet(FourcatModule):
 				# No other log available
 				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
 
-	# Annotation features
-	def get_annotations(self):
-		"""
-		Retrieves the annotations for this dataset.
-		return list: All annotations, each in their own dictionary.
-		"""
-		annotations = self.db.fetchall("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
-
-		if not annotations:
-			annotations = None
-		else:
-			annotations = [Annotation(data=annotation, dataset=self) for annotation in annotations]
-
-		return annotations
-
-	def has_annotations(self):
+	# Annotation functions (most of it is handled in Annotations)
+	def has_annotations(self) -> bool:
 		""" 
-		Returns True if there's one or more annotations found
+		Whether this dataset has annotations
 		"""
 
 		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
 
 		return True if annotation else False
 
-	def has_annotation_fields(self):
+	def get_annotations(self, item_ids=[]) -> list:
+		"""
+		Retrieves the annotations for this dataset.
+
+		:param item_ids:	A list of item IDs to get the annotations from.
+							If empty, get all the annotations for this dataset.
+
+		return list: All annotations, each in their own dictionary.
+		"""
+
+		if item_ids:
+			annotations = self.db.fetchall("SELECT * FROM annotations "
+										   "WHERE dataset = %s AND item_id IN %s;", (self.key, tuple(item_ids)))
+		else:
+			annotations = self.db.fetchall("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+
+		if not annotations:
+			annotations = []
+		else:
+			annotations = [Annotation(data=annotation, db=self.db) for annotation in annotations]
+
+		return annotations
+
+	def has_annotation_fields(self) -> bool:
 		""" 
 		Returns True if there's annotation fields saved tot the dataset table
 		"""
@@ -1605,21 +1613,7 @@ class DataSet(FourcatModule):
 
 		return True if annotation_fields else False
 
-	def make_annotations(self, annotations):
-		"""
-		Generates a list of annotation objects from annotation JSON.
-		:param annotations: A list of dicts or JSON string with annotations 
-		"""
-		if not annotations:
-			return None
-		if isinstance(annotations, str):
-			annotaitons = json.loads(annotations)
-
-		annotations = [Annotation(annotation, self) for annotation in annotations]
-
-		return annotations
-
-	def get_annotation_fields(self):
+	def get_annotation_fields(self) -> dict:
 		"""
 		Retrieves the saved annotation fields for this dataset.
 		These are stored in the annotations table.
@@ -1632,11 +1626,128 @@ class DataSet(FourcatModule):
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
 		else:
-			annotation_fields = None
+			annotation_fields = {}
 
 		return annotation_fields
 
-	def save_annotation_fields(self, new_fields, add=False):
+	def get_annotation_field_labels(self) -> list:
+		"""
+		Retrieves the saved annotation field labels for this dataset.
+		These are stored in the annotations table.
+
+		:return list: List of annotation field labels.
+		"""
+
+		annotation_fields = self.get_annotation_fields()
+
+		if not annotation_fields:
+			return []
+
+		labels = [v["label"] for v in annotation_fields.values()]
+
+		return labels
+
+	def save_annotations(self, annotations: list, overwrite=True) -> int:
+		"""
+		Takes a list of annotations and saves them to the annotations table.
+		If a field is not yet present in the `annotation_fields` column in
+		the datasets table, it also adds it there.
+
+		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
+										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
+		:param bool overwrite:			Whether to overwrite annotation if the label is already present
+										for the dataset.
+
+		:returns int:					How many annotations were saved.
+
+		"""
+
+		if not annotations:
+			return 0
+
+		count = 0
+		annotation_fields = self.get_annotation_fields()
+		annotation_labels = self.get_annotation_field_labels()
+		known_field_ids = {} # Just so we don't have to hash every annotation without a field ID
+
+		# Add some dataset data to annotations, if not present
+		for annotation in annotations:
+
+			# Check if the required fields are present
+			if "item_id" not in annotation:
+				raise AnnotationException("Can't save annotations; annotation must have an `item_id` referencing "
+										  "the item they annotated, got %s" % annotation)
+			if "label" not in annotation or not isinstance(annotation["label"], str):
+				raise AnnotationException("Can't save annotations; annotation must have a `label` field, "
+										  "got %s" % annotation)
+			if not overwrite and annotation["label"] in annotation_labels:
+				raise AnnotationException("Can't save annotations; annotation field with label %s "
+										  "already exists" % annotation["label"])
+
+			# Set dataset key
+			if not annotation.get("dataset"):
+				annotation["dataset"] = self.key
+
+			# If not present, add an ID for this annotation field, based on the dataset key and label
+			if "field_id" not in annotation:
+				field_id_str = annotation["label"] + annotation["dataset"]
+				# Check if we hashed this before
+				if field_id_str in known_field_ids:
+					field_id = known_field_ids[field_id_str]
+				else:
+					field_id = hashlib.md5(field_id_str.encode("utf-8")).hexdigest()
+				annotation["field_id"] = field_id
+
+			# Set default author to this dataset owner
+			# If this annotation is made by a processor, it will have the processor name
+			if not annotation.get("author"):
+				annotation["author"] = self.get_owners()[0]
+
+			# Add data on the type of annotation field, if it is not saved to the datasets table yet.
+			# For now this is just a simple dict with a field ID, type, label, and possible options.
+			if not annotation_fields or annotation["field_id"] not in annotation_fields:
+				annotation_fields[annotation["field_id"]] = {
+					"label": annotation["label"],
+					"type": annotation.get("type", "text") # Default to text
+				}
+				if "options" in annotation:
+					annotation_fields[annotation["field_id"]]["options"] = annotation["options"]
+
+			# Create Annotation object, which also saves it to the database
+			Annotation(data=annotation, db=self.db)
+			count += 1
+
+		# Save annotation fields if things changed
+		if annotation_fields != self.get_annotation_fields():
+			self.save_annotation_fields(annotation_fields)
+
+		return count
+
+	def delete_annotations(self, dataset_key=None, id=None, field_id=None):
+		"""
+		Deletes all annotations for an entire dataset or by a list of (field) IDs.
+
+		:param str dataset_key: A dataset key.
+		:param li id:			A list or string of unique annotation IDs.
+		:param li field_id:		A list or string of IDs for annotation fields.
+
+		:return int: The number of removed records.
+	   """
+
+		if not dataset_key and not id and not field_id:
+			return 0
+
+		where = {}
+		if dataset_key:
+			where["dataset"] = dataset_key
+		if id:
+			where["id"] = id
+		if field_id:
+			where["field_id"] = field_id
+
+		return self.db.delete("annotations", where)
+
+	def save_annotation_fields(self, new_fields: dict, add=False) -> int:
 		"""
 		Save annotation field data to the datasets table (in the `annotation_fields` column).
 		If changes to the annotation fields affect existing annotations,
@@ -1645,7 +1756,7 @@ class DataSet(FourcatModule):
 		:param dict new_fields:  		New annotation fields, with a field ID as key.
 
 		:param bool add:				Whether we're merely adding new fields
-										or replacing the whole batch. If add is false,
+										or replacing the whole batch. If add is False,
 										`new_fields` should contain all fields.
 
 		:return int:					The number of annotation fields saved.
@@ -1667,9 +1778,9 @@ class DataSet(FourcatModule):
 		for field_id, annotation_field in new_fields.items():
 			if not isinstance(field_id, str):
 				raise AnnotationException("Can't save annotation fields: field ID %s is not a valid string" % field_id)
-			if not "label" in annotation_field:
+			if "label" not in annotation_field:
 				raise AnnotationException("Can't save annotation fields: all fields must have a label" % field_id)
-			if not "type" in annotation_field:
+			if "type" not in annotation_field:
 				raise AnnotationException("Can't save annotation fields: all fields must have a type" % field_id)
 
 			# Keep track of whether existing fields have changed; if so, we're going to
@@ -1678,7 +1789,7 @@ class DataSet(FourcatModule):
 				if old_fields[field_id] != annotation_field:
 					changes = True
 
-		# If we're just adding fields, add them to the old fields
+		# If we're just adding fields, add them to the old fields.
 		# If the field already exists, overwrite the old field.
 		if add and old_fields:
 			all_fields = old_fields
@@ -1690,187 +1801,12 @@ class DataSet(FourcatModule):
 		# Ordering of fields is preserved this way.
 		self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
 
-		# If we're adding but the field already exists, update/delete annotations with that ID.
-		add_and_overlap = add and any([True for k in list(new_fields.keys()) if k in old_fields])
-
-		if changes or add_and_overlap:
-			self.update_annotations_via_fields(old_fields, new_fields)
+		# If anything changed with the annotation fields, possibly update
+		# existing annotations (e.g. to delete them or change their labels).
+		if changes:
+			Annotation.update_annotations_via_fields(self.key, old_fields, new_fields, self.db)
 
 		return len(new_fields)
-
-	def update_annotations_via_fields(self, old_fields, new_fields):
-		"""
-		Updates annotations in the annotations table if the input field
-		itself has been changed, for instance if a dropdown label is renamed.
-	
-		:param di old_fields:	Old annotation fields
-		:param di new_fields:	New annotation fields; this should contain not just
-								additions, but all fields, changed or otherwise.
-		
-		"""
-
-		text_fields = ["textarea", "text"]
-		
-		# If old and new fields are identical, do nothing.
-		if old_fields == new_fields:
-			return
-
-		# Only update annotations if they, in fact, exist.
-		annotations = self.get_annotations()
-		if not annotations:
-			return
-
-		fields_to_delete = set()	# Delete all annotations with this field ID
-		fields_to_update = {} 		# Update values of annotations with this field ID
-
-		# Loop through the old annotation fields
-		for old_field_id, old_field in old_fields.items():
-
-			# Delete all annotations of this type if the field is deleted.
-			if old_field_id not in new_fields:
-				fields_to_delete.add(old_field_id)
-				continue
-
-			field_id = old_field_id
-			new_field = new_fields[field_id]
-
-			# If the annotation type has changed, also delete existing annotations,
-			# except between text and textarea, where we can just change the type and keep the text.
-			if old_field["type"] != new_field["type"]:
-				if not old_field["type"] in text_fields and not new_field["type"] in text_fields:
-					fields_to_delete.add(field_id)
-					continue
-
-			# Loop through all the key/values in the new field data
-			# and update in case it's different from the old values.
-			update_data = {}
-			for field_key, field_value in new_field.items():
-
-				# Update if values don't match
-				if field_value != old_field.get(field_key):
-
-					# Special case: option values that are removed/renamed.
-					# Here we only have to change specific values within the 
-					# values column.
-					if field_key == "options":
-
-						new_options = field_value
-						# Delete annotations of this type if all option fields are deleted
-						# (even though this should not be possible in the Explorer front-end)
-						if not new_options:
-							fields_to_delete.add(field_id)
-							continue
-
-						old_options = old_field["options"]
-						
-						options_to_update = {}
-
-						# Options are saved in a dict with IDs and labels as keys/values.
-						for old_option_id, old_option in old_options.items():
-							# Renamed option label
-							if old_option_id in new_options and old_option != new_options[old_option_id]:
-								options_to_update[old_option] = new_options[old_option_id] # Old label -> new label
-							# Deleted option
-							elif old_option_id not in new_options:
-								options_to_update[old_option] = None # Remove None labels
-
-						if options_to_update:
-							update_data[field_key] = {}
-							update_data[field_key]["options"] = options_to_update
-
-					# For all other changes, just overwrite with new data.
-					else:
-						update_data[field_key] = field_value
-
-			if update_data:
-				fields_to_update[field_id] = update_data
-
-		# Delete annotations
-		if fields_to_delete:
-			self.delete_annotations(field_id=list(fields_to_delete))
-
-		# Change annotations based on changes in update fields
-		if fields_to_update:
-			new_annotations = []
-			for annotation in annotations:
-				if annotation.field_id in fields_to_update:
-					for k, update_field in fields_to_update[annotation["field_id"]]:
-
-						# Special case: Changed options
-						if k == "options":
-							new_values = []
-							for inserted_option in annotations["value"].split(","):
-								if inserted_option in update_field:
-									if update_field[inserted_option] == None:
-										# Don't add
-										continue
-									elif inserted_option in update_field:
-										# Replace with new value
-										new_values.append(update_field[inserted_option])
-									else:
-										# Keep old value
-										new_values.append(inserted_option)
-
-							update_field = new_values
-
-						annotation[k] = update_field
-
-				new_annotations.append(annotation)
-
-			# Save updated annotations
-			self.save_annotations(new_annotations)
-
-	def save_annotations(self, annotations, overwrite=True):
-		"""
-		Takes a list of annotations and saves them to the annotations table.
-		If a field is not yet present in the datasets table, it also adds it there.
-
-		:param list annotations:		List of dictionaries with annotation items.
-		:param bool overwrite:			Whether to overwrite annotation if the label is already present
-										for the dataset.
-
-		:returns int:					How many annotations were saved.
-
-		"""
-
-		if not annotations:
-			return 0
-
-		# Add some dataset data to annotations, if not present
-		for annotation in annotations:
-			# Set dataset key
-			if not annotation.get("dataset"):
-				annotation["dataset"] = self.key
-			# Set default author to this dataset owner
-			if not annotation.get("author"):
-				annotation["author"] = self.get_owners()[0]
-
-			# Create Annotation object, which saves it to the database
-			Annotation(data=annotation, db=self.db)
-
-	def delete_annotations(self, dataset_key=None, id=None, field_id=None):
-		"""
-		Deletes all annotations for an entire dataset or by a list of (field) IDs.
-
-		:param str dataset_key: A dataset key.
-		:param li id:			A list or string of unique annotation IDs.
-		:param li field_id:		A list or string of IDs for annotation fields.
-
-		:return int: The number of removed records.
-		"""
-
-		if not dataset_key and not id and not field_id:
-			return 0
-
-		where = {}
-		if dataset_key:
-			where["dataset"] = dataset_key
-		if id:
-			where["id"] = id
-		if field_id:
-			where["field_id"] = field_id
-
-		return self.db.delete("annotations", where)
 
 	def __getattr__(self, attr):
 		"""

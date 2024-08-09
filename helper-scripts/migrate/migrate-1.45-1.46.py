@@ -37,8 +37,8 @@ for dataset in datasets:
     for field_id, annotation_field in annotation_fields.items():
 
         if "options" in annotation_field:
-
             flattened_options = {}
+
             if isinstance(annotation_field["options"], list):
                 for op in annotation_field["options"]:
                     flattened_options.update(op)
@@ -55,9 +55,9 @@ print("    Creating new annotations table...")
 db.execute("""
 CREATE TABLE IF NOT EXISTS annotations_new (
   id                SERIAL PRIMARY KEY,
-  field_id          SERIAL,
-  post_id           TEXT,
   dataset           TEXT,
+  field_id          SERIAL,
+  item_id           TEXT,
   timestamp         INT DEFAULT 0,
   timestamp_created INT DEFAULT 0,
   label             TEXT,
@@ -80,7 +80,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
   ON annotations_new (
     label,
     dataset,
-    post_id
+    item_id
 );
 CREATE INDEX IF NOT EXISTS annotation_value
   ON annotations_new (
@@ -104,7 +104,7 @@ else:
     count = 0
     skipped_count = 0
 
-    columns = "post_id,field_id,dataset,timestamp,timestamp_created,label,type,options,value,author,by_processor,metadata"
+    columns = "dataset,field_id,item_id,timestamp,timestamp_created,label,type,options,value,author,by_processor,metadata"
 
     # Each row are **all** annotations per dataset
     for row in annotations:

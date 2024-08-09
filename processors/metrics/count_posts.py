@@ -3,7 +3,6 @@ Collapse post bodies into one long string
 """
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
-from common.lib.annotation import Annotation
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
@@ -60,7 +59,7 @@ class CountPosts(BasicProcessor):
 
 			for post in self.source_dataset.iterate_items(self):
 
-				annotation = Annotation(value="test", label="count_posts_test", dataset=self.source_dataset)
+				annotation = {"value": "test", "item_id": post["id"]}
 				annotations.append(annotation)
 
 				try:
@@ -153,6 +152,7 @@ class CountPosts(BasicProcessor):
 					row["value_relative"] = intervals[interval]["relative"]
 				rows.append(row)
 
+		self.write_annotations(annotations)
 		self.write_csv_items_and_finish(rows)
 
 	@classmethod
