@@ -110,7 +110,6 @@ else:
     for row in annotations:
 
         dataset = db.fetchone("SELECT * FROM datasets WHERE key = '" + row["dataset"] + "';")
-        
         # If the dataset is not present anymore,
         # we're going to skip these annotations;
         # likely the dataset is expired.
@@ -119,7 +118,11 @@ else:
             skipped_count += 1
             continue
 
-        annotation_fields = json.loads(dataset["annotation_fields"])
+        annotation_fields = dataset["annotation_fields"]
+        if annotation_fields:
+            annotation_fields = json.loads(dataset.get("annotation_fields"))
+        else: annotation_fields = {}
+
         author = dataset.get("creator", "")
 
         if not row.get("annotations"):
