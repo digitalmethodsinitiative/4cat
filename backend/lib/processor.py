@@ -3,6 +3,7 @@ Basic post-processor worker - should be inherited by workers to post-process res
 """
 import re
 import traceback
+import hashlib
 import zipfile
 import typing
 import shutil
@@ -738,13 +739,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not source_dataset:
 			source_dataset = self.source_dataset
 
+		# Create a field ID based on the
+
 		# Check if this dataset already has annotation fields
+		field_id = ""
 		existing_labels = source_dataset.get_annotation_field_labels()
 
 		# Set some values
 		for annotation in annotations:
 
-			# Set the default author and label to this processor's name
+			# Set the default label to this processor's name
 			if not annotation.get("label"):
 				# If the processor has already generated annotation fields,
 				# add a number to differentiate the label
@@ -752,6 +756,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				if not overwrite and label in existing_labels:
 					label += "-" + str(len([l for l in existing_labels if l.startswith(label)]))
 				annotation["label"] = label
+
+			# Set the author to this processor's name
 			if not annotation.get("author"):
 				annotation["author"] = self.name
 
@@ -761,6 +767,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			if not annotation.get("metadata"):
 				annotation["metadata"] = {}
 			annotation["metadata"]["processor-parameters"] = self.parameters
+
+			if not annotation.get("field_id"):
+				if not field_id:
+					field_id = source_dataset.key + annotation["label"]
+					field_id = hashlib.md5(field_id.encode("utf-8")).hexdigest()
+				annotation["field_id"] = field_id
 
 		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
 		return annotations_saved

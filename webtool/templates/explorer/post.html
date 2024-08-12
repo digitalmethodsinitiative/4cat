@@ -1,8 +1,5 @@
 <li id="post-{{ post.id }}" class="post{% if post.thread_id == post.id %} op{% endif %}">    
 
-	<!-- Don't show certain data if the dataset is pseudonymised -->
-	{% set pseudonymised = True if dataset.parameters and dataset.parameters.get('pseudonymise', False) %}
-	
 	<!-- Data sources may have a custom template (Jinja2) -->
 	{% if template == "datasource" %}
 		{% include "explorer/datasource-templates/" + datasource + ".html" %}

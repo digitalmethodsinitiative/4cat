@@ -89,6 +89,9 @@ def explorer_dataset(key, page=1):
 	posts = []
 	count = 0
 
+	# Load annotations with post IDs as keys and their annotations as lists.
+	annotations = {}
+
 	# We don't need to sort if we're showing the existing dataset order (the default).
 	# If we're sorting, we need to iterate over the entire dataset first.
 	if not sort or (sort == "dataset-order" and reverse == False):
@@ -120,6 +123,12 @@ def explorer_dataset(key, page=1):
 	if not posts:
 		return error(404, error="No posts or posts could not be displayed")
 
+	# Check whether there's already annotations made.
+	# If so, also pass these to the template and set the post ID
+	# as key so we can easily retrieve them.
+	for post_id in post_ids:
+		annotations[post_id] = dataset.get_annotations(item_id=post_id)
+
 	# We can use either a generic or a pre-made data source-specific template.
 	template = "datasource" if has_datasource_template(datasource) else "generic"
 	if template == "generic":
@@ -130,10 +139,6 @@ def explorer_dataset(key, page=1):
 	with open(posts_css, "r", encoding="utf-8") as css:
 		posts_css = css.read()
 
-	# Check whether there's already annotations inserted already.
-	# If so, also pass these to the template.
-	annotations = dataset.get_annotations()
-	
 	# Generate the HTML page
 	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, template=template, posts_css=posts_css, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
 

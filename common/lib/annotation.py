@@ -109,7 +109,7 @@ class Annotation:
             new_data = {
                 "dataset": data["dataset"],
                 "item_id": data["item_id"],
-                "field_id": data["field_id"] if data.get("field_id") else self.get_field_id(data["dataset"], data["label"]),
+                "field_id": data["field_id"] if data.get("field_id") else self.set_field_id(data["dataset"], data["label"]),
                 "timestamp": 0,
                 "timestamp_created": created_timestamp,
                 "label": data["label"],
@@ -161,14 +161,14 @@ class Annotation:
         """
 
         data = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND label = %s",
-                         (dataset_key, item_id, label))
+                         (dataset_key, str(item_id), label))
         if not data:
             return {}
 
         data["metadata"] = json.loads(data["metadata"])
         return data
 
-    def get_field_id(self, dataset_key: str, label: str) -> str:
+    def set_field_id(self, dataset_key: str, label: str) -> str:
         """
         Sets a `field_id` based on the dataset key and label.
         This combination should be unique.
@@ -176,9 +176,11 @@ class Annotation:
         :param dataset_key: The dataset key
         :param label:       The label of the dataset.
         """
-        field_id = hashlib.md5(dataset_key + label.encode("utf-8")).hexdigest()
+
+        field_id = source_dataset.key + annotation["label"]
+        field_id = hashlib.md5(field_id.encode("utf-8")).hexdigest()
         self.field_id = field_id
-        return field_id
+        return self.field_id
 
     def write_to_db(self):
         """

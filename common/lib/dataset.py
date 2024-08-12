@@ -1592,8 +1592,9 @@ class DataSet(FourcatModule):
 
 		annotations = []
 		if item_id:
-			if isinstance(item_id, str):
+			if isinstance(item_id, str) or isinstance(item_id, int):
 				item_id = [item_id]
+			item_id = [str(i) for i in item_id]
 			ids = self.db.fetchall("SELECT id FROM annotations WHERE dataset = %s AND item_id IN %s;",
 								   (self.key, tuple(item_id)))
 		else:

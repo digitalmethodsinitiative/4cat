@@ -26,6 +26,8 @@ for (a in annotation_fields) {
 
 </script>
 
+<!-- Don't show certain data if the dataset is pseudonymised -->
+{% set pseudonymised = True if dataset.parameters and dataset.parameters.get('pseudonymise', False) %}
 
 {% set key = dataset.data.key %}
 
