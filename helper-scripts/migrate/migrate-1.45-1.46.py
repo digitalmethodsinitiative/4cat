@@ -56,7 +56,7 @@ db.execute("""
 CREATE TABLE IF NOT EXISTS annotations_new (
   id                SERIAL PRIMARY KEY,
   dataset           TEXT,
-  field_id          SERIAL,
+  field_id          TEXT,
   item_id           TEXT,
   timestamp         INT DEFAULT 0,
   timestamp_created INT DEFAULT 0,
@@ -104,7 +104,7 @@ else:
     count = 0
     skipped_count = 0
 
-    columns = "dataset,field_id,item_id,timestamp,timestamp_created,label,type,options,value,author,by_processor,metadata"
+    columns = "id,dataset,field_id,item_id,timestamp,timestamp_created,label,type,options,value,author,by_processor,metadata"
 
     # Each row are **all** annotations per dataset
     for row in annotations:
@@ -156,9 +156,9 @@ else:
                     value = ",".join(value)
 
                 inserts = [(
-                    str(post_id),           # post_id; needs to be a string, changes per data source.
+                    row["dataset"],         # dataset
                     int(field_id),          # field_id; this is an ID for the same type of input field.
-                    row["dataset"],             # dataset
+                    str(post_id),           # post_id; needs to be a string, changes per data source.
                     dataset["timestamp"],   # timestamp
                     dataset["timestamp"],   # timestamp_created
                     label,                  # label
