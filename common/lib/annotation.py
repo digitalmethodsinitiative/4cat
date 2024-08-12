@@ -23,6 +23,7 @@ class Annotation:
     data = None
     db = None
 
+
     id = None                 # Unique ID for this annotation
     item_id = None            # ID of the item for this annotation, e.g. post ID
     field_id = None           # If of this type of annotation field for this dataset
@@ -30,6 +31,7 @@ class Annotation:
     timestamp = None          # When this annotation was edited
     timestamp_created = None  # When this timestamp was created
     label = None              # Label of annotation
+    type = None               # Type of annotation (e.g. `text`)
     options = None            # Possible options
     value = None              # The actual annotation value
     author = None             # Who made the annotation
@@ -64,7 +66,7 @@ class Annotation:
         # an ID, it is guaranteed to be in the database.
         # IDs can both be explicitly given or present in the data dict.
         if id is not None or "id" in data:
-            if "id" in data:
+            if data and "id" in data:
                 id = data["id"]
             self.id = id # IDs correspond to unique serial numbers in the database.
             current = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % (self.id))
@@ -105,9 +107,9 @@ class Annotation:
             created_timestamp = int(time.time())
 
             new_data = {
+                "dataset": data["dataset"],
                 "item_id": data["item_id"],
                 "field_id": data["field_id"] if data.get("field_id") else self.get_field_id(data["dataset"], data["label"]),
-                "dataset": data["dataset"],
                 "timestamp": 0,
                 "timestamp_created": created_timestamp,
                 "label": data["label"],
@@ -122,17 +124,20 @@ class Annotation:
             self.data = new_data
             new_or_updated = True
 
+        for k, v in self.data.items():
+            self.__setattr__(k, v)
+
         # Write to db if anything changed
         if new_or_updated:
-            self.data["timestamp"] = int(time.time())
-            print(self.data)
+            self.timestamp = int(time.time())
             self.write_to_db()
 
-    def get_by_id(self, id: int):
+    def get_by_id(id: int, db):
         """
         Get annotation by ID
 
         :param str id:  ID of annotation
+        :param db:      Database connection object
         :return:  Annotation object, or `None` for invalid annotation ID
         """
 
@@ -141,7 +146,7 @@ class Annotation:
         except ValueError:
             raise AnnotationException("Id '%s' is not valid" % id)
 
-        return Annotation(id=id)
+        return Annotation(id=id, db=db)
 
     def get_by_field(self, dataset_key: str, item_id: str, label: str) -> dict:
         """
@@ -386,9 +391,9 @@ class Annotation:
             return
 
         if attr not in self.data:
-            self.parameters[attr] = value
+            self.metadata[attr] = value
             attr = "metadata"
-            value = self.parameters
+            value = self.metadata
 
         if attr == "metadata":
             value = json.dumps(value)
@@ -398,4 +403,4 @@ class Annotation:
         self.data[attr] = value
 
         if attr == "metadata":
-            self.parameters = json.loads(value)
+            self.metadata = json.loads(value)

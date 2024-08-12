@@ -385,8 +385,8 @@ class DataSet(FourcatModule):
 			# Add possible annotations
 			if has_annotations:
 
-				# Get the annotation, if available.
-				post_annotations = self.get_annotations(item_ids=[mapped_item.data["id"]])
+				# Get annotations for this specific post
+				post_annotations = self.get_annotations(item_id=mapped_item.data["id"])
 
 				# We're always handling annotated data as a MappedItem object,
 				# even if no map_item() function is available for the data source.
@@ -394,18 +394,16 @@ class DataSet(FourcatModule):
 					mapped_item = MappedItem(mapped_item)
 
 				for annotation_label in annotation_labels:
-
-					annotation = ""
-
+					value = ""
 					for post_annotation in post_annotations:
 						if post_annotation.label == annotation_label:
-							annotation = post_annotation.value
-							if isinstance(annotation, list):
-								annotation = ",".join(annotation)
+							value = post_annotation.value
+							if isinstance(value, list):
+								value = ",".join(value)
 
-					# We're always adding an annotation value,
-					# as an empty string if it's absent.
-					mapped_item.data[annotation_label] = annotation
+					# We're always adding an annotation value
+					# as an empty string, even if it's absent.
+					mapped_item.data[annotation_label] = value
 
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
@@ -1581,26 +1579,33 @@ class DataSet(FourcatModule):
 
 		return True if annotation else False
 
-	def get_annotations(self, item_ids=[]) -> list:
+	def get_annotations(self, item_id=[]) -> list:
 		"""
 		Retrieves the annotations for this dataset.
 
-		:param item_ids:	A list of item IDs to get the annotations from.
-							If empty, get all the annotations for this dataset.
+		:param item_id:	A list of item IDs to get the annotations from.
+						If empty, get all the annotations for this dataset.
+						May also be a string to get annotations from a specific item.
 
 		return list: All annotations, each in their own dictionary.
 		"""
 
-		if item_ids:
-			annotations = self.db.fetchall("SELECT * FROM annotations "
-										   "WHERE dataset = %s AND item_id IN %s;", (self.key, tuple(item_ids)))
+		annotations = []
+		if item_id:
+			if isinstance(item_id, str):
+				item_id = [item_id]
+			ids = self.db.fetchall("SELECT id FROM annotations WHERE dataset = %s AND item_id IN %s;",
+								   (self.key, tuple(item_id)))
 		else:
-			annotations = self.db.fetchall("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+			ids = self.db.fetchall("SELECT id FROM annotations WHERE dataset = %s;", (self.key,))
 
-		if not annotations:
-			annotations = []
-		else:
-			annotations = [Annotation(data=annotation, db=self.db) for annotation in annotations]
+		if not ids:
+			return []
+
+		ids = [i["id"] for i in ids]
+
+		for id in ids:
+			annotations.append(Annotation.get_by_id(id, self.db))
 
 		return annotations
 
