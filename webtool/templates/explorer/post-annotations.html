@@ -10,17 +10,17 @@
             {% set type = annotation_fields[field]["type"] %}
 			{% set label = annotation_fields[field]["label"] %}
 
-            {% set annotation = {} %}
+            {# Loop through annotations for this post and
+            retrieve the data from the one matching this annotation field #}
+            {% set an = namespace(an={}) %}
 			{% for post_annotation in post_annotations %}
-                {{ field }}
 				{% if post_annotation.field_id == field %}
-                    {% set annotation = post_annotation %}
-                    {{ annotation }}
+                    {% set an.an = post_annotation %}
     			{% endif %}
             {% endfor %}
-            {{ annotation }}
-
-			<div class="post-annotation field-{{ field }} {{ type }}"><label class="annotation-label">{{ label }}</label>
+            {% set annotation = an.an %}
+			<div class="post-annotation field-{{ field }} type-{{ type }} item-id-{{ post.id }}">
+                <label class="annotation-label">{{ label }}</label>
 			{% if type == 'text' %}
 				<input type="text" class="post-annotation-input text-{{ field }}" value="{{ annotation.value }}">
 
@@ -34,7 +34,7 @@
 				{% for option in annotation_fields[field]["options"] %}
 					{% set option_id = option.keys() | first %}
 					{% set option_label = option.values() | first %}
-					<option class="post-annotation-input option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == annotation %}selected{% endif %}>{{ option_label }}</option>
+					<option class="post-annotation-input option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == annotation.value %}selected{% endif %}>{{ option_label }}</option>
 				{% endfor %}
 				</select>
 
@@ -50,6 +50,24 @@
 				</div>
 			{% endif %}
 
+            {# Tooltip with metadata on the annotation #}
+            {% if annotation.author or annotation.timestamp or annotation.metadata %}
+                <button class="tooltip-trigger" aria-controls="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}">?</button>
+                <p role="tooltip" id="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}" aria-hidden="true">
+                {% if annotation.author or annotation.timestamp %}
+                    Last edited by{% if annotation.by_processor %} processor{% endif %} {% if annotation.author %}<strong>{{ annotation.author }}</strong>{% endif %}{% if annotation.timestamp %} on {{ annotation.timestamp |  datetime(fmt="%d %B, %H:%M", wrap=False) }}{% endif %}
+                {% endif %}
+                {# Extra stuff we may want to display #}
+                {% if annotation.metadata %}
+                    {% set metadata = annotation.metadata | fromjson %}
+                    {% if metadata.get("processor-parameters") %}
+                        {% for parameter in metadata["processor-parameters"] %}
+                            <span class="property-badge"><i class="fa fa-check" aria-hidden="true"></i> {{ parameter }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </p>
+                {% endif %}
+            {% endif %}
 			</div>
 		{% endfor %}
 	{% endif %}

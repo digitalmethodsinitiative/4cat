@@ -86,6 +86,9 @@ class Annotation:
 
         # If we were able to retrieve an annotation from the db, it already exists
         if current:
+
+            #current["metadata"] = json.loads(current["metadata"])
+
             # Check if we have to overwrite old data with new data
             if data:
                 for key, value in data.items():
@@ -110,7 +113,7 @@ class Annotation:
                 "dataset": data["dataset"],
                 "item_id": data["item_id"],
                 "field_id": data["field_id"] if data.get("field_id") else self.set_field_id(data["dataset"], data["label"]),
-                "timestamp": 0,
+                "timestamp": created_timestamp,
                 "timestamp_created": created_timestamp,
                 "label": data["label"],
                 "type": data.get("type", "text"),
@@ -124,7 +127,22 @@ class Annotation:
             self.data = new_data
             new_or_updated = True
 
+        if isinstance(self.data["metadata"], str):
+            try:
+                self.metadata = json.loads(self.data["metadata"])
+            except (TypeError, json.JSONDecodeError):
+                self.metadata = {}
+
         for k, v in self.data.items():
+            # Some type checking
+            try:
+                if k == "timestamp" or k == "timestamp_created":
+                    v = int(v)
+                elif k == "by_processor":
+                    v = bool(v)
+            except ValueError as e:
+                raise AnnotationException("Annotation fields are not of the right type (%s)" % e)
+
             self.__setattr__(k, v)
 
         # Write to db if anything changed
@@ -400,9 +418,9 @@ class Annotation:
         if attr == "metadata":
             value = json.dumps(value)
 
+        self.timestamp = int(time.time())
         self.db.update("annotations", where={"id": self.id}, data={attr: value})
 
         self.data[attr] = value
-
         if attr == "metadata":
             self.metadata = json.loads(value)

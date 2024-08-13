@@ -317,7 +317,7 @@ const annotations = {
 		return annotation_fields;
 	},
 
-	parseAnnotation: function(e) {
+	parseAnnotation: function(el) {
 		/*
 		Converts the DOM objects of an annotation field
 		to an annotation Object.
@@ -326,34 +326,35 @@ const annotations = {
 
 		*/
 
-		annotation = {}
+		let ann = $(el)
+		let field_id = ann.attr("class").split(" ")[1].replace("field-", "");
+		let annotation_type = ann.attr("class").split(" ")[2].replace("type-", "");
+		let item_id = ann.attr("class").split(" ")[3].replace("item-id-", "");
+		let author = "Jan"
+		let label = ann.find(".annotation-label").text();
 
-		let label = $(this).find(".annotation-label").text();
-		let annotation_type = $(this).attr("class").split(" ").pop();
 		let val = undefined;
 		let edited = false
-		let timestamp = Date.now() / 100
 
 		if (annotation_type === "text" || annotation_type === "textarea") {
-			val = $(this).find(".post-annotation-input").val();
+			val = ann.find(".post-annotation-input").val();
 			// It can be the case that the input text is deleted
 			// In this case we *do* want to push new data, so we check
 			// whether there's an 'edited' class present and save if so.
-			if ($(this).find(".post-annotation-input").hasClass("edited")) {
+			if (ann.find(".post-annotation-input").hasClass("edited")) {
 				edited = true
 			}
 		}
 		else if (annotation_type === "dropdown") {
-			let selected = $(this).find(".post-annotation-options").val();
-			val = selected;
+			val = ann.find(".post-annotation-options").val();
 		}
 		else if (annotation_type === "checkbox") {
 			val = [];
-			$(this).find(".post-annotation-options > input").each(function(){
-				if ($(this).is(":checked")) {
-					val.push($(this).val());
+			ann.find(".post-annotation-options > input").each(function(){
+				if (ann.is(":checked")) {
+					val.push(ann.val());
 				}
-				if ($(this).hasClass("edited")) {
+				if (ann.hasClass("edited")) {
 					edited = true
 				}
 			});
@@ -361,27 +362,27 @@ const annotations = {
 				val = undefined;
 			}
 		}
-		if ((val !== undefined && val !== "") || edited) {
+		/*if ((val !== undefined && val !== "") || edited) {
 			vals_changed = true;
 			val = "";
-		}
+			console.log("EDITED")
+		}*/
 
+		/*if (vals_changed){
+			annotation[post_id] = post_vals;
+		}
+*/
 		// Create an annotation object and add them to the array.
 		let annotation = {
-			"field_id": "",
-			"post_id": post_id,
-			"dataset": "",
-			"timestamp": timestamp,
-			"timestamp_created": "",
+			"field_id": field_id,
+			"item_id": item_id,
 			"label": label,
 			"type": annotation_type,
-			"options": "",
-			"value": "",
-			"author": "",
-			"by_processor": "",
-			"metadata": ""
+			"value": val,
+			"author": author,
+			"by_processor": false // Explorer annotations are human-made!
 		}
-
+		console.log(annotation)
 		return annotation
 	},
 
@@ -494,7 +495,7 @@ const annotations = {
 
 					// For dropdowns and checkboxes, we're checking whether we 
 					// have to add or change any of their options.
-					else if (input_type == "checkbox" || input_type == "dropdown"){
+					else if (input_type === "checkbox" || input_type === "dropdown"){
 
 						let options = annotation_fields[field].options;
 						let valid_options = [];
@@ -521,10 +522,10 @@ const annotations = {
 										let post_id = $(this).parents("li").attr("id").split("post-")[1];
 										post_option_id = post_id + "-" + option_id;
 
-										if (input_type == "dropdown") {
+										if (input_type === "dropdown") {
 											$(this).append("<option class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "'>" + new_label + "</option>");
 										}
-										else if (input_type == "checkbox") {
+										else if (input_type === "checkbox") {
 											$(this).append("<input class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "' type='checkbox'><label for='option-" + post_option_id + "'>" + new_label + "</label>");
 										}
 									});
@@ -577,15 +578,15 @@ const annotations = {
 				el = "<div class='post-annotation " + input_id + " " + input_type + "'><label class='annotation-label' for='" + add_field + "{POST_ID}'>" + input_label + "</label>";
 
 				// Add a text input for text fields
-				if (input_type == "text") {
+				if (input_type === "text") {
 					el += "<input type='text' class='post-annotation-input text-" + add_field + "'>";
 				}
-				else if (input_type == "textarea") {
+				else if (input_type === "textarea") {
 					el += "<textarea class='post-annotation-input textarea-" + add_field + "'></textarea>";
 				}
 
 				// Add a dropdown for dropdown fields
-				else if (input_type == "dropdown") {
+				else if (input_type === "dropdown") {
 
 					el += "<select class='post-annotation-options select-" + add_field + "' id='options-" + add_field + "-{POST_ID}'>";
 					
@@ -605,7 +606,7 @@ const annotations = {
 				}
 
 				// Add checkboxes for checkbox fields
-				else if (input_type == "checkbox") {
+				else if (input_type === "checkbox") {
 
 					el += "<div class='post-annotation-options checkboxes-" + add_field + "'>";
 					let options = fields_to_add[add_field].options;
@@ -701,12 +702,11 @@ const annotations = {
 
 		// First we're going to collect the data for this page.
 		// Loop through each post's annotation fields.
-		var anns = [];
-		var dataset_key = $("#dataset-key").text();
+		let anns = [];
+		let dataset_key = $("#dataset-key").text();
 
 		$(".posts > li").each(function(){
 
-			let post_id = this.id.replace("post-", "");
 			let vals_changed = false;
 			let post_annotations = $(this).find(".post-annotations");
 
@@ -715,17 +715,12 @@ const annotations = {
 				post_annotations.find(".post-annotation").each(function(){
 					
 					// Extract annotation object from the element
-					let annotation = parseAnnotation(this);
+					let annotation = annotations.parseAnnotation(this);
 
 					if (annotation) {
-						annotations.push(annotation);
+						anns.push(annotation);
 					}
 				});
-
-				if (vals_changed){
-					annotation[post_id] = post_vals;
-				}
-
 			}
 		})
 		
@@ -741,7 +736,7 @@ const annotations = {
 
 			success: function (response) {
 
-				if (response == 'success') {
+				if (response === 'success') {
 					code = response
 
 					annotations.enableSaving();

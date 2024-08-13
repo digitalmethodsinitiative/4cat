@@ -1591,13 +1591,17 @@ class DataSet(FourcatModule):
 		"""
 
 		annotations = []
+
+		# Get annotation IDs first
 		if item_id:
+			# Get specific annotations if IDs are given
 			if isinstance(item_id, str) or isinstance(item_id, int):
 				item_id = [item_id]
 			item_id = [str(i) for i in item_id]
 			ids = self.db.fetchall("SELECT id FROM annotations WHERE dataset = %s AND item_id IN %s;",
 								   (self.key, tuple(item_id)))
 		else:
+			# Else just get all the annotation data from this dataset
 			ids = self.db.fetchall("SELECT id FROM annotations WHERE dataset = %s;", (self.key,))
 
 		if not ids:
@@ -1605,6 +1609,7 @@ class DataSet(FourcatModule):
 
 		ids = [i["id"] for i in ids]
 
+		# Then get the annotations by ID
 		for id in ids:
 			annotations.append(Annotation.get_by_id(id, self.db))
 
@@ -1661,8 +1666,7 @@ class DataSet(FourcatModule):
 
 		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
 										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
-		:param bool overwrite:			Whether to overwrite annotation if the label is already present
-										for the dataset.
+		:param bool overwrite:			Whether to overwrite the annotation if it already present.
 
 		:returns int:					How many annotations were saved.
 
