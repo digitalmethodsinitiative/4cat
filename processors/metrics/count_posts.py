@@ -51,16 +51,11 @@ class CountPosts(BasicProcessor):
 		first_interval = "9999"
 		last_interval = "0000"
 
-		annotations = []
-
 		self.dataset.update_status("Processing items")
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
 
 			for post in self.source_dataset.iterate_items(self):
-
-				annotation = {"value": "test", "item_id": post["id"]}
-				annotations.append(annotation)
 
 				try:
 					date = get_interval_descriptor(post, timeframe)
@@ -152,7 +147,6 @@ class CountPosts(BasicProcessor):
 					row["value_relative"] = intervals[interval]["relative"]
 				rows.append(row)
 
-		self.write_annotations(annotations)
 		self.write_csv_items_and_finish(rows)
 
 	@classmethod
