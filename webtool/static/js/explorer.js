@@ -22,15 +22,14 @@ const annotations = {
 
 	init: function() {
 
-		let edit_field_box = $("#edit-annotation-fields");
 		let editor = $("#annotation-fields-editor");
 		let editor_controls = $("#annotation-fields-editor-controls");
 		var edits_made = false;
 
 		// Add a new annotation field when clicking the plus icon
 		$("#new-annotation-field").on("click", function(){
-			let annotations_div = annotations.getAnnotationsDiv();
-			$(annotations_div).insertBefore(edit_field_box);});
+			annotations.addAnnotationField();
+		});
 
 		// Show and hide the annotations editor
 		let toggle_fields = $("#toggle-annotation-fields")
@@ -89,7 +88,7 @@ const annotations = {
 		
 		// Make enter apply the option fields
 		editor_controls.on("keypress", "input", function(e){
-			if (e.which == 13) {
+			if (e.which === 13) {
 				annotations.applyAnnotationFields();
 			}
 		});
@@ -121,7 +120,7 @@ const annotations = {
 
 		// Save unsaved annotations upon changing a page.
 		$('.page > a').click(function(){
-			if (!$("#save-annotations").hassClass('disabled')) {
+			if (!$("#save-annotations").hasClass('disabled')) {
 				annotations.saveAnnotations();
 			}
 		})
@@ -146,11 +145,11 @@ const annotations = {
 		let options = $(el).parent().parent().next();
 		let option_fields = options.find(".option-field");
 
-		if (type == "text" || type == "textarea") {
+		if (type === "text" || type === "textarea") {
 			option_fields.remove();
 		}
-		else if (type == "dropdown" || type == "checkbox") {
-			if (option_fields.length == 0) {
+		else if (type === "dropdown" || type === "checkbox") {
+			if (option_fields.length === 0) {
 				options.append(annotations.getInputField);
 			}
 		}
@@ -218,9 +217,9 @@ const annotations = {
 		Returns an object with the set annotation fields.
 		*/
 
-		var annotation_fields = {};
-		var warning = "";
-		var labels_added = []
+		let annotation_fields = {};
+		let warning = "";
+		let labels_added = []
 
 		annotations.warnEditor("");
 
@@ -239,12 +238,12 @@ const annotations = {
 
 			// Get the ID of the field, so we
 			// can later check if it already exists.
-			let field_id = parseInt(this.id.split("-")[1]);
+			let field_id = this.id.split("-")[1];
 
 			// Make sure the inputs have a label
 			if (!label.length > 0) {
 				label_field.addClass("invalid");
-				warning  = "Input names can't be empty";
+				warning  = "Field labels can't be empty";
 			}
 			// Make sure the names can't be duplicates
 			else if (labels_added.includes(label)) {
@@ -254,7 +253,7 @@ const annotations = {
 
 			// We can't add field labels that are also existing column names
 			else if (original_columns.includes(label)) {
-				warning = "Fields labels cannot be an existing column name";
+				warning = "Field label " + label + " is already present as a dataset item, please rename.";
 				label_field.addClass("invalid");
 			}
 
@@ -264,7 +263,7 @@ const annotations = {
 			// Keep track of the labels we've added
 			labels_added.push(label)
 
-			if (type == "text" || type == "textarea") {				
+			if (type === "text" || type === "textarea") {
 				annotation_fields[field_id] = {"type": type, "label": label};
 			}
 			// Add options for dropdowns and checkboxes
@@ -390,8 +389,8 @@ const annotations = {
 		// Applies the annotation fields to each post on this page.
 
 		// First we collect the annotation information from the editor
-		var annotation_fields = annotations.parseAnnotationFields(e);
-		var fields_to_add = {};
+		let annotation_fields = annotations.parseAnnotationFields(e);
+		let fields_to_add = {};
 
 		// Show an error message if the annotation fields were not valid.
 		if (typeof annotation_fields == "string") {
@@ -426,7 +425,7 @@ const annotations = {
 				}
 			});
 
-			// Add input fields to every posts in the explorer.
+			// Add input fields to every post in the explorer.
 			// We take the annotations of the first post to check
 			// what's the current state and add them to every post after.
 			let text_fields = ["textarea", "text"];
@@ -447,7 +446,7 @@ const annotations = {
 					// Edit the labels if they have changed.
 					label_span = $(class_id + " > .annotation-label");
 					label = label_span.first().text();
-					if (label != input_label) {
+					if (label !== input_label) {
 						label_span.each(function(){
 							$(this).text(input_label);
 						});
@@ -460,7 +459,7 @@ const annotations = {
 
 					// If the change is between a textbox and textarea,
 					// change the input type and carry over the text.
-					if (input_type != old_input_type) {
+					if (input_type !== old_input_type) {
 
 						if (text_fields.includes(input_type) && text_fields.includes(old_input_type)) {
 							
@@ -473,11 +472,11 @@ const annotations = {
 								}
 
 								// Replace the HTML element, insert old values, and change the type class
-								if (input_type == "text" && old_input_type == "textarea") {
+								if (input_type === "text" && old_input_type === "textarea") {
 									$(this).parent().removeClass("textarea").addClass("text");
 									$(this).replaceWith($("<input type='text' class='post-annotation-input text-" + field + "'>").val(add_val));
 								}
-								else if (input_type == "textarea" && old_input_type == "text") {
+								else if (input_type === "textarea" && old_input_type === "text") {
 									$(this).parent().removeClass("text").addClass("textarea");
 									$(this).replaceWith($("<textarea class='post-annotation-input textarea-" + field + "'>" + add_val + "</textarea>"));
 								}
@@ -662,26 +661,25 @@ const annotations = {
 		// Save the annotation fields used for this dataset
 		// to the datasets table.
 
-		if (annotation_fields.length < 1 || annotation_fields == undefined) {
-			annotation_fields = annotation_fields.parseAnnotationFields;
+		if (annotation_fields.length < 1) {
+			return;
 		}
 
 		// If there's annotation fields, we can enable/disable the buttons
 		annotations.fieldsExist();
 
-		var dataset_key = $("#dataset-key").text();
-		var json_annotations = JSON.stringify(annotation_fields);
+		let dataset_key = $("#dataset-key").text();
 
 		// AJAX the annotation forms
 		$.ajax({
 			url: getRelativeURL("explorer/save_annotation_fields/" + dataset_key),
 			type: "POST",
 			contentType: "application/json",
-			data: json_annotations,
+			data:  JSON.stringify(annotation_fields),
 
 			success: function (response) {
 				// If the query is accepted by the server.
-				if (response == 'success') {
+				if (response === 'success') {
 					$("#annotations-editor-container").hide();
 					$("#apply-annotation-fields").addClass("disabled");
 				}
@@ -821,43 +819,39 @@ const annotations = {
 		pa.animate({"height": 0}, 250);
 	},
 
-	getAnnotationsDiv: function(id){
-		// Returns an input field element with a pseudo-random ID, if none is provided.
-		if (id == undefined || id == 0) {
-			id = annotations.randomInt();
-		}
-		
-		// Returns an annotation div element with a pseudo-random ID
-		return `<div>
-			<dd class="annotation-fields-row annotation-field" id="field-{{FIELD_ID}}">
-				<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Field label">
-				<a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
-			</dd>
-		</div>
-		<div>
-			<dd>
-				<select name="annotation-field-type" class="annotation-field-type">
-					<option class="annotation-field-option" value="text" selected>Text</option>
-					<option class="annotation-field-option" value="textarea">Text (large)</option>
-					<option class="annotation-field-option" value="checkbox">Checkbox</option>
-					<option class="annotation-field-option" value="dropdown">Dropdown</option>
-				</select>
-			</dd>
-		</div>
-		<div></div>`.replace("{{FIELD_ID}}", id);
+	addAnnotationField: function(){
+		/*
+		Adds an annotation field input element;
+		these have no IDs yet, we'll add a hashed database-label string when saving.
+		*/
+
+		let annotation_field = `<div>
+             <dd class="annotation-fields-row annotation-field">
+                 <input type="text" id="field-undefinedrandomint"
+                 class="annotation-field-label" name="annotation-field-label" placeholder="Field label">
+                 <a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
+             </dd>
+         </div>
+         <div>
+             <dd>
+                 <select name="annotation-field-type" class="annotation-field-type">
+                     <option class="annotation-field-option" value="text" selected>Text</option>
+                     <option class="annotation-field-option" value="textarea">Text (large)</option>
+                     <option class="annotation-field-option" value="checkbox">Checkbox</option>
+                     <option class="annotation-field-option" value="dropdown">Dropdown</option>
+                 </select>
+             </dd>
+         </div><div></div>`.replace("randomint", Math.floor(Math.random() * 100000000).toString());
+		$(annotation_field).insertBefore($("#edit-annotation-fields"));
 	},
 
 	getInputField: function(id){
-		// Returns an input field element with a pseudo-random ID, if none is provided.
-		if (id == undefined || id == 0) {
-			id = annotations.randomInt();
+		// Returns an option field element with a pseudo-random ID, if none is provided.
+		if (id === undefined || id === 0) {
+			id = Math.floor(Math.random() * 100000000).toString();
 		}
 		return "<div class='option-field'><input type='text' id='input-" + id + "' placeholder='Value'></div>";
 	},
-
-	randomInt: function(){
-		return Math.floor(Math.random() * 100000000);
-	}
 };
 
 const page_functions = {
@@ -872,13 +866,14 @@ const page_functions = {
 
 		// Reorder the dataset when the sort type is changed
 		$(".sort-select").on("change", function(){
-			
+
+
 			// Get the column to sort on, an whether we should sort in reverse.
 			let selected = $("#column-sort-select").find("option:selected").val();
 			let order = $("#column-sort-order").find("option:selected").val();
 
 			sort_order = ""
-			if (order == "reverse"){
+			if (order === "reverse"){
 				sort_order = "&order=reverse"
 			}
 
