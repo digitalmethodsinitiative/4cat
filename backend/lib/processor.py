@@ -3,7 +3,6 @@ Basic post-processor worker - should be inherited by workers to post-process res
 """
 import re
 import traceback
-import hashlib
 import zipfile
 import typing
 import shutil
@@ -11,13 +10,14 @@ import json
 import abc
 import csv
 import os
+import random
 
 from pathlib import Path, PurePath
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_commit, remove_nuls, send_email
+from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_values
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
 								   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
@@ -739,10 +739,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not source_dataset:
 			source_dataset = self.source_dataset
 
-		# Create a field ID based on the
+		already_exists_error = False
 
 		# Check if this dataset already has annotation fields
-		field_id = ""
 		existing_labels = source_dataset.get_annotation_field_labels()
 
 		# Set some values
@@ -756,6 +755,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				if not overwrite and label in existing_labels:
 					label += "-" + str(len([l for l in existing_labels if l.startswith(label)]))
 				annotation["label"] = label
+			elif annotation.get("label") and not overwrite:
+				if annotation["label"] in existing_labels:
+					already_exists_error = annotation["label"]
+					break
 
 			# Set the author to this processor's name
 			if not annotation.get("author"):
@@ -768,11 +771,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				annotation["metadata"] = {}
 			annotation["metadata"]["processor-parameters"] = self.parameters
 
-			if not annotation.get("field_id"):
-				if not field_id:
-					field_id = source_dataset.key + annotation["label"]
-					field_id = hashlib.md5(field_id.encode("utf-8")).hexdigest()
-				annotation["field_id"] = field_id
+		if already_exists_error:
+			self.dataset.finish_with_error(
+				"Annotation label '%s' already exists for this dataset" % already_exists_error)
 
 		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
 		return annotations_saved

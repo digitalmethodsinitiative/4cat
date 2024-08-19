@@ -1,7 +1,6 @@
 import collections
 import itertools
 import datetime
-import hashlib
 import fnmatch
 import random
 import shutil
@@ -14,7 +13,7 @@ import backend
 from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_values
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -965,7 +964,7 @@ class DataSet(FourcatModule):
 
 		parent_key = str(parent) if parent else ""
 		plain_key = repr(param_key) + str(query) + parent_key
-		hashed_key = hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		hashed_key = hash_values(plain_key)
 
 		if self.db.fetchone("SELECT key FROM datasets WHERE key = %s", (hashed_key,)):
 			# key exists, generate a new one
@@ -1584,17 +1583,17 @@ class DataSet(FourcatModule):
 		Retrieves the annotations for this dataset.
 
 		:param item_id:	A list of item IDs to get the annotations from.
-						If empty, get all the annotations for this dataset.
-						May also be a string to get annotations from a specific item.
+						May also be a string or int to get a specific annotation.
+						If left empty, get all the annotations for this dataset.
 
-		return list: All annotations, each in their own dictionary.
+		return list: 	List of Annotation objects.
 		"""
 
 		annotations = []
 
 		# Get annotation IDs first
 		if item_id:
-			# Get specific annotations if IDs are given
+			# Cast to string
 			if isinstance(item_id, str) or isinstance(item_id, int):
 				item_id = [item_id]
 			item_id = [str(i) for i in item_id]
@@ -1607,11 +1606,10 @@ class DataSet(FourcatModule):
 		if not ids:
 			return []
 
-		ids = [i["id"] for i in ids]
-
 		# Then get the annotations by ID
+		ids = [i["id"] for i in ids]
 		for id in ids:
-			annotations.append(Annotation.get_by_id(id, self.db))
+			annotations.append(Annotation(id=id, db=self.db))
 
 		return annotations
 
@@ -1678,53 +1676,57 @@ class DataSet(FourcatModule):
 		count = 0
 		annotation_fields = self.get_annotation_fields()
 		annotation_labels = self.get_annotation_field_labels()
-		known_field_ids = {} # Just so we don't have to hash every annotation without a field ID
+
+		field_id = ""
+		salt = str(random.randrange(0, 1000000))
 
 		# Add some dataset data to annotations, if not present
-		for annotation in annotations:
+		for annotation_data in annotations:
 
 			# Check if the required fields are present
-			if "item_id" not in annotation:
+			if "item_id" not in annotation_data:
 				raise AnnotationException("Can't save annotations; annotation must have an `item_id` referencing "
-										  "the item they annotated, got %s" % annotation)
-			if "label" not in annotation or not isinstance(annotation["label"], str):
+										  "the item it annotated, got %s" % annotation_data)
+			if "label" not in annotation_data or not isinstance(annotation_data["label"], str):
 				raise AnnotationException("Can't save annotations; annotation must have a `label` field, "
 										  "got %s" % annotation)
-			if not overwrite and annotation["label"] in annotation_labels:
+			if not overwrite and annotation_data["label"] in annotation_labels:
 				raise AnnotationException("Can't save annotations; annotation field with label %s "
-										  "already exists" % annotation["label"])
+										  "already exists" % annotation_data["label"])
 
 			# Set dataset key
-			if not annotation.get("dataset"):
-				annotation["dataset"] = self.key
-
-			# If not present, add an ID for this annotation field, based on the dataset key and label
-			if "field_id" not in annotation:
-				field_id_str = annotation["label"] + annotation["dataset"]
-				# Check if we hashed this before
-				if field_id_str in known_field_ids:
-					field_id = known_field_ids[field_id_str]
-				else:
-					field_id = hashlib.md5(field_id_str.encode("utf-8")).hexdigest()
-				annotation["field_id"] = field_id
+			if not annotation_data.get("dataset"):
+				annotation_data["dataset"] = self.key
 
 			# Set default author to this dataset owner
 			# If this annotation is made by a processor, it will have the processor name
-			if not annotation.get("author"):
-				annotation["author"] = self.get_owners()[0]
+			if not annotation_data.get("author"):
+				annotation_data["author"] = self.get_owners()[0]
+
+			# The field ID can already exists for the same dataset/key combo,
+			# if a previous label has been renamed.
+			# If we're not overwriting, create a new key with some salt.
+			if not overwrite:
+				if not field_id:
+					field_id = hash_values(annotation_data["dataset"] + annotation_data["label"] + salt)
+				if field_id in annotation_fields:
+					annotation_data["field_id"] = field_id
+
+			# Create Annotation object, which also saves it to the database
+			# If this dataset/item ID/label combination already exists, this retrieves the
+			# existing data and updates it with new values.
+			annotation = Annotation(data=annotation_data, db=self.db)
 
 			# Add data on the type of annotation field, if it is not saved to the datasets table yet.
 			# For now this is just a simple dict with a field ID, type, label, and possible options.
-			if not annotation_fields or annotation["field_id"] not in annotation_fields:
-				annotation_fields[annotation["field_id"]] = {
-					"label": annotation["label"],
-					"type": annotation.get("type", "text") # Default to text
+			if not annotation_fields or annotation.field_id not in annotation_fields:
+				annotation_fields[annotation.field_id] = {
+					"label": annotation.label,
+					"type": annotation.type		# Defaults to `text`
 				}
-				if "options" in annotation:
-					annotation_fields[annotation["field_id"]]["options"] = annotation["options"]
+				if annotation.options:
+					annotation_fields[annotation.options] = annotation.options
 
-			# Create Annotation object, which also saves it to the database
-			Annotation(data=annotation, db=self.db)
 			count += 1
 
 		# Save annotation fields if things changed
@@ -1797,6 +1799,12 @@ class DataSet(FourcatModule):
 			# update the annotations table.
 			if field_id in old_fields:
 				if old_fields[field_id] != annotation_field:
+					changes = True
+
+		# Check if fields are removed
+		if not add:
+			for field_id in old_fields.keys():
+				if field_id not in new_fields:
 					changes = True
 
 		# If we're just adding fields, add them to the old fields.

@@ -3,14 +3,16 @@
 format and lets users annotate the data.
 """
 
+import json
+
 from pathlib import Path
 
-from flask import request, render_template
+from flask import request, render_template, jsonify
 from flask_login import login_required, current_user
 from webtool import app, db, openapi, limiter, config
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
-from common.lib.helpers import convert_to_float
+from common.lib.helpers import convert_to_float, hash_values
 from common.lib.exceptions import DataSetException
 from common.config_manager import ConfigWrapper
 
@@ -90,7 +92,7 @@ def explorer_dataset(dataset_key: str, page=1):
 
 	# We don't need to sort if we're showing the existing dataset order (default).
 	# If we're sorting, we need to iterate over the entire dataset first.
-	if not sort or (sort == "dataset-order" and reverse == False):
+	if not sort or (sort == "dataset-order" and not reverse):
 		for row in dataset.iterate_items(warn_unmappable=False):
 
 			count += 1
@@ -139,32 +141,43 @@ def explorer_dataset(dataset_key: str, page=1):
 	# Generate the HTML page
 	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, template=template, posts_css=posts_css, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
 
-@app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
+@app.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_save_annotation_fields(key: str) -> int:
+def explorer_save_annotation_fields(dataset_key: str) -> str:
 	"""
 	Save the annotation fields of a dataset to the datasets table.
 
-	:param key:  		The dataset key.
+	:param dataset_key:  		The dataset key.
 
 	:return-error 404:  If the dataset ID does not exist.
 	:return int:		The number of annotation fields saved.
 	"""
 
 	# Get dataset.
-	if not key:
+	if not dataset_key:
 		return error(404, error="No dataset key provided")
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=dataset_key, db=db)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
 	# Save it!
 	annotation_fields = request.get_json()
+
+	# Field IDs are not immediately set in the front end.
+	# We're going to do this based on the hash of the
+	# dataset key and the input label (should be unique)
+	field_keys = list(annotation_fields.keys())
+	for field_id in field_keys:
+		if "undefined" in field_id:
+			new_field_id = hash_values(dataset_key + annotation_fields[field_id]["label"])
+			annotation_fields[new_field_id] = annotation_fields[field_id]
+			del annotation_fields[field_id]
+
 	dataset.save_annotation_fields(annotation_fields)
 
 	return "success"
@@ -196,19 +209,32 @@ def explorer_save_annotations(dataset_key: str):
 	dataset.save_annotations(annotations, overwrite=True)
 	return "success"
 
-@app.route("/explorer/save_annotation/<string:key>", methods=["POST"])
+
+@app.route("/explorer/get_annotation_field", methods=["GET"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_save_annotation(key="") -> int:
+def get_annotation_field():
 	"""
-	todo: integrate
-	"""
-	return 0
+	Returns an annotation field input div
 
-def sort_and_iterate_items(dataset: DataSet, sort=None, reverse=False, **kwargs) -> dict:
+	:return-error 406:  If the list of subqueries could not be parsed.
+	"""
+	try:
+		annotation_field = json.loads(request.args.get("annotation_field"))
+	except (TypeError, json.decoder.JSONDecodeError):
+		return error(406, error="Unexpected format for annotation field.")
+
+	html = render_template("explorer/annotation-field.html", annotation_field=annotation_field)
+	return jsonify({
+		"status": "success",
+		"html": html}
+	)
+
+
+def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs) -> dict:
 	"""
 	Loop through both csv and NDJSON files.
 	This is basically a wrapper function for `iterate_items()` with the
@@ -217,9 +243,9 @@ def sort_and_iterate_items(dataset: DataSet, sort=None, reverse=False, **kwargs)
 	This first iterates through the entire file (with a max limit) to determine
 	an order. Then it yields items based on this order.
 
-	:param dataset, str:		The dataset object.
-	:param sort_by, str:		The item key that determines the sort order.
-	:param reverse, bool:		Whether to sort by largest values first.
+	:param dataset:				The dataset object.
+	:param sort:				The item key that determines the sort order.
+	:param reverse:				Whether to sort by largest values first.
 
 	:returns dict:				Yields iterated post
 	"""
@@ -228,7 +254,7 @@ def sort_and_iterate_items(dataset: DataSet, sort=None, reverse=False, **kwargs)
 	sorted_posts = []
 
 	# Use reversed() if we're reading the dataset from back to front.
-	if sort == "dataset-order" and reverse == True:
+	if sort == "dataset-order" and reverse:
 		for item in reversed(list(dataset.iterate_items(**kwargs))):
 			sorted_posts.append(item)
 
@@ -247,29 +273,6 @@ def sort_and_iterate_items(dataset: DataSet, sort=None, reverse=False, **kwargs)
 	for post in sorted_posts:
 		yield post
 
-def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
-	"""
-	todo: Integrate later
-	Retrieve posts by ID from a database-accessible data source.
-	"""
-
-	if not ids:
-		return None
-
-	if board:
-		board = " AND board = '" + board + "' "
-
-	id_field = "id" if not threads else "thread_id"
-	order_by = " ORDER BY " + ", ".join(order_by)
-	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	offset = " OFFSET %i" % int(offset)
-
-	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + board + order_by + " ASC" + limit + offset,
-						(ids,))
-	if not posts:
-		return False
-
-	return posts
 
 def has_datasource_template(datasource: str) -> bool:
 	"""
@@ -289,6 +292,32 @@ def has_datasource_template(datasource: str) -> bool:
 		return True
 	return False
 
+def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
+	"""
+	todo: Integrate later
+	Retrieve posts by ID from a database-accessible data source.
+	"""
+
+	raise NotImplementedError
+
+	if not ids:
+		return None
+
+	if board:
+		board = " AND board = '" + board + "' "
+
+	id_field = "id" if not threads else "thread_id"
+	order_by = " ORDER BY " + ", ".join(order_by)
+	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
+	offset = " OFFSET %i" % int(offset)
+
+	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + board + order_by + " ASC" + limit + offset,
+						(ids,))
+	if not posts:
+		return False
+
+	return posts
+
 @app.route('/results/<datasource>/<string:thread_id>/explorer')
 @api_ratelimit
 @login_required
@@ -306,6 +335,7 @@ def explorer_api_thread(datasource, thread_id):
 
 	:return-error 404:  If the thread ID does not exist for the given data source.
 	"""
+	raise NotImplementedError
 
 	if not datasource:
 		return error(404, error="No datasource provided")
@@ -346,6 +376,7 @@ def explorer_api_posts(datasource, post_ids):
 
 	:return-error 404:  If the thread ID does not exist for the given data source.
 	"""
+	raise NotImplementedError
 
 	if not datasource:
 		return error(404, error="No datasource provided")
