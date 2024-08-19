@@ -1,0 +1,40 @@
+{% set annotation_type = annotation_field["type"] %}
+
+{% set label = annotation_field["label"] %}
+
+<div>
+    <dd class="annotation-fields-row annotation-field" id="field-{{ field }}">
+        <input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Field label" value="{{ label }}">
+        <a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
+    </dd>
+</div>
+<div>
+    <dd>
+        <select name="annotation-field-type" class="annotation-field-type">
+            <option class="annotation-field-option" value="text" {% if annotation_type == "text" %}selected{% endif %}>Text</option>
+            <option class="annotation-field-option" value="textarea" {% if annotation_type == "textarea" %}selected{% endif %}>Text (large)</option>
+            <option class="annotation-field-option" value="checkbox" {% if annotation_type == "checkbox" %}selected{% endif %}>Checkbox</option>
+            <option class="annotation-field-option" value="dropdown" {% if annotation_type == "dropdown" %}selected{% endif %}>Dropdown</option>
+        </select>
+    </dd>
+</div>
+
+{% if annotation_type == "dropdown" or annotation_type == "checkbox" %}
+<div class="option-fields">
+    <dd>
+            {% for option in annotation_fields[field]["options"] %}
+            {% set option_id = option.keys() | first %}
+            {% set option_label = option.values() | first %}
+            <div class="option-field">
+                <input type="text" id="input-{{ option_id }}" value="{{ option_label }}">
+                <a class="button-like-small delete-option-field"><i class="fas fa-trash"></i></a>
+            </div>
+            {% endfor %}
+            <div class="option-field">
+                <input type="text" id="input-{{ range(1, 100000000) | random }}" placeholder="Value">
+            </div>
+    </dd>
+</div>
+{% else %}
+<div class="option-fields"></div>
+{% endif %}
