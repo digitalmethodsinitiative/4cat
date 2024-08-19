@@ -5,8 +5,8 @@ Annotation class
 
 import time
 import json
-import hashlib
 
+from common.lib.helpers import hash_values
 from common.lib.exceptions import AnnotationException
 
 class Annotation:
@@ -22,7 +22,6 @@ class Annotation:
 
     data = None
     db = None
-
 
     id = None                 # Unique ID for this annotation
     item_id = None            # ID of the item for this annotation, e.g. post ID
@@ -51,7 +50,7 @@ class Annotation:
         required_fields = ["label", "item_id", "dataset"]
 
         # Must have an ID or data
-        if id is None and (data is None or not isinstance(data, dict)):
+        if (id is None and data is None) or (data is not None and not isinstance(data, dict)):
             raise AnnotationException("Annotation() requires either a valid `data` dictionary or ID.")
 
         if not db:
@@ -69,7 +68,7 @@ class Annotation:
             if data and "id" in data:
                 id = data["id"]
             self.id = id # IDs correspond to unique serial numbers in the database.
-            current = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % (self.id))
+            current = self.get_by_id(id)
             if not current:
                 raise AnnotationException(
                     "Annotation() requires a valid ID for an existing annotation, %s given" % id)
@@ -86,9 +85,6 @@ class Annotation:
 
         # If we were able to retrieve an annotation from the db, it already exists
         if current:
-
-            #current["metadata"] = json.loads(current["metadata"])
-
             # Check if we have to overwrite old data with new data
             if data:
                 for key, value in data.items():
@@ -105,7 +101,6 @@ class Annotation:
 
         # If this is a new annotation, set all the properties.
         else:
-
             # Keep track of when the annotation was made
             created_timestamp = int(time.time())
 
@@ -142,7 +137,6 @@ class Annotation:
                     v = bool(v)
             except ValueError as e:
                 raise AnnotationException("Annotation fields are not of the right type (%s)" % e)
-
             self.__setattr__(k, v)
 
         # Write to db if anything changed
@@ -150,13 +144,13 @@ class Annotation:
             self.timestamp = int(time.time())
             self.write_to_db()
 
-    def get_by_id(id: int, db):
+    def get_by_id(self, id: int):
         """
         Get annotation by ID
 
         :param str id:  ID of annotation
         :param db:      Database connection object
-        :return:  Annotation object, or `None` for invalid annotation ID
+        :return:  Annotation object, or an empty dict if the ID doesn't exist.
         """
 
         try:
@@ -164,18 +158,24 @@ class Annotation:
         except ValueError:
             raise AnnotationException("Id '%s' is not valid" % id)
 
-        return Annotation(id=id, db=db)
+        data = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % (id))
+
+        if not data:
+            return {}
+
+        data["metadata"] = json.loads(data["metadata"])
+        return data
 
     def get_by_field(self, dataset_key: str, item_id: str, label: str) -> dict:
         """
-        Get the annotation information via its dataset key, item ID, and label.
+        Get the annotation information via its dataset key, item ID, and field_id.
         This is always a unique combination.
 
         :param dataset_key:     The key of the dataset this annotation was made for.
         :param item_id:         The ID of the item this annotation was made for.
         :param label:           The label of the annotation.
 
-        :return data: A dict with data of the retrieved annotation, or None if it doesn't exist.
+        :return data: A dict with data of the retrieved annotation, or an empty dict if it doesn't exist.
         """
 
         data = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND label = %s",
@@ -195,8 +195,8 @@ class Annotation:
         :param label:       The label of the dataset.
         """
 
-        field_id = source_dataset.key + annotation["label"]
-        field_id = hashlib.md5(field_id.encode("utf-8")).hexdigest()
+        base_field_id = dataset_key + label
+        field_id = hash_values(base_field_id)
         self.field_id = field_id
         return self.field_id
 
@@ -205,6 +205,7 @@ class Annotation:
         Write an annotation to the database.
         """
         db_data = self.data
+        db_data["timestamp"] = int(time.time())
         m = db_data["metadata"] # To avoid circular reference error
         db_data["metadata"] = json.dumps(m)
         return self.db.upsert("annotations", data=db_data, constraints=["label", "dataset", "item_id"])
@@ -262,8 +263,8 @@ class Annotation:
         if old_fields == new_fields:
             return 0
 
-        fields_to_delete = set()  # Delete all annotations with this field ID
-        fields_to_update = {}  # Update values of annotations with this field ID
+        fields_to_delete = set()        # Delete all annotations with this field ID
+        fields_to_update = {}           # Update values of annotations with this field ID
 
         # Loop through the old annotation fields
         for old_field_id, old_field in old_fields.items():
@@ -418,7 +419,6 @@ class Annotation:
         if attr == "metadata":
             value = json.dumps(value)
 
-        self.timestamp = int(time.time())
         self.db.update("annotations", where={"id": self.id}, data={attr: value})
 
         self.data[attr] = value
