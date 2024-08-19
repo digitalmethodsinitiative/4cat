@@ -3,6 +3,7 @@ Miscellaneous helper functions for the 4CAT backend
 """
 import subprocess
 import requests
+import hashlib
 import datetime
 import smtplib
 import fnmatch
@@ -897,3 +898,9 @@ def folder_size(path='.'):
         elif entry.is_dir():
             total += folder_size(entry.path)
     return total
+
+def hash_values(string: str) -> str:
+    """
+    Hash a string
+    """
+    return hashlib.md5(string.encode("utf-8")).hexdigest()
