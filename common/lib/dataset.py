@@ -333,14 +333,12 @@ class DataSet(FourcatModule):
 		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
-		# Annotations are dynamically added
-		# and we're handling them as 'extra' map_item fields.
-		has_annotations = self.has_annotations()
+		# Annotations are dynamically added and we're handling them as 'extra' map_item fields.
 		annotation_labels = self.get_annotation_field_labels()
 
 		# missing field strategy can be for all fields at once, or per field
 		# if it is per field, it is a dictionary with field names and their strategy
-		# if it is for all fields, it is may be a callback, 'abort', or 'default'
+		# if it is for all fields, it may be a callback, 'abort', or 'default'
 		default_strategy = "default"
 		if type(map_missing) is not dict:
 			default_strategy = map_missing
@@ -382,7 +380,7 @@ class DataSet(FourcatModule):
 				mapped_item = original_item
 
 			# Add possible annotations
-			if has_annotations:
+			if annotation_labels:
 
 				# Get annotations for this specific post
 				post_annotations = self.get_annotations(item_id=mapped_item.data["id"])
@@ -1825,6 +1823,14 @@ class DataSet(FourcatModule):
 			Annotation.update_annotations_via_fields(self.key, old_fields, new_fields, self.db)
 
 		return len(new_fields)
+
+	def get_annotation_metadata(self) -> dict:
+		"""
+		Retrieves all the data for this dataset from the annotations table.
+		"""
+
+		annotation_data = self.db.fetchall("SELECT * FROM annotations WHERE dataset = '%s';" % self.key)
+		return annotation_data
 
 	def __getattr__(self, attr):
 		"""
