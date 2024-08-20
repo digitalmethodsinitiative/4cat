@@ -4,6 +4,7 @@ Import datasets from other 4CATs
 import requests
 import json
 import time
+import zipfile
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import (QueryParametersException, FourcatException, ProcessorInterruptedException,
@@ -19,8 +20,8 @@ class FourcatImportException(FourcatException):
 class SearchImportFromFourcat(BasicProcessor):
     type = "import_4cat-search"  # job ID
     category = "Search"  # category
-    title = "Import from 4CAT"  # title displayed in UI
-    description = "Import a dataset from another 4CAT server"  # description displayed in UI
+    title = "Import 4CAT dataset and analyses"  # title displayed in UI
+    description = "Import a dataset from another 4CAT server or from a zip file (exported from a 4CAT server)"  # description displayed in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
 
@@ -33,29 +34,242 @@ class SearchImportFromFourcat(BasicProcessor):
                     "\n\nTo import a dataset across servers, both servers need to be running the same version of 4CAT. "
                     "You can find the current version in the footer at the bottom of the interface."
         },
+        "method": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Import Type",
+            "options": {
+                "zip": "Zip File",
+                "url": "4CAT URL",
+            },
+            "default": "url"
+        },
         "url": {
             "type": UserInput.OPTION_TEXT,
             "help": "Dataset URL",
-            "tooltip": "URL to the dataset's page, for example https://4cat.example/results/28da332f8918e6dc5aacd1c3b0170f01b80bd95f8ff9964ac646cecd33bfee49/."
+            "tooltip": "URL to the dataset's page, for example https://4cat.example/results/28da332f8918e6dc5aacd1c3b0170f01b80bd95f8ff9964ac646cecd33bfee49/.",
+            "requires": "method^=url"
         },
         "intro2": {
             "type": UserInput.OPTION_INFO,
             "help": "You can create an API key via the 'API Access' item in 4CAT's navigation menu. Note that you need "
                     "an API key from **the server you are importing from**, not the one you are looking at right now. "
-                    "Additionally, you need to have owner access to the dataset you want to import."
+                    "Additionally, you need to have owner access to the dataset you want to import.",
+            "requires": "method^=url"
         },
         "api-key": {
             "type": UserInput.OPTION_TEXT,
             "help": "4CAT API Key",
             "sensitive": True,
             "cache": True,
-        }
+            "requires": "method^=url"
+        },
+        "data_upload": {
+            "type": UserInput.OPTION_FILE,
+            "help": "File",
+            "tooltip": "Upload a ZIP file containing a dataset exported from a 4CAT server.",
+            "requires": "method^=zip"
+        },
+
     }
 
     created_datasets = None
     base = None
+    remapped_keys = None
 
     def process(self):
+        """
+        Import 4CAT dataset either from another 4CAT server or from the uploaded zip file
+        """
+        if self.parameters.get("method") == "zip":
+            self.process_zip()
+        else:
+            self.process_urls()
+
+    def after_create(query, dataset, request):
+        """
+        Hook to execute after the dataset for this source has been created
+
+        In this case, put the file in a temporary location so it can be
+        processed properly by the related Job later.
+
+        :param dict query:  Sanitised query parameters
+        :param DataSet dataset:  Dataset created for this query
+        :param request:  Flask request submitted for its creation
+        """
+        if query.get("method") == "zip":
+            file = request.files["option-data_upload"]
+            file.seek(0)
+            with dataset.get_results_path().with_suffix(".importing").open("wb") as outfile:
+                while True:
+                    chunk = file.read(1024)
+                    if len(chunk) == 0:
+                        break
+                    outfile.write(chunk)
+        else:
+            # nothing to do for URLs
+            pass
+
+
+    def process_zip(self):
+        """
+        Import 4CAT dataset from a ZIP file
+        """
+        self.dataset.update_status(f"Importing datasets and analyses from ZIP file.")
+        temp_file = self.dataset.get_results_path().with_suffix(".importing")
+
+        processed_files = []
+        missed_files = []
+        with zipfile.ZipFile(temp_file, "r") as zip_ref:
+            zip_contents = zip_ref.namelist()
+
+            # Get all metadata files and determine primary dataset
+            metadata_files = [file for file in zip_contents if file.endswith("_metadata.json")]
+            if not metadata_files:
+                self.dataset.finish_with_error("No metadata files found in ZIP file; is this a 4CAT export?")
+                return
+
+            # Get the primary dataset
+            primary_dataset_keys = set()
+            datasets = []
+            for file in metadata_files:
+                with zip_ref.open(file) as f:
+                    metadata = json.load(f)
+                    if metadata.get("key_parent") is None:
+                        primary_dataset_keys.add(metadata.get("key"))
+                        datasets.append(metadata)
+                    else:
+                        # Child datasets are skipped for now, as we may need to remap keys
+                        pass
+
+            # Primary dataset will overwrite this dataset; we could address this to support multiple primary datasets
+            if len(primary_dataset_keys) != 1:
+                self.dataset.finish_with_error("ZIP file contains multiple primary datasets; only one is allowed.")
+                return
+
+            # Import datasets (
+            # TODO: this is ordered due to potential issues with keys needing to be remapped, but there may be an issue with a child datasets having additional children and needing remapping...
+            while datasets:
+                metadata = datasets.pop(0)
+                dataset_key = metadata.get("key")
+                processed_metadata = self.process_metadata(metadata)
+                if dataset_key in primary_dataset_keys:
+                    # Import primary dataset
+                    self.dataset.update_status(f"Importing primary dataset {dataset_key}.")
+
+
+
+
+
+
+
+
+            # Check that all files were processed
+            if len(zip_contents) != len(processed_files):
+                for file in zip_contents:
+                    if file not in processed_files:
+                        missed_files.append(file)
+
+
+    @staticmethod
+    def process_metadata(metadata):
+        """
+        Process metadata for import
+        """
+        # get rid of some keys that are server-specific and don't need to
+        # be stored (or don't correspond to database columns)
+        metadata.pop("current_4CAT_version")
+        metadata.pop("id")
+        metadata.pop("job")
+        metadata.pop("is_private")
+        metadata.pop("is_finished")  # we'll finish it ourselves, thank you!!!
+
+        # extra params are stored as JSON...
+        metadata["parameters"] = json.loads(metadata["parameters"])
+        if "copied_from" in metadata["parameters"]:
+            metadata["parameters"].pop("copied_from")
+        metadata["parameters"] = json.dumps(metadata["parameters"])
+
+        return metadata
+
+    def create_dataset(self, metadata, original_key, primary=False):
+        """
+        Create a new dataset
+        """
+        if primary:
+            # if this is the first dataset we're importing, make it the
+            # processor's "own" dataset. the key has already been set to
+            # the imported dataset's key via ensure_key() (or a new unqiue
+            # key if it already existed on this server)
+            # by making it the "own" dataset, the user initiating the
+            # import will see the imported dataset as the "result" of their
+            # import query in the interface, similar to the workflow for
+            # other data sources
+            new_dataset = self.dataset
+            metadata.pop("key")  # key already OK (see above)
+            self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
+
+        else:
+            # supernumerary datasets - handle on their own
+            # these include any children of imported datasets
+            try:
+                key_exists = DataSet(key=metadata["key"], db=self.db)
+
+                # if we *haven't* thrown a DatasetException now, then the
+                # key is already in use, so create a "dummy" dataset and
+                # overwrite it with the metadata we have (except for the
+                # key). this ensures that a new unique key will be
+                # generated.
+                new_dataset = DataSet(parameters={}, type=self.type, db=self.db)
+                metadata.pop("key")
+                self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
+
+            except DataSetException:
+                # this is *good* since it means the key doesn't exist, so
+                # we can re-use the key of the imported dataset
+                self.db.insert("datasets", data=metadata)
+                new_dataset = DataSet(key=metadata["key"], db=self.db)
+
+        # make sure the dataset path uses the new key and local dataset
+        # path settings. this also makes sure the log file is created in
+        # the right place (since it is derived from the results file path)
+        extension = metadata["result_file"].split(".")[-1]
+        new_dataset.reserve_result_file(parameters=new_dataset.parameters, extension=extension)
+
+        new_dataset.update_status("Imported dataset created")
+        if new_dataset.key != original_key:
+            # could not use original key because it was already in use
+            # so update any references to use the new key
+            self.remapped_keys[original_key] = new_dataset.key
+            new_dataset.update_status(f"Cannot import with same key - already in use on this server. Using key "
+                                      f"{new_dataset.key} instead of key {original_key}!")
+
+        # refresh object, make sure it's in sync with the database
+        self.created_datasets.add(new_dataset.key)
+        new_dataset = DataSet(key=new_dataset.key, db=self.db)
+        if new_dataset.key == self.dataset.key:
+            # this ensures that the first imported dataset becomes the
+            # processor's "own" dataset, and that the import logs go to
+            # that dataset's log file. For later imports, this evaluates to
+            # False.
+            self.dataset = new_dataset
+
+        # if the key of the parent dataset was changed, change the
+        # reference to it that the child dataset has
+        if new_dataset.key_parent and new_dataset.key_parent in self.remapped_keys:
+            new_dataset.key_parent = self.remapped_keys[new_dataset.key_parent]
+
+        # update some attributes that should come from the new server, not
+        # the old
+        new_dataset.creator = dataset_owner
+        new_dataset.original_timestamp = new_dataset.timestamp
+        new_dataset.imported = True
+        new_dataset.timestamp = int(time.time())
+        new_dataset.db.commit()
+
+        return new_dataset
+
+
+    def process_urls(self):
         """
         Import 4CAT dataset from another 4CAT server
 
@@ -70,7 +284,7 @@ class SearchImportFromFourcat(BasicProcessor):
         self.created_datasets = set()   # keys of created datasets - may not be successful!
         imported = []  # successfully imported datasets
         failed_imports = []  # keys that failed to import
-        remapped_keys = {}  # changed dataset keys
+        self.remapped_keys = {}  # changed dataset keys
         num_rows = 0  # will be used later
         dataset_owner = self.dataset.get_owners()[0]  # at this point it has 1 owner
 
@@ -101,90 +315,10 @@ class SearchImportFromFourcat(BasicProcessor):
                 failed_imports.append(dataset_key)
                 continue
 
-            # get rid of some keys that are server-specific and don't need to
-            # be stored (or don't correspond to database columns)
-            metadata.pop("current_4CAT_version")
-            metadata.pop("id")
-            metadata.pop("job")
-            metadata.pop("is_private")
-            metadata.pop("is_finished")  # we'll finish it ourselves, thank you!!!
+            metadata = self.process_metadata(metadata)
 
-            # extra params are stored as JSON...
-            metadata["parameters"] = json.loads(metadata["parameters"])
-            if "copied_from" in metadata["parameters"]:
-                metadata["parameters"].pop("copied_from")
-            metadata["parameters"] = json.dumps(metadata["parameters"])
-
-            if not imported:
-                # if this is the first dataset we're importing, make it the
-                # processor's "own" dataset. the key has already been set to
-                # the imported dataset's key via ensure_key() (or a new unqiue
-                # key if it already existed on this server)
-                # by making it the "own" dataset, the user initiating the
-                # import will see the imported dataset as the "result" of their
-                # import query in the interface, similar to the workflow for
-                # other data sources
-                new_dataset = self.dataset
-                metadata.pop("key")  # key already OK (see above)
-                self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
-
-            else:
-                # supernumerary datasets - handle on their own
-                # these include any children of imported datasets
-                try:
-                    key_exists = DataSet(key=metadata["key"], db=self.db)
-
-                    # if we *haven't* thrown a DatasetException now, then the
-                    # key is already in use, so create a "dummy" dataset and
-                    # overwrite it with the metadata we have (except for the
-                    # key). this ensures that a new unique key will be
-                    # generated.
-                    new_dataset = DataSet(parameters={}, type=self.type, db=self.db)
-                    metadata.pop("key")
-                    self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
-
-                except DataSetException:
-                    # this is *good* since it means the key doesn't exist, so
-                    # we can re-use the key of the imported dataset
-                    self.db.insert("datasets", data=metadata)
-                    new_dataset = DataSet(key=metadata["key"], db=self.db)
-
-            # make sure the dataset path uses the new key and local dataset
-            # path settings. this also makes sure the log file is created in
-            # the right place (since it is derived from the results file path)
-            extension = metadata["result_file"].split(".")[-1]
-            new_dataset.reserve_result_file(parameters=new_dataset.parameters, extension=extension)
-
-            new_dataset.update_status("Imported dataset created")
-            if new_dataset.key != dataset_key:
-                # could not use original key because it was already in use
-                # so update any references to use the new key
-                remapped_keys[dataset_key] = new_dataset.key
-                new_dataset.update_status(f"Cannot import with same key - already in use on this server. Using key "
-                                f"{new_dataset.key} instead of key {dataset_key}!")
-
-            # refresh object, make sure it's in sync with the database
-            self.created_datasets.add(new_dataset.key)
-            new_dataset = DataSet(key=new_dataset.key, db=self.db)
-            if new_dataset.key == self.dataset.key:
-                # this ensures that the first imported dataset becomes the
-                # processor's "own" dataset, and that the import logs go to
-                # that dataset's log file. For later imports, this evaluates to
-                # False.
-                self.dataset = new_dataset
-
-            # if the key of the parent dataset was changed, change the
-            # reference to it that the child dataset has
-            if new_dataset.key_parent and new_dataset.key_parent in remapped_keys:
-                new_dataset.key_parent = remapped_keys[new_dataset.key_parent]
-
-            # update some attributes that should come from the new server, not
-            # the old
-            new_dataset.creator = dataset_owner
-            new_dataset.original_timestamp = new_dataset.timestamp
-            new_dataset.imported = True
-            new_dataset.timestamp = int(time.time())
-            new_dataset.db.commit()
+            # create the new dataset
+            new_dataset = self.create_dataset(metadata, dataset_key, primary=True if not imported else False)
 
             # then, the log
             self.halt_and_catch_fire()
@@ -353,47 +487,61 @@ class SearchImportFromFourcat(BasicProcessor):
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
-        urls = query.get("url")
-        if not urls:
-            return QueryParametersException("Provide at least one dataset URL.")
+        if query.get("method") == "zip":
+            file = request.files.get("data_upload")
+            if not file:
+                return QueryParametersException("No file uploaded.")
 
-        urls = urls.split(",")
-        bases = set([url.split("/results/")[0].lower() for url in urls])
-        keys = SearchImportFromFourcat.get_keys_from_urls(urls)
+            if not file.filename.endswith(".zip"):
+                return QueryParametersException("Uploaded file must be a ZIP file.")
 
-        if len(keys) != 1:
-            # todo: change this to < 1 if we allow multiple datasets
-            return QueryParametersException("You need to provide a single URL to a 4CAT dataset to import.")
+            return {
+                "data_upload": file
+            }
+        elif query.get("method") == "url":
+            urls = query.get("url")
+            if not urls:
+                return QueryParametersException("Provide at least one dataset URL.")
 
-        if len(bases) != 1:
-            return QueryParametersException("All URLs need to point to the same 4CAT server. You can only import from "
-                                            "one 4CAT server at a time.")
+            urls = urls.split(",")
+            bases = set([url.split("/results/")[0].lower() for url in urls])
+            keys = SearchImportFromFourcat.get_keys_from_urls(urls)
 
-        base = urls[0].split("/results/")[0]
-        try:
-            # test if API key is valid and server is reachable
-            test = SearchImportFromFourcat.fetch_from_4cat(base, keys[0], query.get("api-key"), "metadata")
-        except FourcatImportException as e:
-            raise QueryParametersException(str(e))
+            if len(keys) != 1:
+                # todo: change this to < 1 if we allow multiple datasets
+                return QueryParametersException("You need to provide a single URL to a 4CAT dataset to import.")
 
-        try:
-            # test if we get a response we can parse
-            metadata = test.json()
-        except ValueError:
-            raise QueryParametersException(f"Unexpected response when trying to fetch metadata for dataset {keys[0]}.")
+            if len(bases) != 1:
+                return QueryParametersException("All URLs need to point to the same 4CAT server. You can only import from "
+                                                "one 4CAT server at a time.")
 
-        version = get_software_version()
+            base = urls[0].split("/results/")[0]
+            try:
+                # test if API key is valid and server is reachable
+                test = SearchImportFromFourcat.fetch_from_4cat(base, keys[0], query.get("api-key"), "metadata")
+            except FourcatImportException as e:
+                raise QueryParametersException(str(e))
 
-        if metadata.get("current_4CAT_version") != version:
-            raise QueryParametersException(f"This 4CAT server is running a different version of 4CAT ({version}) than "
-                                           f"the one you are trying to import from ({metadata.get('current_4CAT_version')}). Make "
-                                           "sure both are running the same version of 4CAT and try again.")
+            try:
+                # test if we get a response we can parse
+                metadata = test.json()
+            except ValueError:
+                raise QueryParametersException(f"Unexpected response when trying to fetch metadata for dataset {keys[0]}.")
 
-        # OK, we can import at least one dataset
-        return {
-            "url": ",".join(urls),
-            "api-key": query.get("api-key")
-        }
+            version = get_software_version()
+
+            if metadata.get("current_4CAT_version") != version:
+                raise QueryParametersException(f"This 4CAT server is running a different version of 4CAT ({version}) than "
+                                               f"the one you are trying to import from ({metadata.get('current_4CAT_version')}). Make "
+                                               "sure both are running the same version of 4CAT and try again.")
+
+            # OK, we can import at least one dataset
+            return {
+                "url": ",".join(urls),
+                "api-key": query.get("api-key")
+            }
+        else:
+            raise QueryParametersException("Import method not yet implemented.")
 
     @staticmethod
     def get_keys_from_urls(urls):
