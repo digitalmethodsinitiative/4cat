@@ -5,6 +5,7 @@ Collapse post bodies into one long string
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 
+from common.lib.exceptions import AnnotationException
 
 class AnnotatePosts(BasicProcessor):
 	"""
@@ -31,15 +32,18 @@ class AnnotatePosts(BasicProcessor):
 	def process(self):
 		import random
 		annotations = []
-		with self.dataset.get_results_path().open("w") as results:
+		try:
+			with self.dataset.get_results_path().open("w") as results:
 
-			for post in self.source_dataset.iterate_items(self):
+				for post in self.source_dataset.iterate_items(self):
 
-				annotation = {"item_id": post["id"],
-							  "label": self.parameters.get("field_label", ""),
-							  "value": random.randrange(1, 1000000)}
+						annotation = {"item_id": post["id"],
+									  "label": self.parameters.get("field_label", ""),
+									  "value": random.randrange(1, 1000000)}
+						annotations.append(annotation)
 
-				annotations.append(annotation)
-
-		self.write_annotations(annotations, overwrite=self.parameters.get("overwrite", False))
-		self.dataset.finish(1)
+			if annotations:
+				self.write_annotations(annotations, overwrite=self.parameters.get("overwrite", False))
+				self.dataset.finish(1)
+		except AnnotationException as e:
+			self.dataset.finish_with_error(str(e))
