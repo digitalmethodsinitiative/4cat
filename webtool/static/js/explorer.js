@@ -43,8 +43,8 @@ const annotations = {
 				$("#toggle-annotation-fields").html("<i class='fas fa-eye-slash'></i> Hide editor");
 				toggle_fields.addClass("shown");
 				// Bit convoluted, but necessary to restore auto height
-				current_height = editor.height();
-				auto_height = editor.css("height", "auto").height();
+				let current_height = editor.height();
+				let auto_height = editor.css("height", "auto").height();
 				editor.height(current_height).animate({"height": auto_height}, 250, function(){
 					editor.height("auto");
 				});
@@ -109,7 +109,12 @@ const annotations = {
 		post_annotations.on("click", "option, input[type=checkbox], label", function() { annotations.enableSaving(); edits_made = true;});
 
 		// Keep track of whether the annotations are edited or not.
-		post_annotations.on("keydown change", ".post-annotation-input, .post-annotation input, .post-annotation textarea", function(){$(this).addClass("edited")});
+		post_annotations.on("keydown change",
+							".post-annotation-input, .post-annotation input, .post-annotation textarea",
+							function(){
+			annotations.markChanges($(this).parent());
+
+		});
 
 		// Save the annotations to the database
 		$("#save-annotations").on("click", function(){
@@ -167,7 +172,7 @@ const annotations = {
 				no_empty_fields = false;
 			}
 		input_fields.each(function(){
-			var input_field = $(this).find("input");
+			let input_field = $(this).find("input");
 			let val = input_field.val();
 
 			if (!val.length > 0) {
@@ -192,7 +197,7 @@ const annotations = {
 				count++;
 
 				// Don't add a delete option for the last (empty) input.
-				if (count == amount) {
+				if (count === amount) {
 					return false;
 				}
 				$(this).append(`
@@ -206,12 +211,12 @@ const annotations = {
 		$(el).parent().remove();
 
 		// Make sure you can't delete the last element
-		if (input_fields.find(".option-field").length == 1) {
+		if (input_fields.find(".option-field").length === 1) {
 			input_fields.find(".delete-option-field").remove();
 		}
 	},
 
-	parseAnnotationFields: function (e) {
+	parseAnnotationFields: function () {
 		/*
 		Validates and converts the fields in the annotations editor.
 		Returns an object with the set annotation fields.
@@ -271,11 +276,10 @@ const annotations = {
 				let options = []; // List of dicts, because it needs to be ordered
 				let option_labels = [];
 				let no_options_added = true;
-				let option_id = ""
 
 				options_field.find(".option-field > input").each(function(){
 					let option_label = $(this).val();
-					let option_id = this.id.replace("input-", "");
+					let option_id = $(this).id.replace("input-", "");
 
 					if (!option_labels.includes(option_label) && option_label.length > 0) {
 
@@ -321,39 +325,42 @@ const annotations = {
 		Converts the DOM objects of an annotation field
 		to an annotation Object.
 
-		Must be given an input field element
+		Must be given a .post-annotation div element
 
 		*/
-
-		let ann = $(el)
-		let field_id = ann.attr("class").split(" ")[1].replace("field-", "");
-		let annotation_type = ann.attr("class").split(" ")[2].replace("type-", "");
-		let item_id = ann.attr("class").split(" ")[3].replace("item-id-", "");
-		let author = "Jan"
-		let label = ann.find(".annotation-label").text();
+		console.log(el)
+		let ann_input = el.find(".post-annotation-input");
+		let ann_classes = el.attr("class").split(" ");
+		let ann_input_classes = ann_input.attr("class").split(" ");
+		let field_id = ann_input_classes[1].replace("field-", "");
+		let annotation_type = ann_classes[2].replace("type-", "");
+		let item_id = ann_classes[3].replace("item-id-", "");
+		let label = el.find(".annotation-label").text();
+		let author = el.find(".annotation-author").html();
+		let timestamp = parseInt(el.find(".epoch-timestamp-edited").html());
 
 		let val = undefined;
 		let edited = false
 
 		if (annotation_type === "text" || annotation_type === "textarea") {
-			val = ann.find(".post-annotation-input").val();
+			val = ann_input.val();
 			// It can be the case that the input text is deleted
 			// In this case we *do* want to push new data, so we check
 			// whether there's an 'edited' class present and save if so.
-			if (ann.find(".post-annotation-input").hasClass("edited")) {
+			if (ann_input.hasClass("edited")) {
 				edited = true
 			}
 		}
 		else if (annotation_type === "dropdown") {
-			val = ann.find(".post-annotation-options").val();
+			val = ann_input.find(".post-annotation-options").val();
 		}
 		else if (annotation_type === "checkbox") {
 			val = [];
-			ann.find(".post-annotation-options > input").each(function(){
-				if (ann.is(":checked")) {
-					val.push(ann.val());
+			ann_input.find(".post-annotation-options > input").each(function(){
+				if (ann_input.is(":checked")) {
+					val.push(ann_input.val());
 				}
-				if (ann.hasClass("edited")) {
+				if (ann_input.hasClass("edited")) {
 					edited = true
 				}
 			});
@@ -361,16 +368,17 @@ const annotations = {
 				val = undefined;
 			}
 		}
-		/*if ((val !== undefined && val !== "") || edited) {
-			vals_changed = true;
-			val = "";
-			console.log("EDITED")
-		}*/
 
-		/*if (vals_changed){
-			annotation[post_id] = post_vals;
-		}
-*/
+		// if ((val !== undefined && val !== "") || edited) {
+		// 	vals_changed = true;
+		// 	val = "";
+		// 	console.log("EDITED")
+		// }
+		//
+		// if (vals_changed){
+		// 	annotation[post_id] = post_vals;
+		// }
+
 		// Create an annotation object and add them to the array.
 		let annotation = {
 			"field_id": field_id,
@@ -379,7 +387,8 @@ const annotations = {
 			"type": annotation_type,
 			"value": val,
 			"author": author,
-			"by_processor": false // Explorer annotations are human-made!
+			"by_processor": false, // Explorer annotations are human-made!
+			"timestamp": timestamp
 		}
 		console.log(annotation)
 		return annotation
@@ -395,7 +404,6 @@ const annotations = {
 		// Show an error message if the annotation fields were not valid.
 		if (typeof annotation_fields == "string") {
 			annotations.warnEditor(annotation_fields);
-			return
 		}
 
 		// If everything is ok, we're going to add
@@ -414,247 +422,9 @@ const annotations = {
 			});
 
 			// We store the annotation fields in the dataset table.
-			annotations.saveAnnotationFields(annotation_fields)
-
-			// Get the ID (stored as class) of fields we've already added (could be none)
-			var added_fields = [];
-			$(".posts li").first().find(".post-annotation").each(function(){
-				cls = this.className.split(" ")[1];
-				if (!added_fields.includes(cls)){
-					added_fields.push(cls);
-				}
-			});
-
-			// Add input fields to every post in the explorer.
-			// We take the annotations of the first post to check
-			// what's the current state and add them to every post after.
-			let text_fields = ["textarea", "text"];
-
-			// Loop through all the annotation fields
-			for (var field in annotation_fields) {
-
-				// Get some variables
-				let input_type = annotation_fields[field].type;
-				let input_label = annotation_fields[field].label;
-				let input_id = "field-" + field;
-				let class_id = "." + input_id;
-
-				// We first have to check whether this annotation field was already added.
-				// If this is the case, we're either going to add or convert the fields.
-				if (added_fields.includes(input_id)) {
-					
-					// Edit the labels if they have changed.
-					label_span = $(class_id + " > .annotation-label");
-					label = label_span.first().text();
-					if (label !== input_label) {
-						label_span.each(function(){
-							$(this).text(input_label);
-						});
-					}
-
-					// If the type of input field has changed,
-					// we'll convert the data where possible.
-					// Last class is the input type
-					let old_input_type = $(class_id).first().attr('class').split(' ').at(-1); 
-
-					// If the change is between a textbox and textarea,
-					// change the input type and carry over the text.
-					if (input_type !== old_input_type) {
-
-						if (text_fields.includes(input_type) && text_fields.includes(old_input_type)) {
-							
-							$(class_id + " > .post-annotation-input").each(function(){
-
-								// Get the old inserted text, if it's present
-								let add_val = "";
-								if ($(this).val().length > 0 && $(this).val() != undefined ){
-									add_val = $(this).val();
-								}
-
-								// Replace the HTML element, insert old values, and change the type class
-								if (input_type === "text" && old_input_type === "textarea") {
-									$(this).parent().removeClass("textarea").addClass("text");
-									$(this).replaceWith($("<input type='text' class='post-annotation-input text-" + field + "'>").val(add_val));
-								}
-								else if (input_type === "textarea" && old_input_type === "text") {
-									$(this).parent().removeClass("text").addClass("textarea");
-									$(this).replaceWith($("<textarea class='post-annotation-input textarea-" + field + "'>" + add_val + "</textarea>"));
-								}
-							});
-						}
-
-						// We don't don't convert for changes between checkboxes and dropdowns
-						// or between a text input and dropdowns or checkboxes.
-						// Simply replace the elements. Old data will be lost.
-						else {
-							$(class_id).remove();
-							fields_to_add[field] = annotation_fields[field];
-						}
-					}
-
-					// For dropdowns and checkboxes, we're checking whether we 
-					// have to add or change any of their options.
-					else if (input_type === "checkbox" || input_type === "dropdown"){
-
-						let options = annotation_fields[field].options;
-						let valid_options = [];
-						let option_list = $(class_id).find(".post-annotation-options");
-
-						// Let's take the first post's options as a check.
-						let existing_options = $(class_id).first();
-
-						for (let i in options) {
-							
-							for (let option_id in annotation_fields[field]["options"][i]) {
-								
-								//let option_id = annotation_fields[field]["options"][i][option_id];
-								let existing_option = existing_options.find(".option-" + option_id);
-								let old_label = existing_option.first().val();
-								let new_label = annotation_fields[field]["options"][i][option_id];
-								
-								// If this field does not exist yet, add it
-								if (!existing_option.length) {
-									
-									option_list.each(function(){
-										// We need a unique ID for the posts's specific option element.
-										// Else it gets messy with elements across posts.
-										let post_id = $(this).parents("li").attr("id").split("post-")[1];
-										post_option_id = post_id + "-" + option_id;
-
-										if (input_type === "dropdown") {
-											$(this).append("<option class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "'>" + new_label + "</option>");
-										}
-										else if (input_type === "checkbox") {
-											$(this).append("<input class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "' type='checkbox'><label for='option-" + post_option_id + "'>" + new_label + "</label>");
-										}
-									});
-								}
-
-								// Change the option labels if they have been edited
-								else if (old_label != new_label) {
-									$(class_id).find(".option-" + option_id).each(function(){
-										$(this).val(new_label).text(new_label);
-										$(this).next("label").text(new_label);	
-									});
-								}
-								valid_options.push("option-" + option_id);
-							}
-						}
-
-						// Delete any fields that were removed from the checkbox/dropdown.
-						let present_options = [];
-						option_list.first().find(".post-annotation-input").each(function(){
-							if ((this.id).length > 0) {
-								present_options.push(this.className.replace(" edited", "").split(" ").at(-1));
-							}
-						});
-
-						for (let z in present_options) {
-							if (!valid_options.includes(present_options[z])){
-								let remove_input = $(class_id).find("." + present_options[z]);
-								remove_input.next("label").remove();
-								remove_input.remove();
-							}
-						}
-					}
-				}
-				
-				// If this annotation has not been added yet, do so now.
-				else {
-					fields_to_add[field] = annotation_fields[field];
-				}
-			}
-
-			// Else we're adding them
-			for (var add_field in fields_to_add) {
-
-				// Get some variables
-				let input_type = fields_to_add[add_field].type;
-				let input_id = "field-" + add_field;
-				let input_label = fields_to_add[add_field].label
-
-				// Add a label for the field
-				el = "<div class='post-annotation " + input_id + " " + input_type + "'><label class='annotation-label' for='" + add_field + "{POST_ID}'>" + input_label + "</label>";
-
-				// Add a text input for text fields
-				if (input_type === "text") {
-					el += "<input type='text' class='post-annotation-input text-" + add_field + "'>";
-				}
-				else if (input_type === "textarea") {
-					el += "<textarea class='post-annotation-input textarea-" + add_field + "'></textarea>";
-				}
-
-				// Add a dropdown for dropdown fields
-				else if (input_type === "dropdown") {
-
-					el += "<select class='post-annotation-options select-" + add_field + "' id='options-" + add_field + "-{POST_ID}'>";
-					
-					// Add an empty option field first
-					el += "<option class='post-annotation-input'></option>";
-
-					let options = fields_to_add[add_field].options;
-					let option_id = "";
-
-					for (let i in options) {
-						for (let option_id in options[i]) {
-							option_label = options[i][option_id];
-						}
-						el += "<option class='post-annotation-input option-" + option_id + "' id='option-" + option_id + "' value='" + option_label + "'>" + option_label + "</option>";
-					}
-					el += "</select>";
-				}
-
-				// Add checkboxes for checkbox fields
-				else if (input_type === "checkbox") {
-
-					el += "<div class='post-annotation-options checkboxes-" + add_field + "'>";
-					let options = fields_to_add[add_field].options;
-
-					for (let i in options) {
-
-						for (let option_id in options[i]) {
-							
-							option_label = options[i][option_id];
-						
-							el += "<input type='checkbox' class='post-annotation-input option-" + option_id + "' id='option-{POST_ID}-" + option_id + "' value='" + option_label + "'><label for='option-{POST_ID}-" + option_id + "'>" + option_label + "</label>";
-						}
-					}
-					el += "</div>";
-				}
-				el += "</div>";
-				$(".posts li").each(function(){
-					let post_id = this.id.split("post-")[1];
-					$(this).find(".post-annotations").append(el.replaceAll("{POST_ID}", post_id));
-				});
-			}
+			annotations.saveAnnotationFields(annotation_fields);
+			location.reload();
 		}
-		
-		// Remove annotation forms that are deleted
-		var valid_fields = [];
-		for (var f in annotation_fields) {
-			valid_fields.push("field-" + f);
-		}
-		var present_annotations = $(".post-annotations").first().find(".post-annotation")
-		present_annotations.each(function(){
-			let present_id = $(this).attr("class").split(" ")[1];
-			if (!valid_fields.includes(present_id)) {
-				$("." + present_id).remove();
-			}
-		});
-		
-		// Hide annotations if there's no fields leftover
-		var leftover_annotations = $(".post-annotations").first().find(".post-annotation");
-		if (leftover_annotations.length < 1) {
-			annotations.hideAnnotations();
-			$("#toggle-annotations").addClass("disabled");
-		}
-		// Else we're showing 'em
-		else {
-			annotations.showAnnotations();
-			$("#toggle-annotations").removeClass("disabled");
-		}
-
-		$("#apply-annotation-fields").html("<i class='fas fa-check'></i> Apply")
 	},
 
 	saveAnnotationFields: function (annotation_fields){
@@ -695,7 +465,7 @@ const annotations = {
 		});
 	},
 
-	saveAnnotations: function (e){
+	saveAnnotations: function (){
 		// Write the annotations to the dataset and annotations table.
 
 		// First we're going to collect the data for this page.
@@ -705,7 +475,6 @@ const annotations = {
 
 		$(".posts > li").each(function(){
 
-			let vals_changed = false;
 			let post_annotations = $(this).find(".post-annotations");
 
 			if (post_annotations.length > 0) {
@@ -713,7 +482,7 @@ const annotations = {
 				post_annotations.find(".post-annotation").each(function(){
 					
 					// Extract annotation object from the element
-					let annotation = annotations.parseAnnotation(this);
+					let annotation = annotations.parseAnnotation($(this));
 
 					if (annotation) {
 						anns.push(annotation);
@@ -721,11 +490,13 @@ const annotations = {
 				});
 			}
 		})
-		
-		$("#save-annotations").html("<i class='fas fa-circle-notch spinner'></i> Saving annotations")
+
+		let save_annotations = $("#save-annotations");
+		save_annotations.html("<i class='fas fa-circle-notch spinner'></i> Saving annotations")
 		annotations.disableSaving();
 
 		let code = ""
+
 		$.ajax({
 			url: getRelativeURL("explorer/save_annotations/" + dataset_key),
 			type: "POST",
@@ -738,24 +509,24 @@ const annotations = {
 					code = response
 
 					annotations.enableSaving();
-					$("#save-annotations").html("<i class='fas fa-save'></i> Annotations saved");
-					$("#save-annotations").addClass("disabled");
-					old_annotation_fields = $("#annotation-field").each();
+					save_annotations.html("<i class='fas fa-save'></i> Annotations saved");
+					save_annotations.addClass("disabled");
+					//var old_annotation_fields = $("#annotation-field").each();
 					// alert(alert_message);
 				}
 				else {
 					annotations.enableSaving();
-					$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
-					alert("Could't save annotations");
-					$("#save-annotations").removeClass("disabled");
+					save_annotations.html("<i class='fas fa-save'></i> Save annotations");
+					alert("Couldn't save annotations");
+					save_annotations.removeClass("disabled");
 					console.log(response);
 				}
 			},
 			error: function (error) {
 				annotations.enableSaving();
-				$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
-				$("#save-annotations").removeClass("disabled");
-				//alert("Could't save annotations");
+				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
+				save_annotations.removeClass("disabled");
+				//alert("Couldn't save annotations");
 				console.log(error)
 			}
 		});
@@ -804,8 +575,8 @@ const annotations = {
 		ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
 		// Bit convoluted, but necessary to have auto height
 		let pa = $(".post-annotations");
-		current_height = pa.height();
-		auto_height = pa.css("height", "auto").height();
+		let current_height = pa.height();
+		let auto_height = pa.css("height", "auto").height();
 		pa.height(current_height).animate({"height": auto_height}, 250, function(){
 			pa.height("auto");
 		});
@@ -852,27 +623,37 @@ const annotations = {
 		}
 		return "<div class='option-field'><input type='text' id='input-" + id + "' placeholder='Value'></div>";
 	},
+
+	markChanges: function(el) {
+		// Adds current changes to a post annotation so we can save these later.
+		// Currently includes the time of edits and the username of the annotator
+		let current_username = $("#current-username").html();
+		let current_date = Date.now() / 1000;
+		let input_field = el.find(".post-annotation-input");
+		input_field.addClass("edited");
+		$(el).find(".annotation-author").html(current_username);
+		$(el).find(".epoch-timestamp-edited").html(current_date);
+		$(el).find(".timestamp-edited").html(getLocalTimeStr(current_date));
+	}
 };
 
 const page_functions = {
 	init: function() {
-		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseover', function(e) {
+		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseover', function() {
 			let post = 'post-' + this.getAttribute('href').split('-').pop();
 			document.querySelector('#' + post).classList.add('highlight');
 		}));
-		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseout', function(e) {
+		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseout', function() {
 			document.querySelectorAll('.thread li').forEach(link => link.classList.remove('highlight'));
 		}));
 
 		// Change timestamps to the client's timezone
 		document.querySelectorAll(".timestamp-to-convert").forEach(function(el){
-			let local_date = new Date(parseInt(el.innerText) * 1000)
-			el.innerText = new Intl.DateTimeFormat("en-GB", {dateStyle: "medium", timeStyle: "medium"}).format(local_date)
+			el.innerText = getLocalTimeStr(el.innerText);
 		});
 
 		// Reorder the dataset when the sort type is changed
 		$(".sort-select").on("change", function(){
-
 
 			// Get the column to sort on, an whether we should sort in reverse.
 			let selected = $("#column-sort-select").find("option:selected").val();
@@ -914,5 +695,10 @@ function getRelativeURL(endpoint) {
 	return root + endpoint;
 }
 
+function getLocalTimeStr(epoch_timestamp) {
+	let local_date = new Date(parseInt(epoch_timestamp) * 1000)
+	local_date = Intl.DateTimeFormat("en-GB", {dateStyle: "medium", timeStyle: "medium"}).format(local_date);
+	return local_date
+}
 
 });
