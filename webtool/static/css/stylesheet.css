@@ -493,6 +493,10 @@ button.tooltip-trigger {
     border-color: var(--gray-dark);
 }
 
+p[role=tooltip] > .tooltip-line {
+    display: inline-block;
+}
+
 
 /** --------------------- *
           Tab containers
