@@ -33,7 +33,8 @@ class Annotation:
     type = None               # Type of annotation (e.g. `text`)
     options = None            # Possible options
     value = None              # The actual annotation value
-    author = None             # Who made the annotation
+    author = None             # Who last edited the annotation
+    author_original = None    # Who originally made the annotation
     by_processor = None       # Whether the annotation was made by a processor
     metadata = None           # Misc metadata
 
@@ -115,6 +116,7 @@ class Annotation:
                 "options": data.get("options", ""),
                 "value": data.get("value", ""),
                 "author": data.get("author", ""),
+                "author_original": data.get("author_original", ""),
                 "by_processor": data.get("by_processor", False),
                 "metadata": data.get("metadata", {}),
             }

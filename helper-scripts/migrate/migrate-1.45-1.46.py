@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS annotations_new (
   options           TEXT,
   value             TEXT,
   author            TEXT,
+  author_original   TEXT,
   by_processor      BOOLEAN DEFAULT FALSE,
   metadata          TEXT
 );
