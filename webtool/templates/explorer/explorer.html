@@ -10,6 +10,7 @@
 
 <!-- Load some variables for which we need Jinja2 -->
 <script type="text/javascript">
+
 // Annotation fields
 var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %}
 
@@ -25,6 +26,8 @@ for (a in annotation_fields) {
 }
 
 </script>
+
+    <span id="current-username" style="display: none">{{ current_user.get_name() }}</span>
 
 <!-- Don't show certain data if the dataset is pseudonymised -->
 {% set pseudonymised = True if dataset.parameters and dataset.parameters.get('pseudonymise', False) %}

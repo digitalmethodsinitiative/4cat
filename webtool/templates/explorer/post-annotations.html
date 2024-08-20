@@ -51,23 +51,38 @@
 			{% endif %}
 
             {# Tooltip with metadata on the annotation #}
-            {% if annotation.author or annotation.timestamp or annotation.metadata %}
+            {% if annotation.author or annotation.author_original or annotation.timestamp or annotation.metadata %}
                 <button class="tooltip-trigger" aria-controls="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}">?</button>
                 <p role="tooltip" id="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}" aria-hidden="true">
-                {% if annotation.author or annotation.timestamp %}
-                    Last edited by{% if annotation.by_processor %} processor{% endif %} {% if annotation.author %}<strong>{{ annotation.author }}</strong>{% endif %}{% if annotation.timestamp %} on <span class="timestamp-to-convert">{{ annotation.timestamp }}</span>{% endif %}
+                {% if annotation.author_original %}
+                    <span class="tooltip-line">Created by {% if annotation.by_processor %} processor{% endif %} {% if annotation.author_original %}<strong>{{ annotation.author_original }}</strong>{% endif %}
+                    {% if annotation.timestamp_created %}
+                        on <span class="timestamp-created timestamp-to-convert">{{ annotation.timestamp_created }}</span>
+                    {% endif %}</span>
                 {% endif %}
+                {% if annotation.author != annotation.author_original or annotation.timestamp != annotation.timestamp_created %}
+                    <span class="tooltip-line">Edited by{% if annotation.by_processor %} processor{% endif %} {% if annotation.author %}<strong><span class="annotation-author">{{ annotation.author }}</span></strong>{% endif %}{% if annotation.timestamp %} on <span class="timestamp-edited timestamp-to-convert">{{ annotation.timestamp }}</span>{% endif %}
+                {% endif %}</span>
                 {# Extra stuff we may want to display #}
                 {% if annotation.metadata %}
                     {% set metadata = annotation.metadata | fromjson %}
                     {% if metadata.get("processor-parameters") %}
+                        <span class="tooltip-line">
                         {% for parameter in metadata["processor-parameters"] %}
                             <span class="property-badge"><i class="fa fa-check" aria-hidden="true"></i> {{ parameter }}</span>
                         {% endfor %}
+                        </span>
                     {% endif %}
                 </p>
                 {% endif %}
             {% endif %}
+
+            {# Store some invisible data here to we can retrieve in with JS #}
+            <div class="annotation-data" style="display: none">
+                <span class="epoch-timestamp-edited">{{ annotation.timestamp }}</span>
+                <span class="annotation-author">{{ annotation.author }}</span>
+            </div>
+
 			</div>
 		{% endfor %}
 	{% endif %}

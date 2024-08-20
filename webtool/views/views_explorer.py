@@ -19,13 +19,14 @@ from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
-@app.route('/results/<string:dataset_key>/explorer/', defaults={'page': 1})
-@app.route('/results/<string:dataset_key>/explorer/page/<int:page>')
+
+@app.route("/results/<string:dataset_key>/explorer/", defaults={"page": 1, "show_annotations": False})
+@app.route("/results/<string:dataset_key>/explorer/page/<int:page>")
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_dataset(dataset_key: str, page=1):
+def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 	"""
 	Show posts from a dataset
 

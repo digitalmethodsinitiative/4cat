@@ -117,10 +117,10 @@
                         <dd>
                             {% set annotations = dataset.get_annotations() %}
                             {% if annotations %}
-                                {{ annotations|length|numberify }} item{% if annotations|length > 1 %}s{% endif %} annotated with fields
+                                {{ annotations|length|numberify }} annotation{% if annotations|length > 1 %}s{% endif %}
                             {% endif %}
                             {% for annotation_field in annotation_fields.items() %}
-                                <span class="property-badge">{{ annotation_field[1].type }}</span> {{ annotation_field[1].label }}
+                                <span class="property-badge">{{ annotation_field[1].label }}</span>
                             {% endfor %}
                         </dd>
                     </div>
