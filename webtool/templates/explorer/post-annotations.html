@@ -55,7 +55,7 @@
                 <button class="tooltip-trigger" aria-controls="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}">?</button>
                 <p role="tooltip" id="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}" aria-hidden="true">
                 {% if annotation.author or annotation.timestamp %}
-                    Last edited by{% if annotation.by_processor %} processor{% endif %} {% if annotation.author %}<strong>{{ annotation.author }}</strong>{% endif %}{% if annotation.timestamp %} on {{ annotation.timestamp |  datetime(fmt="%d %B, %H:%M", wrap=False) }}{% endif %}
+                    Last edited by{% if annotation.by_processor %} processor{% endif %} {% if annotation.author %}<strong>{{ annotation.author }}</strong>{% endif %}{% if annotation.timestamp %} on <span class="timestamp-to-convert">{{ annotation.timestamp }}</span>{% endif %}
                 {% endif %}
                 {# Extra stuff we may want to display #}
                 {% if annotation.metadata %}

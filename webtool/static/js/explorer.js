@@ -864,6 +864,12 @@ const page_functions = {
 			document.querySelectorAll('.thread li').forEach(link => link.classList.remove('highlight'));
 		}));
 
+		// Change timestamps to the client's timezone
+		document.querySelectorAll(".timestamp-to-convert").forEach(function(el){
+			let local_date = new Date(parseInt(el.innerText) * 1000)
+			el.innerText = new Intl.DateTimeFormat("en-GB", {dateStyle: "medium", timeStyle: "medium"}).format(local_date)
+		});
+
 		// Reorder the dataset when the sort type is changed
 		$(".sort-select").on("change", function(){
 
