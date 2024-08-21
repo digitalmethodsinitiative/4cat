@@ -697,25 +697,41 @@ body.image-preview {
 }
 
 /* Explorer view */
-#annotation-fields-editor {
-    height: 0;
-    overflow: hidden;
-}
-
 #annotation-fields-editor-controls {
-    display: grid;
-    grid-template-columns: auto auto auto;
+
 }
 
-#annotation-fields-editor-controls>div {
-    border-bottom: 1px solid var(--contrast-bright);
+#annotation-fields-editor-controls li {
+    position: relative;
+    background: white;
+}
+
+#annotation-fields-editor-controls li:not(:last-child) {
+  border-bottom: 1px dotted var(--contrast-dark);
+}
+
+.annotation-field > span, .annotation-field > i, .annotation-field > select {
+    vertical-align: top;
+}
+
+.annotation-field > i {
+    padding-top: 10px;
+}
+
+.option-fields {
+    display: inline-block;
+    max-width: 250px;
+}
+
+.option-field {
+    display: inline-block;
 }
 
 #edit-annotation-fields #input-warning {
     color: var(--accent-error);
 }
 
-/* Remove all styles for explorer posts */
+/* Remove all styles for Explorer posts */
 /* these ought to be defined specifically, */
 /* and 4CAT styles shouldn't interfere. */
 #explorer-posts, #explorer-posts > ol li {
@@ -743,6 +759,14 @@ body.image-preview {
     min-width: 140px;
 }
 
-.annotation-field-label.invalid {
+.annotation-field-label.invalid, .option-field > input.invalid {
     border: 1px solid red;
+}
+
+#edit-annotation-fields {
+    padding: 0.5em
+}
+
+.delete-input {
+    float: right;
 }

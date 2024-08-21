@@ -74,11 +74,9 @@ const annotations = {
 		// Delete an entire annotation input
 		// We're in a grid of threes, so this involves three divs
 		editor_controls.on("click", ".annotation-field > .delete-input", function(){
-				let parent_div = $(this).parent().parent();
-				parent_div.next().remove(); // Input type
-				parent_div.next().remove(); // Options
-				parent_div.remove();		// Label
-			});
+			let parent_div = $(this).parent();
+			parent_div.remove();
+		});
 
 		// Make saving available when annotation fields are changed
 		editor_controls.on("click", ".delete-option-field", function() {
@@ -144,25 +142,20 @@ const annotations = {
 
 	toggleField: function (el) {
 		// Change the type of input fields when switching in the dropdown
-
 		let type = $(el).val();
-
-		let options = $(el).parent().parent().next();
-		let option_fields = options.find(".option-field");
-
+		let options = $(el).parent().parent().find(".option-fields");
 		if (type === "text" || type === "textarea") {
-			option_fields.remove();
+			options.remove();
 		}
 		else if (type === "dropdown" || type === "checkbox") {
-			if (option_fields.length === 0) {
+			if (options.children().length === 0) {
 				options.append(annotations.getInputField);
 			}
 		}
 	},
 
 	addOptions: function (el){
-		// Dynamically a new options for dropdowns and checkboxes
-
+		// Dynamically a new options for dropdowns and checkboxes in the fields editor.
 		// If text is added to a field, and there are 
 		// no empty fields available, add a new one.
 		let no_empty_fields = true;
@@ -232,25 +225,25 @@ const annotations = {
 
 		// Parse information from the annotations editor.
 		$(".annotation-field").each(function(){
-			// To align the input form, we're in a grid of threes:
-			// label, input type, options.
-			// Navigate the DOM to get these elements:
-			let label_field = $(this).children(".annotation-field-label");
-			let type_field = $(this).parent().next();
-			let options_field = $(this).parent().next().next();
 
+			let ann_field = $(this);
+
+			let label_field = ann_field.find(".annotation-field-label");
+			let type = ann_field.find(".annotation-field-type").val();
+			let option_fields = ann_field.find(".option-fields");
 			let label = label_field.val().replace(/\s+/g, ' ');
+			let no_options_added = false
 
 			// Get the ID of the field, so we
 			// can later check if it already exists.
-			let field_id = this.id.split("-")[1];
+			let field_id = ann_field.attr("id").split("-")[1];
 
 			// Make sure the inputs have a label
 			if (!label.length > 0) {
 				label_field.addClass("invalid");
 				warning  = "Field labels can't be empty";
 			}
-			// Make sure the names can't be duplicates
+			// Make sure the labels can't be duplicates
 			else if (labels_added.includes(label)) {
 				warning = "Field labels must be unique";
 				label_field.addClass("invalid");
@@ -262,29 +255,27 @@ const annotations = {
 				label_field.addClass("invalid");
 			}
 
-			// Set the types and values of the annotation
-			type = type_field.find(".annotation-field-type").val();
-
 			// Keep track of the labels we've added
-			labels_added.push(label)
-
+			labels_added.push(label);
 			if (type === "text" || type === "textarea") {
 				annotation_fields[field_id] = {"type": type, "label": label};
 			}
 			// Add options for dropdowns and checkboxes
-			else {
+			else if (option_fields.length > 0) {
 				let options = []; // List of dicts, because it needs to be ordered
 				let option_labels = [];
-				let no_options_added = true;
 
-				options_field.find(".option-field > input").each(function(){
-					let option_label = $(this).val();
-					let option_id = $(this).id.replace("input-", "");
+				no_options_added = true;
 
+				option_fields.find(".option-field").each(function(){
+					let option_input = $(this).find("input");
+					let option_label = option_input.val();
+					let option_id = option_input.attr("id").replace("option-", "");
+					// New option label
 					if (!option_labels.includes(option_label) && option_label.length > 0) {
 
 						// We're using a unique key for options as well.
-						option = {}
+						let option = {}
 						option[option_id] = option_label
 						options.push(option);
 						option_labels.push(option_label);
@@ -300,10 +291,9 @@ const annotations = {
 					// But there must be at least one field in there.
 
 				});
-
 				if (no_options_added) {
 					warning = "At least one field must be added";
-					$(this).find(".option-field > input").first().addClass("invalid");
+					ann_field.find(".option-fields .option-field input").first().addClass("invalid");
 				}
 
 				if (Object.keys(options).length > 0) {
@@ -322,13 +312,13 @@ const annotations = {
 
 	parseAnnotation: function(el) {
 		/*
-		Converts the DOM objects of an annotation field
-		to an annotation Object.
+		Converts the DOM objects of an annotation
+		to an annotation object.
 
-		Must be given a .post-annotation div element
+		Must be given a .post-annotation div element.
 
 		*/
-		console.log(el)
+
 		let ann_input = el.find(".post-annotation-input");
 		let ann_classes = el.attr("class").split(" ");
 		let ann_input_classes = ann_input.attr("class").split(" ");
@@ -390,7 +380,6 @@ const annotations = {
 			"by_processor": false, // Explorer annotations are human-made!
 			"timestamp": timestamp
 		}
-		console.log(annotation)
 		return annotation
 	},
 
@@ -399,7 +388,6 @@ const annotations = {
 
 		// First we collect the annotation information from the editor
 		let annotation_fields = annotations.parseAnnotationFields(e);
-		let fields_to_add = {};
 
 		// Show an error message if the annotation fields were not valid.
 		if (typeof annotation_fields == "string") {
@@ -596,24 +584,25 @@ const annotations = {
 		these have no IDs yet, we'll add a hashed database-label string when saving.
 		*/
 
-		let annotation_field = `<div>
-             <dd class="annotation-fields-row annotation-field">
-                 <input type="text" id="field-undefinedrandomint"
-                 class="annotation-field-label" name="annotation-field-label" placeholder="Field label">
-                 <a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
-             </dd>
-         </div>
-         <div>
-             <dd>
-                 <select name="annotation-field-type" class="annotation-field-type">
-                     <option class="annotation-field-option" value="text" selected>Text</option>
-                     <option class="annotation-field-option" value="textarea">Text (large)</option>
-                     <option class="annotation-field-option" value="checkbox">Checkbox</option>
-                     <option class="annotation-field-option" value="dropdown">Dropdown</option>
-                 </select>
-             </dd>
-         </div><div></div>`.replace("randomint", Math.floor(Math.random() * 100000000).toString());
-		$(annotation_field).insertBefore($("#edit-annotation-fields"));
+		let annotation_field = `
+			<li class="annotation-field" id="field-randomint">
+				<i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
+				 <span class="annotation-fields-row">
+					<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Label">
+				</span>
+				 <span>
+					<select name="annotation-field-type" class="annotation-field-type">
+						<option class="annotation-field-option" value="text" selected>Text</option>
+						<option class="annotation-field-option" value="textarea">Text (large)</option>
+						<option class="annotation-field-option" value="dropdown">Single choice</option>
+						<option class="annotation-field-option" value="checkbox">Multiple choice</option>
+					</select>
+				</span>
+				<span class="option-fields"></span>
+				<a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
+            </li>
+			`.replace("randomint", Math.floor(Math.random() * 100000000).toString());
+		$("#annotation-field-settings").append(annotation_field);
 	},
 
 	getInputField: function(id){
@@ -621,7 +610,7 @@ const annotations = {
 		if (id === undefined || id === 0) {
 			id = Math.floor(Math.random() * 100000000).toString();
 		}
-		return "<div class='option-field'><input type='text' id='input-" + id + "' placeholder='Value'></div>";
+		return "<span class='option-field'><input type='text' id='option-" + id + "' placeholder='Option'></span>";
 	},
 
 	markChanges: function(el) {
@@ -651,6 +640,18 @@ const page_functions = {
 		document.querySelectorAll(".timestamp-to-convert").forEach(function(el){
 			el.innerText = getLocalTimeStr(el.innerText);
 		});
+
+		// Make annotation field editor sortable
+		$('#annotation-field-settings').sortable({
+            cursor: "s-resize",
+            handle: ".handle",
+            items: "li",
+            axis: "y",
+			containment: "#annotation-field-settings",
+			change: function() {
+				$("#apply-annotation-fields").removeClass("disabled");
+			}
+        });
 
 		// Reorder the dataset when the sort type is changed
 		$(".sort-select").on("change", function(){

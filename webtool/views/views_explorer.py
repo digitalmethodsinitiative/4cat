@@ -210,31 +210,6 @@ def explorer_save_annotations(dataset_key: str):
 	dataset.save_annotations(annotations, overwrite=True)
 	return "success"
 
-
-@app.route("/explorer/get_annotation_field", methods=["GET"])
-@api_ratelimit
-@login_required
-@setting_required("privileges.can_run_processors")
-@setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
-def get_annotation_field():
-	"""
-	Returns an annotation field input div
-
-	:return-error 406:  If the list of subqueries could not be parsed.
-	"""
-	try:
-		annotation_field = json.loads(request.args.get("annotation_field"))
-	except (TypeError, json.decoder.JSONDecodeError):
-		return error(406, error="Unexpected format for annotation field.")
-
-	html = render_template("explorer/annotation-field.html", annotation_field=annotation_field)
-	return jsonify({
-		"status": "success",
-		"html": html}
-	)
-
-
 def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs) -> dict:
 	"""
 	Loop through both csv and NDJSON files.
