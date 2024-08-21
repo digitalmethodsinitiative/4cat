@@ -239,7 +239,7 @@ class Tokenise(BasicProcessor):
 		numbers = re.compile(r"\b[0-9]+\b")
 
 		# load general stopwords dictionary
-		with config.get("PATH_ROOT").joinpath("common/assets/stopwords-iso.json").open() as infile:
+		with open(config.get("PATH_ROOT").joinpath("common/assets/stopwords-iso.json"), encoding="utf-8") as infile:
 			stopwords_iso = json.load(infile)
 
 		# Twitter tokenizer if indicated
