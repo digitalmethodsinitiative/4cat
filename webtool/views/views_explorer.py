@@ -13,7 +13,7 @@ from webtool import app, db, openapi, limiter, config
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import convert_to_float, hash_values
-from common.lib.exceptions import DataSetException
+from common.lib.exceptions import DataSetException, AnnotationException
 from common.config_manager import ConfigWrapper
 
 config = ConfigWrapper(config, user=current_user, request=request)
@@ -148,7 +148,7 @@ def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_save_annotation_fields(dataset_key: str) -> str:
+def explorer_save_annotation_fields(dataset_key: str):
 	"""
 	Save the annotation fields of a dataset to the datasets table.
 
@@ -174,14 +174,19 @@ def explorer_save_annotation_fields(dataset_key: str) -> str:
 	# dataset key and the input label (should be unique)
 	field_keys = list(annotation_fields.keys())
 	for field_id in field_keys:
-		if "undefined" in field_id:
+		if "tohash" in field_id:
 			new_field_id = hash_values(dataset_key + annotation_fields[field_id]["label"])
 			annotation_fields[new_field_id] = annotation_fields[field_id]
 			del annotation_fields[field_id]
 
-	dataset.save_annotation_fields(annotation_fields)
+	try:
+		fields_saved = dataset.save_annotation_fields(annotation_fields)
+	except AnnotationException as e:
+		# If anything went wrong with the annotation field saving, return an error.
+		return jsonify(error=str(e)), 400
 
-	return "success"
+	# Else return the amount of fields saved.
+	return str(fields_saved)
 
 @app.route("/explorer/save_annotations/<string:dataset_key>", methods=["POST"])
 @api_ratelimit

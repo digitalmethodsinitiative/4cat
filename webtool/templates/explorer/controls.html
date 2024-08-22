@@ -23,8 +23,8 @@
 						<li class="annotation-control-button">
 							<a class="button-like-small" id="toggle-annotation-fields"><i class="fas fa-edit"></i> Edit fields</a>
 						</li>
-						<li class="annotation-control-button"><a class="button-like-small{% if not annotation_fields %} disabled{% endif %}" id="toggle-annotations"><i class="fas fa-eye"></i> Show annotations</li></a>
-						<li class="annotation-control-button"><a class="button-like-small{% if annotation_fields and annotations %} disabled{% endif %}" id="save-annotations"><i class="fas fa-save"></i> {% if not annotations %}No annotations{% else %}Annotations saved{% endif %}</a>
+						<li class="annotation-control-button"><a class="button-like-small{% if not annotation_fields %} disabled{% endif %}" id="toggle-annotations"><i class="fas fa-eye"></i> Show annotations</a></li>
+						<li class="annotation-control-button"><a class="button-like-small {% if not annotation_fields %} disabled{% endif %}" id="save-annotations"><i class="fas fa-save"></i> Save annotations</a>
 						<button class="tooltip-trigger" aria-controls="tooltip-save-annotations">?</button>
 						<p role="tooltip" id="tooltip-save-annotations" aria-hidden="true">
 							Annotations are saved automatically every ten seconds. Use <strong><i class="fas fa-download"></i>Download csv</strong> on the dataset overview page to download a csv with annotations added as columns.

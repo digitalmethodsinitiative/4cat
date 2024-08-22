@@ -31,18 +31,14 @@
 				<select class="post-annotation-options select-{{ type }}" id="{{ field }}">
 				<option class='post-annotation-input' value=''></option>
 
-				{% for option in annotation_fields[field]["options"] %}
-					{% set option_id = option.keys() | first %}
-					{% set option_label = option.values() | first %}
+				{% for option_id, option_label in annotation_fields[field]["options"].items() %}
 					<option class="post-annotation-input option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == annotation.value %}selected{% endif %}>{{ option_label }}</option>
 				{% endfor %}
 				</select>
 
 			{% elif type == 'checkbox' %}
 				<div class='post-annotation-options checkboxes-{{ field }}'>
-				{% for option in annotation_fields[field]["options"] %}
-					{% set option_id = option.keys() | first %}
-					{% set option_label = option.values() | first %}
+				{% for option_id, option_label in annotation_fields[field]["options"].items() %}
 					{% set checked = "checked" if option_label in annotation.value else "" %}
 
 					<input type='checkbox' class='post-annotation-input option-{{ option_id }}' id='option-{{ post.id }}-{{ option_id }}' value='{{ option_label }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id }}'>{{ option_label }}</label>

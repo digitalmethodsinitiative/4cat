@@ -25,11 +25,9 @@
 
             <span class="option-fields">
             {% if annotation_type == "dropdown" or annotation_type == "checkbox" %}
-                {% for option in annotation_fields[field]["options"] %}
-                    {% set option_id = option.keys() | first %}
-                    {% set option_label = option.values() | first %}
+                {% for option_id, option_label in annotation_fields[field]["options"].items() %}
                     <span class="option-field">
-                    <input type="text"  placeholder="Option" id="input-{{ option_id }}" value="{{ option_label }}">
+                    <input type="text"  placeholder="Option" id="option-{{ option_id }}" value="{{ option_label }}">
                     <a class="button-like-small delete-option-field"><i class="fas fa-trash"></i></a>
                     </span>
                 {% endfor %}
@@ -45,7 +43,7 @@
     </ol>
     <div id="edit-annotation-fields">
         <a class="button-like-small" id="new-annotation-field"><i class="fas fa-plus"></i> New field</a>
-        <a class="button-like-small disabled" id="apply-annotation-fields"><i class="fa-solid fa-check"></i> Apply</a>
+        <a class="button-like-small" id="apply-annotation-fields"><i class="fa-solid fa-check"></i> Apply</a>
         <br><span class="hidden" id="input-warning"></span>
     </div>
 </div>

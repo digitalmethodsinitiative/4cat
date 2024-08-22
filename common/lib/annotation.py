@@ -311,6 +311,7 @@ class Annotation:
 
                         # Options are saved in a dict with IDs as keys and labels as values.
                         for old_option_id, old_option in old_options.items():
+
                             # Renamed option label
                             if old_option_id in new_options and old_option != new_options[old_option_id]:
                                 options_to_update[old_option] = new_options[old_option_id]  # Old label -> new label
@@ -340,6 +341,9 @@ class Annotation:
                 # Write to db
                 for column, update_value in updates.items():
 
+                    if column == "options":
+                        update_value = json.dumps(update_value)
+
                     # Change values of columns
                     updates = db.update("annotations", {column: update_value},
                                         where={"dataset": dataset_key, "field_id": field_id})
@@ -350,7 +354,7 @@ class Annotation:
                     if column == "options":
 
                         inserted_options = db.fetchall("SELECT id, value FROM annotations "
-                                                      "WHERE dataset = %s and field_id = %s" % (dataset_key, field_id))
+                                                      "WHERE dataset = '%s' and field_id = '%s'" % (dataset_key, field_id))
                         new_inserts = []
                         for inserted_option in inserted_options:
 

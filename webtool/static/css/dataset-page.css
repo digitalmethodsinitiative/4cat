@@ -696,9 +696,13 @@ body.image-preview {
     cursor: zoom-out;
 }
 
-/* Explorer view */
-#annotation-fields-editor-controls {
+/* EXPLORER VIEW */
+#annotation-fields-editor {
+    height: 0;
+    overflow-y: hidden;
+}
 
+#annotation-fields-editor-controls {
 }
 
 #annotation-fields-editor-controls li {

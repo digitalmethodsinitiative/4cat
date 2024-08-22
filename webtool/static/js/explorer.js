@@ -53,21 +53,21 @@ const annotations = {
 
 		// Keep track of when the annotation fields were edited.
 		editor_controls.on("click", "#apply-annotation-fields, .delete-input, .delete-option-field", function() {
-			$("#apply-annotation-fields").removeClass("disabled");
+			edits_made = true;
+			annotations.enableSaving();
 		});
 		editor_controls.on("change keydown", "input, select", function() {
-			$("#apply-annotation-fields").removeClass("disabled");
+			edits_made = true;
+			annotations.enableSaving();
 		});	
 
 		// Show and hide annotations
 		$("#toggle-annotations").on("click", function(){
-			if (!$(this).hasClass("disabled")) {
-				if ($(this).hasClass("shown")) {
-					annotations.hideAnnotations();
-				}
-				else {
-					annotations.showAnnotations();
-				}
+			if ($(this).hasClass("shown")) {
+				annotations.hideAnnotations();
+			}
+			else {
+				annotations.showAnnotations();
 			}
 		});
 
@@ -103,8 +103,8 @@ const annotations = {
 		
 		// Make saving available when annotations are changed
 		let post_annotations = $(".post-annotations");
-		post_annotations.on("keydown", "input, textarea", function() { annotations.enableSaving(); edits_made = true;});
-		post_annotations.on("click", "option, input[type=checkbox], label", function() { annotations.enableSaving(); edits_made = true;});
+		post_annotations.on("keydown", "input, textarea", function() { edits_made = true;});
+		post_annotations.on("click", "option, input[type=checkbox], label", function() { edits_made = true;});
 
 		// Keep track of whether the annotations are edited or not.
 		post_annotations.on("keydown change",
@@ -116,25 +116,21 @@ const annotations = {
 
 		// Save the annotations to the database
 		$("#save-annotations").on("click", function(){
-			if (!$(this).hasClass("disabled")) {
-				annotations.saveAnnotations();
-			}
+			annotations.saveAnnotations();
 		});
 
 		// Save unsaved annotations upon changing a page.
 		$('.page > a').click(function(){
-			if (!$("#save-annotations").hasClass('disabled')) {
-				annotations.saveAnnotations();
-			}
+			annotations.saveAnnotations();
 		})
 
 		// Check whether there's already fields saved for this dataset
 		annotations.fieldsExist();
 
-		// Save annotations every 10 seconds
+		// Save annotations every 10 seconds if changes have been made
 		setInterval(function() {
-			if (!$("#save-annotations").hasClass("disabled") && edits_made) {
-				annotations.saveAnnotations();
+			if (edits_made) {
+				//annotations.saveAnnotations();
 			}
 		}, 10000);
 
@@ -262,7 +258,7 @@ const annotations = {
 			}
 			// Add options for dropdowns and checkboxes
 			else if (option_fields.length > 0) {
-				let options = []; // List of dicts, because it needs to be ordered
+				let options = new Map(); // Map, because it needs to be ordered
 				let option_labels = [];
 
 				no_options_added = true;
@@ -271,13 +267,11 @@ const annotations = {
 					let option_input = $(this).find("input");
 					let option_label = option_input.val();
 					let option_id = option_input.attr("id").replace("option-", "");
+
 					// New option label
 					if (!option_labels.includes(option_label) && option_label.length > 0) {
-
 						// We're using a unique key for options as well.
-						let option = {}
-						option[option_id] = option_label
-						options.push(option);
+						options.set(option_id, option_label);
 						option_labels.push(option_label);
 						no_options_added = false;
 					}
@@ -296,10 +290,10 @@ const annotations = {
 					ann_field.find(".option-fields .option-field input").first().addClass("invalid");
 				}
 
-				if (Object.keys(options).length > 0) {
+				if (options.size > 0) {
 					// Strip whitespace from the input field key
 					label = label.replace(/\s+/g, ' ');
-					annotation_fields[field_id] = {"type": type, "label": label, "options": options};
+					annotation_fields[field_id] = {"type": type, "label": label, "options": Object.fromEntries(options)};
 				}
 			}
 		});
@@ -411,7 +405,6 @@ const annotations = {
 
 			// We store the annotation fields in the dataset table.
 			annotations.saveAnnotationFields(annotation_fields);
-			location.reload();
 		}
 	},
 
@@ -427,28 +420,25 @@ const annotations = {
 		annotations.fieldsExist();
 
 		let dataset_key = $("#dataset-key").text();
-
 		// AJAX the annotation forms
 		$.ajax({
 			url: getRelativeURL("explorer/save_annotation_fields/" + dataset_key),
 			type: "POST",
 			contentType: "application/json",
-			data:  JSON.stringify(annotation_fields),
-
+			data: JSON.stringify(annotation_fields),
 			success: function (response) {
-				// If the query is accepted by the server.
-				if (response === 'success') {
-					$("#annotations-editor-container").hide();
-					$("#apply-annotation-fields").addClass("disabled");
-				}
+				// If the query is accepted by the server...
 
-				// If the query is rejected by the server.
-				else {
-					annotations.warnEditor("Couldn't save annotation fields");
-				}
+				//location.reload(); // ...simply reload the page to render the template again
 			},
 			error: function (error) {
-				annotations.warnEditor(error);
+				if (error.status == 400) {
+					annotations.warnEditor(error.responseJSON.error);
+				}
+				else {
+					annotations.warnEditor("Server error, couldn't save annotation fields.")
+				}
+				$("#apply-annotation-fields").html("<i class='fa-solid fa-check'></i> Apply");
 			}
 		});
 	},
@@ -481,7 +471,6 @@ const annotations = {
 
 		let save_annotations = $("#save-annotations");
 		save_annotations.html("<i class='fas fa-circle-notch spinner'></i> Saving annotations")
-		annotations.disableSaving();
 
 		let code = ""
 
@@ -494,27 +483,16 @@ const annotations = {
 			success: function (response) {
 
 				if (response === 'success') {
-					code = response
-
-					annotations.enableSaving();
-					save_annotations.html("<i class='fas fa-save'></i> Annotations saved");
-					save_annotations.addClass("disabled");
-					//var old_annotation_fields = $("#annotation-field").each();
-					// alert(alert_message);
+					code = response;
 				}
 				else {
-					annotations.enableSaving();
-					save_annotations.html("<i class='fas fa-save'></i> Save annotations");
 					alert("Couldn't save annotations");
-					save_annotations.removeClass("disabled");
 					console.log(response);
 				}
+				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
 			},
 			error: function (error) {
-				annotations.enableSaving();
 				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
-				save_annotations.removeClass("disabled");
-				//alert("Couldn't save annotations");
 				console.log(error)
 			}
 		});
@@ -524,21 +502,12 @@ const annotations = {
 		// Annotation fields are sent by the server
 		// and saved in a script in the header.
 		// So we just need to check whether they're there.
-
-		if (Object.keys(annotation_fields).length < 1) {
-			$("#toggle-annotations").addClass("disabled");
-			return false;
-		}
-		else {
-			$("#toggle-annotations").removeClass("disabled");
-			return true;
-		}
+		return Object.keys(annotation_fields).length >= 1;
 	},
 
 	enableSaving: function(){
 		// Enable saving annotations to the database
 		$("#save-annotations, #save-to-dataset").removeClass("disabled");
-		$("#save-annotations").html("<i class='fas fa-save'></i> Save annotations");
 	},
 
 	disableSaving: function(){
@@ -547,7 +516,7 @@ const annotations = {
 	},
 
 	warnEditor: function(warning) {
-		
+		// Warns the annotation field editor if stuff's wrong
 		let warn_field = $("#input-warning");
 		warn_field.html(warning);
 		if (warn_field.hasClass("hidden")) {
@@ -559,7 +528,6 @@ const annotations = {
 	showAnnotations: function() {
 		let ta = $("#toggle-annotations");
 		ta.addClass("shown");
-		ta.removeClass("disabled");
 		ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
 		// Bit convoluted, but necessary to have auto height
 		let pa = $(".post-annotations");
@@ -585,7 +553,7 @@ const annotations = {
 		*/
 
 		let annotation_field = `
-			<li class="annotation-field" id="field-randomint">
+			<li class="annotation-field" id="field-tohashrandomint">
 				<i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
 				 <span class="annotation-fields-row">
 					<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Label">
@@ -614,8 +582,8 @@ const annotations = {
 	},
 
 	markChanges: function(el) {
-		// Adds current changes to a post annotation so we can save these later.
-		// Currently includes the time of edits and the username of the annotator
+		// Adds info on edits on post annotation to its element, so we can save these to the db later.
+		// Currently includes the time of edits and the username of the annotator.
 		let current_username = $("#current-username").html();
 		let current_date = Date.now() / 1000;
 		let input_field = el.find(".post-annotation-input");
@@ -641,7 +609,7 @@ const page_functions = {
 			el.innerText = getLocalTimeStr(el.innerText);
 		});
 
-		// Make annotation field editor sortable
+		// Make annotation field editor sortable with jQuery UI.
 		$('#annotation-field-settings').sortable({
             cursor: "s-resize",
             handle: ".handle",
@@ -649,7 +617,7 @@ const page_functions = {
             axis: "y",
 			containment: "#annotation-field-settings",
 			change: function() {
-				$("#apply-annotation-fields").removeClass("disabled");
+
 			}
         });
 

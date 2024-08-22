@@ -1776,7 +1776,7 @@ class DataSet(FourcatModule):
 		# Get existing annotation fields to see if stuff changed.
 		old_fields = self.get_annotation_fields()
 		changes = False
-
+		
 		# Do some validation
 		# Annotation field must be valid JSON.
 		try:
@@ -1784,7 +1784,12 @@ class DataSet(FourcatModule):
 		except ValueError:
 			raise AnnotationException("Can't save annotation fields: not valid JSON (%s)" % new_fields)
 
+		# No duplicate IDs
+		if len(new_fields) != len(set(new_fields)):
+			raise AnnotationException("Can't save annotation fields: field IDs must be unique")
+
 		# Annotation fields must at minimum have `type` and `label` keys.
+		seen_labels = []
 		for field_id, annotation_field in new_fields.items():
 			if not isinstance(field_id, str):
 				raise AnnotationException("Can't save annotation fields: field ID %s is not a valid string" % field_id)
@@ -1792,6 +1797,9 @@ class DataSet(FourcatModule):
 				raise AnnotationException("Can't save annotation fields: all fields must have a label" % field_id)
 			if "type" not in annotation_field:
 				raise AnnotationException("Can't save annotation fields: all fields must have a type" % field_id)
+			if annotation_field["label"] in seen_labels:
+				raise AnnotationException("Can't save annotation fields: labels must be unique (%s)" % annotation_field["label"])
+			seen_labels.append(annotation_field["label"])
 
 			# Keep track of whether existing fields have changed; if so, we're going to
 			# update the annotations table.
