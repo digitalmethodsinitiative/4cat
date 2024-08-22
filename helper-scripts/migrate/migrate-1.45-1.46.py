@@ -105,7 +105,7 @@ else:
     count = 0
     skipped_count = 0
 
-    columns = "id,dataset,field_id,item_id,timestamp,timestamp_created,label,type,options,value,author,by_processor,metadata"
+    columns = "id,dataset,field_id,item_id,timestamp,timestamp_created,label,type,options,value,author,author_original,by_processor,metadata"
 
     # Each row are **all** annotations per dataset
     for row in annotations:
@@ -167,6 +167,7 @@ else:
                     json.dumps(options) if options else "",    # options; each option has a key and a value.
                     value,                  # value
                     author,                 # author
+                    author,                 # author_original
                     False,                  # by_processor
                     json.dumps({}),         # metadata
                 )]
