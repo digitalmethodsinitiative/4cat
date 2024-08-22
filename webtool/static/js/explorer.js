@@ -100,18 +100,19 @@ const annotations = {
 				annotations.addOptions(e.target);
 			}
 		});
-		
-		// Make saving available when annotations are changed
-		let post_annotations = $(".post-annotations");
-		post_annotations.on("keydown", "input, textarea", function() { edits_made = true;});
-		post_annotations.on("click", "option, input[type=checkbox], label", function() { edits_made = true;});
 
 		// Keep track of whether the annotations are edited or not.
-		post_annotations.on("keydown change",
-							".post-annotation-input, .post-annotation input, .post-annotation textarea",
+		let post_annotations = $(".post-annotations");
+		post_annotations.on("keydown click change",
+							".post-annotation-input, input[type=checkbox], label, option",
 							function(){
-			annotations.markChanges($(this).parent());
-
+			edits_made = true;
+			// Navigate one level up if it's a checkbox input
+			let parent = $(this).parent();
+			if (parent.hasClass("checkboxes")) {
+				parent = parent.parent();
+			}
+			annotations.markChanges(parent);
 		});
 
 		// Save the annotations to the database
@@ -310,71 +311,55 @@ const annotations = {
 		to an annotation object.
 
 		Must be given a .post-annotation div element.
-
 		*/
 
 		let ann_input = el.find(".post-annotation-input");
 		let ann_classes = el.attr("class").split(" ");
-		let ann_input_classes = ann_input.attr("class").split(" ");
-		let field_id = ann_input_classes[1].replace("field-", "");
-		let annotation_type = ann_classes[2].replace("type-", "");
+		let ann_type = ann_classes[2].replace("type-", "");
+		let field_id = ann_classes[1].replace("field-", "");
 		let item_id = ann_classes[3].replace("item-id-", "");
 		let label = el.find(".annotation-label").text();
 		let author = el.find(".annotation-author").html();
+		let options = el.find(".annotation-options").html();
 		let timestamp = parseInt(el.find(".epoch-timestamp-edited").html());
 
 		let val = undefined;
-		let edited = false
 
-		if (annotation_type === "text" || annotation_type === "textarea") {
-			val = ann_input.val();
-			// It can be the case that the input text is deleted
-			// In this case we *do* want to push new data, so we check
-			// whether there's an 'edited' class present and save if so.
-			if (ann_input.hasClass("edited")) {
-				edited = true
+		// If there are values inserted or things changed, return an annotation object.
+		// even if the value is an empty string.
+		if (el.hasClass("edited")) {
+			if (ann_type === "text" || ann_type === "textarea") {
+				val = ann_input.val();
+			} else if (ann_type === "dropdown") {
+				val = ann_input.find(".post-annotation-options").val();
+			} else if (ann_type === "checkbox") {
+				val = [];
+				el.find(".post-annotation-input").each(function () {
+					let checkbox = $(this);
+					if (checkbox.prop("checked") === true) {
+						val.push(checkbox.val());
+					}
+				});
 			}
-		}
-		else if (annotation_type === "dropdown") {
-			val = ann_input.find(".post-annotation-options").val();
-		}
-		else if (annotation_type === "checkbox") {
-			val = [];
-			ann_input.find(".post-annotation-options > input").each(function(){
-				if (ann_input.is(":checked")) {
-					val.push(ann_input.val());
-				}
-				if (ann_input.hasClass("edited")) {
-					edited = true
-				}
-			});
-			if (!val.length > 0) {
-				val = undefined;
+
+			// Create an annotation object and add them to the array.
+			let annotation = {
+				"field_id": field_id,
+				"item_id": item_id,
+				"label": label,
+				"type": ann_type,
+				"value": val,
+				"author": author,
+				"by_processor": false, // Explorer annotations are human-made!
+				"timestamp": timestamp,
+				"options": options,
 			}
+			return annotation;
 		}
-
-		// if ((val !== undefined && val !== "") || edited) {
-		// 	vals_changed = true;
-		// 	val = "";
-		// 	console.log("EDITED")
-		// }
-		//
-		// if (vals_changed){
-		// 	annotation[post_id] = post_vals;
-		// }
-
-		// Create an annotation object and add them to the array.
-		let annotation = {
-			"field_id": field_id,
-			"item_id": item_id,
-			"label": label,
-			"type": annotation_type,
-			"value": val,
-			"author": author,
-			"by_processor": false, // Explorer annotations are human-made!
-			"timestamp": timestamp
+		else {
+		// Return an empty object if nothing changed
+			return {};
 		}
-		return annotation
 	},
 
 	applyAnnotationFields: function (e){
@@ -428,8 +413,7 @@ const annotations = {
 			data: JSON.stringify(annotation_fields),
 			success: function (response) {
 				// If the query is accepted by the server...
-
-				//location.reload(); // ...simply reload the page to render the template again
+				location.reload(); // ...simply reload the page to render the template again
 			},
 			error: function (error) {
 				if (error.status == 400) {
@@ -461,8 +445,7 @@ const annotations = {
 					
 					// Extract annotation object from the element
 					let annotation = annotations.parseAnnotation($(this));
-
-					if (annotation) {
+					if (Object.keys(annotation).length > 0 ) {
 						anns.push(annotation);
 					}
 				});
@@ -472,8 +455,6 @@ const annotations = {
 		let save_annotations = $("#save-annotations");
 		save_annotations.html("<i class='fas fa-circle-notch spinner'></i> Saving annotations")
 
-		let code = ""
-
 		$.ajax({
 			url: getRelativeURL("explorer/save_annotations/" + dataset_key),
 			type: "POST",
@@ -481,17 +462,15 @@ const annotations = {
 			data: JSON.stringify(anns),
 
 			success: function (response) {
-
-				if (response === 'success') {
-					code = response;
-				}
-				else {
-					alert("Couldn't save annotations");
-					console.log(response);
-				}
 				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
 			},
 			error: function (error) {
+				if (error.status == 400) {
+					annotations.warnEditor(error.responseJSON.error);
+				}
+				else {
+					annotations.warnEditor("Server error, couldn't save annotation fields.")
+				}
 				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
 				console.log(error)
 			}
@@ -586,8 +565,7 @@ const annotations = {
 		// Currently includes the time of edits and the username of the annotator.
 		let current_username = $("#current-username").html();
 		let current_date = Date.now() / 1000;
-		let input_field = el.find(".post-annotation-input");
-		input_field.addClass("edited");
+		$(el).addClass("edited");
 		$(el).find(".annotation-author").html(current_username);
 		$(el).find(".epoch-timestamp-edited").html(current_date);
 		$(el).find(".timestamp-edited").html(getLocalTimeStr(current_date));

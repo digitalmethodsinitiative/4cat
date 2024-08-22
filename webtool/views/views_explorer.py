@@ -212,8 +212,14 @@ def explorer_save_annotations(dataset_key: str):
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
-	dataset.save_annotations(annotations, overwrite=True)
-	return "success"
+	try:
+		annotations_saved = dataset.save_annotations(annotations, overwrite=True)
+	except AnnotationException as e:
+		# If anything went wrong with the annotation field saving, return an error.
+		return jsonify(error=str(e)), 400
+
+	# Else return the amount of fields saved.
+	return str(annotations_saved)
 
 def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs) -> dict:
 	"""

@@ -116,7 +116,7 @@ class Annotation:
                 "options": data.get("options", ""),
                 "value": data.get("value", ""),
                 "author": data.get("author", ""),
-                "author_original": data.get("author_original", ""),
+                "author_original": data.get("author", ""),
                 "by_processor": data.get("by_processor", False),
                 "metadata": data.get("metadata", {}),
             }
