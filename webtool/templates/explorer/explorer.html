@@ -12,7 +12,7 @@
 <script type="text/javascript">
 
 // Annotation fields
-var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %}
+var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %};
 
 // We're getting the dataset column names to make sure that
 // new annotation fields cannot overwrite these.
@@ -65,6 +65,8 @@ for (a in annotation_fields) {
 	</div>
 </div>
 
+
 {% include "explorer/pagination.html" %}
 
+<div id="save-annotations-notice">Annotations saved</div>
 {% endblock %}

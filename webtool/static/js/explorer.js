@@ -5,6 +5,12 @@ $(init);
 /*
  * Page init
  */
+
+// Global variable to keep track if annotations have been edited.
+var edits_made = false;
+// To check if we have to save annotations when exiting a page; not necessary for refresh.
+var exit_page = true;
+
 function init() {
 
 	// Functional stuff
@@ -20,11 +26,11 @@ function init() {
  */
 const annotations = {
 
+
 	init: function() {
 
 		let editor = $("#annotation-fields-editor");
 		let editor_controls = $("#annotation-fields-editor-controls");
-		var edits_made = false;
 
 		// Add a new annotation field when clicking the plus icon
 		$("#new-annotation-field").on("click", function(){
@@ -107,9 +113,10 @@ const annotations = {
 							".post-annotation-input, input[type=checkbox], label, option",
 							function(){
 			edits_made = true;
-			// Navigate one level up if it's a checkbox input
+
 			let parent = $(this).parent();
-			if (parent.hasClass("checkboxes")) {
+			// Navigate one level up if it's a checkbox or dropdown input
+			if (parent.hasClass("post-annotation-options")) {
 				parent = parent.parent();
 			}
 			annotations.markChanges(parent);
@@ -120,10 +127,12 @@ const annotations = {
 			annotations.saveAnnotations();
 		});
 
-		// Save unsaved annotations upon changing a page.
-		$('.page > a').click(function(){
-			annotations.saveAnnotations();
-		})
+		// Save unsaved annotations upon leaving the page.
+		window.onbeforeunload = function(){
+			if (exit_page) {
+				annotations.saveAnnotations();
+			}
+		};
 
 		// Check whether there's already fields saved for this dataset
 		annotations.fieldsExist();
@@ -131,7 +140,7 @@ const annotations = {
 		// Save annotations every 10 seconds if changes have been made
 		setInterval(function() {
 			if (edits_made) {
-				//annotations.saveAnnotations();
+				annotations.saveAnnotations();
 			}
 		}, 10000);
 
@@ -327,50 +336,47 @@ const annotations = {
 
 		// If there are values inserted or things changed, return an annotation object.
 		// even if the value is an empty string.
-		if (el.hasClass("edited")) {
-			if (ann_type === "text" || ann_type === "textarea") {
-				val = ann_input.val();
-			} else if (ann_type === "dropdown") {
-				val = ann_input.find(".post-annotation-options").val();
-			} else if (ann_type === "checkbox") {
-				val = [];
-				el.find(".post-annotation-input").each(function () {
-					let checkbox = $(this);
-					if (checkbox.prop("checked") === true) {
-						val.push(checkbox.val());
-					}
-				});
-			}
 
-			// Create an annotation object and add them to the array.
-			let annotation = {
-				"field_id": field_id,
-				"item_id": item_id,
-				"label": label,
-				"type": ann_type,
-				"value": val,
-				"author": author,
-				"by_processor": false, // Explorer annotations are human-made!
-				"timestamp": timestamp,
-				"options": options,
-			}
-			return annotation;
+		if (ann_type === "text" || ann_type === "textarea") {
+			val = ann_input.val();
+		} else if (ann_type === "dropdown") {
+			val = $(ann_input).find(":selected").val();
+		} else if (ann_type === "checkbox") {
+			val = [];
+			el.find(".post-annotation-input").each(function () {
+				let checkbox = $(this);
+				if (checkbox.prop("checked") === true) {
+					val.push(checkbox.val());
+				}
+			});
 		}
-		else {
-		// Return an empty object if nothing changed
-			return {};
+
+		// Create an annotation object and add them to the array.
+		let annotation = {
+			"field_id": field_id,
+			"item_id": item_id,
+			"label": label,
+			"type": ann_type,
+			"value": val,
+			"author": author,
+			"by_processor": false, // Explorer annotations are human-made!
+			"timestamp": timestamp,
+			"options": options,
 		}
+		//console.log(annotation)
+		return annotation;
 	},
 
 	applyAnnotationFields: function (e){
 		// Applies the annotation fields to each post on this page.
 
 		// First we collect the annotation information from the editor
-		let annotation_fields = annotations.parseAnnotationFields(e);
+
+		let new_annotation_fields = annotations.parseAnnotationFields(e);
 
 		// Show an error message if the annotation fields were not valid.
-		if (typeof annotation_fields == "string") {
-			annotations.warnEditor(annotation_fields);
+		if (typeof new_annotation_fields == "string") {
+			annotations.warnEditor(new_annotation_fields);
 		}
 
 		// If everything is ok, we're going to add
@@ -389,33 +395,42 @@ const annotations = {
 			});
 
 			// We store the annotation fields in the dataset table.
-			annotations.saveAnnotationFields(annotation_fields);
+			// First check if existing annotations are affected.
+			if (annotation_fields) {
+				annotations.checkFieldChanges(new_annotation_fields, annotation_fields);
+			}
+			else {
+				annotations.saveAnnotationFields(new_annotation_fields);
+			}
 		}
 	},
 
-	saveAnnotationFields: function (annotation_fields){
+	saveAnnotationFields: function (new_fields){
 		// Save the annotation fields used for this dataset
 		// to the datasets table.
+		// `old fields` can be given to warn the user if changes to existing fields
+		// will affect annotations, like deleting a field or changing its type.
 
-		if (annotation_fields.length < 1) {
+		let dataset_key = $("#dataset-key").text();
+
+		if (new_fields.length < 1) {
 			return;
 		}
 
-		// If there's annotation fields, we can enable/disable the buttons
-		annotations.fieldsExist();
-
-		let dataset_key = $("#dataset-key").text();
 		// AJAX the annotation forms
 		$.ajax({
 			url: getRelativeURL("explorer/save_annotation_fields/" + dataset_key),
 			type: "POST",
 			contentType: "application/json",
-			data: JSON.stringify(annotation_fields),
-			success: function (response) {
+			data: JSON.stringify(new_fields),
+			success: function () {
 				// If the query is accepted by the server...
+				exit_page = false;
 				location.reload(); // ...simply reload the page to render the template again
 			},
 			error: function (error) {
+				console.log(error);
+
 				if (error.status == 400) {
 					annotations.warnEditor(error.responseJSON.error);
 				}
@@ -425,6 +440,62 @@ const annotations = {
 				$("#apply-annotation-fields").html("<i class='fa-solid fa-check'></i> Apply");
 			}
 		});
+	},
+
+	checkFieldChanges(new_fields, old_fields) {
+
+		let deleted_fields = [];
+		let changed_type_fields = [];
+
+		// Warn the user in case fields are deleted or changed from text to choice.
+		if (old_fields) {
+			let text_fields = ["text", "textarea"];
+			let choice_fields = ["checkbox", "dropdown"];
+
+			for (let old_field_id in old_fields) {
+
+				// Deleted
+				if (!(old_field_id in new_fields) || !new_fields) {
+					deleted_fields.push(old_fields[old_field_id]["label"]);
+				} else {
+					let old_type = old_fields[old_field_id]["type"];
+					let new_type = new_fields[old_field_id]["type"]
+					if (old_type !== new_type) {
+						// Changed from text to choice, or the reverse.
+						// In this case annotations will be deleted.
+						// Changes from dropdown to checkbox also result in deleted annotations.
+						if ((text_fields.includes(old_type) && choice_fields.includes(new_type)) ||
+							(choice_fields.includes(old_type) && text_fields.includes(new_type)) ||
+							(choice_fields.includes(old_type) && choice_fields.includes(new_type))) {
+							changed_type_fields.push(new_type);
+						}
+					}
+				}
+			}
+		}
+
+		// Ask 4 confirmation
+		if (deleted_fields.length > 0 || changed_type_fields.length > 0) {
+			let msg = "";
+			if (deleted_fields.length > 0 && changed_type_fields.length > 0) {
+				msg = `Deleting fields and changing field types will also delete existing annotations that belonged to them.
+						Do you want to continue?`;
+			}
+			else if (changed_type_fields.length > 0) {
+				msg = `Changing field types will also delete existing annotations that belonged to them.
+						Do you want to continue?`;
+			}
+			else if (deleted_fields.length > 0) {
+				msg = `Deleting fields will also delete existing annotations that belonged to them. 
+						Do you want to continue?`;
+			}
+			popup.confirm(msg, "Confirm", () => {
+				annotations.saveAnnotationFields(new_fields);
+			});
+		}
+		else {
+			annotations.saveAnnotationFields(new_fields);
+		}
 	},
 
 	saveAnnotations: function (){
@@ -443,10 +514,12 @@ const annotations = {
 
 				post_annotations.find(".post-annotation").each(function(){
 					
-					// Extract annotation object from the element
-					let annotation = annotations.parseAnnotation($(this));
-					if (Object.keys(annotation).length > 0 ) {
-						anns.push(annotation);
+					// Extract annotation object from edited elements
+					if ($(this).hasClass("edited")) {
+						let annotation = annotations.parseAnnotation($(this));
+						if (Object.keys(annotation).length > 0 ) {
+							anns.push(annotation);
+						}
 					}
 				});
 			}
@@ -463,16 +536,18 @@ const annotations = {
 
 			success: function (response) {
 				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
+				annotations.notifySaved();
+				edits_made = false;
 			},
 			error: function (error) {
+				console.log(error)
 				if (error.status == 400) {
 					annotations.warnEditor(error.responseJSON.error);
 				}
 				else {
-					annotations.warnEditor("Server error, couldn't save annotation fields.")
+					annotations.warnEditor("Server error, couldn't save annotations.")
 				}
 				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
-				console.log(error)
 			}
 		});
 	},
@@ -502,6 +577,13 @@ const annotations = {
 			warn_field.removeClass("hidden");
 			warn_field.fadeIn(200);
 		}
+	},
+
+	notifySaved: function() {
+		// Flash a fixed div with the notice that annotations are saved.
+		let notice = $("#save-annotations-notice");
+		notice.fadeIn(400);
+		notice.delay(1750).fadeOut(1000);
 	},
 
 	showAnnotations: function() {

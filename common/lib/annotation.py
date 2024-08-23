@@ -306,7 +306,7 @@ class Annotation:
                             fields_to_delete.add(field_id)
                             continue
 
-                        old_options = old_field["options"]
+                        old_options = old_field.get("options", {})
                         options_to_update = {}
 
                         # Options are saved in a dict with IDs as keys and labels as values.

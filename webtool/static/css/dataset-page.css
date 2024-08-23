@@ -771,6 +771,23 @@ body.image-preview {
     padding: 0.5em
 }
 
+.post-annotations .property-badge {
+    font-size: 13px;
+}
+
+#save-annotations-notice {
+    position: fixed;
+    background-color: var(--accent-okay);
+    color: var(--contrast-bright);
+    display: none;
+    right: 20px;
+    bottom: 64px;
+    width: 200px;
+    text-align: center;
+    padding: 10px 5px 10px 5px;
+    border-radius: 10px;
+}
+
 .delete-input {
     float: right;
 }
