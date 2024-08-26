@@ -1555,7 +1555,6 @@ const ui_helpers = {
             cursor: 'ns-resize',
             handle: '.handle',
             items: '.implicit, .explicit',
-            containment: '#tag-order',
             axis: 'y',
             update: function(e, ui) {
                 let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
