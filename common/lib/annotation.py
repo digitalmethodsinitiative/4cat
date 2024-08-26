@@ -25,11 +25,11 @@ class Annotation:
     db = None
 
     id = None                 # Unique ID for this annotation
-    item_id = None            # ID of the item for this annotation, e.g. post ID
-    field_id = None           # If of this type of annotation field for this dataset
+    item_id = None            # ID of the item that this annotation was made for, e.g. a post ID.
+    field_id = None           # ID for the annotation field
     dataset = None            # Dataset key this annotation is generated from
     timestamp = None          # When this annotation was edited
-    timestamp_created = None  # When this timestamp was created
+    timestamp_created = None  # When this annotation was created
     label = None              # Label of annotation
     type = None               # Type of annotation (e.g. `text`)
     options = None            # Possible options
