@@ -39,20 +39,20 @@ class Annotation:
     by_processor = None       # Whether the annotation was made by a processor
     metadata = None           # Misc metadata
 
-    def __init__(self, data=None, id=None, db=None):
+    def __init__(self, data=None, annotation_id=None, db=None):
         """
         Instantiate annotation object.
 
-        :param data:    Annotation data; should correspond to the annotations table record.
-        :param id:      The ID of an annotation. If given, it retrieves the annotation
-                        from the database.
-        :param db:      Database connection object
+        :param data:            Annotation data; should correspond to the annotations table record.
+        :param annotation_id:   The ID of an annotation. If given, it retrieves the annotation
+                                from the database.
+        :param db:              Database connection object
         """
 
         required_fields = ["label", "item_id", "dataset"]
 
         # Must have an ID or data
-        if (id is None and data is None) or (data is not None and not isinstance(data, dict)):
+        if (annotation_id is None and data is None) or (data is not None and not isinstance(data, dict)):
             raise AnnotationException("Annotation() requires either a valid `data` dictionary or ID.")
 
         if not db:
@@ -66,11 +66,11 @@ class Annotation:
         # Get the annotation data if the ID is given; if an annotation has
         # an ID, it is guaranteed to be in the database.
         # IDs can both be explicitly given or present in the data dict.
-        if id is not None or "id" in data:
+        if annotation_id is not None or "id" in data:
             if data and "id" in data:
-                id = data["id"]
-            self.id = id # IDs correspond to unique serial numbers in the database.
-            current = self.get_by_id(id)
+                annotation_id = data["id"]
+            self.id = annotation_id # IDs correspond to unique serial numbers in the database.
+            current = self.get_by_id(annotation_id)
             if not current:
                 raise AnnotationException(
                     "Annotation() requires a valid ID for an existing annotation, %s given" % id)
@@ -147,21 +147,20 @@ class Annotation:
             self.timestamp = int(time.time())
             self.write_to_db()
 
-    def get_by_id(self, id: int):
+    def get_by_id(self, annotation_id: int):
         """
         Get annotation by ID
 
-        :param str id:  ID of annotation
-        :param db:      Database connection object
+        :param str annotation_id:  ID of annotation.
         :return:  Annotation object, or an empty dict if the ID doesn't exist.
         """
 
         try:
-            int(id)
+            int(annotation_id)
         except ValueError:
-            raise AnnotationException("Id '%s' is not valid" % id)
+            raise AnnotationException("Id '%s' is not valid" % annotation_id)
 
-        data = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % (id))
+        data = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % (annotation_id))
 
         if not data:
             return {}
@@ -230,25 +229,25 @@ class Annotation:
         return self.db.delete("annotations", {"id": self.id})
 
     @staticmethod
-    def delete_many(db, dataset_key=None, id=None, field_id=None):
+    def delete_many(db, dataset_key=None, annotation_id=None, field_id=None):
         """
         Deletes annotations for an entire dataset or by a list of (field) IDs.
 
-        :param db:              Database object.
-        :param str dataset_key: A dataset key.
-        :param li id:			A list or string of unique annotation IDs.
-        :param li field_id:		A list or string of IDs for annotation fields.
+        :param db:                  Database object.
+        :param str dataset_key:     A dataset key.
+        :param li annotation_id:	A list or string of unique annotation IDs.
+        :param li field_id:		    A list or string of IDs for annotation fields.
 
         :return int: The number of removed records.
         """
-        if not dataset_key and not id and not field_id:
+        if not dataset_key and not annotation_id and not field_id:
             return 0
 
         where = {}
         if dataset_key:
             where["dataset"] = dataset_key
-        if id:
-            where["id"] = id
+        if annotation_id:
+            where["id"] = annotation_id
         if field_id:
             where["field_id"] = field_id
 
