@@ -165,7 +165,10 @@ class Annotation:
         if not data:
             return {}
 
+        if data["type"] in ["dropdown", "checkbox"]:
+            data["value"] = data["value"].split(",")
         data["metadata"] = json.loads(data["metadata"])
+
         return data
 
     def get_by_field(self, dataset_key: str, item_id: str, label: str) -> dict:
@@ -185,7 +188,10 @@ class Annotation:
         if not data:
             return {}
 
+        if data["type"] in ["dropdown", "checkbox"]:
+            data["value"] = data["value"].split(",")
         data["metadata"] = json.loads(data["metadata"])
+
         return data
 
     def set_field_id(self, dataset_key: str, label: str) -> str:
@@ -207,9 +213,13 @@ class Annotation:
         Write an annotation to the database.
         """
         db_data = self.data
+
         db_data["timestamp"] = int(time.time())
         m = db_data["metadata"] # To avoid circular reference error
         db_data["metadata"] = json.dumps(m)
+        if db_data["type"] in ["checkbox", "dropdown"]:
+            db_data["value"] = ",".join(db_data["value"])
+
         return self.db.upsert("annotations", data=db_data, constraints=["label", "dataset", "item_id"])
 
     def delete(self):
@@ -341,11 +351,12 @@ class Annotation:
                 # Write to db
                 for column, update_value in updates.items():
 
+                    update_value_insert = update_value
                     if column == "options":
-                        update_value = json.dumps(update_value)
+                        update_value_insert = json.dumps(update_value)
 
                     # Change values of columns
-                    updates = db.update("annotations", {column: update_value},
+                    updates = db.update("annotations", {column: update_value_insert},
                                         where={"dataset": dataset_key, "field_id": field_id})
                     count += updates
 
@@ -353,33 +364,49 @@ class Annotation:
                     # Here we have to also rename/remove inserted options from the values column.
                     if column == "options":
 
-                        inserted_options = db.fetchall("SELECT id, value FROM annotations "
+                        inserted_options = db.fetchall("SELECT id, options, value FROM annotations "
                                                       "WHERE dataset = '%s' and field_id = '%s'" % (dataset_key, field_id))
                         new_inserts = []
                         for inserted_option in inserted_options:
 
                             annotation_id = inserted_option["id"]
-                            inserted_option = inserted_option["value"]
+                            annotation_values = inserted_option["value"]
+                            annotation_options = inserted_option["options"].split(",")
 
-                            if not inserted_option:
-                                continue
+                            # CHange the options
+
+                            if not annotation_values:
+                                 continue
+
+                            annotation_values = annotation_values.split(",")
 
                             # Remove or rename options
                             new_values = []
-                            for inserted_option in inserted_options:
-                                if inserted_option in update_value:
-                                    if update_value[inserted_option] == None:
+                            new_options = update_value["options"]
+
+                            for annotation_value in annotation_values:
+                                if annotation_value in new_options:
+                                    if new_options[annotation_value] == None:
                                         # Don't add
                                         continue
-                                    elif inserted_option in update_value:
+                                    elif annotation_value in new_options:
                                         # Replace with new value
-                                        new_values.append(update_value[inserted_option])
-                                    else:
-                                        # Keep old value
-                                        new_values.append(inserted_option)
+                                        new_values.append(new_options[annotation_value])
+                                else:
+                                    # Keep old value
+                                    new_values.append(annotation_value)
+
+                            # Update the options column as well
+                            new_annotation_options = []
+                            for annotation_option in annotation_options:
+                                if annotation_option in new_options:
+                                    new_annotation_options.append(new_options[annotation_option])
+                                else:
+                                    new_annotation_options.append(annotation_option)
 
                             new_values = ",".join(new_values)
-                            db.update("annotations", {"value": new_values}, where={"id": annotation_id})
+
+                            db.update("annotations", {"value": ",".join(new_values), "options": ",".join(new_annotation_options)}, where={"id": annotation_id})
 
         return count
 
