@@ -65,8 +65,8 @@
                     {% set metadata = annotation.metadata | fromjson %}
                     {% if metadata.get("processor-parameters") %}
                         <span class="tooltip-line">
-                        {% for parameter in metadata["processor-parameters"] %}
-                            <span class="property-badge"><i class="fa fa-check" aria-hidden="true"></i> {{ parameter }}</span>
+                        {% for parameter, input_value in metadata["processor-parameters"].items() %}
+                            <span class="property-badge">{{ parameter }}</span> {{ input_value }}
                         {% endfor %}
                         </span>
                     {% endif %}
