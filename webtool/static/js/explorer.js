@@ -6,10 +6,8 @@ $(init);
  * Page init
  */
 
-// Global variable to keep track if annotations have been edited.
-var edits_made = false;
-// To check if we have to save annotations when exiting a page; not necessary for refresh.
-var exit_page = true;
+// Timer variable to start/reset saving annotations.
+var save_timer = null;
 
 function init() {
 
@@ -57,16 +55,6 @@ const annotations = {
 			}
 		});
 
-		// Keep track of when the annotation fields were edited.
-		editor_controls.on("click", "#apply-annotation-fields, .delete-input, .delete-option-field", function() {
-			edits_made = true;
-			annotations.enableSaving();
-		});
-		editor_controls.on("change keydown", "input, select", function() {
-			edits_made = true;
-			annotations.enableSaving();
-		});	
-
 		// Show and hide annotations
 		$("#toggle-annotations").on("click", function(){
 			if ($(this).hasClass("shown")) {
@@ -112,7 +100,6 @@ const annotations = {
 		post_annotations.on("keydown click change",
 							".post-annotation-input, input[type=checkbox], label, option",
 							function(){
-			edits_made = true;
 
 			let parent = $(this).parent();
 			// Navigate one level up if it's a checkbox or dropdown input
@@ -120,29 +107,18 @@ const annotations = {
 				parent = parent.parent();
 			}
 			annotations.markChanges(parent);
+			annotations.startSaveTimer();
 		});
 
 		// Save the annotations to the database
 		$("#save-annotations").on("click", function(){
+			clearTimeout(save_timer);
+			save_timer = null;
 			annotations.saveAnnotations();
 		});
 
-		// Save unsaved annotations upon leaving the page.
-		window.onbeforeunload = function(){
-			if (exit_page) {
-				annotations.saveAnnotations();
-			}
-		};
-
 		// Check whether there's already fields saved for this dataset
 		annotations.fieldsExist();
-
-		// Save annotations every 10 seconds if changes have been made
-		setInterval(function() {
-			if (edits_made) {
-				annotations.saveAnnotations();
-			}
-		}, 10000);
 
 	},
 
@@ -363,7 +339,6 @@ const annotations = {
 			"timestamp": timestamp,
 			"options": options,
 		}
-		//console.log(annotation)
 		return annotation;
 	},
 
@@ -424,9 +399,9 @@ const annotations = {
 			contentType: "application/json",
 			data: JSON.stringify(new_fields),
 			success: function () {
-				// If the query is accepted by the server...
-				exit_page = false;
-				location.reload(); // ...simply reload the page to render the template again
+				// If the query is accepted by the server
+				// simply reload the page to render the template again
+				window.location.replace(window.location.href);
 			},
 			error: function (error) {
 				console.log(error);
@@ -537,7 +512,6 @@ const annotations = {
 			success: function (response) {
 				save_annotations.html("<i class='fas fa-save'></i> Save annotations");
 				annotations.notifySaved();
-				edits_made = false;
 			},
 			error: function (error) {
 				console.log(error)
@@ -559,14 +533,17 @@ const annotations = {
 		return Object.keys(annotation_fields).length >= 1;
 	},
 
-	enableSaving: function(){
-		// Enable saving annotations to the database
-		$("#save-annotations, #save-to-dataset").removeClass("disabled");
-	},
-
-	disableSaving: function(){
-		// Disable saving annotations to the database
-		$("#save-annotations, #save-to-dataset").addClass("disabled");
+	// Save annotations after x seconds if changes have been made
+	startSaveTimer: function() {
+		// Reset the save timer if it was already ongoing,
+		// so we're not making unnecessary calls when edits are still being made.
+		if (save_timer){
+			clearTimeout(save_timer);
+			save_timer = null;
+		}
+		save_timer = setTimeout(function() {
+			annotations.saveAnnotations();
+		}, 3000);
 	},
 
 	warnEditor: function(warning) {
@@ -582,8 +559,10 @@ const annotations = {
 	notifySaved: function() {
 		// Flash a fixed div with the notice that annotations are saved.
 		let notice = $("#save-annotations-notice");
-		notice.fadeIn(400);
-		notice.delay(1750).fadeOut(1000);
+		if (!notice.is(":visible")) {
+			notice.fadeIn(300);
+			notice.delay(1500).fadeOut(1000);
+		}
 	},
 
 	showAnnotations: function() {
@@ -675,7 +654,6 @@ const page_functions = {
             handle: ".handle",
             items: "li",
             axis: "y",
-			containment: "#annotation-field-settings",
 			change: function() {
 
 			}
