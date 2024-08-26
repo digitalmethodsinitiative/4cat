@@ -96,8 +96,6 @@ header .author .author-description, header .author .time, .metrics span {
 }
 
 .play-button {
-	width: 100%;
-	height: 100%;
 	position: absolute;
 	top: 50%;
     left: 45%;
