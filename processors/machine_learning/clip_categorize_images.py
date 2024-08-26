@@ -28,6 +28,8 @@ class CategorizeImagesCLIP(BasicProcessor):
     description = "Given a list of categories, the CLIP model will estimate likelihood an image is to belong to each (total of all categories per image will be 100%)."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = ["image-category-wall"]
+
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",
         "[CLIP paper: Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/pdf/2103.00020.pdf)",
@@ -61,7 +63,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         return config.get("dmi-service-manager.cc_clip_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("image-downloader")
+               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -117,18 +119,18 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         This takes a zipped set of image files and uses a CLIP docker image to categorize them.
         """
-        categories = [cat.strip() for cat in self.parameters.get('categories').split(',')]
         model = self.parameters.get("model")
         if self.source_dataset.num_rows <= 1:
             # 1 because there is always a metadata file
             self.dataset.finish_with_error("No images found.")
             return
-        elif not categories:
+        elif not self.parameters.get('categories'):
             self.dataset.finish_with_error("No categories provided.")
             return
         elif not model:
             self.dataset.finish_with_error("No model provided.")
             return
+        categories = [cat.strip() for cat in self.parameters.get('categories').split(',')]
 
         # Unpack the image files into a staging_area
         self.dataset.update_status("Unzipping image files")
@@ -150,9 +152,14 @@ class CategorizeImagesCLIP(BasicProcessor):
         try:
             gpu_response = dmi_service_manager.check_gpu_memory_available("clip")
         except DmiServiceManagerException as e:
-            return self.dataset.finish_with_error(str(e))
+            if "GPU not enabled on this instance of DMI Service Manager" in str(e):
+                self.dataset.update_status(
+                    "GPU not enabled on this instance of DMI Service Manager; this may be a minute...")
+                gpu_response = None
+            else:
+                return self.dataset.finish_with_error(str(e))
 
-        if int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+        if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
             self.dataset.finish_with_error(
                 "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
             return
@@ -169,7 +176,8 @@ class CategorizeImagesCLIP(BasicProcessor):
         data = {"args": ['--output_dir', f"data/{path_to_results}",
                          "--model", model,
                          "--categories", f"{','.join(categories)}",
-                         "--images"]
+                         "--images"],
+                "pass_key": True,  # This tells the DMI SM there is a status update endpoint in the clip image
                 }
 
         # Finally, add image files to args
@@ -236,14 +244,23 @@ class CategorizeImagesCLIP(BasicProcessor):
         :return:
         """
         image_metadata = item.get("image_metadata")
+        # Updates to CLIP output; categories used to be a list of categories, but now is a dict with: {"predictions": [[category_label, precent_float],]}
+        categories = item.get("categories")
+        if type(categories) == list:
+            pass
+        elif type(categories) == dict and "predictions" in categories:
+            categories = categories.get("predictions")
+        else:
+            raise KeyError("Unexpected categories format; check NDJSON")
+
         top_cats = []
         percent = 0
-        for cat in item.get("categories", []):
+        for cat in categories:
             if percent > .7:
                 break
             top_cats.append(cat)
             percent += cat[1]
-        all_cats = {cat[0]: cat[1] for cat in item.get("categories", [])}
+        all_cats = {cat[0]: cat[1] for cat in categories}
         return MappedItem({
             "id": item.get("id"),
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),

@@ -30,6 +30,8 @@ class ExtractNouns(BasicProcessor):
 
     references = ["[Information on noun chunks](https://spacy.io/usage/linguistic-features#noun-chunks)"]
 
+    followups = ["wordcloud"]
+
     options = {
         "type": {
             "type": UserInput.OPTION_CHOICE,

@@ -82,7 +82,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "author_fullname": tweet["core"]["user_results"]["result"]["legacy"]["name"],
             "author_id": tweet["legacy"]["user_id_str"],
             "author_avatar_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_image_url_https"],
-            "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_banner_url"],
+            "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"].get("profile_banner_url", ""), # key does not exist when author does not have a banner
             "verified": tweet["core"]["user_results"]["result"].get("is_blue_verified", ""),
             "source": strip_tags(tweet["source"]),
             "language_guess": tweet["legacy"].get("lang"),

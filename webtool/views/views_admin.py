@@ -27,8 +27,6 @@ from webtool import app, db, config
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
-
-from common.lib.helpers import call_api, send_email, UserInput, folder_size
 from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition

@@ -28,6 +28,8 @@ class ExtractNouns(BasicProcessor):  # TEMPORARILY DISABLED
                   "\"Named Entity Recognition\" in the previous module." # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = ["wordcloud"]
+
     options = {
         "entities": {
             "type": UserInput.OPTION_MULTI,

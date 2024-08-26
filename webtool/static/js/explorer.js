@@ -400,8 +400,7 @@ const annotations = {
 			data: JSON.stringify(new_fields),
 			success: function () {
 				// If the query is accepted by the server
-				// simply reload the page to render the template again
-
+				// simply reload the page to render the template again.
 				window.location.replace(window.location.href);
 			},
 			error: function (error) {
@@ -695,7 +694,6 @@ const page_functions = {
 		// and change the dropdown sort option based on the sort parameter.
 		let searchParams = new URLSearchParams(window.location.search)
 		let show_annotations = searchParams.get("show");
-		console.log(show_annotations);
 		if (show_annotations) {
 			annotations.showAnnotations();
 		}

@@ -22,6 +22,7 @@ from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug import Request
 
 from common.config_manager import config
 from common.lib.database import Database
@@ -98,6 +99,9 @@ app.config.from_mapping({
 login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
 login_manager.init_app(app)
 login_manager.login_view = "show_login"
+
+# Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
+Request.max_form_parts = config.get("flask.max_form_parts", 1000)
 
 # import all views
 import webtool.views.views_admin

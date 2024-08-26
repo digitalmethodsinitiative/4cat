@@ -268,6 +268,12 @@ class SearchCustom(BasicProcessor):
         # mapping for each column
         column_mapping = {}
         if tool_format.get("allow_user_mapping", False):
+            magic_mappings = {
+                "id": {"__4cat_auto_sequence": "[generate sequential IDs]"},
+                "thread_id": {"__4cat_auto_sequence": "[generate sequential IDs]"},
+                "empty": {"__4cat_empty_value": "[empty]"},
+                "timestamp": {"__4cat_now": "[current date and time]"}
+            }
             if incomplete_mapping:
                 raise QueryNeedsFurtherInputException({
                     "mapping-info": {
@@ -279,8 +285,7 @@ class SearchCustom(BasicProcessor):
                             "type": UserInput.OPTION_CHOICE,
                             "options": {
                                 "": "",
-                                **({"__4cat_auto_sequence": "[generate sequential IDs]"} if mappable_column in (
-                                "id", "thread_id") else {}),
+                                **magic_mappings.get(mappable_column, magic_mappings["empty"]),
                                 **{column: column for column in fields}
                             },
                             "default": mappable_column if mappable_column in fields else "",
@@ -294,7 +299,7 @@ class SearchCustom(BasicProcessor):
             for field in tool_format["columns"]:
                 mapping_field = "option-mapping-%s" % field
                 provided_field = request.form.get(mapping_field)
-                if (provided_field not in fields and provided_field != "__4cat_auto_sequence") or not provided_field:
+                if (provided_field not in fields and not provided_field.startswith("__4cat")) or not provided_field:
                     missing_mapping.append(field)
                 else:
                     column_mapping["mapping-" + field] = request.form.get(mapping_field)

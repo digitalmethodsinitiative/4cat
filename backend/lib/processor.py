@@ -590,7 +590,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		with zipfile.ZipFile(archive_path, "r") as archive_file:
 			if filename not in archive_file.namelist():
-				raise KeyError("File %s not found in archive %s" % (filename, archive_path))
+				raise FileNotFoundError("File %s not found in archive %s" % (filename, archive_path))
 			else:
 				archive_file.extract(filename, staging_area)
 				return staging_area.joinpath(filename)

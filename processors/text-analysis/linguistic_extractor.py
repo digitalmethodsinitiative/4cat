@@ -35,6 +35,8 @@ class LinguisticFeatures(BasicProcessor):
 				  "with less than 100,000 items. " # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["get-entities", "extract-nouns"]
+
 	references = [
 		"[SpaCy Linguistic Features - Documentation](https://spacy.io/usage/linguistic-features/)"
 	]
@@ -51,6 +53,13 @@ class LinguisticFeatures(BasicProcessor):
 			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See references for more information."
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+        Allow CSV and NDJSON datasets
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""

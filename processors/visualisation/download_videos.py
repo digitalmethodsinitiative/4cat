@@ -52,6 +52,9 @@ class VideoDownloaderPlus(BasicProcessor):
     description = "Download videos from URLs and store in a zip file. May take a while to complete as videos are " \
                   "retrieved externally."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "video"  # media type of the processor
+
+    followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
     if config.get("video-downloader.allow-indirect"):
         references = [
@@ -235,7 +238,8 @@ class VideoDownloaderPlus(BasicProcessor):
         :return bool:
         """
         return ((module.type.endswith("-search") or module.is_from_collector())
-                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"])
+                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]) \
+                and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
@@ -663,6 +667,7 @@ class VideoDownloaderPlus(BasicProcessor):
         :param str text:  string that may contain URLs
         :return list:  	  list containing validated URLs to videos
         """
+        text = str(text)
         split_comma = self.parameters.get("split-comma", True)
         if split_comma:
             texts = text.split(",")

@@ -33,6 +33,8 @@ class PixPlotGenerator(BasicProcessor):
                   "algorithmically grouped by similarity."
     extension = "html"  # extension of result file, used internally and in UI
 
+    followups = []
+
     references = [
         "[PixPlot](https://pixplot.io/)",
         "[Parameter documentation](https://pixplot.io/docs/api/parameters.html)"
@@ -141,7 +143,7 @@ class PixPlotGenerator(BasicProcessor):
         """
         return config.get("dmi-service-manager.db_pixplot_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("image-downloader")
+               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):
         """
@@ -190,14 +192,14 @@ class PixPlotGenerator(BasicProcessor):
         # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
         file_collection_name = dmi_service_manager.get_folder_name(self.source_dataset)
 
-        path_to_files, path_to_results = dmi_service_manager.process_files(staging_area, image_filenames + [metadata_file_path], output_dir,
+        path_to_files, path_to_results = dmi_service_manager.process_files(staging_area, image_filenames + ([metadata_file_path] if metadata_file_path else []), output_dir,
                                                                            file_collection_name, server_results_folder_name)
 
         # PixPlot
         # Create json package for creation request
         data = {'args': ['--images', f"data/{path_to_files}/*",
-                         '--out_dir', f"data/{path_to_results}",
-                         '--metadata', f"data/{path_to_files}/{metadata_file_path.name}"]}
+                         '--out_dir', f"data/{path_to_results}"] +
+                        (['--metadata', f"data/{path_to_files}/{metadata_file_path.name}"] if metadata_file_path else [])}
 
         # Additional options for PixPlot
         cell_size = self.parameters.get('image_size')
@@ -264,6 +266,13 @@ class PixPlotGenerator(BasicProcessor):
         # Get image data
         if not os.path.isfile(os.path.join(temp_path, '.metadata.json')):
             # No metadata
+            return False
+
+        # Check that this is not already a top dataset
+        if self.dataset.top_parent().key == self.source_dataset.key:
+            # i.e. the source image dataset is not a top dataset that happens to have a metadata file from some export
+            # This can happen with the Upload Media datasource if the user uploads a 4CAT results zip with images and .metadata.json
+            # But there is not a top dataset with post data in this instance unfortunately
             return False
 
         with open(os.path.join(temp_path, '.metadata.json')) as file:

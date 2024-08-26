@@ -317,6 +317,23 @@ def timify_long(number):
 
     return time_str + last_str
 
+def andify(items):
+    """
+    Format a list of items for use in text
+
+    Returns a comma-separated list, the last item preceded by "and"
+
+    :param items:  Iterable list
+    :return str:  Formatted string
+    """
+    if len(items) == 0:
+        return ""
+    elif len(items) == 1:
+        return str(items[1])
+
+    result = f" and {items.pop()}"
+    return ", ".join([str(item) for item in items]) + result
+
 
 def get_yt_compatible_ids(yt_ids):
     """

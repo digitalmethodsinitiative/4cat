@@ -193,7 +193,7 @@ class UserInput:
         # and the requirement isn't met
         if settings.get("requires"):
             try:
-                field, operator, value = re.findall(r"([a-zA-Z0-9_]+)([!=$~^]+)(.*)", settings.get("requires"))[0]
+                field, operator, value = re.findall(r"([a-zA-Z0-9_-]+)([!=$~^]+)(.*)", settings.get("requires"))[0]
             except IndexError:
                 # invalid condition, interpret as 'does the field with this name have a value'
                 field, operator, value = (choice, "!=", "")

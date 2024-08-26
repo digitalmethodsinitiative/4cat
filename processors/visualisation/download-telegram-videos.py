@@ -12,6 +12,7 @@ from telethon import TelegramClient
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
+from processors.visualisation.download_videos import VideoDownloaderPlus
 from common.lib.helpers import UserInput
 from common.lib.dataset import DataSet
 
@@ -34,7 +35,10 @@ class TelegramVideoDownloader(BasicProcessor):
                   "Note that not always all videos can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "video"  # media type of the result
     flawless = True
+
+    followups = VideoDownloaderPlus.followups
 
     config = {
         "video-downloader-telegram.max_videos": {

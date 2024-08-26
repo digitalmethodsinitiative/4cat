@@ -4,14 +4,22 @@ RUN apt-get update && apt install -y \
     # General requirements:
     libpq-dev \
     python3-dev \
-    python3-pip
+    python3-pip \
+    # Called in docker-entrypoint.sh:
+    curl \
+    netcat-traditional \
+    postgresql-client \
+    postgresql-server-dev-all \
+    # Called by 4CAT:
+    git \
+    # Needed for video processing only (and only technically on backend)
+    ffmpeg
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Make and use virtual environment
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Ensure that Python outputs everything that's printed inside to containers
+ENV PYTHONUNBUFFERED=1
 
 # Install dependencies
 RUN pip3 install --upgrade pip
@@ -26,26 +34,6 @@ RUN pip3 install -r requirements.txt
 
 # Install frontend Docker requirements
 RUN pip3 install gunicorn
-
-# Build image from compile-image
-FROM python:3.8-slim AS build-image
-COPY --from=compile-image /opt/venv /opt/venv
-# Make virtual env available
-ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1
-
-RUN apt-get update && apt install -y \
-    # Called in docker-entrypoint.sh:
-    curl \
-    netcat-traditional \
-    postgresql-client \
-    postgresql-server-dev-all \
-    # Called by 4CAT:
-    git \
-    # Needed for video processing only (and only technically on backend)
-    ffmpeg
-
-# Set working directory
-WORKDIR /usr/src/app
 
 # Copy project
 COPY . /usr/src/app/
