@@ -12,7 +12,7 @@ from flask_login import login_required, current_user
 from webtool import app, db, openapi, limiter, config
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
-from common.lib.helpers import convert_to_float, hash_values
+from common.lib.helpers import convert_to_float, hash_to_md5
 from common.lib.exceptions import DataSetException, AnnotationException
 from common.config_manager import ConfigWrapper
 
@@ -175,7 +175,7 @@ def explorer_save_annotation_fields(dataset_key: str):
 	field_keys = list(annotation_fields.keys())
 	for field_id in field_keys:
 		if "tohash" in field_id:
-			new_field_id = hash_values(dataset_key + annotation_fields[field_id]["label"])
+			new_field_id = hash_to_md5(dataset_key + annotation_fields[field_id]["label"])
 			annotation_fields[new_field_id] = annotation_fields[field_id]
 			del annotation_fields[field_id]
 

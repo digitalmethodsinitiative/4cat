@@ -6,7 +6,7 @@ Annotation class
 import time
 import json
 
-from common.lib.helpers import hash_values
+from common.lib.helpers import hash_to_md5
 from common.lib.exceptions import AnnotationException
 
 
@@ -204,7 +204,7 @@ class Annotation:
         """
 
         base_field_id = dataset_key + label
-        field_id = hash_values(base_field_id)
+        field_id = hash_to_md5(base_field_id)
         self.field_id = field_id
         return self.field_id
 

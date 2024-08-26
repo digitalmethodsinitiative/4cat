@@ -899,8 +899,8 @@ def folder_size(path='.'):
             total += folder_size(entry.path)
     return total
 
-def hash_values(string: str) -> str:
+def hash_to_md5(string: str) -> str:
     """
-    Hash a string
+    Hash a string with an md5 hash.
     """
     return hashlib.md5(string.encode("utf-8")).hexdigest()

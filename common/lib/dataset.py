@@ -13,7 +13,7 @@ import backend
 from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_values
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_to_md5
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -964,7 +964,7 @@ class DataSet(FourcatModule):
 
 		parent_key = str(parent) if parent else ""
 		plain_key = repr(param_key) + str(query) + parent_key
-		hashed_key = hash_values(plain_key)
+		hashed_key = hash_to_md5(plain_key)
 
 		if self.db.fetchone("SELECT key FROM datasets WHERE key = %s", (hashed_key,)):
 			# key exists, generate a new one
@@ -1694,7 +1694,7 @@ class DataSet(FourcatModule):
 			# If we're not overwriting, create a new key with some salt.
 			if not overwrite:
 				if not field_id:
-					field_id = hash_values(annotation_data["dataset"] + annotation_data["label"] + salt)
+					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] + salt)
 				if field_id in annotation_fields:
 					annotation_data["field_id"] = field_id
 
