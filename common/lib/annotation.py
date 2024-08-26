@@ -60,7 +60,6 @@ class Annotation:
 
         self.db = db
 
-        current = None
         new_or_updated = False
 
         # Get the annotation data if the ID is given; if an annotation has
@@ -69,7 +68,7 @@ class Annotation:
         if annotation_id is not None or "id" in data:
             if data and "id" in data:
                 annotation_id = data["id"]
-            self.id = annotation_id # IDs correspond to unique serial numbers in the database.
+            self.id = annotation_id  # IDs correspond to unique serial numbers in the database.
             current = self.get_by_id(annotation_id)
             if not current:
                 raise AnnotationException(
@@ -109,7 +108,8 @@ class Annotation:
             new_data = {
                 "dataset": data["dataset"],
                 "item_id": data["item_id"],
-                "field_id": data["field_id"] if data.get("field_id") else self.set_field_id(data["dataset"], data["label"]),
+                "field_id": data["field_id"]
+                if data.get("field_id") else self.set_field_id(data["dataset"], data["label"]),
                 "timestamp": created_timestamp,
                 "timestamp_created": created_timestamp,
                 "label": data["label"],
@@ -160,7 +160,7 @@ class Annotation:
         except ValueError:
             raise AnnotationException("Id '%s' is not valid" % annotation_id)
 
-        data = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % (annotation_id))
+        data = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % annotation_id)
 
         if not data:
             return {}
@@ -184,7 +184,7 @@ class Annotation:
         """
 
         data = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND label = %s",
-                         (dataset_key, str(item_id), label))
+                                (dataset_key, str(item_id), label))
         if not data:
             return {}
 
@@ -215,7 +215,7 @@ class Annotation:
         db_data = self.data
 
         db_data["timestamp"] = int(time.time())
-        m = db_data["metadata"] # To avoid circular reference error
+        m = db_data["metadata"]  # To avoid circular reference error
         db_data["metadata"] = json.dumps(m)
         if db_data["type"] == "checkbox":
             db_data["value"] = ",".join(db_data["value"])
@@ -369,8 +369,8 @@ class Annotation:
                     if column == "options":
 
                         annotations = db.fetchall("SELECT id, options, value FROM annotations "
-                                                      "WHERE dataset = '%s' and field_id = '%s' AND value != '';"
-                                                       % (dataset_key, field_id))
+                                                  "WHERE dataset = '%s' and field_id = '%s' AND value != '';"
+                                                  % (dataset_key, field_id))
 
                         for annotation in annotations:
                             annotation_id = annotation["id"]
@@ -378,7 +378,7 @@ class Annotation:
 
                             # Remove or rename options
                             new_values = []
-                            new_options = update_value["options"] # Dict with option id->label as items
+                            new_options = update_value["options"]  # Dict with option id->label as items
 
                             for ann_value in annotation_values:
                                 # Get the option ID, so we can see if it's new, deleted, or renamed.
@@ -418,7 +418,7 @@ class Annotation:
         """
         Setter so we can flexibly update the database
 
-        Also updates internal data stores (.data etc). If the attribute is
+        Also updates internal data stores (.data etc.). If the attribute is
         unknown, it is stored within the 'metadata' attribute.
 
         :param str attr:  Attribute to update
