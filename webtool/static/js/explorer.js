@@ -251,7 +251,7 @@ const annotations = {
 
 				option_fields.find(".option-field").each(function(){
 					let option_input = $(this).find("input");
-					let option_label = option_input.val();
+					let option_label = option_input.val().replaceAll(",", ""); // No commas allowed
 					let option_id = option_input.attr("id").replace("option-", "");
 
 					// New option label
@@ -678,7 +678,7 @@ const page_functions = {
 			// Get the column to sort on, and whether we should sort in reverse.
 			let selected = $("#column-sort-select").find("option:selected").val();
 			let order = $("#column-sort-order").find("option:selected").val();
-			
+
 			let queryParams = new URLSearchParams(window.location.search);
 			let dataset_key = $("#dataset-key").text();
 			queryParams.set("sort", selected)
