@@ -15,7 +15,7 @@
         </div>
     {% endif %}
     </div>
-  {% if dataset.is_finished() and dataset.num_rows > 0 and dataset.file_exists() %}
+  {% if dataset.is_finished() and dataset.num_rows > 0 and dataset.get_results_path().exists() %}
     <ul class="dataset-actions">
     {% if dataset.get_own_processor().map_item or dataset.get_annotation_fields() %}
         <li>
