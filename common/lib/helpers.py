@@ -246,7 +246,7 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
-def convert_to_float(value, default=0):
+def convert_to_float(value, default=0) -> float:
     """
     Convert a value to a floating point, with a fallback
 
@@ -256,7 +256,7 @@ def convert_to_float(value, default=0):
 
     :param value:  Value to convert
     :param int default:  Default value, if conversion not possible
-    :return int:  Converted value
+    :return float:  Converted value
     """
     try:
         return float(value)
