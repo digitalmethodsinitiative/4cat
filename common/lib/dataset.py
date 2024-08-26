@@ -538,11 +538,13 @@ class DataSet(FourcatModule):
 			try:
 				child = DataSet(key=child["key"], db=self.db)
 				child.delete(commit=commit)
+				child.delete_annotations()
 			except DataSetException:
 				# dataset already deleted - race condition?
 				pass
 
 		# delete from database
+		self.delete_annotations()
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
@@ -1719,23 +1721,19 @@ class DataSet(FourcatModule):
 
 		return count
 
-	def delete_annotations(self, dataset_key=None, id=None, field_id=None):
+	def delete_annotations(self, id=None, field_id=None):
 		"""
-		Deletes all annotations for an entire dataset or by a list of (field) IDs.
+		Deletes all annotations for an entire dataset.
+		If `id` or `field_id` are also given, it only deletes those annotations for this dataset.
 
-		:param str dataset_key: A dataset key.
 		:param li id:			A list or string of unique annotation IDs.
 		:param li field_id:		A list or string of IDs for annotation fields.
 
 		:return int: The number of removed records.
-	   """
+		"""
 
-		if not dataset_key and not id and not field_id:
-			return 0
+		where = {"dataset": self.key}
 
-		where = {}
-		if dataset_key:
-			where["dataset"] = dataset_key
 		if id:
 			where["id"] = id
 		if field_id:
