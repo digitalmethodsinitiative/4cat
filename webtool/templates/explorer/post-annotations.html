@@ -19,28 +19,30 @@
     			{% endif %}
             {% endfor %}
             {% set annotation = an.an %}
+
 			<div class="post-annotation field-{{ field }} type-{{ type }} item-id-{{ post.id }}">
                 <label class="annotation-label">{{ label }}</label>
-			{% if type == 'text' %}
+			{% if type == "text" %}
 				<input type="text" class="post-annotation-input" value="{{ annotation.value }}">
 
-			{% elif type == 'textarea' %}
+			{% elif type == "textarea" %}
 				<textarea class="post-annotation-input">{{ annotation.value }}</textarea>
 
-			{% elif type == 'dropdown' %}
+			{% elif type == "dropdown" %}
 				<select class="post-annotation-input">
-				    <option class='post-annotation-option' value=''></option>
+				    <option class="post-annotation-option" value=""></option>
 
 				{% for option_id, option_label in annotation_fields[field]["options"].items() %}
+
 					<option class="post-annotation-option option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == annotation.value %}selected{% endif %}>{{ option_label }}</option>
 				{% endfor %}
 				</select>
 
-			{% elif type == 'checkbox' %}
-				<div class='post-annotation-options'>
+			{% elif type == "checkbox" %}
+				<div class="post-annotation-options">
 				{% for option_id, option_label in annotation_fields[field]["options"].items() %}
 					{% set checked = "checked" if option_label in annotation.value else "" %}
-					<input type='checkbox' class='post-annotation-input option-{{ option_id }}' id='option-{{ post.id }}-{{ option_id }}' value='{{ option_label }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id }}'>{{ option_label }}</label>
+					<input type="checkbox" class="post-annotation-input option-{{ option_id }}" id="option-{{ post.id }}-{{ option_id }}" value="{{ option_label }}" {{ checked }}><label for="option-{{ post.id }}-{{ option_id }}">{{ option_label }}</label>
 				{% endfor %}
 				</div>
 			{% endif %}

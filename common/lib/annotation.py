@@ -9,6 +9,7 @@ import json
 from common.lib.helpers import hash_values
 from common.lib.exceptions import AnnotationException
 
+
 class Annotation:
     """
     Annotation class
@@ -165,7 +166,7 @@ class Annotation:
         if not data:
             return {}
 
-        if data["type"] in ["dropdown", "checkbox"]:
+        if data["type"] == "checkbox":
             data["value"] = data["value"].split(",")
         data["metadata"] = json.loads(data["metadata"])
 
@@ -188,7 +189,7 @@ class Annotation:
         if not data:
             return {}
 
-        if data["type"] in ["dropdown", "checkbox"]:
+        if data["type"] == "checkbox":
             data["value"] = data["value"].split(",")
         data["metadata"] = json.loads(data["metadata"])
 
@@ -217,7 +218,7 @@ class Annotation:
         db_data["timestamp"] = int(time.time())
         m = db_data["metadata"] # To avoid circular reference error
         db_data["metadata"] = json.dumps(m)
-        if db_data["type"] in ["checkbox", "dropdown"]:
+        if db_data["type"] == "checkbox":
             db_data["value"] = ",".join(db_data["value"])
 
         return self.db.upsert("annotations", data=db_data, constraints=["label", "dataset", "item_id"])
@@ -277,6 +278,7 @@ class Annotation:
 
         fields_to_delete = set()        # Delete all annotations with this field ID
         fields_to_update = {}           # Update values of annotations with this field ID
+        old_options = {}
 
         # Loop through the old annotation fields
         for old_field_id, old_field in old_fields.items():
@@ -316,18 +318,21 @@ class Annotation:
                             fields_to_delete.add(field_id)
                             continue
 
-                        old_options = old_field.get("options", {})
+                        # Changed options values (e.g. renamed or one field deleted)
+                        old_options[old_field_id] = old_field.get("options", {})
                         options_to_update = {}
+                        if old_options[old_field_id] and old_options != new_options:
+                            options_to_update = new_options
 
-                        # Options are saved in a dict with IDs as keys and labels as values.
-                        for old_option_id, old_option in old_options.items():
-
-                            # Renamed option label
-                            if old_option_id in new_options and old_option != new_options[old_option_id]:
-                                options_to_update[old_option] = new_options[old_option_id]  # Old label -> new label
-                            # Deleted option
-                            elif old_option_id not in new_options:
-                                options_to_update[old_option] = None  # Remove None labels later
+                        # # Options are saved in a dict with IDs as keys and labels as values.
+                        # for old_option_id, old_option in old_options.items():
+                        #
+                        #     # Renamed option label
+                        #     if old_option_id in new_options and old_option != new_options[old_option_id]:
+                        #         options_to_update[old_option] = new_options[old_option_id]  # Old label -> new label
+                        #     # Deleted option
+                        #     elif old_option_id not in new_options:
+                        #         options_to_update[old_option] = None  # Remove None labels later
 
                         if options_to_update:
                             update_data[field_key] = {"options": options_to_update}
@@ -353,60 +358,42 @@ class Annotation:
 
                     update_value_insert = update_value
                     if column == "options":
-                        update_value_insert = json.dumps(update_value)
+                        update_value_insert = ",".join(list(update_value["options"].values()))
 
                     # Change values of columns
                     updates = db.update("annotations", {column: update_value_insert},
                                         where={"dataset": dataset_key, "field_id": field_id})
                     count += updates
 
-                    # Special case: Changed options.
-                    # Here we have to also rename/remove inserted options from the values column.
+                    # Special case: Changed option labels.
+                    # Here we have to also rename/remove inserted options from the `value` column.
                     if column == "options":
 
-                        inserted_options = db.fetchall("SELECT id, options, value FROM annotations "
-                                                      "WHERE dataset = '%s' and field_id = '%s'" % (dataset_key, field_id))
-                        new_inserts = []
-                        for inserted_option in inserted_options:
+                        annotations = db.fetchall("SELECT id, options, value FROM annotations "
+                                                      "WHERE dataset = '%s' and field_id = '%s' AND value != '';"
+                                                       % (dataset_key, field_id))
 
-                            annotation_id = inserted_option["id"]
-                            annotation_values = inserted_option["value"]
-                            annotation_options = inserted_option["options"].split(",")
-
-                            # CHange the options
-
-                            if not annotation_values:
-                                 continue
-
-                            annotation_values = annotation_values.split(",")
+                        for annotation in annotations:
+                            annotation_id = annotation["id"]
+                            annotation_values = annotation["value"].split(",")
 
                             # Remove or rename options
                             new_values = []
-                            new_options = update_value["options"]
+                            new_options = update_value["options"] # Dict with option id->label as items
 
-                            for annotation_value in annotation_values:
-                                if annotation_value in new_options:
-                                    if new_options[annotation_value] == None:
-                                        # Don't add
-                                        continue
-                                    elif annotation_value in new_options:
-                                        # Replace with new value
-                                        new_values.append(new_options[annotation_value])
+                            for ann_value in annotation_values:
+                                # Get the option ID, so we can see if it's new, deleted, or renamed.
+                                # Should always be present in old options dict
+                                option_id = [k for k, v in old_options[field_id].items() if v == ann_value][0]
+                                # Deleted...
+                                if option_id not in new_options:
+                                    continue
+                                # Or replaced with a new, possibly renamed value
                                 else:
-                                    # Keep old value
-                                    new_values.append(annotation_value)
-
-                            # Update the options column as well
-                            new_annotation_options = []
-                            for annotation_option in annotation_options:
-                                if annotation_option in new_options:
-                                    new_annotation_options.append(new_options[annotation_option])
-                                else:
-                                    new_annotation_options.append(annotation_option)
+                                    new_values.append(new_options[option_id])
 
                             new_values = ",".join(new_values)
-
-                            db.update("annotations", {"value": ",".join(new_values), "options": ",".join(new_annotation_options)}, where={"id": annotation_id})
+                            db.update("annotations", {"value": new_values}, where={"id": annotation_id})
 
         return count
 
