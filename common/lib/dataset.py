@@ -1675,7 +1675,7 @@ class DataSet(FourcatModule):
 										  "the item it annotated, got %s" % annotation_data)
 			if "label" not in annotation_data or not isinstance(annotation_data["label"], str):
 				raise AnnotationException("Can't save annotations; annotation must have a `label` field, "
-										  "got %s" % annotation)
+										  "got %s" % annotation_data)
 			if not overwrite and annotation_data["label"] in annotation_labels:
 				raise AnnotationException("Can't save annotations; annotation field with label %s "
 										  "already exists" % annotation_data["label"])
