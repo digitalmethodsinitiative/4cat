@@ -401,6 +401,7 @@ const annotations = {
 			success: function () {
 				// If the query is accepted by the server
 				// simply reload the page to render the template again
+
 				window.location.replace(window.location.href);
 			},
 			error: function (error) {
@@ -566,6 +567,12 @@ const annotations = {
 	},
 
 	showAnnotations: function() {
+
+		// Store state in URL params
+		let queryParams = new URLSearchParams(window.location.search);
+		queryParams.set("show", "true");
+		history.replaceState(null, null, "?"+queryParams.toString());
+
 		let ta = $("#toggle-annotations");
 		ta.addClass("shown");
 		ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
@@ -579,6 +586,12 @@ const annotations = {
 	},
 
 	hideAnnotations: function() {
+
+		// Store state in URL params
+		let queryParams = new URLSearchParams(window.location.search);
+		queryParams.delete("show");
+		history.replaceState(null, null, "?"+queryParams.toString());
+
 		let ta = $("#toggle-annotations");
 		ta.removeClass("shown");
 		ta.html("<i class='fas fa-eye'></i> Show annotations");
@@ -662,21 +675,31 @@ const page_functions = {
 		// Reorder the dataset when the sort type is changed
 		$(".sort-select").on("change", function(){
 
-			// Get the column to sort on, an whether we should sort in reverse.
+			// Get the column to sort on, and whether we should sort in reverse.
 			let selected = $("#column-sort-select").find("option:selected").val();
 			let order = $("#column-sort-order").find("option:selected").val();
-
-			sort_order = ""
-			if (order === "reverse"){
-				sort_order = "&order=reverse"
-			}
-
+			
+			let queryParams = new URLSearchParams(window.location.search);
 			let dataset_key = $("#dataset-key").text();
-			window.location.href = getRelativeURL("results/" + dataset_key + "/explorer/?sort=" + selected + sort_order);
+			queryParams.set("sort", selected)
+			if (order === "reverse"){
+				queryParams.set("order", "reverse");
+			}
+			else {
+				queryParams.delete("order");
+			}
+			window.location.href = getRelativeURL("results/" + dataset_key + "/explorer/?" + queryParams.toString());
 		});
 
-		// Change the dropdown sort option based on the URL parameter
+		// Show annotations if it's in the URL params,
+		// and change the dropdown sort option based on the sort parameter.
 		let searchParams = new URLSearchParams(window.location.search)
+		let show_annotations = searchParams.get("show");
+		console.log(show_annotations);
+		if (show_annotations) {
+			annotations.showAnnotations();
+		}
+
 		let selected = searchParams.get("sort");
 		let sort_order = searchParams.get("order");
 		$("#column-sort-select").find("option[value='" + selected + "']").attr("selected", "selected");
