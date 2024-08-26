@@ -1594,8 +1594,8 @@ class DataSet(FourcatModule):
 
 		# Then get the annotations by ID
 		ids = [i["id"] for i in ids]
-		for id in ids:
-			annotations.append(Annotation(id=id, db=self.db))
+		for annotation_id in ids:
+			annotations.append(Annotation(annotation_id=annotation_id, db=self.db))
 
 		return annotations
 
