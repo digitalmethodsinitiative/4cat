@@ -645,6 +645,9 @@ class VideoDownloaderPlus(BasicProcessor):
                 if not value:
                     continue
 
+                if value is not str:
+                    value = str(value)
+
                 video_links = self.identify_video_urls_in_string(value)
                 if video_links:
                     item_urls |= set(video_links)
