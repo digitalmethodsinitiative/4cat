@@ -538,7 +538,6 @@ class DataSet(FourcatModule):
 			try:
 				child = DataSet(key=child["key"], db=self.db)
 				child.delete(commit=commit)
-				child.delete_annotations()
 			except DataSetException:
 				# dataset already deleted - race condition?
 				pass
