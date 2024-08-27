@@ -417,7 +417,7 @@ article.result > section:first-child {
     display: none;
 }
 
-.child-list .processor-header .property-badge {
+.child-list .processor-header .property-badge, p[role=tooltip] .property-badge {
     border: 0;
     background: var(--gray);
     display: inline;
@@ -772,8 +772,11 @@ body.image-preview {
     padding: 0.5em
 }
 
-.post-annotations .property-badge {
-    font-size: 13px;
+.post-annotations p[role="tooltip"] .property-badge {
+    display: inline-block;
+    margin: 2px 0px 2px 0px;
+    background-color: white;
+    border: 1px solid black;
 }
 
 #save-annotations-notice {
