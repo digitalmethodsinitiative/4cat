@@ -28,6 +28,8 @@ class AudioToText(BasicProcessor):
     description = "Detect speech in audion and convert to text."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = []
+
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
         "[Whisper paper: Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356)",
@@ -61,7 +63,7 @@ class AudioToText(BasicProcessor):
         """
         return config.get("dmi-service-manager.bc_whisper_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("audio-extractor")
+               (module.get_media_type() == 'audio' or module.type.startswith("audio-extractor"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -162,11 +164,16 @@ class AudioToText(BasicProcessor):
 
         # Check connection and GPU memory available
         try:
-            gpu_response = dmi_service_manager.check_gpu_memory_available("whisper")
+            gpu_response = dmi_service_manager.check_gpu_memory_available("blip2")
         except DmiServiceManagerException as e:
-            return self.dataset.finish_with_error(str(e))
+            if "GPU not enabled on this instance of DMI Service Manager" in str(e):
+                self.dataset.update_status(
+                    "GPU not enabled on this instance of DMI Service Manager; this may be a minute...")
+                gpu_response = None
+            else:
+                return self.dataset.finish_with_error(str(e))
 
-        if int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+        if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
             self.dataset.finish_with_error("DMI Service Manager currently busy; no GPU memory available. Please try again later.")
             return
 

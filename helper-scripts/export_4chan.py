@@ -94,11 +94,6 @@ db = Database(logger=logger, appname="4chan-export", dbname=config.DB_NAME, user
 
 print("Exporting to %s" % args.output)
 
-# Correct sticky threads for /pol/
-if "pol" in boards:
-	print("Updating sticky threads for /pol/.")
-	db.execute("UPDATE threads_4chan SET is_sticky = TRUE WHERE board = 'pol' AND id IN (385738122,383677565,431579660,375779341,374650701,421675128,438918345,401602799,430140262,406826265,376776209,393208524,419662044,415923186,422028606,406251049,415653885,431856910)")
-
 # Get min and max thread IDs to query in batches and know when we're done
 print("Getting upper and lower boundaries of thread IDs.")
 min_thread_id = db.fetchone("SELECT min(id) FROM threads_4chan WHERE %s " % board_sql)["min"]
@@ -205,7 +200,8 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 			deleted = True if (row["timestamp_deleted"] and row["timestamp_deleted"] > 0) and not post.get("op") else False
 			if (deleted or thread_deleted) and row["id"] != row["thread_id"]:
 				post["deleted"] = True
-				post["deleted_on"] = row["timestamp_deleted"] if (row["timestamp_deleted"] and row["timestamp_deleted"] > 0) else thread_data[0]["deleted_on"]
+				if not skip_deleted: # Deleted OP data might have been skipped, so we maybe can't get data from `thread_data`
+					post["deleted_on"] = row["timestamp_deleted"] if (row["timestamp_deleted"] and row["timestamp_deleted"] > 0) else thread_data[0]["deleted_on"]
 
 			# Skip deleted posts, if indicated
 			if skip_deleted and post.get("deleted"):

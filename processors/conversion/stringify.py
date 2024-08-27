@@ -45,15 +45,15 @@ class Stringify(BasicProcessor):
 		}
 	}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	@staticmethod
+	def is_compatible_with(module=None, user=None):
 		"""
-		Allow processor to run on all csv and NDJSON datasets
+        Determine compatibility; this processor is only compatible with top datasets in CSV or NDJSON format.
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
-
-		return module.get_extension() in ("csv", "ndjson")
+        :param str module:  Module ID to determine compatibility with
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""

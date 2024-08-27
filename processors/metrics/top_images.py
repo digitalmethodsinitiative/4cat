@@ -29,6 +29,8 @@ class TopImageCounter(BasicProcessor):
     description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = ["image-downloader"]
+
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
@@ -37,10 +39,7 @@ class TopImageCounter(BasicProcessor):
         :param module: Module to determine compatibility with
         """
 
-        if module.is_top_dataset() and module.get_extension() in ("csv", "ndjson") and module.type != "telegram-search":
-            return True
-        else:
-            return False
+        return module.is_top_dataset() and module.type != "telegram-search" and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """

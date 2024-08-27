@@ -14,7 +14,9 @@ from common.config_manager import config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
+from processors.visualisation.download_videos import VideoDownloaderPlus
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
+from processors.visualisation.download_images import ImageDownloader
 from backend.lib.processor import BasicProcessor
 
 
@@ -30,6 +32,9 @@ class TikTokVideoDownloader(BasicProcessor):
     title = "Download TikTok Videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
+    media_type = "video"
+
+    followups = VideoDownloaderPlus.followups
 
     options = {
         "amount": {
@@ -138,6 +143,9 @@ class TikTokImageDownloader(BasicProcessor):
     title = "Download TikTok Images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
+    media_type = "image"
+
+    followups = ImageDownloader.followups
 
     options = {
         "amount": {

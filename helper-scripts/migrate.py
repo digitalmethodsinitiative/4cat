@@ -129,6 +129,9 @@ if not cwd.glob("4cat-daemon.py"):
 logger = logging.getLogger("migrate")
 logger.setLevel(logging.INFO)
 if args.output:
+	# Add both a file and a stream handler if output is set
+	handler = logging.StreamHandler(sys.stdout)
+	logger.addHandler(handler)
 	handler = logging.FileHandler(args.output)
 else:
 	handler = logging.StreamHandler(sys.stdout)
@@ -327,21 +330,44 @@ else:
 		logger.info("  - %s" % file.name)
 
 # ---------------------------------------------
+#                    Install any needed packages
+# ---------------------------------------------
+
+try:
+	from common.config_manager import config
+except ImportError:
+	config = None
+
+if config and config.get("USING_DOCKER"):
+	logger.info("- Running in Docker environment, checking for and installing any needed compilers...")
+	# Pip needs some compilers to successfully update
+	needed_packages = ["g++", "gcc"]
+	try:
+		apt_get = subprocess.run(["apt-get", "install", "-y"] + needed_packages, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+		logger.info("\n".join(["  " + line for line in apt_get.stdout.decode("utf-8").split("\n")]))
+	except subprocess.CalledProcessError as e:
+		logger.info("\n".join(["  " + line for line in e.output.decode("utf-8").split("\n")]))
+		logger.info(f"\n Error while installing {needed_packages}: {e}")
+
+# ---------------------------------------------
 #                    Run pip
 # ---------------------------------------------
+def log_pip_output(logger, output):
+	for line in output.decode("utf-8").split("\n"):
+		if line.startswith("Requirement already satisfied:"):
+			# eliminate some noise in the output
+			continue
+		logger.info("  " + line)
+
 logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
 logger.info("  (this could take a moment)...")
 try:
 	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
 								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
-	for line in pip.stdout.decode("utf-8").split("\n"):
-		if line.startswith("Requirement already satisfied:"):
-			# eliminate some noise in the output
-			continue
-		logger.info("  " + line)
+	log_pip_output(logger, pip.stdout)
 except subprocess.CalledProcessError as e:
-	logger.info(e)
-	logger.info("\n  Error running pip. You may need to run this script with elevated privileges (e.g. sudo).\n")
+	log_pip_output(logger, e.output)
+	logger.info(f"\n Error running pip: {e}")
 	exit(1)
 logger.info("  ...done")
 

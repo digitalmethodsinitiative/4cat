@@ -397,6 +397,14 @@ config_definition = {
         "tooltip": "Secret key for Flask, used for session cookies",
         "global": True
     },
+    "flask.max_form_parts": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 1000,
+        "help": "Max form parts per request",
+        "coerce_type": int,
+        "global": True,
+        "tooltip": "Affects approximate number of files that can be uploaded at once"
+    },
     "flask.tag_order": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": ["admin"],

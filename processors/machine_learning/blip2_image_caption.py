@@ -28,6 +28,9 @@ class CategorizeImagesCLIP(BasicProcessor):
     description = "The BLIP2 model uses a pretrained image encoder combined with an LLM to generate image captions. The model can also be prompted and uses the image plus prompt to generate text responses."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    # Processors designed to handle input from this Dataset
+    followups = ["image-text-wall"]
+
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",
         "[BLIP-2 paper: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models](https://arxiv.org/abs/2301.12597)",
@@ -60,7 +63,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         return config.get("dmi-service-manager.fc_blip2_enabled", False, user=user) and \
                config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               module.type.startswith("image-downloader")
+               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -138,9 +141,13 @@ class CategorizeImagesCLIP(BasicProcessor):
         try:
             gpu_response = dmi_service_manager.check_gpu_memory_available("blip2")
         except DmiServiceManagerException as e:
-            return self.dataset.finish_with_error(str(e))
+            if "GPU not enabled on this instance of DMI Service Manager" in str(e):
+                self.dataset.update_status("GPU not enabled on this instance of DMI Service Manager; this may be a minute...")
+                gpu_response = None
+            else:
+                return self.dataset.finish_with_error(str(e))
 
-        if int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+        if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
             self.dataset.finish_with_error(
                 "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
             return
@@ -159,7 +166,8 @@ class CategorizeImagesCLIP(BasicProcessor):
                         "--image-folder", f"data/{path_to_files}",
                         "--max_new_tokens", str(self.parameters.get("max_new_tokens", 20)),
                         "--dataset-name", f"{self.dataset.key}"
-                         ]
+                         ],
+                "pass_key": True, # This tells the DMI SM there is a status update endpoint in the blip2 image
                 }
 
         # If prompt, add to args
@@ -181,7 +189,10 @@ class CategorizeImagesCLIP(BasicProcessor):
 
         # Load the video metadata if available
         image_metadata = {}
-        metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+        try:
+            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+        except FileNotFoundError:
+            metadata_file = None
         if metadata_file:
             with open(metadata_file) as file:
                 image_data = json.load(file)

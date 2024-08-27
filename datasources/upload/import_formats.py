@@ -326,6 +326,7 @@ def map_csv_items(reader, columns, dataset, parameters):
     """
     # write to the result file
     indexes = {}
+    now_timestmap = str(int(datetime.datetime.now().timestamp()))
     for row in reader:
         mapped_row = {}
         for field in columns:
@@ -337,6 +338,10 @@ def map_csv_items(reader, columns, dataset, parameters):
                         indexes[field] = 1
                     mapped_row[field] = indexes[field]
                     indexes[field] += 1
+                elif mapping == "__4cat_empty_value":
+                    mapped_row[field] = ""
+                elif mapping == "__4cat_now":
+                    mapped_row[field] = now_timestmap
                 else:
                     # actual mapping
                     mapped_row[field] = row[mapping]

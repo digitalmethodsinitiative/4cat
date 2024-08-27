@@ -402,7 +402,7 @@ def show_result(key):
     try:
         dataset = DataSet(key=key, db=db)
     except DataSetException:
-        return error(404)
+        return error(404, error="This dataset cannot be found.")
 
     if not current_user.can_access_dataset(dataset):
         return error(403, error="This dataset is private.")

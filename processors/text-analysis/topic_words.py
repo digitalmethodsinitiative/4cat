@@ -24,6 +24,8 @@ class TopicModelWordExtractor(BasicProcessor):
     description = "Creates a CSV file with the top tokens (words) per topic in the generated topic model, and their associated weights."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = ["wordcloud"]
+
     options = {
         "topic_size": {
             "type": UserInput.OPTION_TEXT,

@@ -20,6 +20,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
     description = "Convert a Twitter dataset to a TCAT-compatible format. This file can then be uploaded to TCAT."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
+    followups = ["tcat-auto-upload"]
+
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """

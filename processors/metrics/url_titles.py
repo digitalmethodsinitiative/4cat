@@ -35,6 +35,8 @@ class URLFetcher(BasicProcessor):
                    "each URL, optionally following HTTP redirects.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = []
+
     options = {
         "columns": {
             "type": UserInput.OPTION_TEXT,
@@ -80,6 +82,16 @@ class URLFetcher(BasicProcessor):
             "tooltip": "Time to wait before cancelling a request and potentially trying again"
         }
     }
+
+    @staticmethod
+    def is_compatible_with(module=None, user=None):
+        """
+        Determine compatibility
+
+        :param Dataset module:  Module ID to determine compatibility with
+        :return bool:
+        """
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
