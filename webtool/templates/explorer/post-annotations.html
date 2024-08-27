@@ -66,7 +66,7 @@
                     {% if metadata.get("processor-parameters") %}
                         <span class="tooltip-line">
                         {% for parameter, input_value in metadata["processor-parameters"].items() %}
-                            <span class="property-badge">{{ parameter }}</span> {{ input_value }}
+                            <span class="property-badge">{{ parameter }}={{ input_value }}</span>
                         {% endfor %}
                         </span>
                     {% endif %}
@@ -80,7 +80,6 @@
                     <span class="annotation-author">{{ annotation.author }}</span>
                     <span class="annotation-options">{{ annotation_fields[field].get("options", {}).values() | join(",") }}</span>
                 </div>
-
 			</div>
 		{% endfor %}
 	{% endif %}
