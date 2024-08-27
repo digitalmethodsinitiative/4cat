@@ -110,12 +110,12 @@ else:
     # Each row are **all** annotations per dataset
     for row in annotations:
 
-        dataset = db.fetchone("SELECT * FROM datasets WHERE key = '" + row["dataset"] + "';")
+        dataset = db.fetchone("SELECT * FROM datasets WHERE key = '" + row["key"] + "';")
         # If the dataset is not present anymore,
         # we're going to skip these annotations;
         # likely the dataset is expired.
         if not dataset:
-            print("      No dataset found for key %s, skipping..." % row["dataset"])
+            print("      No dataset found for key %s, skipping..." % row["key"])
             skipped_count += 1
             continue
 
@@ -127,7 +127,7 @@ else:
         author = dataset.get("creator", "")
 
         if not row.get("annotations"):
-            print("      No annotations for dataset %s, skipping..." % row["dataset"])
+            print("      No annotations for dataset %s, skipping..." % row["key"])
             skipped_count += 1
             continue
 
