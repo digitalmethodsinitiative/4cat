@@ -767,11 +767,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 			annotation["by_processor"] = True
 
-			# Add processor parameters to annotation metadata
-			if not annotation.get("metadata"):
-				annotation["metadata"] = {}
-			annotation["metadata"]["processor-parameters"] = self.parameters
-
 		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
 		return annotations_saved
 
