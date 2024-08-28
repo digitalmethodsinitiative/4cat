@@ -8,13 +8,11 @@ from googleapiclient.errors import HttpError
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from googleapiclient import discovery
-from google.auth.exceptions import DefaultCredentialsError
-
-from common.lib.exceptions import AnnotationException
+from common.lib.item_mapping import MappedItem
 
 class Perspective(BasicProcessor):
 	"""
-	---
+	Score items with toxicity and other scores through Google Jigsaw's Perspective API.
 	"""
 	type = "perspective"  # job type ID
 	category = "Text analysis"  # category
@@ -100,7 +98,9 @@ class Perspective(BasicProcessor):
 					self.dataset.update_status(str(e))
 					continue
 
-				results.append({item["id"]: response})
+				response["item_id"] = item["id"]
+				response["body"] = item["body"]
+				results.append(response)
 
 				if write_annotations:
 					for attribute in self.parameters["attributes"]:
@@ -111,11 +111,32 @@ class Perspective(BasicProcessor):
 						}
 						annotations.append(annotation)
 
+		# Write annotations
 		if write_annotations:
 			self.write_annotations(annotations, overwrite=True)
 
+		# Write to file
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 			for result in results:
 				outfile.write(json.dumps(result) + "\n")
 
 		self.dataset.finish(len(results))
+
+	@staticmethod
+	def map_item(item):
+
+		# print({"item_id": item["id"],
+		# 	"body": item.get("body"),
+		# 	**attribute_scores})
+
+		attribute_scores = {}
+		all_attributes = ["TOXICITY", "SEVERE_TOXICITY", "IDENTITY_ATTACK", "INSULT", "PROFANITY", "THREAT"]
+		for att in all_attributes:
+			if att in item["attributeScores"]:
+				attribute_scores[att] = item["attributeScores"][att]["summaryScore"]["value"]
+		print(item)
+		return MappedItem({
+			"item_id": item["item_id"],
+			"body": item.get("body"),
+			**attribute_scores
+		})
