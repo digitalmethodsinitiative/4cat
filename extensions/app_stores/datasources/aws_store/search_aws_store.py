@@ -9,12 +9,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from extensions.web_studies.selenium_scraper import SeleniumWrapper
 from common.lib.item_mapping import MappedItem
 from common.lib.user_input import UserInput
-from extensions.web_studies.datasources.url_scraper import SearchWithSelenium
+from extensions.web_studies.selenium_scraper import SeleniumSearch
 
 from common.config_manager import config
 
 
-class SearchAwsStore(SearchWithSelenium):
+class SearchAwsStore(SeleniumSearch):
     """
     Search Amazon Web Services Marketplace data source
     """
@@ -59,7 +59,7 @@ class SearchAwsStore(SearchWithSelenium):
         """
         Allow if Selenium is available
         """
-        return SearchWithSelenium.is_selenium_available()
+        return SeleniumSearch.is_selenium_available()
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

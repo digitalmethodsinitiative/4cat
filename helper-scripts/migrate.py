@@ -79,6 +79,34 @@ def check_for_nltk():
 	
 	nltk.download("omw-1.4", quiet=True)
 
+def install_extensions():
+	"""
+	Check for extensions and run any installation scripts found.
+
+	Note: requirements texts are handled by setup.py
+	"""
+	# Check for extension packages
+	if os.path.isdir("extensions"):
+		for root, dirs, files in os.walk("extensions"):
+			for file in files:
+				if file == "fourcat_install.py":
+					command = [interpreter, os.path.join(root, file)]
+					if args.component == "frontend":
+						command.append("--component=frontend")
+					elif args.component == "backend":
+						command.append("--component=backend")
+					elif args.component == "both":
+						command.append("--component=both")
+
+					print(f"Installing extension: {os.path.join(root, file)}")
+					result = subprocess.run(command, stdout=subprocess.PIPE,
+											stderr=subprocess.PIPE)
+					if result.returncode != 0:
+						print("Error while running extension installation script: " + os.path.join(root, file))
+
+					print(result.stdout.decode("utf-8")) if result.stdout else None
+					print(result.stderr.decode("utf-8")) if result.stderr else None
+
 
 def finish(args, logger):
 	"""
@@ -89,6 +117,7 @@ def finish(args, logger):
 	wrap up and exit.
 	"""
 	check_for_nltk()
+	install_extensions()
 	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
@@ -115,7 +144,7 @@ cli.add_argument("--restart", "-x", default=False, action="store_true", help="Tr
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
 cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
-cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate. Currently only skips check for if 4CAT is running when set to 'frontend'")
+cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate ('both', 'backend', 'frontend'). Skips check for if 4CAT is running when set to 'frontend'. Also used by extensions w/ fourcat_install.py")
 cli.add_argument("--branch", "-b", default=False, help="Which branch to check out from GitHub. By default, check out the latest release.")
 args = cli.parse_args()
 
@@ -145,6 +174,7 @@ logger.info("Pull branch:             " + (args.branch if args.branch else "no")
 logger.info("Restart after migration: " + ("yes" if args.restart else "no"))
 logger.info("Repository URL:          " + args.repository)
 logger.info(".current-version path:   " + args.current_version)
+logger.info(f"Current Datetime:        {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ---------------------------------------------
 #    Ensure existence of current version file

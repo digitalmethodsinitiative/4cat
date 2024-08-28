@@ -210,19 +210,15 @@ class ModuleCollector:
             }
 
         # Load 4CAT core datasources
-        self.log_buffer += "Loading core datasources\n"
         for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
             if subdirectory.is_dir():
-                self.log_buffer += "Loading datasource %s\n" % subdirectory
                 _load_datasource(subdirectory)
 
         # Load extension datasources
-        self.log_buffer += "Loading extension datasources\n"
         for extension in Path(config.get('PATH_ROOT'), "extensions").iterdir():
             if "datasources" in [subdir.name for subdir in extension.iterdir()]:
                 for subdirectory in extension.joinpath("datasources").iterdir():
                     if subdirectory.is_dir():
-                        self.log_buffer += "Loading datasource %s\n" % subdirectory
                         _load_datasource(subdirectory)
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in

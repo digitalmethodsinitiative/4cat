@@ -44,7 +44,7 @@ class ConfigManager:
             # Replace w/ db if provided else only initialise if not already
             self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
-                                         port=self.get("DB_PORT"), appname="config-reader") if not db else db
+                                         port=self.get("DB_PORT"), appname="config-reader")
         else:
             # self.db already initialized
             pass

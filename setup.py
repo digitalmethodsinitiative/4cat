@@ -49,7 +49,6 @@ packages = set([
 	"requests~=2.27",
 	"requests_futures",
 	"scikit_learn",
-	"selenium==4.3.0",
 	"scenedetect==0.6.0.3",
 	"scikit-learn",
 	"scipy==1.10.1",

@@ -11,6 +11,7 @@ from backend.lib.search import Search
 from common.lib.logger import Logger
 from common.lib.exceptions import ProcessorException
 from common.config_manager import config
+from common.lib.user_input import UserInput
 
 if config.get('selenium.browser') and config.get('selenium.selenium_executable_path'):
     from selenium import webdriver
@@ -223,7 +224,8 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
                 raise ProcessorException("Selenium Scraper not configured; browser must be 'firefox' or 'chrome'")
         except (SessionNotCreatedException, WebDriverException) as e:
             if hasattr(self, 'dataset'):
-                self.dataset.update_status("Selenium Scraper not configured")
+                self.dataset.update_status("Selenium Scraper not configured; contact admin.", is_final=True)
+                self.dataset.finish(0)
             if "only supports Chrome" in str(e):
                 raise ProcessorException("Your chromedriver version is incompatible with your Chromium version:\n  (%s)" % e)
             elif "Message: '' executable may have wrong" in str(e):
@@ -597,6 +599,47 @@ class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
     and ensure the webdriver and browser are properly closed out upon completion.
     """
     max_workers = 3
+    config = {
+        "selenium.browser": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "",
+            "help": "Browser type ('firefox' or 'chrome')",
+            "tooltip": "This must corespond to the installed webdriver; Docker installs firefox when backend container restarts if this is set to 'firefox'",
+        },
+        "selenium.max_sites": {
+            "type": UserInput.OPTION_TEXT,
+            "default": 120,
+            "help": "Posts per page",
+            "coerce_type": int,
+            "tooltip": "Posts to display per page"
+        },
+        "selenium.selenium_executable_path": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "",
+            "help": "Path to webdriver (geckodriver or chromedriver)",
+            "tooltip": "Docker installs to /usr/local/bin/geckodriver",
+        },
+        "selenium.firefox_extensions": {
+            "type": UserInput.OPTION_TEXT_JSON,
+            "default": {
+                "i_dont_care_about_cookies": {"path": "", "always_enabled": False},
+                },
+            "help": "Firefox Extensions",
+            "tooltip": "Can be used by certain processors and datasources",
+        },
+        "selenium.display_advanced_options": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": True,
+            "help": "Show advanced options",
+            "tooltip": "Show advanced options for Selenium processors",
+        },
+        "selenium.installed": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Has Selenium been installed",
+            "tooltip": "Toggling off will disable Selenium processors",
+        },
+    }
 
     def search(self, query):
         """
@@ -609,7 +652,11 @@ class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
         :param dict query:  Query parameters
         :return:  Iterable of matching items, or None if there are no results.
         """
-        self.start_selenium(eager=(hasattr(self, "eager_selenium") and self.eager_selenium))
+        try:
+            self.start_selenium(eager=(hasattr(self, "eager_selenium") and self.eager_selenium))
+        except ProcessorException as e:
+            self.quit_selenium()
+            raise e
         # Returns to default position; i.e., 'data:,'
         self.reset_current_page()
         # Sets timeout to 60; can be updated later if desired

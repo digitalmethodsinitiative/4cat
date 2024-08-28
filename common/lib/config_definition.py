@@ -442,45 +442,6 @@ config_definition = {
         "help": "YouTube API Key",
         "tooltip": "The developer key from your API console"
     },
-    "selenium.browser": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "",
-        "help": "Browser type ('firefox' or 'chrome')",
-        "tooltip": "This must corespond to the installed webdriver; Docker installs firefox when backend container restarts if this is set to 'firefox'",
-    },
-    "selenium.max_sites": {
-        "type": UserInput.OPTION_TEXT,
-        "default": 120,
-        "help": "Posts per page",
-        "coerce_type": int,
-        "tooltip": "Posts to display per page"
-    },
-    "selenium.selenium_executable_path": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "",
-        "help": "Path to webdriver (geckodriver or chromedriver)",
-        "tooltip": "Docker installs to /usr/local/bin/geckodriver",
-    },
-    "selenium.firefox_extensions": {
-        "type": UserInput.OPTION_TEXT_JSON,
-        "default": {
-            "i_dont_care_about_cookies": {"path": "", "always_enabled": False},
-            },
-        "help": "Firefox Extensions",
-        "tooltip": "Can be used by certain processors and datasources",
-    },
-    "selenium.display_advanced_options": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Show advanced options",
-        "tooltip": "Show advanced options for Selenium processors",
-    },
-    "selenium.installed": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": False,
-        "help": "Has Selenium been installed",
-        "tooltip": "Toggling off will cause a Docker instance to attempt to reinstall Selenium",
-    },
     # service manager
     # this is a service that 4CAT can connect to to run e.g. ML models
     # it is used by a number of processors
@@ -586,7 +547,6 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging",
     "path": "File paths",
-    "selenium": "Selenium Scraper settings",
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
     "ui": "User interface",
