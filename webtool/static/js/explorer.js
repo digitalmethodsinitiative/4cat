@@ -57,11 +57,13 @@ const annotations = {
 
 		// Show and hide annotations
 		$("#toggle-annotations").on("click", function(){
-			if ($(this).hasClass("shown")) {
-				annotations.hideAnnotations();
-			}
-			else {
-				annotations.showAnnotations();
+			if (!$(this).hasClass("disabled")) {
+				if ($(this).hasClass("shown")) {
+					annotations.hideAnnotations();
+				}
+				else {
+					annotations.showAnnotations();
+				}
 			}
 		});
 
@@ -112,9 +114,11 @@ const annotations = {
 
 		// Save the annotations to the database
 		$("#save-annotations").on("click", function(){
-			clearTimeout(save_timer);
-			save_timer = null;
-			annotations.saveAnnotations();
+			if (!$(this).hasClass("disabled")) {
+				clearTimeout(save_timer);
+				save_timer = null;
+				annotations.saveAnnotations();
+			}
 		});
 
 		// Check whether there's already fields saved for this dataset
@@ -358,8 +362,7 @@ const annotations = {
 		// the annotation fields to each post on the page.
 		else {
 
-			$("#apply-annotation-fields").html("<i class='fas fa-circle-notch spinner'></i> Applying")
-			
+
 			// Remove warnings
 			annotations.warnEditor("")
 			$("#annotation-field").find("input").each(function(){
@@ -375,6 +378,7 @@ const annotations = {
 				annotations.checkFieldChanges(new_annotation_fields, annotation_fields);
 			}
 			else {
+				$("#apply-annotation-fields").html("<i class='fas fa-circle-notch spinner'></i> Applying")
 				annotations.saveAnnotationFields(new_annotation_fields);
 			}
 		}
@@ -567,15 +571,17 @@ const annotations = {
 
 	showAnnotations: function() {
 
+		// Change button
+		let ta = $("#toggle-annotations");
+		ta.addClass("shown");
+		ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
+
 		// Store state in URL params
 		let queryParams = new URLSearchParams(window.location.search);
 		queryParams.set("show", "true");
 		history.replaceState(null, null, "?"+queryParams.toString());
 
-		let ta = $("#toggle-annotations");
-		ta.addClass("shown");
-		ta.html("<i class='fas fa-eye-slash'></i> Hide annotations");
-		// Bit convoluted, but necessary to have auto height
+		// Show/hide annotations div. Bit convoluted, but necessary to have auto height.
 		let pa = $(".post-annotations");
 		let current_height = pa.height();
 		let auto_height = pa.css("height", "auto").height();
@@ -694,8 +700,11 @@ const page_functions = {
 		// and change the dropdown sort option based on the sort parameter.
 		let searchParams = new URLSearchParams(window.location.search)
 		let show_annotations = searchParams.get("show");
-		if (show_annotations) {
-			annotations.showAnnotations();
+		// Never show annotations if there's no annotation fields
+		if (annotation_fields) {
+			if (show_annotations) {
+				annotations.showAnnotations();
+			}
 		}
 
 		let selected = searchParams.get("sort");
