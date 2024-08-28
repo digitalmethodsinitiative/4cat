@@ -248,13 +248,13 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs) -
 	# Sort on the basis of a column value
 	else:
 		try:
-			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x[sort], reverse=reverse):
+			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x.get(sort,""), reverse=reverse):
 				sorted_posts.append(item)
 		except TypeError:
 			# Dataset fields can contain integers and empty strings.
 			# Since these cannot be compared, we will convert every
 			# empty string to 0.
-			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: convert_to_float(x[sort]), reverse=reverse):
+			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: convert_to_float(x.get(sort,"")), reverse=reverse):
 				sorted_posts.append(item)
 
 	for post in sorted_posts:
