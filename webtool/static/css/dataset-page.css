@@ -326,6 +326,7 @@ article.result > section:first-child {
 }
 
 .child-wrapper .button-wrap.processor-result-indicator a {
+    display: inline-block;
     color: inherit;
 }
 
@@ -340,6 +341,7 @@ article.result > section:first-child {
 }
 
 .child-wrapper .button-wrap .byline {
+    cursor: default;
     font-size: 0.8em;
 }
 
