@@ -11,7 +11,7 @@ import os
 
 from common.config_manager import config
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.item_mapping import MappedItem
