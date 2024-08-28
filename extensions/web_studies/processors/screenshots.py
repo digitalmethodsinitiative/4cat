@@ -4,25 +4,22 @@ Screenshot URLs w/ Selenium
 import datetime
 import re
 import time
-
 from selenium.common import UnexpectedAlertPresentException
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, extract_urls_from_string, convert_to_int, url_to_hash
+from common.lib.helpers import UserInput, extract_urls_from_string, convert_to_int
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
-from backend.lib.selenium_scraper import SeleniumWrapper
+from extensions.web_studies.selenium_scraper import SeleniumWrapper
+from extensions.web_studies.datasources.url_screenshots.search_webpage_screenshots  import ScreenshotWithSelenium
 from common.config_manager import config
 
 import os
 import json
-from hashlib import sha256
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
-
-from datasources.url_screenshots.search_webpage_screenshots import ScreenshotWithSelenium
 
 
 class ScreenshotURLs(BasicProcessor):

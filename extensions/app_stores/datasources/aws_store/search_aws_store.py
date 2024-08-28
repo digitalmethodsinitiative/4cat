@@ -1,16 +1,15 @@
 from datetime import datetime, timedelta
 import re
-import time
 import urllib
 from selenium.webdriver.common.by import By
 from selenium.common import exceptions as selenium_exceptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from backend.lib.selenium_scraper import SeleniumWrapper
+from extensions.web_studies.selenium_scraper import SeleniumWrapper
 from common.lib.item_mapping import MappedItem
 from common.lib.user_input import UserInput
-from datasources.url_scraper.search_webpages import SearchWithSelenium
+from extensions.web_studies.datasources.url_scraper import SearchWithSelenium
 
 from common.config_manager import config
 

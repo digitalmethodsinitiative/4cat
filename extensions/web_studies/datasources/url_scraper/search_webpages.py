@@ -8,7 +8,7 @@ import datetime
 import random
 
 from common.config_manager import config
-from backend.lib.selenium_scraper import SeleniumSearch
+from extensions.web_studies.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import validate_url
 from common.lib.item_mapping import MappedItem

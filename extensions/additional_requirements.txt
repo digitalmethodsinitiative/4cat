@@ -1,2 +1,0 @@
-itunes-app-scraper-dmi>=0.9.5
-google-play-scraper-dmi>=0.9.17

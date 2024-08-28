@@ -3,7 +3,7 @@ import datetime
 
 from common.lib.item_mapping import MappedItem
 from common.lib.user_input import UserInput
-from datasources.apple_store.search_apple_store import SearchAppleStore, collect_from_store
+from extensions.app_stores.apple_store.search_apple_store import SearchAppleStore, collect_from_store
 
 
 class SearchGoogleStore(SearchAppleStore):

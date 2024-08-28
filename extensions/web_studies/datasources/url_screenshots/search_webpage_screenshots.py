@@ -12,7 +12,7 @@ import re
 
 from selenium.common import UnexpectedAlertPresentException
 
-from backend.lib.selenium_scraper import SeleniumSearch
+from extensions.web_studies.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import convert_to_int, url_to_hash

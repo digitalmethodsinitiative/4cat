@@ -8,7 +8,7 @@ with open("VERSION") as versionfile:
 	version = versionfile.readline().strip()
 
 # Universal packages
-packages = [
+packages = set([
 	"anytree~=2.8.0",
 	"bcrypt~=3.2.0",
 	"beautifulsoup4",#~=4.11.0",
@@ -31,7 +31,7 @@ packages = [
 	"lxml~=4.9.0",
 	"markdown==3.0.1",
 	"markdown2==2.4.2",
-	"nltk==3.9",
+	"nltk~=3.9.1",
 	"networkx~=2.8.0",
 	"numpy>=1.19.2",
 	"opencv-python>=4.6.0.66",
@@ -68,26 +68,28 @@ packages = [
 	"vk_api",
 	"yt-dlp",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm"
-]
+])
 
 # Check for extension packages
 if os.path.isdir("extensions"):
-	extension_packages = []
-	additional_requirements = os.path.join("extensions", 'additional_requirements.txt')
-	if os.path.exists(additional_requirements):
-		with open(additional_requirements) as extension_requirements:
-			for line in extension_requirements.readlines():
-				extension_packages.append(line.strip())
-	print("Found extensions, installing additional packages: " + str(extension_packages))
-	packages = packages + extension_packages
+	extension_packages = set()
+	for root, dirs, files in os.walk("extensions"):
+		for file in files:
+			if file == "requirements.txt":
+				with open(os.path.join(root, file)) as extension_requirements:
+					for line in extension_requirements.readlines():
+						extension_packages.add(line.strip())
+	if extension_packages:
+		print("Found extensions, installing additional packages: " + str(extension_packages))
+		packages = packages.union(extension_packages)
 
 # Some packages don't run on Windows
-unix_packages = [
+unix_packages = set([
 	"python-daemon==2.3.2"
-]
+])
 
 if os.name != "nt":
-	packages = packages + unix_packages
+	packages = packages.union(unix_packages)
 
 setup(
 	name='fourcat',
@@ -100,5 +102,5 @@ setup(
 	url="https://oilab.eu",
 	packages=['backend', 'webtool', 'datasources'],
 	python_requires='>=3.7',
-	install_requires=packages,
+	install_requires=list(packages),
 )

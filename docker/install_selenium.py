@@ -21,6 +21,9 @@ if __name__ == "__main__":
 
 		return result
 
+	# Check for Linux OS
+	
+
 	print("Setting up Selenium: installing webdriver and browser")
 	# Install additional packages
 	PACKAGES = "wget bzip2 libgtk-3-0 libasound2 libdbus-glib-1-2 libx11-xcb1 libxtst6"

@@ -11,7 +11,7 @@ import time
 
 from dateutil.relativedelta import relativedelta
 
-from backend.lib.selenium_scraper import SeleniumSearch
+from extensions.web_studies.selenium_scraper import SeleniumSearch
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import validate_url
 from common.lib.item_mapping import MappedItem

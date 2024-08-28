@@ -96,8 +96,10 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        paths = [Path(config.get('PATH_ROOT'), "processors"), Path(config.get('PATH_ROOT'), "backend", "workers"),
-                 *[self.datasources[datasource]["path"] for datasource in self.datasources]]
+        paths = [Path(config.get('PATH_ROOT'), "processors"),
+                 Path(config.get('PATH_ROOT'), "backend", "workers"),
+                 Path(config.get('PATH_ROOT'), "extensions"),
+                 *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
 
         root_match = re.compile(r"^%s" % re.escape(str(config.get('PATH_ROOT'))))
         root_path = Path(config.get('PATH_ROOT'))
@@ -166,7 +168,7 @@ class ModuleCollector:
             for missing_module, processor_list in self.missing_modules.items():
                 warning += "\t%s (for %s)\n" % (missing_module, ", ".join(processor_list))
 
-            self.log_buffer = warning
+            self.log_buffer += warning
 
 
         self.processors = categorised_processors
@@ -180,19 +182,21 @@ class ModuleCollector:
         `DATASOURCE` constant. The latter is taken as the ID for this
         datasource.
         """
-        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
-            # folder name, also the name used in config.py
-            folder_name = subdirectory.parts[-1]
-
-            # determine module name
-            module_name = "datasources." + folder_name
+        def _load_datasource(subdirectory):
+            """
+            Load a single datasource
+            """
+            # determine module name (path relative to 4CAT root w/ periods)
+            module_name = ".".join(subdirectory.relative_to(Path(config.get("PATH_ROOT"))).parts)
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
-                continue
+                self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
+                return
 
             if not hasattr(datasource, "init_datasource") or not hasattr(datasource, "DATASOURCE"):
-                continue
+                self.log_buffer += "Could not load datasource %s: missing init_datasource or DATASOURCE\n" % subdirectory
+                return
 
             datasource_id = datasource.DATASOURCE
 
@@ -204,6 +208,22 @@ class ModuleCollector:
                 "init": datasource.init_datasource,
                 "config": {} if not hasattr(datasource, "config") else datasource.config
             }
+
+        # Load 4CAT core datasources
+        self.log_buffer += "Loading core datasources\n"
+        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
+            if subdirectory.is_dir():
+                self.log_buffer += "Loading datasource %s\n" % subdirectory
+                _load_datasource(subdirectory)
+
+        # Load extension datasources
+        self.log_buffer += "Loading extension datasources\n"
+        for extension in Path(config.get('PATH_ROOT'), "extensions").iterdir():
+            if "datasources" in [subdir.name for subdir in extension.iterdir()]:
+                for subdirectory in extension.joinpath("datasources").iterdir():
+                    if subdirectory.is_dir():
+                        self.log_buffer += "Loading datasource %s\n" % subdirectory
+                        _load_datasource(subdirectory)
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in
                               sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}

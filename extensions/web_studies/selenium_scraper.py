@@ -6,7 +6,6 @@ import os
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from bs4.element import Comment
-from textwrap import dedent
 
 from backend.lib.search import Search
 from common.lib.logger import Logger
