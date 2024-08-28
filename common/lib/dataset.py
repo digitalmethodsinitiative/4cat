@@ -382,13 +382,13 @@ class DataSet(FourcatModule):
 			# Add possible annotations
 			if annotation_labels:
 
-				# Get annotations for this specific post
-				post_annotations = self.get_annotations(item_id=mapped_item.data["id"])
-
 				# We're always handling annotated data as a MappedItem object,
 				# even if no map_item() function is available for the data source.
 				if not isinstance(mapped_item, MappedItem):
 					mapped_item = MappedItem(mapped_item)
+
+				# Get annotations for this specific post
+				post_annotations = self.get_annotations(item_id=mapped_item.data["id"])
 
 				for annotation_label in annotation_labels:
 					value = ""
