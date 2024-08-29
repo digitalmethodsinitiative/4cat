@@ -111,12 +111,6 @@ config_definition = {
         "help": "Can export datasets",
         "tooltip": "Allows users to export datasets they own to other 4CAT instances."
     },
-    "privileges.can_schedule_datasources": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": False,
-        "help": "Can schedule data sources and view scheduler",
-        "tooltip": "Controls whether users can add intervals for data sources to be collected and view scheduler tab."
-    },
     "privileges.admin.can_manage_users": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,

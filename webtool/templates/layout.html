@@ -41,9 +41,6 @@
             {% endif %}
 			<li{% if navigation.current == "dataset" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}">Datasets</a></li>
             <li{% if navigation.current == "datasources" %} class="current"{% endif %}><a href="{{ url_for('data_overview') }}">Data sources</a></li>
-            {% if __user_config("privileges.can_schedule_datasources") %}
-                <li{% if navigation.current == "scheduler" %} class="current"{% endif %}><a href="{{ url_for('show_scheduler') }}">Scheduler</a></li>
-            {% endif %}
             {% if current_user.is_authenticated and not current_user.is_special and __user_config("privileges.can_create_api_token") %}
                 <li{% if navigation.current == "api-access" %} class="current"{% endif %}><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}

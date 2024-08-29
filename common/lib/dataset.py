@@ -525,12 +525,6 @@ class DataSet(FourcatModule):
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
-		#TODO: remove when migrate script ensures scheduled_jobs table exists
-		scheduler = self.db.fetchone(
-			"SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )",
-			("public", "scheduled_jobs"))
-		if scheduler["exists"]:
-			self.db.delete("scheduled_jobs", where={"dataset_id": self.key}, commit=commit)
 
 		# delete from drive
 		try:
