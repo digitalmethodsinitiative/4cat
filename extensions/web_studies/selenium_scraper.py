@@ -679,6 +679,8 @@ class SeleniumSearch(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
             posts = self.after_search(posts)
 
         return posts
+
+
     def clean_up(self):
         """
         Ensures Selenium webdriver and Chrome browser and closed whether processor completes successfully or not.

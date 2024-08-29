@@ -46,7 +46,7 @@ class ConfigManager:
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
                                          port=self.get("DB_PORT"), appname="config-reader")
         else:
-            # self.db already initialized
+            # self.db already initialized and no db provided
             pass
 
     def load_user_settings(self):
