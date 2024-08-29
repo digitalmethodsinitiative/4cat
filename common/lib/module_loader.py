@@ -7,6 +7,7 @@ import inspect
 import pickle
 import sys
 import re
+import os
 
 from common.config_manager import config
 
@@ -215,9 +216,10 @@ class ModuleCollector:
                 _load_datasource(subdirectory)
 
         # Load extension datasources
-        for extension in Path(config.get('PATH_ROOT'), "extensions").iterdir():
-            if "datasources" in [subdir.name for subdir in extension.iterdir()]:
-                for subdirectory in extension.joinpath("datasources").iterdir():
+        # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
+        for root, dirs, files in os.walk(Path(config.get('PATH_ROOT'), "extensions")):
+            if "datasources" in dirs:
+                for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():
                         _load_datasource(subdirectory)
 
