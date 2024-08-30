@@ -134,7 +134,7 @@ class Perspective(BasicProcessor):
 		for att in all_attributes:
 			if att in item["attributeScores"]:
 				attribute_scores[att] = item["attributeScores"][att]["summaryScore"]["value"]
-		print(item)
+
 		return MappedItem({
 			"item_id": item["item_id"],
 			"body": item.get("body"),
