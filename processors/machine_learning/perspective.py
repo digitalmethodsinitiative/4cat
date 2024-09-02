@@ -15,7 +15,7 @@ class Perspective(BasicProcessor):
 	Score items with toxicity and other scores through Google Jigsaw's Perspective API.
 	"""
 	type = "perspective"  # job type ID
-	category = "Text analysis"  # category
+	category = "Machine learning"  # category
 	title = "Toxicity scores"  # title displayed in UI
 	description = ("Use the Perspective API to score text with attributes on toxicity, "
 					"including 'toxicity', 'insult', and 'profanity'.")		# description displayed in UI
