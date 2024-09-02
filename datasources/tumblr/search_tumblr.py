@@ -91,7 +91,7 @@ class SearchTumblr(Search):
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
 		"""
-		Check is Tumbler keys configured and if not, requests from User
+		Check if Tumblr keys configured and if not, requests from User
 		"""
 		options = {
 			"intro": {
