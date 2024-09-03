@@ -79,7 +79,7 @@ def check_for_nltk():
 	
 	nltk.download("omw-1.4", quiet=True)
 
-def install_extensions():
+def install_extensions(no_pip=True):
 	"""
 	Check for extensions and run any installation scripts found.
 
@@ -98,6 +98,9 @@ def install_extensions():
 					elif args.component == "both":
 						command.append("--component=both")
 
+					if no_pip:
+						command.append("--no-pip")
+
 					print(f"Installing extension: {os.path.join(root, file)}")
 					result = subprocess.run(command, stdout=subprocess.PIPE,
 											stderr=subprocess.PIPE)
@@ -108,7 +111,7 @@ def install_extensions():
 					print(result.stderr.decode("utf-8")) if result.stderr else None
 
 
-def finish(args, logger):
+def finish(args, logger, no_pip=True):
 	"""
 	Finish migration
 
@@ -117,7 +120,7 @@ def finish(args, logger):
 	wrap up and exit.
 	"""
 	check_for_nltk()
-	install_extensions()
+	install_extensions(no_pip=no_pip)
 	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
@@ -153,6 +156,9 @@ cwd = Path(os.getcwd())
 if not cwd.glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
 	exit(1)
+
+# track pip
+pip_ran = False
 
 # set up logging
 logger = logging.getLogger("migrate")
@@ -251,7 +257,7 @@ if args.release or args.branch:
 			logger.info("  ...latest release available from GitHub (%s) is older than or equivalent to currently checked out version "
 				  "(%s)." % (tag_version, current_version_c))
 			logger.info("  ...upgrade not necessary, skipping.")
-			finish(args, logger)
+			finish(args, logger, no_pip=pip_ran)
 
 	logger.info("  ...ensuring repository %s is a known remote" % args.repository)
 	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
@@ -327,7 +333,7 @@ logger.info("- Code version: %s" % target_version)
 
 if current_version == target_version:
 	logger.info("  ...already up to date.")
-	finish(args, logger)
+	finish(args, logger, no_pip=pip_ran)
 
 if current_version_c[0:3] != target_version_c[0:3]:
 	logger.info("  ...cannot migrate between different major versions.")
@@ -395,6 +401,7 @@ try:
 	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
 								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
 	log_pip_output(logger, pip.stdout)
+	pip_ran = True
 except subprocess.CalledProcessError as e:
 	log_pip_output(logger, e.output)
 	logger.info(f"\n Error running pip: {e}")
@@ -440,4 +447,4 @@ logger.info("  ...done")
 # ---------------------------------------------
 #            Done! Wrap up and finish
 # ---------------------------------------------
-finish(args, logger)
+finish(args, logger, no_pip=pip_ran)
