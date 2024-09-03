@@ -111,33 +111,6 @@ class TextClassifier(BasicProcessor):
 
         return options
 
-    @staticmethod
-    def get_progress_callback(num_items):
-        """
-        Callback for updating dataset progress
-
-        This generates a function that is periodically called by the service
-        manager to update the progress of the query. It sets the progress and
-        updates the dataset status.
-
-        :param int num_prompts:  Total number of prompts that will be processed.
-        :return: Callback
-        """
-
-        def callback(manager):
-            if manager.local_or_remote == "local":
-                current_completed = manager.count_local_files(
-                    manager.processor.config.get("PATH_DATA").joinpath(manager.path_to_results))
-            elif manager.local_or_remote == "remote":
-                existing_files = manager.request_folder_files(manager.server_file_collection_name)
-                current_completed = len(existing_files.get(manager.server_results_folder_name, []))
-
-            manager.processor.dataset.update_status(
-                f"Generated images for {current_completed:,} of {num_prompts:,} prompt(s)")
-            manager.processor.dataset.update_progress(current_completed / num_prompts)
-
-        return callback
-
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
@@ -218,7 +191,7 @@ class TextClassifier(BasicProcessor):
         api_endpoint = "stormtrooper"
 
         try:
-            dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=5, check_process=None)
+            dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=5)
         except DsmOutOfMemory:
             shutil.rmtree(staging_area)
             shutil.rmtree(output_dir)
