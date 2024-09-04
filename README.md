@@ -1,3 +1,5 @@
+# HEY! SURF uses this branch directly. If we need to merge, let me know; I'm sure I could sort it.
+
 # ![](https://github.com/digitalmethodsinitiative/4cat/tree/master/common/assets/logo_readme.png) 4CAT: Capture and Analysis Toolkit
 
 [![DOI: 10.5117/CCR2022.2.007.HAGE](https://zenodo.org/badge/DOI/10.5117/ccr2022.2.007.hage.svg)](https://doi.org/10.5117/CCR2022.2.007.HAGE)
