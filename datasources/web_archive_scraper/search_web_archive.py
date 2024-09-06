@@ -435,6 +435,7 @@ class SearchWebArchiveWithSelenium(SeleniumSearch):
             "min_date": query.get("min_date"),
             "max_date": query.get("max_date"),
             "validated_urls": validated_urls,
+            "frequency": query.get("frequency"),
             "subpages": query.get("subpages", 0),
             'http_request': query.get("http_request", "selenium_only"),
             }
