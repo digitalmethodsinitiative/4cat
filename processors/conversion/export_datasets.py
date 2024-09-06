@@ -3,10 +3,11 @@ Export a dataset and all its children to a ZIP file
 """
 import shutil
 import json
+import datetime
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorException, DataSetException
+from common.lib.exceptions import DataSetException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -22,7 +23,7 @@ class ExportDatasets(BasicProcessor):
 	type = "export-datasets"  # job type ID
 	category = "Conversion"  # category
 	title = "Export Dataset and All Analyses"  # title displayed in UI
-	description = "Creates a ZIP file containing the dataset and all analyses to be archived and uploaded to a 4CAT instance in the future"  # description displayed in UI
+	description = "Creates a ZIP file containing the dataset and all analyses to be archived and uploaded to a 4CAT instance in the future. Automatically expires after 1 day, after which you must run again."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -95,6 +96,11 @@ class ExportDatasets(BasicProcessor):
 		self.dataset.log(f"Exported datasets: {exported_datasets}")
 		self.dataset.log(f"Failed to export datasets: {failed_exports}")
 		shutil.copy(self.dataset.get_log_path(), results_path.joinpath("export.log"))
+
+		# set expiration date
+		# these datasets can be very large and are just copies of the existing datasets, so we don't need to keep them around for long
+		# TODO: convince people to stop using hyphens in python variables and file names...
+		self.dataset.__setattr__("expires-after", (datetime.datetime.now() + datetime.timedelta(days=1)).timestamp())
 
 		# done!
 		self.write_archive_and_finish(results_path, len(exported_datasets))
