@@ -84,10 +84,22 @@ class SearchImportFromFourcat(BasicProcessor):
         self.created_datasets = set()  # keys of created datasets - may not be successful!
         self.remapped_keys = {}  # changed dataset keys
         self.dataset_owner = self.dataset.get_owners()[0]  # at this point it has 1 owner
-        if self.parameters.get("method") == "zip":
-            self.process_zip()
-        else:
-            self.process_urls()
+        try:
+            if self.parameters.get("method") == "zip":
+                self.process_zip()
+            else:
+                self.process_urls()
+        except Exception as e:
+            # Catch all exceptions and finish the job with an error
+            # Resuming is impossible because this dataset was overwritten with the importing dataset
+            # halt_and_catch_fire() will clean up and delete the datasets that were created
+            self.interrupted = True
+            try:
+                self.halt_and_catch_fire()
+            except ProcessorInterruptedException:
+                pass
+            # Reraise the original exception for logging
+            raise e
 
     def after_create(query, dataset, request):
         """
