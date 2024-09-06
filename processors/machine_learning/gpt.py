@@ -24,10 +24,10 @@ class GPT(BasicProcessor):
 
 	references = [
 		"[OpenAPI documentation](https://platform.openai.com/docs/concepts)",
-		"[Karjus, Andres. 2023. Machine-assisted mixed methods: augmenting humanities and social sciences "
-		"with artificial intelligence. arXiv preprint arXiv:2309.14379.]"
+		"[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences "
+		"with artificial intelligence.' arXiv preprint arXiv:2309.14379.]"
 		"(https://arxiv.org/abs/2309.14379)",
-		"[Törnberg, Petter. 2023. How to Use LLMs for Text Analysis. arXiv:2307.13106]."
+		"[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.]"
 		"(https://arxiv.org/abs/2307.13106)"
 	]
 
@@ -89,6 +89,16 @@ class GPT(BasicProcessor):
 
 		return options
 
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+		Determine if processor is compatible with a dataset or processor
+
+		:param module: Module to determine compatibility with
+		"""
+
+		return module.get_extension() in ["csv", "ndjson"]
+
 	def process(self):
 
 		model = self.parameters.get("model")
@@ -123,7 +133,7 @@ class GPT(BasicProcessor):
 			self.dataset.finish_with_error("You need to provide the prompt with input values using [brackets] of "
 										   "column names.")
 
-		write_annotations = self.parameters.get("write_annotations", True)
+		write_annotations = self.parameters.get("write_annotations", False)
 		annotations = []
 
 		results = []
@@ -136,32 +146,35 @@ class GPT(BasicProcessor):
 
 			# Replace with dataset values
 			prompt = base_prompt
-
 			for replacement in replacements:
-				prompt = prompt.replace(replacement, str(item.get(replacement, "")))
+				prompt = prompt.replace(replacement, str(item[replacement]))
 
 			response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
 
+			item_id = item["id"] if "id" in item else item.get("item_id", "")
+
 			response = response.choices[0].message.content
 			results.append({
-				"item_id": item["id"],
+				"id": item_id,
 				"prompt": prompt,
 				model + " output": response
 			})
 
-			if write_annotations:
+			# todo: make this available for all datasets
+			if self.source_dataset.is_top_dataset() and write_annotations:
 				annotation = {
 					"label": model + " output",
-					"item_id": item["id"],
+					"item_id": item_id,
 					"value": response,
 					"type": "textarea"
 				}
 				annotations.append(annotation)
 
 			self.dataset.update_status("Generated output for item %s/%s" % (i, self.source_dataset.num_rows))
+			i += 1
 
 		# Write annotations
-		if write_annotations:
+		if self.source_dataset.is_top_dataset() and write_annotations:
 			self.write_annotations(annotations, overwrite=True)
 
 		# Write to csv file
