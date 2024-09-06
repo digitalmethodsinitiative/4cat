@@ -75,11 +75,15 @@ class SearchImportFromFourcat(BasicProcessor):
     created_datasets = None
     base = None
     remapped_keys = None
+    dataset_owner = None
 
     def process(self):
         """
         Import 4CAT dataset either from another 4CAT server or from the uploaded zip file
         """
+        self.created_datasets = set()  # keys of created datasets - may not be successful!
+        self.remapped_keys = {}  # changed dataset keys
+        self.dataset_owner = self.dataset.get_owners()[0]  # at this point it has 1 owner
         if self.parameters.get("method") == "zip":
             self.process_zip()
         else:
@@ -117,8 +121,9 @@ class SearchImportFromFourcat(BasicProcessor):
         self.dataset.update_status(f"Importing datasets and analyses from ZIP file.")
         temp_file = self.dataset.get_results_path().with_suffix(".importing")
 
-        processed_files = []
-        missed_files = []
+        imported = []
+        processed_files = 1 # take into account the export.log file
+        failed_imports = []
         with zipfile.ZipFile(temp_file, "r") as zip_ref:
             zip_contents = zip_ref.namelist()
 
@@ -131,43 +136,110 @@ class SearchImportFromFourcat(BasicProcessor):
             # Get the primary dataset
             primary_dataset_keys = set()
             datasets = []
+            parent_child_mapping = {}
             for file in metadata_files:
                 with zip_ref.open(file) as f:
                     metadata = json.load(f)
-                    if metadata.get("key_parent") is None:
+                    if not metadata.get("key_parent"):
                         primary_dataset_keys.add(metadata.get("key"))
                         datasets.append(metadata)
                     else:
-                        # Child datasets are skipped for now, as we may need to remap keys
-                        pass
+                        # Store the mapping of parent to child datasets
+                        parent_key = metadata.get("key_parent")
+                        if parent_key not in parent_child_mapping:
+                            parent_child_mapping[parent_key] = []
+                        parent_child_mapping[parent_key].append(metadata)
 
             # Primary dataset will overwrite this dataset; we could address this to support multiple primary datasets
             if len(primary_dataset_keys) != 1:
                 self.dataset.finish_with_error("ZIP file contains multiple primary datasets; only one is allowed.")
                 return
 
-            # Import datasets (
-            # TODO: this is ordered due to potential issues with keys needing to be remapped, but there may be an issue with a child datasets having additional children and needing remapping...
+            # Import datasets
             while datasets:
+                self.halt_and_catch_fire()
+
+                # Create the datasets
                 metadata = datasets.pop(0)
                 dataset_key = metadata.get("key")
                 processed_metadata = self.process_metadata(metadata)
-                if dataset_key in primary_dataset_keys:
-                    # Import primary dataset
-                    self.dataset.update_status(f"Importing primary dataset {dataset_key}.")
+                new_dataset = self.create_dataset(processed_metadata, dataset_key, dataset_key in primary_dataset_keys)
+                processed_files += 1
 
+                # TODO: I am now noticing that we do not update the results_file; it is even more unlikely to collide as it is both a random key and label combined... but...
+                # Copy the log file
+                self.halt_and_catch_fire()
+                log_filename = new_dataset.get_log_path().name
+                if log_filename in zip_contents:
+                    self.dataset.update_status(f"Transferring log file for dataset {new_dataset.key}")
+                    with zip_ref.open(log_filename) as f:
+                        with new_dataset.get_log_path().open("wb") as outfile:
+                            outfile.write(f.read())
+                    processed_files += 1
+                else:
+                    self.dataset.log(f"Log file not found for dataset {new_dataset.key} (original key {dataset_key}).")
 
+                # Copy the results
+                self.halt_and_catch_fire()
+                results_filename = new_dataset.get_results_path().name
+                if results_filename in zip_contents:
+                    self.dataset.update_status(f"Transferring data file for dataset {new_dataset.key}")
+                    with zip_ref.open(results_filename) as f:
+                        with new_dataset.get_results_path().open("wb") as outfile:
+                            outfile.write(f.read())
+                    processed_files += 1
 
+                    if not imported:
+                        # first dataset - use num rows as 'overall'
+                        num_rows = metadata["num_rows"]
+                else:
+                    # TODO: should I just delete the new_dataset here?
+                    self.dataset.log(f"Results file not found for dataset {new_dataset.key} (original key {dataset_key}).")
+                    new_dataset.finish_with_error(f"Results file not found for dataset {new_dataset.key} (original key {dataset_key}).")
+                    failed_imports.append(dataset_key)
+                    continue
 
+                # finally, the kids
+                self.halt_and_catch_fire()
+                if dataset_key in parent_child_mapping:
+                    datasets.extend(parent_child_mapping[dataset_key])
+                    self.dataset.log(f"Adding ({len(parent_child_mapping[dataset_key])}) child datasets to import queue")
 
+                # done - remember that we've imported this one
+                imported.append(new_dataset)
+                new_dataset.update_status(metadata["status"])
 
-
+                if new_dataset.key != self.dataset.key:
+                    # only finish if this is not the 'main' dataset, or the user
+                    # will think the whole import is done
+                    new_dataset.finish(metadata["num_rows"])
 
             # Check that all files were processed
-            if len(zip_contents) != len(processed_files):
+            missed_files = []
+            if len(zip_contents) != processed_files:
                 for file in zip_contents:
                     if file not in processed_files:
                         missed_files.append(file)
+
+            # todo: this part needs updating if/when we support importing multiple datasets!
+            if failed_imports:
+                self.dataset.update_status(f"Dataset import finished, but not all data was imported properly. "
+                                           f"{len(failed_imports)} dataset(s) were not successfully imported. Check the "
+                                           f"dataset log file for details.", is_final=True)
+            elif missed_files:
+                self.dataset.log(f"ZIP file contained {len(missed_files)} files that were not processed: {missed_files}")
+                self.dataset.update_status(f"Dataset import finished, but not all files were processed. "
+                                           f"{len(missed_files)} files were not successfully imported. Check the "
+                                           f"dataset log file for details.", is_final=True)
+            else:
+                self.dataset.update_status(f"{len(imported)} dataset(s) succesfully imported.",
+                                           is_final=True)
+
+            if not self.dataset.is_finished():
+                # now all related datasets are imported, we can finish the 'main'
+                # dataset, and the user will be alerted that the full import is
+                # complete
+                self.dataset.finish(num_rows)
 
 
     @staticmethod
@@ -196,6 +268,7 @@ class SearchImportFromFourcat(BasicProcessor):
         Create a new dataset
         """
         if primary:
+            self.dataset.update_status(f"Importing primary dataset {original_key}.")
             # if this is the first dataset we're importing, make it the
             # processor's "own" dataset. the key has already been set to
             # the imported dataset's key via ensure_key() (or a new unqiue
@@ -209,6 +282,7 @@ class SearchImportFromFourcat(BasicProcessor):
             self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
 
         else:
+            self.dataset.update_status(f"Importing child dataset {original_key}.")
             # supernumerary datasets - handle on their own
             # these include any children of imported datasets
             try:
@@ -260,7 +334,7 @@ class SearchImportFromFourcat(BasicProcessor):
 
         # update some attributes that should come from the new server, not
         # the old
-        new_dataset.creator = dataset_owner
+        new_dataset.creator = self.dataset_owner
         new_dataset.original_timestamp = new_dataset.timestamp
         new_dataset.imported = True
         new_dataset.timestamp = int(time.time())
@@ -281,12 +355,9 @@ class SearchImportFromFourcat(BasicProcessor):
         keys = SearchImportFromFourcat.get_keys_from_urls(urls)
         api_key = self.parameters.get("api-key")
 
-        self.created_datasets = set()   # keys of created datasets - may not be successful!
         imported = []  # successfully imported datasets
         failed_imports = []  # keys that failed to import
-        self.remapped_keys = {}  # changed dataset keys
         num_rows = 0  # will be used later
-        dataset_owner = self.dataset.get_owners()[0]  # at this point it has 1 owner
 
         # we can add support for multiple datasets later by removing
         # this part!
@@ -419,7 +490,7 @@ class SearchImportFromFourcat(BasicProcessor):
             for deletable in deletables:
                 DataSet(key=deletable, db=self.db).delete()
 
-            self.dataset.finish_with_error(f"Interrupted while importing datasets from {self.base}. Cannot resume - you "
+            self.dataset.finish_with_error(f"Interrupted while importing datasets{' from '+self.base if self.base else ''}. Cannot resume - you "
                                            f"will need to initiate the import again.")
 
             raise ProcessorInterruptedException()
@@ -488,20 +559,31 @@ class SearchImportFromFourcat(BasicProcessor):
         :return dict:  Safe query parameters
         """
         if query.get("method") == "zip":
-            file = request.files.get("data_upload")
-            if not file:
-                return QueryParametersException("No file uploaded.")
+            filename = ""
+            if "option-data_upload-entries" in request.form:
+                # First pass sends list of files in the zip
+                pass
+            elif "option-data_upload" in request.files:
+                # Second pass sends the actual file
+                file = request.files["option-data_upload"]
+                if not file:
+                    raise QueryParametersException("No file uploaded.")
 
-            if not file.filename.endswith(".zip"):
-                return QueryParametersException("Uploaded file must be a ZIP file.")
+                if not file.filename.endswith(".zip"):
+                    raise QueryParametersException("Uploaded file must be a ZIP file.")
+
+                filename = file.filename
+            else:
+                raise QueryParametersException("No file was offered for upload.")
 
             return {
-                "data_upload": file
+                "method": "zip",
+                "filename": filename
             }
         elif query.get("method") == "url":
             urls = query.get("url")
             if not urls:
-                return QueryParametersException("Provide at least one dataset URL.")
+                raise QueryParametersException("Provide at least one dataset URL.")
 
             urls = urls.split(",")
             bases = set([url.split("/results/")[0].lower() for url in urls])
@@ -509,10 +591,10 @@ class SearchImportFromFourcat(BasicProcessor):
 
             if len(keys) != 1:
                 # todo: change this to < 1 if we allow multiple datasets
-                return QueryParametersException("You need to provide a single URL to a 4CAT dataset to import.")
+                raise QueryParametersException("You need to provide a single URL to a 4CAT dataset to import.")
 
             if len(bases) != 1:
-                return QueryParametersException("All URLs need to point to the same 4CAT server. You can only import from "
+                raise QueryParametersException("All URLs need to point to the same 4CAT server. You can only import from "
                                                 "one 4CAT server at a time.")
 
             base = urls[0].split("/results/")[0]
