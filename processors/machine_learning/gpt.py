@@ -17,9 +17,7 @@ class GPT(BasicProcessor):
 	type = "gpt"  # job type ID
 	category = "Machine learning"  # category
 	title = "GPT prompting"  # title displayed in UI
-	description = ("Use OpenAI's GPT LLMs to generate outputs based on the parent dataset. "
-				   "Note: Be very sensitive with running this processor on your datasets, "
-				   "as data will be given to OpenAI.") # description displayed in UI
+	description = ("Use OpenAI's GPT LLMs to generate outputs based on the parent dataset.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI. In this case it's variable!
 
 	references = [
@@ -27,22 +25,41 @@ class GPT(BasicProcessor):
 		"[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences "
 		"with artificial intelligence.' arXiv preprint arXiv:2309.14379.]"
 		"(https://arxiv.org/abs/2309.14379)",
-		"[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.]"
-		"(https://arxiv.org/abs/2307.13106)"
-	]
+		"[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.]"]
 
 	config = {
 		"api.openai.api_key": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"help": "OpenAI API key",
-			"tooltip": "Can be created on platform.openapi.com"
+			"tooltip": "Can be created on <strong>platform.openapi.com</strong>"
 		}
 	}
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
 		options = {
+			"per_item": {
+				"type": UserInput.OPTION_INFO,
+				"help": "Outputs are generated per row in the parent dataset. Use [brackets] with a column name to "
+						"indicate where and what dataset value you want to use, e.g.: 'Determine the language of the "
+						"following text: [body]').",
+			},
+			"ethics_warning": {
+				"type": UserInput.OPTION_INFO,
+				"help": "<strong>Be very sensitive with running this processor on your datasets, as data will be "
+						"sent to OpenAI.</strong>"
+			},
+			"ethics_warning2": {
+				"type": UserInput.OPTION_INFO,
+				"help": "Always consider anonymising your data or choosing an open-source LLM host.</strong>"
+			},
+			"ethics_warning3": {
+				"type": UserInput.OPTION_INFO,
+				"help": "Before running a prompt on a large dataset, it is recommended to first create a sample and "
+						"test the prompt on a handful of rows. You can sample your dataset with the filter processors"
+						" on this page."
+			},
 			"model": {
 				"type": UserInput.OPTION_CHOICE,
 				"help": "Model",
@@ -53,10 +70,6 @@ class GPT(BasicProcessor):
 				},
 				"default": "gpt-4o-mini"
 			},
-			"per_item": {
-				"type": UserInput.OPTION_INFO,
-				"help": "Outputs are generated per row in the parent dataset. Use [brackets] with a column name to indicate where and what dataset value you want to use, e.g.: 'Determine the language of the following text: [body]')",
-			},
 			"prompt": {
 				"type": UserInput.OPTION_TEXT_LARGE,
 				"help": "Prompt"
@@ -64,17 +77,33 @@ class GPT(BasicProcessor):
 			"temperature": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Temperature",
-				"default": 0.5
+				"default": 0.5,
+				"tooltip": "The temperature hyperparameter indicates how strict the model will output the next "
+						   "predicted word with the highest probability. A score closer to 1 leads to more 'creative'"
+						   " outputs."
 			},
 			"max_tokens": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "Max tokens",
-				"default": 50
+				"help": "Max output tokens",
+				"default": 50,
+				"tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
+						   "text for common English text."
 			},
 			"write_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add output as annotations to the parent dataset.",
 				"default": True
+			},
+			"annotation_label": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Annotation label",
+				"default": "",
+				"requires": "write_annotations==true"
+			},
+			"consent": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "I understand that my data is sent to OpenAI and that OpenAI may incur costs.",
+				"default": False,
 			}
 		}
 
@@ -84,7 +113,7 @@ class GPT(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
 				"help": "OpenAI API key",
-				"tooltip": "Can be created on platform.openapi.com"
+				"tooltip": "Can be created at platform.openapi.com"
 			}
 
 		return options
@@ -100,6 +129,10 @@ class GPT(BasicProcessor):
 		return module.get_extension() in ["csv", "ndjson"]
 
 	def process(self):
+
+		consent = self.parameters.get("consent", False)
+		if not consent:
+			self.dataset.finish_with_error("You must consent to your data being sent to OpenAI first")
 
 		model = self.parameters.get("model")
 
@@ -128,12 +161,17 @@ class GPT(BasicProcessor):
 			self.dataset.finish_with_error("You need to insert a valid prompt")
 			return
 
-		replacements = re.findall(r"\[(.*?)\]", base_prompt)
+		replacements = re.findall(r"\[.*?\]", base_prompt)
 		if not replacements:
 			self.dataset.finish_with_error("You need to provide the prompt with input values using [brackets] of "
-										   "column names.")
+										   "column names")
 
 		write_annotations = self.parameters.get("write_annotations", False)
+		if write_annotations:
+			label = self.parameters.get("annotation_label", "")
+			if not label:
+				label = model + " output"
+
 		annotations = []
 
 		results = []
@@ -147,11 +185,20 @@ class GPT(BasicProcessor):
 			# Replace with dataset values
 			prompt = base_prompt
 			for replacement in replacements:
-				prompt = prompt.replace(replacement, str(item[replacement]))
+				try:
+					field_name = str(item[replacement[1:-1]]).strip()
+					prompt = prompt.replace(replacement, field_name)
+				except KeyError as e:
+					self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
 
 			response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
 
-			item_id = item["id"] if "id" in item else item.get("item_id", "")
+			if "id" in item:
+				item_id = item["id"]
+			elif "item_id" in item:
+				item_id = item["item_id"]
+			else:
+				item_id = str(i)
 
 			response = response.choices[0].message.content
 			results.append({
@@ -160,10 +207,9 @@ class GPT(BasicProcessor):
 				model + " output": response
 			})
 
-			# todo: make this available for all datasets
-			if self.source_dataset.is_top_dataset() and write_annotations:
+			if write_annotations:
 				annotation = {
-					"label": model + " output",
+					"label": label,
 					"item_id": item_id,
 					"value": response,
 					"type": "textarea"
@@ -174,7 +220,7 @@ class GPT(BasicProcessor):
 			i += 1
 
 		# Write annotations
-		if self.source_dataset.is_top_dataset() and write_annotations:
+		if write_annotations:
 			self.write_annotations(annotations, overwrite=True)
 
 		# Write to csv file
