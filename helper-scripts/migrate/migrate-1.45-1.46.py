@@ -100,6 +100,9 @@ annotations = db.fetchall("SELECT * FROM annotations;")
 if not annotations:
     print("    No annotation fields to transfer, skipping...")
 
+elif  "key" not in annotations[0] and "dataset" in annotations[0]:
+    print("    Annotations table seems to have been updated already")
+
 else:
     
     count = 0
