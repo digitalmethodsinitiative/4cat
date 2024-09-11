@@ -110,11 +110,10 @@ class AmazonProductSearch(SeleniumSearch):
             url = url_obj['url']
             current_depth = url_obj['current_depth']
 
+            self.dataset.update_progress(collected_urls / num_urls) # annoyingly a moving target but not sure how to truly estimated it
             if depth == 0:
-                self.dataset.update_progress(collected_urls / num_urls)
                 self.dataset.update_status("%i of %i URLs collected" % (urls_collected, num_urls))
             else:
-                self.dataset.update_progress((current_depth + 1) / num_urls)
                 self.dataset.update_status("Collecting depth %i of %i (%i of %i URLs collected)" % (current_depth + 1, depth + 1, urls_collected, num_urls))
 
             try:
