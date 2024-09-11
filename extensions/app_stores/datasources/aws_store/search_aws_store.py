@@ -151,7 +151,8 @@ class SearchAwsStore(SeleniumSearch):
 
             try:
                 num_results = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, '//span[@data-test-selector="availableProductsCountMessage"]')))
-                num_results = int(num_results.text.lstrip('(').rstrip(" results)"))
+                # TODO better parsing
+                num_results = int(num_results.text.lstrip('(').rstrip(" results)").replace("Over ", ""))
                 if num_results == 0:
                     self.dataset.log(f"No results found{', continuing...' if i < len(queries) - 1 else ''}")
                     continue
