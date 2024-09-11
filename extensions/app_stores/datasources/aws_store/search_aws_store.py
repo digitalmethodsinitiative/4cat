@@ -340,9 +340,12 @@ class SearchAwsStore(SeleniumSearch):
                 query_filters[option_name] = []
 
                 # Open option dropdown
-                button = option_container.find_element(By.CLASS_NAME, "awsui-select-trigger-icon")
+                button = option_container.find_elements(By.CLASS_NAME, "awsui-select-trigger-icon")
+                if not button:
+                    selenium_driver.selenium_log.warning(f"Unable to find button for {option_name}")
+                    continue
                 # Click button; this is a destructive method and removed obscuring elements
-                selenium_driver.destroy_to_click(button)
+                selenium_driver.destroy_to_click(button[0])
 
                 # Get dropdown list (this is not visible until button is clicked)
                 drop_down_list = option_container.find_element(By.CLASS_NAME, "awsui-select-dropdown")

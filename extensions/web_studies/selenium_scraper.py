@@ -504,6 +504,15 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         """
         Scroll down page until it is fully loaded. Returns top of window at end.
         """
+        def _scroll_to_top():
+            try:
+                self.driver.execute_script("window.scrollTo(0, 0);")
+            except JavascriptException as e:
+                # Apparently no window.scrollTo?
+                action = ActionChains(self.driver)
+                action.send_keys(Keys.HOME)
+                action.perform()
+
         start_time = time.time()
         last_bottom = self.driver.execute_script('return window.scrollY')
         action = None
@@ -511,6 +520,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             if max_time is not None:
                 if time.time() - start_time > max_time:
                     # Stop if max_time exceeded
+                    _scroll_to_top()
                     return last_bottom
 
             # Scroll down
@@ -518,21 +528,22 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
                 self.driver.execute_script("window.scrollTo(0, window.scrollY + window.innerHeight);")
             except JavascriptException as e:
                 # Apparently no window.scrollTo?
-                if action is None:
-                    action = ActionChains(self.driver)
-                    action.send_keys(Keys.PAGE_DOWN)
+                action = ActionChains(self.driver)
+                action.send_keys(Keys.PAGE_DOWN)
                 action.perform()
 
             # Wait for anything to load
             try:
-                WebDriverWait(self.driver, max_time).until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
+                WebDriverWait(self.driver, max_time if max_time else None).until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
             except TimeoutException:
                 # Stop if timeout
+                _scroll_to_top()
                 return last_bottom
 
             current_bottom = self.driver.execute_script('return window.scrollY')
             if last_bottom == current_bottom:
                 # We've reached the bottom of the page
+                _scroll_to_top()
                 return current_bottom
 
             last_bottom = current_bottom
