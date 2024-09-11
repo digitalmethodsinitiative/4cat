@@ -1,19 +1,16 @@
 import hashlib
 import zipfile
 import secrets
-import shutil
 import random
 import json
 import math
 import csv
 import os
-import copy
 
 from pathlib import Path
 from abc import ABC, abstractmethod
 
 from common.config_manager import config
-from common.lib.dataset import DataSet
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
