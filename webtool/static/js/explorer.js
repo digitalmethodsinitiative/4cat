@@ -24,7 +24,6 @@ function init() {
  */
 const annotations = {
 
-
 	init: function() {
 
 		let editor = $("#annotation-fields-editor");
@@ -99,7 +98,7 @@ const annotations = {
 
 		// Keep track of whether the annotations are edited or not.
 		let post_annotations = $(".post-annotations");
-		post_annotations.on("keydown click change",
+		post_annotations.on("keydown keyup change",
 							".post-annotation-input, input[type=checkbox], label, option",
 							function(){
 
@@ -109,7 +108,6 @@ const annotations = {
 				parent = parent.parent();
 			}
 			annotations.markChanges(parent);
-			annotations.startSaveTimer();
 		});
 
 		// Save the annotations to the database
@@ -648,6 +646,7 @@ const annotations = {
 		$(el).find(".annotation-author").html(current_username);
 		$(el).find(".epoch-timestamp-edited").html(current_date);
 		$(el).find(".timestamp-edited").html(getLocalTimeStr(current_date));
+		annotations.startSaveTimer();
 	}
 };
 
