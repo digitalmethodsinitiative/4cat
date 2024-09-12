@@ -33,6 +33,15 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
 else:
     raise ImportError('Selenium not set up')
 
+########################################################
+# This is to attempt to fix a bug in Selenium's logger #
+########################################################
+import logging
+class CustomFormatter(logging.Formatter):
+    def format(self, record):
+        if not hasattr(record, 'location'):
+            record.location = 'N/A'
+        return super().format(record)
 
 class SeleniumWrapper(metaclass=abc.ABCMeta):
     """
@@ -50,7 +59,13 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
     consecutive_errors = 0
     num_consecutive_errors_before_restart = 3
 
-    selenium_log = Logger(logger_name='selenium', filename='selenium.log', log_level='DEBUG')
+    # I would prefer to use our log class but it seems to cause issue with selenium's logger
+    formatter = CustomFormatter('%(asctime)s - %(name)s - %(levelname)s - %(location)s - %(message)s')
+    selenium_log = logging.getLogger('selenium')
+    selenium_log.setLevel(logging.DEBUG)
+    file_handler = logging.FileHandler(config.get("PATH_LOGS").joinpath('selenium.log'))
+    file_handler.setFormatter(formatter)
+    selenium_log.addHandler(file_handler)
 
     def get_with_error_handling(self, url, max_attempts=1, wait=0, restart_browser=False):
         """
