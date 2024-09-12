@@ -62,7 +62,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
     # I would prefer to use our log class but it seems to cause issue with selenium's logger
     formatter = CustomFormatter('%(asctime)s - %(name)s - %(levelname)s - %(location)s - %(message)s')
     selenium_log = logging.getLogger('selenium')
-    selenium_log.setLevel(logging.DEBUG)
+    selenium_log.setLevel(logging.INFO)
     file_handler = logging.FileHandler(config.get("PATH_LOGS").joinpath('selenium.log'))
     file_handler.setFormatter(formatter)
     selenium_log.addHandler(file_handler)
