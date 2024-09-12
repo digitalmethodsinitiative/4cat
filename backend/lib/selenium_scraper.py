@@ -246,6 +246,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         Weird Selenium error? Restart and try again.
         """
         self.quit_selenium()
+        time.sleep(2)
         self.start_selenium()
         self.reset_current_page()
 
@@ -545,12 +546,15 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         # processors using selenium or other, even, other user firefox instances
         self.selenium_log.info(f"4CAT is killing {browser} with PID: {self.driver.service.process.pid}")
         try:
-            subprocess.check_call(['kill', str(self.driver.service.process.pid)])
+            #subprocess.check_call(['kill', str(self.driver.service.process.pid)])
+            subprocess.check_call(['pkill', {browser}])
         except subprocess.CalledProcessError as e:
             self.selenium_log.error(f"Error killing {browser}: {e}")
             self.quit_selenium()
             raise e
 
+        # Wait and check if browser is still running
+        time.sleep(5)
         result = subprocess.run(["ps aux | grep firefox"], shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         result_output = result.stdout.decode("utf-8")
 
@@ -561,8 +565,9 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         processes = [process for process in result.stdout.decode("utf-8").split('\n') if process]
         if len(processes) > 2:
             # 2 processes are the grep and the piped command
-            self.selenium_log.warning(f"Additional {browser} processes running: {len(processes) - 2}")
-            self.selenium_log.warning('\n'.join(processes))
+            num_processes = len(processes) - 2
+            processes = "\n".join(processes)
+            self.selenium_log.warning(f"Additional {browser} processes running: {num_processes}\n{processes}")
 
 
 
