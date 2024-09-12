@@ -140,9 +140,12 @@ class ScreenshotWithSelenium(SeleniumSearch):
         scraped_urls = set()
         total_urls = len(urls_to_scrape)
         metadata = {}
+        failed_urls = []
 
         # Set timeout for driver.get(); Web archives in particular can take a while to load
         self.set_page_load_timeout(30)
+        self.dataset.update_status("Starting to scrape %i URLs" % total_urls)
+        self.dataset.log(f"Check end of log for list of any failed URLs if applicable")
 
         while urls_to_scrape:
             # Grab first url
@@ -175,10 +178,13 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=wait, restart_browser=True)
                 if errors:
                     # Even if success, it is possible to have errors on earlier attempts
-                    [result['error'].append("Attempt %i: %s" % (attempts + i, str(error))) for i, error in enumerate(errors)]
+                    [result['error'].append("Request page error (attempt %i): %s" % (attempts + i, str(error))) for i, error in enumerate(errors)]
                 if not get_success:
+                    if "Message: Reached error page: about:neterror?e=connectionFailure" in str(errors):
+                        # This is a common error when the page is not reachable
+                        # particularly with archive.org
+                        time.sleep(1)
                     # Try again
-                    self.dataset.log("Error collecting screenshot for %s: %s" % (url, ', '.join([str(error) for error in errors])))
                     continue
 
                 if capture == "all":
@@ -194,9 +200,9 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 try:
                     self.save_screenshot(results_path.joinpath(filename), width=width, height=height, viewport_only=(capture == "viewport"))
                 except Exception as e:
-                    self.dataset.log("Error saving screenshot for %s: %s" % (url, str(e)))
-                    result['error'].append("Attempt %i: %s" % (attempts, str(e)))
+                    result['error'].append("Screenshot error (attempt %i): %s" % (attempts, str(e)))
                     continue
+
                 self.dataset.log("Page load time with screenshot: %s" % (time.time() - start_time))
 
                 # Update file attribute with url if supported
@@ -214,6 +220,9 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 # Update result
                 result['final_url'] = self.driver.current_url
                 result['subject'] = self.driver.title
+            else:
+                failed_urls.append(url)
+                self.dataset.log("Error collecting screenshot for %s: %s" % (url, result['error']))
 
             # Record result data
             metadata[url] = result
@@ -222,11 +231,14 @@ class ScreenshotWithSelenium(SeleniumSearch):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
-        self.dataset.log('Screenshots taken: %i' % screenshots)
         if screenshots != done:
-            self.dataset.log("%i URLs could not be screenshotted" % (done - screenshots)) # this can also happens if two provided urls are the same
+            self.dataset.update_status("Collected %i screenshots; %i URLs could not be screenshotted (check log for details)" % (screenshots, (done - screenshots)), is_final=True) # this can also happens if two provided urls are the same
+        else:
+            self.dataset.update_status("Collected %i screenshots" % screenshots, is_final=True)
+        if failed_urls:
+            self.dataset.log("Failed URLs:\n%s" % '\n'.join(failed_urls))
         # finish up
-        self.dataset.update_status("Compressing images")
+        self.dataset.log("Compressing images")
         return results_path
 
     @staticmethod
