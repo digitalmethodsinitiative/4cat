@@ -560,7 +560,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         self.selenium_log.info(f"4CAT is killing {browser} with PID: {self.driver.service.process.pid}")
         try:
             #subprocess.check_call(['kill', str(self.driver.service.process.pid)])
-            subprocess.check_call(['pkill', {browser}])
+            subprocess.check_call(['pkill', browser])
         except subprocess.CalledProcessError as e:
             self.selenium_log.error(f"Error killing {browser}: {e}")
             self.quit_selenium()
