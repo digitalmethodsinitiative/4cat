@@ -18,7 +18,7 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException, \
-    TimeoutException, JavascriptException, NoAlertPresentException
+    TimeoutException, JavascriptException, NoAlertPresentException, InvalidSessionIdException
     from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
@@ -59,7 +59,12 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         Returns a tuple containing a bool (True if successful, False if not) and a list of the errors raised.
         """
         # Start clean
-        self.reset_current_page()
+        try:
+            self.reset_current_page()
+        except InvalidSessionIdException:
+            # Somehow we lost the session; restart Selenium
+            self.restart_selenium()
+            self.reset_current_page()
 
         success = False
         attempts = 0
@@ -74,7 +79,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
                 errors.append(f"Timeout retrieving {url}")
                 self.selenium_log.debug(f"Selenium Timeout({url}): {e}")
             except Exception as e:
-                self.selenium_log.error(f"Error driver.get({url}): {e}")
+                self.selenium_log.error(f"Error driver.get({url}){(' (dataset '+self.dataset.key+') ') if hasattr(self, 'dataset') else ''}: {e}")
                 errors.append(e)
                 self.consecutive_errors += 1
                 
