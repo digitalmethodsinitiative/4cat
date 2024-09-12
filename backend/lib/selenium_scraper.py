@@ -59,12 +59,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         Returns a tuple containing a bool (True if successful, False if not) and a list of the errors raised.
         """
         # Start clean
-        try:
-            self.reset_current_page()
-        except InvalidSessionIdException:
-            # Somehow we lost the session; restart Selenium
-            self.restart_selenium()
-            self.reset_current_page()
+        self.reset_current_page()
 
         success = False
         attempts = 0
@@ -246,14 +241,17 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         except Exception as e:
             self.selenium_log.error(e)
 
-    def restart_selenium(self):
+    def restart_selenium(self, num_retries=1):
         """
         Weird Selenium error? Restart and try again.
         """
+        if num_retries > 3:
+            raise ProcessorException("Selenium restart failed after 3 attempts")
+        
         self.quit_selenium()
         time.sleep(2)
         self.start_selenium()
-        self.reset_current_page()
+        self.reset_current_page(num_retries=num_retries + 1)
 
     def set_page_load_timeout(self, timeout=60):
         """
@@ -317,7 +315,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
 
         return True
 
-    def reset_current_page(self):
+    def reset_current_page(self, num_retries=1):
         """
         It may be desirable to "reset" the current page, for example in conjunction with self.check_for_movement(),
         to ensure the results are obtained for a specific url provided.
@@ -326,7 +324,13 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         Depending on the type of failure (which may not be detected), calling page_source may return the page_source
         from url_1 even after driver.get(url_2) is called.
         """
-        self.driver.get('data:,')
+        try:
+            self.driver.get('data:,')
+        except InvalidSessionIdException:
+            # Somehow we lost the session; restart Selenium
+            self.restart_selenium(num_retries=num_retries)
+            self.driver.get('data:,')
+
         self.last_scraped_url = self.driver.current_url
 
     def check_for_404(self, stop_if_in_title='default'):
@@ -572,21 +576,27 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             raise e
 
         # Wait and check if browser is still running
-        time.sleep(5)
-        result = subprocess.run(["ps aux | grep firefox"], shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        result_output = result.stdout.decode("utf-8")
+        attempts = 0
+        processes = []
+        while attempts < 5:
+            attempts += 1
+            time.sleep(2)
+            result = subprocess.run(["ps aux | grep firefox"], shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result_output = result.stdout.decode("utf-8")
 
-        if result.returncode != 0:
-            result_error = result.stderr.decode("utf-8")
-            self.selenium_log.error(f"Error checking for {browser} processes: {result_error}")
+            if result.returncode != 0:
+                result_error = result.stderr.decode("utf-8")
+                self.selenium_log.error(f"Error checking for {browser} processes: {result_error}")
 
-        processes = [process for process in result.stdout.decode("utf-8").split('\n') if process]
+            processes = [process for process in result.stdout.decode("utf-8").split('\n') if process]
+            if len(processes) <= 2:
+                break
+
         if len(processes) > 2:
             # 2 processes are the grep and the piped command
             num_processes = len(processes) - 2
             processes = "\n".join(processes)
             self.selenium_log.warning(f"Additional {browser} processes running: {num_processes}\n{processes}")
-
 
 
 
