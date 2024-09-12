@@ -203,7 +203,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                     result['error'].append("Screenshot error (attempt %i): %s" % (attempts, str(e)))
                     continue
 
-                self.dataset.log("Page load time with screenshot: %s" % (time.time() - start_time))
+                # self.dataset.log("Page load time with screenshot: %s" % (time.time() - start_time))
 
                 # Update file attribute with url if supported
                 if hasattr(os, "setxattr"):
@@ -222,7 +222,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 result['subject'] = self.driver.title
             else:
                 failed_urls.append(url)
-                self.dataset.log("Error collecting screenshot for %s: %s" % (url, result['error']))
+                self.dataset.log(f"Screenshot could not be made for {url}")
 
             # Record result data
             metadata[url] = result
@@ -232,11 +232,11 @@ class ScreenshotWithSelenium(SeleniumSearch):
             json.dump(metadata, outfile)
 
         if screenshots != done:
-            self.dataset.update_status("Collected %i screenshots; %i URLs could not be screenshotted (check log for details)" % (screenshots, (done - screenshots)), is_final=True) # this can also happens if two provided urls are the same
+            self.dataset.update_status("Collected %i screenshots; %i URLs could not be screenshotted (check dataset log for details)" % (screenshots, (done - screenshots)), is_final=True) # this can also happens if two provided urls are the same
         else:
             self.dataset.update_status("Collected %i screenshots" % screenshots, is_final=True)
         if failed_urls:
-            self.dataset.log("Failed URLs:\n%s" % '\n'.join(failed_urls))
+            self.dataset.log("Requests for following URLs failed because the website did not properly respond:\n%s" % '\n'.join(failed_urls))
         # finish up
         self.dataset.log("Compressing images")
         return results_path
