@@ -3,4 +3,4 @@ data/
 .ipynb_checkpoints/
 .gitignore
 .idea/
-__pycache__
+__pycache__/
