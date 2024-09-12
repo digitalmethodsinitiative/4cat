@@ -183,7 +183,8 @@ class ScreenshotWithSelenium(SeleniumSearch):
                     if "Message: Reached error page: about:neterror?e=connectionFailure" in str(errors):
                         # This is a common error when the page is not reachable
                         # particularly with archive.org
-                        time.sleep(1)
+                        self.dataset.log(f"Connection error{'; retrying' if attempts < 2 else ''}: {url}")
+                        time.sleep(10)
                     # Try again
                     continue
 
