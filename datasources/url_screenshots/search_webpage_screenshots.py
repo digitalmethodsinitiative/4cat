@@ -25,6 +25,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
     """
     type = "image-downloader-screenshots-search"  # job ID
     extension = "zip"
+    max_results = 5
 
     eager_selenium = True
 
@@ -83,7 +84,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                            "help with images loading or if a site seems to be blocking the screenshot generator due to "
                            "repeat requests. Wayback Machine captures and other slow sites often require longer waits "
                            "(at least 15 seconds is suggested).",
-                "default": 0,
+                "default": 10,
                 "min": 0,
                 "max": 30,
             },
