@@ -176,11 +176,13 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 attempts += 1
                 start_time = time.time()
                 get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=2, restart_browser=True)
+                error_string = ""
                 if errors:
                     # Even if success, it is possible to have errors on earlier attempts
-                    [result['error'].append("Request page error (attempt %i): %s" % (attempts + i, str(error))) for i, error in enumerate(errors)]
+                    error_string = "\n".join(["Request page error (attempt %i): %s" % (attempts + i, str(error)) for i, error in enumerate(errors)])
+                    result['error'].append(error_string)
                 if not get_success:
-                    if any([error_message in ", ".join(errors) for error_message in ["Reached error page: about:neterror?", "e=connectionFailure"]]):
+                    if any([error_message in error_string for error_message in ["Reached error page: about:neterror?", "e=connectionFailure"]]):
                         # This is a common error when the page is not reachable
                         # particularly with archive.org
                         self.dataset.log(f"Connection error{'; retrying' if attempts < 2 else ''}: {url}")
@@ -215,7 +217,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 break
 
             result['timestamp'] = int(datetime.datetime.now().timestamp())
-            result['error'] = ', '.join(result['error'])
+            result['error'] = '\n'.join(result['error'])
             if success:
                 self.dataset.update_status("Processed %i/%i URL(s) with %i screenshot(s) taken" % (done + 1, total_urls, screenshots))
                 # Update result
