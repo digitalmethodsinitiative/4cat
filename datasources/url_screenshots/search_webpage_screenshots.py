@@ -223,7 +223,7 @@ class ScreenshotWithSelenium(SeleniumSearch):
                 result['subject'] = self.driver.title
             else:
                 failed_urls.append(url)
-                self.dataset.log(f"Screenshot could not be made for {url}")
+                self.dataset.log(f"Screenshot could not be made for {url}: {result['error']}")
 
             # Record result data
             metadata[url] = result
