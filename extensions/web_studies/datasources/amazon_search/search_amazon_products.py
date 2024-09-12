@@ -228,10 +228,13 @@ class AmazonProductSearch(SeleniumSearch):
                         rec_link = rec.find_elements(By.CSS_SELECTOR, "a[class*=a-link-normal]")
                         if rec_link:
                             rec_link = rec_link[0].get_attribute("href")
-                            # TODO: do we wish to extract recommendation details? Will be impossible unless we save the new HTML that exists after the next page
-                            # if rec.find_elements(By.XPATH, ".//span/div/div/div/*"):
-                            #     print(rec.find_elements(By.XPATH, ".//span/div/div/div/*")[0].text)
-                            result["recommendations"][heading_text].append(AmazonProductSearch.normalize_amazon_links(rec_link))
+                            rec_html = rec.get_attribute("innerHTML")
+                            rec_data = {
+                                "text": self.scrape_beautiful_text(rec_html) if rec_html else [""],
+                                "original_link": rec_link,
+                                "normalized_link": AmazonProductSearch.normalize_amazon_links(rec_link)
+                            }
+                            result["recommendations"][heading_text].append(rec_data)
                         else:
                             # blank rec; likely all recs have been collected
                             continue
@@ -268,7 +271,7 @@ class AmazonProductSearch(SeleniumSearch):
                             additional_subpages += result["recommendations"][full_rec_type]
 
                 # Remove duplicates
-                additional_subpages = list(set(additional_subpages))
+                additional_subpages = set([rec["normalized_link"] for rec in additional_subpages])
                 num_urls += len(additional_subpages)
                 self.dataset.update_status(f"Adding {len(additional_subpages)} additional subpages to collect")
                 urls_to_collect += [{'url': url, 'current_depth': current_depth + 1} for url in additional_subpages if url not in collected_urls]
@@ -291,12 +294,27 @@ class AmazonProductSearch(SeleniumSearch):
         # Convert the recommendations to comma-separated strings
         recommendations = page_result.pop("recommendations")
         page_result["rec_types_displayed"] = ", ".join(recommendations.keys())
-        page_result["all_recs"] = ", ".join([rec for rec_list in recommendations.values() for rec in rec_list])
-        for column_name, rec_type in AmazonProductSearch.known_carousels.items():
+        page_result["all_recs"] = ""
+        rec_type = None
+
+        # Replace commas in the title; this is annoying but most of our processors simply split on commas instead of taking advantage of JSONs and lists
+        page_result["title"] = page_result["title"].replace(",", " ")
+
+        for column_name, rec_group in AmazonProductSearch.known_carousels.items():
             if column_name == "all_recs":
                 # Ignore special type for all recommendations
                 continue
-            page_result[column_name] = ", ".join(recommendations.get(rec_type, []))
+            if rec_type is None and rec_group in recommendations:
+                rec_type = type(recommendations[rec_group][0])
+
+            if rec_type == str:
+                # These are the links; originally all that was collected
+                page_result["all_recs"] += ", ".join(recommendations.get(rec_group, [])) + ", "
+                page_result[column_name] = ", ".join(recommendations.get(rec_group, []))
+            else:
+                # Currently (2024/09/12) the first item in the text is the product title
+                page_result["all_recs"] += ", ".join([rec["text"][0].replace(",", " ") for rec in recommendations.get(rec_group, [{"text": [""]}])]) + ", "
+                page_result[column_name] = ", ".join([rec["text"][0].replace(",", " ") for rec in recommendations.get(rec_group, [{"text": [""]}])])
 
         # Remove the HTML; maybe should only do for frontend...
         page_result.pop("html")
