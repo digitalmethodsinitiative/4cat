@@ -175,12 +175,12 @@ class ScreenshotWithSelenium(SeleniumSearch):
 
                 attempts += 1
                 start_time = time.time()
-                get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=wait, restart_browser=True)
+                get_success, errors = self.get_with_error_handling(url, max_attempts=1, wait=2, restart_browser=True)
                 if errors:
                     # Even if success, it is possible to have errors on earlier attempts
                     [result['error'].append("Request page error (attempt %i): %s" % (attempts + i, str(error))) for i, error in enumerate(errors)]
                 if not get_success:
-                    if "Message: Reached error page: about:neterror?e=connectionFailure" in str(errors):
+                    if any([error_message in ", ".join(errors) for error_message in ["Reached error page: about:neterror?", "e=connectionFailure"]]):
                         # This is a common error when the page is not reachable
                         # particularly with archive.org
                         self.dataset.log(f"Connection error{'; retrying' if attempts < 2 else ''}: {url}")
