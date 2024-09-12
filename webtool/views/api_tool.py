@@ -386,7 +386,7 @@ def queue_dataset():
 
 	# Allow user to schedule datasets to be queue on interval
 	if request.form.to_dict().get("schedule-collection", False) and config.get("privileges.can_schedule_datasources", user=current_user):
-		job_interval = max(0, int(request.form.to_dict().get("schedule-interval", 0)) * 60) # * (60 * 60 * 24)) # Convert days to seconds
+		job_interval = max(0, int(request.form.to_dict().get("schedule-interval", 0)) * (60 * 60 * 24)) # Convert days to seconds
 		queue.add_job(jobtype="scheduler", remote_id="scheduler-"+dataset.key, interval=job_interval, details={"enddate": request.form.to_dict().get("schedule-enddate", 0)})
 	else:
 		queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=0)
