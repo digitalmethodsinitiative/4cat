@@ -140,8 +140,11 @@ def _jinja2_filter_add_ahref(content):
 	return content
 
 @app.template_filter('markdown')
-def _jinja2_filter_markdown(text):
+def _jinja2_filter_markdown(text, strip_outer=False):
 	val = markdown.markdown(text)
+	if strip_outer:
+		val = re.sub(r"^<p>", "", val)
+		val = re.sub(r"</p>$", "", val)
 	return val
 
 @app.template_filter('isbool')
