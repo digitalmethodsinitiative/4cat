@@ -153,7 +153,8 @@ class Tokenise(BasicProcessor):
 													"unigrams)",
 					"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. "
 												 "Warning: computationally heavy)",
-					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)"
+					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
+					"finnish_wordlist_big": "Finnish word list (add reference)"
 				},
 				"help": "Tokens to exclude",
 				"tooltip": "See the references for information on the word lists' provenance. It is highly recommended "
