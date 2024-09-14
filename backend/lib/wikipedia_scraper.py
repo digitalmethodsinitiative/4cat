@@ -1,10 +1,25 @@
 import requests
 import ural
 
-from backend.lib.search import Search
+from requests.exceptions import RequestException
 
-def WikipediaSearch(Search):
-    def normalise_pagenames(self, urls):
+class WikipediaSearch:
+    def wiki_request(self, auth="", *args, **kwargs):
+        if auth:
+            if "headers" not in kwargs:
+                kwargs["headers"] = {}
+            kwargs["headers"]["Authorization"] = f"Bearer {auth}"
+
+        try:
+            result = requests.get(*args, **kwargs)
+            if result.status_code != 200:
+                raise ValueError(f"Wikipedia API request failed ({result.status_code})")
+
+            return result.json()
+        except (ValueError, RequestException):
+            return None
+
+    def normalise_pagenames(self, auth, urls):
         parsed_urls = {}
         for url in urls:
             domain = ural.get_hostname(url)
@@ -29,7 +44,7 @@ def WikipediaSearch(Search):
 
             parsed_urls[language].add(page)
 
-        self.dataset.update_status(f"Collecting TOCs for {len(parsed_urls):,} Wikipedia articles.")
+        self.dataset.update_status(f"Collecting canonical article names for {len(parsed_urls):,} Wikipedia article(s).")
 
         # sort by language (so we can batch requests)
         result = {}
@@ -37,21 +52,24 @@ def WikipediaSearch(Search):
             api_base = f"https://{language}.wikipedia.org/w/api.php"
             pages = list(pages)
             canonical_titles = []
-            tocs[language] = {}
 
             self.dataset.update_status(f"Collecting canonical article names for articles on {language}.wikipedia.org")
             # get canonical title for URL
             while pages:
                 batch = pages[:50]
                 pages = pages[50:]
-                canonical = requests.get(api_base, params={
+                canonical = self.wiki_request(auth, api_base, params={
                     "action": "query",
                     "format": "json",
                     "redirects": "1",
                     "titles": "|".join(batch),
                 })
 
-                for page in canonical.json()["query"]["pages"].values():
+                if not canonical:
+                    self.dataset.update_status("Could not get canonical name for article batch - skipping")
+                    continue
+
+                for page in canonical["query"]["pages"].values():
                     canonical_titles.append(page["title"])
 
             result[language] = canonical_titles

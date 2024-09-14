@@ -3,17 +3,18 @@ Collect Wikipedia revisions
 """
 import requests
 import datetime
-import ural
 import time
 import json
 import re
 
+from backend.lib.search import Search
 from backend.lib.wikipedia_scraper import WikipediaSearch
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
+from common.lib.exceptions import QueryParametersException
 
 
-class SearchWikiRevisions(WikipediaSearch):
+class SearchWikiRevisions(Search, WikipediaSearch):
     """
     Scrape Wikipedia article revisions
     """
@@ -59,6 +60,12 @@ class SearchWikiRevisions(WikipediaSearch):
     }
 
     config = {
+        "api.wikipedia": {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "Wikipedia Access Token",
+            "tooltip": "API key for the Wikimedia API. With an API key, more requests can be made per minute, which "
+                       "will speed up Wikipedia-based data sources"
+        },
         "api.abstract": {
             "type": UserInput.OPTION_TEXT,
             "help": "Abstract API Key",
@@ -74,19 +81,20 @@ class SearchWikiRevisions(WikipediaSearch):
         """
         urls = [url.strip() for url in self.parameters.get("urls").split("\n")]
         urls = [url for url in urls if url]
-        abstract_api_key = self.config.get("api.abstract")
+        abstract_apikey = self.config.get("api.abstract")
+        wiki_apikey = self.config.get("api.wikipedia")
         location_cache = {}
 
         num_pages = 0
         num_revisions = 0
-        for language, pages in self.normalise_pagenames(urls):
+        for language, pages in self.normalise_pagenames(wiki_apikey, urls).items():
             api_base = f"https://{language}.wikipedia.org/w/api.php"
 
             for page in pages:
                 num_pages += 1
 
                 # get revisions from API
-                page_revisions = requests.get(api_base, params={
+                page_revisions = self.wiki_request(wiki_apikey, api_base, params={
                     "action": "query",
                     "format": "json",
                     "prop": "revisions",
@@ -94,7 +102,11 @@ class SearchWikiRevisions(WikipediaSearch):
                     "titles": page,
                 })
 
-                page_revisions = list(page_revisions.json()["query"]["pages"].values())[0]["revisions"]
+                if not page_revisions:
+                    self.dataset.update_status(f"Could not get revisions for {page} from Wikipedia API - skipping")
+                    continue
+
+                page_revisions = list(page_revisions["query"]["pages"].values())[0]["revisions"]
 
                 self.dataset.update_status(
                     f"Collecting {len(page_revisions):,} revisions for article '{page}' on {language}.wikipedia.org")
@@ -103,7 +115,7 @@ class SearchWikiRevisions(WikipediaSearch):
                     location = ""
 
                     # geolocate only anonymous requests
-                    if "anon" in revision and abstract_api_key:
+                    if "anon" in revision and abstract_apikey:
                         # todo: check if IPv6 can even be geolocated by abstract
                         # if not, just skip and save the API request
                         location = "UNKNOWN / Geolocation service unavailable"
@@ -119,7 +131,7 @@ class SearchWikiRevisions(WikipediaSearch):
                                 # the rate limit is 120 per minute
                                 # this should be OK to deal with that
                                 geo = requests.get(
-                                    f"https://ipgeolocation.abstractapi.com/v1/?api_key={abstract_api_key}&ip_address={revision['user']}",
+                                    f"https://ipgeolocation.abstractapi.com/v1/?api_key={abstract_apikey}&ip_address={revision['user']}",
                                     timeout=5)
                                 if geo.status_code == 429:
                                     retries += 1
@@ -172,7 +184,14 @@ class SearchWikiRevisions(WikipediaSearch):
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
-        return query
+        if not query.get("urls").strip():
+            raise QueryParametersException("You need to provide at least one Wikipedia article URL")
+
+        return {
+            "urls": query.get("urls").strip(),
+            "rvlimit": query.get("rvlimit"),
+            "geolocate": query.get("geolocate")
+        }
 
     @staticmethod
     def map_item(item):

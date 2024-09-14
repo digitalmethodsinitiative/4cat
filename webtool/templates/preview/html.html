@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html class="image-preview">
+<head>
+    <title>Image preview - {{ dataset.get_results_path().name }}</title>
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
+</head>
+<body class="image-preview {{ dataset.get_results_path().suffix[1:] }}-preview">
+<div class="image-preview-container">
+    <input type="checkbox" name="image-zoom" class="image-zoom" id="image-zoom" >
+    <label for="image-zoom">
+        <img src="{{ url_for('get_result', query_file=dataset.result_file) }}" alt="">
+    </label>
+</div>
+</body>
+</html>
