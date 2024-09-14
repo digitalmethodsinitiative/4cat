@@ -53,6 +53,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
             a { color: inherit; }
             nav { font-weight: bold; }
             td { background: #eff0f3; padding: 0.25em; }
+            *[title] { border-bottom: 1px dashed #363636; cursor: help; }
           </style>
         </head>
         <body>
@@ -82,7 +83,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
             languages = self.wiki_request(wiki_apikey, lang_api)
             if not languages:
                 self.dataset.update_status(
-                    f"Cannot get language versions for page {page} - may not exist (status code {languages.status_code}), skipping")
+                    f"Cannot get language versions for page {page} - may not exist, skipping")
                 continue
 
             self.dataset.update_status(f"Found {len(languages)} language versions for Wikipedia page {page}")
@@ -93,7 +94,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
                 page_url = f"https://{page_language}.wikipedia.org/wiki/{page}"
 
                 api_base = f"https://{page_language}.wikipedia.org/w/api.php"
-                self.dataset.update_status(f"Getting images for article {page} (language '{page_language}')")
+                self.dataset.update_status(f"Getting images for article {page} ({self.map_lang(page_language)}/{page_language})")
 
                 # get the image URLs from the page source
                 # since that is the most reliable source of image order
@@ -105,7 +106,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
 
                 if not image_urls:
                     self.dataset.update_status(
-                        f"Cannot get images for article {page} for language '{page_language}' - skipping (status code {image_urls.status_code}")
+                        f"Cannot get images for article {page} for language '{page_language}' - skipping")
                     continue
 
                 all_languages.append(page_language)
@@ -115,7 +116,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
                 html += f"""
                 <tr>
                   <td><a href="https://{page_language}.wikipedia.org/wiki/{page}">{page}</a></td>
-                  <td>{page_language}</td>
+                  <td title="{language}">{self.map_lang(page_language)}</td>
                   <td>"""
 
                 for image in images:
@@ -146,7 +147,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
     <th>Occurrences</th>
 """
         for language in all_languages:
-            html += f'<th><a href="https://{language}.wikipedia.org">{language}</a></th>'
+            html += f'<th><a href="https://{language}.wikipedia.org"><span title="{self.map_lang(language)}">{language}</span></a></th>'
         html += "</tr>"
 
         image_map = {k: image_map[k] for k in sorted(image_map, key=lambda v: len(image_map[v]), reverse=True)}
