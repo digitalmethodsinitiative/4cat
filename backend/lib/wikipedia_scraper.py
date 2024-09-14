@@ -421,7 +421,7 @@ class WikipediaSearch:
             canonical_titles = []
 
             self.dataset.update_status(
-                f"Collecting canonical article names for articles on {language}.wikipedia.org ({self.map_lang(language)}")
+                f"Collecting canonical article names for articles on {language}.wikipedia.org ({self.map_lang(language)})")
             # get canonical title for URL
             while pages:
                 batch = pages[:50]
