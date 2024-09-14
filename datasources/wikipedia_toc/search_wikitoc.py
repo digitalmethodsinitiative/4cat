@@ -222,10 +222,10 @@ $(document).ready(function() {
         """
         wiki_apikey = self.config.get("api.wikipedia")
         urls = [url.strip() for url in self.parameters.get("urls").split("\n")]
-        urls = [[url for url in urls if url][0]]
+        urls = [url for url in urls if url][0]
         tocs = {}
 
-        for language, pages in self.normalise_pagenames(wiki_apikey, urls).items():
+        for language, pages in self.normalise_pagenames(wiki_apikey, [urls]).items():
             api_base = f"https://{language}.wikipedia.org/w/api.php"
             pages = list(pages)
             tocs[language] = {}

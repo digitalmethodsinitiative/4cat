@@ -75,7 +75,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
         image_map = {}
         all_languages = []
         url_map = {}
-        for language, pages in self.normalise_pagenames([urls]).items():
+        for language, pages in self.normalise_pagenames(wiki_apikey, [urls]).items():
             page = pages.pop()
             lang_api = f"https://api.wikimedia.org/core/v1/wikipedia/{language}/page/{page.replace(' ', '_')}/links/language"
 
