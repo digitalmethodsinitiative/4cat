@@ -720,7 +720,8 @@ def view_logs():
 
     :return:
     """
-    return render_template("controlpanel/logs.html")
+    headers = "\n".join([f"{h}: {request.headers[h]}" for h in dict(request.headers)])
+    return render_template("controlpanel/logs.html", headers=headers)
 
 
 @app.route("/logs/<string:logfile>/")
