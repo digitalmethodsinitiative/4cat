@@ -479,6 +479,13 @@ config_definition = {
         "default": False,
         "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
     },
+    "ui.offer_anonymisation": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Offer anonymisation options",
+        "default": True,
+        "tooltip": "Offer users the option to anonymise their datasets at the time of creation. It is strongly "
+                   "recommended to leave this enabled."
+    },
     "ui.show_datasource": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Show data source",
