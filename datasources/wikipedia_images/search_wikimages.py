@@ -88,13 +88,16 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
 
             self.dataset.update_status(f"Found {len(languages)} language versions for Wikipedia page {page}")
 
+            languages_done = 0
             for language_version in languages:
                 page = language_version["title"]
                 page_language = language_version["code"]
                 page_url = f"https://{page_language}.wikipedia.org/wiki/{page}"
 
                 api_base = f"https://{page_language}.wikipedia.org/w/api.php"
+                languages_done += 1
                 self.dataset.update_status(f"Getting images for article {page} ({self.map_lang(page_language)}/{page_language})")
+                self.dataset.update_progress(languages_done / len(languages))
 
                 # get the image URLs from the page source
                 # since that is the most reliable source of image order
@@ -116,7 +119,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
                 html += f"""
                 <tr>
                   <td><a href="https://{page_language}.wikipedia.org/wiki/{page}">{page}</a></td>
-                  <td title="{language}">{self.map_lang(page_language)}</td>
+                  <td><span title="{page_language}">{self.map_lang(page_language)}</span></td>
                   <td>"""
 
                 for image in images:
