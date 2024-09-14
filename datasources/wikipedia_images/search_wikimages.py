@@ -48,7 +48,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
           <title>Wikipedia Cross-Lingual Image Analysis &#8226; {url}</title>
           <style>
             h1, h2 { background: #363636; color: white; padding: 0.4em 0.25em 0.25em 0.25em; }
-            html { font-family: sans-serif; background: white; color: #363636; }
+            html { font-family: sans-serif; background: white; color: #363636; white-space: nowrap }
             img { max-height: 125px; }
             a { color: inherit; }
             nav { font-weight: bold; }
