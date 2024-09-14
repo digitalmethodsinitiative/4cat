@@ -36,7 +36,8 @@
                 </div>
 
                 <div id="data-options">
-                    <p class="form-intro dataset-anonymisation">4CAT can remove information it identifies as relating to an item's author, or
+                {% if __user_config("ui.offer_anonymisation") %}
+                    <p class="form-intro dataset-anonymisation">{{ __user_config("4cat.name") }} can remove information it identifies as relating to an item's author, or
                         replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value. Other
                         personal information may persist; it is your responsibility to further anonymise data where
                         appropriate.</p>
@@ -50,6 +51,7 @@
                             </select>
                         </div>
                     </div>
+                {% endif %}
                     <div class="form-element">
                         <label for="data-make-private">Make private:</label>
                         <div class="filter-parameters">
