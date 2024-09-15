@@ -1159,7 +1159,12 @@ class DataSet(FourcatModule):
 		if not self.data["software_source"]:
 			return ""
 
-		return self.data["software_source"] + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		filepath = self.data.get("software_file", "")
+		if filepath.startswith("/extensions/"):
+			# go to root of extension
+			filepath = "/".join(filepath.split("/")[2:])
+
+		return self.data["software_source"] + "/blob/" + self.data["software_version"] + filepath
 
 	def top_parent(self):
 		"""
