@@ -164,7 +164,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# start log file
 		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_commit())
+		self.dataset.update_version(get_software_commit(self))
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided

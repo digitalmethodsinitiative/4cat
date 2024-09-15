@@ -17,6 +17,7 @@ import re
 import os
 import io
 
+from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
 from urllib.parse import urlparse, urlunparse
@@ -120,12 +121,9 @@ def get_git_branch():
         return ""
 
 
-def get_software_commit():
+def get_software_commit(worker=None):
     """
-    Get current 4CAT commit hash
-
-    Reads a given version file and returns the first string found in there
-    (up until the first space). On failure, return an empty string.
+    Get current 4CAT git commit hash
 
     Use `get_software_version()` instead if you need the release version
     number rather than the precise commit hash.
@@ -134,34 +132,54 @@ def get_software_commit():
     repository in the 4CAT root folder, and if so, what commit is currently
     checked out in it.
 
-    :return str:  4CAT git commit hash
+    For extensions, get the repository information for that extension, or if
+    the extension is not a git repository, return empty data.
+
+    :param BasicWorker processor:  Worker to get commit for. If not given, get
+    version information for the main 4CAT installation.
+
+    :return tuple:  4CAT git commit hash, repository name
     """
-    versionpath = config.get('PATH_ROOT').joinpath(config.get('path.versionfile'))
-
-    if versionpath.exists() and not versionpath.is_file():
-        return ""
-
-    if not versionpath.exists():
-        # try git command line within the 4CAT root folder
-        # if it is a checked-out git repository, it will tell us the hash of
-        # the currently checked-out commit
-        try:
-            cwd = os.getcwd()
-            os.chdir(config.get('PATH_ROOT'))
-            show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            os.chdir(cwd)
-            if show.returncode != 0:
-                raise ValueError()
-            return show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
-        except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
-            return ""
-
+    # try git command line within the 4CAT root folder
+    # if it is a checked-out git repository, it will tell us the hash of
+    # the currently checked-out commit
+    cwd = os.getcwd()
     try:
-        with open(versionpath, "r", encoding="utf-8", errors="ignore") as versionfile:
-            version = versionfile.readline().split(" ")[0]
-            return version
-    except OSError:
-        return ""
+        # if extension, go to the extension file's path
+        # we will run git here - if it is not its own repository, we have no
+        # useful version info (since the extension is by definition not in the
+        # main 4CAT repository) and will return an empty value
+        if worker and worker.is_extension:
+            os.chdir(config.get('PATH_ROOT').joinpath(Path(worker.filepath).parent))
+            # check if we are in the extensions' own repo or 4CAT's
+            repo_level = subprocess.run(["git", "rev-parse", "--show-toplevel"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
+                # not its own repository
+                return ("", "")
+
+        else:
+            os.chdir(config.get("PATH_ROOT"))
+
+        show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        if show.returncode != 0:
+            raise ValueError()
+        commit = show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
+
+        # now get the repository the commit belongs to, if we can
+        origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        if origin.returncode != 0 or not origin.stdout:
+            raise ValueError()
+        repository = origin.stdout.decode("utf-8")
+        if repository.endswith(".git"):
+            repository = repository[:-4]
+
+    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
+        return ("", "")
+
+    finally:
+        os.chdir(cwd)
+
+    return (commit, repository)
 
 def get_software_version():
     """

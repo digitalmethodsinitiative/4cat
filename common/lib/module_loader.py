@@ -107,6 +107,7 @@ class ModuleCollector:
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
+            is_extension = folder.stem == "extensions"
             for file in folder.rglob("*.py"):
                 # determine module name for file
                 # reduce path to be relative to 4CAT root
@@ -147,6 +148,7 @@ class ModuleCollector:
 
                     self.workers[component[1].type] = component[1]
                     self.workers[component[1].type].filepath = relative_path
+                    self.workers[component[1].type].is_extension = is_extension
 
                     # we can't use issubclass() because for that we would need
                     # to import BasicProcessor, which would lead to a circular
@@ -170,7 +172,6 @@ class ModuleCollector:
                 warning += "\t%s (for %s)\n" % (missing_module, ", ".join(processor_list))
 
             self.log_buffer += warning
-
 
         self.processors = categorised_processors
 

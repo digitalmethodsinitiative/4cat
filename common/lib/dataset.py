@@ -114,6 +114,8 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			own_processor = self.get_own_processor()
+			version = get_software_commit(own_processor)
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
@@ -125,7 +127,8 @@ class DataSet(FourcatModule):
 				"timestamp": int(time.time()),
 				"is_finished": False,
 				"is_private": is_private,
-				"software_version": get_software_commit(),
+				"software_version": version[0],
+				"software_source": version[1],
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
@@ -139,7 +142,6 @@ class DataSet(FourcatModule):
 
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
-				own_processor = self.get_own_processor()
 				if own_processor:
 					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
 				# Still no extension, default to 'csv'
@@ -1118,7 +1120,8 @@ class DataSet(FourcatModule):
 			processor_path = ""
 
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
-			"software_version": version,
+			"software_version": version[0],
+			"software_source": version[1],
 			"software_file": processor_path
 		})
 
@@ -1153,10 +1156,10 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.get("4cat.github_url"):
+		if not self.data["software_source"]:
 			return ""
 
-		return config.get("4cat.github_url") + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		return self.data["software_source"] + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
 	def top_parent(self):
 		"""
