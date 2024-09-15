@@ -114,6 +114,7 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			self.data = {"type": type}  # get_own_processor needs this
 			own_processor = self.get_own_processor()
 			version = get_software_commit(own_processor)
 			self.data = {
@@ -1162,7 +1163,7 @@ class DataSet(FourcatModule):
 		filepath = self.data.get("software_file", "")
 		if filepath.startswith("/extensions/"):
 			# go to root of extension
-			filepath = "/".join(filepath.split("/")[2:])
+			filepath = "/" + "/".join(filepath.split("/")[3:])
 
 		return self.data["software_source"] + "/blob/" + self.data["software_version"] + filepath
 

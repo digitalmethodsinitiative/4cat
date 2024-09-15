@@ -144,13 +144,17 @@ def get_software_commit(worker=None):
     # if it is a checked-out git repository, it will tell us the hash of
     # the currently checked-out commit
     cwd = os.getcwd()
+
+    # path has no Path.relative()...
+    relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
     try:
         # if extension, go to the extension file's path
         # we will run git here - if it is not its own repository, we have no
         # useful version info (since the extension is by definition not in the
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
-            os.chdir(config.get('PATH_ROOT').joinpath(Path(worker.filepath).parent))
+            extension_dir = config.get("PATH_ROOT").joinpath(relative_filepath)
+            os.chdir(extension_dir)
             # check if we are in the extensions' own repo or 4CAT's
             repo_level = subprocess.run(["git", "rev-parse", "--show-toplevel"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
@@ -169,11 +173,11 @@ def get_software_commit(worker=None):
         origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if origin.returncode != 0 or not origin.stdout:
             raise ValueError()
-        repository = origin.stdout.decode("utf-8")
+        repository = origin.stdout.decode("utf-8").strip()
         if repository.endswith(".git"):
             repository = repository[:-4]
 
-    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
+    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
         return ("", "")
 
     finally:
