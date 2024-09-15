@@ -78,7 +78,7 @@ class NeologismExtractor(ProcessorPreset):
 					"lemmatise": False,
 					"docs_per": timeframe,
 					"columns": columns,
-					"filter": ["wordlist-googlebooks-english", "stopwords-iso-all"]
+					"filter": ["wordlist-googlebooks-english", "stopwords-iso-en"]
 				}
 			},
 			# then, create vectors for those tokens

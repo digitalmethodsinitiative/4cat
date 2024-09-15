@@ -53,7 +53,6 @@ packages = set([
 	"scikit-learn",
 	"scipy==1.10.1",
 	"shapely",
-	"spacy==3.7.2",
 	"svgwrite~=1.4.0",
 	"tailer",
 	"Telethon~=1.36.0",

@@ -469,6 +469,19 @@ config_definition = {
         "default": False,
         "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
     },
+    "ui.offer_anonymisation": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Offer anonymisation options",
+        "default": True,
+        "tooltip": "Offer users the option to anonymise their datasets at the time of creation. It is strongly "
+                   "recommended to leave this enabled."
+    },
+    "ui.advertise_install": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Advertise local 4CAT",
+        "default": True,
+        "tooltip": "In the login form, remind users of the possibility to install their own 4CAT server."
+    },
     "ui.show_datasource": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Show data source",
