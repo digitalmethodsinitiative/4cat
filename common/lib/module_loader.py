@@ -107,7 +107,7 @@ class ModuleCollector:
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
-            is_extension = folder.stem == "extensions"
+            is_extension = folder.is_relative_to(Path(config.get("PATH_ROOT"), "extensions"))
             for file in folder.rglob("*.py"):
                 # determine module name for file
                 # reduce path to be relative to 4CAT root
