@@ -218,7 +218,7 @@ class ModuleCollector:
 
         # Load extension datasources
         # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
-        for root, dirs, files in os.walk(Path(config.get('PATH_ROOT'), "extensions")):
+        for root, dirs, files in os.walk(Path(config.get('PATH_ROOT'), "extensions"), followlinks=True):
             if "datasources" in dirs:
                 for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():
