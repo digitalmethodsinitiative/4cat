@@ -41,24 +41,6 @@ def init_datasource(database, logger, queue, name):
     """
     pass
 
-# I was not completely happy with how either expand_url_shorteners or download_images was working
-# so I am trying regex. Plus we should have this as a helper function I think.
-# https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string
-def extract_urls_from_string(text_with_urls, return_type='string'):
-    """
-    Take a string, return a list of any urls in it.
-
-    :param string text_with_urls: A string of text
-    :return list: A list of urls
-    """
-    link_regex_pattern = re.compile(r"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])", re.IGNORECASE)
-    urls = link_regex_pattern.findall(text_with_urls)
-
-    if return_type == 'string':
-        return [url[0] + '://' + ''.join(url[1:]) for url in urls]
-    elif return_type == 'tuple':
-        return urls
-
 def strip_tags(html, convert_newlines=True):
     """
     Strip HTML from a string
@@ -935,20 +917,6 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
         url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
 
     return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
-
-def validate_url(x):
-    """
-    Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
-    and netloc (host) for the url.
-
-    :param str x:  string representing a url
-    :return bool:  True if string is valid url, False if not
-    """
-    if type(x) == str:
-        result = urlparse(x)
-        return all([result.scheme, result.netloc])
-    else:
-        raise ValueError('Must provide type str not type %s' % type(x))
 
 def folder_size(path='.'):
     """
