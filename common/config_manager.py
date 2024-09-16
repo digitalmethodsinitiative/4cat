@@ -170,11 +170,6 @@ class ConfigManager:
         known_tags = [t["tag"] for t in self.db.fetchall("SELECT DISTINCT tag FROM settings")]
         tag_order = self.get("flask.tag_order")
 
-        for tag in tag_order:
-            # don't include tags not used by users in the tag order
-            if tag not in user_tags:
-                tag_order.remove(tag)
-
         for tag in known_tags:
             # add tags used by a setting to tag order
             if tag and tag not in tag_order:
