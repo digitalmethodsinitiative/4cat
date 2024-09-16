@@ -64,8 +64,7 @@ packages = set([
 	"imagedominantcolor @ git+https://github.com/dale-wahl/imagedominantcolor.git@pillow10",
 	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
-	"yt-dlp",
-	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm"
+	"yt-dlp"
 ])
 
 # Check for extension packages
