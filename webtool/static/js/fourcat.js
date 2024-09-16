@@ -497,7 +497,7 @@ const query = {
                     applyProgress($('#query-status'), 100);
                     let keyword = json.label;
 
-                    $('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
+                    $('#query-results').append('<li><a href="../results/' + json.key + '/">' + keyword + ' (' + json.rows + ' items)</a></li>');
                     query.reset_form();
                     popup.alert('Query for \'' + keyword + '\' complete!', 'Success');
                 } else {
