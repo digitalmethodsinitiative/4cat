@@ -630,17 +630,17 @@ const query = {
 
                 for (let i = 0; i < json.length; i += 1) {
                     search_queue_length += json[i]['count'];
-                    search_queue_notice += " <span class='property-badge'>" + json[i]['jobtype'].replace('-search', '') + ' (' + json[i]['count'] + ')' + '</span>'
+                    search_queue_notice += " <span class='property-badge'>" + json[i]['processor_name'] + ' (' + json[i]['count'] + ')' + '</span>'
                 }
 
                 if (search_queue_length == 0) {
                     search_queue_box.html('Search queue is empty.');
                     search_queue_list.html('');
                 } else if (search_queue_length == 1) {
-                    search_queue_box.html('Currently processing 1 search query: ');
+                    search_queue_box.html('Currently collecting 1 dataset: ');
                     search_queue_list.html(search_queue_notice);
                 } else {
-                    search_queue_box.html('Currently processing ' + search_queue_length + ' search queries: ');
+                    search_queue_box.html('Currently collecting ' + search_queue_length + ' datasets: ');
                     search_queue_list.html(search_queue_notice);
                 }
             },

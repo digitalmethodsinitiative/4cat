@@ -163,7 +163,7 @@ class Logger:
     }
     alert_level = "FATAL"
 
-    def __init__(self, output=False, filename='4cat.log', log_level="INFO"):
+    def __init__(self, logger_name='4cat-backend', output=False, filename='4cat.log', log_level="INFO"):
         """
         Set up log handler
 
@@ -181,7 +181,7 @@ class Logger:
         self.log_path = log_folder.joinpath(filename)
         self.previous_report = time.time()
 
-        self.logger = logging.getLogger("4cat-backend")
+        self.logger = logging.getLogger(logger_name)
         self.logger.setLevel(log_level)
 
         # this handler manages the text log files

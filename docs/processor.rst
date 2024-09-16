@@ -27,7 +27,7 @@ A minimal example of a processor could look like this:
     """
     A minimal example 4CAT processor
     """
-    from backend.abstract.processor import BasicProcessor
+    from backend.lib.processor import BasicProcessor
 
     class ExampleProcessor(BasicProcessor):
         """
@@ -57,7 +57,7 @@ But there is more you can do. The full API looks like this:
 The `BasicProcessor` class
 --------------------------
 
-.. autoclass:: backend.abstract.processor.BasicProcessor
+.. autoclass:: backend.lib.processor.BasicProcessor
     :members:
     :undoc-members:
     :show-inheritance:

@@ -164,7 +164,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# start log file
 		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_commit())
+		self.dataset.update_version(get_software_commit(self))
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided
@@ -628,7 +628,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
 
-	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED):
+	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
 		"""
 		Archive a bunch of files into a zip archive and finish processing
 
@@ -639,6 +639,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		  files added to the archive will be used.
 		:param int compression:  Type of compression to use. By default, files
 		  are not compressed, to speed up unarchiving.
+		:param bool finish:  Finish the dataset/job afterwards or not?
 		"""
 		is_folder = False
 		if issubclass(type(files), PurePath):
@@ -665,7 +666,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if num_items is None:
 			num_items = done
 
-		self.dataset.finish(num_items)
+		if finish:
+			self.dataset.finish(num_items)
 
 	def create_standalone(self):
 		"""

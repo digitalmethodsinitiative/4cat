@@ -8,7 +8,7 @@ TBD
 The `BasicWorker` class
 -----------------------
 
-.. autoclass:: backend.abstract.worker.BasicWorker
+.. autoclass:: backend.lib.worker.BasicWorker
     :members:
     :undoc-members:
     :show-inheritance:

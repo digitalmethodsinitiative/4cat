@@ -8,10 +8,10 @@ with open("VERSION") as versionfile:
 	version = versionfile.readline().strip()
 
 # Universal packages
-packages = [
+packages = set([
 	"anytree~=2.8.0",
 	"bcrypt~=3.2.0",
-	"beautifulsoup4~=4.11.0",
+	"beautifulsoup4",#~=4.11.0",
 	"clarifai-grpc~=9.0",
 	"cryptography>=39.0.1",
 	"cssselect~=1.1.0",
@@ -22,7 +22,7 @@ packages = [
 	"Flask~=2.2",
 	"Flask_Limiter==1.0.1",
 	"Flask_Login~=0.6",
-	"gensim>=4.1.0, <4.2",
+	"gensim>=4.1.0",
 	"google_api_python_client==2.0.2",
 	"html2text==2020.*",
 	"ImageHash>4.2.0",
@@ -31,7 +31,7 @@ packages = [
 	"lxml~=4.9.0",
 	"markdown==3.0.1",
 	"markdown2==2.4.2",
-	"nltk==3.9.1",
+	"nltk~=3.9.1",
 	"networkx~=2.8.0",
 	"numpy>=1.19.2",
 	"opencv-python>=4.6.0.66",
@@ -48,6 +48,7 @@ packages = [
 	"razdel~=0.5",
 	"requests~=2.27",
 	"requests_futures",
+	"scikit_learn",
 	"scenedetect==0.6.0.3",
 	"scikit-learn",
 	"scipy==1.10.1",
@@ -64,15 +65,28 @@ packages = [
 	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
 	"yt-dlp"
-]
+])
+
+# Check for extension packages
+if os.path.isdir("extensions"):
+	extension_packages = set()
+	for root, dirs, files in os.walk("extensions"):
+		for file in files:
+			if file == "requirements.txt":
+				with open(os.path.join(root, file)) as extension_requirements:
+					for line in extension_requirements.readlines():
+						extension_packages.add(line.strip())
+	if extension_packages:
+		print("Found extensions, installing additional packages: " + str(extension_packages))
+		packages = packages.union(extension_packages)
 
 # Some packages don't run on Windows
-unix_packages = [
+unix_packages = set([
 	"python-daemon==2.3.2"
-]
+])
 
 if os.name != "nt":
-	packages = packages + unix_packages
+	packages = packages.union(unix_packages)
 
 setup(
 	name='fourcat',
@@ -85,5 +99,5 @@ setup(
 	url="https://oilab.eu",
 	packages=['backend', 'webtool', 'datasources'],
 	python_requires='>=3.7',
-	install_requires=packages,
+	install_requires=list(packages),
 )
