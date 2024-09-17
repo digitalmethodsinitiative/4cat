@@ -109,6 +109,9 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			self.data = {"type": type}  # get_own_processor needs this
+			own_processor = self.get_own_processor()
+			version = get_software_commit(own_processor)
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
@@ -120,7 +123,8 @@ class DataSet(FourcatModule):
 				"timestamp": int(time.time()),
 				"is_finished": False,
 				"is_private": is_private,
-				"software_version": get_software_commit(),
+				"software_version": version[0],
+				"software_source": version[1],
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
@@ -134,7 +138,6 @@ class DataSet(FourcatModule):
 
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
-				own_processor = self.get_own_processor()
 				if own_processor:
 					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
 				# Still no extension, default to 'csv'
@@ -859,10 +862,12 @@ class DataSet(FourcatModule):
 		elif parameters.get("subject_match") and parameters["subject_match"] != "empty":
 			return parameters["subject_match"]
 		elif parameters.get("query"):
-			label = parameters["query"] if len(parameters["query"]) < 30 else parameters["query"][:25] + "..."
+			label = parameters["query"]
 			# Some legacy datasets have lists as query data
 			if isinstance(label, list):
 				label = ", ".join(label)
+
+			label = label if len(label) < 30 else label[:25] + "..."
 			label = label.strip().replace("\n", ", ")
 			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
@@ -1109,7 +1114,8 @@ class DataSet(FourcatModule):
 			processor_path = ""
 
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
-			"software_version": version,
+			"software_version": version[0],
+			"software_source": version[1],
 			"software_file": processor_path
 		})
 
@@ -1144,10 +1150,15 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.get("4cat.github_url"):
+		if not self.data["software_source"]:
 			return ""
 
-		return config.get("4cat.github_url") + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		filepath = self.data.get("software_file", "")
+		if filepath.startswith("/extensions/"):
+			# go to root of extension
+			filepath = "/" + "/".join(filepath.split("/")[3:])
+
+		return self.data["software_source"] + "/blob/" + self.data["software_version"] + filepath
 
 	def top_parent(self):
 		"""

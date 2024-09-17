@@ -142,9 +142,12 @@ def _jinja2_filter_add_ahref(content):
 
 	return content
 
-@app.template_filter('markdown')
-def _jinja2_filter_markdown(text):
+@app.template_filter('markdown',)
+def _jinja2_filter_markdown(text, trim_container=False):
 	val = markdown.markdown(text)
+	if trim_container:
+		val = re.sub(r"^<p>", "", val)
+		val = re.sub(r"</p>$", "", val)
 	return val
 
 @app.template_filter('isbool')
@@ -203,7 +206,7 @@ def _jinja2_filter_extension_to_noun(ext):
 @app.template_filter('social_mediafy')
 def _jinja2_filter_social_mediafy(body, datasource=""):
 	# Adds links to a text body with hashtags, @-mentions, and URLs
-	# A data source must be given to generate the correct URLs. 
+	# A data source must be given to generate the correct URLs.
 
 	if not datasource:
 		return body
@@ -267,7 +270,7 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 
 @app.template_filter('string_counter')
 def _jinja2_filter_string_counter(string, emoji=False):
-	# Returns a dictionary with counts of characters in a string. 
+	# Returns a dictionary with counts of characters in a string.
 	# Also handles emojis.
 
 	# We need to convert multi-character emojis ("graphemes") to one character.
@@ -282,7 +285,7 @@ def _jinja2_filter_string_counter(string, emoji=False):
 			counter[s] = 0
 		counter[s] += 1
 
-	return counter 
+	return counter
 
 @app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):
@@ -319,6 +322,7 @@ def inject_now():
 	else:
 		version = "???"
 
+
 	return {
 		"__has_https": wrapped_config.get("flask.https"),
 		"__datenow": datetime.datetime.utcnow(),
@@ -328,3 +332,7 @@ def inject_now():
 		"__version": version,
 		"uniqid": uniqid
 	}
+
+@app.template_filter('log')
+def _jinja2_filter_log(text):
+	app.logger.info(text)

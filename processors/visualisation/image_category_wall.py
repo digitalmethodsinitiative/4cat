@@ -61,13 +61,14 @@ class ImageCategoryWallGenerator(BasicProcessor):
 	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on CLIP dataset only
-		
+
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		return module.type.startswith("image-to-categories") or \
 			module.type.startswith("image-downloader") or \
 			module.type.startswith("video-hasher-1") or \
-			module.type.startswith("video-hash-similarity-matrix")
+			module.type.startswith("video-hash-similarity-matrix") and \
+			not module.type not in ["image-downloader-screenshots-search"]
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -170,7 +171,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
 		self.dataset.log(f"Found {image_dataset.type} w/ {image_dataset.num_rows} images and {category_dataset.type} w/ {category_dataset.num_rows} items")
 
 		category_column = self.parameters.get("category")
-		if category_column is None:
+		if not category_column:
 			self.dataset.finish_with_error("No category provided.")
 			return
 
@@ -427,6 +428,3 @@ class ImageCategoryWallGenerator(BasicProcessor):
 		canvas.save(pretty=True)
 		self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
 		return self.dataset.finish(len(category_widths))
-
-
-

@@ -9,7 +9,7 @@
             <div{% if settings.type == "toggle" %} class="with-tail"{% endif %}>
         {% if settings.type == "toggle" %}
             <input name="option-{{ option }}" id="forminput-{{ option }}" type="checkbox" {% if settings.default %} checked{% endif %}>
-            {% if "tooltip" in settings %}<p class="option-help">{{ settings.tooltip }}</p>{% endif %}
+            {% if "tooltip" in settings %}<p class="option-help">{{ settings.tooltip|markdown(True)|safe }}</p>{% endif %}
         {% elif settings.type == "file" %}
             <input name="option-{{ option }}" id="forminput-{{ option }}" type="file"{% if settings.multiple %} multiple="true" {% endif %}{% if settings.accept %}accept=".csv"{% endif %}>
             {% if "tooltip" in settings %}

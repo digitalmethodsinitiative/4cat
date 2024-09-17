@@ -3,18 +3,19 @@ Generate network of wikipedia pages + categories in posts
 """
 import re
 import requests
-
-from backend.lib.processor import BasicProcessor
 from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO
-
 import networkx as nx
+
+from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
 
 class WikiURLCoLinker(BasicProcessor):
 	"""

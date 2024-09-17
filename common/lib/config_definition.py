@@ -168,20 +168,10 @@ config_definition = {
         "help": "Can view worker status",
         "tooltip": "Controls whether users can view worker status via the Control Panel"
     },
-    # The following two options should be set to ensure that every analysis step can
+    # The following option should be set to ensure that every analysis step can
     # be traced to a specific version of 4CAT. This allows for reproducible
-    # research. You can however leave them empty with no ill effect. The version ID
-    # should be a commit hash, which will be combined with the Github URL to offer
-    # links to the exact version of 4CAT code that produced an analysis result.
-    # If no version file is available, the output of "git show" in PATH_ROOT will be used
-    # to determine the version, if possible.
-    "path.versionfile": {
-        "type": UserInput.OPTION_TEXT,
-        "default": ".git-checked-out",
-        "help": "Version file",
-        "tooltip": "Path to file containing GitHub commit hash. File containing a commit ID (everything after the first whitespace found is ignored)",
-        "global": True
-    },
+    # research. The output of "git show" in PATH_ROOT will be used to determine
+    # the version of a processor file, if possible.
     "4cat.github_url": {
         "type": UserInput.OPTION_TEXT,
         "default": "https://github.com/digitalmethodsinitiative/4cat",
@@ -509,6 +499,19 @@ config_definition = {
         "default": False,
         "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
     },
+    "ui.offer_anonymisation": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Offer anonymisation options",
+        "default": True,
+        "tooltip": "Offer users the option to anonymise their datasets at the time of creation. It is strongly "
+                   "recommended to leave this enabled."
+    },
+    "ui.advertise_install": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Advertise local 4CAT",
+        "default": True,
+        "tooltip": "In the login form, remind users of the possibility to install their own 4CAT server."
+    },
     "ui.show_datasource": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Show data source",
@@ -532,6 +535,18 @@ config_definition = {
         "default": True,
         "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
                    "of the underlying JSON."
+    },
+    "ui.offer_hashing": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer pseudonymisation",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
+    },
+    "ui.offer_private": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer create as private",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
     },
     "ui.option_email": {
         "type": UserInput.OPTION_CHOICE,

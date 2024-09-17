@@ -288,6 +288,11 @@ def preview_items(key):
         # just show image in an empty page
         return render_template("preview/image.html", dataset=dataset)
 
+    elif dataset.get_extension() == "html":
+        # just render the file!
+        with dataset.get_results_path().open() as infile:
+            return render_template("preview/html.html", html=infile.read())
+
     elif dataset.get_extension() not in ("json", "ndjson") or use_mapper:
         # iterable data, which we use iterate_items() for, which in turn will
         # use map_item if the underlying data is not CSV but JSON
