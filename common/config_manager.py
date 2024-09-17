@@ -437,6 +437,10 @@ class ConfigWrapper:
         self.tags = tags
         self.request = request
 
+        # this ensures the user object in turn reads from the wrapper
+        if self.user:
+            self.user.with_config(self)
+
 
     def set(self, *args, **kwargs):
         """
