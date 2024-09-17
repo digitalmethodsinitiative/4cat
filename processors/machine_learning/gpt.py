@@ -45,16 +45,7 @@ class GPT(BasicProcessor):
 						"indicate where and what dataset value you want to use, e.g.: 'Determine the language of the "
 						"following text: [body]').",
 			},
-			"ethics_warning": {
-				"type": UserInput.OPTION_INFO,
-				"help": "<strong>Be very sensitive with running this processor on your datasets, as data will be "
-						"sent to OpenAI.</strong>"
-			},
-			"ethics_warning2": {
-				"type": UserInput.OPTION_INFO,
-				"help": "Always consider anonymising your data or choosing an open-source LLM host.</strong>"
-			},
-			"ethics_warning3": {
+			"ethics_warning1": {
 				"type": UserInput.OPTION_INFO,
 				"help": "Before running a prompt on a large dataset, it is recommended to first create a sample and "
 						"test the prompt on a handful of rows. You can sample your dataset with the filter processors"
@@ -67,8 +58,23 @@ class GPT(BasicProcessor):
 					"gpt-4o-mini": "GPT-4o mini",
 					"gpt-4o": "GPT-4o",
 					"gpt-4-turbo": "GPT-4 turbo",
+					"o1-mini": "o1-mini",
+					"custom": "Custom (fine-tuned) model"
 				},
 				"default": "gpt-4o-mini"
+			},
+			"custom_model_info": {
+				"type": UserInput.OPTION_INFO,
+				"requires": "model==custom",
+				"help": "[You can fine-tune a model on the OpenAI portal to improve your prompt results]("
+						"https://platform.openai.com/docs/guides/fine-tuning). With fine-tuned models, examples in the "
+						"prompt ('few-shot learning') may not be necessary anymore."
+			},
+			"custom_model": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Model ID",
+				"requires": "model==custom",
+				"tooltip": "In the format <strong>ft:[modelname]:[org_id]:[custom_suffix]:[id]</strong>. See the link above."
 			},
 			"prompt": {
 				"type": UserInput.OPTION_TEXT_LARGE,
@@ -89,16 +95,14 @@ class GPT(BasicProcessor):
 				"tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
 						   "text for common English text."
 			},
-			"write_annotations": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add output as annotations to the parent dataset.",
-				"default": True
+			"ethics_warning2": {
+				"type": UserInput.OPTION_INFO,
+				"help": "<strong>Be very sensitive with running this processor on your datasets, as data will be "
+						"sent to OpenAI.</strong>"
 			},
-			"annotation_label": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "Annotation label",
-				"default": "",
-				"requires": "write_annotations==true"
+			"ethics_warning3": {
+				"type": UserInput.OPTION_INFO,
+				"help": "Always consider anonymising your data or choosing an open-source LLM host.</strong>"
 			},
 			"consent": {
 				"type": UserInput.OPTION_TOGGLE,
@@ -106,6 +110,21 @@ class GPT(BasicProcessor):
 				"default": False,
 			}
 		}
+
+		# Allow adding prompt answers as annotations to the top-level dataset
+		# if this is a direct child
+		if parent_dataset and parent_dataset.is_top_dataset():
+			options["write_annotations"] = {
+					"type": UserInput.OPTION_TOGGLE,
+					"help": "Add output as annotations to the parent dataset.",
+					"default": True
+			}
+			options["annotation_label"] = {
+					"type": UserInput.OPTION_TEXT,
+					"help": "Annotation label",
+					"default": "",
+					"requires": "write_annotations==true"
+			}
 
 		api_key = config.get("api.openai.api_key", user=user)
 		if not api_key:
@@ -135,6 +154,13 @@ class GPT(BasicProcessor):
 			self.dataset.finish_with_error("You must consent to your data being sent to OpenAI first")
 
 		model = self.parameters.get("model")
+		if model == "custom":
+			if not self.parameters.get("custom_model", ""):
+				self.dataset.finish_with_error("You must provide a valid ID for your custom model")
+			else:
+				custom_model_id = self.parameters.get("custom_model", "")
+				self.parameters["model"] = custom_model_id
+				model = custom_model_id
 
 		api_key = self.parameters.get("api_key")
 		if not api_key:
@@ -191,7 +217,14 @@ class GPT(BasicProcessor):
 				except KeyError as e:
 					self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
 
-			response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
+			try:
+				response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
+			except openai.NotFoundError as e:
+				self.dataset.finish_with_error(e.message)
+				return 0
+			except openai.BadRequestError as e:
+				self.dataset.finish_with_error(e.message)
+				return 0
 
 			if "id" in item:
 				item_id = item["id"]
