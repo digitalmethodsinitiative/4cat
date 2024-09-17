@@ -97,9 +97,11 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
+        extension_path = Path(config.get('PATH_ROOT'), "extensions")
+
         paths = [Path(config.get('PATH_ROOT'), "processors"),
                  Path(config.get('PATH_ROOT'), "backend", "workers"),
-                 Path(config.get('PATH_ROOT'), "extensions"),
+                 extension_path,
                  *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
 
         root_match = re.compile(r"^%s" % re.escape(str(config.get('PATH_ROOT'))))
@@ -107,7 +109,7 @@ class ModuleCollector:
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
-            is_extension = folder.is_relative_to(Path(config.get("PATH_ROOT"), "extensions"))
+            is_extension = extension_path in folder.parents or folder == extension_path
             for file in folder.rglob("*.py"):
                 # determine module name for file
                 # reduce path to be relative to 4CAT root
