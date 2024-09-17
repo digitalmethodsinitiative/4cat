@@ -52,7 +52,6 @@ packages = [
 	"scikit-learn",
 	"scipy==1.10.1",
 	"shapely",
-	"spacy==3.7.2",
 	"svgwrite~=1.4.0",
 	"tailer",
 	"Telethon~=1.36.0",
@@ -64,8 +63,7 @@ packages = [
 	"imagedominantcolor @ git+https://github.com/dale-wahl/imagedominantcolor.git@pillow10",
 	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
-	"yt-dlp",
-	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm"
+	"yt-dlp"
 ]
 
 # Some packages don't run on Windows
