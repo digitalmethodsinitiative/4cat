@@ -250,6 +250,70 @@ def get_ffmpeg_version(ffmpeg_path):
     return version.parse(ffmpeg_version)
 
 
+def find_extensions():
+    """
+    Find 4CAT extensions and load their metadata
+
+    Looks for subfolders of the extension folder, and loads additional metadata
+    where available.
+
+    :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
+    dictionary, and a list of (str) errors encountered while loading
+    """
+    extension_path = config.get("PATH_ROOT").joinpath("extensions")
+    errors = []
+    if not extension_path.exists() or not extension_path.is_dir():
+        return [], None
+
+    # each folder in the extensions folder is an extension
+    extensions = {
+        extension.name: {
+            "name": extension.name,
+            "version": "",
+            "url": "",
+            "git_url": "",
+            "is_git": False
+        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
+    }
+
+    # collect metadata for extensions
+    allowed_metadata_keys = ("name", "version", "url")
+    cwd = os.getcwd()
+    for extension in extensions:
+        extension_folder = extension_path.joinpath(extension)
+        metadata_file = extension_folder.joinpath("metadata.json")
+        if metadata_file.exists():
+            with metadata_file.open() as infile:
+                try:
+                    metadata = json.load(infile)
+                    extensions[extension].update({k: metadata[k] for k in metadata if k in allowed_metadata_keys})
+                except (TypeError, ValueError) as e:
+                    errors.append(f"Error reading metadata file for extension '{extension}' ({e})")
+                    continue
+
+        extensions[extension]["is_git"] = extension_folder.joinpath(".git/HEAD").exists()
+        if extensions[extension]["is_git"]:
+            # try to get remote URL
+            try:
+                os.chdir(extension_folder)
+                origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE,
+                                        stdout=subprocess.PIPE)
+                if origin.returncode != 0 or not origin.stdout:
+                    raise ValueError()
+                repository = origin.stdout.decode("utf-8").strip()
+                if repository.endswith(".git") and "github.com" in repository:
+                    # use repo URL
+                    repository = repository[:-4]
+                extensions[extension]["git_url"] = repository
+            except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
+                print(e)
+                pass
+            finally:
+                os.chdir(cwd)
+
+    return extensions, errors
+
+
 def convert_to_int(value, default=0):
     """
     Convert a value to an integer, with a fallback
