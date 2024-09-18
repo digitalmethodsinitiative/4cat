@@ -20,6 +20,7 @@ from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
 								   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
+from common.lib.user import User
 
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -112,7 +113,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# creator. This ensures that if a value has been overriden for the owner,
 		# the overridden value is used instead.
 		config.with_db(self.db)
-		self.config = ConfigWrapper(config=config, user=self.owner)
+		self.config = ConfigWrapper(config=config, user=User.get_by_name(self.db, self.owner))
 
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
