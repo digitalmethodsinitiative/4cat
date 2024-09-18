@@ -163,7 +163,7 @@
         </ol>
     </section>
 
-    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item or (dataset.get_extension() in ("ndjson") and not __user_config("ui.prefer_mapped_preview"))) %}
+    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item or (dataset.get_extension() in ("ndjson",) and not __user_config("ui.prefer_mapped_preview"))) %}
         <section class="inline-preview">
             <h2 class="blocktitle section-subheader">
                 <span>{% if dataset.get_extension == "html" %}View dataset{% else %}Dataset preview{% endif %}</span>
