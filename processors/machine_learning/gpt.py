@@ -32,7 +32,7 @@ class OpenAI(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"help": "OpenAI API key",
-			"tooltip": "Can be created on <strong>platform.openapi.com</strong>"
+			"tooltip": "Can be created on platform.openapi.com"
 		}
 	}
 
