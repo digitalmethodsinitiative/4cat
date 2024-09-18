@@ -10,14 +10,14 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.config_manager import config
 
-class GPT(BasicProcessor):
+class OpenAI(BasicProcessor):
 	"""
 	Prompt OpenAI's GPT models
 	"""
-	type = "gpt"  # job type ID
+	type = "openai-llms"  # job type ID
 	category = "Machine learning"  # category
-	title = "GPT prompting"  # title displayed in UI
-	description = ("Use OpenAI's GPT LLMs to generate outputs based on the parent dataset.") # description displayed in UI
+	title = "OpenAI LLMs"  # title displayed in UI
+	description = ("Use OpenAI's LLMs (e.g. GPT-4) to generate outputs based on the parent dataset.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI. In this case it's variable!
 
 	references = [
@@ -25,7 +25,7 @@ class GPT(BasicProcessor):
 		"[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences "
 		"with artificial intelligence.' arXiv preprint arXiv:2309.14379.]"
 		"(https://arxiv.org/abs/2309.14379)",
-		"[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.]"]
+		"[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307.13106)"]
 
 	config = {
 		"api.openai.api_key": {
@@ -74,19 +74,20 @@ class GPT(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Model ID",
 				"requires": "model==custom",
-				"tooltip": "In the format <strong>ft:[modelname]:[org_id]:[custom_suffix]:[id]</strong>. See the link above."
+				"tooltip": "In the format ft:[modelname]:[org_id]:[custom_suffix]:[id]. See link above"
 			},
 			"prompt": {
 				"type": UserInput.OPTION_TEXT_LARGE,
-				"help": "Prompt"
+				"help": "Prompt",
+				"tooltip": "See the academic references for this processor on best practices for LLM prompts"
 			},
 			"temperature": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Temperature",
 				"default": 0.5,
-				"tooltip": "The temperature hyperparameter indicates how strict the model will output the next "
-						   "predicted word with the highest probability. A score closer to 1 leads to more 'creative'"
-						   " outputs."
+				"tooltip": "The temperature hyperparameter indicates how strict the model will gravitate towards the next "
+						   "predicted word with the highest probability. A score close to 0 returns more predictable "
+						   "outputs while a score close to 1 leads to more creative outputs."
 			},
 			"max_tokens": {
 				"type": UserInput.OPTION_TEXT,
@@ -102,7 +103,7 @@ class GPT(BasicProcessor):
 			},
 			"ethics_warning3": {
 				"type": UserInput.OPTION_INFO,
-				"help": "Always consider anonymising your data or choosing an open-source LLM host.</strong>"
+				"help": "<strong>Always consider anonymising your data or choosing an open-source LLM host.</strong>"
 			},
 			"consent": {
 				"type": UserInput.OPTION_TOGGLE,
@@ -132,7 +133,7 @@ class GPT(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
 				"help": "OpenAI API key",
-				"tooltip": "Can be created at platform.openapi.com"
+				"tooltip": "Can be created on platform.openapi.com"
 			}
 
 		return options
@@ -152,6 +153,7 @@ class GPT(BasicProcessor):
 		consent = self.parameters.get("consent", False)
 		if not consent:
 			self.dataset.finish_with_error("You must consent to your data being sent to OpenAI first")
+		self.dataset.delete_parameter("consent")
 
 		model = self.parameters.get("model")
 		if model == "custom":
@@ -182,6 +184,7 @@ class GPT(BasicProcessor):
 		self.dataset.delete_parameter("api_key")  # sensitive, delete after use
 
 		base_prompt = self.parameters.get("prompt", "")
+		self.dataset.update_status("Prompt: %s" % base_prompt)
 
 		if not base_prompt:
 			self.dataset.finish_with_error("You need to insert a valid prompt")
