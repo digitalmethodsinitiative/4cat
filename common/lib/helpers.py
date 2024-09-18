@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import hashlib
 import subprocess
 import requests
 import datetime
@@ -16,9 +17,10 @@ import re
 import os
 import io
 
+from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
-from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 from calendar import monthrange
 from packaging import version
 
@@ -39,7 +41,6 @@ def init_datasource(database, logger, queue, name):
     :param string name:  ID of datasource that is being initialised
     """
     pass
-
 
 def strip_tags(html, convert_newlines=True):
     """
@@ -120,12 +121,9 @@ def get_git_branch():
         return ""
 
 
-def get_software_commit():
+def get_software_commit(worker=None):
     """
-    Get current 4CAT commit hash
-
-    Reads a given version file and returns the first string found in there
-    (up until the first space). On failure, return an empty string.
+    Get current 4CAT git commit hash
 
     Use `get_software_version()` instead if you need the release version
     number rather than the precise commit hash.
@@ -134,34 +132,58 @@ def get_software_commit():
     repository in the 4CAT root folder, and if so, what commit is currently
     checked out in it.
 
-    :return str:  4CAT git commit hash
+    For extensions, get the repository information for that extension, or if
+    the extension is not a git repository, return empty data.
+
+    :param BasicWorker processor:  Worker to get commit for. If not given, get
+    version information for the main 4CAT installation.
+
+    :return tuple:  4CAT git commit hash, repository name
     """
-    versionpath = config.get('PATH_ROOT').joinpath(config.get('path.versionfile'))
+    # try git command line within the 4CAT root folder
+    # if it is a checked-out git repository, it will tell us the hash of
+    # the currently checked-out commit
+    cwd = os.getcwd()
 
-    if versionpath.exists() and not versionpath.is_file():
-        return ""
-
-    if not versionpath.exists():
-        # try git command line within the 4CAT root folder
-        # if it is a checked-out git repository, it will tell us the hash of
-        # the currently checked-out commit
-        try:
-            cwd = os.getcwd()
-            os.chdir(config.get('PATH_ROOT'))
-            show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            os.chdir(cwd)
-            if show.returncode != 0:
-                raise ValueError()
-            return show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
-        except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
-            return ""
-
+    # path has no Path.relative()...
+    relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
     try:
-        with open(versionpath, "r", encoding="utf-8", errors="ignore") as versionfile:
-            version = versionfile.readline().split(" ")[0]
-            return version
-    except OSError:
-        return ""
+        # if extension, go to the extension file's path
+        # we will run git here - if it is not its own repository, we have no
+        # useful version info (since the extension is by definition not in the
+        # main 4CAT repository) and will return an empty value
+        if worker and worker.is_extension:
+            extension_dir = config.get("PATH_ROOT").joinpath(relative_filepath)
+            os.chdir(extension_dir)
+            # check if we are in the extensions' own repo or 4CAT's
+            repo_level = subprocess.run(["git", "rev-parse", "--show-toplevel"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
+                # not its own repository
+                return ("", "")
+
+        else:
+            os.chdir(config.get("PATH_ROOT"))
+
+        show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        if show.returncode != 0:
+            raise ValueError()
+        commit = show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
+
+        # now get the repository the commit belongs to, if we can
+        origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        if origin.returncode != 0 or not origin.stdout:
+            raise ValueError()
+        repository = origin.stdout.decode("utf-8").strip()
+        if repository.endswith(".git"):
+            repository = repository[:-4]
+
+    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
+        return ("", "")
+
+    finally:
+        os.chdir(cwd)
+
+    return (commit, repository)
 
 def get_software_version():
     """
@@ -174,7 +196,7 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    current_version_file = config.get("PATH_ROOT").joinpath("config/.current-version")
     if not current_version_file.exists():
         return ""
 
@@ -226,6 +248,70 @@ def get_ffmpeg_version(ffmpeg_path):
     ffmpeg_version = re.split(r"[^0-9.]", ffmpeg_version)[0]
 
     return version.parse(ffmpeg_version)
+
+
+def find_extensions():
+    """
+    Find 4CAT extensions and load their metadata
+
+    Looks for subfolders of the extension folder, and loads additional metadata
+    where available.
+
+    :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
+    dictionary, and a list of (str) errors encountered while loading
+    """
+    extension_path = config.get("PATH_ROOT").joinpath("extensions")
+    errors = []
+    if not extension_path.exists() or not extension_path.is_dir():
+        return [], None
+
+    # each folder in the extensions folder is an extension
+    extensions = {
+        extension.name: {
+            "name": extension.name,
+            "version": "",
+            "url": "",
+            "git_url": "",
+            "is_git": False
+        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
+    }
+
+    # collect metadata for extensions
+    allowed_metadata_keys = ("name", "version", "url")
+    cwd = os.getcwd()
+    for extension in extensions:
+        extension_folder = extension_path.joinpath(extension)
+        metadata_file = extension_folder.joinpath("metadata.json")
+        if metadata_file.exists():
+            with metadata_file.open() as infile:
+                try:
+                    metadata = json.load(infile)
+                    extensions[extension].update({k: metadata[k] for k in metadata if k in allowed_metadata_keys})
+                except (TypeError, ValueError) as e:
+                    errors.append(f"Error reading metadata file for extension '{extension}' ({e})")
+                    continue
+
+        extensions[extension]["is_git"] = extension_folder.joinpath(".git/HEAD").exists()
+        if extensions[extension]["is_git"]:
+            # try to get remote URL
+            try:
+                os.chdir(extension_folder)
+                origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE,
+                                        stdout=subprocess.PIPE)
+                if origin.returncode != 0 or not origin.stdout:
+                    raise ValueError()
+                repository = origin.stdout.decode("utf-8").strip()
+                if repository.endswith(".git") and "github.com" in repository:
+                    # use repo URL
+                    repository = repository[:-4]
+                extensions[extension]["git_url"] = repository
+            except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
+                print(e)
+                pass
+            finally:
+                os.chdir(cwd)
+
+    return extensions, errors
 
 
 def convert_to_int(value, default=0):
@@ -886,6 +972,37 @@ def sets_to_lists(d: MutableMapping):
                 yield k, v
 
     return dict(_sets_to_lists_gen(d))
+
+
+def url_to_hash(url, remove_scheme=True, remove_www=True):
+    """
+    Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
+    rest of the URL.
+    """
+    parsed_url = urlparse(url.lower())
+    if parsed_url:
+        if remove_scheme:
+            parsed_url = parsed_url._replace(scheme="")
+        if remove_www:
+            netloc = re.sub(r"^www\.", "", parsed_url.netloc)
+            parsed_url = parsed_url._replace(netloc=netloc)
+
+        url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
+    else:
+        # Unable to parse URL; use regex
+        if remove_scheme:
+            url = re.sub(r"^https?://", "", url)
+        if remove_www:
+            if not remove_scheme:
+                scheme = re.match(r"^https?://", url).group()
+                temp_url = re.sub(r"^https?://", "", url)
+                url = scheme + re.sub(r"^www\.", "", temp_url)
+            else:
+                url = re.sub(r"^www\.", "", url)
+
+        url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
+
+    return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
 
 def folder_size(path='.'):
     """

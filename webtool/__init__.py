@@ -105,12 +105,11 @@ Request.max_form_parts = config.get("flask.max_form_parts", 1000)
 
 # import all views
 import webtool.views.views_admin
+import webtool.views.views_extensions
 import webtool.views.views_restart
 import webtool.views.views_user
-
 import webtool.views.views_dataset
 import webtool.views.views_misc
-
 import webtool.views.api_explorer
 import webtool.views.api_standalone
 import webtool.views.api_tool
