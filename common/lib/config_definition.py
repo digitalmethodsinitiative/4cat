@@ -59,6 +59,13 @@ config_definition = {
                    "software, and a 'powered by 4CAT' notice may also show up in the web interface regardless of the "
                    "value entered here."
     },
+    "4cat.about_this_server": {
+        "type": UserInput.OPTION_TEXT_LARGE,
+        "default": "",
+        "help": "Server information",
+        "tooltip": "Custom server information that is displayed on the 'About' page. Can for instance be used to show "
+                   "information about who maintains the tool or what its intended purpose is."
+    },
     "4cat.crash_message": {
         "type": UserInput.OPTION_TEXT_LARGE,
         "default": "This processor has crashed; the crash has been logged. 4CAT will try again when it is restarted. "
