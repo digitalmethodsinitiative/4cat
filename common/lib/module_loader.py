@@ -243,7 +243,7 @@ class ModuleCollector:
             self.datasources[datasource_id]["has_worker"] = bool(worker)
             self.datasources[datasource_id]["has_options"] = self.datasources[datasource_id]["has_worker"] and \
                                                              bool(self.workers["%s-search" % datasource_id].get_options())
-            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_extension") and worker.is_from_extension
+            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
 
     def load_worker_class(self, worker):
         """
