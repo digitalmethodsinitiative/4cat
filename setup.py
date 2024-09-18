@@ -35,6 +35,7 @@ packages = set([
 	"networkx~=2.8.0",
 	"numpy>=1.19.2",
 	"opencv-python>=4.6.0.66",
+	"openai",
 	"packaging",
 	"pandas==1.5.3",
 	"Pillow>=10.3",
