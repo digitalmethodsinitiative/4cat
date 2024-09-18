@@ -8,10 +8,10 @@ with open("VERSION") as versionfile:
 	version = versionfile.readline().strip()
 
 # Universal packages
-packages = [
+packages = set([
 	"anytree~=2.8.0",
 	"bcrypt~=3.2.0",
-	"beautifulsoup4~=4.11.0",
+	"beautifulsoup4",#~=4.11.0",
 	"clarifai-grpc~=9.0",
 	"cryptography>=39.0.1",
 	"cssselect~=1.1.0",
@@ -48,11 +48,11 @@ packages = [
 	"razdel~=0.5",
 	"requests~=2.27",
 	"requests_futures",
+	"scikit_learn",
 	"scenedetect==0.6.0.3",
 	"scikit-learn",
 	"scipy==1.10.1",
 	"shapely",
-	"spacy==3.7.2",
 	"svgwrite~=1.4.0",
 	"tailer",
 	"Telethon~=1.36.0",
@@ -64,17 +64,29 @@ packages = [
 	"imagedominantcolor @ git+https://github.com/dale-wahl/imagedominantcolor.git@pillow10",
 	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
-	"yt-dlp",
-	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm"
-]
+	"yt-dlp"
+])
+
+# Check for extension packages
+if os.path.isdir("extensions"):
+	extension_packages = set()
+	for root, dirs, files in os.walk("extensions"):
+		for file in files:
+			if file == "requirements.txt":
+				with open(os.path.join(root, file)) as extension_requirements:
+					for line in extension_requirements.readlines():
+						extension_packages.add(line.strip())
+	if extension_packages:
+		print("Found extensions, installing additional packages: " + str(extension_packages))
+		packages = packages.union(extension_packages)
 
 # Some packages don't run on Windows
-unix_packages = [
+unix_packages = set([
 	"python-daemon==2.3.2"
-]
+])
 
 if os.name != "nt":
-	packages = packages + unix_packages
+	packages = packages.union(unix_packages)
 
 setup(
 	name='fourcat',
@@ -87,5 +99,5 @@ setup(
 	url="https://oilab.eu",
 	packages=['backend', 'webtool', 'datasources'],
 	python_requires='>=3.7',
-	install_requires=packages,
+	install_requires=list(packages),
 )
