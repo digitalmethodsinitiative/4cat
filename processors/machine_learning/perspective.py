@@ -9,6 +9,7 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from googleapiclient import discovery
 from common.lib.item_mapping import MappedItem
+from common.config_manager import config
 
 class Perspective(BasicProcessor):
 	"""
@@ -28,39 +29,55 @@ class Perspective(BasicProcessor):
 		"(https://doi.org/10.1177/20539517211046181)"
 	]
 
-	options = {
-		"api_key": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API Key",
-            "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this "
-                       "key on the API dashboard.",
-			"sensitive": True
-        },
-        "attributes": {
-            "type": UserInput.OPTION_MULTI,
-            "help": "Attributes to score",
-            "options": {
-                "TOXICITY": "Toxicity",
-                "SEVERE_TOXICITY": "Severe toxicity",
-                "IDENTITY_ATTACK": "Identity attack",
-                "INSULT": "Insult",
-                "PROFANITY": "Profanity",
-                "THREAT": "Threat"
-            },
-            "default": ["TOXICITY"]
-        },
-		"write_annotations": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Add attribute scores as annotations to the parent dataset.",
-			"default": True
+	config = {
+		"api.google.api_key": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Google API key",
+			"tooltip": "Can be created on console.cloud.google.com"
 		}
 	}
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		options = {
+			"attributes": {
+				"type": UserInput.OPTION_MULTI,
+				"help": "Attributes to score",
+				"options": {
+					"TOXICITY": "Toxicity",
+					"SEVERE_TOXICITY": "Severe toxicity",
+					"IDENTITY_ATTACK": "Identity attack",
+					"INSULT": "Insult",
+					"PROFANITY": "Profanity",
+					"THREAT": "Threat"
+				},
+				"default": ["TOXICITY"]
+			},
+			"write_annotations": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Add attribute scores as annotations to the parent dataset.",
+				"default": True
+			}
+		}
+
+		api_key = config.get("api.google.api_key", user=user)
+		if not api_key:
+			options["api_key"] = {
+				"type": UserInput.OPTION_TEXT,
+				"default": "",
+				"help": "Google API key",
+				"tooltip": "Can be created on console.cloud.google.com"
+			}
+
+		return options
 
 	def process(self):
 
 		api_key = self.parameters.get("api_key")
 		self.dataset.delete_parameter("api_key")  # sensitive, delete after use
-
+		if not api_key:
+			api_key = config.get("api.google.api_key", user=self.owner)
 		if not api_key:
 			self.dataset.finish_with_error("You need to provide a valid API key")
 			return
@@ -71,13 +88,17 @@ class Perspective(BasicProcessor):
 
 		write_annotations = self.parameters.get("api_key", True)
 
-		client = discovery.build(
-			"commentanalyzer",
-			"v1alpha1",
-			developerKey=api_key,
-			discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
-			static_discovery=False,
-		)
+		try:
+			client = discovery.build(
+				"commentanalyzer",
+				"v1alpha1",
+				developerKey=api_key,
+				discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
+				static_discovery=False,
+			)
+		except HttpError as e:
+			error = json.loads(e.content)["error"]["message"]
+			self.dataset.finish_with_error(error)
 
 		results = []
 		annotations = []
