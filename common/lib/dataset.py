@@ -1381,6 +1381,7 @@ class DataSet(FourcatModule):
 		:return:  Processor class, or `None` if not available.
 		"""
 		processor_type = self.parameters.get("type", self.data.get("type"))
+
 		return self.modules.processors.get(processor_type)
 
 	def get_available_processors(self, user=None, exclude_hidden=False):
