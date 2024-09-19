@@ -86,7 +86,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.manager = manager
 		self.job = job
 		self.init_time = int(time.time())
-		self.config = ConfigDummy()
+		self.config = modules.config
 
 		# ModuleCollector cannot be easily imported into a worker because it itself
 		# imports all workers, so you get a recursive import that Python (rightly) blocks

@@ -220,7 +220,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
 
 		# Download images (exclude .webm files)
-		if "filename" in post and post["ext"] != ".webm" and config.get("fourchan-search.save_images"):
+		if "filename" in post and post["ext"] != ".webm" and self.config.get("fourchan-search.save_images"):
 			self.queue_image(post, thread)
 
 		return return_value
@@ -241,11 +241,11 @@ class ThreadScraper4chan(BasicJSONScraper):
 		md5 = hashlib.md5()
 		md5.update(base64.b64decode(post["md5"]))
 
-		image_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_IMAGES'))
+		image_folder = self.config.get('PATH_ROOT').joinpath(self.config.get('PATH_IMAGES'))
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
-		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
-			claimtime = int(time.time()) + int(config.get("fourchan-search.image_interval"))
+		if self.config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
+			claimtime = int(time.time()) + int(self.config.get("fourchan-search.image_interval"))
 
 			try:
 				self.queue.add_job("fourchan-image", remote_id=post["md5"], claim_after=claimtime, details={

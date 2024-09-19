@@ -81,15 +81,15 @@ class StableDiffusionImageGenerator(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
         These are dynamic for this processor: the 'column names' option is
         populated with the column names from the parent dataset, if available.
 
+        :param config:
         :param DataSet parent_dataset:  Parent dataset
-        :param user:  Flask User to which the options are shown, if applicable
         :return dict:  Processor options
         """
         options = cls.options
@@ -123,12 +123,12 @@ class StableDiffusionImageGenerator(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on datasets with columns (from which a prompt can be retrieved)
         """
-        return config.get("dmi-service-manager.sd_enabled", False, user=user) and \
-            config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.sd_enabled", False) and \
+            config.get("dmi-service-manager.ab_server_address", False) and \
             module.get_columns()
 
     @staticmethod

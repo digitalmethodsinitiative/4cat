@@ -81,11 +81,12 @@ class VideoStack(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
         :param DataSet module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         if not (module.get_media_type() == "video" or module.type.startswith("video-downloader")):
@@ -94,7 +95,7 @@ class VideoStack(BasicProcessor):
             # Only check these if we have a video dataset
             # also need ffprobe to determine video lengths
             # is usually installed in same place as ffmpeg
-            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path", user=user))
+            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
             ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
             return ffmpeg_path and ffprobe_path
 

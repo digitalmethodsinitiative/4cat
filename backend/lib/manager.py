@@ -4,7 +4,6 @@ The heart of the app - manages jobs and workers
 import signal
 import time
 
-from common.lib.module_loader import ModuleCollector
 from common.lib.exceptions import JobClaimedException
 
 
@@ -22,19 +21,20 @@ class WorkerManager:
 	pool = []
 	looping = True
 
-	def __init__(self, queue, database, logger, as_daemon=True):
+	def __init__(self, queue, database, logger, modules, as_daemon=True):
 		"""
 		Initialize manager
 
 		:param queue:  Job queue
 		:param database:  Database handler
 		:param logger:  Logger object
+		:param modules:  Modules cache via ModuleLoader()
 		:param bool as_daemon:  Whether the manager is being run as a daemon
 		"""
 		self.queue = queue
 		self.db = database
 		self.log = logger
-		self.modules = ModuleCollector(write_config=True)
+		self.modules = modules
 
 		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)

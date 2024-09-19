@@ -37,10 +37,10 @@
                 </ul>
             </nav>
 
-            {% if dataset.is_expiring() %}
+            {% if dataset.is_expiring(config=__config) %}
                 <div class="fullwidth notice">
                     <strong>Note:</strong> this dataset will no longer be available
-                    after {{ dataset.is_expiring()|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+                    after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
 
                 </div>
             {% endif %}
@@ -178,7 +178,7 @@
         </section>
     {% endif %}
 
-    {% if current_user.is_authenticated and __user_config("privileges.can_run_processors") and dataset.num_rows > 0 and dataset.get_available_processors(user=current_user)|length > 0 and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, role="owner")) %}
+    {% if current_user.is_authenticated and __user_config("privileges.can_run_processors") and dataset.num_rows > 0 and dataset.get_available_processors(config=__config)|length > 0 and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, role="owner")) %}
         <section class="analysis-gallery available-processors">
 
             <h3 class="blocktitle section-subheader">

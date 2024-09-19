@@ -1299,7 +1299,7 @@ class DataSet(FourcatModule):
 			genealogy.append(self.key)
 			return ",".join(genealogy)
 
-	def get_compatible_processors(self, user=None):
+	def get_compatible_processors(self, config=None):
 		"""
 		Get list of processors compatible with this dataset
 
@@ -1308,9 +1308,10 @@ class DataSet(FourcatModule):
 		specify accepted types (via the `is_compatible_with` method), it is
 		assumed it accepts any top-level datasets
 
-		:param str|User|None user:  User to get compatibility for. If set,
-		use the user-specific config settings where available.
-
+		:param ConfigManager|None config:  Configuration reader to determine
+		compatibility through. This may not be the same reader the dataset was
+		instantiated with, e.g. when checking whether some other user should
+		be able to run processors on this dataset.
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
 		processors = self.modules.processors
@@ -1324,7 +1325,7 @@ class DataSet(FourcatModule):
 			# method returns True *or* if it has no explicit compatibility
 			# check and this dataset is top-level (i.e. has no parent)
 			if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
-					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, user=user)):
+					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, config=config)):
 				available[processor_type] = processor
 
 		return available
@@ -1381,7 +1382,7 @@ class DataSet(FourcatModule):
 
 		return self.modules.processors.get(processor_type)
 
-	def get_available_processors(self, user=None, exclude_hidden=False):
+	def get_available_processors(self, config=None, exclude_hidden=False):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1390,8 +1391,10 @@ class DataSet(FourcatModule):
 		run but have options are included so they may be run again with a
 		different configuration
 
-		:param str|User|None user:  User to get compatibility for. If set,
-		use the user-specific config settings where available.
+		:param ConfigManager|None config:  Configuration reader to determine
+		compatibility through. This may not be the same reader the dataset was
+		instantiated with, e.g. when checking whether some other user should
+		be able to run processors on this dataset.
 		:param bool exclude_hidden:  Exclude processors that should be displayed
 		in the UI? If `False`, all processors are returned.
 
@@ -1402,13 +1405,13 @@ class DataSet(FourcatModule):
 			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
 			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not exclude_hidden or not processor.is_hidden}
 
-		processors = self.get_compatible_processors(user=user)
+		processors = self.get_compatible_processors(config=config)
 
 		for analysis in self.children:
 			if analysis.type not in processors:
 				continue
 
-			if not processors[analysis.type].get_options():
+			if not processors[analysis.type].get_options(config=config):
 				del processors[analysis.type]
 				continue
 
@@ -1484,15 +1487,14 @@ class DataSet(FourcatModule):
 			return False
 		return True
 
-	def is_expiring(self, user=None):
+	def is_expiring(self, config):
 		"""
 		Determine if dataset is set to expire
 
 		Similar to `is_expired`, but checks if the dataset will be deleted in
 		the future, not if it should be deleted right now.
 
-		:param user:  User to use for configuration context. Provide to make
-		sure configuration overrides for this user are taken into account.
+        :param ConfigManager config:  Configuration reader (context-aware)
 		:return bool|int:  `False`, or the expiration date as a Unix timestamp.
 		"""
 		# has someone opted out of deleting this?
@@ -1504,7 +1506,7 @@ class DataSet(FourcatModule):
 			return self.parameters.get("expires-after")
 
 		# is the data source configured to have its datasets expire?
-		expiration = config.get("datasources.expiration", {}, user=user)
+		expiration = config.get("datasources.expiration", {})
 		if not expiration.get(self.parameters.get("datasource")):
 			return False
 
@@ -1514,19 +1516,18 @@ class DataSet(FourcatModule):
 
 		return False
 
-	def is_expired(self, user=None):
+	def is_expired(self, config):
 		"""
 		Determine if dataset should be deleted
 
 		Datasets can be set to expire, but when they should be deleted depends
 		on a number of factor. This checks them all.
 
-		:param user:  User to use for configuration context. Provide to make
-		sure configuration overrides for this user are taken into account.
+        :param ConfigManager config:  Configuration reader (context-aware)
 		:return bool:
 		"""
 		# has someone opted out of deleting this?
-		if not self.is_expiring():
+		if not self.is_expiring(config):
 			return False
 
 		# is this dataset explicitly marked as expiring after a certain time?
@@ -1535,7 +1536,7 @@ class DataSet(FourcatModule):
 			return True
 
 		# is the data source configured to have its datasets expire?
-		expiration = config.get("datasources.expiration", {}, user=user)
+		expiration = config.get("datasources.expiration", {})
 		if not expiration.get(self.parameters.get("datasource")):
 			return False
 

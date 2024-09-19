@@ -23,7 +23,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
     followups = ["tcat-auto-upload"]
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 

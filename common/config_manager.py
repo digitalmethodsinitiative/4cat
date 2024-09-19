@@ -432,7 +432,12 @@ class ConfigWrapper:
         serve 4CAT with a different configuration based on the proxy server
         used.
         """
-        self.config = config
+        if type(config) is ConfigWrapper:
+            # let's not do nested wrappers
+            self.config = config.config
+        else:
+            self.config = config
+
         self.user = user
         self.tags = tags
         self.request = request

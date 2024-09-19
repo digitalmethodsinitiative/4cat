@@ -26,13 +26,9 @@ from webtool import app, db, config, fourcat_modules
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
-from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
+from common.lib.helpers import call_api, send_email, UserInput, get_git_branch
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
-
-from common.config_manager import ConfigWrapper
-
-config = ConfigWrapper(config, user=current_user, request=request)
 
 
 @app.route("/admin/")

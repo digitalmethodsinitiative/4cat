@@ -15,8 +15,8 @@ class InternalAPI(BasicWorker):
 
 	ensure_job = {"remote_id": "localhost"}
 
-	host = config.get('API_HOST')
-	port = config.get('API_PORT')
+	host = None
+	port = None
 
 	def work(self):
 		"""
@@ -27,6 +27,9 @@ class InternalAPI(BasicWorker):
 
 		:return:
 		"""
+		self.host = self.config.get('API_HOST')
+		self.port = self.config.get('API_PORT')
+
 		if self.port == 0:
 			# if configured not to listen, just loop until the backend shuts
 			# down we can't return here immediately, since this is a worker,

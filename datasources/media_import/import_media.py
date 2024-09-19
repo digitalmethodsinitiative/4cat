@@ -30,7 +30,7 @@ class SearchMedia(BasicProcessor):
     accepted_file_types = ["audio", "video", "image"]
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         return {
             "intro": {
                 "type": UserInput.OPTION_INFO,
@@ -49,7 +49,7 @@ class SearchMedia(BasicProcessor):
         }
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Step 1: Validate query and files
 
@@ -57,8 +57,7 @@ class SearchMedia(BasicProcessor):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
-        :return dict:  Safe query parameters
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         # do we have uploaded files?
         bad_files = []

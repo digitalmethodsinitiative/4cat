@@ -16,9 +16,6 @@ from webtool import app, db, config, fourcat_modules
 from webtool.lib.helpers import pad_interval, error
 from webtool.views.views_dataset import create_dataset, show_results
 
-from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user, request=request)
-
 csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.errorhandler(413)
@@ -145,7 +142,6 @@ def data_overview(datasource=None):
 
         # Status labels to display in query form
         labels = []
-        datasource_options = worker_class.get_options()
         is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
         is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
         labels.append(is_local)

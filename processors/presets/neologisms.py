@@ -21,10 +21,11 @@ class NeologismExtractor(ProcessorPreset):
 
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Get processor options
-		"""
+	def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
+        :param config:
+        """
 		options = {
 			"timeframe": {
 				"type": UserInput.OPTION_CHOICE,
@@ -50,11 +51,12 @@ class NeologismExtractor(ProcessorPreset):
 		return options
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor to run on all csv and NDJSON datasets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 
 		return module.get_extension() in ("csv", "ndjson")

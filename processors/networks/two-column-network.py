@@ -88,15 +88,15 @@ class ColumnNetworker(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
         These are dynamic for this processor: the 'column names' option is
         populated with the column names from the parent dataset, if available.
 
+        :param config:
         :param DataSet parent_dataset:  Parent dataset
-        :param user:  Flask User to which the options are shown, if applicable
         :return dict:  Processor options
         """
         options = cls.options
@@ -123,11 +123,12 @@ class ColumnNetworker(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor to run on all csv and NDJSON datasets
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.get_extension() in ("csv", "ndjson")
 

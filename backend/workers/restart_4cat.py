@@ -14,7 +14,6 @@ from pathlib import Path
 
 from backend.lib.worker import BasicWorker
 from common.lib.exceptions import WorkerInterruptedException
-from common.config_manager import config
 
 
 class FourcatRestarterAndUpgrader(BasicWorker):
@@ -50,11 +49,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
         # prevent multiple restarts running at the same time which could blow
         # up really fast
-        lock_file = Path(config.get("PATH_ROOT")).joinpath("config/restart.lock")
+        lock_file = Path(self.config.get("PATH_ROOT")).joinpath("config/restart.lock")
 
         # this file has the log of the restart worker itself and is checked by
         # the frontend to see how far we are
-        log_file_restart = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_LOGS")).joinpath("restart.log")
+        log_file_restart = Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_LOGS")).joinpath("restart.log")
         log_stream_restart = log_file_restart.open("a")
 
         if not is_resuming:
@@ -74,7 +73,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             if self.job.data["remote_id"].startswith("upgrade"):
                 command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart --output %s" % \
-                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_restart)))
+                          (shlex.quote(self.config.get("4cat.github_url")), shlex.quote(str(log_file_restart)))
                 if self.job.details and self.job.details.get("branch"):
                     # migrate to code in specific branch
                     command += f" --branch {shlex.quote(self.job.details['branch'])}"
@@ -100,7 +99,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # restarts and we re-attempt to make a daemon, it will fail
                 # when trying to close the stdin file descriptor of the
                 # subprocess (man, that was a fun bug to hunt down)
-                process = subprocess.Popen(shlex.split(command), cwd=str(config.get("PATH_ROOT")),
+                process = subprocess.Popen(shlex.split(command), cwd=str(self.config.get("PATH_ROOT")),
                                            stdout=log_stream_restart, stderr=log_stream_restart,
                                            stdin=subprocess.DEVNULL)
 
@@ -143,20 +142,20 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # front-end restart or upgrade too
             self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             log_stream_restart.write("4CAT restarted.\n")
-            with Path(config.get("PATH_ROOT")).joinpath("config/.current-version").open() as infile:
+            with Path(self.config.get("PATH_ROOT")).joinpath("config/.current-version").open() as infile:
                 log_stream_restart.write(f"4CAT is now running version {infile.readline().strip()}.\n")
 
             # we're gonna use some specific Flask routes to trigger this, i.e.
             # we're interacting with the front-end through HTTP
-            api_host = "https://" if config.get("flask.https") else "http://"
-            if config.get("USING_DOCKER"):
+            api_host = "https://" if self.config.get("flask.https") else "http://"
+            if self.config.get("USING_DOCKER"):
                 import os
                 docker_exposed_port = os.environ['PUBLIC_PORT']
                 api_host += f"host.docker.internal{':' + docker_exposed_port if docker_exposed_port != '80' else ''}"
             else:
-                api_host += config.get("flask.server_name")
+                api_host += self.config.get("flask.server_name")
 
-            if self.job.data["remote_id"].startswith("upgrade") and config.get("USING_DOCKER"):
+            if self.job.data["remote_id"].startswith("upgrade") and self.config.get("USING_DOCKER"):
                 # when using Docker, the front-end needs to update separately
                 log_stream_restart.write("Telling front-end Docker container to upgrade...\n")
                 log_stream_restart.close()  # close, because front-end will be writing to it

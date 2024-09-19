@@ -61,7 +61,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
@@ -69,15 +69,16 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         TCAT-compatible file.
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "convert-ndjson-for-tcat" and \
-            config.get('tcat-auto-upload.server_url', user=user) and \
-            config.get('tcat-auto-upload.token', user=user) and \
-            config.get('tcat-auto-upload.username', user=user) and \
-            config.get('tcat-auto-upload.password', user=user)
+            config.get('tcat-auto-upload.server_url') and \
+            config.get('tcat-auto-upload.token') and \
+            config.get('tcat-auto-upload.username') and \
+            config.get('tcat-auto-upload.password')
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -85,20 +86,20 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         TCAT servers are configured. Otherwise, no options are given since
         there is nothing to choose.
 
+        :param config:
         :param DataSet parent_dataset:  Dataset that will be uploaded
-        :param User user:  User that will be uploading it
-        :return dict:  Option definition
-        """
-        if config.get('tcat-auto-upload.server_url', user=user) \
-                and type(config.get('tcat-auto-upload.server_url', user=user)) in (set, list, tuple) \
-                and len(config.get('tcat-auto-upload.server_url', user=user)) > 1:
+
+
+        if config.get('tcat-auto-upload.server_url') \
+                and type(config.get('tcat-auto-upload.server_url')) in (set, list, tuple) \
+                and len(config.get('tcat-auto-upload.server_url')) > 1:
             return {
                 "server": {
                     "type": UserInput.OPTION_CHOICE,
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.get('tcat-auto-upload.server_url', user=user)
+                            url: url for url in config.get('tcat-auto-upload.server_url')
                         }
                     },
                     "default": "random",

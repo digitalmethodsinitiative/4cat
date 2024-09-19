@@ -161,17 +161,17 @@ class SearchWithinTCATBins(Search):
                     pass
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get data source options
 
         This method takes the pre-defined options, but fills the 'bins' options
         with bins currently available from the configured TCAT instances.
 
+        :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
         the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
+can
         be used to show some options only to privileges users.
         """
         options = cls.options
@@ -507,13 +507,13 @@ class SearchWithinTCATBins(Search):
         return APIv2_tweet
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate DMI-TCAT query input
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # no query 4 u

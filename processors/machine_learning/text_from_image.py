@@ -87,14 +87,14 @@ class ImageTextDetector(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on image sets
 
         :param module: Module to determine compatibility with
         """
-        return config.get('dmi-service-manager.eb_ocr_enabled', False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get('dmi-service-manager.eb_ocr_enabled', False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):

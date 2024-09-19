@@ -185,7 +185,7 @@ class SearchCustom(BasicProcessor):
         else:
             self.dataset.finish(done)
 
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate custom data input
 
@@ -194,7 +194,7 @@ class SearchCustom(BasicProcessor):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # do we have an uploaded file?

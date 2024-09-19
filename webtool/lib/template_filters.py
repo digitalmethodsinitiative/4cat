@@ -12,9 +12,7 @@ import requests
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
 from common.lib.helpers import timify_long
-from common.config_manager import ConfigWrapper
 
-from flask import request
 from flask_login import current_user
 
 @app.template_filter('datetime')
@@ -372,9 +370,7 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	wrapped_config = ConfigWrapper(config, user=current_user, request=request)
-
-	cv_path = wrapped_config.get("PATH_ROOT").joinpath("config/.current-version")
+	cv_path = config.get("PATH_ROOT").joinpath("config/.current-version")
 	if cv_path.exists():
 		with cv_path.open() as infile:
 			version = infile.readline().strip()
@@ -383,11 +379,12 @@ def inject_now():
 
 
 	return {
-		"__has_https": wrapped_config.get("flask.https"),
+		"__has_https": config.get("flask.https"),
 		"__datenow": datetime.datetime.utcnow(),
 		"__notifications": current_user.get_notifications(),
-		"__user_config": lambda setting: wrapped_config.get(setting),
-		"__user_cp_access": any([wrapped_config.get(p) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
+		"__user_config": lambda setting: config.get(setting),
+		"__config": config,
+		"__user_cp_access": any([config.get(p) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
 		"__version": version,
 		"uniqid": uniqid
 	}

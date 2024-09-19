@@ -105,11 +105,12 @@ class MakeWordtree(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor to run on all csv and NDJSON datasets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 
 		return module.get_extension() in ("csv", "ndjson")
@@ -163,7 +164,6 @@ class MakeWordtree(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		window = min(window, self.get_options()["window"]["max"] + 1)
 		window = max(1, window)
 
 		# determine what tokenisation strategy to use

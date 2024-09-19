@@ -51,7 +51,7 @@ class TelegramImageDownloader(BasicProcessor):
         }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -59,11 +59,11 @@ class TelegramImageDownloader(BasicProcessor):
         TCAT servers are configured. Otherwise, no options are given since
         there is nothing to choose.
 
+        :param config:
         :param DataSet parent_dataset:  Dataset that will be uploaded
-        :param User user:  User that will be uploading it
-        :return dict:  Option definition
         """
-        max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
+
+        max_number_images = int(config.get('image-downloader-telegram.max', 1000))
 
         return {
             "amount": {
@@ -88,11 +88,12 @@ class TelegramImageDownloader(BasicProcessor):
 
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on Telegram datasets with required info
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         if type(module) is DataSet:
             # we need these to actually instantiate a telegram client and

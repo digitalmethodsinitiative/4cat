@@ -25,16 +25,17 @@ class MakeWordCloud(BasicProcessor):
 	extension = "svg"
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type in ("tfidf", "collocations", "vector-ranker", "similar-word2vec", "topic-model-words", "extract-nouns", "get-entities")
 
 	@classmethod
-	def get_options(self, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 
 		options = {}
 		if not parent_dataset:

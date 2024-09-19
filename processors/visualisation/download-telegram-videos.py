@@ -56,7 +56,7 @@ class TelegramVideoDownloader(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -64,11 +64,11 @@ class TelegramVideoDownloader(BasicProcessor):
         TCAT servers are configured. Otherwise, no options are given since
         there is nothing to choose.
 
+        :param config:
         :param DataSet parent_dataset:  Dataset that will be uploaded
-        :param User user:  User that will be uploading it
-        :return dict:  Option definition
         """
-        max_videos = int(config.get('video-downloader-telegram.max_videos', 100, user=user))
+
+        max_videos = int(config.get('video-downloader-telegram.max_videos', 100))
 
         return {
             "amount": {
@@ -82,13 +82,14 @@ class TelegramVideoDownloader(BasicProcessor):
 
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on Telegram datasets with required info
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        if not config.get("video-downloader-telegram.allow_videos", user=user):
+        if not config.get("video-downloader-telegram.allow_videos"):
             return False
 
         if type(module) is DataSet:

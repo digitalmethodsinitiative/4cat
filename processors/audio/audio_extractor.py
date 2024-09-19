@@ -36,19 +36,22 @@ class AudioExtractor(BasicProcessor):
 	followups = ["audio-to-text"]
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on videos only
+
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-			   config.get("video-downloader.ffmpeg_path", user=user) and \
+			   config.get("video-downloader.ffmpeg_path") and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Collect maximum number of audio files from configuration and update options accordingly
-		"""
+	def get_options(cls, parent_dataset=None, config=None):
+        """
+        Collect maximum number of audio files from configuration and update options accordingly
+        :param config:
+        """
 		options = {
 			"amount": {
 				"type": UserInput.OPTION_TEXT,

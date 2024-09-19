@@ -108,11 +108,12 @@ class AttributeRanker(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor to run on all csv and NDJSON datasets
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 
 		return module.get_extension() in ("csv", "ndjson")
@@ -317,21 +318,22 @@ class AttributeRanker(BasicProcessor):
 
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Get processor options
+	def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
 
-		This method by default returns the class's "options" attribute, or an
-		empty dictionary. It can be redefined by processors that need more
-		fine-grained options, e.g. in cases where the availability of options
-		is partially determined by the parent dataset's parameters.
+        This method by default returns the class's "options" attribute, or an
+        empty dictionary. It can be redefined by processors that need more
+        fine-grained options, e.g. in cases where the availability of options
+        is partially determined by the parent dataset's parameters.
 
-		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
-		"""
+        :param config:
+        :param DataSet parent_dataset:  An object representing the dataset that
+        the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+        case they are requested for display in the 4CAT web interface. This can
+        be used to show some options only to privileges users.
+        """
 		options = cls.options
 
 		if parent_dataset and parent_dataset.get_columns():

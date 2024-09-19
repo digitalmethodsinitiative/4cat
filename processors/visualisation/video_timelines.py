@@ -52,7 +52,7 @@ class VideoTimelines(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -61,6 +61,7 @@ class VideoTimelines(BasicProcessor):
         archive. Each folder will be rendered as a separate timeline.
 
         :param str module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         return module.type in ["video-frames", "video-scene-frames"]

@@ -37,7 +37,7 @@ class VideoHasherPreset(ProcessorPreset):
     extension = "gexf"
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         return {
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
@@ -66,7 +66,7 @@ class VideoHasherPreset(ProcessorPreset):
 		}
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -77,7 +77,7 @@ class VideoHasherPreset(ProcessorPreset):
         :return bool:
         """
         return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-               config.get("video-downloader.ffmpeg_path", user=user) and \
+               config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_pipeline(self):
@@ -135,10 +135,11 @@ class VideoHasher(BasicProcessor):
 	followups = ["video-hash-network", "video-hash-similarity-matrix"]
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Options for the processor
-			"""
+	def get_options(cls, parent_dataset=None, config=None):
+        """
+        Options for the processor
+        :param config:
+            """
 		options = {
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
@@ -160,7 +161,7 @@ class VideoHasher(BasicProcessor):
 
 		return options
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on videos only
 		"""
@@ -322,7 +323,7 @@ class VideoHashNetwork(BasicProcessor):
 	]
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		return {"percent": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Percent similar",
@@ -332,7 +333,7 @@ class VideoHashNetwork(BasicProcessor):
 		}}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on video hasher
 		"""
@@ -443,7 +444,7 @@ class VideoHashSimilarities(BasicProcessor):
 	]
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		return {"percent": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Percent similar",
@@ -453,7 +454,7 @@ class VideoHashSimilarities(BasicProcessor):
 		}}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on video hasher
 		"""

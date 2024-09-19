@@ -57,18 +57,19 @@ class CategorizeImagesCLIP(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on image archives if enabled in Control Panel
         """
-        return config.get("dmi-service-manager.fc_blip2_enabled", False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.fc_blip2_enabled", False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Collect maximum number of files from configuration and update options accordingly
+        :param config:
         """
         options = {
             "amount": {
@@ -92,7 +93,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("dmi-service-manager.fd_blip2_num_files", 100, user=user))
+        max_number_images = int(config.get("dmi-service-manager.fd_blip2_num_files", 100))
         if max_number_images == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of images"
             options["amount"]["default"] = 100

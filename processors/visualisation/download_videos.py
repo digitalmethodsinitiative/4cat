@@ -152,15 +152,16 @@ class VideoDownloaderPlus(BasicProcessor):
         self.last_post_process_status = None
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Updating columns with actual columns and setting max_number_videos per
         the max number of images allowed.
+        :param config:
         """
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_videos = int(config.get('video-downloader.max', 100, user=user))
+        max_number_videos = int(config.get('video-downloader.max', 100))
         if max_number_videos == 0:
             options['amount']['help'] = "No. of videos"
             options["amount"]["tooltip"] = "Use 0 to download all videos"
@@ -169,7 +170,7 @@ class VideoDownloaderPlus(BasicProcessor):
             options['amount']['help'] = f"No. of videos (max {max_number_videos:,}"
 
         # And update the max size and help from config
-        max_video_size = int(config.get('video-downloader.max-size', 100, user=user))
+        max_video_size = int(config.get('video-downloader.max-size', 100))
         if max_video_size == 0:
             # Allow video of any size
             options["max_video_size"]["tooltip"] = "Set to 0 if all sizes are to be downloaded."
@@ -205,7 +206,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # these two options are likely to be unwanted on instances with many
         # users, so they are behind an admin config options
-        if config.get("video-downloader.allow-indirect", user=user):
+        if config.get("video-downloader.allow-indirect"):
             options["use_yt_dlp"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Also attempt to download non-direct video links (such YouTube and other video hosting sites)",
@@ -213,7 +214,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 "tooltip": "If False, 4CAT will only download directly linked videos (works with fields like Twitter's \"video\", TikTok's \"video_url\" or Instagram's \"media_url\"), but if True 4CAT uses YT-DLP to download from YouTube and a number of other video hosting sites (see references)."
             }
 
-        if config.get("video-downloader.allow-multiple", user=user):
+        if config.get("video-downloader.allow-multiple"):
             options["channel_videos"] = {
                                             "type": UserInput.OPTION_TEXT,
                                             "help": "Download multiple videos per link? (only works w/ non-direct video links)",
@@ -226,7 +227,7 @@ class VideoDownloaderPlus(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -235,6 +236,7 @@ class VideoDownloaderPlus(BasicProcessor):
         dataset anyway.
 
         :param module:  Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         return ((module.type.endswith("-search") or module.is_from_collector())

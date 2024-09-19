@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA, TruncatedSVD
 from gensim.models import KeyedVectors
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
+from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas, convert_to_float
 from common.lib.exceptions import ProcessorInterruptedException
 
 from svgwrite.container import SVG
@@ -94,11 +94,12 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on token sets
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "generate-embeddings"
 
@@ -111,11 +112,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             return
 
         input_words = input_words.split(",")
-
-        try:
-            threshold = float(self.parameters.get("threshold"))
-        except ValueError:
-            threshold = float(self.get_options()["threshold"]["default"])
+        threshold = convert_to_float(self.parameters.get("threshold"))
 
         threshold = max(-1.0, min(1.0, threshold))
         num_words = convert_to_int(self.parameters.get("num-words"))

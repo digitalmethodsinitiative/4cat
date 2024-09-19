@@ -17,14 +17,14 @@ if result.returncode != 0:
     print("stderr:\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
     exit(1)
 
-from flask import Flask
-from flask_login import LoginManager
+from flask import Flask, request
+from flask_login import LoginManager, current_user
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug import Request
 
-from common.config_manager import config
+from common.config_manager import config, ConfigWrapper
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
@@ -36,7 +36,6 @@ from webtool.lib.helpers import generate_css_colours
 # initialize global objects for interacting with all the things
 login_manager = LoginManager()
 app = Flask(__name__)
-fourcat_modules = ModuleCollector()
 
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy
@@ -104,6 +103,10 @@ login_manager.login_view = "show_login"
 
 # Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
 Request.max_form_parts = config.get("flask.max_form_parts", 1000)
+
+# prepare for views
+config = ConfigWrapper(config, user=current_user, request=request)
+fourcat_modules = ModuleCollector(config=config)
 
 # import all views
 import webtool.views.views_admin

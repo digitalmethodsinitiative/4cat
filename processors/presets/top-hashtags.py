@@ -32,12 +32,12 @@ class TopHashtags(ProcessorPreset):
     })
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Check if dataset has a hashtag attribute
 
         :param module:  Dataset to check
-        :param user:  User trying to run the processor
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         columns = module.get_columns()

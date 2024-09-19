@@ -32,11 +32,12 @@ class TopImageCounter(BasicProcessor):
     followups = ["image-downloader"]
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         All top-level datasets, excluding Telegram, which has a different image logic
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
 
         return module.is_top_dataset() and module.type != "telegram-search" and module.get_extension() in ("csv", "ndjson")
@@ -175,7 +176,7 @@ class TopImageCounter(BasicProcessor):
         self.write_csv_items_and_finish(results)
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -183,7 +184,7 @@ class TopImageCounter(BasicProcessor):
         only work properly on csv datasets so check the extension before
         showing it.
 
-        :param user:
+        :param config:
         :param parent_dataset:  Dataset to get options for
         :return dict:
         """

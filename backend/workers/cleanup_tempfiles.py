@@ -6,7 +6,6 @@ import re
 
 from pathlib import Path
 
-from common.config_manager import config
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.exceptions import WorkerInterruptedException, DataSetException
@@ -34,7 +33,7 @@ class TempFileCleaner(BasicWorker):
         :return:
         """
 
-        result_files = Path(config.get('PATH_DATA')).glob("*")
+        result_files = Path(self.config.get('PATH_DATA')).glob("*")
         for file in result_files:
             if file.stem.startswith("."):
                 # skip hidden files

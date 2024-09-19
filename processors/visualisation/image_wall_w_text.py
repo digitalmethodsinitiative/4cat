@@ -40,22 +40,24 @@ class ImageTextWallGenerator(BasicProcessor):
 	combined_dataset = ["image-downloader-stable-diffusion"]
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on CLIP dataset only
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		image_dataset, text_dataset = cls.identity_dataset_types(module)
 		return image_dataset is not None and text_dataset is not None
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Collect maximum number of audio files from configuration and update options accordingly
-		"""
-		max_number_images = int(config.get("image-visuals.max_per_cat", 1000, user=user))
-		max_pixels = int(config.get("image-visuals.max_pixels_per_image", 500, user=user))
+	def get_options(cls, parent_dataset=None, config=None):
+        """
+        Collect maximum number of audio files from configuration and update options accordingly
+        :param config:
+        """
+		max_number_images = int(config.get("image-visuals.max_per_cat", 1000))
+		max_pixels = int(config.get("image-visuals.max_pixels_per_image", 500))
 		options = {
 			"amount": {
 				"type": UserInput.OPTION_TEXT,

@@ -19,7 +19,7 @@ from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
 								   DataSetException, MapItemException)
-from common.config_manager import config, ConfigWrapper
+from common.config_manager import ConfigWrapper
 from common.lib.user import User
 
 
@@ -37,14 +37,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	useful is another question).
 
 	To determine whether a processor can process a given dataset, you can
-	define a `is_compatible_with(FourcatModule module=None, str user=None):) -> bool` class
+	define a `is_compatible_with(FourcatModule module=None, config=None):) -> bool` class
 	method which takes a dataset as argument and returns a bool that determines
 	if this processor is considered compatible with that dataset. For example:
 
 	.. code-block:: python
 
         @classmethod
-        def is_compatible_with(cls, module=None, user=None):
+        def is_compatible_with(cls, module=None, config=None):
             return module.type == "linguistic-features"
 
 
@@ -109,11 +109,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			self.job.finish()
 			return
 
-		# set up config reader using the worker's DB connection and the dataset
-		# creator. This ensures that if a value has been overriden for the owner,
-		# the overridden value is used instead.
-		config.with_db(self.db)
-		self.config = ConfigWrapper(config=config, user=User.get_by_name(self.db, self.owner))
+		# set up config reader wrapping the worker's config manager, which is
+		# in turn the one passed to it by the WorkerManager, which is the one
+		# originally loaded in bootstrap
+		self.config = ConfigWrapper(config=self.config, user=User.get_by_name(self.db, self.owner))
 
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
@@ -170,7 +169,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# get parameters
 		# if possible, fill defaults where parameters are not provided
 		given_parameters = self.dataset.parameters.copy()
-		all_parameters = self.get_options(self.dataset)
+		all_parameters = self.get_options(self.dataset, config=self.config)
 		self.parameters = {
 			param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
 			for param in [*all_parameters.keys(), *given_parameters.keys()]
@@ -179,7 +178,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# now the parameters have been loaded into memory, clear any sensitive
 		# ones. This has a side-effect that a processor may not run again
 		# without starting from scratch, but this is the price of progress
-		options = self.get_options(self.dataset.get_parent())
+		options = self.get_options(self.dataset.get_parent(), config=self.config)
 		for option, option_settings in options.items():
 			if option_settings.get("sensitive"):
 				self.dataset.delete_parameter(option)
@@ -241,7 +240,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
 			try:
-				available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
+				available_processors = self.dataset.get_available_processors(config=self.config)
 			except ValueError:
 				self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
 				break
@@ -329,7 +328,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.job.finish()
 
-		if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+		if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
 			owner = self.dataset.get_parameters().get("email-complete", False)
 			# Check that username is email address
 			if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
@@ -340,8 +339,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				import html2text
 
 				self.log.debug("Sending email to %s" % owner)
-				dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get('flask.server_name') + '/results/' + self.dataset.key
-				sender = config.get('mail.noreply')
+				dataset_url = ('https://' if self.config.get('flask.https') else 'http://') + self.config.get('flask.server_name') + '/results/' + self.dataset.key
+				sender = self.config.get('mail.noreply')
 				message = MIMEMultipart("alternative")
 				message["From"] = sender
 				message["To"] = owner
@@ -778,7 +777,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		"""
 		Get processor options
 
@@ -787,12 +786,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		fine-grained options, e.g. in cases where the availability of options
 		is partially determined by the parent dataset's parameters.
 
+		:param config:
 		:param DataSet parent_dataset:  An object representing the dataset that
 		  the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		  case they are requested for display in the 4CAT web interface. This can
-		  be used to show some options only to privileges users.
-		"""
+
+
 		return cls.options if hasattr(cls, "options") else {}
 
 	@classmethod

@@ -57,15 +57,16 @@ class SearchReddit(Search):
 	after = "after"
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Determine if user needs to see the 'careful with wildcard queries!'
-		warning
+	def get_options(cls, parent_dataset=None, config=None):
+        """
+        Determine if user needs to see the 'careful with wildcard queries!'
+        warning
 
-		:param parent_dataset:
-		:param user:
-		:return dict:  Options definition
-		"""
+        :param config:
+        :param parent_dataset:
+        :param user:
+        :return dict:  Options definition
+        """
 		options = {
 			"wildcard-warning": {
 				"type": UserInput.OPTION_INFO,
@@ -518,7 +519,7 @@ class SearchReddit(Search):
 		# clean up timestamps outside of window
 		self.request_timestamps = [timestamp for timestamp in self.request_timestamps if timestamp >= window_start]
 
-	def validate_query(query, request, user):
+	def validate_query(query, request, config):
 		"""
 		Validate input for a dataset query on the 4chan data source.
 
@@ -528,7 +529,7 @@ class SearchReddit(Search):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
-		:param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		:return dict:  Safe query parameters
 		"""
 		# we need a board!
@@ -541,10 +542,10 @@ class SearchReddit(Search):
 		# ignore leading r/ for boards
 		query["board"] = ",".join(boards)
 
-		keywordless_query = config.get("reddit-search.can_query_without_keyword", False, user=user)
+		keywordless_query = config.get("reddit-search.can_query_without_keyword", False)
 
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin and not keywordless_query and not query.get(
+		if not keywordless_query and not query.get(
 				"body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get(
 			"subject_url", ""):
 			raise QueryParametersException("Please provide a body query or subject query.")

@@ -332,6 +332,24 @@ def convert_to_int(value, default=0):
         return default
 
 
+def convert_to_float(value, default=0.0):
+    """
+    Convert a value to a float, with a fallback
+
+    The fallback is used if an Error is thrown during converstion to float.
+    This is a convenience function, but beats putting try-catches everywhere
+    we're using user input as a float.
+
+    :param value:  Value to convert
+    :param float default:  Default value, if conversion not possible
+    :return float:  Converted value
+    """
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def timify_long(number):
     """
     Make a number look like an indication of time

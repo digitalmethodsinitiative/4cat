@@ -564,7 +564,7 @@ class Search4Chan(SearchWithScope):
 		postgres_join = ""
 
 		# Option wether to use sphinx for text searches
-		use_sphinx = config.get("fourchan.use_sphinx", True)
+		use_sphinx = self.config.get("fourchan.use_sphinx", True)
 
 		if query.get("min_date", None):
 			try:
@@ -808,9 +808,9 @@ class Search4Chan(SearchWithScope):
 		:return MySQLDatabase:
 		"""
 		return MySQLDatabase(
-			host=config.get("4cat.sphinx_host"),
-			user=config.get('DB_USER'),
-			password=config.get('DB_PASSWORD'),
+			host=self.config.get("4cat.sphinx_host"),
+			user=self.config.get('DB_USER'),
+			password=self.config.get('DB_PASSWORD'),
 			port=9306,
 			logger=self.log
 		)
@@ -831,7 +831,7 @@ class Search4Chan(SearchWithScope):
 
 		return thread_sizes
 
-	def validate_query(query, request, user):
+	def validate_query(query, request, config):
 		"""
 		Validate input for a dataset query on the 4chan data source.
 
@@ -841,12 +841,12 @@ class Search4Chan(SearchWithScope):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
-		:param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		:return dict:  Safe query parameters
 		"""
 
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin and not config.get("fourchan-search.can_query_without_keyword", False, user=user) \
+		if not config.get("fourchan-search.can_query_without_keyword", False) \
 				and not query.get("body_match", None) \
 				and not query.get("subject_match", None) \
 				and query.get("search_scope", "") != "random-sample" \
