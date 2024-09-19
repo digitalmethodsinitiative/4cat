@@ -143,7 +143,7 @@ def get_worker_status():
             "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=db)
         } for worker in call_api("worker-status")["response"]["running"]
     ]
-    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
+    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=fourcat_modules.workers,
                            now=time.time())
 
 
@@ -588,7 +588,7 @@ def manipulate_settings():
             submenu = "core"
         elif option_owner.endswith("-search"):
             submenu = "datasources"
-        elif option_owner in backend.all_modules.processors:
+        elif option_owner in fourcat_modules.processors:
             submenu = "processors"
 
         tabname = config_definition.categories.get(option_owner)

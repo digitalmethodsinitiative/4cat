@@ -88,9 +88,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.init_time = int(time.time())
 		self.config = ConfigDummy()
 
-		# all_modules cannot be easily imported into a worker because all_modules itself
+		# ModuleCollector cannot be easily imported into a worker because it itself
 		# imports all workers, so you get a recursive import that Python (rightly) blocks
-		# so for workers, all_modules' content is passed as a constructor argument
+		# so for workers, modules data is passed as a constructor argument
 		self.modules = modules
 
 		database_appname = "%s-%s" % (self.type, self.job.data["id"])

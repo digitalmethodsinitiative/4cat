@@ -209,7 +209,7 @@ def import_dataset():
 		.replace("5", "five").replace("6", "six").replace("7", "seven").replace("8", "eight") \
 		.replace("9", "nine")
 
-	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
+	if not platform or platform not in fourcat_modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message=f"Unknown platform or source format '{platform}'")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
@@ -928,7 +928,7 @@ def check_search_queue():
 	unfinished_jobs = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
 
 	for i, job in enumerate(unfinished_jobs):
-		processor = backend.all_modules.processors.get(job["jobtype"])
+		processor = fourcat_modules.processors.get(job["jobtype"])
 		if processor:
 			unfinished_jobs[i]["processor_name"] = processor.title
 		else:

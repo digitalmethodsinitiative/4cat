@@ -104,20 +104,17 @@ class DataSet(FourcatModule):
 			if not current:
 				raise DataSetNotFoundException("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
-			query = current["query"]
 		elif job is not None:
 			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
 				raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
 
-			query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
 				raise DataSetException("DataSet() requires a complete dataset record for its 'data' argument")
 
-			query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
