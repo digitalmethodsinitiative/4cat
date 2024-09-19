@@ -21,6 +21,10 @@ config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+@app.errorhandler(413)
+def request_entity_too_large(this_error):
+    message = f"File too large; try uploading as a ZIP file instead."
+    return error(413, message=message, status="error")
 
 @app.route('/')
 @login_required
@@ -149,8 +153,8 @@ def data_overview(datasource=None):
         if is_static:
             labels.append("static")
 
-        if hasattr(worker_class, "is_from_extension"):
-            labels.append("extension")
+        if hasattr(worker_class, "is_from_zeeschuimer"):
+            labels.append("zeeschuimer")
 
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":

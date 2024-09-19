@@ -35,6 +35,8 @@ class YouTubeMetadata(BasicProcessor):
 	description = "Extract information from YouTube videos and channels linked-to in the dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["youtube-thumbnails"]
+
 	max_retries = 3
 	sleep_time = 20
 
@@ -73,7 +75,7 @@ class YouTubeMetadata(BasicProcessor):
 		:param module: Module to determine compatibility with
 		"""
 		# Compatible with every top-level dataset.
-		return module.is_top_dataset()
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
@@ -440,6 +442,7 @@ class YouTubeMetadata(BasicProcessor):
 				time.sleep(self.sleep_time) # Wait a bit before trying again
 				pass
 
+			response = None
 			while retries < self.max_retries:
 				try:
 					if object_type == "video":
@@ -484,17 +487,17 @@ class YouTubeMetadata(BasicProcessor):
 					time.sleep(self.sleep_time) # Wait a bit before trying again
 					pass
 
-			# Do nothing with the results if the requests failed
-			if retries > self.max_retries:
+			# Do nothing with the results if the requests failed after retries
+			if retries >= self.max_retries:
+				self.dataset.update_status("Failed to get metadata from " + str(ids_string) + " after " + str(retries) + " retries.")
 				if self.api_limit_reached == True:
 					self.dataset.update_status("Daily YouTube API requests exceeded.")
 
 				return results
 
-			else:
-
+			elif response is not None:
 				# Sometimes there's no results,
-				# and "respoonse" won't have an item key.
+				# and "response" won't have an item key.
 				if "items" not in response:
 					continue
 

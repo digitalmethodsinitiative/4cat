@@ -52,6 +52,9 @@ class VideoDownloaderPlus(BasicProcessor):
     description = "Download videos from URLs and store in a zip file. May take a while to complete as videos are " \
                   "retrieved externally."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "video"  # media type of the processor
+
+    followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
     if config.get("video-downloader.allow-indirect"):
         references = [
@@ -231,10 +234,12 @@ class VideoDownloaderPlus(BasicProcessor):
         in principle, but any links to videos are likely to come from the top
         dataset anyway.
 
-        :param str module:  Module ID to determine compatibility with
+        :param module:  Module to determine compatibility with
         :return bool:
         """
-        return (module.type.endswith("-search") or module.is_from_collector()) and module.type not in ["tiktok-search", "tiktok-urls-search"]
+        return ((module.type.endswith("-search") or module.is_from_collector())
+                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]) \
+                and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
@@ -388,7 +393,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 }]
                 success = True
                 self.videos_downloaded_from_url = 1
-            except (requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, FilesizeException, FailedDownload, NotAVideo) as e:
+            except (requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects, FilesizeException, FailedDownload, NotAVideo) as e:
                 # FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
                 # FailedDownload raised when response other than 200 received
                 # NotAVideo raised due to specific Content-Type known to not be a video (and not a webpage/html that could lead to a video via YT-DLP)
@@ -570,9 +575,12 @@ class VideoDownloaderPlus(BasicProcessor):
                 # Verify video
                 # YT-DLP will download images; so we raise them differently
                 # TODO: test/research other possible ways to verify video links; watch for additional YT-DLP oddities
-                if "image" in response.headers["Content-Type"].lower():
+                content_type = response.headers.get("Content-Type")
+                if not content_type:
+                    raise VideoStreamUnavailable(f"Unable to verify video; no Content-Type provided: {url}")
+                elif "image" in content_type.lower():
                     raise NotAVideo("Not a Video (%s): %s" % (response.headers["Content-Type"], url))
-                elif "video" not in response.headers["Content-Type"].lower():
+                elif "video" not in content_type.lower():
                     raise VideoStreamUnavailable(f"Does not appear to be a direct to video link: {url}; "
                                                  f"Content-Type: {response.headers['Content-Type']}")
 
@@ -636,6 +644,9 @@ class VideoDownloaderPlus(BasicProcessor):
                 value = post.get(column)
                 if not value:
                     continue
+
+                if value is not str:
+                    value = str(value)
 
                 video_links = self.identify_video_urls_in_string(value)
                 if video_links:

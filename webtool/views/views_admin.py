@@ -1,10 +1,10 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
-import itertools
 import markdown2
 import datetime
 import psycopg2
+import psycopg2.errors
 import tailer
 import smtplib
 import time
@@ -26,8 +26,7 @@ from webtool import app, db, config, fourcat_modules
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
-
-from common.lib.helpers import call_api, send_email, UserInput
+from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -62,18 +61,22 @@ def admin_frontpage():
     }
 
     disk_stats = {
-        "data": sum([f.stat().st_size for f in config.get("PATH_DATA").glob("**/*") if f.is_file()]),
-        "logs": sum([f.stat().st_size for f in config.get("PATH_LOGS").glob("**/*") if f.is_file()]),
-        "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
+        "data": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_data'"),
+        "logs": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_logs'"),
+        "db": db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_db'"),
     }
 
+    # it is possible these stats don't exist yet, so replace with 0 if that is the case
+    disk_stats = {k: v["count"] if v else 0 for k, v in disk_stats.items()}
+
     upgrade_available = not not db.fetchone(
-        "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+        "SELECT * FROM users_notifications WHERE username = '!admin' AND notification LIKE 'A new version of 4CAT%'")
 
     tags = config.get_active_tags(current_user)
+    current_branch = get_git_branch()
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
         "captured": num_items, "datasets": num_datasets, "disk": disk_stats
-    }, upgrade_available=upgrade_available, tags=tags)
+    }, upgrade_available=upgrade_available, tags=tags, current_branch=current_branch)
 
 
 @app.route("/admin/users/", defaults={"page": 1})
@@ -96,13 +99,17 @@ def list_users(page):
     filter_bits = []
     replacements = []
     if filter_name:
-        filter_bits.append("(name LIKE %s OR userdata::json->>'notes' LIKE %s)")
+        filter_bits.append("(name ILIKE %s OR userdata::json->>'notes' ILIKE %s)")
         replacements.append("%" + filter_name + "%")
         replacements.append("%" + filter_name + "%")
 
     if tag:
-        filter_bits.append("tags != '[]' AND tags @> %s")
-        replacements.append('["' + tag + '"]')
+        if tag.startswith("user:"):
+            filter_bits.append("name LIKE %s")
+            replacements.append(re.sub("^user:", "", tag))
+        else:
+            filter_bits.append("tags != '[]' AND tags @> %s")
+            replacements.append('["' + tag + '"]')
 
     filter_bit = "WHERE " + (" AND ".join(filter_bits)) if filter_bits else ""
     order_bit = "name ASC"
@@ -130,8 +137,13 @@ def list_users(page):
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_worker_status():
-    workers = call_api("worker-status")["response"]["running"]
-    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=fourcat_modules.workers,
+    workers = [
+        {
+            **worker,
+            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=db)
+        } for worker in call_api("worker-status")["response"]["running"]
+    ]
+    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
                            now=time.time())
 
 
@@ -189,7 +201,7 @@ def add_user():
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
-        except psycopg2.IntegrityError:
+        except (psycopg2.IntegrityError, psycopg2.errors.UniqueViolation):
             db.rollback()
             if not force:
                 response = {**response, **{
@@ -211,8 +223,13 @@ def add_user():
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
                             username, url, url)}}
                 except RuntimeError as e:
+                    # Grab the token and provide it to the admin, so they can send to user
+                    new_token = user.generate_token()
+                    url_base = config.get("flask.server_name")
+                    protocol = "https" if config.get("flask.https") else "http"
+                    url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, new_token)
                     response = {**response, **{
-                        "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
+                        "message": "Token was reset but registration e-mail could not be sent (%s). Reset password link: [%s](%s)" % (e, url, url)}}
 
     if fmt == "html":
         if redirect_to_page:
@@ -425,9 +442,17 @@ def manipulate_tags():
     tags = [{"tag": tag, "explicit": True} for tag in tag_priority]
     tags.extend([{"tag": tag, "explicit": False} for tag in all_tags if tag not in tag_priority])
 
-    if not tags:
+    if not [tag for tag in tags if tag["tag"] == "admin"]:
         # admin tag always exists
-        tags = [{"tag": "admin", "explicit": True}]
+        tags.append({"tag": "admin", "explicit": True})
+
+    num_admins = 0
+    for i, tag in enumerate(tags):
+        tags[i]["users"] = db.fetchone("SELECT COUNT(*) AS count FROM users WHERE tags != '[]' AND tags @> %s", ('["' + tag["tag"] + '"]',))["count"]
+        if tag["tag"] == "admin":
+            num_admins = tags[i]["users"]
+        elif tag["tag"].startswith("user:"):
+            tags[i]["users"] = 1  # by definition
 
     if request.method == "POST":
         try:
@@ -468,7 +493,7 @@ def manipulate_tags():
         # always async
         return jsonify({"success": True})
 
-    return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
+    return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
 @app.route("/admin/settings", methods=["GET", "POST"])
@@ -555,13 +580,32 @@ def manipulate_settings():
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
             default = json.dumps(default)
 
+        # this is used for organising things in the UI
+        option_owner = option.split(".")[0]
+        submenu = "other"
+        if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
+                                    "logging", "ui"):
+            submenu = "core"
+        elif option_owner.endswith("-search"):
+            submenu = "datasources"
+        elif option_owner in backend.all_modules.processors:
+            submenu = "processors"
+
+        tabname = config_definition.categories.get(option_owner)
+        if not tabname:
+            tabname = modules.get(option_owner)
+        if not tabname:
+            tabname = option_owner
+
         options[option] = {
             **definition.get(option, {
                 "type": UserInput.OPTION_TEXT,
                 "help": option,
                 "default": all_settings.get(option)
             }),
+            "submenu": submenu,
             "default": default,
+            "tabname": tabname,
             "is_changed": is_changed
         }
 
@@ -569,6 +613,7 @@ def manipulate_settings():
             changed_categories.add(option.split(".")[0])
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
+    options = {k: options[k] for k in sorted(options, key=lambda o: options[o]["tabname"])}
 
     # 'data sources' is one setting but we want to be able to indicate
     # overrides per sub-item
@@ -613,7 +658,7 @@ def manipulate_notifications():
             incomplete.append("username")
 
         recipient = User.get_by_name(db, params["username"])
-        if not recipient and params["username"] not in ("!everyone", "!admins"):
+        if not recipient and not params["username"].startswith("!"):
             flash("User '%s' does not exist" % params["username"])
             incomplete.append("username")
 
@@ -674,7 +719,8 @@ def view_logs():
 
     :return:
     """
-    return render_template("controlpanel/logs.html")
+    headers = "\n".join([f"{h}: {request.headers[h]}" for h in dict(request.headers)])
+    return render_template("controlpanel/logs.html", headers=headers)
 
 
 @app.route("/logs/<string:logfile>/")

@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 import logging
 
 from functools import partial
@@ -21,6 +22,7 @@ from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug import Request
 
 from common.config_manager import config
 from common.lib.database import Database
@@ -41,12 +43,16 @@ app = Flask(__name__)
 proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
 app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
-# Set up logging for Gunicorn; only run w/ Docker
 if config.get("USING_DOCKER"):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
     log = Logger(filename='frontend_4cat.log')
 
+else:
+    log = Logger()
+
+# Set up logging for Gunicorn
+if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     # Add Gunicorn error log to main app logger
     gunicorn_logger = logging.getLogger('gunicorn.error')
     app.logger.handlers = gunicorn_logger.handlers
@@ -99,14 +105,16 @@ login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous"
 login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
+# Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
+Request.max_form_parts = config.get("flask.max_form_parts", 1000)
+
 # import all views
 import webtool.views.views_admin
+import webtool.views.views_extensions
 import webtool.views.views_restart
 import webtool.views.views_user
-
 import webtool.views.views_dataset
 import webtool.views.views_misc
-
 import webtool.views.api_explorer
 import webtool.views.api_standalone
 import webtool.views.api_tool

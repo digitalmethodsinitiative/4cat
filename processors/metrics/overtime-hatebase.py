@@ -27,6 +27,8 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 	description = "Extracts offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset. Also includes engagement metrics."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	references = [
 		"[Hatebase.org](https://hatebase.org)",
 		"[Rogers, Richard. 2020. \"Deplatforming: Following extreme Internet celebrities to Telegram and alternative social media.\" European Journal of Culture, vol. 35, no . 3: 213-229.](https://journals.sagepub.com/doi/pdf/10.1177/0267323120922066)"

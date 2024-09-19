@@ -255,7 +255,7 @@ class Database:
 		protoquery += " ON CONFLICT"
 
 		if constraints:
-			protoquery += "(" + ", ".join(["{}" for each in constraints]) + ")"
+			protoquery += " (" + ", ".join(["{}" for each in constraints]) + ")"
 			identifiers.extend([sql.Identifier(column) for column in constraints])
 
 		protoquery += " DO UPDATE SET "
@@ -293,6 +293,14 @@ class Database:
 			result = cursor.fetchall()
 		except AttributeError:
 			result = []
+		except psycopg2.ProgrammingError as e:
+			# there seems to be a bug with psycopg2 where it sometimes raises
+			# this for empty query results even though it shouldn't. this
+			# doesn't seem to indicate an actual problem so we catch the
+			# exception and return an empty list
+			self.rollback()
+			result = []
+			self.log.warning("Caught ProgrammingError: %s" % e)
 
 		cursor.close()
 		self.commit()
@@ -317,6 +325,7 @@ class Database:
 			# no results to fetch
 			self.rollback()
 			result = None
+			self.log.warning("Caught ProgrammingError: %s" % e)
 
 		cursor.close()
 		self.commit()
@@ -366,8 +375,11 @@ class Database:
 		# collect results
 		try:
 			result = cursor.fetchall()
-		except (AttributeError, psycopg2.ProgrammingError) as e:
+		except AttributeError as e:
 			result = []
+		except psycopg2.ProgrammingError as e:
+			result = []
+			self.log.warning("Caught ProgrammingError: %s" % e)
 
 		# clean up cancelling job when we have the data
 		self.interruptable_job.finish()

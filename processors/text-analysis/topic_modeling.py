@@ -30,6 +30,8 @@ class TopicModeler(BasicProcessor):
                   "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
+    followups = ["document_count", "document_topic_matrix", "topic-model-words"]
+
     options = {
         "vectoriser": {
             "type": UserInput.OPTION_CHOICE,

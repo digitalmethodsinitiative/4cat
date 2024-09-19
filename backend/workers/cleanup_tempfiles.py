@@ -25,6 +25,8 @@ class TempFileCleaner(BasicWorker):
     type = "clean-temp-files"
     max_workers = 1
 
+    ensure_job = {"remote_id": "localhost", "interval": 10800}
+
     def work(self):
         """
         Go through result files, and for each one check if it should still
@@ -59,7 +61,12 @@ class TempFileCleaner(BasicWorker):
                 # exists - should be safe to clean up
                 self.log.info("No matching dataset with key %s for file %s, deleting file" % (key, str(file)))
                 if file.is_dir():
-                    shutil.rmtree(file)
+                    try:
+                        shutil.rmtree(file)
+                    except PermissionError:
+                        self.log.info(f"Folder {file} does not belong to a dataset but cannot be deleted (no "
+                                      f"permissions), skipping")
+
                 else:
                     try:
                         file.unlink()
@@ -73,6 +80,8 @@ class TempFileCleaner(BasicWorker):
                 # if the dataset is finished, the staging area should have been
                 # compressed into a zip file, or deleted, so this is also safe
                 # to clean up
-                self.log.debug("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
+                self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
                 dataset.key, str(file)))
                 shutil.rmtree(file)
+
+        self.job.finish()

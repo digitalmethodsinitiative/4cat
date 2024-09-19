@@ -8,6 +8,7 @@ import math
 
 from PIL import Image, ImageFile, ImageOps, ImageDraw, UnidentifiedImageError
 from sklearn.cluster import KMeans
+from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
@@ -53,7 +54,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type.startswith("image-downloader")
+		return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -152,21 +153,25 @@ class ImageWallGenerator(BasicProcessor):
 			try:
 				picture = Image.open(str(path))
 			except UnidentifiedImageError:
-				self.dataset.update_status("Image %s could not be parsed. Skipping." % path)
+				self.dataset.update_status(f"File {path.name} could not be parsed. Skipping.")
 				continue
 
-			self.dataset.update_status("Analysing %s (%i/%i)" % (path.name, len(dimensions), self.source_dataset.num_rows))
+			self.dataset.update_status(f"Analysing {path.name} ({len(dimensions):,}/{self.source_dataset.num_rows:,})")
 			self.dataset.update_progress(len(dimensions) / self.source_dataset.num_rows / 2)
 
 			# these calculations can take ages for huge images, so resize if it is
 			# larger than the threshold
-			dimensions[path.name] = (picture.width, picture.height)
+			dimensions[str(path)] = (picture.width, picture.height)
 			value = 0
 			
 			if sort_mode not in ("", "random") and (picture.height > sample_max or picture.width > sample_max):
 				sample_width = int(sample_max * picture.width / max(picture.width, picture.height))
 				sample_height = int(sample_max * picture.height / max(picture.width, picture.height))
-				picture = ImageOps.fit(picture, (sample_width, sample_height))
+				try:
+					picture = ImageOps.fit(picture, (sample_width, sample_height))
+				except ValueError:
+					# Default of BICUBIC may fail
+					picture = ImageOps.fit(picture, (sample_width, sample_height), method=Image.NEAREST)
 
 			if sort_mode not in ("", "random"):
 				# ensure we get RGB values for pixels
@@ -238,9 +243,9 @@ class ImageWallGenerator(BasicProcessor):
 
 			# converted to HSV, because RGB does not sort nicely
 			if type(value) is int:
-				image_colours[path.name] = value
+				image_colours[str(path)] = value
 			else:
-				image_colours[path.name] = colorsys.rgb_to_hsv(*value)
+				image_colours[str(path)] = colorsys.rgb_to_hsv(*value)
 
 			index += 1
 
@@ -331,9 +336,9 @@ class ImageWallGenerator(BasicProcessor):
 			size_y = math.ceil(fitted_pixels / size_x / tile_y) * tile_y
 
 		else:
-			raise NotImplementedError("Sizing mode '%s' not implemented" % sizing_mode)
+			raise NotImplementedError(f"Sizing mode '{sizing_mode}' not implemented")
 
-		self.dataset.log("Canvas size is %ix%i" % (size_x, size_y))
+		self.dataset.log(f"Canvas size is {size_x}x{size_y}")
 		wall = Image.new("RGBA", (int(size_x), int(size_y)))
 		ImageDraw.floodfill(wall, (0, 0), (255, 255, 255, 0))  # transparent background
 		counter = 0
@@ -345,16 +350,22 @@ class ImageWallGenerator(BasicProcessor):
 
 		# now actually putting the images on a wall is relatively trivial
 		for path in sorted_image_files:
+			path = Path(path)
 			counter += 1
-			self.dataset.update_status("Rendering %s (%i/%i) to image wall" % (path, counter, len(sorted_image_files)))
+			self.dataset.update_status(f"Rendering {path.name} ({counter:,}/{len(sorted_image_files):,}) to image wall")
 			self.dataset.update_progress(0.5 + (counter / len(sorted_image_files) / 2))
 			picture = Image.open(str(staging_area.joinpath(path)))
 
 			if tile_x == -1:
 				picture_x = max(1, int(picture.width * (tile_y / picture.height)))
-				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.BILINEAR)
 			else:
-				picture = ImageOps.fit(picture, (tile_x, tile_y), method=Image.BILINEAR)
+				picture_x = tile_x
+
+			try:
+				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.BILINEAR)
+			except ValueError:
+				# BILINEAR may also fail
+				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.NEAREST)
 
 			# simply put them side by side until the right edge is reached,
 			# then move to a new row

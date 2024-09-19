@@ -27,10 +27,10 @@ class VideoSceneTimelineCreator(ProcessorPreset):
         Compatible with downloaded videos, and not really anything else!
         Additionally ffmpeg needs to be available.
 
-        :param str module:  Module ID to determine compatibility with
+        :param DataSet module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type.startswith("video-downloader") and \
+        return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
                config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 

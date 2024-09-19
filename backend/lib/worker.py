@@ -127,13 +127,22 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			self.abort()
 		except ProcessorException as e:
 			self.log.error(str(e), frame=e.frame)
-			self.job.add_status("Crash during execution")
 		except Exception as e:
 			frames = traceback.extract_tb(e.__traceback__)
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
-			self.job.add_status("Crash during execution")
+
+		# Clean up after work successfully completed or terminates
+		self.clean_up()
+
+	def clean_up(self):
+		"""
+		Clean up after a processor runs successfully or results in error.
+		Workers should override this method to implement any procedures
+		to run to clean up a worker; by default this does nothing.
+		"""
+		pass
 
 	def abort(self):
 		"""
@@ -169,3 +178,27 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		classes should implement this method.
 		"""
 		pass
+
+	@staticmethod
+	def is_4cat_class():
+		"""
+		Is this a 4CAT class?
+
+		This is used to determine whether a class is a 4CAT worker or a
+		processor. This method should always return True for workers.
+
+		:return:  True
+		"""
+		return True
+	
+	@staticmethod
+	def is_4cat_processor():
+		"""
+		Is this a 4CAT processor?
+
+		This is used to determine whether a class is a 4CAT
+		processor.
+		
+		:return:  False
+		"""
+		return False

@@ -17,7 +17,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_setting
 
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
-  id                     SERIAL PRIMARY KEY,
+  id                     BIGSERIAL PRIMARY KEY,
   jobtype                text    DEFAULT 'misc',
   remote_id              text,
   details                text,
@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS jobs (
   timestamp_after        integer DEFAULT 0,
   timestamp_lastclaimed  integer DEFAULT 0,
   timestamp_claimed      integer DEFAULT 0,
-  status                 text,
   attempts               integer DEFAULT 0,
   interval               integer DEFAULT 0
 );
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   key_parent        text DEFAULT '' NOT NULL,
   creator           VARCHAR DEFAULT 'anonymous',
   query             text,
-  job               integer DEFAULT 0,
+  job               BIGINT DEFAULT 0,
   parameters        text,
   result_file       text DEFAULT '',
   timestamp         integer,
@@ -57,6 +56,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   is_private        boolean DEFAULT TRUE,
   software_version  text,
   software_file     text DEFAULT '',
+  software_source   text DEFAULT '',
   annotation_fields text DEFAULT ''
 );
 
@@ -81,8 +81,11 @@ CREATE TABLE IF NOT EXISTS metrics (
   datasource         text,
   board              text,
   date               text,
-  count              integer
+  count              BIGINT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_metrics
+    ON metrics (metric, datasource, board, date);
 
 -- users
 CREATE TABLE IF NOT EXISTS users (

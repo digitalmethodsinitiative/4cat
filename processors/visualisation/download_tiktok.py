@@ -14,7 +14,9 @@ from common.config_manager import config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
+from processors.visualisation.download_videos import VideoDownloaderPlus
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
+from processors.visualisation.download_images import ImageDownloader
 from backend.lib.processor import BasicProcessor
 
 
@@ -30,6 +32,9 @@ class TikTokVideoDownloader(BasicProcessor):
     title = "Download TikTok Videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
+    media_type = "video"
+
+    followups = VideoDownloaderPlus.followups
 
     options = {
         "amount": {
@@ -63,7 +68,7 @@ class TikTokVideoDownloader(BasicProcessor):
         # Update the amount max and help from config
         max_number_videos = int(config.get('video-downloader.max', 1000, user=user))
         options['amount']['max'] = max_number_videos
-        options['amount']['help'] = f"No. of images (max {max_number_videos:,})"
+        options['amount']['help'] = f"No. of videos (max {max_number_videos:,})"
 
         return options
 
@@ -95,12 +100,15 @@ class TikTokVideoDownloader(BasicProcessor):
 
         self.dataset.update_status("Downloading TikTok media")
         video_ids_to_download = []
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(self):
             video_ids_to_download.append(mapped_item.get("id"))
 
+        # the downloader is an asynchronous method because we want to be able
+        # to run multiple downloads in parallel
         tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
-        results = loop.run_until_complete(tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
+        results = loop.run_until_complete(
+            tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
@@ -135,6 +143,9 @@ class TikTokImageDownloader(BasicProcessor):
     title = "Download TikTok Images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
+    media_type = "image"
+
+    followups = ImageDownloader.followups
 
     options = {
         "amount": {
@@ -174,9 +185,9 @@ class TikTokImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get('image-downloader.max', 1000))
+        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
         options['amount']['max'] = max_number_images
-        options['amount']['help'] = "No. of images (max %s)" % max_number_images
+        options['amount']['help'] = f"No. of images (max {max_number_images:,})"
 
         return options
 
@@ -222,7 +233,7 @@ class TikTokImageDownloader(BasicProcessor):
         metadata = {}
 
         # Loop through items and collect URLs
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(self):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
 
@@ -299,6 +310,11 @@ class TikTokImageDownloader(BasicProcessor):
                         raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
 
                     refreshed_mapped_item = SearchTikTokByImport.map_item(refreshed_item)
+                    if refreshed_mapped_item.get_missing_fields():
+                        self.dataset.log(f"The following fields were missing in item and have been replaced with a "
+                                         f"default value: {', '.join(refreshed_mapped_item.get_missing_fields())}")
+
+                    refreshed_mapped_item = refreshed_mapped_item.get_item_data(safe=True)
                     post_id = refreshed_mapped_item.get("id")
                     url = refreshed_mapped_item.get(url_column)
 

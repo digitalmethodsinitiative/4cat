@@ -1,5 +1,3 @@
-version: '3.6'
-
 services:
   db:
     container_name: 4cat_db
@@ -39,6 +37,8 @@ services:
   frontend:
     image: 4cat
     container_name: 4cat_frontend
+    env_file:
+      - .env
     depends_on:
       - db
       - backend
@@ -49,7 +49,7 @@ services:
       - ./data/datasets/:/usr/src/app/data/
       - ./data/config/:/usr/src/app/config/
       - ./data/logs/:/usr/src/app/logs/
-    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
+    command: ["docker/wait-for-backend.sh"]
 
 volumes:
   4cat_db:

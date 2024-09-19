@@ -78,6 +78,7 @@ class WorkerManager:
 			all_workers = self.worker_pool[jobtype]
 			for worker in all_workers:
 				if not worker.is_alive():
+					self.log.debug(f"Terminating worker {worker.job.data['jobtype']}/{worker.job.data['remote_id']}")
 					worker.join()
 					self.worker_pool[jobtype].remove(worker)
 
@@ -99,6 +100,7 @@ class WorkerManager:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=self.modules)
 						worker.start()
+						self.log.debug(f"Starting new worker of for job {job.data['jobtype']}/{job.data['remote_id']}")
 						self.worker_pool[jobtype].append(worker)
 					except JobClaimedException:
 						# it's fine
@@ -123,23 +125,35 @@ class WorkerManager:
 				self.looping = False
 
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
+		# request shutdown from all workers except the API
+		# this allows us to use the API to figure out if a certain worker is
+		# hanging during shutdown, for example
 		for jobtype in self.worker_pool:
+			if jobtype == "api":
+				continue
+
 			for worker in self.worker_pool[jobtype]:
 				if hasattr(worker, "request_interrupt"):
 					worker.request_interrupt()
 				else:
 					worker.abort()
 
-		# wait for all workers to finish
+		# wait for all workers that we just asked to quit to finish
 		self.log.info("Waiting for all workers to finish...")
 		for jobtype in self.worker_pool:
+			if jobtype == "api":
+				continue
 			for worker in self.worker_pool[jobtype]:
 				self.log.info("Waiting for worker %s..." % jobtype)
 				worker.join()
 
-		time.sleep(3)
+		# shut down API last
+		for worker in self.worker_pool.get("api", []):
+			worker.request_interrupt()
+			worker.join()
 
 		# abort
+		time.sleep(1)
 		self.log.info("Bye!")
 
 	def validate_datasources(self):

@@ -7,7 +7,7 @@ to its aggressive rate limiting. Instead, import data collected elsewhere.
 from datetime import datetime
 
 from backend.lib.search import Search
-
+from common.lib.item_mapping import MappedItem
 
 class SearchNineGag(Search):
     """
@@ -18,7 +18,7 @@ class SearchNineGag(Search):
     title = "Import scraped Imgur data"  # title displayed in UI
     description = "Import Imgur data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -36,29 +36,29 @@ class SearchNineGag(Search):
         raise NotImplementedError("Imgur datasets can only be created by importing data from elsewhere")
 
     @staticmethod
-    def map_item(post):
-        post_timestamp = datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+    def map_item(item):
+        post_timestamp = datetime.strptime(item["created_at"], "%Y-%m-%dT%H:%M:%SZ")
 
-        return {
-            "id": post["id"],
-            "subject": post["title"],
-            "body": post["description"],
+        return MappedItem({
+            "id": item["id"],
+            "subject": item["title"],
+            "body": item["description"],
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "author": post["account_id"],
-            "type": post["cover"]["type"],
-            "media_url": post["cover"]["url"],
-            "post_url": post["url"],
-            "album_media": post["image_count"],
-            "is_ad": "no" if not post["is_ad"] else "yes",
-            "is_album": "no" if not post["is_album"] else "yes",
-            "is_mature": "no" if not post["is_mature"] else "yes",
-            "is_viral": "no" if not post["in_most_viral"] else "yes",
-            "views": post["view_count"],
-            "upvotes": post["upvote_count"],
-            "downvotes": post["downvote_count"],
-            "score": post["point_count"],
-            "comments": post["comment_count"],
-            "favourites": post["favorite_count"],
-            "virality_score": post["virality"],
+            "author": item["account_id"],
+            "type": item["cover"]["type"],
+            "media_url": item["cover"]["url"],
+            "post_url": item["url"],
+            "album_media": item["image_count"],
+            "is_ad": "no" if not item["is_ad"] else "yes",
+            "is_album": "no" if not item["is_album"] else "yes",
+            "is_mature": "no" if not item["is_mature"] else "yes",
+            "is_viral": "no" if not item["in_most_viral"] else "yes",
+            "views": item["view_count"],
+            "upvotes": item["upvote_count"],
+            "downvotes": item["downvote_count"],
+            "score": item["point_count"],
+            "comments": item["comment_count"],
+            "favourites": item["favorite_count"],
+            "virality_score": item["virality"],
             "unix_timestamp": int(post_timestamp.timestamp()),
-        }
+        })

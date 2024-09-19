@@ -23,7 +23,7 @@ class Pagination(object):
 	Provide pagination
 	"""
 
-	def __init__(self, page, per_page, total_count, route="show_results"):
+	def __init__(self, page, per_page, total_count, route="show_results", route_args=None):
 		"""
 		Set up pagination object
 
@@ -36,6 +36,7 @@ class Pagination(object):
 		self.per_page = per_page
 		self.total_count = total_count
 		self.route = route
+		self.route_args = route_args if route_args else {}
 
 	@property
 	def pages(self):
@@ -223,7 +224,7 @@ def make_html_colour(rgb):
 def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="favicon.ico"):
 	"""
 	Converts an RGBA image to a different color by first converting to black and then colorizing the image
-	and readding the alpha stream. It works best with Black and White images (already colored images appear
+	and re-adding the alpha stream. It works best with Black and White images (already colored images appear
 	washed out).
 
 	:param str/RGB color:   Accepts either a string represening a color from ImageColor.colormap or a

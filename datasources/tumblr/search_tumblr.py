@@ -76,54 +76,98 @@ class SearchTumblr(Search):
 	}
 	references = ["[Tumblr API documentation](https://www.tumblr.com/docs/en/api/v2)"]
 
-	options = {
-		"intro": {
-			"type": UserInput.OPTION_INFO,
-			"help": "Retrieve any kind of Tumblr posts with specific tags or from specific blogs. Gets 100.000 posts "
-					"at max. Insert tags or names of blogs, one on each line. You may insert up to ten tags or "
-					"blogs.\n\nTumblr tags may include whitespace and commas. A `#` before the tag is optional.\n\n"
-					"Tag search only get posts explicitly associated with the exact tag you insert here. Querying "
-					"`gogh` will thus not get posts only tagged with `van gogh`. Keyword search is unfortunately not "
-					"allowed by the [Tumblr API](https://api.tumblr.com).\n\nIf 4CAT reached its Tumblr API rate "
-					"limit, try again 24 hours later."
-		},
-		"search_scope": {
-			"type": UserInput.OPTION_CHOICE,
-			"help": "Search by",
-			"options": {
-				"tag": "Tag",
-				"blog": "Blog"
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Check is Tumbler keys configured and if not, requests from User
+		"""
+		options = {
+			"intro": {
+				"type": UserInput.OPTION_INFO,
+				"help": "Retrieve any kind of Tumblr posts with specific tags or from specific blogs. Gets 100.000 posts "
+						"at max. Insert tags or names of blogs, one on each line. You may insert up to ten tags or "
+						"blogs.\n\nTumblr tags may include whitespace and commas. A `#` before the tag is optional.\n\n"
+						"Tag search only get posts explicitly associated with the exact tag you insert here. Querying "
+						"`gogh` will thus not get posts only tagged with `van gogh`. Keyword search is unfortunately not "
+						"allowed by the [Tumblr API](https://api.tumblr.com).\n\nIf 4CAT reached its Tumblr API rate "
+						"limit, try again 24 hours later."
 			},
-			"default": "tag"
-		},
-		"query": {
-			"type": UserInput.OPTION_TEXT_LARGE,
-			"help": "Tags/blogs",
-			"tooltip": "Separate with commas or new lines."
-		},
-		"fetch_reblogs": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Also fetch reblogs with text? (warning: slow)",
-			"default": False
-		},
-		"divider": {
-			"type": UserInput.OPTION_DIVIDER
-		},
-		"date-intro": {
-			"type": UserInput.OPTION_INFO,
-			"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is volatile: when fetching sporadically used "
-					"tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases "
-					"the date parameter (<code>before</code>) with six hours and sends the query again. This often "
-					"successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 "
-					"days), it checks for data up to six years before the last date, decreasing 12 times by 6 months. "
-					"If that also results in nothing, it assumes the dataset is complete. Check the oldest post in "
-					"your dataset to see if it this is indeed the case and whether any odd time gaps exists."
-		},
-		"daterange": {
-			"type": UserInput.OPTION_DATERANGE,
-			"help": "Date range"
+			"search_scope": {
+				"type": UserInput.OPTION_CHOICE,
+				"help": "Search by",
+				"options": {
+					"tag": "Tag",
+					"blog": "Blog"
+				},
+				"default": "tag"
+			},
+			"query": {
+				"type": UserInput.OPTION_TEXT_LARGE,
+				"help": "Tags/blogs",
+				"tooltip": "Separate with commas or new lines."
+			},
+			"fetch_reblogs": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Also fetch reblogs with text? (warning: slow)",
+				"default": False
+			}
 		}
-	}
+
+		try:
+			config_keys = SearchTumblr.get_tumbler_keys(user)
+		except ConfigException:
+			# No 4CAT set keys for user; let user input their own
+			options["key-info"] = {
+				"type": UserInput.OPTION_INFO,
+				"help": "In order to access the Tumblr API, you need to register an application. You can do so "
+						"[here](https://www.tumblr.com/oauth/apps) and use the keys below. You will first get the OAuth "
+						"Consumer Key and Secret, and then the User Token Key and Secret [after entering them here](ht"
+									  "tps://api.tumblr.com/console/calls/user/info) and granting access."
+			}
+			options["consumer_key"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "OAuth Consumer Key"
+			}
+			options["consumer_secret"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "OAuth Consumer Secret"
+			}
+			options["key"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "User Token Key"
+			}
+			options["secret_key"] = {
+				"type": UserInput.OPTION_TEXT,
+				"sensitive": True,
+				"cache": True,
+				"help": "User Token Secret"
+			}
+
+		options["divider"] = {
+				"type": UserInput.OPTION_DIVIDER
+			}
+		options["date-intro"] = {
+				"type": UserInput.OPTION_INFO,
+				"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is volatile: when fetching sporadically used "
+						"tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases "
+						"the date parameter (<code>before</code>) with six hours and sends the query again. This often "
+						"successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 "
+						"days), it checks for data up to six years before the last date, decreasing 12 times by 6 months. "
+						"If that also results in nothing, it assumes the dataset is complete. Check the oldest post in "
+						"your dataset to see if it this is indeed the case and whether any odd time gaps exists."
+			}
+		options["daterange"] = {
+				"type": UserInput.OPTION_DATERANGE,
+				"help": "Date range"
+			}
+
+		return options
 
 	def get_items(self, query):
 		"""
@@ -259,7 +303,7 @@ class SearchTumblr(Search):
 		# We're gonna change max_date, so store a copy for reference.
 		max_date_original = max_date
 
-		# We use the averag time difference between posts to spot possible gaps in the data.
+		# We use the average time difference between posts to spot possible gaps in the data.
 		all_time_difs = []
 		avg_time_dif = 0
 		time_difs_len = 0
@@ -621,20 +665,30 @@ class SearchTumblr(Search):
 
 		return result
 
+	@staticmethod
+	def get_tumbler_keys(user):
+		config_keys = [
+			config.get("api.tumblr.consumer_key", user=user),
+			config.get("api.tumblr.consumer_secret", user=user),
+			config.get("api.tumblr.key", user=user),
+			config.get("api.tumblr.secret_key", user=user)]
+		if not all(config_keys):
+			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
+		return config_keys
+
 	def connect_to_tumblr(self):
 		"""
 		Returns a connection to the Tumblr API using the pytumblr library.
 
 		"""
-
-		config_keys = [
-			self.config.get("api.tumblr.consumer_key"),
-			self.config.get("api.tumblr.consumer_secret"),
-			self.config.get("api.tumblr.key"),
-			self.config.get("api.tumblr.secret_key")]
-
+		# User input keys
+		config_keys = [self.parameters.get("consumer_key"),
+			self.parameters.get("consumer_secret"),
+			self.parameters.get("key"),
+			self.parameters.get("secret_key")]
 		if not all(config_keys):
-			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
+			# No user input keys; attempt to use 4CAT config keys
+			config_keys = self.get_tumbler_keys(self.owner)
 
 		self.client = pytumblr.TumblrRestClient(*config_keys)
 
