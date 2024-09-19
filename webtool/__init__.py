@@ -69,10 +69,6 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
 
-else:
-    log = Logger()
-
-fourcat_modules = ModuleCollector()
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
               password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
               port=config.get("DB_PORT"), appname="frontend")
