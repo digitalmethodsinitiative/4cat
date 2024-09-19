@@ -20,6 +20,7 @@ from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
 								   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
+from common.lib.user import User
 
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -112,7 +113,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# creator. This ensures that if a value has been overriden for the owner,
 		# the overridden value is used instead.
 		config.with_db(self.db)
-		self.config = ConfigWrapper(config=config, user=self.owner)
+		self.config = ConfigWrapper(config=config, user=User.get_by_name(self.db, self.owner))
 
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
@@ -164,7 +165,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# start log file
 		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_commit())
+		self.dataset.update_version(get_software_commit(self))
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided
@@ -628,7 +629,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
 
-	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED):
+	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
 		"""
 		Archive a bunch of files into a zip archive and finish processing
 
@@ -639,6 +640,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		  files added to the archive will be used.
 		:param int compression:  Type of compression to use. By default, files
 		  are not compressed, to speed up unarchiving.
+		:param bool finish:  Finish the dataset/job afterwards or not?
 		"""
 		is_folder = False
 		if issubclass(type(files), PurePath):
@@ -665,7 +667,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if num_items is None:
 			num_items = done
 
-		self.dataset.finish(num_items)
+		if finish:
+			self.dataset.finish(num_items)
 
 	def create_standalone(self):
 		"""

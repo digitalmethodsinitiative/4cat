@@ -1,0 +1,55 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}4CAT Extensions{% endblock %}
+{% block body_class %}plain-page admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "extensions" %}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section class="result-list">
+            <h2><span>4CAT Extensions</span></h2>
+                        {% for notice in flashes %}
+                            <p class="form-notice">{{ notice|safe }}</p>
+                        {% endfor %}
+            <p>4CAT extensions can be installed in the <code>extensions</code> folder in the 4CAT root. For more
+                information, see the README file in that folder. This page lists all currently installed extensions;
+                currently, to manage extensions you will need to access the filesystem and move files into the correct
+                location manually.</p>
+            <div class="user-panel">
+                <table class="fullwidth notification-table cp-table">
+                    <colgroup>
+                        <col>
+                        <col>
+                        <col class="actions">
+                    </colgroup>
+                    <tr>
+                        <th>Extension</th>
+                        <th>Version</th>
+                        <th>Links</th>
+                    </tr>
+                    {% if extensions %}
+                        {% for extension_id, extension in extensions.items() %}
+                            <tr>
+                                <td><span class="property-badge">{{ extension_id }}</span>{% if extension_id != extension.name %}
+                                    {{ extension.name }}{% endif %}</td>
+                                <td>{% if extension.version %}{{ extension.version }}{% else %}unknown{% endif %}</td>
+                                <td>
+                                    {% if extension.url and extension.url != extension.git_url %}
+                                        <a href="{{ extension.url }}"><i class="fa fa-fw fa-link" aria-hidden="true"></i><span
+                                                class="sr-only">Website</span></a>{% endif %}
+                                    {% if extension.git_url %}<a href="{{ extension.git_url }}"><i class="fab fa-fw fa-git{% if "github.com" in extension.git_url %}hub{% endif %}"
+                                                                                                   aria-hidden="true"></i><span
+                                            class="sr-only">Remote git repository</span></a>{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3">No 4CAT extensions are installed.</td>
+                        </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </section>
+    </article>
+{% endblock %}

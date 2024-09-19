@@ -384,8 +384,9 @@ def queue_dataset():
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
-	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
-	dataset.link_job(Job.get_by_remote_ID(dataset.key, db))
+	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=0)
+	new_job = Job.get_by_remote_ID(dataset.key, db)
+	dataset.link_job(new_job)
 
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
@@ -924,9 +925,16 @@ def check_search_queue():
 
 	:return-schema: {type=array,properties={jobtype={type=string}, count={type=integer}},items={type=string}}
 	"""
-	unfinished_datasets = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
+	unfinished_jobs = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
 
-	return jsonify(unfinished_datasets)
+	for i, job in enumerate(unfinished_jobs):
+		processor = backend.all_modules.processors.get(job["jobtype"])
+		if processor:
+			unfinished_jobs[i]["processor_name"] = processor.title
+		else:
+			unfinished_jobs[i]["processor_name"] = job["jobtype"]
+
+	return jsonify(unfinished_jobs)
 
 @app.route("/api/toggle-dataset-favourite/<string:key>")
 @login_required

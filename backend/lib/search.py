@@ -1,16 +1,16 @@
 import hashlib
+import zipfile
 import secrets
-import shutil
 import random
 import json
 import math
 import csv
+import os
 
 from pathlib import Path
 from abc import ABC, abstractmethod
 
 from common.config_manager import config
-from common.lib.dataset import DataSet
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
@@ -71,7 +71,6 @@ class Search(BasicProcessor, ABC):
 				items = self.import_from_file(query_parameters.get("file"))
 			else:
 				items = self.search(query_parameters)
-
 		except WorkerInterruptedException:
 			raise ProcessorInterruptedException("Interrupted while collecting data, trying again later.")
 
@@ -79,10 +78,12 @@ class Search(BasicProcessor, ABC):
 		num_items = 0
 		if items:
 			self.dataset.update_status("Writing collected data to dataset file")
-			if results_file.suffix == ".ndjson":
-				num_items = self.items_to_ndjson(items, results_file)
-			elif results_file.suffix == ".csv":
+			if self.extension == "csv":
 				num_items = self.items_to_csv(items, results_file)
+			elif self.extension == "ndjson":
+				num_items = self.items_to_ndjson(items, results_file)
+			elif self.extension == "zip":
+				num_items = self.items_to_archive(items, results_file)
 			else:
 				raise NotImplementedError("Datasource query cannot be saved as %s file" % results_file.suffix)
 
@@ -361,6 +362,22 @@ class Search(BasicProcessor, ABC):
 
 		return processed
 
+	def items_to_archive(self, items, filepath):
+		"""
+		Save retrieved items as an archive
+
+		Assumes that items is an iterable with one item, a Path object
+		referring to a folder containing files to be archived. The folder will
+		be removed afterwards.
+
+		:param items:
+		:param filepath:  Where to store the archive
+		:return int:  Number of items
+		"""
+		num_items = len(os.listdir(items))
+		self.write_archive_and_finish(items, None, zipfile.ZIP_STORED, False)
+		return num_items
+
 
 class SearchWithScope(Search, ABC):
 	"""
@@ -404,7 +421,7 @@ class SearchWithScope(Search, ABC):
 			# proportion of items matches
 			# first, get amount of items for all threads in which matching
 			# items occur and that are long enough
-			thread_ids = tuple([post["thread_id"] for post in items])
+			thread_ids = tuple([item["thread_id"] for item in items])
 			self.dataset.update_status("Retrieving thread metadata for %i threads" % len(thread_ids))
 			try:
 				min_length = int(query.get("scope_length", 30))
