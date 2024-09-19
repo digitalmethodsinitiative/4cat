@@ -101,7 +101,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		try:
 			# a dataset can have multiple owners, but the creator is the user
 			# that actually queued the processor, so their config is relevant
-			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
+			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db, modules=self.modules)
 			self.owner = self.dataset.creator
 		except DataSetException as e:
 			# query has been deleted in the meantime. finish without error,
@@ -259,7 +259,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					parent=self.dataset.key,
 					extension=available_processors[next_type].extension,
 					is_private=self.dataset.is_private,
-					owner=self.dataset.creator
+					owner=self.dataset.creator,
+					modules=self.modules
 				)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
