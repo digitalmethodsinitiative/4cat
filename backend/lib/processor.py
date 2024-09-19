@@ -789,7 +789,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param config:
 		:param DataSet parent_dataset:  An object representing the dataset that
 		  the processor would be run on
-
+		"""
 
 		return cls.options if hasattr(cls, "options") else {}
 

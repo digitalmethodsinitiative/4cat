@@ -59,9 +59,8 @@ class TikTokVideoDownloader(BasicProcessor):
 
         :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-can
-        be used to show some options only to privileges users.
+        the processor would be run on can be used to show some options only to
+        privileges users.
         """
         options = cls.options
 

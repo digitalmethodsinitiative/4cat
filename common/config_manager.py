@@ -320,10 +320,14 @@ class ConfigManager:
 
         # can provide either a string or user object
         if type(user) is not str:
+            if type(user).__name__ == "LocalProxy":
+                # passed on from Flask
+                user = user._get_current_object()
+
             if hasattr(user, "get_id"):
                 user = user.get_id()
             elif user is not None:
-                raise TypeError("get() expects None, a User object or a string for argument 'user'")
+                raise TypeError(f"get() expects None, a User object or a string for argument 'user' ({type(user).__name__} given)")
 
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups

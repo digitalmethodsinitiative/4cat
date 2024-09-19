@@ -60,11 +60,11 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
     options = {
         "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "coerce_type": int,
-                "help": "Number of images to generate",
-                "default": 20,
-            },
+            "type": UserInput.OPTION_TEXT,
+            "coerce_type": int,
+            "help": "Number of images to generate",
+            "default": 20,
+        },
         "prompt-column": {
             "type": UserInput.OPTION_TEXT,
             "default": False,
@@ -174,7 +174,6 @@ class StableDiffusionImageGenerator(BasicProcessor):
             elif user_max_prompts != 0 and len(prompts) >= user_max_prompts:
                 break
 
-
             prompts[item.get("id", len(prompts) + 1)] = {
                 "prompt": item.get(prompt_c, ""),
                 "negative": item.get(neg_c) if item.get(neg_c) is not None else ""
@@ -223,8 +222,8 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
         # interface.py args
         data = {"timeout": (86400 * 7), "args": ['--output-dir', f"data/{path_to_results}",
-                         "--prompts-file",
-                         f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(prompts_file.name))}"],
+                                                 "--prompts-file",
+                                                 f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(prompts_file.name))}"],
                 "pass_key": True,  # This tells the DMI SM there is a status update endpoint in the clip image
 
                 }

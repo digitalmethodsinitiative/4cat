@@ -44,11 +44,11 @@ class TelegramImageDownloader(BasicProcessor):
     config = {
         "image-downloader-telegram.max": {
             'type': UserInput.OPTION_TEXT,
-            'default' : "1000",
+            'default': "1000",
             'help': 'Max images',
             'tooltip': "Maxmimum number of Telegram images a user can download.",
-            },
-        }
+        },
+    }
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -86,7 +86,6 @@ class TelegramImageDownloader(BasicProcessor):
             }
         }
 
-
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -99,9 +98,9 @@ class TelegramImageDownloader(BasicProcessor):
             # we need these to actually instantiate a telegram client and
             # download the images
             return module.type == "telegram-search" and \
-                   "api_phone" in module.parameters and \
-                   "api_id" in module.parameters and \
-                   "api_hash" in module.parameters
+                "api_phone" in module.parameters and \
+                "api_id" in module.parameters and \
+                "api_hash" in module.parameters
         else:
             return module.type == "telegram-search"
 
@@ -224,7 +223,7 @@ class TelegramImageDownloader(BasicProcessor):
                         "from_dataset": self.source_dataset.key,
                         "post_ids": [msg_id]
                     }
-                    
+
             except ValueError as e:
                 self.dataset.log(f"Couldn't retrieve images for {entity}, it probably does not exist anymore ({e})")
                 self.flawless = False

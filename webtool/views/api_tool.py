@@ -316,7 +316,7 @@ def queue_dataset():
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
-			sanitised_query = search_worker.validate_query(sanitised_query, request, None)
+			sanitised_query = search_worker.validate_query(sanitised_query, request, config)
 
 		except QueryNeedsFurtherInputException as e:
 			# ask the user for more input by returning a HTML snippet
