@@ -22,7 +22,7 @@ packages = set([
 	"Flask~=2.2",
 	"Flask_Limiter==1.0.1",
 	"Flask_Login~=0.6",
-	"gensim>=4.1.0",
+	"gensim>=4.3.3, <4.4.0",
 	"google_api_python_client==2.0.2",
 	"html2text==2020.*",
 	"ImageHash>4.2.0",
