@@ -59,9 +59,9 @@ class ThingExpirer(BasicWorker):
 				raise WorkerInterruptedException("Interrupted while expiring datasets")
 
 			# the dataset creator's configuration context determines expiration
-			wrapper = ConfigWrapper(self.config, user=dataset["creator"])
 			try:
 				dataset = DataSet(key=dataset["key"], db=self.db)
+				wrapper = ConfigWrapper(self.config, user=User.get_by_name(self.db, dataset.creator))
 				if dataset.is_expired(config=wrapper):
 					self.log.info(f"Deleting dataset {dataset.key} (expired)")
 					dataset.delete()
@@ -89,7 +89,7 @@ class ThingExpirer(BasicWorker):
 			if self.interrupted:
 				raise WorkerInterruptedException("Interrupted while expiring users")
 
-			user = User.get_by_name(self.db, expiring_user["name"])
+			user = User.get_by_name(self.db, expiring_user["name"], config=self.config)
 			username = user.data["name"]
 
 			# parse expiration date if available

@@ -16,7 +16,6 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-from common.config_manager import config
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -243,7 +242,7 @@ class ImageDownloader(BasicProcessor):
                 md5.update(base64.b64decode(item["image_md5"]))
                 extension = item["image_file"].split(".")[-1]
 
-                local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
+                local_path = Path(self.config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
                 if local_path.exists():
                     local_path = str(local_path.absolute())
                     item_urls.add(local_path)
@@ -549,8 +548,8 @@ class ImageDownloader(BasicProcessor):
         time.sleep(rate_limit)
 
         # cache the image for later, if configured so
-        if config.get('PATH_IMAGES'):
-            local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
+        if self.config.get('PATH_IMAGES'):
+            local_path = Path(self.config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
             with open(local_path, 'wb') as outfile:
                 for chunk in image.iter_content(1024):
                     outfile.write(chunk)

@@ -9,11 +9,9 @@ assumes that ffprobe is also present in the same location.
 import shutil
 import subprocess
 import shlex
-import re
 
 from packaging import version
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -117,7 +115,7 @@ class VideoStack(BasicProcessor):
 
         # To figure out the length of a video we use ffprobe, if available
         with_errors = False
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
+        ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack

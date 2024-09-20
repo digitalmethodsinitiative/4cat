@@ -18,7 +18,6 @@ from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorPreset
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
-from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]

@@ -11,7 +11,6 @@ from googleapiclient.errors import HttpError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]

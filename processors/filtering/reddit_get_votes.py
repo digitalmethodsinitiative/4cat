@@ -10,7 +10,6 @@ from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

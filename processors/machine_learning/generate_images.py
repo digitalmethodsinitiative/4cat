@@ -6,14 +6,11 @@ Why? Because we can.
 import shutil
 import json
 import re
-import os
 
 from backend.lib.processor import BasicProcessor
 from processors.visualisation.download_images import ImageDownloader
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

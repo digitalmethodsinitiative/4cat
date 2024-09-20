@@ -9,9 +9,8 @@ import os
 from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 
-from common.config_manager import config
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
@@ -228,7 +227,7 @@ class PixPlotGenerator(BasicProcessor):
         dmi_service_manager.process_results(output_dir)
 
         # Results HTML file redirects to output_dir/index.html
-        plot_url = ('https://' if config.get("flask.https") else 'http://') + config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
+        plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
         html_file = self.get_html_page(plot_url)
 
         # Write HTML file

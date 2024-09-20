@@ -11,7 +11,6 @@ import re
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
-from common.config_manager import config
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 

@@ -4,8 +4,6 @@ Upload Twitter dataset to DMI-TCAT instance
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 
-from common.config_manager import config
-
 class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     """
     Run processor pipeline to extract neologisms

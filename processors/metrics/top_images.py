@@ -5,7 +5,6 @@ import hashlib
 import base64
 import re
 
-from common.config_manager import config
 from collections import Counter, OrderedDict
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
@@ -111,7 +110,7 @@ class TopImageCounter(BasicProcessor):
                 "filename": images[id]["filename"],
                 "num_posts": images[id]["count"],
                 "url_4cat": (
-                                "https" if config.get("flask.https") else "http") + "://" + config.get("flask.server_name") + "/api/image/" +
+                                "https" if self.config.get("flask.https") else "http") + "://" + self.config.get("flask.server_name") + "/api/image/" +
                             images[id]["md5"] + "." + images[id]["filename"].split(".")[
                                 -1],
                 "url_4plebs": "https://archive.4plebs.org/_/search/image/" + images[id]["hash"].replace("/", "_"),

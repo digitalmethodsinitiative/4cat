@@ -2,11 +2,9 @@
 Filter posts by lexicon
 """
 import re
-from pathlib import Path
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -89,7 +87,7 @@ class LexicalFilter(BaseFilter):
         # load lexicons from word lists
         lexicons = {}
         for lexicon_id in self.parameters.get("lexicon", []):
-            lexicon_file = config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{lexicon_id}.txt")
+            lexicon_file = self.config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{lexicon_id}.txt")
             if not lexicon_file.exists():
                 continue
 

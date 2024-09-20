@@ -17,7 +17,6 @@ from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
-from common.config_manager import config
 
 __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
@@ -76,6 +75,7 @@ class Tokenise(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
+        print(config)
         with config.get("PATH_ROOT").joinpath("common/assets/stopwords-languages.json").open() as infile:
             stopwords = json.load(infile)
 
@@ -246,7 +246,7 @@ class Tokenise(BasicProcessor):
         numbers = re.compile(r"\b[0-9]+\b")
 
         # load general stopwords dictionary
-        with open(config.get("PATH_ROOT").joinpath("common/assets/stopwords-iso.json"), encoding="utf-8") as infile:
+        with open(self.config.get("PATH_ROOT").joinpath("common/assets/stopwords-iso.json"), encoding="utf-8") as infile:
             stopwords_iso = json.load(infile)
 
         # Twitter tokenizer if indicated
@@ -298,7 +298,7 @@ class Tokenise(BasicProcessor):
             if wordlist.startswith("stopwords-iso"):
                 word_filter = set.union(word_filter, stopwords_iso[wordlist.replace("stopwords-iso-", "")])
             else:
-                wordlist_path = config.get("PATH_ROOT").joinpath(f"common/assets/wordlists/{wordlist}.txt")
+                wordlist_path = self.config.get("PATH_ROOT").joinpath(f"common/assets/wordlists/{wordlist}.txt")
                 if wordlist_path.exists():
                     with wordlist_path.open(encoding="utf-8") as input:
                         word_filter = set.union(word_filter, input.read().splitlines())

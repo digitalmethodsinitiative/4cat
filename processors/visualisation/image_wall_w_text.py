@@ -11,14 +11,13 @@ from svgwrite.image import Image as ImageElement
 
 from svgwrite.container import SVG
 from svgwrite.shapes import Rect
-from svgwrite.text import Text, TextArea
+from svgwrite.text import Text
 
 from PIL import Image, ImageOps
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
-from common.config_manager import config
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]

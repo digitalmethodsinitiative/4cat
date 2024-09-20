@@ -20,20 +20,15 @@ Flow:
          -> queue_image(): if an image was attached, queue a job to scrape it
    -> update_thread(): update thread data
 """
-import requests
 import psycopg2
 import hashlib
 import base64
-import flag
 import json
 import time
 import six
 
 from backend.lib.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
-from common.lib.helpers import strip_tags
-from common.config_manager import config
-from common.lib.user_input import UserInput
 
 
 class ThreadScraper4chan(BasicJSONScraper):

@@ -8,8 +8,6 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
     QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, timify_long
 
-from common.config_manager import config
-
 
 class SearchReddit(Search):
     """

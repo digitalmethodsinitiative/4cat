@@ -7,13 +7,9 @@ import mimetypes
 from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
-from common.config_manager import config
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
-
-# approximate number of files that can be uploaded in a single request rounded to 100
-max_files_approx = int((math.floor(config.get('flask.max_form_parts', 1000)-50)/100)) * 100
 
 class SearchMedia(BasicProcessor):
     type = "media-import-search"  # job ID
@@ -31,6 +27,9 @@ class SearchMedia(BasicProcessor):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
+        # approximate number of files that can be uploaded in a single request rounded to 100
+        max_files_approx = int((math.floor(config.get('flask.max_form_parts', 1000) - 50) / 100)) * 100
+
         return {
             "intro": {
                 "type": UserInput.OPTION_INFO,

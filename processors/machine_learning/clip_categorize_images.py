@@ -9,7 +9,6 @@ from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from common.config_manager import config
 from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"

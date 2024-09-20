@@ -10,13 +10,11 @@ import time
 import csv
 import re
 
-from pathlib import Path
-
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
-from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
+from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
 								   MapItemException, MappedItemIncompleteException)
@@ -88,7 +86,7 @@ class DataSet(FourcatModule):
 		this dataset.
 		"""
 		self.db = db
-		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}
@@ -189,7 +187,7 @@ class DataSet(FourcatModule):
 		:return: A path to the results file, 'empty_file', or `None`
 		"""
 		if self.data["is_finished"] and self.data["num_rows"] > 0:
-			return self.folder.joinpath(self.data["result_file"])
+			return self.get_results_path()
 		elif self.data["is_finished"] and self.data["num_rows"] == 0:
 			return 'empty'
 		else:
@@ -205,6 +203,9 @@ class DataSet(FourcatModule):
 
 		:return Path:  A path to the results file
 		"""
+		# alas we need to instantiate a config reader here - no way around it
+		if not self.folder:
+			self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
 		return self.folder.joinpath(self.data["result_file"])
 
 	def get_results_folder_path(self):
@@ -215,7 +216,7 @@ class DataSet(FourcatModule):
 
 		:return Path:  A path to the results file
 		"""
-		return self.folder.joinpath("folder_" + self.key)
+		return self.get_results_path().parent.joinpath("folder_" + self.key)
 
 	def get_log_path(self):
 		"""
@@ -949,16 +950,14 @@ class DataSet(FourcatModule):
 			file = query_bit + "-" + self.data["key"]
 			file = re.sub(r"[-]+", "-", file)
 
-		path = self.folder.joinpath(file + "." + extension.lower())
+		self.data["result_file"] = file + "." + extension.lower()
 		index = 1
-		while path.is_file():
-			path = self.folder.joinpath(file + "-" + str(index) + "." + extension.lower())
+		while self.get_results_path().is_file():
+			self.data["result_file"] = file + "-" + str(index) + "." + extension.lower()
 			index += 1
 
-		file = path.name
 		updated = self.db.update("datasets", where={"query": self.data["query"], "key": self.data["key"]},
-								 data={"result_file": file})
-		self.data["result_file"] = file
+								 data={"result_file": self.data["result_file"]})
 		return updated > 0
 
 	def get_key(self, query, parameters, parent="", time_offset=0):
@@ -1596,8 +1595,11 @@ class DataSet(FourcatModule):
 		TODO: create more dynamic method of obtaining url.
 		"""
 		filename = self.get_results_path().name
-		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
-						config.get("flask.server_name") + '/result/' + filename
+
+		# we cheat a little here by using the modules' config reader, but these
+		# will never be context-dependent values anyway
+		url_to_file = ('https://' if self.modules.config.get("flask.https") else 'http://') + \
+						self.modules.config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
 	def warn_unmappable_item(self, item_count, processor=None, error_message=None, warn_admins=True):

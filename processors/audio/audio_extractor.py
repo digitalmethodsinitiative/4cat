@@ -8,8 +8,6 @@ import shutil
 import subprocess
 import shlex
 
-from common.config_manager import config
-
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -98,7 +96,7 @@ class AudioExtractor(BasicProcessor):
             vid_name = path.stem
             # ffmpeg -i video.mkv -map 0:a -acodec libmp3lame audio.mp4
             command = [
-                shutil.which(config.get("video-downloader.ffmpeg_path")),
+                shutil.which(self.config.get("video-downloader.ffmpeg_path")),
                 "-i", shlex.quote(str(path)),
                 "-ar", str(16000),
                 shlex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))

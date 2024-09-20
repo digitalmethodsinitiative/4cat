@@ -14,7 +14,6 @@ from ural import urls_from_text
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
@@ -56,11 +55,10 @@ class VideoDownloaderPlus(BasicProcessor):
 
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
-    if config.get("video-downloader.allow-indirect"):
-        references = [
-            "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
-            "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
-        ]
+    references = [
+        "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
+        "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
+    ]
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 

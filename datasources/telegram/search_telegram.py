@@ -16,7 +16,6 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient

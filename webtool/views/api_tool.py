@@ -770,7 +770,7 @@ def remove_tag():
 	all_tags += [s["tag"] for s in db.fetchall("SELECT DISTINCT tag FROM settings WHERE tag LIKE 'user:%'")]
 
 	for user in tagged_users:
-		user = User.get_by_name(db, user["name"])
+		user = User.get_by_name(db, user["name"], config=config)
 		user.remove_tag(tag)
 
 	if tag in all_tags:
@@ -836,7 +836,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 
 	for username in usernames.split(","):
 		username = username.strip()
-		new_owner = User.get_by_name(db, username)
+		new_owner = User.get_by_name(db, username, config=config)
 		if new_owner is None and not username.startswith("tag:"):
 			return error(404, error=f"The user '{username}' does not exist. Use tag:example to add a tag as an owner.")
 
@@ -898,7 +898,7 @@ def remove_dataset_owner(key=None, username=None):
 	if username == current_user.get_id():
 		return error(403, error="You cannot remove yourself from a dataset.")
 
-	owner = User.get_by_name(db, username)
+	owner = User.get_by_name(db, username, config=config)
 	if owner is None and not username.startswith("tag:"):
 		return error(404, error="User does not exist.")
 
@@ -1060,7 +1060,7 @@ def queue_processor(key=None, processor=None):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
-	available_processors = dataset.get_available_processors(user=current_user, exclude_hidden=True)
+	available_processors = dataset.get_available_processors(config=config, exclude_hidden=True)
 	if processor not in available_processors:
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 

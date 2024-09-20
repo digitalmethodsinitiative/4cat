@@ -12,7 +12,6 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from backend.lib.database_mysql import MySQLDatabase
-from common.config_manager import config
 
 
 class SearchWithinTCATBinsV2(Search):
@@ -89,7 +88,7 @@ can
         options = cls.options
 
         # Collect Metadata from TCAT instances
-        all_bins = cls.collect_tcat_metadata()
+        all_bins = cls.collect_tcat_metadata(config)
 
         options["bin"] = {
             "type": UserInput.OPTION_CHOICE,
@@ -116,7 +115,7 @@ can
         bin_name = bin.split("@")[0]
         tcat_name = bin.split("@").pop()
 
-        available_instances = config.get("dmi-tcatv2-search.database_instances", [])
+        available_instances = self.config.get("dmi-tcatv2-search.database_instances", [])
         instance = [instance for instance in available_instances if instance.get('tcat_name') == tcat_name][0]
 
         db = MySQLDatabase(logger=self.log,
@@ -320,7 +319,7 @@ can
 
 
     @classmethod
-    def collect_tcat_metadata(cls):
+    def collect_tcat_metadata(cls, config):
         """
         Collect specific metadata from TCAT instances listed in the configuration and return a dictionary containing
         this data. To be used to infor the user of available TCAT bins and create the options from which a user will

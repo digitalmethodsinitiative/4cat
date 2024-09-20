@@ -437,18 +437,21 @@ class ConfigWrapper:
         used.
         """
         if type(config) is ConfigWrapper:
-            # let's not do nested wrappers
+            # let's not do nested wrappers, but copy properties unless
+            # provided explicitly
+            self.user = user if user else config.user
+            self.tags = tags if tags else config.tags
+            self.request = request if request else config.request
             self.config = config.config
         else:
             self.config = config
-
-        self.user = user
-        self.tags = tags
-        self.request = request
+            self.user = user
+            self.tags = tags
+            self.request = request
 
         # this ensures the user object in turn reads from the wrapper
         if self.user:
-            self.user.with_config(self)
+            self.user.with_config(self, rewrap=False)
 
 
     def set(self, *args, **kwargs):

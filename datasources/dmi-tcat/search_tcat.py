@@ -13,7 +13,6 @@ from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
 
@@ -136,7 +135,7 @@ class SearchWithinTCATBins(Search):
     }
 
     @classmethod
-    def collect_all_bins(cls, force_update=False):
+    def collect_all_bins(cls, config, force_update=False):
         """
         Requests bin information from TCAT instances
         """
@@ -176,7 +175,7 @@ can
         """
         options = cls.options
 
-        cls.collect_all_bins()
+        cls.collect_all_bins(config)
         if all([data.get("failed", False) for instance, data in cls.bin_data["all_bins"].items()]):
             options["bin"] = {
                 "type": UserInput.OPTION_INFO,
@@ -217,7 +216,7 @@ can
         # instance URL again here
         # while the parameter could be marked 'sensitive', the values would
         # still show up in e.g. the HTML of the 'create dataset' form
-        available_instances = config.get("dmi-tcat-search.instances", [])
+        available_instances = self.config.get("dmi-tcat-search.instances", [])
         instance_url = ""
         instance = None
         for available_instance in available_instances:
@@ -231,7 +230,7 @@ can
             return self.dataset.finish_with_error("Invalid DMI-TCAT instance name '%s'" % bin_host)
 
         # Collect the bins again (ensure we have updated info in case bin is still active)
-        self.collect_all_bins(force_update=True)
+        self.collect_all_bins(self.config, force_update=True)
         # Add metadata to parameters
         try:
             current_bin = self.bin_data["all_bins"][instance][bin_name]

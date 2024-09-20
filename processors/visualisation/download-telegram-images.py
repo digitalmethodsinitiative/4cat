@@ -10,7 +10,6 @@ from pathlib import Path
 from telethon import TelegramClient
 from telethon.errors import TimedOutError
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
@@ -134,7 +133,7 @@ class TelegramImageDownloader(BasicProcessor):
         query = self.source_dataset.top_parent().parameters
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
+        session_path = Path(self.config.get('PATH_ROOT')).joinpath(self.config.get('PATH_SESSIONS'), session_id + ".session")
         amount = self.parameters.get("amount")
         with_thumbnails = self.parameters.get("video-thumbnails")
         with_websites = self.parameters.get("website-thumbnails")

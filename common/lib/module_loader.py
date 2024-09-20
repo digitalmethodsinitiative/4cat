@@ -9,8 +9,6 @@ import sys
 import re
 import os
 
-from common.config_manager import config
-
 
 class ModuleCollector:
     """

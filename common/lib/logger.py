@@ -187,6 +187,7 @@ class Logger:
         # this handler manages the text log files
         handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
         handler.setLevel(log_level)
+
         handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
                                                "%d-%m-%Y %H:%M:%S"))
         self.logger.addHandler(handler)

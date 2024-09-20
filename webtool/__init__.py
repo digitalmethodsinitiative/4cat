@@ -77,7 +77,7 @@ queue = JobQueue(logger=log, database=db)
 
 # initialize openapi endpoint collector for later specification generation
 from webtool.lib.openapi_collector import OpenAPICollector
-openapi = OpenAPICollector(app)
+openapi = OpenAPICollector(app, config)
 
 # initialize rate limiter
 limiter = Limiter(app, key_func=get_remote_address)

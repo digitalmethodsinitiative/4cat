@@ -10,7 +10,6 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 
 class SearchVK(Search):

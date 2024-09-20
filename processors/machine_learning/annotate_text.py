@@ -12,7 +12,6 @@ from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerE
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
