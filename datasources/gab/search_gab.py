@@ -16,7 +16,7 @@ class SearchGab(Search):
     title = "Import scraped Gab data"  # title displayed in UI
     description = "Import Gab data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
     fake = ""
 
     # not available as a processor for existing datasets

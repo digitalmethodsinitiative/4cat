@@ -234,7 +234,7 @@ class VideoDownloaderPlus(BasicProcessor):
         in principle, but any links to videos are likely to come from the top
         dataset anyway.
 
-        :param str module:  Module ID to determine compatibility with
+        :param module:  Module to determine compatibility with
         :return bool:
         """
         return ((module.type.endswith("-search") or module.is_from_collector())
@@ -645,6 +645,9 @@ class VideoDownloaderPlus(BasicProcessor):
                 if not value:
                     continue
 
+                if value is not str:
+                    value = str(value)
+
                 video_links = self.identify_video_urls_in_string(value)
                 if video_links:
                     item_urls |= set(video_links)
@@ -667,7 +670,6 @@ class VideoDownloaderPlus(BasicProcessor):
         :param str text:  string that may contain URLs
         :return list:  	  list containing validated URLs to videos
         """
-        text = str(text)
         split_comma = self.parameters.get("split-comma", True)
         if split_comma:
             texts = text.split(",")

@@ -35,7 +35,7 @@ class ProcessorPreset(BasicProcessor):
 			pipeline[-1]["parameters"]["next"] = [last]
 
 		analysis_pipeline = DataSet(parameters=pipeline[0]["parameters"], type=pipeline[0]["type"], db=self.db,
-								 parent=self.dataset.key)
+								 parent=self.dataset.key, modules=self.modules)
 
 		# this starts the pipeline
 		self.queue.add_job(pipeline[0]["type"], remote_id=analysis_pipeline.key)

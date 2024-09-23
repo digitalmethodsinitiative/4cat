@@ -20,7 +20,7 @@ class SearchTwitterViaZeeschuimer(Search):
     title = "Import scraped X/Twitter data"  # title displayed in UI
     description = "Import X/Twitter data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = []
@@ -81,7 +81,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "author_fullname": tweet["core"]["user_results"]["result"]["legacy"]["name"],
             "author_id": tweet["legacy"]["user_id_str"],
             "author_avatar_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_image_url_https"],
-            "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_banner_url"],
+            "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"].get("profile_banner_url", ""), # key does not exist when author does not have a banner
             "source": strip_tags(tweet["source"]),
             "language_guess": tweet["legacy"].get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",

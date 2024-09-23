@@ -16,19 +16,16 @@ import re
 from pathlib import Path
 from dateutil.parser import parse as parse_datetime, ParserError
 
-import backend
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response
 from flask_login import current_user, login_required
 
-from webtool import app, db, config
+from webtool import app, db, config, fourcat_modules
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
-
-from common.lib.helpers import call_api, send_email, UserInput, folder_size
 from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
@@ -146,7 +143,7 @@ def get_worker_status():
             "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=db)
         } for worker in call_api("worker-status")["response"]["running"]
     ]
-    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
+    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=fourcat_modules.workers,
                            now=time.time())
 
 
@@ -155,7 +152,7 @@ def get_worker_status():
 @setting_required("privileges.admin.can_view_status")
 def get_queue_status():
     queue = call_api("worker-status")["response"]["queued"]
-    return render_template("controlpanel/queue-status.html", queue=queue, worker_types=backend.all_modules.workers,
+    return render_template("controlpanel/queue-status.html", queue=queue, worker_types=fourcat_modules.workers,
                            now=time.time())
 
 
@@ -513,9 +510,9 @@ def manipulate_settings():
 
     modules = {
         **{datasource + "-search": definition["name"] for datasource, definition in
-           backend.all_modules.datasources.items()},
+           fourcat_modules.datasources.items()},
         **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
-           backend.all_modules.processors.values()}
+           fourcat_modules.processors.values()}
     }
 
     global_settings = config.get_all(user=None, tags=None)
@@ -591,7 +588,7 @@ def manipulate_settings():
             submenu = "core"
         elif option_owner.endswith("-search"):
             submenu = "datasources"
-        elif option_owner in backend.all_modules.processors:
+        elif option_owner in fourcat_modules.processors:
             submenu = "processors"
 
         tabname = config_definition.categories.get(option_owner)
@@ -631,7 +628,7 @@ def manipulate_settings():
             "enabled": datasource in config.get("datasources.enabled"),
             "expires": config.get("datasources.expiration").get(datasource, {})
         }
-        for datasource, info in backend.all_modules.datasources.items()}
+        for datasource, info in fourcat_modules.datasources.items()}
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
@@ -722,7 +719,8 @@ def view_logs():
 
     :return:
     """
-    return render_template("controlpanel/logs.html")
+    headers = "\n".join([f"{h}: {request.headers[h]}" for h in dict(request.headers)])
+    return render_template("controlpanel/logs.html", headers=headers)
 
 
 @app.route("/logs/<string:logfile>/")
@@ -879,7 +877,7 @@ def dataset_bulk():
     """
     incomplete = []
     forminput = {}
-    datasources = {datasource: meta["name"] for datasource, meta in backend.all_modules.datasources.items()}
+    datasources = {datasource: meta["name"] for datasource, meta in fourcat_modules.datasources.items()}
 
     if request.method == "POST":
         # action depends on which button was clicked
@@ -948,7 +946,7 @@ def dataset_bulk():
             flash(f"{len(bulk_owner):,} new owner(s) were added to the datasets.")
 
         if not incomplete:
-            datasets = [DataSet(data=dataset, db=db) for dataset in datasets_meta]
+            datasets = [DataSet(data=dataset, db=db, modules=fourcat_modules) for dataset in datasets_meta]
             flash(f"{len(datasets):,} dataset(s) updated.")
 
             if action == "export":

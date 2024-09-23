@@ -23,7 +23,7 @@ class Pagination(object):
 	Provide pagination
 	"""
 
-	def __init__(self, page, per_page, total_count, route="show_results"):
+	def __init__(self, page, per_page, total_count, route="show_results", route_args=None):
 		"""
 		Set up pagination object
 
@@ -36,6 +36,7 @@ class Pagination(object):
 		self.per_page = per_page
 		self.total_count = total_count
 		self.route = route
+		self.route_args = route_args if route_args else {}
 
 	@property
 	def pages(self):
