@@ -437,6 +437,7 @@ class SearchTelegram(Search):
                         if crawl_max_depth and (depth_map.get(query) < crawl_max_depth):
                             message_fwd = serialized_message.get("fwd_from")
                             fwd_from = None
+                            fwd_source_type = None
                             if message_fwd and message_fwd.get("from_id"):
                                 if message_fwd["from_id"].get("_type") == "PeerChannel":
                                     # Legacy(?) data structure (pre 2024/7/22)
@@ -444,18 +445,26 @@ class SearchTelegram(Search):
                                     # to Telethon! this is nice because it means we don't have to
                                     # resolve entities to crawl iteratively
                                     fwd_from = int(message_fwd["from_id"]["channel_id"])
+                                    fwd_source_type = "channel"
                                 elif message_fwd and message_fwd.get("from_id", {}).get('full_chat',{}):
                                     # TODO: do we need a check here to only follow certain types of messages? this is similar to resolving, but the types do not appear the same to me
                                     # Note: message_fwd["from_id"]["channel_id"] == message_fwd["from_id"]["full_chat"]["id"] in test cases so far
                                     fwd_from = int(message_fwd["from_id"]["full_chat"]["id"])
+                                    fwd_source_type = "channel"
+                                elif message_fwd and message_fwd.get("from_id", {}).get('full_user',{}):
+                                    # forwards can also come from users
+                                    # these can never be followed, so don't add these to the crawl, but do document them
+                                    fwd_source_type = "user"
                                 else:
+                                    print(json.dumps(message_fwd))
                                     self.log.warning(f"Telegram (dataset {self.dataset.key}): Unknown fwd_from data structure; unable to crawl")
+                                    fwd_source_type = "unknown"
 
                             # Check if fwd_from or the resolved entity ID is already queued or has been queried
-                            if fwd_from and fwd_from not in full_query and fwd_from not in queries:
-
+                            if fwd_from and fwd_from not in full_query and fwd_from not in queries and fwd_source_type not in ("user",):
                                 # new entity discovered!
                                 # might be discovered (before collection) multiple times, so retain lowest depth
+                                print(f"Potentially crawling {fwd_from}")
                                 depth_map[fwd_from] = min(depth_map.get(fwd_from, crawl_max_depth), depth_map[query] + 1)
                                 if fwd_from not in crawl_references:
                                     crawl_references[fwd_from] = 0
@@ -728,6 +737,9 @@ class SearchTelegram(Search):
             if from_data and from_data.get("from_name"):
                 forwarded_name = message["fwd_from"]["from_name"]
 
+            if from_data and from_data.get("users") and len(from_data["users"]) > 0 and "user" not in from_data:
+                from_data["user"] = from_data["users"][0]
+
             if from_data and ("user" in from_data or "chats" in from_data):
                 # 'resolve entities' was enabled for this dataset
                 if "user" in from_data:
@@ -779,7 +791,7 @@ class SearchTelegram(Search):
             "body": message["message"],
             "reply_to": message.get("reply_to_msg_id", ""),
             "views": message["views"] if message["views"] else "",
-            "forwards": message.get("forwards", MissingMappedField(0)),
+            # "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
             "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(message["date"]),
