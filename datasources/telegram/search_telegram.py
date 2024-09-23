@@ -234,6 +234,7 @@ class SearchTelegram(Search):
 
         self.details_cache = {}
         self.failures_cache = set()
+        #TODO: This ought to yield as we're holding everything in memory; async generator? execute_queries() also needs to be modified for this
         results = asyncio.run(self.execute_queries())
 
         if not query.get("save-session"):
@@ -326,9 +327,10 @@ class SearchTelegram(Search):
         except Exception as e:
             # catch-all so we can disconnect properly
             # ...should we?
-            self.dataset.update_status("Error scraping posts from Telegram")
-            self.log.error(f"Telegram scraping error: {traceback.format_exc()}")
-            return []
+            self.dataset.update_status("Error scraping posts from Telegram; halting collection.")
+            self.log.error(f"Telegram scraping error (dataset {self.dataset.key}): {traceback.format_exc()}")
+            # May as well return what was captured, yes?
+            return posts
         finally:
             await client.disconnect()
 
@@ -364,12 +366,13 @@ class SearchTelegram(Search):
         # has been mentioned. When crawling is enabled and this exceeds the
         # given threshold, the entity is added to the query
         crawl_references = {}
-        queried_entities = list(queries)
-        full_query = list(queries)
+        full_query = set(queries)
+        num_queries = len(queries)
 
         # we may not always know the 'entity username' for an entity ID, so
         # keep a reference map as we go
         entity_id_map = {}
+        query_id_map= {}
 
         # Collect queries
         # Use while instead of for so we can change queries during iteration
@@ -383,17 +386,18 @@ class SearchTelegram(Search):
             delay = 10
             retries = 0
             processed += 1
-            self.dataset.update_progress(processed / len(full_query))
+            self.dataset.update_progress(processed / num_queries)
 
             if no_additional_queries:
-                # Note that we are note completing this query
+                # Note that we are not completing this query
                 self.dataset.update_status(f"Rate-limited by Telegram; not executing query {entity_id_map.get(query, query)}")
                 continue
 
             while True:
                 self.dataset.update_status(f"Retrieving messages for entity '{entity_id_map.get(query, query)}'")
+                entity_posts = 0
+                discovered = 0
                 try:
-                    entity_posts = 0
                     async for message in client.iter_messages(entity=query, offset_date=max_date):
                         entity_posts += 1
                         total_messages += 1
@@ -413,11 +417,14 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
-                        if "_chat" in serialized_message and query not in entity_id_map and serialized_message["_chat"]["id"] == query:
-                            # once we know what a channel ID resolves to, use the username instead so it is easier to
-                            # understand for the user
-                            entity_id_map[query] = serialized_message["_chat"]["username"]
-                            self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
+                        if "_chat" in serialized_message:
+                            # Add query ID to check if queries have been crawled previously
+                            full_query.add(serialized_message["_chat"]["id"])
+                            if query not in entity_id_map and serialized_message["_chat"]["id"] == query:
+                                # once we know what a channel ID resolves to, use the username instead so it is easier to
+                                # understand for the user
+                                entity_id_map[query] = serialized_message["_chat"]["username"]
+                                self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
 
                         if resolve_refs:
                             serialized_message = await self.resolve_groups(client, serialized_message)
@@ -427,29 +434,46 @@ class SearchTelegram(Search):
                             break
 
                         # if crawling is enabled, see if we found something to add to the query
-                        if crawl_max_depth and (not crawl_msg_threshold or depth_map.get(query) < crawl_msg_threshold):
+                        if crawl_max_depth and (depth_map.get(query) < crawl_max_depth):
                             message_fwd = serialized_message.get("fwd_from")
                             fwd_from = None
-                            if message_fwd and message_fwd["from_id"] and message_fwd["from_id"].get("_type") == "PeerChannel":
-                                # even if we haven't resolved the ID, we can feed the numeric ID
-                                # to Telethon! this is nice because it means we don't have to
-                                # resolve entities to crawl iteratively
-                                fwd_from = int(message_fwd["from_id"]["channel_id"])
+                            if message_fwd and message_fwd.get("from_id"):
+                                if message_fwd["from_id"].get("_type") == "PeerChannel":
+                                    # Legacy(?) data structure (pre 2024/7/22)
+                                    # even if we haven't resolved the ID, we can feed the numeric ID
+                                    # to Telethon! this is nice because it means we don't have to
+                                    # resolve entities to crawl iteratively
+                                    fwd_from = int(message_fwd["from_id"]["channel_id"])
+                                elif message_fwd and message_fwd.get("from_id", {}).get('full_chat',{}):
+                                    # TODO: do we need a check here to only follow certain types of messages? this is similar to resolving, but the types do not appear the same to me
+                                    # Note: message_fwd["from_id"]["channel_id"] == message_fwd["from_id"]["full_chat"]["id"] in test cases so far
+                                    fwd_from = int(message_fwd["from_id"]["full_chat"]["id"])
+                                else:
+                                    self.log.warning(f"Telegram (dataset {self.dataset.key}): Unknown fwd_from data structure; unable to crawl")
 
-                            if fwd_from and fwd_from not in queried_entities and fwd_from not in queries:
+                            # Check if fwd_from or the resolved entity ID is already queued or has been queried
+                            if fwd_from and fwd_from not in full_query and fwd_from not in queries:
+
                                 # new entity discovered!
                                 # might be discovered (before collection) multiple times, so retain lowest depth
                                 depth_map[fwd_from] = min(depth_map.get(fwd_from, crawl_max_depth), depth_map[query] + 1)
-                                if depth_map[query] < crawl_max_depth:
-                                    if fwd_from not in crawl_references:
-                                        crawl_references[fwd_from] = 0
+                                if fwd_from not in crawl_references:
+                                    crawl_references[fwd_from] = 0
+                                crawl_references[fwd_from] += 1
 
-                                    crawl_references[fwd_from] += 1
-                                    if crawl_references[fwd_from] >= crawl_msg_threshold and fwd_from not in queries:
-                                        queries.append(fwd_from)
-                                        full_query.append(fwd_from)
-                                        self.dataset.update_status(f"Discovered new entity {entity_id_map.get(fwd_from, fwd_from)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
+                                # Add to queries if it has been referenced enough times
+                                if crawl_references[fwd_from] >= crawl_msg_threshold:
+                                    queries.append(fwd_from)
+                                    full_query.add(fwd_from)
+                                    num_queries += 1
+                                    discovered += 1
+                                    self.dataset.update_status(f"Discovered new entity {entity_id_map.get(fwd_from, fwd_from)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
 
+                        serialized_message["4CAT_metadata"] = {
+                            "collected_at": datetime.now().isoformat(), # this is relevant for rather long crawls
+                            "query": query, # possibly redundant, but we are adding non-user defined queries by crawling and may be useful to know exactly what query was used to collect an entity
+                            "query_depth": depth_map.get(query, 0)
+                        }
                         yield serialized_message
 
                         if entity_posts >= max_items:
@@ -502,6 +526,7 @@ class SearchTelegram(Search):
                     delay *= 2
                     continue
 
+                self.dataset.log(f"Completed {entity_id_map.get(query, query)} with {entity_posts} messages (discovered {discovered} new entities)")
                 break
 
     async def resolve_groups(self, client, message):
