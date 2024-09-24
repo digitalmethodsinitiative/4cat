@@ -36,7 +36,7 @@ jobs:
       - name: Check 4CAT backend log for expected INFO message
         run: |
           test_case=" INFO at api.py:65: Local API listening for requests at backend:4444"
-          var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
+          sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
           echo "::group::Backend test"
           if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then 
               echo "4CAT backend running as expected"
@@ -50,7 +50,11 @@ jobs:
       - name: Print log on failure
         if: failure()
         run: |
-          docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
-          echo "::group::Backend logs"
-          cat backend_4cat.log
-          echo "::endgroup::"
+          if [ "$(docker ps | grep 4cat)" ]; then 
+              docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
+              echo "::group::Backend logs"
+              cat backend_4cat.log
+              echo "::endgroup::"
+          else 
+              echo "Docker containers not running; check logs in previous steps"
+          fi

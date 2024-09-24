@@ -3,6 +3,9 @@
 
 set -e
 
+echo "oh no, i am alive again. such pain! end me now!"
+exit 1
+
 until python3 -m docker.wait-for-backend; do
   >&2 echo "Backend has not started - sleeping"
   sleep 1

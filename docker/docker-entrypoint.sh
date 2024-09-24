@@ -1,9 +1,6 @@
 #!/bin/sh
 set -e
 
-echo "i'm alive... but only pain. kill meeeeee. death..."
-exit 1
-
 exit_backend() {
   echo "Exiting backend"
   python3 4cat-daemon.py stop
