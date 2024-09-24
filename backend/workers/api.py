@@ -62,7 +62,8 @@ class InternalAPI(BasicWorker):
 
 		server.listen()
 		server.settimeout(2)
-		self.manager.log.info("Local API listening for requests at %s:%s" % (self.host, self.port))
+		# self.manager.log.info("Local API listening for requests at %s:%s" % (self.host, self.port))
+		self.manager.log.info("aaaaaahhhhh more pain! why? how? aarrrrghhhhh")
 
 		# continually listen for new connections
 		while not self.interrupted:
