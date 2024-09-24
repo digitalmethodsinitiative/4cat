@@ -12,7 +12,7 @@ jobs:
     name: Test docker-compose up with build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run docker compose up
         run: docker compose -f docker-compose_build.yml up -d
       - name: Check backend container is running
