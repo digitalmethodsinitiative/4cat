@@ -484,7 +484,7 @@ class SearchTelegram(Search):
                                         # invite links
                                         continue
 
-                                    entity_name = link.split("?")[0].split("#")[0]
+                                    entity_name = link.split("/")[0].split("?")[0].split("#")[0]
                                     linked_entities.add(entity_name)
 
                                 # @references
@@ -492,6 +492,8 @@ class SearchTelegram(Search):
                                 for reference in references:
                                     if reference.startswith("@"):
                                         reference = reference[1:]
+
+                                    reference = reference.split("/")[0]
 
                                     linked_entities.add(reference)
 
