@@ -478,7 +478,7 @@ class SearchTelegram(Search):
                             if crawl_via_links:
                                 # t.me links
                                 all_links = ural.urls_from_text(serialized_message["message"])
-                                all_links = [link.split("t.me/")[1] for link in all_links if ural.get_hostname(link) == "t.me"]
+                                all_links = [link.split("t.me/")[1] for link in all_links if ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
                                 for link in all_links:
                                     if link.startswith("+"):
                                         # invite links
