@@ -245,6 +245,8 @@ def import_dataset():
 				"fields": filterable_fields
 			}
 		}]
+		
+	
 
 	# store the file at the result path for the dataset, but with a different suffix
 	# since the dataset was only just created, this file is guaranteed to not exist yet
@@ -1002,6 +1004,42 @@ def toggle_private(key):
 		return redirect(url_for("show_result", key=dataset.key))
 	else:
 		return jsonify({"success": True, "is_private": dataset.is_private})
+	
+@app.route("/api/toggle-dataset-language/<string:key>")
+@login_required
+@openapi.endpoint("tool")
+def toggle_language(key):
+	"""
+	Toggle whether a dataset is Finnish or English
+
+	:param str key: Key of the dataset 
+
+	:return: A JSON object with the status of the request
+	:return-schema: {type=object,properties={success={type=boolean},language={type=string}}}
+
+	:return-error 404:  If the dataset key was not found
+	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except DataSetException:
+		return error(404, error="Dataset does not exist.")
+
+	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
+		return error(403, error="This dataset is private")
+
+	# apply status to dataset and all children
+	if dataset.language == "fi" or dataset.language == "":
+		dataset.language = "en"
+	elif dataset.language == "en":
+		dataset.language = "fi"
+	
+	dataset.update_children(language=dataset.language)
+
+	if request.args.get("redirect") is not None:
+		flash("Dataset language status toggled.")
+		return redirect(url_for("show_result", key=dataset.key))
+	else:
+		return jsonify({"success": True, "language": dataset.language})
 
 @app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit

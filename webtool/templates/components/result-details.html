@@ -13,6 +13,11 @@
                         from{% else %}
                         Add to{% endif %} favourites</a></li>
                     {% endif %}
+                    {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
+                    <li><a href="{{ url_for("toggle_language", key=dataset.key) }}?redirect"
+                           class="toggle-languages"> 
+                        {% if dataset.language == "fi" %}Make English{% else %}Make Finnish{% endif %}</a></li>
+                    {% endif %}
                     {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
                         <li><a href="{{ url_for('toggle_private', key=dataset.key) }}?redirect"
                                class="toggle-private"><i
