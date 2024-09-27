@@ -29,7 +29,7 @@ class NeologismExtractor(ProcessorPreset):
         :param Dataset module:  Module ID to determine compatibility with
         :return bool:
         """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson") and module.language == 'fi'
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
