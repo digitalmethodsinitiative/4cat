@@ -9,7 +9,6 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
       - ./data/postgres/:/var/lib/postgresql/data/
-#      - 4cat_db:/var/lib/postgresql/data/
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
       interval: 5s

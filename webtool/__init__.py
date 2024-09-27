@@ -28,6 +28,7 @@ from common.config_manager import config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
+from common.lib.module_loader import ModuleCollector
 
 from common.lib.user import User
 from webtool.lib.helpers import generate_css_colours
@@ -35,6 +36,7 @@ from webtool.lib.helpers import generate_css_colours
 # initialize global objects for interacting with all the things
 login_manager = LoginManager()
 app = Flask(__name__)
+fourcat_modules = ModuleCollector()
 
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy

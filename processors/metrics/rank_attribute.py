@@ -203,7 +203,7 @@ class AttributeRanker(BasicProcessor):
 			# keep track of occurrences of found items per relevant time period
 			for value in values:
 				if to_lowercase:
-						value = value.lower()
+						value = str(value).lower()
 
 				if rank_style == "overall" and value not in overall_top:
 					continue

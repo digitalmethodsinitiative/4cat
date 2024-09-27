@@ -11,14 +11,12 @@ import os
 
 from pathlib import Path
 
-import backend
-
 from flask import jsonify, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
 	get_flashed_messages, send_from_directory
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-from webtool import app, db, log, openapi, limiter, queue, config
+from webtool import app, db, log, openapi, limiter, queue, config, fourcat_modules
 from webtool.lib.helpers import error, setting_required
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
@@ -132,14 +130,14 @@ def datasource_form(datasource_id):
 
 	:return-error 404: If the datasource does not exist.
 	"""
-	if datasource_id not in backend.all_modules.datasources:
+	if datasource_id not in fourcat_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	if datasource_id not in config.get('datasources.enabled'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	datasource = backend.all_modules.datasources[datasource_id]
-	worker_class = backend.all_modules.workers.get(datasource_id + "-search")
+	datasource = fourcat_modules.datasources[datasource_id]
+	worker_class = fourcat_modules.workers.get(datasource_id + "-search")
 
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
@@ -211,13 +209,13 @@ def import_dataset():
 		.replace("5", "five").replace("6", "six").replace("7", "seven").replace("8", "eight") \
 		.replace("9", "nine")
 
-	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
+	if not platform or platform not in fourcat_modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message=f"Unknown platform or source format '{platform}'")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
 	worker = None
 	for worker_type in worker_types:
-		worker = backend.all_modules.workers.get(worker_type)
+		worker = fourcat_modules.workers.get(worker_type)
 		if worker:
 			break
 
@@ -229,7 +227,8 @@ def import_dataset():
 		type=worker.type,
 		db=db,
 		owner=current_user.get_id(),
-		extension=worker.extension
+		extension=worker.extension,
+		modules=fourcat_modules
 	)
 	dataset.update_status("Importing uploaded file...")
 
@@ -298,14 +297,14 @@ def queue_dataset():
 	:return-error 404: If the datasource does not exist.
 	"""
 	datasource_id = request.form.get("datasource", "")
-	if datasource_id not in backend.all_modules.datasources:
+	if datasource_id not in fourcat_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	search_worker_id = datasource_id + "-search"
-	if search_worker_id not in backend.all_modules.workers:
+	if search_worker_id not in fourcat_modules.workers:
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
-	search_worker = backend.all_modules.workers[search_worker_id]
+	search_worker = fourcat_modules.workers[search_worker_id]
 
 	# handle confirmation outside of parameter parsing, since it is not data
 	# source specific
@@ -369,7 +368,8 @@ def queue_dataset():
 		type=search_worker_id,
 		extension=extension,
 		is_private=is_private,
-		owner=current_user.get_id()
+		owner=current_user.get_id(),
+		modules=fourcat_modules
 	)
 
 	# this bit allows search workers to insist on the new dataset having a
@@ -891,7 +891,7 @@ def remove_dataset_owner(key=None, username=None):
 	username = request.form.get("name", "") if not username else username
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -927,14 +927,7 @@ def check_search_queue():
 	"""
 	unfinished_jobs = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
 
-	for i, job in enumerate(unfinished_jobs):
-		processor = backend.all_modules.processors.get(job["jobtype"])
-		if processor:
-			unfinished_jobs[i]["processor_name"] = processor.title
-		else:
-			unfinished_jobs[i]["processor_name"] = job["jobtype"]
-
-	return jsonify(unfinished_jobs)
+	return jsonify(unfinished_datasets)
 
 @app.route("/api/toggle-dataset-favourite/<string:key>")
 @login_required
@@ -954,7 +947,7 @@ def toggle_favourite(key):
 	:return-error 404:  If the dataset key was not found
 	"""
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -994,7 +987,7 @@ def toggle_private(key):
 	:return-error 404:  If the dataset key was not found
 	"""
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -1055,7 +1048,7 @@ def queue_processor(key=None, processor=None):
 
 	# cover all bases - can only run processor on "parent" dataset
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Not a valid dataset key.")
 
@@ -1091,7 +1084,8 @@ def queue_processor(key=None, processor=None):
 					   extension=available_processors[processor].get_extension(parent_dataset=dataset),
 					   type=processor,
 					   is_private=dataset.is_private,
-					   owner=current_user.get_id()
+					   owner=current_user.get_id(),
+					   modules=fourcat_modules
 	)
 
 	# give same ownership as parent dataset
@@ -1112,7 +1106,7 @@ def queue_processor(key=None, processor=None):
 		"container": "*[data-dataset-key=" + dataset.key + "]",
 		"key": analysis.key,
 		"html": render_template("components/result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
-                                processors=backend.all_modules.processors) if analysis.is_new else "",
+                                processors=fourcat_modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
 		"is_filter": available_processors[processor].is_filter()
 	})
@@ -1149,7 +1143,7 @@ def check_processor():
 
 	for key in keys:
 		try:
-			dataset = DataSet(key=key, db=db)
+			dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 		except DataSetException:
 			continue
 
@@ -1166,7 +1160,7 @@ def check_processor():
 			"progress": round(dataset.get_progress() * 100),
 			"html": render_template("components/result-child.html", child=dataset, dataset=parent,
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
-                                    processors=backend.all_modules.processors),
+                                    processors=fourcat_modules.processors),
 			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
 			"url": "/result/" + dataset.data["result_file"]
 		})
@@ -1234,7 +1228,7 @@ def export_packed_dataset(key=None, component=None):
 	:return:
 	"""
 	try:
-		dataset = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
