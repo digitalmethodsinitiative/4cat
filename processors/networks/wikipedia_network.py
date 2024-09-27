@@ -33,7 +33,7 @@ class WikiURLCoLinker(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson") and module.language != 'fi'
 
 	def process(self):
 		"""
