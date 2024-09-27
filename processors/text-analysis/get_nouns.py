@@ -54,7 +54,7 @@ class ExtractNouns(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.type == "linguistic-features"
+        return module.type == "linguistic-features" and module.language != 'fi'
 
     def process(self):
         """

@@ -71,7 +71,7 @@ class ExtractNouns(BasicProcessor):  # TEMPORARILY DISABLED
         :param module: Module to determine compatibility with
         """
 
-        return module.type == "linguistic-features-fin"
+        return module.type == "linguistic-features-fin" and module.language == 'fi'
 
     def process(self):
         """
