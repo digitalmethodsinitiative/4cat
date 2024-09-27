@@ -820,6 +820,38 @@ class SearchTelegram(Search):
                     # Failsafe; can be updated to support formatting of new datastructures in the future
                     reactions += f"{reaction}, "
 
+        # t.me links
+        linked_entities = set()
+        all_links = ural.urls_from_text(message["message"])
+        all_links = [link.split("t.me/")[1] for link in all_links if
+                     ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
+
+        for link in all_links:
+            if link.startswith("+"):
+                # invite links
+                continue
+
+            entity_name = link.split("/")[0].split("?")[0].split("#")[0]
+            linked_entities.add(entity_name)
+
+        # @references
+        # in execute_queries we use MessageEntityMention to get these
+        # however, after serializing these objects we only have the offsets of
+        # the mentioned username, and telegram does weird unicode things to its
+        # offsets meaning we can't just substring the message. So use a regex
+        # as a 'good enough' solution
+        all_mentions = set(re.findall(r"@([^\s\W]+)", message["message"]))
+
+        # make this case-insensitive since people may use different casing in
+        # messages than the 'official' username for example
+        all_connections = set([v for v in [forwarded_username, *linked_entities, *all_mentions] if v])
+        all_ci_connections = set()
+        seen = set()
+        for connection in all_connections:
+            if connection.lower() not in seen:
+                all_ci_connections.add(connection)
+                seen.add(connection.lower())
+
         return MappedItem({
             "id": f"{message['_chat']['username']}-{message['id']}",
             "thread_id": thread,
@@ -841,6 +873,9 @@ class SearchTelegram(Search):
             "author_forwarded_from_name": forwarded_name,
             "author_forwarded_from_username": forwarded_username,
             "author_forwarded_from_id": forwarded_id,
+            "entities_linked": ",".join(linked_entities),
+            "entities_mentioned": ",".join(all_mentions),
+            "all_connections": ",".join(all_ci_connections),
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
                 "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
