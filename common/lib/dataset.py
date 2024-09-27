@@ -9,6 +9,7 @@ import json
 import time
 import csv
 import re
+from ftlangdetect import detect
 
 from pathlib import Path
 
@@ -56,9 +57,10 @@ class DataSet(FourcatModule):
 	no_status_updates = False
 	staging_areas = None
 	_queue_position = None
+	#language = ''
 
 	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
-				 type=None, is_private=True, owner="anonymous"):
+				 type=None, is_private=True, owner="anonymous", language=''):
 		"""
 		Create new dataset object
 
@@ -76,6 +78,7 @@ class DataSet(FourcatModule):
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
+		
 
 		if key is not None:
 			self.key = key
@@ -129,7 +132,8 @@ class DataSet(FourcatModule):
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
-				"key_parent": parent
+				"key_parent": parent,
+				"language": language
 			}
 			self.parameters = parameters
 

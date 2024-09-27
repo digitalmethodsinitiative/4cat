@@ -8,6 +8,7 @@ import csv
 
 from pathlib import Path
 from abc import ABC, abstractmethod
+from ftlangdetect import detect
 
 from common.config_manager import config
 from common.lib.dataset import DataSet
@@ -92,9 +93,11 @@ class Search(BasicProcessor, ABC):
 
 		if self.import_warning_count == 0 and self.import_error_count == 0:
 			self.dataset.finish(num_rows=num_items)
+			self.dataset.language = self.update_language()
 		else:
-			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=True)
+			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=False)
 			self.dataset.finish(num_rows=num_items)
+			self.dataset.language = self.update_language()
 
 	def search(self, query):
 		"""
@@ -361,6 +364,47 @@ class Search(BasicProcessor, ABC):
 
 		return processed
 
+	def update_language(self):
+		num_items = 0
+		text = ''
+		    
+		try:
+			for item in self.dataset.iterate_items():
+				if num_items >= 50:
+					break
+
+           
+				try:
+					body_text = item.get("body", "")
+					if body_text:
+						text += body_text + " "
+						num_items += 1
+				except KeyError as e:
+					self.dataset.update_status(f"{str(e)} - no body field.")
+				except Exception as e:
+					self.dataset.update_status(f"random error item: {str(e)}")
+
+        
+			text = text.replace('\n', '')
+
+			self.dataset.update_status('checking the language')
+			#self.dataset.update_status(f'text: {text}')
+
+        	
+			try:
+				language = detect(text)
+				self.dataset.update_status("the language was detected correctly")
+				language = language['lang'] 
+				self.dataset.update_status(f'language: {language}')
+				#self.dataset.update_status(f'Language detected: {language["lang"]}')
+			except Exception as e:
+				self.dataset.update_status(f"Error detecting language: {str(e)}")
+				language = 'en' 
+
+			return language if language == 'fi' else 'en'
+		except Exception as e:
+			self.dataset.update_status(f"Error in the iterate_items: {str(e)}")
+			return 'en'
 
 class SearchWithScope(Search, ABC):
 	"""
