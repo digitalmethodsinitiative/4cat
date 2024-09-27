@@ -45,6 +45,7 @@ class DataSet(FourcatModule):
 	genealogy = None
 	preset_parent = None
 	parameters = None
+	modules = None
 
 	owners = None
 	tagged_owners = None
