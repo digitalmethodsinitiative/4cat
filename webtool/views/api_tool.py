@@ -830,7 +830,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 	usernames = request.form.get("name", "") if not username else username
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
