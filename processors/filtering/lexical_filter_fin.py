@@ -18,14 +18,14 @@ class LexicalFilter(BaseFilter):
     """
     Retain only posts matching a given lexicon
     """
-    type = "lexical-filter"  # job type ID
+    type = "lexical-filter-fin"  # job type ID
     category = "Filtering"  # category
-    title = "Filter by words or phrases"  # title displayed in UI
+    title = "Filter by words or phrases in Finnish"  # title displayed in UI
     description = "Retains posts that contain selected words or phrases, including preset word lists. " \
                   "This creates a new dataset."  # description displayed in UI
 
     references = [
-        "[Hatebase](https://hatebase.org)",
+        "[Finnish hatespeech](https://www.theseus.fi/handle/10024/261556)",
         "[Regex101](https://regex101.com/)"
     ]
 
@@ -36,10 +36,9 @@ class LexicalFilter(BaseFilter):
             "type": UserInput.OPTION_MULTI,
             "default": [],
             "options": {
-                "hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
-                "hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
+                "finnish_hatespeech": "Finnish words present in hatespeech crimes",
             },
-            "help": "Filter items containing words in these lexicons. Note that they may be outdated."
+            "help": "Filter items containing words in this lexicon. Note that they may be outdated and the list is not exhaustive. Part of the wordlist is in Swedish."
         },
         "lexicon-custom": {
             "type": UserInput.OPTION_TEXT,
@@ -49,7 +48,7 @@ class LexicalFilter(BaseFilter):
         "as_regex": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
-            "help": "Interpret custom word list as a regular expression",
+            "help": "Interpret custom word list as a regular expression. This only applies to custom lexicons.",
             "tooltip": "Regular expressions are parsed with Python"
         },
         "exclude": {
@@ -72,7 +71,7 @@ class LexicalFilter(BaseFilter):
 
         :param module: Module to determine compatibility with
         """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson") and module.language == 'fi'
 
     def filter_items(self):
         """
@@ -96,7 +95,10 @@ class LexicalFilter(BaseFilter):
                 lexicons[lexicon_id] = set()
 
             with open(lexicon_file, encoding="utf-8") as lexicon_handle:
+		 
                 lexicons[lexicon_id] |= set(lexicon_handle.read().splitlines())
+                
+       
 
         # add user-defined words
         custom_id = "user-defined"
@@ -113,22 +115,24 @@ class LexicalFilter(BaseFilter):
             if not lexicons[lexicon_id]:
                 continue
 
-            if not self.parameters.get("as_regex"):
+            if not self.parameters.get("as_regex") and lexicon_id == custom_id:
                 phrases = [re.escape(term) for term in lexicons[lexicon_id] if term]
             else:
                 phrases = [term for term in lexicons[lexicon_id] if term]
+                
 
             try:
                 if not case_sensitive:
                     lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b",
+                        "|".join(phrases),
                         flags=re.IGNORECASE)
-                      
+                    
                 else:
                     lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b")
-            except re.error:
-                self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
+                        "|".join(phrases)) 
+                    
+            except re.error as e:
+                self.dataset.update_status(f"Invalid regular expression, cannot use as filter {e}", is_final=True)
                 self.dataset.finish(0)
                 return
 
