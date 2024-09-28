@@ -17,7 +17,8 @@ class NeologismExtractor(ProcessorPreset):
 				  "Uses stopwords-iso as its stopword filter."
 	extension = "csv"
 
-	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
+	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'",
+	"Finnish Wordlist: https://kaino.kotus.fi/sanat/taajuuslista/parole.php"]
 
 	@staticmethod
 	def is_compatible_with(module=None, user=None):
