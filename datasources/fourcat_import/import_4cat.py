@@ -298,14 +298,14 @@ class SearchImportFromFourcat(BasicProcessor):
             # supernumerary datasets - handle on their own
             # these include any children of imported datasets
             try:
-                key_exists = DataSet(key=metadata["key"], db=self.db)
+                key_exists = DataSet(key=metadata["key"], db=self.db, modules=self.modules)
 
                 # if we *haven't* thrown a DatasetException now, then the
                 # key is already in use, so create a "dummy" dataset and
                 # overwrite it with the metadata we have (except for the
                 # key). this ensures that a new unique key will be
                 # generated.
-                new_dataset = DataSet(parameters={}, type=self.type, db=self.db)
+                new_dataset = DataSet(parameters={}, type=self.type, db=self.db, modules=self.modules)
                 metadata.pop("key")
                 self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
 
@@ -313,7 +313,7 @@ class SearchImportFromFourcat(BasicProcessor):
                 # this is *good* since it means the key doesn't exist, so
                 # we can re-use the key of the imported dataset
                 self.db.insert("datasets", data=metadata)
-                new_dataset = DataSet(key=metadata["key"], db=self.db)
+                new_dataset = DataSet(key=metadata["key"], db=self.db, modules=self.modules)
 
         # make sure the dataset path uses the new key and local dataset
         # path settings. this also makes sure the log file is created in
@@ -331,7 +331,7 @@ class SearchImportFromFourcat(BasicProcessor):
 
         # refresh object, make sure it's in sync with the database
         self.created_datasets.add(new_dataset.key)
-        new_dataset = DataSet(key=new_dataset.key, db=self.db)
+        new_dataset = DataSet(key=new_dataset.key, db=self.db, modules=self.modules)
         if new_dataset.key == self.dataset.key:
             # this ensures that the first imported dataset becomes the
             # processor's "own" dataset, and that the import logs go to
@@ -500,7 +500,7 @@ class SearchImportFromFourcat(BasicProcessor):
             # overwritten by this point
             deletables = [k for k in self.created_datasets if k != self.dataset.key]
             for deletable in deletables:
-                DataSet(key=deletable, db=self.db).delete()
+                DataSet(key=deletable, db=self.db, modules=self.modules).delete()
 
             self.dataset.finish_with_error(f"Interrupted while importing datasets{' from '+self.base if self.base else ''}. Cannot resume - you "
                                            f"will need to initiate the import again.")
