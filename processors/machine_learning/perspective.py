@@ -146,10 +146,6 @@ class Perspective(BasicProcessor):
 	@staticmethod
 	def map_item(item):
 
-		# print({"item_id": item["id"],
-		# 	"body": item.get("body"),
-		# 	**attribute_scores})
-
 		attribute_scores = {}
 		all_attributes = ["TOXICITY", "SEVERE_TOXICITY", "IDENTITY_ATTACK", "INSULT", "PROFANITY", "THREAT"]
 		for att in all_attributes:
