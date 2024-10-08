@@ -513,7 +513,6 @@ article.result > section:first-child {
 .processor-option-wrap > label {
     display: flex;
     align-items: center;
-    max-height: 1.5em;
 }
 
 .processor-option-wrap > label.option-type-toggle {
@@ -552,7 +551,7 @@ article.result > section:first-child {
     flex-direction: column;
     align-items: stretch;
     height: 125px;
-    width: 75%;
+    width: 95%;
     overflow-y: scroll;
     overflow-x: hidden;
     background-color: var(--gray);
@@ -561,7 +560,7 @@ article.result > section:first-child {
 .processor-option-wrap .multi-select-options {
     height: auto;
     max-height: 15em;
-    width: 19em;
+    width: 100%;
 }
 
 .multi-select-options > label, .form-element .multi-select-options label {
@@ -569,6 +568,7 @@ article.result > section:first-child {
     text-align: left;
     cursor: pointer;
     user-select: none;
+    min-height: auto;
 }
 
 .multi-select-options .no-match {

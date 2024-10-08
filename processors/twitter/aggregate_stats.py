@@ -132,7 +132,8 @@ class TwitterAggregatedStats(BasicProcessor):
         counter = 0
         data_types = None
 
-        for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+        for post in self.source_dataset.iterate_items(self):
+            post = post.original
             try:
                 tweet_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
                 post["timestamp"] = tweet_time.strftime("%Y-%m-%d %H:%M:%S")

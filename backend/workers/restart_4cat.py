@@ -50,11 +50,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
         # prevent multiple restarts running at the same time which could blow
         # up really fast
-        lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+        lock_file = Path(config.get("PATH_ROOT")).joinpath("config/restart.lock")
 
         # this file has the log of the restart worker itself and is checked by
         # the frontend to see how far we are
-        log_file_restart = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+        log_file_restart = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_LOGS")).joinpath("restart.log")
         log_stream_restart = log_file_restart.open("a")
 
         if not is_resuming:
@@ -143,7 +143,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # front-end restart or upgrade too
             self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             log_stream_restart.write("4CAT restarted.\n")
-            with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
+            with Path(config.get("PATH_ROOT")).joinpath("config/.current-version").open() as infile:
                 log_stream_restart.write(f"4CAT is now running version {infile.readline().strip()}.\n")
 
             # we're gonna use some specific Flask routes to trigger this, i.e.

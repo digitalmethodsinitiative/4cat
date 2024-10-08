@@ -446,7 +446,7 @@ class SearchVK(Search):
             "views": item.get("views", {}).get("count"),
             "likes": item.get("likes", {}).get("count"),
             "post_comments": item.get("comments", {}).get("count"),
-            "edited": datetime.datetime.fromtimestamp(item.get("edited")).strftime("%Y-%m-%d %H:%M:%S") if vk_item.get("edited", False) else False,
+            "edited": datetime.datetime.fromtimestamp(item.get("edited")).strftime("%Y-%m-%d %H:%M:%S") if item.get("edited", False) else False,
             "photos": ", ".join(photos),
             "videos": ", ".join(videos),
             "audio": ", ".join(audio),

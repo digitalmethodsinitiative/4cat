@@ -12,6 +12,7 @@ from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
+from processors.visualisation.download_videos import VideoDownloaderPlus
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -30,6 +31,8 @@ class VideoFrames(BasicProcessor):
 	title = "Extract frames from videos"  # title displayed in UI
 	description = "Extract frames from videos"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+
+	followups = ["video-timelines"] + VideoDownloaderPlus.followups
 
 	options = {
 		"frame_interval": {
@@ -55,14 +58,12 @@ class VideoFrames(BasicProcessor):
 		},
 	}
 
-	followups = ["video-timelines"]
-
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow on tiktok-search only for dev
+		Allow on videos
 		"""
-		return module.type.startswith("video-downloader") and \
+		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
 			   config.get("video-downloader.ffmpeg_path", user=user) and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 

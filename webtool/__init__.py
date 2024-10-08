@@ -22,11 +22,13 @@ from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug import Request
 
 from common.config_manager import config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
+from common.lib.module_loader import ModuleCollector
 
 from common.lib.user import User
 from webtool.lib.helpers import generate_css_colours
@@ -34,6 +36,7 @@ from webtool.lib.helpers import generate_css_colours
 # initialize global objects for interacting with all the things
 login_manager = LoginManager()
 app = Flask(__name__)
+fourcat_modules = ModuleCollector()
 
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy
@@ -99,15 +102,17 @@ login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous"
 login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
+# Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
+Request.max_form_parts = config.get("flask.max_form_parts", 1000)
+
 # import all views
 import webtool.views.views_admin
+import webtool.views.views_extensions
 import webtool.views.views_restart
 import webtool.views.views_user
-
 import webtool.views.views_dataset
 import webtool.views.views_misc
 import webtool.views.views_scheduler
-
 import webtool.views.api_explorer
 import webtool.views.api_standalone
 import webtool.views.api_tool

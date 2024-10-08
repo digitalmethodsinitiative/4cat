@@ -31,6 +31,8 @@ class TfIdf(BasicProcessor):
 	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["wordcloud"]
+
 	options = {
 		"library": {
 			"type": UserInput.OPTION_CHOICE,
@@ -279,7 +281,7 @@ class TfIdf(BasicProcessor):
 		results = []
 		for index, document in enumerate(df_matrix):
 			df_tim = (df_matrix.sort_values(by=[document], ascending=False))[:top_n]
-			for i in range(top_n):
+			for i in range(min(top_n, len(df_tim.index))):
 				result = {}
 				result["item"] = df_tim.index.values[i]
 				result["value"] = df_tim[document].values[i].tolist()

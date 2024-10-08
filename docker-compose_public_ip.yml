@@ -6,8 +6,6 @@
 # The issue this "solves" is allowing 4CAT to be deployed on an unknown
 # IP address which is only provided by SURF after 4CAT deployment.
 
-version: '3.6'
-
 services:
   db:
     container_name: 4cat_db
@@ -27,7 +25,7 @@ services:
       retries: 5
 
   backend:
-    image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
+    image: digitalmethodsinitiative/4cat:latest
     container_name: 4cat_backend
     init: true
     restart: unless-stopped
@@ -42,11 +40,11 @@ services:
       - 4cat_data:/usr/src/app/data/
       - 4cat_config:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
-    # The -p sets your SERVER_NAME to your public IP
-    entrypoint: docker/docker-entrypoint.sh -p
+    # The -h sets your SERVER_NAME to hostname
+    entrypoint: docker/docker-entrypoint.sh -h
 
   frontend:
-    image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
+    image: digitalmethodsinitiative/4cat:latest
     container_name: 4cat_frontend
     restart: unless-stopped
     env_file:
@@ -55,8 +53,8 @@ services:
       - db
       - backend
     ports:
-      - ${TELEGRAM_PORT}:443
-      - ${PUBLIC_PORT}:5000
+      - 445:443
+      - 8080:5000
     volumes:
       - 4cat_data:/usr/src/app/data/
       - 4cat_config:/usr/src/app/config/

@@ -26,6 +26,8 @@ class TopicModelWordExtractor(BasicProcessor):
     description = "Uses the LDA model to predict to which topic each item or sentence belongs and creates a CSV file showing this information. Each line represents one 'document'; if tokens are grouped per 'item' and only one column is used (e.g. only the 'body' column), there is one row per post/item, otherwise a post may be represented by multiple rows (for each sentence and/or column used)."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = []
+
     options = {
         "include_top_features": {
             "type": UserInput.OPTION_TOGGLE,
@@ -34,9 +36,9 @@ class TopicModelWordExtractor(BasicProcessor):
             "tooltip": 'This may be useful in better understanding your topics.',
         },
         "columns": {
-            "type": UserInput.OPTION_TEXT,
+            "type": UserInput.OPTION_MULTI,
             "help": "Extra column(s) to include from original data",
-            "default": "id",
+            "default": ["id"],
             "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always included."
         },
     }

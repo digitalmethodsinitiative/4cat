@@ -140,7 +140,7 @@ if config_path.exists():
                     docker_version = line.split('=')[-1].strip()
                     if docker_version not in ['latest', 'stable']:
                         notification = f"You have updated 4CAT, but your Docker .env file indicates you installed a specific version. If you recreate your 4CAT Docker containers, 4CAT will regress to {docker_version}. Consider updating DOCKER_TAG in .env to the 'stable' tag to always use the latest version."
-                        add_notification(db, "!admins", notification)
+                        add_notification(db, "!admin", notification)
                     break
 
 

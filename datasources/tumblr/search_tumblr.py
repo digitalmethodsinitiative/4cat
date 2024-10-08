@@ -303,7 +303,7 @@ class SearchTumblr(Search):
 		# We're gonna change max_date, so store a copy for reference.
 		max_date_original = max_date
 
-		# We use the averag time difference between posts to spot possible gaps in the data.
+		# We use the average time difference between posts to spot possible gaps in the data.
 		all_time_difs = []
 		avg_time_dif = 0
 		time_difs_len = 0

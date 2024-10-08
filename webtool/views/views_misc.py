@@ -9,13 +9,11 @@ import markdown
 from pathlib import Path
 from datetime import datetime
 
-import backend
-
 from flask import request, render_template, jsonify, Response
 from flask_login import login_required, current_user
 
-from webtool import app, db, config
-from webtool.lib.helpers import pad_interval, error, setting_required
+from webtool import app, db, config, fourcat_modules
+from webtool.lib.helpers import pad_interval, error
 from webtool.views.views_dataset import create_dataset, show_results
 
 from common.config_manager import ConfigWrapper
@@ -23,6 +21,10 @@ config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+@app.errorhandler(413)
+def request_entity_too_large(this_error):
+    message = f"File too large; try uploading as a ZIP file instead."
+    return error(413, message=message, status="error")
 
 @app.route('/')
 @login_required
@@ -69,9 +71,9 @@ def show_about():
     else:
         news = None
 
-    datasources = {k: v for k, v in backend.all_modules.datasources.items() if
+    datasources = {k: v for k, v in fourcat_modules.datasources.items() if
                    k in config.get("datasources.enabled") and not v["importable"]}
-    importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
+    importables = {k: v for k, v in fourcat_modules.datasources.items() if v["importable"]}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 
@@ -112,7 +114,7 @@ def data_overview(datasource=None):
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
                    metadata["has_worker"] and datasource in config.get("datasources.enabled")}
 
     if datasource not in datasources:
@@ -131,7 +133,7 @@ def data_overview(datasource=None):
     if datasource:
 
         datasource_id = datasource
-        worker_class = backend.all_modules.workers.get(datasource_id + "-search")
+        worker_class = fourcat_modules.workers.get(datasource_id + "-search")
         # Database IDs may be different from the Datasource ID (e.g. the datasource "4chan" became "fourchan" but the database ID remained "4chan")
         database_db_id = worker_class.prefix if hasattr(worker_class, "prefix") else datasource_id
 
@@ -151,8 +153,8 @@ def data_overview(datasource=None):
         if is_static:
             labels.append("static")
 
-        if hasattr(worker_class, "is_from_extension"):
-            labels.append("extension")
+        if hasattr(worker_class, "is_from_zeeschuimer"):
+            labels.append("zeeschuimer")
 
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":

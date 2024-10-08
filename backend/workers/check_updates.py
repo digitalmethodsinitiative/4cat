@@ -55,12 +55,12 @@ class UpdateChecker(BasicWorker):
             # update available!
             # show a notification for all admins (normal users can't update
             # after all)
-            add_notification(self.db, "!admins",
+            add_notification(self.db, "!admin",
                              "A new version of 4CAT is [available](%s). The latest version is %s; you are running version %s." % (
                                  release_url, latest_tag, current_version
                              ), allow_dismiss=True)
 
         else:
             # up to date? dismiss any notifications about new versions
-            self.db.execute("DELETE FROM users_notifications WHERE username = '!admins' "
+            self.db.execute("DELETE FROM users_notifications WHERE username = '!admin' "
                             "AND notification LIKE 'A new version of 4CAT%'")

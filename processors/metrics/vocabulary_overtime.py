@@ -23,6 +23,8 @@ class OvertimeAnalysis(BasicProcessor):
 	description = "Determines the counts over time of particular set of words or phrases."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	references = [
 		"[Hatebase.org](https://hatebase.org)"
 		"[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
@@ -72,6 +74,16 @@ class OvertimeAnalysis(BasicProcessor):
 			"help": "Custom vocabulary (separate with commas)"
 		}
 	}
+
+	@staticmethod
+	def is_compatible_with(module=None, user=None):
+		"""
+        Determine compatibility
+
+        :param Dataset module:  Module ID to determine compatibility with
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""

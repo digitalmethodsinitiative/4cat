@@ -7,11 +7,15 @@
     margin: 0;
 }
 
-.worker-list li > * {
+.worker-list li {
+    padding: 0;
+}
+
+.worker-list li div > * {
     display: inline-block
 }
 
-.worker-list li {
+.worker-list li div {
     padding: 0.75em 1em 0.5em 1em;
 }
 
@@ -121,6 +125,17 @@ table td[colspan] {
     color: var(--accent-alternate)
 }
 
+.settings.tab-controls li a {
+    padding: 0.25em 1em;
+}
+
+article .settings h3:not(.blocktitle) {
+    margin: 0;
+    padding: 0.5em;
+    background: var(--contrast-dark);
+    color: var(--always-white);
+}
+
 .config-tag-info {
     text-align: center;
     border-bottom: 2px solid var(--contrast-dark);
@@ -144,6 +159,10 @@ table td[colspan] {
     padding: 0.1em 0;
 }
 
+#tag-order .remove-tag {
+    width: 1.25em;
+}
+
 #tag-order .button-like {
     display: inline-block;
     border-radius: 0.2em;
@@ -153,6 +172,15 @@ table td[colspan] {
 
 #tag-order i.handle, #tag-order i.semi-handle {
     cursor: ns-resize;
+}
+
+#tag-order li {
+    display: grid;
+    grid-template-columns: 2em auto;
+}
+
+#tag-order li.default-tag {
+    grid-template-columns: 2em auto;
 }
 
 ol#tag-order li:nth-child(2n) {
@@ -165,6 +193,20 @@ ol#tag-order li:nth-child(2n) {
 
 #tag-order li:first-child {
     border-top: 1px dotted var(--contrast-dark)
+}
+
+#tag-order .tag-container {
+    display: grid;
+    grid-template-columns: auto 2em 6.5em 6.5em;
+    grid-column-gap: 0.5em;
+}
+
+#tag-order .tag-container .button-like {
+    text-align: center;
+}
+
+#tag-order .tag-container.global-tag {
+    grid-template-columns: auto 13.5em;
 }
 
 .stats-container {

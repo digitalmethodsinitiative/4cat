@@ -163,10 +163,10 @@
         </ol>
     </section>
 
-    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) %}
+    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item or (dataset.get_extension() in ("ndjson",) and not __user_config("ui.prefer_mapped_preview"))) %}
         <section class="inline-preview">
             <h2 class="blocktitle section-subheader">
-                <span>Preview</span>
+                <span>{% if dataset.get_extension == "html" %}View dataset{% else %}Dataset preview{% endif %}</span>
                 <button
                     data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
                     aria-controls="popup-preview-{{ dataset.key }}">
@@ -191,7 +191,7 @@
                 <p>See <a href="https://docs.google.com/document/d/1po-sOB8tDRZlvWrEayu97cGh_qsBuW0URd4md0_tv7k/edit?usp=sharing">this exercise sheet</a> for step-by-step tutorials.</p>
             </div>
             {% set cat = namespace(egory='') %}
-            {% for processor in dataset.get_available_processors().values() %}
+            {% for processor in dataset.get_available_processors(exclude_hidden=True).values() %}
                 {% if processor.category != cat.egory %}
                     {% if cat.egory != '' %}</ol>{% endif %}
                     {% set cat.egory = processor.category %}

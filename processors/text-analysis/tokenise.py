@@ -2,6 +2,7 @@
 Tokenize post bodies
 """
 import ahocorasick
+import razdel
 import string
 import jieba
 import json
@@ -12,6 +13,7 @@ import nltk
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
+from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
@@ -34,6 +36,8 @@ class Tokenise(BasicProcessor):
 				  "tokens per sentence)."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller",]
+
 	references = [
 			"[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
 			"[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
@@ -46,8 +50,11 @@ class Tokenise(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow CSV and NDJSON datasets
+		Allow processor to run on all csv and NDJSON datasets
+
+		:param module: Dataset or processor to determine compatibility with
 		"""
+
 		return module.get_extension() in ("csv", "ndjson")
 
 	@classmethod
@@ -66,9 +73,12 @@ class Tokenise(BasicProcessor):
 		case they are requested for display in the 4CAT web interface. This can
 		be used to show some options only to privileges users.
 		"""
+		with config.get("PATH_ROOT").joinpath("common/assets/stopwords-languages.json").open() as infile:
+			stopwords = json.load(infile)
+
 		options = {
 			"columns": {
-				"type": UserInput.OPTION_TEXT,
+				"type": UserInput.OPTION_MULTI,
 				"help": "Column(s) to tokenise",
 				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
 			},
@@ -76,30 +86,35 @@ class Tokenise(BasicProcessor):
 				"type": UserInput.OPTION_CHOICE,
 				"default": "all",
 				"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "thread": "Thread"},
-				"help": "Produce documents per"
+				"help": "Produce token sets per",
+				"tooltip": "This determines the periodisation of follow-up analyses; e.g. if you want to produce topic "
+							"models per month as the next step, you need to choose 'Month' here."
+			},
+			"language": {
+				"type": UserInput.OPTION_CHOICE,
+				"options": {
+					**{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+					"other": "Other (stemming, lemmatizing and sentence splitting will most likely not produce "
+							 "accurate results)"
+				},
+				"default": "english",
+				"help": "Language",
+				"tooltip": "This affects stemming, tokenisation, stopword filtering, and sentence splitting, unless "
+						   "overridden via the options below"
 			},
 			"tokenizer_type": {
 				"type": UserInput.OPTION_CHOICE,
 				"default": "twitter",
 				"options": {
-					"twitter": "nltk TweetTokenizer",
-					"regular": "nltk word_tokenize",
+					"twitter": "nltk TweetTokenizer (use general language setting, optimised for social media)",
+					"regular": "nltk word_tokenize (use general language setting)",
+					"razdel": "razdel (for Russian text)",
 					"jieba-cut": "jieba (for Chinese text; accurate mode)",
 					"jieba-cut-all": "jieba (for Chinese text; full mode)",
 					"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
 				},
 				"help": "Tokeniser",
 				"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
-			},
-			"language": {
-				"type": UserInput.OPTION_CHOICE,
-				"options": {
-					**{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
-					"other": "Other (language-specific options such as stemming, lemmatizing and sentence splitting will "
-							 "have no effect)"
-				},
-				"default": "english",
-				"help": "Language"
 			},
 			"grouping-per": {
 				"type": UserInput.OPTION_CHOICE,
@@ -109,57 +124,63 @@ class Tokenise(BasicProcessor):
 					"item": "Item",
 					"sentence": "Sentence in item"
 				},
-				"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'item'."
+				"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what "
+						   "to choose, choose 'item'."
 			},
 			"stem": {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
 				"help": "Stem tokens (with SnowballStemmer)",
-				"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', etc."
+				"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes "
+						   "'bicycl', etc.",
+				"requires": "language!=other"
 			},
 			"lemmatise": {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
 				"help": "Lemmatise tokens (English only)",
-				"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', 'bicycles' " \
-						   " becomes 'bicycle', 'better' becomes 'good'."
+				"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', "
+						   "'bicycles' becomes 'bicycle', 'better' becomes 'good'.",
+				"requires": "language==english"
+			},
+			"filter": {
+				"type": UserInput.OPTION_MULTI_SELECT,
+				"default": ["copy-language"],
+				"options": {
+					"copy-language": "Stop words for language chosen above",
+					**{
+						f"stopwords-iso-{code}": f"{language} stop words (stopwords-iso)"
+						for code, language in stopwords.items()
+					},
+					"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top "
+													"unigrams)",
+					"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. "
+												 "Warning: computationally heavy)",
+					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)"
+				},
+				"help": "Tokens to exclude",
+				"tooltip": "See the references for information on the word lists' provenance. It is highly recommended "
+						   "to exclude stop words. Choosing more word lists increases processing time."
 			},
 			"accept_words": {
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
-				"help": "Always allow these words",
-				"tooltip": "These won't be deleted as stop words. Also won't be stemmed or lemmatised. Separate with commas."
+				"help": "Always allow these tokens",
+				"tooltip": "These won't be deleted as stop words and will never be stemmed or lemmatised. Separate "
+						   "with commas."
 			},
 			"reject_words": {
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
-				"help": "Always delete these words",
-				"tooltip": "These will be deleted from the corpus. Also won't be stemmed or lemmatised. Separate with commas."
-			},
-			"filter": {
-				"type": UserInput.OPTION_MULTI,
-				"default": [],
-				"options": {
-					#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
-					"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
-					"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
-					"stopwords-iso-zh": "Chinese stopwords (stopwords-iso)",
-					"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
-					#"wordlist-infochimps-english": "English word list (infochimps)",
-					"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
-					"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. Warning: computationally heavy)",
-					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
-					#"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
-				},
-				"help": "Word lists to exclude",
-				"tooltip": "See the references for information per word list. It is highly recommended to exclude stop words. " \
-						   "Choosing more word lists increases processing time."
+				"help": "Always delete these tokens",
+				"tooltip": "These will be ignored and excluded from the corpus. Separate with commas."
 			},
 			"only_unique": {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
-				"help": "Only keep unique words per item",
-				"tooltip": "Can be useful to filter out spam."
+				"help": "Only keep unique tokens per item",
+				"tooltip": "If a token occurs multiple times in the same item, only process once. Can be useful to "
+						   "filter out spam."
 			}
 		}
 
@@ -220,6 +241,10 @@ class Tokenise(BasicProcessor):
 		symbol = re.compile(r"[" + re.escape(string.punctuation) + "’‘“”" + "]")
 		numbers = re.compile(r"\b[0-9]+\b")
 
+		# load general stopwords dictionary
+		with open(config.get("PATH_ROOT").joinpath("common/assets/stopwords-iso.json"), encoding="utf-8") as infile:
+			stopwords_iso = json.load(infile)
+
 		# Twitter tokenizer if indicated
 		language = self.parameters.get("language", "english")
 		if self.parameters.get("tokenizer_type") == "jieba-cut":
@@ -231,15 +256,48 @@ class Tokenise(BasicProcessor):
 		elif self.parameters.get("tokenizer_type") == "jieba-search":
 			tokenizer = jieba.cut_for_search
 			tokenizer_args = {}
+		elif self.parameters.get("tokenizer_type") == "razdel":
+			tokenizer = razdel.tokenize
+			tokenizer_args = {}
+		elif self.parameters.get("tokenizer_type") == "twitter":
+			tokenizer = TweetTokenizer(preserve_case=False).tokenize
+			tokenizer_args = {}
 		else:
-			tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
-			tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
+			tokenizer = word_tokenize
+			tokenizer_args = {"language": language} if language != "other" else {}
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters.get("filter", []):
-			with config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{wordlist}.txt").open(encoding="utf-8") as input:
-				word_filter = set.union(word_filter, input.read().splitlines())
+			if wordlist == "copy-language" and language != "other":
+				# use stopwords-iso list for chosen language
+				copy_language = {
+					"arabic": "ar",
+					"danish": "dk",
+					"dutch": "nl",
+					"english": "en",
+					"finnish": "fi",
+					"french": "fr",
+					"german": "de",
+					"hungarian": "hu",
+					"italian": "it",
+					"norwegian": "no",
+					"porter": "pt",
+					"portugese": "pt",
+					"romanian": "ro",
+					"russian": "ru",
+					"spanish": "es",
+					"swedish": "sv",
+				}.get(language, "en")
+				wordlist = f"stopwords-iso-{copy_language}"
+
+			if wordlist.startswith("stopwords-iso"):
+				word_filter = set.union(word_filter, stopwords_iso[wordlist.replace("stopwords-iso-", "")])
+			else:
+				wordlist_path = config.get("PATH_ROOT").joinpath(f"common/assets/wordlists/{wordlist}.txt")
+				if wordlist_path.exists():
+					with wordlist_path.open(encoding="utf-8") as input:
+						word_filter = set.union(word_filter, input.read().splitlines())
 
 		# Extend or limit the word filter with optionally added words
 		# Remove accepted words from filter
@@ -295,7 +353,11 @@ class Tokenise(BasicProcessor):
 
 		# if told so, first split the post into separate sentences
 		if grouping == "sentence":
-			if language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt')) if
+			if language == "Russian":
+				# for russian we use a special purpose splitter with better
+				# performance
+				sentence_method = razdel.sentenize
+			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab')) if
 								'pickle' in lang]:
 				self.dataset.update_status(
 					f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
@@ -341,7 +403,7 @@ class Tokenise(BasicProcessor):
 					self.dataset.update_status(0)
 					return
 
-				value = [v for v in sentence_method(post[column], language) if v is not None]
+				value = [Tokenise.normalise_segment(v) for v in sentence_method(post[column], language) if v is not None]
 				if value:
 					groupings.extend(value)
 
@@ -361,6 +423,8 @@ class Tokenise(BasicProcessor):
 
 				# stem, lemmatise and save tokens that are not in filter
 				for token in tokens:
+					token = Tokenise.normalise_segment(token)
+
 					token = token.lower()
 					token = numbers.sub("", symbol.sub("", token))
 
@@ -428,3 +492,19 @@ class Tokenise(BasicProcessor):
 
 		# create zip of archive and delete temporary files and folder
 		self.write_archive_and_finish(staging_area)
+
+	@staticmethod
+	def normalise_segment(segment):
+		"""
+		Cast token or sentence to string
+
+		Various tokenisers and splitters return tokens/segments in different
+		ways; this method ensures we always end up with a string.
+
+		:param segment:  Segment to cast to string
+		:return str:
+		"""
+		if type(segment) is Substring:
+			return segment.text
+		else:
+			return str(segment)

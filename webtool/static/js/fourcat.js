@@ -138,10 +138,11 @@ const processor = {
         e.preventDefault();
 
         if ($(this).text().includes('Run')) {
-            let form = $(this).parents('form');
+            const run_button = $(this);
+            let form = run_button.parents('form');
 
             // if it's a big dataset, ask if the user is *really* sure
-            let parent = $(this).parents('li.child-wrapper');
+            let parent = run_button.parents('li.child-wrapper');
             if (parent.length === 0) {
                 parent = $('.result-tree');
             }
@@ -153,12 +154,21 @@ const processor = {
                 }
             }
 
-            $.ajax(form.attr('data-async-action') + '?async', {
-                'method': form.attr('method'),
-                'data': form.serialize(),
-                'success': function (response) {
+            let reset_form = true;
+            fetch(form.attr('data-async-action') + '?async', {method: form.attr('method'), body: new FormData(form[0])})
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (response) {
                     if (response.hasOwnProperty("messages") && response.messages.length > 0) {
                         popup.alert(response.messages.join("\n\n"));
+                    } else if(response.hasOwnProperty('message')) {
+                        popup.alert(response.message);
+                    }
+
+                    if(response.hasOwnProperty('status') && response['status'] === 'error') {
+                        reset_form = false;
+                        return;
                     }
 
                     if (response.html.length > 0) {
@@ -196,27 +206,29 @@ const processor = {
                             expand();
                         }
                     }
-                },
-                'error': function (response) {
+                })
+                .catch(function (response) {
                     try {
                         response = JSON.parse(response.responseText);
                         popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
-                    } catch (Exception) {
+                    } catch {
                         popup.alert('The analysis could not be queued: ' + response.responseText, 'Warning');
                     }
-                }
-            });
-
-            if ($(this).data('original-content')) {
-                $(this).html($(this).data('original-content'));
-                $(this).trigger('click');
-                $(this).html($(this).data('original-content'));
-                form.trigger('reset');
-            }
+                })
+                .finally(() => {
+                    if (reset_form && run_button.data('original-content')) {
+                        run_button.html(run_button.data('original-content'));
+                        run_button.trigger('click');
+                        run_button.html(run_button.data('original-content'));
+                        form.trigger('reset');
+                        ui_helpers.toggleButton({target: run_button});
+                    }
+                });
         } else {
             $(this).data('original-content', $(this).html());
             $(this).find('.byline').html('Run');
             $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
+            ui_helpers.toggleButton({target: $(this)[0]});
         }
     },
 
@@ -353,13 +365,30 @@ const query = {
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    const sample_size = Math.min(pair[1].size, snippet_size);
-                    const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
+                    console.log(pair[1].type)
+                    if (!['application/zip', 'application/x-zip-compressed'].includes(pair[1].type)) {
+                        const sample_size = Math.min(pair[1].size, snippet_size);
+                        const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
 
-                    // make sure we're submitting utf-8 - read and then re-encode to be sure
-                    const blobAsText = await FileReaderPromise(blob);
-                    const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
-                    formdata.set(pair[0], snippet);
+                        // make sure we're submitting utf-8 - read and then re-encode to be sure
+                        const blobAsText = await FileReaderPromise(blob);
+                        const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
+                        formdata.set(pair[0], snippet);
+                    } else {
+                        // if this is a zip file, don't bother with a snippet (which won't be
+                        // useful) but do send a list of files in the zip
+                        const reader = new zip.ZipReader(new zip.BlobReader(pair[1]));
+                        const entries = await reader.getEntries();
+                        formdata.set(pair[0] + '-entries', JSON.stringify(
+                           entries.map(function(e) {
+                               return {
+                                   filename: e.filename,
+                                   filesize: e.compressedSize
+                               }
+                           })
+                        ));
+                        formdata.set(pair[0], null);
+                    }
                 }
             }
         }
@@ -468,7 +497,7 @@ const query = {
                     applyProgress($('#query-status'), 100);
                     let keyword = json.label;
 
-                    $('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
+                    $('#query-results').append('<li><a href="../results/' + json.key + '/">' + keyword + ' (' + json.rows + ' items)</a></li>');
                     query.reset_form();
                     popup.alert('Query for \'' + keyword + '\' complete!', 'Success');
                 } else {
@@ -493,6 +522,11 @@ const query = {
     },
 
     check_resultpage: function () {
+        if (!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         let unfinished = $('.dataset-unfinished');
         if (unfinished.length === 0) {
             return;
@@ -565,6 +599,7 @@ const query = {
                     $('#dataset-results').html(child.resultrow_html);
 
                     target.replaceWith(update);
+                    ui_helpers.conditional_form.init();
                     update.addClass('updated');
                     target.remove();
                 });
@@ -595,17 +630,17 @@ const query = {
 
                 for (let i = 0; i < json.length; i += 1) {
                     search_queue_length += json[i]['count'];
-                    search_queue_notice += " <span class='property-badge'>" + json[i]['jobtype'].replace('-search', '') + ' (' + json[i]['count'] + ')' + '</span>'
+                    search_queue_notice += " <span class='property-badge'>" + json[i]['processor_name'] + ' (' + json[i]['count'] + ')' + '</span>'
                 }
 
                 if (search_queue_length == 0) {
                     search_queue_box.html('Search queue is empty.');
                     search_queue_list.html('');
                 } else if (search_queue_length == 1) {
-                    search_queue_box.html('Currently processing 1 search query: ');
+                    search_queue_box.html('Currently collecting 1 dataset: ');
                     search_queue_list.html(search_queue_notice);
                 } else {
-                    search_queue_box.html('Currently processing ' + search_queue_length + ' search queries: ');
+                    search_queue_box.html('Currently collecting ' + search_queue_length + ' datasets: ');
                     search_queue_list.html(search_queue_notice);
                 }
             },
@@ -737,6 +772,8 @@ const query = {
                     multichoice.makeMultichoice();
                     multichoice.makeMultiSelect();
                 }
+
+                ui_helpers.conditional_form.manage(document.getElementById('query-form'));
             },
             'error': function () {
                 $('#datasource-select').parents('form').trigger('reset');
@@ -1279,7 +1316,7 @@ const multichoice = {
      */
     init: function () {
         // Multichoice inputs need to be loaded dynamically
-        $(document).on('click', '.toggle-button', function () {
+        $(document).on('click', '.toggle-button, .processor-queue-button', function () {
             if ($(".multichoice-wrapper, .multi-select-wrapper").length > 0) {
                 multichoice.makeMultichoice();
                 multichoice.makeMultiSelect();
@@ -1449,6 +1486,10 @@ const ui_helpers = {
 
         //table controls
         $(document).on('input', '.copy-from', ui_helpers.table_control);
+
+        //mighty morphing web forms
+        $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select, #query-form input, #query-form select', ui_helpers.conditional_form.manage);
+        ui_helpers.conditional_form.init();
 
         //iframe flexible sizing
         $('iframe').on('load', ui_helpers.fit_iframe);
@@ -1670,11 +1711,13 @@ const ui_helpers = {
      * @param force_close  Assume the event is un-toggling something regardless of current state
      */
     toggleButton: function (e, force_close = false) {
-        if (!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') {
+        if ((!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') && typeof e.preventDefault === "function") {
             e.preventDefault();
         }
 
-        let target = '#' + $(this).attr('aria-controls');
+        const button_target = $(e.target).is('.toggle-button, .processor-queue-button') ? $(e.target) : $(e.target).parents('.toggle-button, .processor-queue-button')[0];
+
+        let target = '#' + $(button_target).attr('aria-controls');
         let is_open = $(target).attr('aria-expanded') !== 'false';
 
         if (is_open || force_close) {
@@ -1729,7 +1772,7 @@ const ui_helpers = {
         e.preventDefault();
         let link = e.target;
         let target_id = link.getAttribute('aria-controls');
-        let controls = link.parentNode.parentNode;
+        let controls = find_parent(link, '.tab-controls');
         controls.querySelector('.highlighted').classList.remove('highlighted');
         link.parentNode.classList.add('highlighted');
         controls.parentNode.parentNode.querySelector('.tab-container *[aria-expanded=true]').setAttribute('aria-expanded', 'false');
@@ -1757,6 +1800,95 @@ const ui_helpers = {
                 element.value = value;
             }
         })
+    },
+
+    conditional_form: {
+        /**
+         * Set visibility of form elements when they are loaded
+         */
+        init: function(form=null) {
+            document.querySelectorAll('*[data-requires]').forEach((element) => {
+                const form = $(element).parents('form')[0];
+                if(form.getAttribute('data-form-managed')) {
+                    return;
+                }
+                ui_helpers.conditional_form.manage({target: element});
+            });
+        },
+
+        /**
+         * Manage visibility of form elements when forms are interacted with
+
+         * @param e  Event, or a form object
+         */
+        manage: function (e) {
+            let form;
+
+            if('tagName' in e && e.tagName === 'FORM') {
+                form = e;
+            } else {
+                form = $(e.target).parents('form')[0];
+            }
+
+            form.setAttribute('data-form-managed', true);
+            const conditionals = form.querySelectorAll('*[data-requires]');
+
+            if (!conditionals) {
+                return;
+            }
+
+            conditionals.forEach((element) => {
+                let requirement = RegExp(/([a-zA-Z0-9_-]+)([!=$~^]+)(.*)/g).exec(element.getAttribute('data-requires'));
+                if (!requirement || requirement.length !== 4) { // assume 'field is not empty'
+                    requirement = [null, element.getAttribute('data-requires'), '!=', ''];
+                }
+
+                const negate = requirement[2] === '!=';
+                const other_field = 'option-' + requirement[1];
+                const other_element = form.querySelector("*[name='" + other_field + "']");
+
+                console.log(other_field);
+
+                if (!other_element) { //invalid reference
+                    return;
+                }
+
+                const other_value = other_element.value;
+
+                let requirement_met = false;
+                if (other_element.getAttribute('type') === 'checkbox') {
+                    // checkboxes are a bit different (and simpler)
+                    const other_is_checked = other_element.checked;
+                    if(requirement[2] === '!=') {
+                        if((other_is_checked && ['', 'false'].includes(requirement[3])) || (!other_is_checked && ['checked', 'true'].includes(requirement[3]))) {
+                            requirement_met = true;
+                        }
+                    } else {
+                        if((other_is_checked && ['checked', 'true'].includes(requirement[3])) || (!other_is_checked && ['', 'false'].includes(requirement[3]))) {
+                            requirement_met = true;
+                        }
+                    }
+                } else {
+                    if(requirement[2] === '!=') {
+                        requirement_met = other_value !== requirement[3];
+                    } else if(requirement[2] === '^=') {
+                        requirement_met = other_value.startsWith(requirement[3]);
+                    } else if(requirement[2] === '~=') {
+                        requirement_met = other_value.indexOf(requirement[3]) >= 0;
+                    } else if(requirement[2] === '$=') {
+                        requirement_met = other_value.endsWith(requirement[3]);
+                    } else if(['==', '='].includes(requirement[2])) {
+                        requirement_met = other_value === requirement[3];
+                    }
+                }
+
+                if (requirement_met) {
+                    $(element).show();
+                } else {
+                    $(element).hide();
+                }
+            });
+        }
     },
 
     /**
@@ -1850,4 +1982,15 @@ function hsv2hsl(h, s, v) {
     l /= 2;
 
     return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
+}
+
+function find_parent(element, selector) {
+    while(element.parentNode) {
+        element = element.parentNode;
+        if(element.matches(selector)) {
+            return element;
+        }
+    }
+
+    return null;
 }

@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   is_private        boolean DEFAULT TRUE,
   software_version  text,
   software_file     text DEFAULT '',
+  software_source   text DEFAULT '',
   annotation_fields text DEFAULT ''
 );
 
@@ -80,8 +81,11 @@ CREATE TABLE IF NOT EXISTS metrics (
   datasource         text,
   board              text,
   date               text,
-  count              integer
+  count              BIGINT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_metrics
+    ON metrics (metric, datasource, board, date);
 
 -- users
 CREATE TABLE IF NOT EXISTS users (

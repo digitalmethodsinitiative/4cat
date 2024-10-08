@@ -28,6 +28,8 @@ class VideoSceneDetector(BasicProcessor):
 				  "intensity or cuts and fades to black) and extract the scene metadata."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["video-scene-frames", "video-timelines"]
+
 	references = [
 		"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",
 		"[Detection Algorithms](https://scenedetect.com/projects/Manual/en/latest/api/detectors.html)"
@@ -137,14 +139,12 @@ class VideoSceneDetector(BasicProcessor):
 		},
 	}
 
-	followups = ["video-scene-frames", "video-timelines"]
-
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow on videos
 		"""
-		return module.type.startswith("video-downloader")
+		return module.get_media_type() == "video" or module.type.startswith("video-downloader")
 
 	def process(self):
 		"""
@@ -237,7 +237,7 @@ class VideoSceneDetector(BasicProcessor):
 		rows = []
 		if video_metadata is None:
 			# Not good, but let's store the scenes and note the error
-			self.dataset.update_status("Error connecting video scenes to original dataset", is_final=True)
+			self.dataset.log("No metadata file found")
 
 			for filename, video_scenes in collected_scenes.items():
 				for i, scene in enumerate(video_scenes):
@@ -256,7 +256,7 @@ class VideoSceneDetector(BasicProcessor):
 							continue
 						# List types are not super fun for CSV
 						if 'post_ids' in video_data:
-							video_data['post_ids'] = ','.join(video_data['post_ids'])
+							video_data['post_ids'] = ','.join([str(i) for i in video_data['post_ids']])
 
 						for i, scene in enumerate(collected_scenes[file.get('filename')]):
 							rows.append({

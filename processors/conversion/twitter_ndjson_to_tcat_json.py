@@ -20,6 +20,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
     description = "Convert a Twitter dataset to a TCAT-compatible format. This file can then be uploaded to TCAT."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
+    followups = ["tcat-auto-upload"]
+
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
@@ -38,10 +40,10 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
         # This handles and writes one Tweet at a time
         with self.dataset.get_results_path().open("w") as output:
-            for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+            for post in self.source_dataset.iterate_items(self):
                 posts += 1
 
-                post = self.map_to_TCAT(post)
+                post = self.map_to_TCAT(post.original)
 
                 # TCAT has a check on line 62 of /import/import-jsondump.php
                 # that rejects strings large than 40960
@@ -51,6 +53,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     output.write(json.dumps(post, ensure_ascii=False))
                     # NDJSON file is expected by TCAT
                     output.write('\n')
+                else:
+                    self.dataset.log(f"Tweet {post['id_str']} is too large to be imported by TCAT. It has been dropped.")
 
         self.dataset.update_status("Finished.")
         self.dataset.finish(num_rows=posts)

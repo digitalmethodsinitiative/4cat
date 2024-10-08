@@ -4,7 +4,7 @@
     {# The button for this processor #}
     {% set processor_options = processor.get_options(dataset, current_user) %}
     <div class="button-wrap processor-result-indicator">
-        <button class="processor-queue-button{% if processor_options %} toggle-button{% endif %} {{processor.type}}-button" {% if processor_options %}aria-controls="processor-options-{{ dataset.key }}-{{ processor.type }}"{% endif %}>
+        <button class="processor-queue-button {{processor.type}}-button" {% if processor_options %}aria-controls="processor-options-{{ dataset.key }}-{{ processor.type }}"{% endif %}>
             <span class="headline">
                 <i class="fa fa-{% if processor_options %}cog{% else %}play{% endif %}" aria-hidden="true"></i>
             </span>

@@ -8,7 +8,7 @@ import re
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
-from common.lib.exceptions import DataSetNotFoundException
+from common.lib.exceptions import DataSetNotFoundException, WorkerInterruptedException
 
 from common.lib.user import User
 
@@ -55,6 +55,9 @@ class ThingExpirer(BasicWorker):
 		""")
 
 		for dataset in datasets:
+			if self.interrupted:
+				raise WorkerInterruptedException("Interrupted while expiring datasets")
+
 			try:
 				dataset = DataSet(key=dataset["key"], db=self.db)
 				if dataset.is_expired():
@@ -81,6 +84,9 @@ class ThingExpirer(BasicWorker):
 		now = datetime.datetime.now()
 
 		for expiring_user in expiring_users:
+			if self.interrupted:
+				raise WorkerInterruptedException("Interrupted while expiring users")
+
 			user = User.get_by_name(self.db, expiring_user["name"])
 			username = user.data["name"]
 

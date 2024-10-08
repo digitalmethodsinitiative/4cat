@@ -24,7 +24,7 @@ __credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
-class ImageWallGenerator(BasicProcessor):
+class ImageCategoryWallGenerator(BasicProcessor):
 	"""
 	Image wall generator
 
@@ -51,7 +51,7 @@ class ImageWallGenerator(BasicProcessor):
 		"image-visuals.max_pixels_per_image": {
 			"type": UserInput.OPTION_TEXT,
 			"coerce_type": int,
-			"default": 300,
+			"default": 400,
 			"min": 25,
 			"help": "Max pixels for each images when visualising",
 		}
@@ -61,13 +61,14 @@ class ImageWallGenerator(BasicProcessor):
 	def is_compatible_with(cls, module=None, user=None):
 		"""
 		Allow processor on CLIP dataset only
-		
+
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		return module.type.startswith("image-to-categories") or \
 			module.type.startswith("image-downloader") or \
 			module.type.startswith("video-hasher-1") or \
-			module.type.startswith("video-hash-similarity-matrix")
+			module.type.startswith("video-hash-similarity-matrix") and \
+			not module.type not in ["image-downloader-screenshots-search"]
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -81,24 +82,37 @@ class ImageWallGenerator(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Category column"
 			},
-			"amount": {
+			"width_amount": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "Max images per category",
+				"help": "Max images per category" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
 				"default": 10 if max_number_images == 0 else min(max_number_images, 10),
 				"min": 0 if max_number_images == 0 else 1,
 				"max": max_number_images,
-				"tooltip": "'0' uses as many images as available in the archive" + (f" (up to {max_number_images})" if max_number_images != 0 else "")
+				"tooltip": "This controls the width of the image wall"
 			},
 			"height": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "Image height",
+				"help": "Image height in pixels",
 				"tooltip": f"In pixels. Each image will be this height and are resized proportionally to fit it. Must be between 25 and {max_pixels}.",
 				"coerce_type": int,
 				"default": min(max_pixels, 100),
 				"min": 25,
 				"max": max_pixels
+			},
+			"images_per_item": {
+				"type": UserInput.OPTION_CHOICE,
+				"options": {
+					"all": "All images",
+					"first": "Only first image",
+				},
+				"default": "first",
+				"help": "Images per item",
+				"tooltip": "If an item has multiple images, should all images be used or if the first one representative?",
 			}
 		}
+		if max_number_images == 0:
+			options['width_amount']['tooltip'] = options['width_amount']['tooltip'] + ";'0' will use all available images"
+			options['width_amount'].pop('max')
 
 		if parent_dataset is None:
 			return options
@@ -128,10 +142,12 @@ class ImageWallGenerator(BasicProcessor):
 		"""
 		Identify dataset types that are compatible with this processor
 		"""
-		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
+		# Is the the source dataset an image dataset?
+		if any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in ImageCategoryWallGenerator.image_datasets]):
 			image_dataset = source_dataset
 			category_dataset = source_dataset.top_parent()
-		elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in ImageWallGenerator.image_datasets]):
+		# Or is the parent dataset an image dataset?
+		elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in ImageCategoryWallGenerator.image_datasets] + [source_dataset.get_parent().get_media_type() == "image"]):
 			image_dataset = source_dataset.get_parent()
 			category_dataset = source_dataset
 		else:
@@ -155,14 +171,13 @@ class ImageWallGenerator(BasicProcessor):
 		self.dataset.log(f"Found {image_dataset.type} w/ {image_dataset.num_rows} images and {category_dataset.type} w/ {category_dataset.num_rows} items")
 
 		category_column = self.parameters.get("category")
-		if category_column is None:
+		if not category_column:
 			self.dataset.finish_with_error("No category provided.")
 			return
 
 		# 0 = use as many images as in the archive, up to the max
-		images_per_category = convert_to_int(self.parameters.get("amount"), 100)
-		if images_per_category == 0:
-			images_per_category = self.get_options()["amount"]["max"]
+		images_per_category = convert_to_int(self.parameters.get("width_amount"), 100)
+		images_per_item = self.parameters.get("images_per_item", "first")
 
 		# Some processors may have a special category type to extract categories
 		special_case = category_dataset.type == "image-to-categories"
@@ -175,72 +190,88 @@ class ImageWallGenerator(BasicProcessor):
 		# Map post IDs to filenames
 		if image_dataset.type == "video-hasher-1":
 			# We know the post ID is the filename.stem as this dataset is derived from the image dataset
-			filename_map = {filename.stem + ".mp4": filename for filename in staging_area.iterdir()}
+			filename_map = {filename.stem + ".mp4": [filename] for filename in staging_area.iterdir()}
 		elif special_case:
 			# We know the post ID is the filename.stem as this dataset is derived from the image dataset
-			filename_map = {filename.stem: filename for filename in staging_area.iterdir()}
+			filename_map = {filename.stem: [filename] for filename in staging_area.iterdir()}
 		else:
 			# Use image metadata to map post IDs to filenames
 			with open(staging_area.joinpath('.metadata.json')) as file:
 				image_data = json.load(file)
-			filename_map = {post_id: staging_area.joinpath(image.get("filename")) for image in image_data.values()
-							if image.get("success") for post_id in image.get("post_ids")}
-		self.dataset.log(filename_map)
+			filename_map = {}
+			# Images can belong to multiple posts; posts can have multiple images
+			for image in image_data.values():
+				if image.get("success"):
+					for post_id in image.get("post_ids"):
+						if post_id not in filename_map:
+							filename_map[post_id] = [staging_area.joinpath(image.get("filename"))]
+						else:
+							filename_map[post_id].append(staging_area.joinpath(image.get("filename")))
+
 		# Organize posts into categories
 		category_type = None
-		categories = {}
-		post_values = []  # used for numeric categories
+		mixed_types = False
 		self.dataset.update_status("Collecting categories")
-		for i, post in enumerate(category_dataset.iterate_items(self)):
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while collecting categories")
+		for _i in range(2):
+			if mixed_types or category_type is None:
+				# Allows a second loop if mixed types are detected
+				categories = {}
+				post_values = []  # used for numeric categories
+				for i, post in enumerate(category_dataset.iterate_items(self)):
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while collecting categories")
 
-			if post.get("id") not in filename_map:
-				# No image for this post
-				continue
+					if post.get("id") not in filename_map:
+						# No image for this post
+						continue
 
-			# Identify category type and collect post_category
-			if post.get(category_column) is None:
-				self.dataset.finish_with_error("Unable to find category column in dataset")
-				return
-			elif special_case and category_column == "top_categories":
-				if category_type is None:
-					category_type = float
-				# Special case
-				top_cats = post.get("top_categories")
-				top_cat = top_cats.split(",")[0].split(":")[0].strip()
-				top_cat_score = float(top_cats.split(",")[0].split(":")[1].strip().replace("%", ""))
-				post_result = {"id": post.get("id"), "value": top_cat_score, "top_cats": top_cats}
-				if top_cat not in categories:
-					categories[top_cat] = [post_result]
-				else:
-					categories[top_cat].append(post_result)
-			else:
-				if category_type is None:
-					try:
-						float(post.get(category_column))
-						category_type = float
-					except ValueError:
-						category_type = str
-
-				if category_type == str:
-					post_category = post.get(category_column)
-					if post_category == "":
-						post_category = "None"
-					if post_category not in categories:
-						categories[post_category] = [{"id": post.get("id")}]
+					# Identify category type and collect post_category
+					if special_case and category_column == "top_categories":
+						if category_type is None:
+							category_type = float
+						# Special case
+						top_cats = post.get("top_categories")
+						top_cat = top_cats.split(",")[0].split(":")[0].strip()
+						top_cat_score = float(top_cats.split(",")[0].split(":")[1].strip().replace("%", ""))
+						post_result = {"id": post.get("id"), "value": top_cat_score, "top_cats": top_cats}
+						if top_cat not in categories:
+							categories[top_cat] = [post_result]
+						else:
+							categories[top_cat].append(post_result)
 					else:
-						categories[post_category].append({"id": post.get("id")})
-				elif category_type == float:
-					try:
-						post_category = float(post.get(category_column))
-						post_values.append((post_category, post.get("id")))
-					except ValueError:
-						# Unsure exactly how to handle; possibly the first post was convertible to a float
-						raise ProcessorException(
-							f"Mixed category types detected; unable to render image wall (item {i} {post_category})")
+						if category_type is None:
+							try:
+								if post.get(category_column) is None:
+									category_type = str
+								else:
+									float(post.get(category_column))
+									category_type = float
+							except ValueError:
+								category_type = str
 
-		if len(categories) == 0:
+						if category_type == str:
+							post_category = post.get(category_column)
+							if post_category == "" or post_category is None:
+								post_category = "None"
+							if post_category not in categories:
+								categories[post_category] = [{"id": post.get("id")}]
+							else:
+								categories[post_category].append({"id": post.get("id")})
+						elif category_type == float:
+							if post.get(category_column) is None:
+								self.dataset.log(f"Post {post.get('id')} has no data; skipping")
+								continue
+							try:
+								post_category = float(post.get(category_column))
+								post_values.append((post_category, post.get("id")))
+							except ValueError:
+								# Possibly the first post was convertible to a float
+								# Set as string and loop again
+								mixed_types = True
+								category_type = str
+								break
+
+		if len(categories) == 0 and len(post_values) == 0:
 			self.dataset.finish_with_error("No categories found")
 			return
 
@@ -327,46 +358,48 @@ class ImageWallGenerator(BasicProcessor):
 					category_widths[category] += footersize[0]
 					break
 
-				image_filename = filename_map.get(image.get("id"))
-				if not image_filename:
+				# Get image or images for this item
+				image_filenames = filename_map.get(image.get("id")) if images_per_item == "all" else [filename_map.get(image.get("id"), [None])[0]]
+				if not image_filenames:
 					self.dataset.log(f"Image {image.get('id')} not found in image archive")
 					continue
-				frame = Image.open(str(image_filename))
+				for image_filename in image_filenames:
+					frame = Image.open(str(image_filename))
 
-				frame_width = int(base_height * frame.width / frame.height)
-				frame.thumbnail((frame_width, base_height))
+					frame_width = int(base_height * frame.width / frame.height)
+					frame.thumbnail((frame_width, base_height))
 
-				# add to SVG as data URI (so it is a self-contained file)
-				frame_data = io.BytesIO()
-				try:
-					frame.save(frame_data, format="JPEG")  # JPEG probably optimal for video frames
-				except OSError:
-					# Try removing alpha channel
-					frame = frame.convert('RGB')
-					frame.save(frame_data, format="JPEG")
-				frame_data = "data:image/jpeg;base64," + base64.b64encode(frame_data.getvalue()).decode("utf-8")
-				# add to category element
-				frame_element = ImageElement(href=frame_data, insert=(category_widths[category], 0),
-											 size=(frame_width, base_height))
-				category_image.add(frame_element)
+					# add to SVG as data URI (so it is a self-contained file)
+					frame_data = io.BytesIO()
+					try:
+						frame.save(frame_data, format="JPEG")  # JPEG probably optimal for video frames
+					except OSError:
+						# Try removing alpha channel
+						frame = frame.convert('RGB')
+						frame.save(frame_data, format="JPEG")
+					frame_data = "data:image/jpeg;base64," + base64.b64encode(frame_data.getvalue()).decode("utf-8")
+					# add to category element
+					frame_element = ImageElement(href=frame_data, insert=(category_widths[category], 0),
+												 size=(frame_width, base_height))
+					category_image.add(frame_element)
 
-				# add score label
-				if category_type in [float, int]:
-					if category_type == int:
-						image_score = str(image.get("value"))
-					else:
-						image_score = f"{image.get('value'):.2f}" + ("%" if special_case and (category_column == "top_categories") else "")
-					footersize = (fontsize * (len(image_score) + 2) * 0.5925, fontsize * 2)
-					footer_shape = SVG(insert=(offset_w, base_height - footersize[1]), size=footersize)
-					footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-					label_element = Text(insert=("50%", "50%"), text=image_score, dominant_baseline="middle",
-										 text_anchor="middle", fill="#FFF", style="font-size:%ipx" % fontsize)
-					footer_shape.add(label_element)
-					category_image.add(footer_shape)
-				offset_w += frame_width
+					# add score label
+					if category_type in [float, int]:
+						if category_type == int:
+							image_score = str(image.get("value"))
+						else:
+							image_score = f"{image.get('value'):.2f}" + ("%" if special_case and (category_column == "top_categories") else "")
+						footersize = (fontsize * (len(image_score) + 2) * 0.5925, fontsize * 2)
+						footer_shape = SVG(insert=(offset_w, base_height - footersize[1]), size=footersize)
+						footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
+						label_element = Text(insert=("50%", "50%"), text=image_score, dominant_baseline="middle",
+											 text_anchor="middle", fill="#FFF", style="font-size:%ipx" % fontsize)
+						footer_shape.add(label_element)
+						category_image.add(footer_shape)
+					offset_w += frame_width
 
-				category_widths[category] += frame_width
-				self.dataset.log(f"Added image {image.get('id')} to category {category}; width {category_widths[category]} height {offset_y}")
+					category_widths[category] += frame_width
+					self.dataset.log(f"Added image {image.get('id')} to category {category}; width {category_widths[category]} height {offset_y}")
 
 			# Add Category label
 			footersize = (fontsize * (len(category) + 2) * 0.5925, fontsize * 2)
@@ -395,6 +428,3 @@ class ImageWallGenerator(BasicProcessor):
 		canvas.save(pretty=True)
 		self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
 		return self.dataset.finish(len(category_widths))
-
-
-

@@ -20,6 +20,7 @@ from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
 								   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
+from common.lib.user import User
 
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -82,6 +83,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
 
+	#: Is this processor hidden in the front-end, and only used internally/in presets?
+	is_hidden = False
+
 	#: This will be defined automatically upon loading the processor. There is
 	#: no need to override manually
 	filepath = None
@@ -97,7 +101,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		try:
 			# a dataset can have multiple owners, but the creator is the user
 			# that actually queued the processor, so their config is relevant
-			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
+			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db, modules=self.modules)
 			self.owner = self.dataset.creator
 		except DataSetException as e:
 			# query has been deleted in the meantime. finish without error,
@@ -109,7 +113,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# creator. This ensures that if a value has been overriden for the owner,
 		# the overridden value is used instead.
 		config.with_db(self.db)
-		self.config = ConfigWrapper(config=config, user=self.owner)
+		self.config = ConfigWrapper(config=config, user=User.get_by_name(self.db, self.owner))
 
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
@@ -161,7 +165,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# start log file
 		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_commit())
+		self.dataset.update_version(get_software_commit(self))
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided
@@ -255,7 +259,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					parent=self.dataset.key,
 					extension=available_processors[next_type].extension,
 					is_private=self.dataset.is_private,
-					owner=self.dataset.creator
+					owner=self.dataset.creator,
+					modules=self.modules
 				)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
@@ -283,7 +288,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 								# Should not happen; we cannot find the source dataset
 								self.log.warning("Cannot find preset's source dataset for dataset %s" % self.dataset.key)
 								break
-
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
@@ -438,13 +442,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				writer = csv.DictWriter(output, fieldnames=fieldnames)
 				writer.writeheader()
 
-				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_items(self)):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing CSV file")
 
-					post[field_name] = new_data[count]
-					writer.writerow(post)
+					post.original[field_name] = new_data[count]
+					writer.writerow(post.original)
 
 		elif parent_path.suffix.lower() == ".ndjson":
 			# JSON cannot encode sets
@@ -453,18 +457,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				new_data = [list(datapoint) for datapoint in new_data]
 
 			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_items(self)):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
 
-					if not update_existing and field_name in post.keys():
+					if not update_existing and field_name in post.original.keys():
 						raise ProcessorException('field_name %s already exists!' % field_name)
 
 					# Update data
-					post[field_name] = new_data[count]
+					post.original[field_name] = new_data[count]
 
-					output.write(json.dumps(post) + "\n")
+					output.write(json.dumps(post.original) + "\n")
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % parent_path.suffix)
 
@@ -587,7 +591,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		with zipfile.ZipFile(archive_path, "r") as archive_file:
 			if filename not in archive_file.namelist():
-				raise KeyError("File %s not found in archive %s" % (filename, archive_path))
+				raise FileNotFoundError("File %s not found in archive %s" % (filename, archive_path))
 			else:
 				archive_file.extract(filename, staging_area)
 				return staging_area.joinpath(filename)
@@ -626,7 +630,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
 
-	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED):
+	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
 		"""
 		Archive a bunch of files into a zip archive and finish processing
 
@@ -637,6 +641,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		  files added to the archive will be used.
 		:param int compression:  Type of compression to use. By default, files
 		  are not compressed, to speed up unarchiving.
+		:param bool finish:  Finish the dataset/job afterwards or not?
 		"""
 		is_folder = False
 		if issubclass(type(files), PurePath):
@@ -663,7 +668,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if num_items is None:
 			num_items = done
 
-		self.dataset.finish(num_items)
+		if finish:
+			self.dataset.finish(num_items)
 
 	def create_standalone(self):
 		"""

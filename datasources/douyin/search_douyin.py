@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 class SearchDouyin(Search):
     """
@@ -18,7 +18,7 @@ class SearchDouyin(Search):
     title = "Import scraped Douyin data"  # title displayed in UI
     description = "Import Douyin data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -44,7 +44,7 @@ class SearchDouyin(Search):
         if "ZS_collected_from_embed" in item and item["ZS_collected_from_embed"]:
             # HTML embedded posts formated differently than JSON posts
 
-            stream_data = item.get("cellRoom", {}).get("rawdata")
+            stream_data = item.get("cellRoom", {}).get("rawdata") if item.get("cellRoom") != "$undefined" else {}
             if stream_data:
                 # These appear to be streams
                 subject = "Stream"
@@ -64,9 +64,14 @@ class SearchDouyin(Search):
                 is_fake_key = "is_ad_fake"  # have not seen...
             else:
                 post_timestamp = datetime.fromtimestamp(item["createTime"])
-                videos = sorted([vid for vid in item.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
+                videos_list = item.get("video").get("bitRateList")
+                if not videos_list:
+                    # Image galleries do not have video data
+                    video_url = ""
+                else:
+                    videos = sorted([vid for vid in item.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
                                 reverse=True)
-                video_url = "https" + videos[0]["playApi"]
+                    video_url = "https" + videos[0]["playApi"]
                 video_description = item["desc"]
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
                 prevent_download = "yes" if item["download"]["prevent"] else "no"
@@ -91,14 +96,14 @@ class SearchDouyin(Search):
             mix_name_key = "mixName"
 
             # Stats
-            collect_count = stats["collectCount"]
-            comment_count = stats["commentCount"]
-            digg_count = stats["diggCount"]
-            download_count = stats["downloadCount"]
-            forward_count = stats["forwardCount"]
-            play_count = stats["playCount"]
-            share_count = stats["shareCount"]
-            live_watch_count = stats["liveWatchCount"]
+            collect_count = stats.get("collectCount", MissingMappedField("Unknown"))
+            comment_count = stats.get("commentCount", MissingMappedField("Unknown"))
+            digg_count = stats.get("diggCount", MissingMappedField("Unknown"))
+            download_count = stats.get("downloadCount", MissingMappedField("Unknown"))
+            forward_count = stats.get("forwardCount", MissingMappedField("Unknown"))
+            play_count = stats.get("playCount", MissingMappedField("Unknown"))
+            share_count = stats.get("shareCount", MissingMappedField("Unknown"))
+            live_watch_count = stats.get("liveWatchCount", MissingMappedField("Unknown"))
 
             # This is a guess, I have not encountered it
             video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if "tagName" in tag])
@@ -124,10 +129,15 @@ class SearchDouyin(Search):
 
             else:
                 post_timestamp = datetime.fromtimestamp(item["create_time"])
-                videos = sorted([vid for vid in item["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
+                videos_list = item.get("video").get("bit_rate")
+                if not videos_list:
+                    # Image galleries do not have video data
+                    video_url = ""
+                else:
+                    videos = sorted([vid for vid in item["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
                                 reverse=True)
+                    video_url = videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else ""
                 video_description = item["desc"]
-                video_url = videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else ""
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
 
                 # Author is, well, author
@@ -153,14 +163,14 @@ class SearchDouyin(Search):
             is_fake_key = "is_ad_fake"
 
             # Stats
-            collect_count = stats.get("collect_count") if stats else "Unknown"
-            comment_count = stats.get("comment_count") if stats else "Unknown"
-            digg_count = stats.get("digg_count") if stats else "Unknown"
-            download_count = stats.get("download_count") if stats else "Unknown"
-            forward_count = stats.get("forward_count") if stats else "Unknown"
-            play_count = stats.get("play_count") if stats else "Unknown"
-            share_count = stats.get("share_count") if stats else "Unknown"
-            live_watch_count = stats.get("live_watch_count") if stats else "Unknown"
+            collect_count = stats.get("collect_count") if stats else MissingMappedField("Unknown")
+            comment_count = stats.get("comment_count") if stats else MissingMappedField("Unknown")
+            digg_count = stats.get("digg_count") if stats else MissingMappedField("Unknown")
+            download_count = stats.get("download_count") if stats else MissingMappedField("Unknown")
+            forward_count = stats.get("forward_count") if stats else MissingMappedField("Unknown")
+            play_count = stats.get("play_count") if stats else MissingMappedField("Unknown")
+            share_count = stats.get("share_count") if stats else MissingMappedField("Unknown")
+            live_watch_count = stats.get("live_watch_count") if stats else MissingMappedField("Unknown")
 
             video_tags = ",".join(
                 [tag["tag_name"] for tag in (item["video_tag"] if item["video_tag"] is not None else []) if
@@ -170,13 +180,35 @@ class SearchDouyin(Search):
 
         # Stream Stats
         count_total_streams_viewers = stats.get("total_user", "N/A")
-        stream_viewers = stats.get("user_count_str", "")
         count_current_stream_viewers = SearchDouyin.get_chinese_number(stats.get("user_count_str")) if "user_count_str" in stats else "N/A"
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
         displayed = True
         if item.get("ZS_collected_from_mix") and not item.get("ZS_first_mix_vid"):
             displayed = False
+
+        # Image galleries have been added to Douyin
+        image_urls = []
+        if item.get("images"):
+            for img in item["images"]:
+                if "url_list" in img:
+                    image_urls.append(img["url_list"][0])
+                elif "urlList" in img:
+                    image_urls.append(img["urlList"][0])
+
+        # Music
+        music_author = item.get('music').get('author') if item.get('music') and item.get("music") != "$undefined" else ""
+        music_title = item.get('music').get('title') if item.get('music') and item.get("music") != "$undefined" else ""
+        music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') and item.get("music") != "$undefined" else ""
+
+        # Collection
+        mix_current_episode = mix_current_episode if mix_current_episode != "$undefined" else "N/A"
+        collection_id = item.get(mix_info_key, {}).get(mix_id_key, "N/A")
+        collection_id = collection_id if collection_id != "$undefined" else "N/A"
+        collection_name = item.get(mix_info_key, {}).get(mix_name_key, "N/A")
+        collection_name = collection_name if collection_name != "$undefined" else "N/A"
+        part_of_collection = "yes" if mix_info_key in item and mix_id_key in item[
+            mix_info_key] and collection_id != "N/A" else "no"
 
         return MappedItem({
             "id": item[aweme_id_key],
@@ -186,8 +218,8 @@ class SearchDouyin(Search):
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),
             # Adding this as different Douyin pages contain different data
-            "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}",
-            "region": item.get("region"),
+            "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}" if subject == "Post" else f"https://live.douyin.com/{author.get('web_rid')}",
+            "region": item.get("region", ""),
             "hashtags": ",".join(
                 [tag[hashtag_key] for tag in (item[text_extra_key] if item[text_extra_key] is not None else []) if
                  hashtag_key in tag]),
@@ -199,6 +231,10 @@ class SearchDouyin(Search):
             "prevent_download": prevent_download,
             "video_url": video_url,
             "video_duration": duration,
+            "image_urls": ','.join(image_urls),
+            "music_author": music_author,
+            "music_title": music_title,
+            "music_url": music_url,
             # Video stats
             "collect_count": collect_count,
             "comment_count": comment_count,
@@ -217,11 +253,11 @@ class SearchDouyin(Search):
             "author_region": author.get("region"),
             "author_is_ad_fake": author.get(is_fake_key),
             # Collection/Mix
-            "part_of_collection": "yes" if mix_info_key in item and mix_id_key in item[mix_info_key] else "no",
+            "part_of_collection": part_of_collection,
             "4CAT_first_video_displayed": "yes" if displayed else "no",
             # other videos may have been viewed, but this is unknown to us
-            "collection_id": item.get(mix_info_key, {}).get(mix_id_key, "N/A"),
-            "collection_name": item.get(mix_info_key, {}).get(mix_name_key, "N/A"),
+            "collection_id": collection_id,
+            "collection_name": collection_name,
             "place_in_collection": mix_current_episode,
             "unix_timestamp": int(post_timestamp.timestamp()),
         })

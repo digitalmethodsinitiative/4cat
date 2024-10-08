@@ -22,6 +22,8 @@ class GetCollocations(BasicProcessor):
 	description = "Extracts words appearing close to each other from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["preset-coword-network", "wordcloud"]
+
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
