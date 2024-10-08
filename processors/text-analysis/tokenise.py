@@ -357,7 +357,7 @@ class Tokenise(BasicProcessor):
 				# for russian we use a special purpose splitter with better
 				# performance
 				sentence_method = razdel.sentenize
-			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt')) if
+			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab')) if
 								'pickle' in lang]:
 				self.dataset.update_status(
 					f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
