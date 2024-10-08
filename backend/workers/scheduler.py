@@ -95,7 +95,7 @@ class Scheduler(BasicWorker):
 		"""
 		if first:
 			# Schedule the first job; dataset already exists
-			dataset = DataSet(key=self.job.data["remote_id"].replace("scheduler-",""), db=self.db)
+			dataset = DataSet(key=self.job.data["remote_id"].replace("scheduler-",""), db=self.db, modules=self.modules)
 
 			# Dataset processor
 			processor = dataset.get_own_processor()
@@ -126,7 +126,8 @@ class Scheduler(BasicWorker):
 				type=self.details.get("processor_type"),
 				extension=self.details.get("extension"),
 				is_private=self.details.get("is_private"),
-				owner=self.details.get("owner")
+				owner=self.details.get("owner"),
+				modules=self.modules
 			)
 			self.update_details({"last_dataset": dataset.key})
 
