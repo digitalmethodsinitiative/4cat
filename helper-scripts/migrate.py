@@ -69,6 +69,10 @@ def check_for_nltk():
 	# NLTK
 	import nltk
 	try:
+		nltk.data.find('tokenizers/punkt_tab')
+	except LookupError:
+		nltk.download('punkt_tab', quiet=True)
+	try:
 		nltk.data.find('tokenizers/punkt')
 	except LookupError:
 		nltk.download('punkt', quiet=True)
