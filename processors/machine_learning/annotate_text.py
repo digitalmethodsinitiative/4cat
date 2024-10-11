@@ -31,6 +31,13 @@ class TextClassifier(BasicProcessor):
                    "provided categories.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    references = [
+        "Annotations are made using the [Stormtrooper](https://centre-for-humanities-computing.github.io/stormtrooper/) library",
+        "Model card: [google/flan-t5-large](https://huggingface.co/google/flan-t5-large)",
+        "Model card: [tiiuae/falcon-7b-instruct](https://huggingface.co/tiiuae/falcon-7b-instruct)",
+        "Model card: [meta-llama/Meta-Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct)"
+    ]
+
     config = {
         "dmi-service-manager.stormtrooper_intro-1": {
             "type": UserInput.OPTION_INFO,
