@@ -18,11 +18,12 @@ packages = [
 	"datedelta~=1.4.0",
 	"dateparser~=1.1.0",
 	"emoji>=2.12.1",
+	"fasttext",
 	"flag",
 	"Flask~=2.2",
 	"Flask_Limiter==1.0.1",
 	"Flask_Login~=0.6",
-	"gensim>=4.1.0, <4.2",
+	"gensim>=4.3.3, <4.4.0",
 	"google_api_python_client==2.0.2",
 	"html2text==2020.*",
 	"ImageHash>4.2.0",
@@ -66,7 +67,7 @@ packages = [
 	"vk_api",
 	"yt-dlp",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm",
-	"fi_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fi_core_news_sm-3.7.0/fi_core_news_sm-3.7.0-py3-none-any.whl"
+	"fi_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fi_core_news_sm-3.7.0/fi_core_news_sm-3.7.0-py3-none-any.whl"	
 ]
 
 # Some packages don't run on Windows

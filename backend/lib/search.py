@@ -5,10 +5,11 @@ import random
 import json
 import math
 import csv
+import fasttext
 
 from pathlib import Path
 from abc import ABC, abstractmethod
-from ftlangdetect import detect
+
 
 from common.config_manager import config
 from common.lib.dataset import DataSet
@@ -367,43 +368,34 @@ class Search(BasicProcessor, ABC):
 	def update_language(self):
 		num_items = 0
 		text = ''
-		    
+		lang_model_path = config.get('PATH_ROOT').joinpath("common/assets/lid.176.ftz")
+		lang_model = fasttext.load_model(str(lang_model_path))
 		try:
 			for item in self.dataset.iterate_items():
 				if num_items >= 50:
 					break
-
-           
-				try:
-					body_text = item.get("body", "")
-					if body_text:
-						text += body_text + " "
-						num_items += 1
-				except KeyError as e:
-					self.dataset.update_status(f"{str(e)} - no body field.")
-				except Exception as e:
-					self.dataset.update_status(f"random error item: {str(e)}")
-
-        
+				body_text = item.get("body", "")
+				if body_text:
+					text += body_text + " "
+					num_items += 1
+				
 			text = text.replace('\n', '')
 
 			self.dataset.update_status('checking the language')
-			#self.dataset.update_status(f'text: {text}')
 
-        	
 			try:
-				language = detect(text)
+				language = lang_model.predict(text)
 				self.dataset.update_status("the language was detected correctly")
-				language = language['lang'] 
+				language = language[0][0] 
 				self.dataset.update_status(f'language: {language}')
 				#self.dataset.update_status(f'Language detected: {language["lang"]}')
 			except Exception as e:
 				self.dataset.update_status(f"Error detecting language: {str(e)}")
 				language = 'en' 
 
-			return language if language == 'fi' else 'en'
+			return "fi" if language == '__label__fi' else 'en'
 		except Exception as e:
-			self.dataset.update_status(f"Error in the iterate_items: {str(e)}")
+			self.dataset.update_status(f"Error: {str(e)}")
 			return 'en'
 
 class SearchWithScope(Search, ABC):

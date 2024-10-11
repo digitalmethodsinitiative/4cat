@@ -9,7 +9,7 @@ import json
 import time
 import csv
 import re
-from ftlangdetect import detect
+
 
 from pathlib import Path
 

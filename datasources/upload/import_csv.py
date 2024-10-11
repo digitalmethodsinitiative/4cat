@@ -7,12 +7,14 @@ import time
 import csv
 import re
 import io
+import fasttext
 
 import datasources.upload.import_formats as import_formats
 
 from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
+from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException, \
     QueryNeedsExplicitConfirmationException, CsvDialectException
@@ -174,8 +176,7 @@ class SearchCustom(BasicProcessor):
 
         if skipped:
             self.dataset.update_status(
-                f"CSV file imported, but {skipped:,} items were skipped because their date could not be parsed.",
-                is_final=True)
+                f"CSV file imported, but {skipped:,} items were skipped because their date could not be parsed.")
 
         temp_file.unlink()
         self.dataset.delete_parameter("filename")
@@ -183,6 +184,7 @@ class SearchCustom(BasicProcessor):
             self.dataset.finish_with_error("No valid items could be found in the uploaded file. The column containing "
                                            "the item's timestamp may be in a format that cannot be parsed properly.")
         else:
+            self.dataset.language = self.update_language()
             self.dataset.finish(done)
 
     def validate_query(query, request, user):
@@ -374,3 +376,36 @@ class SearchCustom(BasicProcessor):
                 if len(chunk) == 0:
                     break
                 outfile.write(chunk)
+
+    def update_language(self):
+        num_items = 0
+        text = ''
+        lang_model_path = config.get('PATH_ROOT').joinpath("common/assets/lid.176.ftz")
+        lang_model = fasttext.load_model(str(lang_model_path))
+        try:
+            for item in self.dataset.iterate_items():
+                if num_items >= 50:
+                    break
+                body_text = item.get("body", "")
+                if body_text:
+                    text += body_text + " "
+                    num_items += 1
+				
+            text = text.replace('\n', '')
+
+            self.dataset.update_status('checking the language')
+
+            try:
+                language = lang_model.predict(text)
+                self.dataset.update_status("the language was detected correctly")
+                language = language[0][0] 
+                self.dataset.update_status(f'language: {language}')
+				#self.dataset.update_status(f'Language detected: {language["lang"]}')
+            except Exception as e:
+                self.dataset.update_status(f"Error detecting language: {str(e)}")
+                language = 'en' 
+
+            return "fi" if language == '__label__fi' else 'en'
+        except Exception as e:
+            self.dataset.update_status(f"Error: {str(e)}")
+            return 'en'
