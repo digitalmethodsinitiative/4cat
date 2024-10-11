@@ -10,6 +10,7 @@ import re
 import os
 
 import nltk
+import spacy
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
@@ -28,9 +29,9 @@ class Tokenise(BasicProcessor):
 	"""
 	Tokenize posts
 	"""
-	type = "tokenise-posts"  # job type ID
+	type = "tokenise-posts-fin"  # job type ID
 	category = "Text analysis"  # category
-	title = "Tokenise"  # title displayed in UI
+	title = "Tokenise (can lemmatise Finnish)"  # title displayed in UI
 	description = "Splits the post body texts in separate words (tokens). This data can then be used for text analysis. " \
 				  "The output is a list of lists (each list representing all post tokens or " \
 				  "tokens per sentence)."  # description displayed in UI
@@ -52,7 +53,7 @@ class Tokenise(BasicProcessor):
 		"""
 		Allow CSV and NDJSON datasets
 		"""
-		return module.get_extension() in ("csv", "ndjson") and module.language != "fi"
+		return module.get_extension() in ("csv", "ndjson") 
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -135,10 +136,9 @@ class Tokenise(BasicProcessor):
 			"lemmatise": {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
-				"help": "Lemmatise tokens (English only)",
+				"help": "Lemmatise tokens (available for English and Finnish only)",
 				"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', "
-						   "'bicycles' becomes 'bicycle', 'better' becomes 'good'.",
-				"requires": "language==english"
+						   "'bicycles' becomes 'bicycle', 'better' becomes 'good'."
 			},
 			"filter": {
 				"type": UserInput.OPTION_MULTI_SELECT,
@@ -322,12 +322,16 @@ class Tokenise(BasicProcessor):
 		# initialise pre-processors if needed
 		stemmer = None
 		lemmatizer = None
+		nlp = None
 		if self.parameters.get("language") != "other":
 			if self.parameters.get("stem"):
 				stemmer = SnowballStemmer(language)
 
 			if self.parameters.get("lemmatise"):
-				lemmatizer = WordNetLemmatizer()
+				if self.parameters.get("language") == "finnish":
+					nlp = spacy.load("fi_core_news_sm", disable=['parser', 'ner'])
+				else:
+					lemmatizer = WordNetLemmatizer()
 
 		# Only keep unique words?
 		only_unique = self.parameters.get("only_unique")
@@ -435,6 +439,10 @@ class Tokenise(BasicProcessor):
 
 					if self.parameters["lemmatise"] and lemmatizer:
 						token = lemmatizer.lemmatize(token)
+					if self.parameters["lemmatise"] and nlp:
+						token_lemma = nlp(token)
+						token = [token.lemma_ for token in token_lemma]
+						token = token[0]
 
 					# append tokens to the post's token list
 					post_tokens.append(token)

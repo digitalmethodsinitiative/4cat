@@ -35,7 +35,7 @@ class LinguisticFeatures(BasicProcessor):
 				  "with less than 100,000 items. " # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	followups = ["get-entities", "extract-nouns"]
+	followups = ["get-entities-fin", "extract-nouns-fin"]
 
 	references = [
 		"[SpaCy Linguistic Features - Documentation](https://spacy.io/usage/linguistic-features/)"

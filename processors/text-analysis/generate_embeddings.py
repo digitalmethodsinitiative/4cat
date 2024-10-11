@@ -111,7 +111,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.type == "tokenise-posts"
+		return module.type == "tokenise-posts" or module.type == "tokenise-posts-fin"
 
 	def process(self):
 		"""
