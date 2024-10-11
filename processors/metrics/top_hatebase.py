@@ -35,7 +35,7 @@ class HatebaseRanker(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.type == "hatebase-data"
+		return module.type == "hatebase-data" and module.language != "fi"
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
