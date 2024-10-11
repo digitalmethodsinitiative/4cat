@@ -40,6 +40,11 @@ class TextClassifier(BasicProcessor):
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Enable LLM-powered text classification",
+        },
+        "dmi-service-manager.stormtrooper_models": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "google/flan-t5-large,tiiaue/falcon-7b-instruct",
+            "help": "Comma-separated list of models that can be selected"
         }
     }
 
@@ -53,8 +58,6 @@ class TextClassifier(BasicProcessor):
             "type": UserInput.OPTION_CHOICE,
             "default": "google/flan-t5-large",
             "options": {
-                "google/flan-t5-large": "google/flan-t5-large",
-                "tiiaue/falcon-7b-instruct": "tiiaue/falcon-7b-instruct"
             },
             "help": "Large Language Model to use"
         },
@@ -97,6 +100,10 @@ class TextClassifier(BasicProcessor):
         :return dict:  Processor options
         """
         options = cls.options
+
+        models = config.get("dmi-service-manager.stormtrooper_models", user=user).split(",")
+        options["model"]["options"] = {m: m for m in models}
+
         if parent_dataset is None:
             return options
 
