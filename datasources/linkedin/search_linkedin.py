@@ -79,7 +79,10 @@ class SearchLinkedIn(Search):
         # or alternatively they are stored here:
         if not images and item["content"] and item["content"].get("articleComponent") and item["content"]["articleComponent"].get("largeImage"):
             image = item["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
-            images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
+            if not image and item["content"]["articleComponent"]["largeImage"]["attributes"][0]["imageUrl"]:
+                images.append(item["content"]["articleComponent"]["largeImage"]["attributes"][0]["imageUrl"]["url"])
+            elif image and image.get("artifacts"):
+                images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
 
         author = SearchLinkedIn.get_author(item)
 
