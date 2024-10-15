@@ -282,13 +282,6 @@ def queue_dataset():
 	Request parameters vary by data source. The ones mandated constitute the
 	minimum but more may be required.
 
-	:request-param str board:  Board ID to query
-	:request-param str datasource:  Data source ID to query
-	:request-param str body_match:  String to match in the post body
-	:request-param str subject_match:  String to match in the post subject
-    :request-param int min_date:  Timestamp marking the beginning of the match
-                                  period
-    :request-param int max_date:  Timestamp marking the end of the match period
     :request-param str ?access_token:  Access token; only required if not
                                        logged in currently.
 
@@ -296,6 +289,7 @@ def queue_dataset():
 	              status and results.
 	:return-error 404: If the datasource does not exist.
 	"""
+
 	datasource_id = request.form.get("datasource", "")
 	if datasource_id not in fourcat_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
