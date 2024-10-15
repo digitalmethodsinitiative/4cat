@@ -384,7 +384,7 @@ class SearchCustom(BasicProcessor):
         lang_model = fasttext.load_model(str(lang_model_path))
         try:
             for item in self.dataset.iterate_items():
-                if num_items >= 50:
+                if num_items >= 15:
                     break
                 body_text = item.get("body", "")
                 if body_text:
