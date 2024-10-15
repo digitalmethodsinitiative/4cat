@@ -243,6 +243,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 vectors = tsne.fit_transform(vectors)
             except ValueError:
                 self.dataset.finish_with_error("Insufficient data to reduce to 2D. The word embeddings model may be too small to visualise properly.")
+                return
         elif reduction_method == "TruncatedSVD":
             # standard sklearn parameters made explicit
             svd = TruncatedSVD(n_components=2, algorithm="randomized", n_iter=5, random_state=0)
