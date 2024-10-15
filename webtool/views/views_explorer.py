@@ -3,13 +3,11 @@
 format and lets users annotate the data.
 """
 
-import json
-
 from pathlib import Path
 
 from flask import request, render_template, jsonify
 from flask_login import login_required, current_user
-from webtool import app, db, openapi, limiter, config
+from webtool import app, db, openapi, limiter, config, fourcat_modules
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import convert_to_float, hash_to_md5
@@ -39,7 +37,7 @@ def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 
 	# Get dataset info.
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 	
