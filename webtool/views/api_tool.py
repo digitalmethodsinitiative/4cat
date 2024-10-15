@@ -1246,11 +1246,7 @@ def export_packed_dataset(key=None, component=None):
 		return error(403, error="You cannot export unfinished datasets.")
 
 	if component == "metadata":
-		metadata = db.fetchone("SELECT * FROM datasets WHERE key = %s", (dataset.key,))
-
-		# get 4CAT version (presumably to ensure export is compatible with import)
-		metadata["current_4CAT_version"] = get_software_version()
-		return jsonify(metadata)
+		return jsonify(dataset.get_metadata())
 
 	elif component == "children":
 		children = [d["key"] for d in db.fetchall("SELECT key FROM datasets WHERE key_parent = %s AND is_finished = TRUE", (dataset.key,))]

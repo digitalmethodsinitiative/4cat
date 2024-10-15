@@ -15,7 +15,7 @@ from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_to_md5
 from common.lib.item_mapping import MappedItem, DatasetItem
@@ -1585,6 +1585,20 @@ class DataSet(FourcatModule):
 
 		# Default to text
 		return self.parameters.get("media_type", "text")
+
+	def get_metadata(self):
+		"""
+		Get dataset metadata
+
+		This consists of all the data stored in the database for this dataset, plus the current 4CAT version (appended
+		as 'current_4CAT_version'). This is useful for exporting datasets, as it can be used by another 4CAT instance to
+		update its database (and ensure compatibility with the exporting version of 4CAT).
+		"""
+		metadata = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
+
+		# get 4CAT version (presumably to ensure export is compatible with import)
+		metadata["current_4CAT_version"] = get_software_version()
+		return metadata
 
 	def get_result_url(self):
 		"""

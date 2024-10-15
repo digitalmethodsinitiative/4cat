@@ -146,16 +146,6 @@ class ConfigManager:
         """
         self.with_db()
 
-        # delete unknown keys
-        known_keys = tuple([names for names, settings in config.config_definition.items() if settings.get("type") not in UserInput.OPTIONS_COSMETIC])
-        unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
-
-        if unknown_keys:
-            self.db.log.info(f"Deleting unknown settings from database: {', '.join([key['name'] for key in unknown_keys])}")
-            self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
-
-        self.db.commit()
-
         # create global values for known keys with the default
         known_settings = self.get_all()
         for setting, parameters in self.config_definition.items():
