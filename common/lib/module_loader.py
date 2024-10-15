@@ -36,7 +36,7 @@ class ModuleCollector:
     processors = {}
     datasources = {}
 
-    def __init__(self):
+    def __init__(self, write_config=False):
         """
         Load data sources and workers
 
@@ -54,13 +54,14 @@ class ModuleCollector:
         self.expand_datasources()
 
         # cache module-defined config options for use by the config manager
-        module_config = {}
-        for worker in self.workers.values():
-            if hasattr(worker, "config") and type(worker.config) is dict:
-                module_config.update(worker.config)
+        if write_config:
+            module_config = {}
+            for worker in self.workers.values():
+                if hasattr(worker, "config") and type(worker.config) is dict:
+                    module_config.update(worker.config)
 
-        with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
-            pickle.dump(module_config, outfile)
+            with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+                pickle.dump(module_config, outfile)
 
         # load from cache
         config.load_user_settings()
@@ -243,7 +244,7 @@ class ModuleCollector:
             self.datasources[datasource_id]["has_worker"] = bool(worker)
             self.datasources[datasource_id]["has_options"] = self.datasources[datasource_id]["has_worker"] and \
                                                              bool(self.workers["%s-search" % datasource_id].get_options())
-            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_extension") and worker.is_from_extension
+            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
 
     def load_worker_class(self, worker):
         """

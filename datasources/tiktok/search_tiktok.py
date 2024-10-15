@@ -20,7 +20,7 @@ class SearchTikTok(Search):
     title = "Import scraped Tiktok data"  # title displayed in UI
     description = "Import Tiktok data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -90,6 +90,7 @@ class SearchTikTok(Search):
             "unix_timestamp": int(post["createTime"]),
             "is_duet": "yes" if (post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False) else "no",
             "is_ad": "yes" if post.get("isAd", False) else "no",
+            "is_paid_partnership": "yes" if post.get("adAuthorization") else "no",
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
             "music_url": post["music"].get("playUrl", ""),

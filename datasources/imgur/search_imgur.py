@@ -19,7 +19,7 @@ class SearchImgur(Search):
     title = "Import scraped Imgur data"  # title displayed in UI
     description = "Import Imgur data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]

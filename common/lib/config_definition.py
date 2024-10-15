@@ -150,7 +150,7 @@ config_definition = {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
         "help": "Can restart/upgrade",
-        "tooltip": "Controls whether users can restart and upgrade 4CAT via the Control Panel"
+        "tooltip": "Controls whether users can restart, upgrade, and manage extensions 4CAT via the Control Panel"
     },
     "privileges.can_upgrade_to_dev": {
         # this is NOT an admin privilege, because all admins automatically
