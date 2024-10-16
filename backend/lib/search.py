@@ -368,11 +368,13 @@ class Search(BasicProcessor, ABC):
 	def update_language(self):
 		num_items = 0
 		text = ''
+		#loads the language identification model
 		lang_model_path = config.get('PATH_ROOT').joinpath("common/assets/lid.176.ftz")
 		lang_model = fasttext.load_model(str(lang_model_path))
 		try:
+			#iterate through the first posts to detect the language
 			for item in self.dataset.iterate_items():
-				if num_items >= 50:
+				if num_items >= 15:
 					break
 				body_text = item.get("body", "")
 				if body_text:
@@ -380,7 +382,7 @@ class Search(BasicProcessor, ABC):
 					num_items += 1
 				
 			text = text.replace('\n', '')
-
+			
 			self.dataset.update_status('checking the language')
 
 			try:
@@ -388,11 +390,11 @@ class Search(BasicProcessor, ABC):
 				self.dataset.update_status("the language was detected correctly")
 				language = language[0][0] 
 				self.dataset.update_status(f'language: {language}')
-				#self.dataset.update_status(f'Language detected: {language["lang"]}')
+				
 			except Exception as e:
 				self.dataset.update_status(f"Error detecting language: {str(e)}")
 				language = 'en' 
-
+			#return the language label (easy to add more languages if needed)
 			return "fi" if language == '__label__fi' else 'en'
 		except Exception as e:
 			self.dataset.update_status(f"Error: {str(e)}")
