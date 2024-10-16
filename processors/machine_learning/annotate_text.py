@@ -184,8 +184,8 @@ class TextClassifier(BasicProcessor):
         # prepare data for annotation
         data_path = staging_area.joinpath("data.temp.ndjson")
         with data_path.open("w", newline="") as outfile:
-            for item in self.source_dataset.iterate_items():
-                outfile.write(json.dumps({item.get("id"): item.get(textfield)}) + "\n")
+            for i, item in enumerate(self.source_dataset.iterate_items()):
+                outfile.write(json.dumps({item.get("id", str(i)): item.get(textfield)}) + "\n")
 
         path_to_files, path_to_results = dmi_service_manager.process_files(staging_area,
                                                                            [data_path.name, labels_path.name],
@@ -238,15 +238,14 @@ class TextClassifier(BasicProcessor):
         self.dataset.update_status("Loading annotated data")
         with output_dir.joinpath("results.json").open() as infile:
             annotations = json.load(infile)
-
         self.dataset.update_status("Writing results")
         with self.dataset.get_results_path().open("w") as outfile:
             writer = None
-            for item in self.source_dataset.iterate_items():
+            for i, item in enumerate(self.source_dataset.iterate_items()):
                 row = {
-                    "id": item.get("id"),
+                    "id": item.get("id", i),
                     textfield: item.get(textfield),
-                    "category": annotations[item.get("id")]
+                    "category": annotations.get(item.get("id", str(i))) # str(i) because it is not recorded as an int in the annotations
                 }
                 if not writer:
                     writer = csv.DictWriter(outfile, fieldnames=row.keys())
