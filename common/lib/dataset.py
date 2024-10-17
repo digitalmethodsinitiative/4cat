@@ -13,10 +13,10 @@ import re
 
 from pathlib import Path
 
-import backend
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int
+from common.lib.module_loader import ModuleCollector
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -46,6 +46,7 @@ class DataSet(FourcatModule):
 	genealogy = None
 	preset_parent = None
 	parameters = None
+	modules = None
 
 	owners = None
 	tagged_owners = None
@@ -60,14 +61,33 @@ class DataSet(FourcatModule):
 	#language = ''
 
 	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
-				 type=None, is_private=True, owner="anonymous", language=''):
+				 type=None, is_private=True, owner="anonymous", language='', modules=None):
 		"""
 		Create new dataset object
 
 		If the dataset is not in the database yet, it is added.
 
-		:param parameters:  Parameters, e.g. search query, date limits, et cetera
+		:param dict parameters:  Only when creating a new dataset. Dataset
+		parameters, free-form dictionary.
+		:param str key: Dataset key. If given, dataset with this key is loaded.
+		:param int job: Job ID. If given, dataset corresponding to job is
+		loaded.
+		:param dict data: Dataset data, corresponding to a row in the datasets
+		database table. If not given, retrieved from database depending on key.
 		:param db:  Database connection
+		:param str parent:  Only when creating a new dataset. Parent dataset
+		key to which the one being created is a child.
+		:param str extension: Only when creating a new dataset. Extension of
+		dataset result file.
+		:param str type: Only when creating a new dataset. Type of the dataset,
+		corresponding to the type property of a processor class.
+		:param bool is_private: Only when creating a new dataset. Whether the
+		dataset is private or public.
+		:param str owner: Only when creating a new dataset. The user name of
+		the dataset's creator.
+		:param modules: Module cache. If not given, will be loaded when needed
+		(expensive). Used to figure out what processors are compatible with
+		this dataset.
 		"""
 		self.db = db
 		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
@@ -78,7 +98,7 @@ class DataSet(FourcatModule):
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
-		
+		self.modules = modules
 
 		if key is not None:
 			self.key = key
@@ -86,20 +106,17 @@ class DataSet(FourcatModule):
 			if not current:
 				raise DataSetNotFoundException("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
-			query = current["query"]
 		elif job is not None:
 			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
 				raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
 
-			query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
 				raise DataSetException("DataSet() requires a complete dataset record for its 'data' argument")
 
-			query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
@@ -117,6 +134,9 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			self.data = {"type": type}  # get_own_processor needs this
+			own_processor = self.get_own_processor()
+			version = get_software_commit(own_processor)
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
@@ -128,7 +148,8 @@ class DataSet(FourcatModule):
 				"timestamp": int(time.time()),
 				"is_finished": False,
 				"is_private": is_private,
-				"software_version": get_software_commit(),
+				"software_version": version[0],
+				"software_source": version[1],
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
@@ -143,9 +164,8 @@ class DataSet(FourcatModule):
 
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
-				own_processor = self.get_own_processor()
 				if own_processor:
-					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
+					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db, modules=self.modules) if parent else None)
 				# Still no extension, default to 'csv'
 				if not extension:
 					extension = "csv"
@@ -155,7 +175,7 @@ class DataSet(FourcatModule):
 
 		# retrieve analyses and processors that may be run for this dataset
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
+		self.children = sorted([DataSet(data=analysis, db=self.db, modules=self.modules) for analysis in analyses],
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
 
 		self.refresh_owners()
@@ -484,7 +504,7 @@ class DataSet(FourcatModule):
 		parameters["copied_from"] = self.key
 		parameters["copied_at"] = time.time()
 
-		copy = DataSet(parameters=parameters, db=self.db, extension=self.result_file.split(".")[-1], type=self.type)
+		copy = DataSet(parameters=parameters, db=self.db, extension=self.result_file.split(".")[-1], type=self.type, modules=self.modules)
 		for field in self.data:
 			if field in ("id", "key", "timestamp", "job", "parameters", "result_file"):
 				continue
@@ -519,7 +539,7 @@ class DataSet(FourcatModule):
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
 			try:
-				child = DataSet(key=child["key"], db=self.db)
+				child = DataSet(key=child["key"], db=self.db, modules=self.modules)
 				child.delete(commit=commit)
 			except DataSetException:
 				# dataset already deleted - race condition?
@@ -552,7 +572,7 @@ class DataSet(FourcatModule):
 		"""
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
-			child = DataSet(key=child["key"], db=self.db)
+			child = DataSet(key=child["key"], db=self.db, modules=self.modules)
 			for attr, value in kwargs.items():
 				child.__setattr__(attr, value)
 
@@ -869,10 +889,12 @@ class DataSet(FourcatModule):
 		elif parameters.get("subject_match") and parameters["subject_match"] != "empty":
 			return parameters["subject_match"]
 		elif parameters.get("query"):
-			label = parameters["query"] if len(parameters["query"]) < 30 else parameters["query"][:25] + "..."
+			label = parameters["query"]
 			# Some legacy datasets have lists as query data
 			if isinstance(label, list):
 				label = ", ".join(label)
+
+			label = label if len(label) < 30 else label[:25] + "..."
 			label = label.strip().replace("\n", ", ")
 			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
@@ -883,8 +905,8 @@ class DataSet(FourcatModule):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
-		elif "datasource" in parameters and parameters["datasource"] in backend.all_modules.datasources:
-			return backend.all_modules.datasources[parameters["datasource"]]["name"] + " Dataset"
+		elif "datasource" in parameters and parameters["datasource"] in self.modules.datasources:
+			return self.modules.datasources[parameters["datasource"]]["name"] + " Dataset"
 		else:
 			return default
 
@@ -1115,12 +1137,13 @@ class DataSet(FourcatModule):
 		try:
 			# this fails if the processor type is unknown
 			# edge case, but let's not crash...
-			processor_path = backend.all_modules.processors.get(self.data["type"]).filepath
+			processor_path = self.modules.processors.get(self.data["type"]).filepath
 		except AttributeError:
 			processor_path = ""
 
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
-			"software_version": version,
+			"software_version": version[0],
+			"software_source": version[1],
 			"software_file": processor_path
 		})
 
@@ -1155,10 +1178,15 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.get("4cat.github_url"):
+		if not self.data["software_source"]:
 			return ""
 
-		return config.get("4cat.github_url") + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		filepath = self.data.get("software_file", "")
+		if filepath.startswith("/extensions/"):
+			# go to root of extension
+			filepath = "/" + "/".join(filepath.split("/")[3:])
+
+		return self.data["software_source"] + "/blob/" + self.data["software_version"] + filepath
 
 	def top_parent(self):
 		"""
@@ -1190,7 +1218,7 @@ class DataSet(FourcatModule):
 
 		while key_parent:
 			try:
-				parent = DataSet(key=key_parent, db=self.db)
+				parent = DataSet(key=key_parent, db=self.db, modules=self.modules)
 			except DataSetException:
 				break
 
@@ -1216,7 +1244,7 @@ class DataSet(FourcatModule):
 
 		:return list:  List of DataSets
 		"""
-		children = [DataSet(data=record, db=self.db) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		children = [DataSet(data=record, db=self.db, modules=self.modules) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
 		results = children.copy()
 		if recursive:
 			for child in children:
@@ -1288,7 +1316,7 @@ class DataSet(FourcatModule):
 
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
-		processors = backend.all_modules.processors
+		processors = self.modules.processors
 
 		available = {}
 		for processor_type, processor in processors.items():
@@ -1332,6 +1360,20 @@ class DataSet(FourcatModule):
 
 			return self._queue_position
 
+	def get_modules(self):
+		"""
+		Get 4CAT modules
+
+		Is a function because loading them is not free, and this way we can
+		cache the result.
+
+		:return:
+		"""
+		if not self.modules:
+			self.modules = ModuleCollector()
+
+		return self.modules
+
 	def get_own_processor(self):
 		"""
 		Get the processor class that produced this dataset
@@ -1339,7 +1381,8 @@ class DataSet(FourcatModule):
 		:return:  Processor class, or `None` if not available.
 		"""
 		processor_type = self.parameters.get("type", self.data.get("type"))
-		return backend.all_modules.processors.get(processor_type)
+
+		return self.modules.processors.get(processor_type)
 
 	def get_available_processors(self, user=None, exclude_hidden=False):
 		"""
@@ -1418,7 +1461,7 @@ class DataSet(FourcatModule):
 
 		:return DataSet:  Parent dataset, or `None` if not applicable
 		"""
-		return DataSet(key=self.key_parent, db=self.db) if self.key_parent else None
+		return DataSet(key=self.key_parent, db=self.db, modules=self.modules) if self.key_parent else None
 
 	def detach(self):
 		"""
@@ -1545,6 +1588,20 @@ class DataSet(FourcatModule):
 
 		# Default to text
 		return self.parameters.get("media_type", "text")
+
+	def get_metadata(self):
+		"""
+		Get dataset metadata
+
+		This consists of all the data stored in the database for this dataset, plus the current 4CAT version (appended
+		as 'current_4CAT_version'). This is useful for exporting datasets, as it can be used by another 4CAT instance to
+		update its database (and ensure compatibility with the exporting version of 4CAT).
+		"""
+		metadata = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
+
+		# get 4CAT version (presumably to ensure export is compatible with import)
+		metadata["current_4CAT_version"] = get_software_version()
+		return metadata
 
 	def get_result_url(self):
 		"""

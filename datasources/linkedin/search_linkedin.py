@@ -21,7 +21,7 @@ class SearchLinkedIn(Search):
     title = "Import scraped LinkedIn data"  # title displayed in UI
     description = "Import LinkedIn data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -79,7 +79,10 @@ class SearchLinkedIn(Search):
         # or alternatively they are stored here:
         if not images and item["content"] and item["content"].get("articleComponent") and item["content"]["articleComponent"].get("largeImage"):
             image = item["content"]["articleComponent"]["largeImage"]["attributes"][0]["detailData"]["vectorImage"]
-            images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
+            if not image and item["content"]["articleComponent"]["largeImage"]["attributes"][0]["imageUrl"]:
+                images.append(item["content"]["articleComponent"]["largeImage"]["attributes"][0]["imageUrl"]["url"])
+            elif image and image.get("artifacts"):
+                images.append(image["rootUrl"] + image["artifacts"][0]["fileIdentifyingUrlPathSegment"])
 
         author = SearchLinkedIn.get_author(item)
 

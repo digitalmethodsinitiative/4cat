@@ -139,9 +139,12 @@ def _jinja2_filter_add_ahref(content):
 
 	return content
 
-@app.template_filter('markdown')
-def _jinja2_filter_markdown(text):
+@app.template_filter('markdown',)
+def _jinja2_filter_markdown(text, trim_container=False):
 	val = markdown.markdown(text)
+	if trim_container:
+		val = re.sub(r"^<p>", "", val)
+		val = re.sub(r"</p>$", "", val)
 	return val
 
 @app.template_filter('isbool')
@@ -262,7 +265,7 @@ def _jinja2_filter_post_field(field, post):
 	formatted_field = field
 
 	field = str(field)
-	
+
 	for key in re.findall(r"\{\{(.*?)\}\}", field):
 
 		original_key = key
@@ -296,7 +299,7 @@ def _jinja2_filter_post_field(field, post):
 		# We see 0 as a valid value - e.g. '0 retweets'.
 		if not val and val != 0:
 			return ""
-		
+
 		# Support some basic string slicing
 		if string_slice:
 			field = field.replace("[" + string_slice + "]", "")
@@ -317,7 +320,7 @@ def _jinja2_filter_post_field(field, post):
 
 		# Apply further filters, if present (e.g. lower)
 		for extra_filter in extra_filters:
-			
+
 			extra_filter = extra_filter.strip()
 
 			# We're going to parse possible parameters to pass to the filter
@@ -328,7 +331,7 @@ def _jinja2_filter_post_field(field, post):
 				extra_filter = extra_filter.split("(")[0]
 				params = [p.strip() for p in params.split(",")]
 				params = [post[param] for param in params]
-			
+
 			val = app.jinja_env.filters[extra_filter](val, *params)
 
 		if string_slice:
@@ -388,3 +391,7 @@ def inject_now():
 		"__version": version,
 		"uniqid": uniqid
 	}
+
+@app.template_filter('log')
+def _jinja2_filter_log(text):
+	app.logger.info(text)

@@ -9,7 +9,6 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
       - ./data/postgres/:/var/lib/postgresql/data/
-#      - 4cat_db:/var/lib/postgresql/data/
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
       interval: 5s
@@ -36,7 +35,6 @@ services:
 #      - 4cat_data:/usr/src/app/data/
 #      - 4cat_config:/usr/src/app/config/
 #      - 4cat_logs:/usr/src/app/logs/
-
     entrypoint: docker/docker-entrypoint.sh
 
   frontend:

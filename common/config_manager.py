@@ -44,9 +44,9 @@ class ConfigManager:
             # Replace w/ db if provided else only initialise if not already
             self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
-                                         port=self.get("DB_PORT"), appname="config-reader") if not db else db
+                                         port=self.get("DB_PORT"), appname="config-reader")
         else:
-            # self.db already initialized
+            # self.db already initialized and no db provided
             pass
 
     def load_user_settings(self):
@@ -146,16 +146,6 @@ class ConfigManager:
         """
         self.with_db()
 
-        # delete unknown keys
-        known_keys = tuple([names for names, settings in config.config_definition.items() if settings.get("type") not in UserInput.OPTIONS_COSMETIC])
-        unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
-
-        if unknown_keys:
-            self.db.log.info(f"Deleting unknown settings from database: {', '.join([key['name'] for key in unknown_keys])}")
-            self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
-
-        self.db.commit()
-
         # create global values for known keys with the default
         known_settings = self.get_all()
         for setting, parameters in self.config_definition.items():
@@ -169,11 +159,6 @@ class ConfigManager:
         user_tags = list(set(itertools.chain(*[u["tags"] for u in self.db.fetchall("SELECT DISTINCT tags FROM users")])))
         known_tags = [t["tag"] for t in self.db.fetchall("SELECT DISTINCT tag FROM settings")]
         tag_order = self.get("flask.tag_order")
-
-        for tag in tag_order:
-            # don't include tags not used by users in the tag order
-            if tag not in user_tags:
-                tag_order.remove(tag)
 
         for tag in known_tags:
             # add tags used by a setting to tag order
@@ -441,6 +426,10 @@ class ConfigWrapper:
         self.user = user
         self.tags = tags
         self.request = request
+
+        # this ensures the user object in turn reads from the wrapper
+        if self.user:
+            self.user.with_config(self)
 
 
     def set(self, *args, **kwargs):

@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import asyncio
 import json
+import ural
 import time
 import re
 
@@ -24,7 +25,7 @@ from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, Cha
     FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import User
+from telethon.tl.types import User, MessageEntityMention
 
 
 
@@ -214,6 +215,14 @@ class SearchTelegram(Search):
                 "tooltip": "Entities need to be references at least this many times to be added to the query. Only "
                            "references discovered below the max crawl depth are taken into account."
             }
+            options["crawl-via-links"] = {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Extract new groups from links",
+                "tooltip": "Look for references to other groups in message content via t.me links and @references. "
+                           "This is more error-prone than crawling only via forwards, but can be a way to discover "
+                           "links that would otherwise remain undetected."
+            }
 
         return options
 
@@ -234,6 +243,7 @@ class SearchTelegram(Search):
 
         self.details_cache = {}
         self.failures_cache = set()
+        #TODO: This ought to yield as we're holding everything in memory; async generator? execute_queries() also needs to be modified for this
         results = asyncio.run(self.execute_queries())
 
         if not query.get("save-session"):
@@ -326,9 +336,10 @@ class SearchTelegram(Search):
         except Exception as e:
             # catch-all so we can disconnect properly
             # ...should we?
-            self.dataset.update_status("Error scraping posts from Telegram")
-            self.log.error(f"Telegram scraping error: {traceback.format_exc()}")
-            return []
+            self.dataset.update_status("Error scraping posts from Telegram; halting collection.")
+            self.log.error(f"Telegram scraping error (dataset {self.dataset.key}): {traceback.format_exc()}")
+            # May as well return what was captured, yes?
+            return posts
         finally:
             await client.disconnect()
 
@@ -356,6 +367,7 @@ class SearchTelegram(Search):
 
         crawl_max_depth = self.parameters.get("crawl-depth", 0)
         crawl_msg_threshold = self.parameters.get("crawl-threshold", 10)
+        crawl_via_links = self.parameters.get("crawl-via-links", False)
 
         self.dataset.log(f"Max crawl depth: {crawl_max_depth}")
         self.dataset.log(f"Crawl threshold: {crawl_msg_threshold}")
@@ -364,12 +376,13 @@ class SearchTelegram(Search):
         # has been mentioned. When crawling is enabled and this exceeds the
         # given threshold, the entity is added to the query
         crawl_references = {}
-        queried_entities = list(queries)
-        full_query = list(queries)
+        full_query = set(queries)
+        num_queries = len(queries)
 
         # we may not always know the 'entity username' for an entity ID, so
         # keep a reference map as we go
         entity_id_map = {}
+        query_id_map= {}
 
         # Collect queries
         # Use while instead of for so we can change queries during iteration
@@ -383,17 +396,18 @@ class SearchTelegram(Search):
             delay = 10
             retries = 0
             processed += 1
-            self.dataset.update_progress(processed / len(full_query))
+            self.dataset.update_progress(processed / num_queries)
 
             if no_additional_queries:
-                # Note that we are note completing this query
+                # Note that we are not completing this query
                 self.dataset.update_status(f"Rate-limited by Telegram; not executing query {entity_id_map.get(query, query)}")
                 continue
 
             while True:
                 self.dataset.update_status(f"Retrieving messages for entity '{entity_id_map.get(query, query)}'")
+                entity_posts = 0
+                discovered = 0
                 try:
-                    entity_posts = 0
                     async for message in client.iter_messages(entity=query, offset_date=max_date):
                         entity_posts += 1
                         total_messages += 1
@@ -413,11 +427,14 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
-                        if "_chat" in serialized_message and query not in entity_id_map and serialized_message["_chat"]["id"] == query:
-                            # once we know what a channel ID resolves to, use the username instead so it is easier to
-                            # understand for the user
-                            entity_id_map[query] = serialized_message["_chat"]["username"]
-                            self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
+                        if "_chat" in serialized_message:
+                            # Add query ID to check if queries have been crawled previously
+                            full_query.add(serialized_message["_chat"]["id"])
+                            if query not in entity_id_map and serialized_message["_chat"]["id"] == query:
+                                # once we know what a channel ID resolves to, use the username instead so it is easier to
+                                # understand for the user
+                                entity_id_map[query] = serialized_message["_chat"]["username"]
+                                self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
 
                         if resolve_refs:
                             serialized_message = await self.resolve_groups(client, serialized_message)
@@ -427,29 +444,85 @@ class SearchTelegram(Search):
                             break
 
                         # if crawling is enabled, see if we found something to add to the query
-                        if crawl_max_depth and (not crawl_msg_threshold or depth_map.get(query) < crawl_msg_threshold):
+                        linked_entities = set()
+                        if crawl_max_depth and (depth_map.get(query) < crawl_max_depth):
                             message_fwd = serialized_message.get("fwd_from")
                             fwd_from = None
-                            if message_fwd and message_fwd["from_id"] and message_fwd["from_id"].get("_type") == "PeerChannel":
-                                # even if we haven't resolved the ID, we can feed the numeric ID
-                                # to Telethon! this is nice because it means we don't have to
-                                # resolve entities to crawl iteratively
-                                fwd_from = int(message_fwd["from_id"]["channel_id"])
+                            fwd_source_type = None
+                            if message_fwd and message_fwd.get("from_id"):
+                                if message_fwd["from_id"].get("_type") == "PeerChannel":
+                                    # Legacy(?) data structure (pre 2024/7/22)
+                                    # even if we haven't resolved the ID, we can feed the numeric ID
+                                    # to Telethon! this is nice because it means we don't have to
+                                    # resolve entities to crawl iteratively
+                                    fwd_from = int(message_fwd["from_id"]["channel_id"])
+                                    fwd_source_type = "channel"
+                                elif message_fwd and message_fwd.get("from_id", {}).get('full_chat',{}):
+                                    # TODO: do we need a check here to only follow certain types of messages? this is similar to resolving, but the types do not appear the same to me
+                                    # Note: message_fwd["from_id"]["channel_id"] == message_fwd["from_id"]["full_chat"]["id"] in test cases so far
+                                    fwd_from = int(message_fwd["from_id"]["full_chat"]["id"])
+                                    fwd_source_type = "channel"
+                                elif message_fwd and (message_fwd.get("from_id", {}).get('full_user',{}) or message_fwd.get("from_id", {}).get("_type") == "PeerUser"):
+                                    # forwards can also come from users
+                                    # these can never be followed, so don't add these to the crawl, but do document them
+                                    fwd_source_type = "user"
+                                else:
+                                    print(json.dumps(message_fwd))
+                                    self.log.warning(f"Telegram (dataset {self.dataset.key}): Unknown fwd_from data structure; unable to crawl")
+                                    fwd_source_type = "unknown"
 
-                            if fwd_from and fwd_from not in queried_entities and fwd_from not in queries:
-                                # new entity discovered!
-                                # might be discovered (before collection) multiple times, so retain lowest depth
-                                depth_map[fwd_from] = min(depth_map.get(fwd_from, crawl_max_depth), depth_map[query] + 1)
-                                if depth_map[query] < crawl_max_depth:
-                                    if fwd_from not in crawl_references:
-                                        crawl_references[fwd_from] = 0
+                                if fwd_from:
+                                    linked_entities.add(fwd_from)
 
-                                    crawl_references[fwd_from] += 1
-                                    if crawl_references[fwd_from] >= crawl_msg_threshold and fwd_from not in queries:
-                                        queries.append(fwd_from)
-                                        full_query.append(fwd_from)
-                                        self.dataset.update_status(f"Discovered new entity {entity_id_map.get(fwd_from, fwd_from)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
 
+                            if crawl_via_links:
+                                # t.me links
+                                all_links = ural.urls_from_text(serialized_message["message"])
+                                all_links = [link.split("t.me/")[1] for link in all_links if ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
+                                for link in all_links:
+                                    if link.startswith("+"):
+                                        # invite links
+                                        continue
+
+                                    entity_name = link.split("/")[0].split("?")[0].split("#")[0]
+                                    linked_entities.add(entity_name)
+
+                                # @references
+                                references = [r for t, r in message.get_entities_text() if type(t) is MessageEntityMention]
+                                for reference in references:
+                                    if reference.startswith("@"):
+                                        reference = reference[1:]
+
+                                    reference = reference.split("/")[0]
+
+                                    linked_entities.add(reference)
+
+                            # Check if fwd_from or the resolved entity ID is already queued or has been queried
+                            for link in linked_entities:
+                                if link not in full_query and link not in queries and fwd_source_type not in ("user",):
+                                    # new entity discovered!
+                                    # might be discovered (before collection) multiple times, so retain lowest depth
+                                    # print(f"Potentially crawling {link}")
+                                    depth_map[link] = min(depth_map.get(link, crawl_max_depth), depth_map[query] + 1)
+                                    if link not in crawl_references:
+                                        crawl_references[link] = 0
+                                    crawl_references[link] += 1
+
+                                    # Add to queries if it has been referenced enough times
+                                    if crawl_references[link] >= crawl_msg_threshold:
+                                        queries.append(link)
+                                        full_query.add(link)
+                                        num_queries += 1
+                                        discovered += 1
+                                        self.dataset.update_status(f"Discovered new entity {entity_id_map.get(link, link)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
+
+
+
+                        serialized_message["4CAT_metadata"] = {
+                            "collected_at": datetime.now().isoformat(), # this is relevant for rather long crawls
+                            "query": query, # possibly redundant, but we are adding non-user defined queries by crawling and may be useful to know exactly what query was used to collect an entity
+                            "query_depth": depth_map.get(query, 0)
+                        }
                         yield serialized_message
 
                         if entity_posts >= max_items:
@@ -502,6 +575,7 @@ class SearchTelegram(Search):
                     delay *= 2
                     continue
 
+                self.dataset.log(f"Completed {entity_id_map.get(query, query)} with {entity_posts} messages (discovered {discovered} new entities)")
                 break
 
     async def resolve_groups(self, client, message):
@@ -703,6 +777,9 @@ class SearchTelegram(Search):
             if from_data and from_data.get("from_name"):
                 forwarded_name = message["fwd_from"]["from_name"]
 
+            if from_data and from_data.get("users") and len(from_data["users"]) > 0 and "user" not in from_data:
+                from_data["user"] = from_data["users"][0]
+
             if from_data and ("user" in from_data or "chats" in from_data):
                 # 'resolve entities' was enabled for this dataset
                 if "user" in from_data:
@@ -743,6 +820,38 @@ class SearchTelegram(Search):
                     # Failsafe; can be updated to support formatting of new datastructures in the future
                     reactions += f"{reaction}, "
 
+        # t.me links
+        linked_entities = set()
+        all_links = ural.urls_from_text(message["message"])
+        all_links = [link.split("t.me/")[1] for link in all_links if
+                     ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
+
+        for link in all_links:
+            if link.startswith("+"):
+                # invite links
+                continue
+
+            entity_name = link.split("/")[0].split("?")[0].split("#")[0]
+            linked_entities.add(entity_name)
+
+        # @references
+        # in execute_queries we use MessageEntityMention to get these
+        # however, after serializing these objects we only have the offsets of
+        # the mentioned username, and telegram does weird unicode things to its
+        # offsets meaning we can't just substring the message. So use a regex
+        # as a 'good enough' solution
+        all_mentions = set(re.findall(r"@([^\s\W]+)", message["message"]))
+
+        # make this case-insensitive since people may use different casing in
+        # messages than the 'official' username for example
+        all_connections = set([v for v in [forwarded_username, *linked_entities, *all_mentions] if v])
+        all_ci_connections = set()
+        seen = set()
+        for connection in all_connections:
+            if connection.lower() not in seen:
+                all_ci_connections.add(connection)
+                seen.add(connection.lower())
+
         return MappedItem({
             "id": f"{message['_chat']['username']}-{message['id']}",
             "thread_id": thread,
@@ -754,7 +863,7 @@ class SearchTelegram(Search):
             "body": message["message"],
             "reply_to": message.get("reply_to_msg_id", ""),
             "views": message["views"] if message["views"] else "",
-            "forwards": message.get("forwards", MissingMappedField(0)),
+            # "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
             "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(message["date"]),
@@ -764,6 +873,9 @@ class SearchTelegram(Search):
             "author_forwarded_from_name": forwarded_name,
             "author_forwarded_from_username": forwarded_username,
             "author_forwarded_from_id": forwarded_id,
+            "entities_linked": ",".join(linked_entities),
+            "entities_mentioned": ",".join(all_mentions),
+            "all_connections": ",".join(all_ci_connections),
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
                 "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
@@ -975,7 +1087,6 @@ class SearchTelegram(Search):
         return {
             "items": num_items,
             "query": ",".join(sanitized_items),
-            "board": "",  # needed for web interface
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
@@ -984,7 +1095,8 @@ class SearchTelegram(Search):
             "min_date": min_date,
             "max_date": max_date,
             "crawl-depth": query.get("crawl-depth"),
-            "crawl-threshold": query.get("crawl-threshold")
+            "crawl-threshold": query.get("crawl-threshold"),
+            "crawl-via-links": query.get("crawl-via-links")
         }
 
     @staticmethod

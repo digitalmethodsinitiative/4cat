@@ -574,6 +574,10 @@ class ImageDownloader(BasicProcessor):
 			else:
 				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
 				raise FileNotFoundError()
+		except requests.exceptions.LocationParseError as e:
+			# not an valid url, just skip
+			self.dataset.log("Error: LocationParseError while trying to download image %s: %s" % (url, e))
+			raise FileNotFoundError()
 		except requests.exceptions.InvalidSchema:
 			# not an http url, just skip
 			raise FileNotFoundError()

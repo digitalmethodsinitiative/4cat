@@ -50,7 +50,9 @@ class Tokenise(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow CSV and NDJSON datasets
+		Allow processor to run on all csv and NDJSON datasets
+
+		:param module: Dataset or processor to determine compatibility with
 		"""
 		return module.get_extension() in ("csv", "ndjson") and module.language != "fi"
 
@@ -355,7 +357,7 @@ class Tokenise(BasicProcessor):
 				# for russian we use a special purpose splitter with better
 				# performance
 				sentence_method = razdel.sentenize
-			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt')) if
+			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab')) if
 								'pickle' in lang]:
 				self.dataset.update_status(
 					f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")

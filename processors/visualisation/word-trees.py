@@ -38,71 +38,104 @@ class MakeWordtree(BasicProcessor):
 		"Wattenberg, M., & Viégas, F. B. (2008). The Word Tree, an Interactive Visual Concordance. IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228. <https://doi.org/10.1109/TVCG.2008.172>"
 	]
 
-	options = {
-		"query": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Word tree root query",
-			"tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation. Cannot be empty or contain whitespace."
-		},
-		"limit": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 3,
-			"min": 1,
-			"max": 25,
-			"help": "Max branches/level",
-			"tooltip": "Limit the amount of branches per level, sorted by most-occuring phrases. Range 1-25."
-		},
-		"window": {
-			"type": UserInput.OPTION_TEXT,
-			"min": 1,
-			"max": 10,
-			"default": 5,
-			"help": "Window size",
-			"tooltip": "Up to this many words before and/or after the queried phrase will be visualised"
-		},
-		"sides": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "right",
-			"options": {
-				"left": "Before query",
-				"right": "After query",
-				"both": "Before and after query"
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+		"""
+		options = {
+			"column": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Text column",
+				"default": "url",
+				"inline": True,
+				"tooltip": "Select the column containing the text from which to generate the word tree.",
 			},
-			"help": "Query context to visualise"
-		},
-		"align": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "middle",
-			"options": {
-				"middle": "Vertically centered",
-				"top": "Top",
+			"query": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "",
+				"help": "Word tree root query",
+				"tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation. Cannot be empty or contain whitespace."
 			},
-			"help": "Visual alignment"
-		},
-		"tokeniser_type": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "regular",
-			"options": {
-				"regular": "nltk word_tokenize",
-				"jieba-cut": "jieba (for Chinese text; accurate mode, recommended)",
-				"jieba-cut-all": "jieba (for Chinese text; full mode)",
-				"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+			"limit": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 3,
+				"min": 1,
+				"max": 25,
+				"help": "Max branches/level",
+				"tooltip": "Limit the amount of branches per level, sorted by most-occuring phrases. Range 1-25."
 			},
-			"help": "Tokeniser",
-			"tooltip": "What heuristic to use to split up the text into separate words."
-		},
-		"strip-urls": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Remove URLs"
-		},
-		"strip-symbols": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Remove punctuation"
+			"window": {
+				"type": UserInput.OPTION_TEXT,
+				"min": 1,
+				"max": 10,
+				"default": 5,
+				"help": "Window size",
+				"tooltip": "Up to this many words before and/or after the queried phrase will be visualised"
+			},
+			"sides": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "right",
+				"options": {
+					"left": "Before query",
+					"right": "After query",
+					"both": "Before and after query"
+				},
+				"help": "Query context to visualise"
+			},
+			"align": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "middle",
+				"options": {
+					"middle": "Vertically centered",
+					"top": "Top",
+				},
+				"help": "Visual alignment"
+			},
+			"tokeniser_type": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "regular",
+				"options": {
+					"regular": "nltk word_tokenize",
+					"jieba-cut": "jieba (for Chinese text; accurate mode, recommended)",
+					"jieba-cut-all": "jieba (for Chinese text; full mode)",
+					"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+				},
+				"help": "Tokeniser",
+				"tooltip": "What heuristic to use to split up the text into separate words."
+			},
+			"strip-urls": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Remove URLs"
+			},
+			"strip-symbols": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Remove punctuation"
+			}
 		}
-	}
+
+		# Get the columns for the select columns option
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["column"]["type"] = UserInput.OPTION_CHOICE
+			options["column"]["options"] = {v: v for v in columns}
+			options["column"]["default"] = "body" if "body" in columns else sorted(
+				columns,
+				key=lambda k: any([name in k for name in ["text", "subject", "description"]]), reverse=True).pop(0)
+
+		return options
+
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+		Allow processor to run on all csv and NDJSON datasets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+
+		return module.get_extension() in ("csv", "ndjson")
 
 	# determines how close the nodes are displayed to each other (min. 1)
 	whitespace = 2
@@ -126,13 +159,6 @@ class MakeWordtree(BasicProcessor):
 	# methods
 	limit = 1
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-        Allow CSV and NDJSON datasets
-        """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a plain text file
@@ -143,6 +169,7 @@ class MakeWordtree(BasicProcessor):
 		delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
 
 		# settings
+		column = self.parameters.get("column")
 		strip_urls = self.parameters.get("strip-urls")
 		strip_symbols = self.parameters.get("strip-symbols")
 		sides = self.parameters.get("sides")
@@ -184,7 +211,7 @@ class MakeWordtree(BasicProcessor):
 			processed += 1
 			if processed % 500 == 0:
 				self.dataset.update_status("Processing and tokenising post %i" % processed)
-			body = post["body"]
+			body = post.get(column)
 			if not body:
 				continue
 
