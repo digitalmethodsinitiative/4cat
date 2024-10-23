@@ -480,7 +480,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
-	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True):
+	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
 		A generator that iterates through files in an archive
 
