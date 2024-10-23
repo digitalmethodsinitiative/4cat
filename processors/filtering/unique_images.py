@@ -104,11 +104,15 @@ class UniqueImageFilter(BasicProcessor):
         processed = 0
         staging_area = self.dataset.get_staging_area()
 
+        self.dataset.update_progress("Processing images and looking for duplicates")
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while filtering for unique images")
 
             self.dataset.update_progress(processed / self.source_dataset.num_rows)
+            if processed % 100 == 0:
+                self.dataset.update_progress(f"Processed {processed:,} of {self.source_dataset.num_rows:,} images, "
+                                             f"found {dupes:,} duplicate(s)")
             processed += 1
 
             if image_file.name == ".metadata.json":
