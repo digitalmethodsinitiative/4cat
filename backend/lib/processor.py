@@ -497,6 +497,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param bool immediately_delete:  Temporary files are removed after yielded;
 		  False keeps files until the staging_area is removed (usually during processor
 		  cleanup)
+		:param list filename_filter:  Whitelist of filenames to iterate.
+		Other files will be ignored. If empty, do not ignore anything.
 		:return:  An iterator with a Path item for each file
 		"""
 
@@ -513,6 +515,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			archive_contents = sorted(archive_file.namelist())
 
 			for archived_file in archive_contents:
+				if filename_filter and archived_file not in filename_filter:
+					continue
+
 				info = archive_file.getinfo(archived_file)
 				if info.is_dir():
 					continue
