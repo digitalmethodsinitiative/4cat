@@ -15,7 +15,7 @@ from pathlib import Path
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, get_last_line
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -1098,6 +1098,18 @@ class DataSet(FourcatModule):
 		self.data["progress"] = progress
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"progress": progress})
 		return updated > 0
+
+	def get_last_update(self):
+		"""
+		Get the last update time of the dataset. If dataset is completed, this will be the last status update (usually
+		"Dataset Completed".
+
+		Returns None if there is no last update time.
+		"""
+		if self.get_log_path().exists():
+			return datetime.datetime.strptime(get_last_line(self.get_log_path())[:24], "%c")
+		else:
+			return None
 
 	def get_progress(self):
 		"""
