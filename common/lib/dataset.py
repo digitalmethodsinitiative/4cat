@@ -1107,7 +1107,11 @@ class DataSet(FourcatModule):
 		Returns None if there is no last update time.
 		"""
 		if self.get_log_path().exists():
-			return datetime.datetime.strptime(get_last_line(self.get_log_path())[:24], "%c")
+			try:
+				return datetime.datetime.strptime(get_last_line(self.get_log_path())[:24], "%c")
+			except ValueError as e:
+				# Unable to parse datetime from last line
+				return None
 		else:
 			return None
 
