@@ -70,7 +70,7 @@ class UniqueImageFilter(BasicProcessor):
         processed = 0
         staging_area = self.dataset.get_staging_area()
 
-        self.dataset.update_progress("Processing images and looking for duplicates")
+        self.dataset.update_status("Processing images and looking for duplicates")
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while filtering for unique images")
