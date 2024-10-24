@@ -70,7 +70,7 @@ def show_results(page):
         filters["sort_by"] = "timestamp"
 
     if not request.args:
-        filters["hide_empty"] = True
+        filters["hide_empty"] = False
 
     # handle 'depth'; all, own datasets, or favourites?
     # 'all' is limited to admins

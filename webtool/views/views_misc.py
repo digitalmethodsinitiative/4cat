@@ -73,7 +73,7 @@ def show_about():
 
     datasources = {k: v for k, v in fourcat_modules.datasources.items() if
                    k in config.get("datasources.enabled") and not v["importable"]}
-    importables = {k: v for k, v in fourcat_modules.datasources.items() if v["importable"]}
+    importables = {k: v for k, v in fourcat_modules.datasources.items() if (v["importable"] and k in config.get("datasources.enabled"))}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 

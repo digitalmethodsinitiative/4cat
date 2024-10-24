@@ -57,7 +57,7 @@
             <li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('show_about') }}">About</a></li>
             {% for page in __user_config("ui.nav_pages") %}
             <li{% if navigation.current == page %} class="current"{% endif %}>
-                <a href="{{ url_for("show_page", page=page) }}">{% if page == "faq" %}<abbr title="Frequently Asked Questions">FAQ</abbr>{% else %}{{ page|title }}{% endif %}</a>
+                <a href="{{ url_for("show_page", page=page) }}">{{ page|title }}</a>
             </li>
             {% endfor %}
 		</ul>

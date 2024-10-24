@@ -505,11 +505,10 @@ config_definition = {
         "type": UserInput.OPTION_MULTI_SELECT,
         "help": "Pages in navigation",
         "options": {
-            "faq": "FAQ",
             "data-policy": "Data Policy",
             "citing": "How to cite",
         },
-        "default": ["faq"],
+        "default": [],
         "tooltip": "These pages will be included in the navigation bar at the top of the interface."
     },
     "ui.prefer_mapped_preview": {

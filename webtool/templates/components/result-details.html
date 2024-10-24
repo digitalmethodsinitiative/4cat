@@ -76,14 +76,21 @@
                 {% endif %}
 
                     <div class="onequarter">
-                        <dt>Created</dt>
-                        <dd>
-                            {% if dataset.parameters.original_timestamp %}
-                                <i class="fa fa-file-import tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-imported"></i> <span class="sr-only">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
-                                <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-imported">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
-                            {% endif %}
-                            {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
-                        </dd>
+                        {% if dataset.is_finished() and dataset.get_last_update() %}
+                            <dt>Finished</dt>
+                            <dd>
+                                {{ dataset.get_last_update().timestamp()|int|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+                            </dd>
+                        {% else %}
+                            <dt>Created</dt>
+                            <dd>
+                                {% if dataset.parameters.original_timestamp %}
+                                    <i class="fa fa-file-import tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-imported"></i> <span class="sr-only">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
+                                    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-imported">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
+                                {% endif %}
+                                {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+                            </dd>
+                        {% endif %}
                     </div>
 
                     <div class="threequarters dataset-owner-list">

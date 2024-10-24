@@ -7,13 +7,14 @@ import json
 
 from pathlib import Path
 
+import telethon.errors
 from telethon import TelegramClient
 from telethon.errors import TimedOutError
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, timify_long
 from common.lib.dataset import DataSet
 from processors.visualisation.download_images import ImageDownloader
 
@@ -194,6 +195,13 @@ class TelegramImageDownloader(BasicProcessor):
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while downloading images")
 
+                    if not message:
+                        # message no longer exists
+                        self.dataset.log(f"Could not download image for message {msg_id} - message is unavailable (it "
+                                         f"may have been deleted)")
+                        self.flawless = False
+                        continue
+
                     success = False
                     try:
                         # it's actually unclear if images are always jpegs, but this
@@ -215,14 +223,23 @@ class TelegramImageDownloader(BasicProcessor):
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download image for message {msg_id} ({e})")
                         self.flawless = False
+                    finally:
+                        media_done += 1
+                        self.metadata[filename] = {
+                            "filename": filename,
+                            "success": success,
+                            "from_dataset": self.source_dataset.key,
+                            "post_ids": [msg_id]
+                        }
 
-                    media_done += 1
-                    self.metadata[filename] = {
-                        "filename": filename,
-                        "success": success,
-                        "from_dataset": self.source_dataset.key,
-                        "post_ids": [msg_id]
-                    }
+            except telethon.errors.FloodError as e:
+                later = "later"
+                if hasattr(e, "seconds"):
+                    later = f"in {timify_long(e.seconds)}"
+                self.dataset.update_status(f"Rate-limited by Telegram after downloading {media_done-1:,} image(s); "
+                                           f"halting download process. Try again {later}.", is_final=True)
+                self.flawless = False
+                break
                     
             except ValueError as e:
                 self.dataset.log(f"Couldn't retrieve images for {entity}, it probably does not exist anymore ({e})")

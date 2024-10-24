@@ -31,6 +31,13 @@ class TextClassifier(BasicProcessor):
                    "provided categories.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    references = [
+        "Annotations are made using the [Stormtrooper](https://centre-for-humanities-computing.github.io/stormtrooper/) library",
+        "Model card: [google/flan-t5-large](https://huggingface.co/google/flan-t5-large)",
+        "Model card: [tiiuae/falcon-7b-instruct](https://huggingface.co/tiiuae/falcon-7b-instruct)",
+        "Model card: [meta-llama/Meta-Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct)"
+    ]
+
     config = {
         "dmi-service-manager.stormtrooper_intro-1": {
             "type": UserInput.OPTION_INFO,
@@ -40,6 +47,11 @@ class TextClassifier(BasicProcessor):
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Enable LLM-powered text classification",
+        },
+        "dmi-service-manager.stormtrooper_models": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "google/flan-t5-large,tiiaue/falcon-7b-instruct",
+            "help": "Comma-separated list of models that can be selected"
         }
     }
 
@@ -53,8 +65,6 @@ class TextClassifier(BasicProcessor):
             "type": UserInput.OPTION_CHOICE,
             "default": "google/flan-t5-large",
             "options": {
-                "google/flan-t5-large": "google/flan-t5-large",
-                "tiiaue/falcon-7b-instruct": "tiiaue/falcon-7b-instruct"
             },
             "help": "Large Language Model to use"
         },
@@ -97,6 +107,10 @@ class TextClassifier(BasicProcessor):
         :return dict:  Processor options
         """
         options = cls.options
+
+        models = config.get("dmi-service-manager.stormtrooper_models", user=user).split(",")
+        options["model"]["options"] = {m: m for m in models}
+
         if parent_dataset is None:
             return options
 
@@ -170,8 +184,8 @@ class TextClassifier(BasicProcessor):
         # prepare data for annotation
         data_path = staging_area.joinpath("data.temp.ndjson")
         with data_path.open("w", newline="") as outfile:
-            for item in self.source_dataset.iterate_items():
-                outfile.write(json.dumps({item.get("id"): item.get(textfield)}) + "\n")
+            for i, item in enumerate(self.source_dataset.iterate_items()):
+                outfile.write(json.dumps({item.get("id", str(i)): item.get(textfield)}) + "\n")
 
         path_to_files, path_to_results = dmi_service_manager.process_files(staging_area,
                                                                            [data_path.name, labels_path.name],
@@ -224,15 +238,14 @@ class TextClassifier(BasicProcessor):
         self.dataset.update_status("Loading annotated data")
         with output_dir.joinpath("results.json").open() as infile:
             annotations = json.load(infile)
-
         self.dataset.update_status("Writing results")
         with self.dataset.get_results_path().open("w") as outfile:
             writer = None
-            for item in self.source_dataset.iterate_items():
+            for i, item in enumerate(self.source_dataset.iterate_items()):
                 row = {
-                    "id": item.get("id"),
+                    "id": item.get("id", i),
                     textfield: item.get(textfield),
-                    "category": annotations[item.get("id")]
+                    "category": annotations.get(item.get("id", str(i))) # str(i) because it is not recorded as an int in the annotations
                 }
                 if not writer:
                     writer = csv.DictWriter(outfile, fieldnames=row.keys())
