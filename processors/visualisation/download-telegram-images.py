@@ -232,7 +232,7 @@ class TelegramImageDownloader(BasicProcessor):
                             "post_ids": [msg_id]
                         }
 
-            except BadRequestError:
+            except BadRequestError as e:
                 self.dataset.log(f"Couldn't retrieve images for {entity} - the channel is no longer accessible ({e})")
                 self.flawless = False
 
