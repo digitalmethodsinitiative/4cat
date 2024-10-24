@@ -218,7 +218,7 @@ class TelegramImageDownloader(BasicProcessor):
                             await client.download_media(message, str(path), thumb=-1)
                         msg_id = message.id
                         success = True
-                    except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError, BadRequestError) as e:
+                    except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError) as e:
                         filename = f"{entity}-index-{media_done}"
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download image for message {msg_id} ({e})")
@@ -231,6 +231,10 @@ class TelegramImageDownloader(BasicProcessor):
                             "from_dataset": self.source_dataset.key,
                             "post_ids": [msg_id]
                         }
+
+            except BadRequestError:
+                self.dataset.log(f"Couldn't retrieve images for {entity} - the channel is no longer accessible ({e})")
+                self.flawless = False
 
             except telethon.errors.FloodError as e:
                 later = "later"
