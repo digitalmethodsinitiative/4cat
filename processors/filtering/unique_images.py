@@ -1,15 +1,12 @@
 """
 Filter by unique images
 """
-import imagehash
-import hashlib
 import shutil
 import json
 
-from PIL import Image
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, hash_file
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -60,37 +57,6 @@ class UniqueImageFilter(BasicProcessor):
         return module.get_media_type() == "image" or module.type.startswith(
             "image-downloader") or module.type == "video-frames"
 
-    def hash_file(self, image_file, hash_type="file-hash"):
-        """
-        Generate an image hash
-
-        :param Path image_file:  Image file to hash
-        :param str hash_type:  Hash type, one of `file-hash`, `colorhash`,
-        `phash`, `average_hash`, `dhash`
-        :return str:  Hexadecimal hash value
-        """
-        if not image_file.exists():
-            raise FileNotFoundError()
-
-        if hash_type == "file-hash":
-            hasher = hashlib.sha1()
-
-            # Open the file in binary mode
-            with image_file.open("rb") as infile:
-                # Read and update hash in chunks to handle large files
-                while chunk := infile.read(1024):
-                    hasher.update(chunk)
-
-            return hasher.hexdigest()
-
-        elif hash_type in ("colorhash", "phash", "average_hash", "dhash"):
-            image = Image.open(image_file)
-
-            return str(getattr(imagehash, hash_type)(image))
-
-        else:
-            raise NotImplementedError(f"Unknown hash type '{hash_type}'")
-
     def process(self):
         """
         Loop through images and only retain ones that have not been seen yet
@@ -111,7 +77,7 @@ class UniqueImageFilter(BasicProcessor):
 
             self.dataset.update_progress(processed / self.source_dataset.num_rows)
             if processed % 100 == 0:
-                self.dataset.update_progress(f"Processed {processed:,} of {self.source_dataset.num_rows:,} images, "
+                self.dataset.update_status(f"Processed {processed:,} of {self.source_dataset.num_rows:,} images, "
                                              f"found {dupes:,} duplicate(s)")
             processed += 1
 
@@ -120,7 +86,7 @@ class UniqueImageFilter(BasicProcessor):
                     metadata = json.load(infile)
                 continue
 
-            image_hash = self.hash_file(image_file, self.parameters.get("hash-type"))
+            image_hash = hash_file(image_file, self.parameters.get("hash-type"))
 
             if image_hash not in seen_hashes:
                 seen_hashes.add(image_hash)
