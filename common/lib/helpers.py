@@ -1,8 +1,9 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
-import hashlib
 import subprocess
+import imagehash
+import hashlib
 import requests
 import datetime
 import smtplib
@@ -23,6 +24,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse, urlunparse
 from calendar import monthrange
 from packaging import version
+from PIL import Image
 
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -403,6 +405,37 @@ def andify(items):
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
 
+
+def hash_file(image_file, hash_type="file-hash"):
+    """
+    Generate an image hash
+
+    :param Path image_file:  Image file to hash
+    :param str hash_type:  Hash type, one of `file-hash`, `colorhash`,
+    `phash`, `average_hash`, `dhash`
+    :return str:  Hexadecimal hash value
+    """
+    if not image_file.exists():
+        raise FileNotFoundError()
+
+    if hash_type == "file-hash":
+        hasher = hashlib.sha1()
+
+        # Open the file in binary mode
+        with image_file.open("rb") as infile:
+            # Read and update hash in chunks to handle large files
+            while chunk := infile.read(1024):
+                hasher.update(chunk)
+
+        return hasher.hexdigest()
+
+    elif hash_type in ("colorhash", "phash", "average_hash", "dhash"):
+        image = Image.open(image_file)
+
+        return str(getattr(imagehash, hash_type)(image))
+
+    else:
+        raise NotImplementedError(f"Unknown hash type '{hash_type}'")
 
 def get_yt_compatible_ids(yt_ids):
     """
