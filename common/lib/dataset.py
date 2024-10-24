@@ -1193,7 +1193,7 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_source"]:
+		if "software_source" not in self.data or not self.data["software_source"]:
 			return ""
 
 		filepath = self.data.get("software_file", "")
