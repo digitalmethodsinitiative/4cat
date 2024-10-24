@@ -200,7 +200,7 @@ class TelegramImageDownloader(BasicProcessor):
                         self.dataset.log(f"Could not download image for message {msg_id} - message is unavailable (it "
                                          f"may have been deleted)")
                         self.flawless = False
-                        continue
+                        break
 
                     success = False
                     try:
@@ -223,6 +223,7 @@ class TelegramImageDownloader(BasicProcessor):
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download image for message {msg_id} ({e})")
                         self.flawless = False
+
                     finally:
                         media_done += 1
                         self.metadata[filename] = {
