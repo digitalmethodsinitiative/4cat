@@ -9,7 +9,7 @@ from pathlib import Path
 
 import telethon.errors
 from telethon import TelegramClient
-from telethon.errors import TimedOutError
+from telethon.errors import TimedOutError, BadRequestError
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
@@ -218,7 +218,7 @@ class TelegramImageDownloader(BasicProcessor):
                             await client.download_media(message, str(path), thumb=-1)
                         msg_id = message.id
                         success = True
-                    except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError) as e:
+                    except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError, BadRequestError) as e:
                         filename = f"{entity}-index-{media_done}"
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download image for message {msg_id} ({e})")
