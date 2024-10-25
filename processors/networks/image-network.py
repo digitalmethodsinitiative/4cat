@@ -183,14 +183,18 @@ class ImageGrapher(BasicProcessor):
             if hash_type != "none" and image_hash in seen_hashes:
                 # if we're deduplicating and the image is already in the graph,
                 # merge the nodes (use the original node as the 'to node')
-                to_node = hash_file_map[image_hash]
-                if image_file != to_node:
+                to_node = hash_file_map.get(image_hash)
+                if to_node and image_file != to_node:
                     self.dataset.update_status(f"Image {image_file} identified as a duplicate of {to_node} - "
                                                f"merging.")
 
             else:
                 seen_hashes.add(image_hash)
                 to_node = image_file
+
+            if not to_node:
+                # image could not be hashed, probably invalid file
+                continue
 
             if self.parameters.get("image-value") == "url":
                 to_node = file_url_map[to_node]
