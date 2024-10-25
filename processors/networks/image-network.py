@@ -139,6 +139,9 @@ class ImageGrapher(BasicProcessor):
         file_url_map = {v["filename"]: u for u, v in metadata.items()}
         for url, details in metadata.items():
             for item_id in details.get("post_ids", []):
+                if self.source_dataset.type.endswith("-telegram"):
+                    # telegram has weird IDs
+                    item_id = "-".join(details["filename"].split("-")[:-1]) + "-" + str(item_id)
                 id_file_map[item_id] = details["filename"]
 
         root_dataset = None
