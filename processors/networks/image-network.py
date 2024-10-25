@@ -170,31 +170,36 @@ class ImageGrapher(BasicProcessor):
             if item.get("id") not in id_file_map:
                 continue
 
-            from_node_label = item.get(column)
-            from_node = f"{column}-{from_node_label}"
+            # from nodes are the dataset fields (e.g. 'body' or 'chat')
+            # to node names are filenames (optionally mapped to URLs later)
+            from_node = item.get(column)
+            from_node_id = f"{column}-{from_node}"
 
             image_file = id_file_map[item.get("id")]
-            image_hash = file_hash_map[image_file]
-            if image_hash in seen_hashes:
-                to_node_label = hash_file_map[image_hash]
-                if image_file != to_node_label:
-                    self.dataset.update_status(f"Image {image_file} is a duplicate of {to_node_label} - merging.")
+            image_hash = file_hash_map.get(image_file)
+            if hash_type != "none" and image_hash in seen_hashes:
+                # if we're deduplicating and the image is already in the graph,
+                # merge the nodes (use the original node as the 'to node')
+                to_node = hash_file_map[image_hash]
+                if image_file != to_node:
+                    self.dataset.update_status(f"Image {image_file} identified as a duplicate of {to_node} - "
+                                               f"merging.")
 
             else:
                 seen_hashes.add(image_hash)
-                to_node_label = id_file_map[item.get("id")]
+                to_node = image_file
 
             if self.parameters.get("image-value") == "url":
-                to_node_label = file_url_map[to_node_label]
+                to_node = file_url_map[to_node]
 
-            to_node = f"image-{to_node_label}"
-            if from_node not in network.nodes:
-                network.add_node(from_node, label=from_node_label, category=column)
+            to_node_id = f"image-{to_node}"
+            if from_node_id not in network.nodes:
+                network.add_node(from_node_id, label=from_node, category=column)
 
-            if to_node not in network.nodes:
-                network.add_node(to_node, label=to_node_label, category="image", image=to_node_label)
+            if to_node_id not in network.nodes:
+                network.add_node(to_node_id, label=to_node, category="image", image=to_node)
 
-            edge = (from_node, to_node)
+            edge = (from_node_id, to_node_id)
             if edge not in network.edges():
                 network.add_edge(*edge, frequency=0)
 
