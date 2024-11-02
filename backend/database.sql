@@ -57,8 +57,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   software_version  text,
   software_file     text DEFAULT '',
   software_source   text DEFAULT '',
-  annotation_fields text DEFAULT '',
-  language          text DEFAULT ''
+  annotation_fields text DEFAULT ''
 );
 
 CREATE TABLE datasets_owners (

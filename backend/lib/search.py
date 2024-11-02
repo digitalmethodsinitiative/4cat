@@ -5,12 +5,10 @@ import random
 import json
 import math
 import csv
-import fasttext
 import os
 
 from pathlib import Path
 from abc import ABC, abstractmethod
-
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
@@ -95,11 +93,9 @@ class Search(BasicProcessor, ABC):
 
 		if self.import_warning_count == 0 and self.import_error_count == 0:
 			self.dataset.finish(num_rows=num_items)
-			self.dataset.language = self.update_language()
 		else:
-			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=False)
+			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=True)
 			self.dataset.finish(num_rows=num_items)
-			self.dataset.language = self.update_language()
 
 	def search(self, query):
 		"""
@@ -174,10 +170,22 @@ class Search(BasicProcessor, ABC):
 				if self.interrupted:
 					raise WorkerInterruptedException()
 
-				# remove NUL bytes here because they trip up a lot of other
-				# things
-				# also include import metadata in item
-				item = json.loads(line.replace("\0", ""))
+				try:
+					# remove NUL bytes here because they trip up a lot of other
+					# things
+					# also include import metadata in item
+					item = json.loads(line.replace("\0", ""))
+				except json.JSONDecodeError:
+					warning = (f"An item on line {i:,} of the imported file could not be parsed as JSON - this may "
+							   f"indicate that the file you uploaded was incomplete and you need to try uploading it "
+							   f"again. The item will be ignored.")
+
+					if warning not in import_warnings:
+						import_warnings[warning] = 0
+					import_warnings[warning] += 1
+					continue
+
+
 				new_item = {
 					**item["data"],
 					"__import_meta": {k: v for k, v in item.items() if k != "data"}
@@ -366,40 +374,6 @@ class Search(BasicProcessor, ABC):
 
 		return processed
 
-	def update_language(self):
-		num_items = 0
-		text = ''
-		#loads the language identification model
-		lang_model_path = config.get('PATH_ROOT').joinpath("common/assets/lid.176.ftz")
-		lang_model = fasttext.load_model(str(lang_model_path))
-		try:
-			#iterate through the first posts to detect the language
-			for item in self.dataset.iterate_items():
-				if num_items >= 15:
-					break
-				body_text = item.get("body", "")
-				if body_text:
-					text += body_text + " "
-					num_items += 1
-				
-			text = text.replace('\n', '')
-			
-			self.dataset.update_status('checking the language')
-
-			try:
-				language = lang_model.predict(text)
-				self.dataset.update_status("the language was detected correctly")
-				language = language[0][0] 
-				self.dataset.update_status(f'language: {language}')
-				
-			except Exception as e:
-				self.dataset.update_status(f"Error detecting language: {str(e)}")
-				language = 'en' 
-			#return the language label (easy to add more languages if needed)
-			return "fi" if language == '__label__fi' else 'en'
-		except Exception as e:
-			self.dataset.update_status(f"Error: {str(e)}")
-			return 'en'
 	def items_to_archive(self, items, filepath):
 		"""
 		Save retrieved items as an archive

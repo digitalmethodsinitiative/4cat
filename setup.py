@@ -18,7 +18,6 @@ packages = set([
 	"datedelta~=1.4.0",
 	"dateparser~=1.1.0",
 	"emoji>=2.12.1",
-	"fasttext",
 	"flag",
 	"Flask~=2.2",
 	"Flask_Limiter==1.0.1",
@@ -67,7 +66,6 @@ packages = set([
 	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
 	"yt-dlp",
-	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz#egg=en_core_web_sm",
 	"fi_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fi_core_news_sm-3.7.0/fi_core_news_sm-3.7.0-py3-none-any.whl"	
 ])
 

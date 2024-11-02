@@ -17,7 +17,8 @@ class NeologismExtractor(ProcessorPreset):
 				  "Uses stopwords-iso as its stopword filter."
 	extension = "csv"
 
-	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
+	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'",
+	"Finnish Wordlist: https://kaino.kotus.fi/sanat/taajuuslista/parole.php"]
 
 
 
@@ -38,6 +39,12 @@ class NeologismExtractor(ProcessorPreset):
 				"help": "Column(s) from which to extract neologisms",
 				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
 			},
+			"language": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "English",
+				"options": {"en": "English", "fi": "Finnish"},
+				"help": "Select language"
+			}
 		}
 		if parent_dataset and parent_dataset.get_columns():
 			columns = parent_dataset.get_columns()
@@ -68,33 +75,64 @@ class NeologismExtractor(ProcessorPreset):
 		"""
 		timeframe = self.parameters.get("timeframe")
 		columns = self.parameters.get("columns")
-
-		pipeline = [
-			# first, tokenise the posts, excluding all common words
-			{
-				"type": "tokenise-posts",
-				"parameters": {
-					"stem": False,
-					"strip_symbols": True,
-					"lemmatise": False,
-					"docs_per": timeframe,
-					"columns": columns,
-					"filter": ["wordlist-googlebooks-english", "stopwords-iso-en"]
+		language = self.parameters.get("language")
+		
+		if language == "fi":
+			pipeline = [
+				# first, tokenise the posts, excluding all common words
+				{
+					"type": "tokenise-posts",
+					"parameters": {
+						"stem": False,
+						"language":"finnish",
+						"strip_symbols": True,
+						"lemmatise": False,
+						"docs_per": timeframe,
+						"columns": columns,
+						"filter": ["finnish_wordlist_big", "stopwords-iso-fi"]
+					}
+				},
+				# then, create vectors for those tokens
+				{
+					"type": "vectorise-tokens",
+					"parameters": {}
+				},
+				# finally, the top vectors constitute the result of this preset
+				{
+					"type": "vector-ranker",
+					"parameters": {
+						"amount": True,
+						"top": 15,
+					}
 				}
-			},
-			# then, create vectors for those tokens
-			{
-				"type": "vectorise-tokens",
-				"parameters": {}
-			},
-			# finally, the top vectors constitute the result of this preset
-			{
-				"type": "vector-ranker",
-				"parameters": {
-					"amount": True,
-					"top": 15,
+			]
+		else:
+			pipeline = [
+				# first, tokenise the posts, excluding all common words
+				{
+					"type": "tokenise-posts",
+					"parameters": {
+						"stem": False,
+						"strip_symbols": True,
+						"lemmatise": False,
+						"docs_per": timeframe,
+						"columns": columns,
+						"filter": ["wordlist-googlebooks-english", "stopwords-iso-en"]
+					}
+				},
+				# then, create vectors for those tokens
+				{
+					"type": "vectorise-tokens",
+					"parameters": {}
+				},
+				# finally, the top vectors constitute the result of this preset
+				{
+					"type": "vector-ranker",
+					"parameters": {
+						"amount": True,
+						"top": 15,
+					}
 				}
-			}
-		]
+			]
 
 		return pipeline

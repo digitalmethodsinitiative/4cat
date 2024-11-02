@@ -120,7 +120,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# find out what the source_dataset dataset is if it's a search worker
 			try:
 				self.source_dataset = self.dataset.get_parent()
-				self.dataset.language = self.source_dataset.language
 
 				# for presets, transparently use the *top* dataset as a source_dataset
 				# since that is where any underlying processors should get
