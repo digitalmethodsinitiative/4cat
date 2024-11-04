@@ -26,6 +26,7 @@ class LexicalFilter(BaseFilter):
 
     references = [
         "[Hatebase](https://hatebase.org)",
+        "[Finnish hatespeech](https://www.theseus.fi/handle/10024/261556)",
         "[Regex101](https://regex101.com/)"
     ]
 
@@ -38,6 +39,7 @@ class LexicalFilter(BaseFilter):
             "options": {
                 "hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
                 "hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
+                "finnish_hatespeech": "Finnish (and Swedish) words present in hatespeech crimes"
             },
             "help": "Filter items containing words in these lexicons. Note that they may be outdated."
         },
@@ -45,6 +47,18 @@ class LexicalFilter(BaseFilter):
             "type": UserInput.OPTION_TEXT,
             "default": "",
             "help": "Custom word list (separate with commas)"
+        },
+        #match type allows the user to decide whether they want the filter to only match exact words (enclosed by \b) or any regex match
+        "match-type": {
+            "type": UserInput.OPTION_CHOICE,
+            "default": "exact-match",
+            "options": {
+                "exact-match": "Match exact word only",
+                "subword-match": "Match inflections and compounds"
+            },
+            "help": "Choose whether to match posts containing the exact word only or posts containing compounds or inflections of the word \
+                  (e.g. 'pankki' would match with 'pankki', pankkissa' and 'kielipankki'). \
+                    This option is indicated for highly inflected languages. Take into account irregular terms. Use regex for further adjustments. "
         },
         "as_regex": {
             "type": UserInput.OPTION_TOGGLE,
@@ -84,6 +98,7 @@ class LexicalFilter(BaseFilter):
         """
         exclude = self.parameters.get("exclude", False)
         case_sensitive = self.parameters.get("case-sensitive", False)
+        match_type = self.parameters.get("match-type")
 
         # load lexicons from word lists
         lexicons = {}
@@ -113,24 +128,41 @@ class LexicalFilter(BaseFilter):
             if not lexicons[lexicon_id]:
                 continue
 
-            if not self.parameters.get("as_regex"):
+            if not self.parameters.get("as_regex") and lexicon_id != "finnish_hatespeech":
                 phrases = [re.escape(term) for term in lexicons[lexicon_id] if term]
             else:
                 phrases = [term for term in lexicons[lexicon_id] if term]
 
-            try:
-                if not case_sensitive:
-                    lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b",
+            if match_type == "subword-match":
+                try:
+                    if not case_sensitive:
+                        lexicon_regexes[lexicon_id] = re.compile(
+                        r"(" + "|".join(phrases) + r")" ,
                         flags=re.IGNORECASE)
-                      
-                else:
-                    lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b")
-            except re.error:
-                self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
-                self.dataset.finish(0)
-                return
+                    
+                    else:
+                        lexicon_regexes[lexicon_id] = re.compile(
+                        r"(" + "|".join(phrases) + r")" 
+                        )
+                except re.error:
+                    self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
+                    self.dataset.finish(0)
+                    return
+            
+            else:
+                try:
+                    if not case_sensitive:
+                        lexicon_regexes[lexicon_id] = re.compile(
+                            r"\b(" + "|".join(phrases) + r")\b",
+                            flags=re.IGNORECASE)
+                        
+                    else:
+                        lexicon_regexes[lexicon_id] = re.compile(
+                            r"\b(" + "|".join(phrases) + r")\b")
+                except re.error:
+                    self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
+                    self.dataset.finish(0)
+                    return
 
         # now for the real deal
         self.dataset.update_status("Reading source file")

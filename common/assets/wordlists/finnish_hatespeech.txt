@@ -1,4 +1,3 @@
-nord
 \bsuomi\b \bsuomalaisille\b
 \blyhytkasvui
 \bseksuaali .* \btaipumu
@@ -30,7 +29,7 @@ syndrooma
 \btransihmi
 \bdvärg
 \bbinai
-\b(?<!hanka)lahko\b
+\b(?<!hanka)lahko
 \bmenkää\b \bsinne\b \bmistä\b
 \btakaisin\b \bsinne\b \bmistä\b
 \bhomppel
@@ -39,7 +38,7 @@ syndrooma
 \bprofet
 \btransmie
 \bheikkolahjai
-\b(?<!asenne)vammai\b
+(?<!asenne)vammai
 \blespo
 manne(?!n\b|r|lin\b)
 \bsukupuol .* \bilmaisu
@@ -136,7 +135,7 @@ rullatuol
 \bvirolai .* \bhuor
 \bhuivipä
 \bpilotti
-\b(?<!sade)kuuro\b
+\b(?<!sade)kuuro
 \bbin\b \bladen
 \bsomali
 \bjehova
@@ -324,7 +323,7 @@ transsu
 \bvastaanottokesku
 \bmormon
 pilapiirro
-\b(?<!kyy)ryssä\b
+\b(?<!kyy)ryssä
 \btransvest
 \bulos\b \bkaapista\b
 \bflata\b
