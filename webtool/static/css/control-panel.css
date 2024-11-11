@@ -260,6 +260,10 @@ article .stats-container h3:not(.blocktitle) {
     margin-right: 0.5em;
 }
 
+.log-display.wrapped-log {
+    white-space: pre-line;
+}
+
 /**
  ** Bulk dataset management
  */

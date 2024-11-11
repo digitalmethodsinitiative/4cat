@@ -149,6 +149,12 @@ config_definition = {
         "help": "Can restart/upgrade",
         "tooltip": "Controls whether users can restart, upgrade, and manage extensions 4CAT via the Control Panel"
     },
+    "privileges.admin.can_manage_extensions": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can manage extensions",
+        "tooltip": "Controls whether users can install and uninstall 4CAT extensions via the Control Panel"
+    },
     "privileges.can_upgrade_to_dev": {
         # this is NOT an admin privilege, because all admins automatically
         # get all admin privileges! users still need the above privilege

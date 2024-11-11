@@ -735,7 +735,7 @@ def get_log(logfile):
     :param str logfile: 'backend' or 'stderr'
     :return:
     """
-    if logfile not in ("stderr", "backend", "import"):
+    if logfile not in ("stderr", "backend", "import", "extensions"):
         return "Not Found", 404
 
     if logfile == "backend":
