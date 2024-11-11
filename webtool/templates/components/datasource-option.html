@@ -109,7 +109,7 @@
                     <span class="colour-example" id="colour-example-{{ hue_id }}"></span>
                 </div>
         {% elif settings.type == "extensions" %}
-            <div class="extension-toggle-form">
+            <div class="extension-toggle-form broad-toggle-form">
                 <input name="option-{{ option }}" type="hidden" value="{{ extensions_config|list|join(",") }}">
                 <table>
                     <thead>
@@ -117,14 +117,14 @@
                         <th colspan="2">Extension</th>
                     </tr>
                     <tr class="table-controls">
-                        <td><input type="checkbox" class="copy-from deenabled"></td>
+                        <td><input type="checkbox" class="copy-from d-e-enabled"></td>
                         <td class="italic">(change all)</td>
                     </tr>
                     </thead>
                     <tbody>
             {% for extension, extension_config in extensions_config.items() %}
                     <tr>
-                        <td><input class="copy-to e-enabled" type="checkbox" name="option-{{ option }}-enable-{{ extension }}" id="forminput-{{ option }}-{{ extension }}"{% if extension_config.enabled %} checked{% endif %}></td>
+                        <td><input class="copy-to d-e-enabled" type="checkbox" name="option-{{ option }}-enable-{{ extension }}" id="forminput-{{ option }}-{{ extension }}"{% if extension_config.enabled %} checked{% endif %}></td>
                         <td>{{ extension_config.name }}</td>
                     </tr>
             {% endfor %}
@@ -132,7 +132,7 @@
                 </table>
             </div>
         {% elif settings.type == "datasources" %}
-            <div class="datasource-toggle-form">
+            <div class="datasource-toggle-form broad-toggle-form">
                 <input name="option-{{ option }}" type="hidden" value="{{ datasources_config|list|join(",") }}">
                 <table>
                     <thead>

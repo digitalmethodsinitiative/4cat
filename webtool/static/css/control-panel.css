@@ -89,14 +89,14 @@ table td[colspan] {
     max-width: 25em;
 }
 
-.settings .datasource-toggle-form table {
+.settings .broad-toggle-form table {
     position: relative;
     left: -15em;
     background: var(--always-white);
     width: calc(100% + 12em);
 }
 
-.settings .datasource-toggle-form input[type=text] {
+.settings .broad-toggle-form input[type=text] {
     width: 5em;
 }
 

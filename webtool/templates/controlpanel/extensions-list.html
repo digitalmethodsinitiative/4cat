@@ -8,13 +8,19 @@
     <article class="small">
         <section class="result-list">
             <h2><span>4CAT Extensions</span></h2>
-                        {% for notice in flashes %}
-                            <p class="form-notice">{{ notice|safe }}</p>
-                        {% endfor %}
-            <p>4CAT extensions can be installed in the <code>extensions</code> folder in the 4CAT root. For more
+            {% if flashes %}
+                <div class="form-notices-wrapper">
+                {% for notice in flashes %}
+                <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                </div>
+            {% endif %}
+            <p class="intro">4CAT extensions can be installed in the <code>extensions</code> folder in the 4CAT root. For more
                 information, see the README file in that folder. This page lists all currently installed extensions;
                 currently, to manage extensions you will need to access the filesystem and move files into the correct
                 location manually.</p>
+            <p>Extensions need to be enabled after installation to run. You can do so via the
+                <a href="{{ url_for("manipulate_settings") }}">4CAT settings panel</a>.</p>
             <div class="user-panel">
                 <table class="fullwidth notification-table cp-table">
                     <colgroup>
@@ -59,6 +65,10 @@
 
                 <p role="tooltip" class="multiple" id="tooltip-uninstall" aria-hidden="true">Uninstall this
                     extension</p>
+                <p role="tooltip" class="multiple" id="tooltip-enabled" aria-hidden="true">This extension is currently
+                    enabled</p>
+                <p role="tooltip" class="multiple" id="tooltip-disabled" aria-hidden="true">This extension is currently
+                    disabled</p>
             </div>
         </section>
 
