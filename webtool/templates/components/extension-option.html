@@ -108,29 +108,6 @@
                            data-value="{% if settings.value %}{{ settings.value }}{% else %}46{% endif %}" data-update-background="#colour-example-{{ hue_id }}">
                     <span class="colour-example" id="colour-example-{{ hue_id }}"></span>
                 </div>
-        {% elif settings.type == "extensions" %}
-            <div class="extension-toggle-form">
-                <input name="option-{{ option }}" type="hidden" value="{{ extensions_config|list|join(",") }}">
-                <table>
-                    <thead>
-                    <tr>
-                        <th colspan="2">Extension</th>
-                    </tr>
-                    <tr class="table-controls">
-                        <td><input type="checkbox" class="copy-from deenabled"></td>
-                        <td class="italic">(change all)</td>
-                    </tr>
-                    </thead>
-                    <tbody>
-            {% for extension, extension_config in extensions_config.items() %}
-                    <tr>
-                        <td><input class="copy-to e-enabled" type="checkbox" name="option-{{ option }}-enable-{{ extension }}" id="forminput-{{ option }}-{{ extension }}"{% if extension_config.enabled %} checked{% endif %}></td>
-                        <td>{{ extension_config.name }}</td>
-                    </tr>
-            {% endfor %}
-                    </tbody>
-                </table>
-            </div>
         {% elif settings.type == "datasources" %}
             <div class="datasource-toggle-form">
                 <input name="option-{{ option }}" type="hidden" value="{{ datasources_config|list|join(",") }}">

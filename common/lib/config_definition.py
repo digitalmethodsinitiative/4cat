@@ -37,6 +37,18 @@ config_definition = {
                    "setting.",
         "indirect": True
     },
+    # Extensions
+    "extensions._intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT extensions can be disabled and disabled via the control below. When enabled, extensions may "
+                "define further settings that can typically be configured via the extension's tab on the left side of "
+                "this page. Note that 4CAT needs to be restarted for this to take effect!"
+    },
+    "extensions.enabled": {
+        "type": UserInput.OPTION_EXTENSIONS,
+        "default": {},
+        "help": "Extensions"
+    },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
     # notice may also show up in the web interface regardless of the value entered here.
