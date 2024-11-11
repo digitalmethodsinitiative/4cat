@@ -63,7 +63,7 @@ class HatebaseAnalyser(BasicProcessor):
         :param Dataset module:  Module ID to determine compatibility with
         :return bool:
         """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson") and module.language != 'fi'
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson") 
 
 	def process(self):
 		"""
