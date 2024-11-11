@@ -22,7 +22,7 @@
             <p>Extensions need to be enabled after installation to run. You can do so via the
                 <a href="{{ url_for("manipulate_settings") }}">4CAT settings panel</a>.</p>
             <div class="user-panel">
-                <table class="fullwidth notification-table cp-table">
+                <table class="fullwidth notification-table cp-table extensions-table">
                     <colgroup>
                         <col>
                         <col>
@@ -36,8 +36,12 @@
                     </tr>
                     {% if extensions %}
                         {% for extension_id, extension in extensions.items() %}
-                            <tr>
-                                <td><span class="property-badge">{{ extension_id }}</span>{% if extension_id != extension.name %}
+                            <tr{% if not extension.enabled %} class="tooltip-trigger"{% endif %} aria-controls="tooltip-disabled">
+                                <td {% if not extension.enabled %}class="disabled"{% endif %}>
+                                {% if not extension.enabled %}<i class="fa fa-times" aria-hidden="true"></i>
+                                    <span class="sr-only">This extension is currently disabled.</span>{% endif %}
+                                    <span class="property-badge">
+                                    {{ extension_id }}</span>{% if extension_id != extension.name %}
                                     {{ extension.name }}{% endif %}</td>
                                 <td>{% if extension.version %}{{ extension.version }}{% else %}unknown{% endif %}</td>
                                 <td>
@@ -51,7 +55,7 @@
                                 <td>
                                     <form action="{{ url_for("uninstall_extension") }}" method="POST">
                                         <input type="hidden" name="extension-name" value="{{ extension_id }}">
-                                        <button class="tooltip-trigger"aria-controls="tooltip-uninstall"><i class="fa fa-folder-minus" aria-hidden="true"></i> <span class="sr-only">Uninstall extension</span></button>
+                                        <button class="confirm-first" data-confirm-action="uninstall this extension"><i class="fa fa-folder-minus tooltip-trigger" aria-hidden="true" aria-controls="tooltip-uninstall"></i> <span class="sr-only">Uninstall extension</span></button>
                                     </form>
                                 </td>
                             </tr>

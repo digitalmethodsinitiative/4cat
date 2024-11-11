@@ -46,6 +46,10 @@ table.cp-table .actions {
     vertical-align: middle;
 }
 
+.extensions-table tr.disabled {
+    color: var(--gray-dark);
+}
+
 table td[colspan] {
     text-align: center;
 }
