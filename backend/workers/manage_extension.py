@@ -153,10 +153,10 @@ class ExtensionManipulator(BasicWorker):
                     except json.JSONDecodeError:
                         pass
 
+            shutil.rmtree(canonical_folder)
             if overwrite:
                 self.extension_log.warning(f"Uninstalling existing 4CAT extension {existing_name} (version "
                                            f"{existing_version}.")
-                shutil.rmtree(canonical_folder)
             else:
                 return self.extension_log.error(f"An extension with ID {canonical_id} is already installed "
                                                 f"({extension_name}, version {existing_version}). Cannot install "
