@@ -207,7 +207,7 @@ class VideoTimelines(BasicProcessor):
                     labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():
-            dataset = DataSet(key=dataset, db=self.db).nearest("*-search")
+            dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest("*-search")
 
             # determine appropriate label
             # is this the right place? should it be in the datasource?
