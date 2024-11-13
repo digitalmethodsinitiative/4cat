@@ -190,9 +190,10 @@ class ExtensionManipulator(BasicWorker):
             with zipfile.ZipFile(archive_path, "r") as archive_file:
                 archive_file.extractall(temp_name)
         except Exception as e:
-            archive_path.unlink()
             return self.extension_log.error(f"Could not extract extension zip archive {archive_path.name}: {e}. Cannot "
                                             f"install."), None
+        finally:
+            archive_path.unlink()
 
         return temp_name, extension_name
 
