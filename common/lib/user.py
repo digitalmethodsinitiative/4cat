@@ -444,10 +444,10 @@ class User:
         :return list:  Notifications, as a list of dictionaries
         """
         if not self.config:
-            raise ValueError("User not instantiated with a configuration reader. Provide a ConfigManager at "
-                             "instantiation or use with_config().")
+            tag_recipients = ["!everyone"]
+        else:
+            tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.config.get_active_tags(self)]]
 
-        tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.config.get_active_tags(self)]]
         if self.is_admin:
             # for backwards compatibility - used to be called '!admins' even if the tag is 'admin'
             tag_recipients.append("!admins")

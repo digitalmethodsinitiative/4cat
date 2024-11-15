@@ -39,8 +39,8 @@ def load_user(user_name):
     user = User.get_by_name(db, user_name)
     if user:
         user.authenticate()
+        user.with_config(ConfigWrapper(config, user=user, request=request))
 
-    user.with_config(ConfigWrapper(config, user=user, request=request))
     return user
 
 
