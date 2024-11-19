@@ -183,8 +183,9 @@ class VideoHasher(BasicProcessor):
 		self.dataset.log('Frames per seconds: %f' % frame_interval)
 
 		# Prepare staging area for videos and video tracking
+		# VideoHash creates various files that may not be cleaned up on error so we use an output directory
 		staging_area = self.dataset.get_staging_area()
-		self.dataset.log('Staging directory location: %s' % staging_area)
+		output_dir = self.dataset.get_staging_area()
 
 		video_hashes = {}
 		video_metadata = None
@@ -224,7 +225,7 @@ class VideoHasher(BasicProcessor):
 
 			video_hashes[path.name] = {'videohash': videohash}
 
-			shutil.copy(videohash.collage_path, staging_area.joinpath(path.stem + '.jpg'))
+			shutil.copy(videohash.collage_path, output_dir.joinpath(path.stem + '.jpg'))
 			video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
 
 			processed_videos += 1
@@ -240,7 +241,7 @@ class VideoHasher(BasicProcessor):
 		if video_metadata is None:
 			# Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
 			try:
-				metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+				metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, output_dir)
 			except FileNotFoundError:
 				metadata_path = None
 			if metadata_path:
@@ -293,7 +294,7 @@ class VideoHasher(BasicProcessor):
 					num_posts += 1
 
 		writer = None
-		with staging_area.joinpath("video_hashes.csv").open("w", encoding="utf-8", newline="") as outfile:
+		with output_dir.joinpath("video_hashes.csv").open("w", encoding="utf-8", newline="") as outfile:
 			for row in rows:
 				if not writer:
 					writer = csv.DictWriter(outfile, fieldnames=row.keys())
@@ -303,7 +304,7 @@ class VideoHasher(BasicProcessor):
 
 		# Finish up
 		self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')
-		self.write_archive_and_finish(staging_area)
+		self.write_archive_and_finish(output_dir)
 
 class VideoHashNetwork(BasicProcessor):
 	"""
