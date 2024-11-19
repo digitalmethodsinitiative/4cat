@@ -51,6 +51,22 @@ class Database:
 
 		self.commit()
 
+	def check_and_reconnect(self):
+		"""
+        Check if the connection is closed and reconnect if necessary.
+        """
+		try:
+			self.connection.cursor().execute('SELECT 1')
+		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+			self.log.warning(f"Database connection closed. Reconnecting...\n{e}")
+			self.connection = psycopg2.connect(dbname=self.connection.info.dbname,
+											   user=self.connection.info.user,
+											   password=self.connection.info.password,
+											   host=self.connection.info.host,
+											   port=self.connection.info.port,
+											   application_name=self.appname)
+			self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
 	def query(self, query, replacements=None, cursor=None):
 		"""
 		Execute a query
@@ -62,6 +78,8 @@ class Database:
 		"""
 		if not cursor:
 			cursor = self.get_cursor()
+		else:
+			self.check_and_reconnect()
 
 		self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
 
@@ -422,4 +440,5 @@ class Database:
 
 		:return: Cursor
 		"""
+		self.check_and_reconnect()
 		return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
