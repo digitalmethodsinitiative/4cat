@@ -117,6 +117,9 @@ class VideoTimelines(BasicProcessor):
                 if previous_video is not None or not looping:
                     # draw the video filename/label on top of the rendered
                     # frame thumbnails
+                    if not previous_video:
+                        # This likely means no frames were found for the video and this processor should not have run
+                        continue
                     video_label = labels.get(previous_video, previous_video)
                     footersize = (fontsize * (len(video_label) + 2) * 0.5925, fontsize * 2)
                     footer_shape = SVG(insert=(0, base_height - footersize[1]), size=footersize)
@@ -164,6 +167,10 @@ class VideoTimelines(BasicProcessor):
                 frame_element = ImageElement(href=frame_data, insert=(timeline_widths[video], 0), size=(frame_width, base_height))
                 timeline.add(frame_element)
                 timeline_widths[video] += frame_width
+
+        if not timeline_widths:
+            self.dataset.finish_with_error("No video frames found")
+            return
 
         # now we know all dimensions we can instantiate the canvas too
         canvas_width = max(timeline_widths.values())

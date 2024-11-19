@@ -216,11 +216,12 @@ class VideoHasher(BasicProcessor):
 				self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
 				self.dataset.finish(0)
 				return
-			except FileNotFoundError as e:
-				self.dataset.update_status(f"Unable to find file {str(path)}")
+			except FileNotFoundError:
+				self.dataset.update_status(f"Unable to find file {path.name}")
 				continue
 			except FFmpegFailedToExtractFrames as e:
-				self.dataset.update_status(f"Unable to extract frame for {str(path)}: {e}")
+				self.dataset.update_status(f"Unable to extract frame for {path.name} (see log for details)")
+				self.dataset.log(f"Unable to extract frame for {str(path)}: {e}")
 				continue
 
 			video_hashes[path.name] = {'videohash': videohash}
@@ -233,6 +234,10 @@ class VideoHasher(BasicProcessor):
 				"Created %i/%i video hashes" % (processed_videos, total_possible_videos))
 			self.dataset.update_progress(processed_videos / total_possible_videos)
 			videohash.delete_storage_path()
+
+		if processed_videos == 0:
+			self.dataset.finish_with_error("Unable to create video hashes for any videos")
+			return
 
 		# Write hash file
 		# This file is held here and then copied as its own dataset via VideoHasherTwo
@@ -304,7 +309,7 @@ class VideoHasher(BasicProcessor):
 
 		# Finish up
 		self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')
-		self.write_archive_and_finish(output_dir)
+		self.write_archive_and_finish(output_dir, num_items=processed_videos)
 
 class VideoHashNetwork(BasicProcessor):
 	"""
