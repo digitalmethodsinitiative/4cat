@@ -94,7 +94,7 @@ class VideoFrames(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for path in self.iterate_archive_contents(self.source_file, staging_area):
+		for i, path in enumerate(self.iterate_archive_contents(self.source_file, staging_area)):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -138,17 +138,21 @@ class VideoFrames(BasicProcessor):
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:
-				error = 'Error Return Code with video %s: %s' % (vid_name, str(result.returncode))
-				self.dataset.log(error)
+				self.dataset.update_status(f"Unable to extract frames from video {vid_name} (see logs for details)")
+				self.dataset.log('Error Return Code (%s) with video %s: %s' % (str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
+			else:
+				processed_videos += 1
+				self.dataset.update_status("Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
 
-			processed_videos += 1
-			self.dataset.update_status(
-				"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
-			self.dataset.update_progress(processed_videos / total_possible_videos)
+			self.dataset.update_progress(i / total_possible_videos)
 
 		# Finish up
 		# We've created a directory and folder structure here as opposed to a single folder with single files as
 		# expected by self.write_archive_and_finish() so we use make_archive instead
+		if not processed_videos:
+			self.dataset.finish_with_error("Unable to extract frames from any videos")
+			return
+
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
 
