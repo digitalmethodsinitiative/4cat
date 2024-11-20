@@ -48,17 +48,25 @@ class LexicalFilter(BaseFilter):
             "default": "",
             "help": "Custom word list (separate with commas)"
         },
-        #match-type allows the user to decide whether they want the filter to only match exact words (enclosed by \b) or any regex match
-        "match-type": {
+        #the language determines whether the user can choose the "Match inflections and compounds" option under "match-type"
+        "language": {
             "type": UserInput.OPTION_CHOICE,
-            "default": "exact-match",
+            "default": "English",
             "options": {
-                "exact-match": "Match exact word only",
-                "subword-match": "Match inflections and compounds"
-            },
-            "help": "Choose whether to match posts containing the exact word only or posts containing compounds or inflections of the word \
-                  (e.g. 'pankki' would match with 'pankki' and 'kielipankki', while 'pank' would also allow 'pankista' and 'pankissa'). \
-                    This option is indicated for highly inflected languages. You can use regex for further adjustments. "
+                "finnish": "Finnish",
+                "English": "English",
+                "other": "Other" #can be expanded with other languages, maybe instead of specific languages use highly inflected/weakly inflected
+            }
+        },
+        #match-type allows the user to decide whether they want the filter to only match exact words (enclosed by \b) or any regex match
+        "match-subword": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Choose whether to match posts containing compounds or inflections of the word. \
+                  The default is exact-word match.",
+            "tooltip": "(e.g. 'pankki' would match with 'pankki' and 'kielipankki', while 'pank' would also allow 'pankista' and 'pankissa').\
+                    You can use regex for further adjustments. ",
+            "requires": "language==finnish"
         },
         "as_regex": {
             "type": UserInput.OPTION_TOGGLE,
@@ -98,7 +106,7 @@ class LexicalFilter(BaseFilter):
         """
         exclude = self.parameters.get("exclude", False)
         case_sensitive = self.parameters.get("case-sensitive", False)
-        match_type = self.parameters.get("match-type")
+        
 
         # load lexicons from word lists
         lexicons = {}
@@ -133,7 +141,7 @@ class LexicalFilter(BaseFilter):
             else:
                 phrases = [term for term in lexicons[lexicon_id] if term]
 
-            if match_type == "subword-match":
+            if self.parameters.get("match-subword"):
                 try:
                     if not case_sensitive:
                         lexicon_regexes[lexicon_id] = re.compile(

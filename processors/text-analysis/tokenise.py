@@ -341,7 +341,7 @@ class Tokenise(BasicProcessor):
 
 			if self.parameters.get("lemmatise"):
 				lemmatizer = WordNetLemmatizer()
-			if self.parameters.get("lemmatise_fin") == "finnish":
+			if self.parameters.get("lemmatise_fin"):
 				nlp = spacy.load("fi_core_news_sm", disable=['parser', 'ner'])
 				
 		# Only keep unique words?
