@@ -145,7 +145,7 @@ class Tokenise(BasicProcessor):
 				"requires": "language==english"
 			},
 			#it seems as if requires only allows one option, so I added another option exclusive to finnish
-			"lemmatise": {
+			"lemmatise_fin": {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,
 				"help": "Lemmatise tokens (Finnish only)",
@@ -340,10 +340,9 @@ class Tokenise(BasicProcessor):
 				stemmer = SnowballStemmer(language)
 
 			if self.parameters.get("lemmatise"):
-				if self.parameters.get("language") == "finnish":
-					nlp = spacy.load("fi_core_news_sm", disable=['parser', 'ner'])
-				else:
-					lemmatizer = WordNetLemmatizer()
+				lemmatizer = WordNetLemmatizer()
+			if self.parameters.get("lemmatise_fin") == "finnish":
+				nlp = spacy.load("fi_core_news_sm", disable=['parser', 'ner'])
 				
 		# Only keep unique words?
 		only_unique = self.parameters.get("only_unique")
@@ -452,7 +451,7 @@ class Tokenise(BasicProcessor):
 					if self.parameters["lemmatise"] and lemmatizer:
 						token = lemmatizer.lemmatize(token)
 					#finnish lemmatization
-					if self.parameters["lemmatise"] and nlp:
+					if self.parameters["lemmatise_fin"] and nlp:
 						token_lemma = nlp(token)
 						token = [token.lemma_ for token in token_lemma]
 						token = token[0]
