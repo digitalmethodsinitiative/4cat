@@ -444,6 +444,7 @@ class User:
         :return list:  Notifications, as a list of dictionaries
         """
         if not self.config:
+            # User not logged in; only view notifications for everyone
             tag_recipients = ["!everyone"]
         else:
             tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.config.get_active_tags(self)]]

@@ -333,12 +333,12 @@ def show_login():
     username = request.form['username']
     password = request.form['password']
     registered_user = User.get_by_login(db, username, password)
-    registered_user.with_config(config)
 
     if registered_user is None:
         flash('Username or Password is invalid.', 'error')
         return redirect(url_for('show_login'))
 
+    registered_user.with_config(config)
     login_user(registered_user, remember=True)
 
     return redirect(url_for("show_frontpage"))
