@@ -58,7 +58,7 @@ class SearchTikTokComments(Search):
             "post_url": item["share_info"]["url"].split(".html")[0],
             "post_body": item["share_info"]["title"],
             "comment_url": item["share_info"]["url"],
-            "is_liked_by_post_author": "yes" if bool(item["author_pin"]) else "no",
+            "is_liked_by_post_author": "yes" if bool(item.get("author_pin")) else "no",
             "is_sticky": "yes" if bool(item["stick_position"]) else "no",
             "is_comment_on_comment": "no" if bool(item["reply_id"] == "0") else "yes",
             "language_guess": item["comment_language"]
