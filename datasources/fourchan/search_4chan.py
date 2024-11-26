@@ -442,7 +442,7 @@ class Search4Chan(SearchWithScope):
 			"help": "Can query without keyword",
 			"default": False,
 			"tooltip": "Allows users to query the 4chan data without specifying a keyword. This can lead to HUGE datasets!"
-		},
+		}
 	}
 
 	def get_items_simple(self, query):

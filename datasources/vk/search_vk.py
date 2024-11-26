@@ -30,7 +30,7 @@ class SearchVK(Search):
         "[VK API documentation](https://vk.com/dev/first_guide)",
         "[Python API wrapper](https://github.com/python273/vk_api)"
     ]
-
+    
     expanded_profile_fields = "id,screen_name,first_name,last_name,name,deactivated,is_closed,is_admin,sex,city,country,photo_200,photo_100,photo_50,followers_count,members_count"  # https://vk.com/dev/objects/user & https://vk.com/dev/objects/group
 
     @classmethod
