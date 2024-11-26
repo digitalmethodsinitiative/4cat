@@ -49,23 +49,33 @@ class Database:
 		if self.log is None:
 			self.log = logging
 
-		self.commit()
-
-	def check_and_reconnect(self):
+	def check_and_reconnect(self, tries=3, wait=10):
 		"""
         Check if the connection is closed and reconnect if necessary.
+
+        :param int tries: Number of tries to reconnect
+        :param int wait: Time to wait between tries (first try is immediate)
         """
 		try:
 			self.connection.cursor().execute('SELECT 1')
 		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
 			self.log.warning(f"Database connection closed. Reconnecting...\n{e}")
-			self.connection = psycopg2.connect(dbname=self.connection.info.dbname,
-											   user=self.connection.info.user,
-											   password=self.connection.info.password,
-											   host=self.connection.info.host,
-											   port=self.connection.info.port,
-											   application_name=self.appname)
-			self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+			current = 1
+			while current <= tries:
+				try:
+					self.connection = psycopg2.connect(dbname=self.connection.info.dbname,
+													   user=self.connection.info.user,
+													   password=self.connection.info.password,
+													   host=self.connection.info.host,
+													   port=self.connection.info.port,
+													   application_name=self.appname)
+					self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+					break
+				except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+					self.log.warning(f"Database connection closed. Reconnecting...\n{e}")
+					time.sleep(wait)
+					current += 1
+
 
 	def query(self, query, replacements=None, cursor=None):
 		"""
