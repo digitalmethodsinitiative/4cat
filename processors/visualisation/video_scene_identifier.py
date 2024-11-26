@@ -252,8 +252,9 @@ class VideoSceneDetector(BasicProcessor):
 				if video_data.get('success'):
 					files = video_data.get('files') if 'files' in video_data else [{"filename": video_data.get("filename"), "success":True}]
 					for file in files:
-						if not file.get("success"):
+						if not file.get("success") or file.get("filename") not in collected_scenes:
 							continue
+							
 						# List types are not super fun for CSV
 						if 'post_ids' in video_data:
 							video_data['post_ids'] = ','.join([str(i) for i in video_data['post_ids']])
