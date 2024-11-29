@@ -522,7 +522,7 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
     return canvas
 
 
-def call_api(action, payload=None):
+def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
@@ -530,6 +530,8 @@ def call_api(action, payload=None):
 
     :param str action: API action
     :param payload: API payload
+    :param bool wait_for_response:  Wait for response? If not close connection
+    immediately after sending data.
 
     :return: API response, or timeout message in case of timeout
     """
@@ -540,16 +542,17 @@ def call_api(action, payload=None):
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
 
-    try:
-        response = ""
-        while True:
-            bytes = connection.recv(2048)
-            if not bytes:
-                break
+    if wait_for_response:
+        try:
+            response = ""
+            while True:
+                bytes = connection.recv(2048)
+                if not bytes:
+                    break
 
-            response += bytes.decode("ascii", "ignore")
-    except (socket.timeout, TimeoutError):
-        response = "(Connection timed out)"
+                response += bytes.decode("ascii", "ignore")
+        except (socket.timeout, TimeoutError):
+            response = "(Connection timed out)"
 
     try:
         connection.shutdown(socket.SHUT_RDWR)
@@ -559,7 +562,7 @@ def call_api(action, payload=None):
     connection.close()
 
     try:
-        return json.loads(response)
+        return json.loads(response) if wait_for_response else None
     except json.JSONDecodeError:
         return response
 
@@ -998,36 +1001,6 @@ def sets_to_lists(d: MutableMapping):
 
     return dict(_sets_to_lists_gen(d))
 
-
-def url_to_hash(url, remove_scheme=True, remove_www=True):
-    """
-    Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
-    rest of the URL.
-    """
-    parsed_url = urlparse(url.lower())
-    if parsed_url:
-        if remove_scheme:
-            parsed_url = parsed_url._replace(scheme="")
-        if remove_www:
-            netloc = re.sub(r"^www\.", "", parsed_url.netloc)
-            parsed_url = parsed_url._replace(netloc=netloc)
-
-        url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
-    else:
-        # Unable to parse URL; use regex
-        if remove_scheme:
-            url = re.sub(r"^https?://", "", url)
-        if remove_www:
-            if not remove_scheme:
-                scheme = re.match(r"^https?://", url).group()
-                temp_url = re.sub(r"^https?://", "", url)
-                url = scheme + re.sub(r"^www\.", "", temp_url)
-            else:
-                url = re.sub(r"^www\.", "", url)
-
-        url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
-
-    return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
 
 def folder_size(path='.'):
     """
