@@ -50,16 +50,16 @@ class SearchTikTok(Search):
             # from intercepted API response
             user_nickname = post["author"]["uniqueId"]
             user_fullname = post["author"]["nickname"]
-            user_id = post["author"]["id"]
+            user_thumbnail = post["author"].get("avatarThumb", "")
         elif post.get("author"):
             # from embedded JSON object
             user_nickname = post["author"]
             user_fullname = post["nickname"]
-            user_id = ""
+            user_thumbnail = ""
         else:
             user_nickname = ""
             user_fullname = ""
-            user_id = ""
+            user_thumbnail = ""
 
         # there are various thumbnail URLs, some of them expire later than
         # others. Try to get the highest-resolution one that hasn't expired
