@@ -161,6 +161,7 @@ class TikTokImageDownloader(BasicProcessor):
             "options": {
                 "thumbnail": "Video Thumbnail",
                 "music": "Music Thumbnail",
+                "author_avatar": "User avatar"
             },
             "default": "thumbnail"
         }
@@ -217,6 +218,8 @@ class TikTokImageDownloader(BasicProcessor):
             url_column = "thumbnail_url"
         elif self.parameters.get("thumb_type") == "music":
             url_column = "music_thumbnail"
+        elif self.parameters.get("thumb_type") == "author_avatar":
+            url_column = "author_avatar"
         else:
             self.dataset.update_status("No image column selected.", is_final=True)
             self.dataset.finish(0)
