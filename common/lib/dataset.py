@@ -15,7 +15,7 @@ from pathlib import Path
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, get_last_line
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -477,7 +477,7 @@ class DataSet(FourcatModule):
 			raise RuntimeError("Cannot finish a finished dataset again")
 
 		self.db.update("datasets", where={"key": self.data["key"]},
-					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
+					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0, "finished_at": int(time.time())})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
@@ -1098,22 +1098,6 @@ class DataSet(FourcatModule):
 		self.data["progress"] = progress
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"progress": progress})
 		return updated > 0
-
-	def get_last_update(self):
-		"""
-		Get the last update time of the dataset. If dataset is completed, this will be the last status update (usually
-		"Dataset Completed".
-
-		Returns None if there is no last update time.
-		"""
-		if self.get_log_path().exists():
-			try:
-				return datetime.datetime.strptime(get_last_line(self.get_log_path())[:24], "%c")
-			except ValueError as e:
-				# Unable to parse datetime from last line
-				return None
-		else:
-			return None
 
 	def get_progress(self):
 		"""

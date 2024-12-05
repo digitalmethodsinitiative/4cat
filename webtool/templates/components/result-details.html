@@ -76,10 +76,10 @@
                 {% endif %}
 
                     <div class="onequarter">
-                        {% if dataset.is_finished() and dataset.get_last_update() %}
+                        {% if dataset.is_finished() and dataset.finished_at %}
                             <dt>Finished</dt>
                             <dd>
-                                {{ dataset.get_last_update().timestamp()|int|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+                                {{ dataset.finished_at|int|datetime(fmt="%d %B %Y, %H:%M")|safe }}
                             </dd>
                         {% else %}
                             <dt>Created</dt>
