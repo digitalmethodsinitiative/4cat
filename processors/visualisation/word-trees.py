@@ -212,6 +212,12 @@ class MakeWordtree(BasicProcessor):
 			if processed % 500 == 0:
 				self.dataset.update_status("Processing and tokenising post %i" % processed)
 			body = post.get(column)
+			
+			try:
+				body = str(body)
+			except TypeError:
+				continue
+
 			if not body:
 				continue
 

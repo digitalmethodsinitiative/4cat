@@ -84,6 +84,12 @@ class ColumnNetworker(BasicProcessor):
             "default": False,
             "help": "Convert values to lowercase",
             "tooltip": "Merges values with varying cases"
+        },
+        "ignore-nodes": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "",
+            "help": "Nodes to ignore",
+            "tooltip": "Separate with commas if you want to ignore multiple nodes"
         }
     }
 
@@ -145,6 +151,7 @@ class ColumnNetworker(BasicProcessor):
         allow_loops = self.parameters.get("allow-loops")
         interval_type = self.parameters.get("interval")
         to_lower = self.parameters.get("to-lowercase", False)
+        ignoreable = [n.strip() for n in self.parameters.get("ignore-nodes", "").split(",") if n.strip()]
 
         processed = 0
 
@@ -192,6 +199,14 @@ class ColumnNetworker(BasicProcessor):
             if split_comma:
                 values_a = [value.strip() for value_groups in values_a for value in value_groups.split(",")]
                 values_b = [value.strip() for value_groups in values_b for value in value_groups.split(",")]
+
+            if ignoreable:
+                values_a = [v for v in values_a if v not in ignoreable]
+                values_b = [v for v in values_b if v not in ignoreable]
+
+            # only proceed if we actually have any edges left
+            if not values_a or not values_b:
+                continue
 
             try:
                 interval = get_interval_descriptor(item, interval_type)

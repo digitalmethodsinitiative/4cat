@@ -621,6 +621,10 @@ body.csv-preview table td, body.csv-preview table th {
     border: 1px solid var(--gray-light);
 }
 
+body.csv-preview table tr:nth-child(2n+1) {
+    background: var(--contrast-bright);
+}
+
 .child.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
 	display: none;
 }

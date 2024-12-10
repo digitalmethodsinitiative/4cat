@@ -237,6 +237,7 @@ class Tokenise(BasicProcessor):
 
 		The result is valid JSON, written in chunks.
 		"""
+		sentence_error = False
 		columns = self.parameters.get("columns")
 		if not columns:
 			self.dataset.update_status("No columns selected, aborting.", is_final=True)
@@ -370,11 +371,11 @@ class Tokenise(BasicProcessor):
 				# for russian we use a special purpose splitter with better
 				# performance
 				sentence_method = razdel.sentenize
-			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab')) if
-								'pickle' in lang]:
+			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab'))]:
 				self.dataset.update_status(
 					f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
 				sentence_method = dummy_function
+				sentence_error = True
 			else:
 				sentence_method = sent_tokenize
 		else:
@@ -507,6 +508,9 @@ class Tokenise(BasicProcessor):
 		metadata['parameters']['intervals'] = list(metadata['parameters']['intervals'])
 		with staging_area.joinpath(".token_metadata.json").open("w", encoding="utf-8") as outfile:
 			json.dump(metadata, outfile)
+
+		if sentence_error:
+			self.dataset.update_status(f"Finished tokenizing; Unable to group by sentence ({language} not supported), instead grouped by item.", is_final=True)
 
 		# create zip of archive and delete temporary files and folder
 		self.write_archive_and_finish(staging_area)
