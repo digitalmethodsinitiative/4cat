@@ -607,8 +607,8 @@ class VideoDownloaderPlus(BasicProcessor):
                 # Download video
                 self.dataset.update_status(
                     "Downloading %i/%i via requests: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
-                try:
-                    with open(results_path.joinpath(save_location), "wb") as f:
+                with open(results_path.joinpath(save_location), "wb") as f:
+                    try:
                         for chunk in response.iter_content(chunk_size=1024 * 1024):
                             if not max_video_size == 0 and f.tell() > (max_video_size * 1000000):
                                     # File size too large; stop download and remove file
@@ -616,8 +616,8 @@ class VideoDownloaderPlus(BasicProcessor):
                                     raise FilesizeException("Video size larger than maximum allowed per 4CAT")
                             if chunk:
                                 f.write(chunk)
-                except ChunkedEncodingError as e:
-                    raise FailedDownload(f"Failed to download video: {e}")
+                    except requests.exceptions.ChunkedEncodingError as e:
+                        raise FailedDownload(f"Failed to complete download: {e}")
 
                 # Return filename to add to metadata
                 return save_location.name
