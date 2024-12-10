@@ -3,6 +3,7 @@ Download videos
 
 First attempt to download via request, but if that fails use yt-dlp
 """
+import os
 import json
 import re
 import time
@@ -601,15 +602,22 @@ class VideoDownloaderPlus(BasicProcessor):
                                 f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT")
                     # Size unknown
                     elif not self.config.get("video-downloader.allow-unknown-size", False):
-                        FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
+                        raise FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
 
                 # Download video
                 self.dataset.update_status(
                     "Downloading %i/%i via requests: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
-                with open(results_path.joinpath(save_location), "wb") as f:
-                    for chunk in response.iter_content(chunk_size=1024 * 1024):
-                        if chunk:
-                            f.write(chunk)
+                try:
+                    with open(results_path.joinpath(save_location), "wb") as f:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if not max_video_size == 0 and f.tell() > (max_video_size * 1000000):
+                                    # File size too large; stop download and remove file
+                                    os.remove(f.name)
+                                    raise FilesizeException("Video size larger than maximum allowed per 4CAT")
+                            if chunk:
+                                f.write(chunk)
+                except ChunkedEncodingError as e:
+                    raise FailedDownload(f"Failed to download video: {e}")
 
                 # Return filename to add to metadata
                 return save_location.name
