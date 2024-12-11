@@ -23,7 +23,7 @@ class ExportDatasets(BasicProcessor):
 	type = "export-datasets"  # job type ID
 	category = "Conversion"  # category
 	title = "Export Dataset and All Analyses"  # title displayed in UI
-	description = "Creates a ZIP file containing the dataset and all analyses to be archived and uploaded to a 4CAT instance in the future. Automatically expires after 1 day, after which you must run again."  # description displayed in UI
+	description = "Creates a ZIP file containing the dataset and all analyses to be archived and uploaded to a 4CAT instance in the future. Filters are *not* included and must be exported separately as new datasets. Results automatically expires after 1 day, after which you must run again."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
