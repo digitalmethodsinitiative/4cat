@@ -7,6 +7,7 @@
 [![Docker image status](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml)
 
 <p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>
+
 <p align="center">4CAT has a website at <a href="https://4cat.nl">4cat.nl</a>.</p>
 <p align="center"><a href="https://bsky.app/profile/4cat.nl">Follow 4CAT on Bluesky</a> for updates.</p>
 4CAT is a research tool that can be used to analyse and process data from
