@@ -37,6 +37,18 @@ config_definition = {
                    "setting.",
         "indirect": True
     },
+    # Extensions
+    "extensions._intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT extensions can be disabled and disabled via the control below. When enabled, extensions may "
+                "define further settings that can typically be configured via the extension's tab on the left side of "
+                "this page. **Note that 4CAT needs to be restarted for this to take effect!**"
+    },
+    "extensions.enabled": {
+        "type": UserInput.OPTION_EXTENSIONS,
+        "default": {},
+        "help": "Extensions"
+    },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
     # notice may also show up in the web interface regardless of the value entered here.
@@ -148,6 +160,12 @@ config_definition = {
         "default": False,
         "help": "Can restart/upgrade",
         "tooltip": "Controls whether users can restart, upgrade, and manage extensions 4CAT via the Control Panel"
+    },
+    "privileges.admin.can_manage_extensions": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can manage extensions",
+        "tooltip": "Controls whether users can install and uninstall 4CAT extensions via the Control Panel"
     },
     "privileges.can_upgrade_to_dev": {
         # this is NOT an admin privilege, because all admins automatically
@@ -554,4 +572,5 @@ categories = {
     "dmi-service-manager": "DMI Service Manager",
     "ui": "User interface",
     "image-visuals": "Image visualization",
+    "extensions": "Extensions"
 }
