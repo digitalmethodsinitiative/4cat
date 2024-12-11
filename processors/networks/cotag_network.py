@@ -29,6 +29,13 @@ class CoTaggerPreset(ProcessorPreset):
             "default": True,
             "help": "Convert tags to lowercase",
             "tooltip": "Merges tags with varying cases"
+        },
+        "ignore-tags": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "",
+            "help": "Tags to ignore",
+            "tooltip": "Separate with commas if you want to ignore multiple tags. Do not include the '#' "
+                       "character."
         }
     }
 
@@ -72,6 +79,7 @@ class CoTaggerPreset(ProcessorPreset):
                     "split-comma": True,
                     "categorise": True,
                     "allow-loops": False,
+                    "ignore-nodes": self.parameters.get("ignore-tags", ""),
                     "to-lowercase": self.parameters.get("to-lowercase", True)
                 }
             }

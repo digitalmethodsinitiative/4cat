@@ -269,11 +269,11 @@ class ConfigManager:
 
             if not is_json and value is not None:
                 value = json.loads(value)
-            # TODO: check this as it feels like it could cause a default to return even if value is not None. - Dale
-            elif default is not None:
-                value = default
+            # TODO: Which default should have priority? The provided default feels like it should be the highest priority, but I think that is an old implementation and perhaps should be removed. - Dale
             elif value is None and setting_name in self.config_definition and "default" in self.config_definition[setting_name]:
                 value = self.config_definition[setting_name]["default"]
+            elif value is None and default is not None:
+                value = default
 
             final_settings[setting_name] = value
 

@@ -1,14 +1,16 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
-import hashlib
 import subprocess
+import imagehash
+import hashlib
 import requests
 import hashlib
 import datetime
 import smtplib
 import fnmatch
 import socket
+import shlex
 import copy
 import time
 import json
@@ -24,6 +26,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse, urlunparse
 from calendar import monthrange
 from packaging import version
+from PIL import Image
 
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -111,10 +114,8 @@ def get_git_branch():
     repository or git is not installed an empty string is returned.
     """
     try:
-        cwd = os.getcwd()
-        os.chdir(config.get('PATH_ROOT'))
-        branch = subprocess.run(["git", "branch", "--show-current"], stdout=subprocess.PIPE)
-        os.chdir(cwd)
+        root_dir = str(config.get('PATH_ROOT').resolve())
+        branch = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
         return branch.stdout.decode("utf-8").strip()
@@ -144,7 +145,6 @@ def get_software_commit(worker=None):
     # try git command line within the 4CAT root folder
     # if it is a checked-out git repository, it will tell us the hash of
     # the currently checked-out commit
-    cwd = os.getcwd()
 
     # path has no Path.relative()...
     relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
@@ -154,24 +154,24 @@ def get_software_commit(worker=None):
         # useful version info (since the extension is by definition not in the
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
-            extension_dir = config.get("PATH_ROOT").joinpath(relative_filepath)
-            os.chdir(extension_dir)
+            working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
-            repo_level = subprocess.run(["git", "rev-parse", "--show-toplevel"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            git_cmd = f"git -C {shlex.quote(working_dir)} rev-parse --show-toplevel"
+            repo_level = subprocess.run(shlex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
                 # not its own repository
                 return ("", "")
 
         else:
-            os.chdir(config.get("PATH_ROOT"))
+            working_dir = str(config.get("PATH_ROOT").resolve())
 
-        show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        show = subprocess.run(shlex.split(f"git -C {shlex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if show.returncode != 0:
             raise ValueError()
         commit = show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
 
         # now get the repository the commit belongs to, if we can
-        origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        origin = subprocess.run(shlex.split(f"git -C {shlex.quote(working_dir)} config --get remote.origin.url"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if origin.returncode != 0 or not origin.stdout:
             raise ValueError()
         repository = origin.stdout.decode("utf-8").strip()
@@ -180,9 +180,6 @@ def get_software_commit(worker=None):
 
     except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
         return ("", "")
-
-    finally:
-        os.chdir(cwd)
 
     return (commit, repository)
 
@@ -279,7 +276,6 @@ def find_extensions():
 
     # collect metadata for extensions
     allowed_metadata_keys = ("name", "version", "url")
-    cwd = os.getcwd()
     for extension in extensions:
         extension_folder = extension_path.joinpath(extension)
         metadata_file = extension_folder.joinpath("metadata.json")
@@ -296,8 +292,8 @@ def find_extensions():
         if extensions[extension]["is_git"]:
             # try to get remote URL
             try:
-                os.chdir(extension_folder)
-                origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE,
+                extension_root = str(extension_folder.resolve())
+                origin = subprocess.run(shlex.split(f"git -C {shlex.quote(extension_root)} config --get remote.origin.url"), stderr=subprocess.PIPE,
                                         stdout=subprocess.PIPE)
                 if origin.returncode != 0 or not origin.stdout:
                     raise ValueError()
@@ -309,8 +305,6 @@ def find_extensions():
             except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
                 print(e)
                 pass
-            finally:
-                os.chdir(cwd)
 
     return extensions, errors
 
@@ -420,6 +414,37 @@ def andify(items):
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
 
+
+def hash_file(image_file, hash_type="file-hash"):
+    """
+    Generate an image hash
+
+    :param Path image_file:  Image file to hash
+    :param str hash_type:  Hash type, one of `file-hash`, `colorhash`,
+    `phash`, `average_hash`, `dhash`
+    :return str:  Hexadecimal hash value
+    """
+    if not image_file.exists():
+        raise FileNotFoundError()
+
+    if hash_type == "file-hash":
+        hasher = hashlib.sha1()
+
+        # Open the file in binary mode
+        with image_file.open("rb") as infile:
+            # Read and update hash in chunks to handle large files
+            while chunk := infile.read(1024):
+                hasher.update(chunk)
+
+        return hasher.hexdigest()
+
+    elif hash_type in ("colorhash", "phash", "average_hash", "dhash"):
+        image = Image.open(image_file)
+
+        return str(getattr(imagehash, hash_type)(image))
+
+    else:
+        raise NotImplementedError(f"Unknown hash type '{hash_type}'")
 
 def get_yt_compatible_ids(yt_ids):
     """
