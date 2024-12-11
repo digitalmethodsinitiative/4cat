@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   num_rows          integer DEFAULT 0,
   progress          float DEFAULT 0.0,
   is_finished       boolean DEFAULT FALSE,
+  finished_at       integer DEFAULT NULL,
   is_private        boolean DEFAULT TRUE,
   software_version  text,
   software_file     text DEFAULT '',
