@@ -35,6 +35,7 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
+    OPTION_DATASOURCES_TABLE = "datasources_table" # a table with settings per data source
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
@@ -142,6 +143,21 @@ class UserInput:
 
                 parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
                 parsed_input[option.split(".")[0] + ".expiration"] = datasources
+
+            elif settings.get("type") == UserInput.OPTION_DATASOURCES_TABLE:
+                # special case, parse table values to generate a dict
+                columns = list(settings["columns"].keys())
+                table_input = {}
+
+                for datasource in list(settings["default"].keys()):
+                    table_input[datasource] = {}
+                    for column in columns:
+
+                        choice = input.get(option + "-" + datasource + "-" + column, False)
+                        column_settings = settings["columns"][column] # sub-settings per column
+                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
+
+                parsed_input[option] = table_input
 
             elif option not in input:
                 # not provided? use default

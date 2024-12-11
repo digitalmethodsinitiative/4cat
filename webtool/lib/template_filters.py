@@ -10,14 +10,17 @@ import math
 import os
 import re
 import requests
+import regex
 
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
 from common.lib.helpers import timify_long
 from common.config_manager import ConfigWrapper
 
+from pathlib import Path
 from flask import request
 from flask_login import current_user
+from ural import urls_from_text
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
@@ -206,6 +209,44 @@ def _jinja2_filter_extension_to_noun(ext):
 	else:
 		return "item"
 
+
+@app.template_filter('social_mediafy')
+def _jinja2_filter_social_mediafy(body, datasource=""):
+	# Adds links to a text body with hashtags, @-mentions, and URLs
+	# A data source must be given to generate the correct URLs.
+
+	if not datasource:
+		return body
+
+	# Base URLs after which tags and @-mentions follow, per platform
+	base_urls = {
+		"twitter": {
+			"hashtag": "https://twitter.com/hashtag/",
+			"mention": "https://twitter.com/"
+		},
+		"tiktok": {
+			"hashtag": "https://tiktok.com/tag/",
+			"mention": "https://tiktok.com/@"
+		},
+		"instagram": {
+			"hasthag": "https://instagram.com/explore/tags/",
+			"mention": "https://instagram.com/"
+		},
+		"tumblr": {
+			"mention": "https://tumblr.com/",
+			"markdown": True
+			# Hashtags aren't linked in the post body
+		},
+		"linkedin": {
+			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
+			"mention": "https://linkedin.com/in/"
+		},
+		"telegram": {
+			"markdown": True
+		}
+	}
+
+  
 @app.template_filter("ellipsiate")
 def _jinja2_filter_ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
 	if len(text) <= length:
@@ -375,6 +416,53 @@ def _jinja2_filter_post_field(field, post):
 
 	return formatted_field
 
+	# Supported data sources
+	known_datasources = list(base_urls.keys())
+	if datasource not in known_datasources:
+		return body
+
+	# Add URL links
+	if not base_urls[datasource].get("markdown"):
+		for url in urls_from_text(body):
+			body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
+
+	# Add hashtag links
+	if "hashtag"  in base_urls[datasource]:
+		tags = re.findall(r"#[\w0-9]+", body)
+		# We're sorting tags by length so we don't incorrectly
+		# replace tags that are a substring of another, longer tag.
+		tags = sorted(tags, key=lambda x: len(x), reverse=True)
+		for tag in tags:
+			# Match the string, but not if it's preceded by a >, which indicates that we've already added an anchor tag.
+			body = re.sub(r"(?<!'>)(" + tag + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag), body)
+
+	# Add @-mention links
+	if "mention"  in base_urls[datasource]:
+		mentions = re.findall(r"@[\w0-9-]+", body)
+		mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
+		for mention in mentions:
+			body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["mention"] + mention[1:], mention), body)
+
+	return body
+
+@app.template_filter('string_counter')
+def _jinja2_filter_string_counter(string, emoji=False):
+	# Returns a dictionary with counts of characters in a string.
+	# Also handles emojis.
+
+	# We need to convert multi-character emojis ("graphemes") to one character.
+	if emoji == True:
+		string = regex.finditer(r"\X", string) # \X matches graphemes
+		string = [m.group(0) for m in string]
+
+	# Count 'em
+	counter = {}
+	for s in string:
+		if s not in counter:
+			counter[s] = 0
+		counter[s] += 1
+
+	return counter
 
 @app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):

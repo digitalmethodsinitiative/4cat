@@ -58,7 +58,7 @@ class ConvertCSVToMacExcel(BasicProcessor):
 		)
 
 		# recreate CSV file with the new dialect
-		with self.dataset.get_results_path().open("w") as output:
+		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
 			fieldnames = self.source_dataset.get_item_keys(self)
 
 			writer = csv.DictWriter(output, fieldnames=fieldnames, dialect="excel-mac")

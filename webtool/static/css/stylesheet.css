@@ -493,6 +493,10 @@ button.tooltip-trigger {
     border-color: var(--gray-dark);
 }
 
+p[role=tooltip] > .tooltip-line {
+    display: inline-block;
+}
+
 
 /** --------------------- *
           Tab containers
@@ -954,6 +958,11 @@ article section.data-overview .description {
 .pagination li.page a:hover, .pagination li.page a:focus {
 	background: var(--accent);
     color: var(--contrast-bright);
+}
+
+.pagination .details {
+    margin: 0 auto;
+    text-align: center;
 }
 
 .tabs {
