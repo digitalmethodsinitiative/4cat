@@ -56,7 +56,6 @@ class Database:
 		:param int tries: Number of tries to reconnect
         :param int wait: Time to wait between tries (first try is immediate)
 		"""
-		self.log.warning("Reconnecting to database...")
 		for i in range(tries):
 			try:
 				self.connection = psycopg2.connect(dbname=self.connection.info.dbname,
@@ -88,6 +87,7 @@ class Database:
 		try:
 			cursor.execute(query, replacements)
 		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+			self.log.warning(f"Database Exception: {e}\nReconnecting and retrying query...")
 			self.reconnect()
 			cursor = self.get_cursor()
 			cursor.execute(query, replacements)
@@ -131,6 +131,7 @@ class Database:
 		try:
 			execute_values(cursor, query, replacements)
 		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+			self.log.warning(f"Database Exception: {e}\nReconnecting and retrying query...")
 			self.reconnect()
 			cursor = self.get_cursor()
 			execute_values(cursor, query, replacements)
@@ -430,6 +431,7 @@ class Database:
 		"""
 		try:
 			return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-		except (psycopg2.InterfaceError, psycopg2.OperationalError):
+		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+			self.log.warning(f"Database Exception: {e}\nReconnecting and retrying query...")
 			self.reconnect()
 			return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
