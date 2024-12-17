@@ -151,7 +151,8 @@ class SearchImportFromFourcat(BasicProcessor):
             parent_child_mapping = {}
             for file in metadata_files:
                 with zip_ref.open(file) as f:
-                    metadata = json.load(f)
+                    content = f.read().decode('utf-8')  # Decode the binary content using the desired encoding
+                    metadata = json.loads(content)
                     if not metadata.get("key_parent"):
                         primary_dataset_keys.add(metadata.get("key"))
                         datasets.append(metadata)

@@ -88,7 +88,9 @@
 		{% endif %}
 		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
 		  <li><a href="{{ url_for('show_page', page='issues') }}">Help &amp; Bug Reports</a></li>
+		{% if current_user.is_authenticated %}
           <li><abbr title="Version">v</abbr>{{ __version }}</li>
+        {% endif %}
 		  <li><a href="https://www.oilab.eu">OILab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
 	</nav>
