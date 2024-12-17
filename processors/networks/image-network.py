@@ -44,7 +44,8 @@ class ImageGrapher(BasicProcessor):
                 if parent.get_columns():
                     root_dataset = parent
                     break
-            columns = root_dataset.get_columns()
+            if root_dataset:
+                columns = root_dataset.get_columns()
 
         return {
             "column": {
