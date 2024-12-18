@@ -37,15 +37,8 @@ class ImageGrapher(BasicProcessor):
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
-        root_dataset = None
-        columns = None
-        if parent_dataset:
-            for parent in reversed(parent_dataset.get_genealogy()):
-                if parent.get_columns():
-                    root_dataset = parent
-                    break
-            if root_dataset:
-                columns = root_dataset.get_columns()
+        root_dataset = cls.get_root_dataset(parent_dataset)
+        columns = root_dataset.get_columns() if root_dataset else None
 
         return {
             "column": {
@@ -89,13 +82,30 @@ class ImageGrapher(BasicProcessor):
         }
 
     @classmethod
+    def get_root_dataset(cls, dataset):
+        """
+        Get the root dataset of a dataset
+
+        This relies on image datasets not having columns
+
+        :param dataset: The dataset to get the root dataset of
+        :return: The root dataset else None
+        """
+        if not dataset:
+            return None
+        for parent in reversed(dataset.get_genealogy()):
+            if parent.get_columns():
+                return parent
+        return None
+
+    @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
         Allow processor to run on images downloaded from a dataset
 
         :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader")
+        return module.type.startswith("image-downloader") and cls.get_root_dataset(module)
 
     def process(self):
         column = self.parameters.get("column")
@@ -145,12 +155,7 @@ class ImageGrapher(BasicProcessor):
                     item_id = "-".join(details["filename"].split("-")[:-1]) + "-" + str(item_id)
                 id_file_map[item_id] = details["filename"]
 
-        root_dataset = None
-        for parent in reversed(self.dataset.get_genealogy()):
-            if parent.get_columns():
-                root_dataset = parent
-                break
-
+        root_dataset = self.get_root_dataset(self.dataset)
         if not root_dataset:
             return self.dataset.finish_with_error("No suitable parent dataset found - this processor can only "
                                                   "be run on sets of images sourced from another 4CAT dataset.")
