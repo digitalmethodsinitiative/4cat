@@ -306,9 +306,10 @@ class VideoDownloaderPlus(BasicProcessor):
         max_size = str(max_video_size) + "M"
         if not max_video_size == 0:
             if allow_unknown_sizes:
-                ydl_opts["format"] = f"[filesize<?{max_size}]/[filesize_approx<?{max_size}]"
+                # Note the combination of bestvideo+bestaudio means we double the size of the video allowed (but halfing would not be accurate either...)
+                ydl_opts["format"] = f"[filesize<?{max_size}]/[filesize_approx<?{max_size}]/bestvideo[filesize<?{max_size}]+bestaudio[filesize<?{max_size}]/bestvideo[filesize_approx<?{max_size}]+bestaudio[filesize_approx<?{max_size}]"
             else:
-                ydl_opts["format"] = f"[filesize<{max_size}]/[filesize_approx<{max_size}]"
+                ydl_opts["format"] = f"[filesize<{max_size}]/[filesize_approx<{max_size}]/bestvideo[filesize<{max_size}]+bestaudio[filesize<{max_size}]/bestvideo[filesize_approx<{max_size}]+bestaudio[filesize_approx<{max_size}]"
 
         # Loop through video URLs and download
         self.downloaded_videos = 0
