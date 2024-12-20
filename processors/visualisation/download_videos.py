@@ -12,6 +12,7 @@ from pathlib import Path
 import requests
 import yt_dlp
 from ural import urls_from_text
+from urllib.parse import urlparse
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
@@ -316,6 +317,8 @@ class VideoDownloaderPlus(BasicProcessor):
         failed_downloads = 0
         copied_videos = 0
         consecutive_errors = 0
+        not_a_video = 0
+        last_domains = []
         self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
         yt_dlp_archive_map = {}
         for url in urls:
@@ -325,9 +328,10 @@ class VideoDownloaderPlus(BasicProcessor):
                 if previous_vid_metadata.get('success', False):
                     # Use previous downloaded video
                     try:
+                        self.dataset.log(f"Copying previously downloaded video for url: {url}")
                         num_copied = self.copy_previous_video(previous_vid_metadata, results_path, vid_lib.previous_downloaders)
                         urls[url] = previous_vid_metadata
-                        self.dataset.log(f"Copied previously downloaded video to current dataset for url: {url}")
+                        self.dataset.update_status(f"Copied previously downloaded video to current dataset.")
                         copied_videos += num_copied
                         continue
                     except FailedToCopy as e:
@@ -340,11 +344,13 @@ class VideoDownloaderPlus(BasicProcessor):
 
             urls[url]["success"] = False
             urls[url]["retry"] = True
+            last_domains = last_domains[-4:] + [urlparse(url).netloc]
 
             # Stop processing if worker has been asked to stop or max downloads reached
             if self.downloaded_videos >= amount and amount != 0:
                 urls[url]["error"] = "Max video download limit already reached."
                 continue
+
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
@@ -356,7 +362,17 @@ class VideoDownloaderPlus(BasicProcessor):
                 else:
                     message = "Downloaded %i videos. Errors %i consecutive times; check logs to ensure " \
                               "video URLs are working links and you are not being blocked." % (self.downloaded_videos, consecutive_errors)
-                self.dataset.update_status(message, is_final=True)
+                elf.dataset.update_status(message, is_final=True)
+                if self.downloaded_videos == 0:
+                    self.dataset.finish(0)
+                    return
+                else:
+                    # Finish processor with already downloaded videos
+                    break
+            if not_a_video >= 10 and last_domains.count(urlparse(url).netloc) == 5:
+                # This processor can be used to extract all links from text body and attempt to download any with videos
+                # If the same domain is encountered 5 times in a row and no links are to videos, we are assuming the user has poorly chosen their columns and no videos will be found
+                self.dataset.update_status(f"Too many consecutive non-video URLs encountered; {'try again with Non-direct videos option selected' if self.config.get('video-downloader.allow-indirect') else 'try extracting URLs and filtering dataset first'}.", is_final=True)
                 if self.downloaded_videos == 0:
                     self.dataset.finish(0)
                     return
@@ -407,7 +423,7 @@ class VideoDownloaderPlus(BasicProcessor):
                                                                     :100] + '_%(autonumber)s.%(ext)s'
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         # Count and use self.yt_dlp_monitor() to ensure sure we don't download videos forever...
-                        self.url_files = []
+                        self.url_files = {}
                         self.last_dl_status = {}
                         self.last_post_process_status = {}
                         self.dataset.update_status("Downloading %i/%i via yt-dlp: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
@@ -424,7 +440,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             with yt_dlp.YoutubeDL({"socket_timeout": 30}) as ydl2:
                                 info2 = ydl2.extract_info(url, download=False)
                                 if info2:
-                                    self.url_files.append(yt_dlp_archive_map[info2.get('extractor') + info2.get('id')])
+                                    self.url_files[info2.get('_filename', {})] = yt_dlp_archive_map[info2.get('extractor') + info2.get('id')]
                                     self.dataset.log("Already downloaded video associated with: %s" % url)
                                 else:
                                     message = f"Video identified, but unable to identify which video from {url}"
@@ -468,9 +484,9 @@ class VideoDownloaderPlus(BasicProcessor):
 
                     # Add file data collected by YT-DLP
                     urls[url]["downloader"] = "yt_dlp"
-                    urls[url]['files'] = self.url_files
+                    urls[url]['files'] = list(self.url_files.values())
                     # Add to archive mapping in case needed
-                    for file in self.url_files:
+                    for file in self.url_files.values():
                         yt_dlp_archive_map[
                             file.get('metadata').get('extractor') + file.get('metadata').get('id')] = file
 
@@ -480,13 +496,18 @@ class VideoDownloaderPlus(BasicProcessor):
 
                 else:
                     # No YT-DLP; move on
-                    self.dataset.log(f"Unknown Request Error: {str(e)}")
+                    self.dataset.log(f"NotVideoLinkError: {str(e)}")
+                    not_a_video += 1
                     urls[url]["error"] = str(e)
+                    if last_domains.count(urlparse(url).netloc) >= 2:
+                        # Same domain encountered at least twice; let's wait before getting blocked
+                        time.sleep(5 * not_a_video)
                     continue
 
             urls[url]["success"] = success
             if success:
                 consecutive_errors = 0
+                not_a_video = 0
 
             # Update status
             self.downloaded_videos += len(self.videos_downloaded_from_url)
@@ -495,6 +516,7 @@ class VideoDownloaderPlus(BasicProcessor):
                                        (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""))
             self.dataset.update_progress(self.downloaded_videos / self.total_possible_videos)
 
+        self.dataset.update_status("Updating and saving metadata")
         # Save some metadata to be able to connect the videos to their source
         metadata = {
             url: {
@@ -510,7 +532,8 @@ class VideoDownloaderPlus(BasicProcessor):
         self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos" +
                                    (f"; videos copied from {copied_videos} previous downloads" if copied_videos > 0 else "") +
                                    (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""), is_final=True)
-        self.write_archive_and_finish(results_path, len([x for x in urls.values() if x.get('success')]))
+        self.dataset.update_status("Writing downloaded videos to zip archive")
+        self.write_archive_and_finish(results_path, self.downloaded_videos+copied_videos)
 
     def yt_dlp_monitor(self, d):
         """
@@ -534,11 +557,11 @@ class VideoDownloaderPlus(BasicProcessor):
         self.last_post_process_status = d
         if d['status'] == 'finished':  # "downloading", "error", or "finished"
             self.videos_downloaded_from_url.add(d.get('info_dict',{}).get('_filename', {}))
-            self.url_files.append({
+            self.url_files[d.get('info_dict',{}).get('_filename', {})] = {
                 "filename": Path(d.get('info_dict').get('_filename')).name,
                 "metadata": d.get('info_dict'),
                 "success": True
-            })
+            }
 
         # Make sure we can stop downloads
         if self.interrupted:
@@ -714,6 +737,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 if file.get("filename") not in archive_contents:
                     raise FailedToCopy(f"Previously downloaded video {file.get('filename')} not found")
 
+                self.dataset.log(f"Copying previously downloaded video {file.get('filename')} to new staging area")
                 archive_file.extract(file.get("filename"), staging_area)
                 num_copied += 1
 
