@@ -4,17 +4,26 @@ Default 4CAT Configuration Options
 Possible options and their default values. Options are actually set in 4CAT"s
 Database. Additional options can be defined in Data sources or Processors as
 `config` objects.
+
+The order of th dictionary below determines the order of the settings in the interface.
+
 """
 from common.lib.user_input import UserInput
 import json
 
 config_definition = {
-    "datasources._intro": {
+    "datasources.intro": {
         "type": UserInput.OPTION_INFO,
         "help": "Data sources enabled below will be offered to people on the 'Create Dataset' page. Additionally, "
                 "people can upload datasets for these by for example exporting them with "
                 "[Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) to this 4CAT instance.\n\n"
                 "Some data sources offer further settings which may be configured on other tabs."
+    },
+    "datasources.intro2": {
+        "type": UserInput.OPTION_INFO,
+        "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
+                "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
+                "expiration status of existing datasets."
     },
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
@@ -22,12 +31,6 @@ config_definition = {
                     "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
-    },
-    "datasources._intro2": {
-        "type": UserInput.OPTION_INFO,
-        "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
-                "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
-                "expiration status of existing datasets."
     },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
@@ -109,8 +112,8 @@ config_definition = {
     "privileges.can_use_explorer": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
-        "help": "Can use explorer",
-        "tooltip": "Controls whether users can use the Explorer feature to navigate datasets."
+        "help": "Can use Explorer",
+        "tooltip": "Controls whether users can use the Explorer feature to analyse and annotate datasets."
     },
     "privileges.can_export_datasets": {
         "type": UserInput.OPTION_TOGGLE,
@@ -302,13 +305,18 @@ config_definition = {
         "global": True
     },
     # Explorer settings
-    # The maximum allowed amount of rows (prevents timeouts and memory errors)
+    "explorer.basic-explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT's Explorer feature lets you navigate and annotate datasets as if they "
+                "appared on their original platform. This is intended to facilitate qualitative "
+                "exploration and manual coding."
+    },
     "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
         "help": "Amount of posts",
         "coerce_type": int,
-        "tooltip": "Amount of posts to show in Explorer. The maximum allowed amount of rows (prevents timeouts and "
+        "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
     "explorer.posts_per_page": {
@@ -316,7 +324,29 @@ config_definition = {
         "default": 50,
         "help": "Posts per page",
         "coerce_type": int,
-        "tooltip": "Posts to display per page"
+        "tooltip": "Number of posts to display per page"
+    },
+    "explorer.config_explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "Per data source, you can enable or disable the Explorer. Posts will be formatted through a <em>generic</em> template "
+                "made of [this HTML file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/templates/explorer/"
+                "templates/generic.html) and [this CSS file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/"
+                "static/css/explorer/generic.css). For various data sources, <em>data source-specific</em> templates are also available. "
+                "These are made of a custom HTML template in [this directory](https://github.com/digitalmethodsinitiative/4cat/tree/master/"
+                "webtool/datasource-templates/explorer/templates) and a custom CSS file [in this directory](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer)."
+    },
+    "explorer.config": {
+        "type": UserInput.OPTION_DATASOURCES_TABLE,
+        "help": "Explorer settings per data source",
+        "default": {"fourchan": {"enabled": True}, "eightchan": {"enabled": True}, "eightkun": {"enabled": True}, "ninegag": {"enabled": True}, "bitchute": {"enabled": True}, "dmi-tcat": {"enabled": True}, "dmi-tcatv2": {"enabled": True}, "douban": {"enabled": True}, "douyin": {"enabled": False}, "imgur": {"enabled": True}, "upload": {"enabled": True}, "instagram": {"enabled": True}, "linkedin": {"enabled": True}, "parler": {"enabled": True}, "reddit": {"enabled": True}, "telegram": {"enabled": True}, "tiktok": {"enabled": True}, "tiktok-urls": {"enabled": True}, "tumblr": {"enabled": True}, "twitter": {"enabled": True}, "twitterv2": {"enabled": True}, "usenet": {"enabled": True}, "vk": {"enabled": True}},
+        "columns": {
+            "enabled": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Enable Explorer",
+                "tooltip": "Whether the Explorer is available for this data source",
+                "default": True
+            }
+        }
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
@@ -544,7 +574,7 @@ categories = {
     "4cat": "4CAT Tool settings",
     "api": "API credentials",
     "flask": "Flask settings",
-    "explorer": "Data Explorer",
+    "explorer": "Explorer",
     "datasources": "Data sources",
     "expire": "Dataset expiration settings",
     "mail": "Mail settings & credentials",
