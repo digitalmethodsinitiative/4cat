@@ -189,7 +189,7 @@ class VideoHasher(BasicProcessor):
 
 		video_hashes = {}
 		video_metadata = None
-		total_possible_videos = min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = max((min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
 		processed_videos = 0
 
 		self.dataset.update_status("Creating video hashes")
