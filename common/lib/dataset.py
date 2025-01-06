@@ -1338,6 +1338,10 @@ class DataSet(FourcatModule):
 			if processor.is_from_collector():
 				continue
 
+			own_processor = self.get_own_processor()
+			if own_processor and own_processor.exclude_followup_processors(processor_type):
+				continue
+
 			# consider a processor compatible if its is_compatible_with
 			# method returns True *or* if it has no explicit compatibility
 			# check and this dataset is top-level (i.e. has no parent)
