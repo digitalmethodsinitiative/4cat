@@ -155,7 +155,7 @@ class DmiServiceManager:
         existing_service = self.check_service_exists()
         if existing_service:
             if len(existing_service) > 1:
-                raise Exception("Multiple services found with the same dataset key.")
+                raise DmiServiceManagerException("Multiple services found with the same dataset key.")
             else:
                 existing_service = existing_service[0]
                 if existing_service['status'] == 'complete':
@@ -176,7 +176,7 @@ class DmiServiceManager:
             try:
                 resp = requests.post(api_endpoint, json=data, timeout=30)
             except requests.exceptions.ConnectionError as e :
-                raise DmiServiceManagerException(f"Unable to connect to DMI Service Manager server: {str(e)}")
+                raise DsmConnectionError(f"Unable to connect to DMI Service Manager server: {str(e)}")
 
             if resp.status_code == 202:
                 # New request successful
@@ -186,10 +186,10 @@ class DmiServiceManager:
                     resp_json = resp.json()
                     if resp.status_code == 400 and 'key' in resp_json and 'error' in resp_json and resp_json['error'] == f"future_key {resp_json['key']} already exists":
                         # Request already exists; get DMI SM database key
-                        raise Exception(f"Request already exists; check that DMI SM is up to date")
+                        raise DmiServiceManagerException(f"Request already exists; check that DMI SM is up to date")
                     elif resp.status_code == 404:
                         # Could be local vs remote not set correctly
-                        raise DmiServiceManagerException(f"404: {resp.url} not found; DMI Service Manager may not be set up for this service")
+                        raise DsmConnectionError(f"404: {resp.url} not found; DMI Service Manager may not be set up for this service")
                     else:
                         raise DmiServiceManagerException(f"DMI Service Manager error: {str(resp.status_code)}: {str(resp_json)}")
                 except JSONDecodeError:
@@ -221,14 +221,14 @@ class DmiServiceManager:
                     # Have seen the Service Manager fail particularly when another processor is uploading many consecutive files
                     connection_error += 1
                     if connection_error > 3:
-                        raise DmiServiceManagerException(f"Unable to connect to DMI Service Manager server: {str(e)}")
+                        raise DsmConnectionError(f"Unable to connect to DMI Service Manager server: {str(e)}")
                     continue
 
                 if result.status_code != 200 or (result.json and result.json().get('status') != "success"):
                     # Unexpected response from DMI SM
                     connection_error += 1
                     if connection_error > 3:
-                        raise DmiServiceManagerException(f"Unable to connect to DMI Service Manager server: {str(result.status_code)}: {str(result.json()) if 'json' in result.headers.get('Content-Type', '') else str(result.text)}")
+                        raise DsmConnectionError(f"Unable to connect to DMI Service Manager server: {str(result.status_code)}: {str(result.json()) if 'json' in result.headers.get('Content-Type', '') else str(result.text)}")
                     continue
                 service_status = result.json()["job"]
 
@@ -255,7 +255,7 @@ class DmiServiceManager:
                 elif service_status['status'] in ["complete", "error"]:
                     results = json.loads(service_status['results'])
                     if not results:
-                        # This should not be the case is the service was written well (unless the DMI SM crashed?)
+                        # This should not be the case if the service was written well (unless the DMI SM crashed?)
                         #TODO test if timing issue?
                         connection_error += 1
                         if connection_error > 3:
@@ -268,7 +268,7 @@ class DmiServiceManager:
                     else:
                         error = results['error']
                         if "CUDA error: out of memory" in error:
-                            raise DmiServiceManagerException("DMI Service Manager server ran out of memory; try reducing the number of files processed at once or waiting until the server is less busy.")
+                            raise DsmOutOfMemory("DMI Service Manager server ran out of memory; try reducing the number of files processed at once or waiting until the server is less busy.")
                         else:
                             raise DmiServiceManagerException(f"Error {service_endpoint}: " + error)
                 else:
@@ -308,14 +308,14 @@ class DmiServiceManager:
             except requests.exceptions.ConnectionError as e:
                 retries += 1
                 if retries > 3:
-                    raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading files from: {folder_name}")
+                    raise DsmConnectionError(f"Connection Error {e} (retries {retries}) while downloading files from: {folder_name}")
                 continue
 
         # Check if 4CAT has access to this server
         if filename_response.status_code == 403:
-            raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
+            raise DsmConnectionError("403: 4CAT does not have permission to use the DMI Service Manager server")
         elif filename_response.status_code in [400, 405]:
-            raise DmiServiceManagerException(f"400: DMI Service Manager server {filename_response.json()['reason']}")
+            raise DsmConnectionError(f"400: DMI Service Manager server {filename_response.json()['reason']}")
         elif filename_response.status_code == 404:
             # Folder not found; no files
             return {}
@@ -388,9 +388,9 @@ class DmiServiceManager:
                         self.processor.dataset.update_status(f"Uploaded {files_uploaded} of {total_files_to_upload} files!")
                     self.processor.dataset.update_progress(files_uploaded / total_files_to_upload)
                 elif response.status_code == 403:
-                    raise DmiServiceManagerException("403: 4CAT does not have permission to use the DMI Service Manager server")
+                    raise DsmConnectionError("403: 4CAT does not have permission to use the DMI Service Manager server")
                 elif response.status_code == 405:
-                    raise DmiServiceManagerException("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
+                    raise DsmConnectionError("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
                 else:
                     self.processor.dataset.log(f"Unable to upload file ({response.status_code} - {response.reason}): {upload_file}")
 
@@ -432,7 +432,7 @@ class DmiServiceManager:
                 except requests.exceptions.ConnectionError as e:
                     retries += 1
                     if retries > 3:
-                        raise DmiServiceManagerException(f"Connection Error {e} (retries {retries}) while downloading file: {folder_name}/{filename}")
+                        raise DsmConnectionError(f"Connection Error {e} (retries {retries}) while downloading file: {folder_name}/{filename}")
                     continue
             files_downloaded += 1
             if files_downloaded % 1000 == 0:
