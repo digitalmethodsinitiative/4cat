@@ -182,7 +182,7 @@ class ImageTextDetector(BasicProcessor):
             try:
                 self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
                 metadata_exists = True
-            except KeyError:
+            except FileNotFoundError:
                 self.dataset.update_status("No metadata file found")
                 metadata_exists = False
         else:
