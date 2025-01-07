@@ -42,7 +42,7 @@ packages = set([
 	"praw~=7.0",
 	"prawcore~=2.0",
 	"psutil~=5.0",
-	#"psycopg2~=2.9.0",
+	"psycopg2~=2.9.0",
 	"pyahocorasick~=1.4.0",
 	"PyMySQL~=1.0",
 	"PyTumblr==0.1.0",
