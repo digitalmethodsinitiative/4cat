@@ -1,4 +1,4 @@
-# Add finished_at column to datasets table
+# Add timestamp_finished column to datasets table
 import json
 import sys
 import os
@@ -23,12 +23,12 @@ db_config = ini["DATABASE"]
 db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
               host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
 
-print("  Checking if datasets table has a column 'finished_at'...")
+print("  Checking if datasets table has a column 'timestamp_finished'...")
 has_column = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'finished_at'")
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'timestamp_finished'")
 if has_column["num"] == 0:
     print("  ...No, adding.")
-    db.execute("ALTER TABLE datasets ADD COLUMN finished_at INTEGER DEFAULT NULL")
+    db.execute("ALTER TABLE datasets ADD COLUMN timestamp_finished INTEGER DEFAULT NULL")
     print("  ...Added column. Updating datasets with information based on logs.")
     dataset_ids = db.fetchall("SELECT key FROM datasets WHERE is_finished = TRUE")
     unable_to_update = []
@@ -40,19 +40,19 @@ if has_column["num"] == 0:
 
         if dataset.get_log_path().exists():
             try:
-                finished_at = datetime.datetime.strptime(get_last_line(dataset.get_log_path())[:24], "%c")
-                update_data.append((key, int(finished_at.timestamp())))
+                timestamp_finished = datetime.datetime.strptime(get_last_line(dataset.get_log_path())[:24], "%c")
+                update_data.append((key, int(timestamp_finished.timestamp())))
             except ValueError as e:
                 # Unable to parse datetime from last line
                 print(f" ...Unable to parse datetime from last line for dataset {key}: {e}")
                 unable_to_update.append(key)
         else:
-            # No log file; unable to determine finished_at
-            print(f" ...Unable to determine finished_at for dataset {key}; no log file.")
+            # No log file; unable to determine timestamp_finished
+            print(f" ...Unable to determine timestamp_finished for dataset {key}; no log file.")
             unable_to_update.append(key)
 
     if update_data:
-        db.execute_many("UPDATE datasets SET finished_at = data.finished_at FROM (VALUES %s) AS data (key, finished_at) WHERE datasets.key = data.key", replacements=update_data)
+        db.execute_many("UPDATE datasets SET timestamp_finished = data.timestamp_finished FROM (VALUES %s) AS data (key, timestamp_finished) WHERE datasets.key = data.key", replacements=update_data)
 
     db.commit()
     print(f"  ...Updated {len(update_data)} datasets.")

@@ -477,7 +477,7 @@ class DataSet(FourcatModule):
 			raise RuntimeError("Cannot finish a finished dataset again")
 
 		self.db.update("datasets", where={"key": self.data["key"]},
-					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0, "finished_at": int(time.time())})
+					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0, "timestamp_finished": int(time.time())})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
