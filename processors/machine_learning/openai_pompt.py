@@ -155,12 +155,15 @@ class OpenAI(BasicProcessor):
 		consent = self.parameters.get("consent", False)
 		if not consent:
 			self.dataset.finish_with_error("You must consent to your data being sent to OpenAI first")
+			return
+
 		self.dataset.delete_parameter("consent")
 
 		model = self.parameters.get("model")
 		if model == "custom":
 			if not self.parameters.get("custom_model", ""):
 				self.dataset.finish_with_error("You must provide a valid ID for your custom model")
+				return
 			else:
 				custom_model_id = self.parameters.get("custom_model", "")
 				self.parameters["model"] = custom_model_id
@@ -177,11 +180,13 @@ class OpenAI(BasicProcessor):
 			temperature = float(self.parameters.get("temperature"))
 		except ValueError:
 			self.dataset.finish_with_error("Temperature must be a number")
+			return
 
 		try:
 			max_tokens = int(self.parameters.get("max_tokens"))
 		except ValueError:
 			self.dataset.finish_with_error("Max tokens must be a number")
+			return
 
 		self.dataset.delete_parameter("api_key")  # sensitive, delete after use
 
@@ -196,6 +201,7 @@ class OpenAI(BasicProcessor):
 		if not replacements:
 			self.dataset.finish_with_error("You need to provide the prompt with input values using [brackets] of "
 										   "column names")
+			return
 
 		write_annotations = False
 		# todo: update when explorer is integrated
@@ -224,18 +230,18 @@ class OpenAI(BasicProcessor):
 					prompt = prompt.replace(replacement, field_name)
 				except KeyError as e:
 					self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
-
+					return
 			try:
 				response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
 			except openai.NotFoundError as e:
 				self.dataset.finish_with_error(e.message)
-				return 0
+				return
 			except openai.BadRequestError as e:
 				self.dataset.finish_with_error(e.message)
-				return 0
+				return
 			except openai.AuthenticationError as e:
 				self.dataset.finish_with_error(e.message)
-				return 0
+				return
 
 			if "id" in item:
 				item_id = item["id"]
