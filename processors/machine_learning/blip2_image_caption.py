@@ -6,7 +6,7 @@ import json
 
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, DsmConnectionError
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -183,8 +183,15 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error(
                 "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
             return
+        except DsmConnectionError as e:
+            self.dataset.log(str(e))
+            self.log.warning(f"DMI Service Manager connection error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error("DMI Service Manager connection error; please contact 4CAT admins.")
+            return
         except DmiServiceManagerException as e:
-            self.dataset.finish_with_error(str(e))
+            self.dataset.log(str(e))
+            self.log.warning(f"BLIP2 Error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error(f"Error with BLIP2 model; please contact 4CAT admins.")
             return
 
         # Load the video metadata if available
@@ -202,6 +209,9 @@ class CategorizeImagesCLIP(BasicProcessor):
                         data.update({"url": url})
                         # using the filename without extension as the key; since that is how the results form their filename
                         image_metadata[".".join(data['filename'].split(".")[:-1])] = data
+        else:
+            self.dataset.log("No image metadata found")
+
 
         self.dataset.update_status("Processing BLIP2 results...")
         # Download the result files
@@ -237,12 +247,12 @@ class CategorizeImagesCLIP(BasicProcessor):
         :param item:
         :return:
         """
-        image_metadata = item.get("image_metadata")
+        image_metadata = item.get("image_metadata", {})
         return MappedItem({
             "id": item.get("id"),
             "text": item.get("text"),
-            # "original_url": image_metadata.get("url", ""), # TODO: does not appear all image datasets are using URL properly...
-            "image_filename": image_metadata.get("filename", ""),
+            "image_filename": image_metadata.get("filename", "") if image_metadata else item.get("id"), # fallback to id which is filename
+            "original_url": image_metadata.get("url", "N/A"),
             "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
         })
