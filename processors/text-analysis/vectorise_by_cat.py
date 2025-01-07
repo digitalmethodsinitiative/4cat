@@ -8,7 +8,6 @@ import itertools
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -136,8 +135,6 @@ class VectoriseByCategory(BasicProcessor):
 		Get the dataset that contains the category column; this should be the dataset above the tokenise-posts dataset
 		"""
 		genealogy = dataset.get_genealogy()
-		config.with_db()
-		config.db.log.info(f"Genealogy: {[(gen.key, gen.type) for gen in genealogy]}")
 
 		# Find parent of tokenise-posts dataset; this dataset will contain the categories related to the tokens extracted from it
 		tokeniser_found = False
