@@ -9,7 +9,7 @@ from pathlib import Path
 
 import telethon.errors
 from telethon import TelegramClient
-from telethon.errors import TimedOutError
+from telethon.errors import TimedOutError, BadRequestError
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
@@ -200,7 +200,7 @@ class TelegramImageDownloader(BasicProcessor):
                         self.dataset.log(f"Could not download image for message {msg_id} - message is unavailable (it "
                                          f"may have been deleted)")
                         self.flawless = False
-                        continue
+                        break
 
                     success = False
                     try:
@@ -223,6 +223,7 @@ class TelegramImageDownloader(BasicProcessor):
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download image for message {msg_id} ({e})")
                         self.flawless = False
+
                     finally:
                         media_done += 1
                         self.metadata[filename] = {
@@ -231,6 +232,10 @@ class TelegramImageDownloader(BasicProcessor):
                             "from_dataset": self.source_dataset.key,
                             "post_ids": [msg_id]
                         }
+
+            except BadRequestError as e:
+                self.dataset.log(f"Couldn't retrieve images for {entity} - the channel is no longer accessible ({e})")
+                self.flawless = False
 
             except telethon.errors.FloodError as e:
                 later = "later"

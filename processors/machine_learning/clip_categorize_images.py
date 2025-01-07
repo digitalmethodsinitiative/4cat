@@ -192,8 +192,15 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error(
                 "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
             return
+        except DsmConnectionError as e:
+            self.dataset.log(str(e))
+            self.log.warning(f"DMI Service Manager connection error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error("DMI Service Manager connection error; please contact 4CAT admins.")
+            return
         except DmiServiceManagerException as e:
-            self.dataset.finish_with_error(str(e))
+            self.dataset.log(str(e))
+            self.log.warning(f"CLIP Error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error(f"Error with CLIP model; please contact 4CAT admins.")
             return
 
         # Load the video metadata if available
@@ -227,6 +234,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                     image_name = ".".join(result_filename.split(".")[:-1])
                     data = {
                         "id": image_name,
+                        "filename": result_filename,
                         "categories": result_data,
                         "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
                     }
@@ -243,7 +251,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         :param item:
         :return:
         """
-        image_metadata = item.get("image_metadata")
+        image_metadata = item.get("image_metadata", {})
         # Updates to CLIP output; categories used to be a list of categories, but now is a dict with: {"predictions": [[category_label, precent_float],]}
         categories = item.get("categories")
         if type(categories) == list:
@@ -263,9 +271,9 @@ class CategorizeImagesCLIP(BasicProcessor):
         all_cats = {cat[0]: cat[1] for cat in categories}
         return MappedItem({
             "id": item.get("id"),
+            "image_filename": item.get("filename"),
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),
-            "original_url": image_metadata.get("url", ""),
-            "image_filename": image_metadata.get("filename", ""),
+            "original_url": image_metadata.get("url", "N/A"),
             "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
             **all_cats

@@ -866,6 +866,23 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		return False
 
+	@classmethod
+	def exclude_followup_processors(cls, processor_type=None):
+		"""
+        Used for processor compatibility
+
+        To be defined by the child processor if it should exclude certain follow-up processors.
+        e.g.:
+
+        def exclude_followup_processors(cls, processor_type):
+			if processor_type in ["undesirable-followup-processor"]:
+				return True
+			return False
+
+        :param str processor_type:  Processor type to exclude
+        :return bool:  True if processor should be excluded, False otherwise
+        """
+		return False
 
 	@classmethod
 	def get_csv_parameters(cls, csv_library):

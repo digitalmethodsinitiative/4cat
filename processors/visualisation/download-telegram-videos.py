@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from telethon import TelegramClient
-from telethon.errors import FloodError
+from telethon.errors import FloodError, BadRequestError
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
@@ -198,7 +198,7 @@ class TelegramVideoDownloader(BasicProcessor):
 
                         msg_id = message.id
                         success = True
-                    except (AttributeError, RuntimeError, ValueError, TypeError) as e:
+                    except (AttributeError, RuntimeError, ValueError, TypeError, BadRequestError) as e:
                         filename = f"{entity}-index-{media_done}"
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download video for message {msg_id} ({e})")
