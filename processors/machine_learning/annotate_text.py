@@ -281,7 +281,7 @@ class TextClassifier(BasicProcessor):
             if not labels or len([l for l in labels if l.strip()]) < 2:
                 raise QueryParametersException("At least two labels should be provided for text classification.")
         else:
-            file = request.files["option-category_file"]
+            file = request.files["option-category-file"]
             if not file:
                 raise QueryParametersException(
                     "No label file provided. A label file is required when using few-shot classification.")
@@ -296,7 +296,7 @@ class TextClassifier(BasicProcessor):
                 has_header = csv.Sniffer().has_header(sample)
                 dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
 
-                reader = csv.reader(wrapped_file) if not has_header else csv.DictReader(wrapped_file)
+                reader = csv.reader(wrapped_file, dialect=dialect) if not has_header else csv.DictReader(wrapped_file)
                 row = next(reader)
                 if len(list(row)) != 2:
                     raise QueryParametersException("The label file must have exactly two columns.")
