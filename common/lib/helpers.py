@@ -14,6 +14,7 @@ import copy
 import time
 import json
 import math
+import csv
 import ssl
 import re
 import os
@@ -102,6 +103,27 @@ def sniff_encoding(file):
         maybe_bom = False
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
+
+def sniff_csv_dialect(csv_input):
+    """
+    Determine CSV dialect for an input stream
+
+    :param csv_input:  Input stream
+    :return tuple:  Tuple: Dialect object and a boolean representing whether
+    the CSV file seems to have a header
+    """
+    encoding = sniff_encoding(csv_input)
+    if type(csv_input) is io.TextIOWrapper:
+        wrapped_input = csv_input
+    else:
+        wrapped_input = io.TextIOWrapper(csv_input, encoding=encoding)
+    wrapped_input.seek(0)
+    sample = wrapped_input.read(1024 * 1024)
+    wrapped_input.seek(0)
+    has_header = csv.Sniffer().has_header(sample)
+    dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+
+    return dialect, has_header
 
 
 def get_git_branch():
