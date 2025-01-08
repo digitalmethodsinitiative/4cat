@@ -245,7 +245,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                     image_name = ".".join(result_filename.split(".")[:-1])
                     data = {
                         "id": image_name,
-                        "filename": result_filename,
+                        "filename": result_data.get("filename"),
                         "categories": result_data,
                         "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
                     }
@@ -265,10 +265,15 @@ class CategorizeImagesCLIP(BasicProcessor):
         image_metadata = item.get("image_metadata", {})
         # Updates to CLIP output; categories used to be a list of categories, but now is a dict with: {"predictions": [[category_label, precent_float],]}
         categories = item.get("categories")
+        error = None
         if type(categories) == list:
             pass
-        elif type(categories) == dict and "predictions" in categories:
-            categories = categories.get("predictions")
+        elif type(categories) == dict:
+            error = categories.get("error", "N/A")
+            if "predictions" in categories:
+                categories = categories.get("predictions")
+            else:
+                categories = []
         else:
             raise KeyError("Unexpected categories format; check NDJSON")
 
@@ -287,6 +292,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             "original_url": image_metadata.get("url", "N/A"),
             "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
+            "error": error,
             **all_cats
         })
 
