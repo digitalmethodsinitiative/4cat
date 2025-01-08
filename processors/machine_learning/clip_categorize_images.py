@@ -137,7 +137,18 @@ class CategorizeImagesCLIP(BasicProcessor):
         staging_area = self.unpack_archive_contents(self.source_file)
 
         # Collect filenames (skip .json metadata files)
-        image_filenames = [filename for filename in os.listdir(staging_area) if filename.split('.')[-1] not in ["json", "log"]]
+        image_filenames = []
+        skipped_images = 0
+        for filename in os.listdir(staging_area):
+            if filename.split('.')[-1] in ["json", "log"]:
+                continue
+            if filename.split('.')[-1] in ["svg"]:
+                skipped_images += 1
+                self.dataset.log(f"Skipping {filename} (SVG files cannot be processed currently)")
+                # Issues is with PIL; we could convert to PNG in future
+                continue
+            image_filenames.append(filename)
+
         if self.parameters.get("amount", 100) != 0:
             image_filenames = image_filenames[:self.parameters.get("amount", 100)]
         total_image_files = len(image_filenames)
@@ -242,7 +253,7 @@ class CategorizeImagesCLIP(BasicProcessor):
 
                     processed += 1
 
-        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images")
+        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images{'' if skipped_images == 0 else f' (skipped {skipped_images} SVG files)'}", is_final=True)
         self.dataset.finish(processed)
 
     @staticmethod
