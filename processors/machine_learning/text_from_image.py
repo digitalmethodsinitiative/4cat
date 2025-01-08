@@ -45,9 +45,9 @@ class ImageTextDetector(BasicProcessor):
     references = [
         "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
         "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)"
-        "[Keras OCR model]( https://keras-ocr.readthedocs.io/en/latest/)",
-        "[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
-        "[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
+        #"[Keras OCR model]( https://keras-ocr.readthedocs.io/en/latest/)",
+        #"[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
+        #"[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
     ]
 
     config = {
@@ -69,15 +69,15 @@ class ImageTextDetector(BasicProcessor):
             "default": 0,
             "coerce_type": int,
         },
-        "model_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "paddle_ocr",
-            "options": {
-                "paddle_ocr": "Paddle OCR model",
-                "keras_ocr": "Keras OCR model",
-            },
-            "help": "See references for additional information about models and their utility"
-        },
+        # "model_type": {
+        #     "type": UserInput.OPTION_CHOICE,
+        #     "default": "paddle_ocr",
+        #     "options": {
+        #         "paddle_ocr": "Paddle OCR model",
+        #         "keras_ocr": "Keras OCR model",
+        #     },
+        #     "help": "See references for additional information about models and their utility"
+        # },
         "update_original": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Update original dataset with detected text",
@@ -103,6 +103,7 @@ class ImageTextDetector(BasicProcessor):
         following structure:
 
         """
+        model_type = self.parameters.get("model_type", "paddle_ocr")
         if self.source_dataset.num_rows == 0:
             self.dataset.finish_with_error("No images available.")
             return
@@ -118,16 +119,23 @@ class ImageTextDetector(BasicProcessor):
         staging_area = self.dataset.get_staging_area()
         # Collect filenames and metadata
         image_filenames = []
+        skipped_images = 0
         metadata_file = None
         for image in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unzipping images")
 
-            if image.name.split('.')[-1] not in ["json", "log"]:
-                image_filenames.append(image.name)
-
             if image.name == ".metadata.json":
                 metadata_file = image.name
+                continue
+            elif image.name.split('.')[-1]  in ["json", "log"]:
+                continue
+            elif image.name.split('.')[-1] == "svg":
+                self.dataset.log(f"SVG files are not supported, skipping {image.name}")
+                skipped_images += 1
+                continue
+
+            image_filenames.append(image.name)
 
             if max_images and len(image_filenames) >= max_images:
                 break
@@ -153,7 +161,7 @@ class ImageTextDetector(BasicProcessor):
                                                                            server_results_folder_name=server_results_folder_name)
 
         # Arguments for the OCR server
-        data = {'args': ['--model', self.parameters.get("model_type"),
+        data = {'args': ['--model', model_type,
                          '--output_dir', f"data/{path_to_results}",
                          '--images']}
         data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
@@ -169,7 +177,9 @@ class ImageTextDetector(BasicProcessor):
                 "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
             return
         except DmiServiceManagerException as e:
-            self.dataset.finish_with_error(str(e))
+            self.dataset.log(str(e))
+            self.log.warning(f"text_from_image Error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error(f"Error with {model_type} model; please contact 4CAT admins.")
             return
 
         self.dataset.update_status("Processing OCR results...")
@@ -262,7 +272,7 @@ class ImageTextDetector(BasicProcessor):
             except ProcessorException as e:
                 self.dataset.update_status("Error updating parent dataset: %s" % e)
 
-        detected_message = f"Detected speech in {processed} of {total_image_files} images."
+        detected_message = f"Detected text in {processed} of {total_image_files} images.{(' Skipped ' + str(skipped_images) + ' images; see log for details.') if skipped_images else ''}"
         if self.parameters.get("update_original", False) and not update_original:
             self.dataset.update_status(f"{detected_message} No metadata file found, unable to update original dataset.", is_final=True)
         else:
