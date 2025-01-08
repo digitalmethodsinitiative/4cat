@@ -1102,6 +1102,9 @@ def queue_processor(key=None, processor=None):
 		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
 			  available_processors[processor].title)
 
+	if hasattr(processor_worker, "after_create"):
+		processor_worker.after_create(sanitised_query, analysis, request)
+
 	return jsonify({
 		"status": "success",
 		"container": "*[data-dataset-key=" + dataset.key + "]",
