@@ -98,13 +98,16 @@ class UniqueImageFilter(BasicProcessor):
 
         new_metadata = {}
         inverse_hashmap = {v: k for k, v in hash_map.items()}
-        for url, item in metadata.items():
-            if item["filename"] in inverse_hashmap:
-                new_metadata[inverse_hashmap[item["filename"]]] = {
-                    **item,
-                    "hash": inverse_hashmap[item["filename"]],
-                    "hash_type": self.parameters.get("hash-type")
-                }
+        if metadata:
+            for url, item in metadata.items():
+                if item["filename"] in inverse_hashmap:
+                    new_metadata[inverse_hashmap[item["filename"]]] = {
+                        **item,
+                        "hash": inverse_hashmap[item["filename"]],
+                        "hash_type": self.parameters.get("hash-type")
+                    }
+        else:
+            new_metadata = {hash_map[k]: {"filename": hash_map[k], "hash": k, "hash_type": self.parameters.get("hash-type")} for k in hash_map}
 
         with staging_area.joinpath(".metadata.json").open("w") as outfile:
             json.dump(new_metadata, outfile)
