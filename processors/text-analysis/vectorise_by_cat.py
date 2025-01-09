@@ -117,7 +117,7 @@ class VectoriseByCategory(BasicProcessor):
 		if not parent_dataset:
 			return options
 		category_dataset = cls.get_category_dataset(parent_dataset)
-		if not category_dataset:
+		if not category_dataset or not category_dataset.get_columns():
 			return options
 		cat_columns = {c: c for c in sorted(category_dataset.get_columns())}
 		options.update({
