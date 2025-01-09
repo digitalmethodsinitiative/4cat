@@ -110,7 +110,7 @@ class VideoDownloaderPlus(BasicProcessor):
             "default": 1000,
             "help": "Max number of videos to download",
             "tooltip": "Only allow downloading up to this many videos per batch. Increasing this can lead to "
-                       "long-running processors and large datasets."
+                       "long-running processors and large datasets. Set to 0 for no limit."
         },
         "video-downloader.max-size": {
             "type": UserInput.OPTION_TEXT,
