@@ -312,7 +312,7 @@ class TextClassifier(BasicProcessor):
             wrapped_file = io.TextIOWrapper(file, encoding=encoding)
             try:
                 wrapped_file.seek(0)
-                dialect, has_header = sniff_csv_dialect(file)
+                dialect, has_header = sniff_csv_dialect(wrapped_file)
                 reader = csv.reader(wrapped_file, dialect=dialect) if not has_header else csv.DictReader(wrapped_file)
                 row = next(reader)
                 if len(list(row)) != 2:
