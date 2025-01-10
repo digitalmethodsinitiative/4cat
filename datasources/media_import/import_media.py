@@ -231,6 +231,7 @@ class SearchMedia(BasicProcessor):
         # update the number of files in the dataset
         dataset.num_files = saved_files
         dataset.media_type = mime_type
+        # TODO: use job's 'details' to save data to share/log?
         if skipped_files:
             # todo: this now doesn't actually get logged because the log is
             # re-initialised after after_create runs?
@@ -241,7 +242,16 @@ class SearchMedia(BasicProcessor):
         """
         Step 3: Ummmm, we kinda did everything
         """
-        self.dataset.log(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}")
+        # Check for SVG files
+        svg_warning = 0
+        if self.parameters.get("media_type") == "image":
+            for file in self.iterate_archive_contents(self.dataset.get_results_path()):
+                if file.suffix == ".svg":
+                    if svg_warning == 0:
+                        self.dataset.log("SVG files may not be processed correctly by some 4CAT processors.")
+                    self.dataset.log(f"SVG file detected: {file.name}")
+                    svg_warning += 1
+        self.dataset.update_status(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}{'' if svg_warning == 0 else f' ({svg_warning} SVG files; see log)'}", is_final=True)
         self.dataset.finish(self.parameters.get("num_files"))
 
     @staticmethod

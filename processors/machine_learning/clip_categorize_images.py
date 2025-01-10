@@ -6,7 +6,7 @@ import json
 
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, DsmConnectionError
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -137,7 +137,18 @@ class CategorizeImagesCLIP(BasicProcessor):
         staging_area = self.unpack_archive_contents(self.source_file)
 
         # Collect filenames (skip .json metadata files)
-        image_filenames = [filename for filename in os.listdir(staging_area) if filename.split('.')[-1] not in ["json", "log"]]
+        image_filenames = []
+        skipped_images = 0
+        for filename in os.listdir(staging_area):
+            if filename.split('.')[-1] in ["json", "log"]:
+                continue
+            if filename.split('.')[-1] in ["svg"]:
+                skipped_images += 1
+                self.dataset.log(f"Skipping {filename} (SVG files cannot be processed currently)")
+                # Issues is with PIL; we could convert to PNG in future
+                continue
+            image_filenames.append(filename)
+
         if self.parameters.get("amount", 100) != 0:
             image_filenames = image_filenames[:self.parameters.get("amount", 100)]
         total_image_files = len(image_filenames)
@@ -192,8 +203,15 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error(
                 "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
             return
+        except DsmConnectionError as e:
+            self.dataset.log(str(e))
+            self.log.warning(f"DMI Service Manager connection error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error("DMI Service Manager connection error; please contact 4CAT admins.")
+            return
         except DmiServiceManagerException as e:
-            self.dataset.finish_with_error(str(e))
+            self.dataset.log(str(e))
+            self.log.warning(f"CLIP Error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error(f"Error with CLIP model; please contact 4CAT admins.")
             return
 
         # Load the video metadata if available
@@ -227,6 +245,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                     image_name = ".".join(result_filename.split(".")[:-1])
                     data = {
                         "id": image_name,
+                        "filename": result_data.get("filename"),
                         "categories": result_data,
                         "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
                     }
@@ -234,7 +253,7 @@ class CategorizeImagesCLIP(BasicProcessor):
 
                     processed += 1
 
-        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images")
+        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images{'' if skipped_images == 0 else f' (skipped {skipped_images} SVG files)'}", is_final=True)
         self.dataset.finish(processed)
 
     @staticmethod
@@ -243,13 +262,18 @@ class CategorizeImagesCLIP(BasicProcessor):
         :param item:
         :return:
         """
-        image_metadata = item.get("image_metadata")
+        image_metadata = item.get("image_metadata", {})
         # Updates to CLIP output; categories used to be a list of categories, but now is a dict with: {"predictions": [[category_label, precent_float],]}
         categories = item.get("categories")
+        error = None
         if type(categories) == list:
             pass
-        elif type(categories) == dict and "predictions" in categories:
-            categories = categories.get("predictions")
+        elif type(categories) == dict:
+            error = categories.get("error", "N/A")
+            if "predictions" in categories:
+                categories = categories.get("predictions")
+            else:
+                categories = []
         else:
             raise KeyError("Unexpected categories format; check NDJSON")
 
@@ -263,11 +287,12 @@ class CategorizeImagesCLIP(BasicProcessor):
         all_cats = {cat[0]: cat[1] for cat in categories}
         return MappedItem({
             "id": item.get("id"),
+            "image_filename": item.get("filename"),
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),
-            "original_url": image_metadata.get("url", ""),
-            "image_filename": image_metadata.get("filename", ""),
+            "original_url": image_metadata.get("url", "N/A"),
             "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
+            "error": error,
             **all_cats
         })
 
