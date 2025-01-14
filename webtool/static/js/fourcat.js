@@ -208,6 +208,7 @@ const processor = {
                     }
                 })
                 .catch(function (response) {
+                    console.log(`Error: ${response}`);
                     try {
                         response = JSON.parse(response.responseText);
                         popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
@@ -362,10 +363,10 @@ const query = {
         if (!for_real) {
             // just for validation
             // limit file upload size
+            let newFormData = new FormData();
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    console.log(pair[1].type)
                     if (!['application/zip', 'application/x-zip-compressed'].includes(pair[1].type)) {
                         const sample_size = Math.min(pair[1].size, snippet_size);
                         const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
@@ -373,13 +374,13 @@ const query = {
                         // make sure we're submitting utf-8 - read and then re-encode to be sure
                         const blobAsText = await FileReaderPromise(blob);
                         const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
-                        formdata.set(pair[0], snippet);
+                        newFormData.append(pair[0], snippet);
                     } else {
                         // if this is a zip file, don't bother with a snippet (which won't be
                         // useful) but do send a list of files in the zip
                         const reader = new zip.ZipReader(new zip.BlobReader(pair[1]));
                         const entries = await reader.getEntries();
-                        formdata.set(pair[0] + '-entries', JSON.stringify(
+                        newFormData.append(pair[0] + '-entries', JSON.stringify(
                            entries.map(function(e) {
                                return {
                                    filename: e.filename,
@@ -387,10 +388,13 @@ const query = {
                                }
                            })
                         ));
-                        formdata.set(pair[0], null);
+                        newFormData.append(pair[0], null);
                     }
+                } else {
+                    newFormData.append(pair[0], pair[1]);
                 }
             }
+            formdata = newFormData;
         }
 
         if (extra_data) {
