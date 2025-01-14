@@ -203,7 +203,7 @@ class VectoriseByCategory(BasicProcessor):
 		threshold_value = self.parameters.get("threshold_value", None)
 		top_n = self.parameters.get("top_n", None)
 		use_word_filter = self.parameters.get("use_word_filter")
-		word_filter_list = [word.strip() for word in self.parameters.get("word_filter_list", "").split(",")]
+		word_filter_list = [word.strip().lower() for word in self.parameters.get("word_filter_list", "").split(",")]
 		separate_by_interval = self.parameters.get("separate_by_interval")
 
 		# go through all archived token sets and vectorise them
@@ -254,6 +254,17 @@ class VectoriseByCategory(BasicProcessor):
 								vector_sets[vector_set_name][category][token] = 1
 							else:
 								vector_sets[vector_set_name][category][token] += 1
+
+		sets_of_categories = 0
+		for interval, category_data in vector_sets.items():
+			if not category_data:
+				self.dataset.log(f"No tokens found for interval {interval}")
+			else:
+				sets_of_categories += 1
+
+		if not sets_of_categories:
+			self.dataset.finish_with_error("No tokens found")
+			return
 
 		# Write vectors to file
 		self.dataset.update_status("Writing results file")
