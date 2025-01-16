@@ -395,18 +395,18 @@ class TikTokImageDownloader(BasicProcessor):
         """
         try:
             response = requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent})
-        except requests.exceptions.RequestException as e:
+
+            if response.status_code != 200 or "image" not in response.headers.get("content-type", ""):
+                raise FileNotFoundError(f"Unable to download image; status_code:{response.status_code} content-type:{response.headers.get('content-type', '')}")
+
+            # Process images
+            image_io = BytesIO(response.content)
+            try:
+                picture = Image.open(image_io)
+            except UnidentifiedImageError:
+                picture = Image.open(image_io.raw)
+        except (ConnectionError, requests.exceptions.RequestException) as e:
             raise FileNotFoundError(f"Unable to download TikTok image via {url} ({e}), skipping")
-
-        if response.status_code != 200 or "image" not in response.headers.get("content-type", ""):
-            raise FileNotFoundError(f"Unable to download image; status_code:{response.status_code} content-type:{response.headers.get('content-type', '')}")
-
-        # Process images
-        image_io = BytesIO(response.content)
-        try:
-            picture = Image.open(image_io)
-        except UnidentifiedImageError:
-            picture = Image.open(image_io.raw)
 
         # Grab extension from response
         extension = response.headers["Content-Type"].split("/")[-1]
