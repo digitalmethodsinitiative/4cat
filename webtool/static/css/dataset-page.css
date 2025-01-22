@@ -625,6 +625,16 @@ body.csv-preview table tr:nth-child(2n+1) {
     background: var(--contrast-bright);
 }
 
+.colour-preview i {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 1px solid var(--gray-dark);
+    position: relative;
+    top: -0.1em;
+    vertical-align: bottom;
+}
+
 .child.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
 	display: none;
 }
