@@ -47,7 +47,7 @@ class SearchPinterest(Search):
         :return MappedItem:  Mapped item
         """
         try:
-            timestamp = datetime.strptime(post.get("created_at"), "%a, %d %b %Y %H:%M:%S %z")
+            timestamp = datetime.strptime(post.get("created_at", post.get("createdAt")), "%a, %d %b %Y %H:%M:%S %z")
             unix_timestamp = int(timestamp.timestamp())
             str_timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
         except (ValueError, TypeError):
