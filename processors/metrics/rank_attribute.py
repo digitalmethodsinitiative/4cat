@@ -173,7 +173,7 @@ class AttributeRanker(BasicProcessor):
 				values = self.get_values(post, columns, filter, split_comma, extract)
 				for value in values:
 					if to_lowercase:
-						value = value.lower()
+						value = str(value).lower()
 					if value not in overall_top:
 						overall_top[value] = 0
 
