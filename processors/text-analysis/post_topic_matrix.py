@@ -185,7 +185,7 @@ class TopicModelWordExtractor(BasicProcessor):
                         #TODO: Either store the original document when tokenized or re-do the sentance split and, possibly, the columns if multiple were used.
                         # The second seems unfeasible, but the first would require somehow storing the split documents and then retrieving them here by post_id and document_id; give me a database guys!
                         if multiple_docs_per_post:
-                            combined_data['document'] = token_data['multiple_docs']
+                            combined_data['original_document_split'] = token_data['multiple_docs']
 
                         doc_predictions = model_data['predictions'][str(document_number)]
                         combined_data['top_topic(s)'] = ', '.join([str(int(key) + 1) for key, value in doc_predictions.items() if value == max(doc_predictions.values())])  # add one to topic key here as well
