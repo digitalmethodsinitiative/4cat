@@ -44,6 +44,7 @@ packages = set([
 	"psutil~=5.0",
 	"psycopg2~=2.9.0",
 	"pyahocorasick~=1.4.0",
+	"pymemcache",
 	"PyMySQL~=1.0",
 	"PyTumblr==0.1.0",
 	"razdel~=0.5",
