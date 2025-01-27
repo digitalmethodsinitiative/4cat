@@ -13,7 +13,8 @@ from atproto_client.exceptions import UnauthorizedError, BadRequestError, Invoke
     ModelError, NetworkError
 
 from backend.lib.search import Search
-from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
+from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException, \
+    ProcessorInterruptedException
 from common.lib.helpers import timify_long
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -237,6 +238,8 @@ class SearchBluesky(Search):
             search_for_invalid_post = False
             invalid_post_counter = 0
             while True:
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while getting posts from the Bluesky API")
                 # Query posts, including pagination (cursor for next page)
                 tries = 0
                 response = None
@@ -313,10 +316,14 @@ class SearchBluesky(Search):
                         cursor = str(int(cursor) + 1) if cursor else None
                         continue
 
+                new_posts = 0
                 # Handle the posts
                 for item in items:
                     if 0 < max_posts <= rank:
                         break
+
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while getting posts from the Bluesky API")
 
                     post = item.model_dump()
                     post_id = post["uri"]
@@ -326,6 +333,7 @@ class SearchBluesky(Search):
                         # Skip duplicate posts
                         continue
 
+                    new_posts += 1
                     query_post_ids.add(post_id)
 
                     # Add user handles from references
@@ -387,12 +395,13 @@ class SearchBluesky(Search):
                     break
 
                 if not cursor:
-                    if items:
+                    if new_posts:
                         # Bluesky API seems to stop around 10000 posts and not return a cursor
                         # Re-query with the same query to get the next set of posts using last_date (set above)
                         self.dataset.log(f"Query {query}: {query_requests} requests")
                         queries.insert(0, query)
                     else:
+                        # No new posts; if we have not hit the max_posts, but no new posts are being returned, then we are done
                         self.dataset.log(f"Query {query}: {query_requests} requests; no additional posts returned")
 
                     if rank:
