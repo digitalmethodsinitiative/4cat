@@ -378,7 +378,8 @@ class SearchBluesky(Search):
 
                 # Check if there is a cursor for the next page
                 cursor = response['cursor']
-                self.dataset.update_progress(total_posts / (max_posts * num_queries))
+                if max_posts != 0:
+                    self.dataset.update_progress(total_posts / (max_posts * num_queries))
 
                 if 0 < max_posts <= rank:
                     self.dataset.update_status(
