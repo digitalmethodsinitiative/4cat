@@ -1851,8 +1851,6 @@ const ui_helpers = {
                 const other_field = 'option-' + requirement[1];
                 const other_element = form.querySelector("*[name='" + other_field + "']");
 
-                console.log(other_field);
-
                 if (!other_element) { //invalid reference
                     return;
                 }
