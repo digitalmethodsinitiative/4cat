@@ -239,5 +239,6 @@ class WorkerManager:
 					time.sleep(0.25)
 
 				# now all queries are interrupted, formally request an abort
+				self.log.info(f"Requesting interrupt of job {worker.job.data['id']} ({worker.job.data['jobtype']}/{worker.job.data['remote_id']})")
 				worker.request_interrupt(interrupt_level)
 				return
