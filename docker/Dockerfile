@@ -1,4 +1,4 @@
-FROM python:3.8-slim AS compile-image
+FROM python:3.11-slim
 
 RUN apt-get update && apt install -y \
     # General requirements:
