@@ -244,6 +244,8 @@ def import_dataset():
 				"fields": filterable_fields
 			}
 		}]
+		
+	
 
 	# store the file at the result path for the dataset, but with a different suffix
 	# since the dataset was only just created, this file is guaranteed to not exist yet
@@ -1004,7 +1006,7 @@ def toggle_private(key):
 		return redirect(url_for("show_result", key=dataset.key))
 	else:
 		return jsonify({"success": True, "is_private": dataset.is_private})
-
+	
 @app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit
 @login_required

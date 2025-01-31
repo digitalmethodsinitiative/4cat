@@ -10,6 +10,7 @@ import re
 import os
 
 import nltk
+import spacy
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
@@ -44,7 +45,8 @@ class Tokenise(BasicProcessor):
 			"[Words in stopwords-iso word list](https://github.com/stopwords-iso/stopwords-iso/blob/master/stopwords-iso.json)",
 			"[Words in Google Books word list](https://github.com/hackerb9/gwordlist)",
 			"[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
-			"[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
+			"[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)",
+			"[Words in Finnish vocabulary list](https://www.kotus.fi/aineistot/sana-aineistot/nykysuomen_sanalista)"
 	]
 
 	@classmethod
@@ -54,8 +56,7 @@ class Tokenise(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-
-		return module.get_extension() in ("csv", "ndjson")
+		return module.get_extension() in ("csv", "ndjson") 
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -143,6 +144,15 @@ class Tokenise(BasicProcessor):
 						   "'bicycles' becomes 'bicycle', 'better' becomes 'good'.",
 				"requires": "language==english"
 			},
+			#it seems as if requires only allows one option, so I added another option exclusive to finnish
+			"lemmatise_fin": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Lemmatise tokens (Finnish only)",
+				"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', "
+						   "'bicycles' becomes 'bicycle', 'better' becomes 'good'.",
+				"requires": "language==finnish"
+			},
 			"filter": {
 				"type": UserInput.OPTION_MULTI_SELECT,
 				"default": ["copy-language"],
@@ -156,7 +166,8 @@ class Tokenise(BasicProcessor):
 													"unigrams)",
 					"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. "
 												 "Warning: computationally heavy)",
-					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)"
+					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
+					"finnish_wordlist_big": "Finnish word list (Kotimaisten kielten keskus)"
 				},
 				"help": "Tokens to exclude",
 				"tooltip": "See the references for information on the word lists' provenance. It is highly recommended "
@@ -330,7 +341,9 @@ class Tokenise(BasicProcessor):
 
 			if self.parameters.get("lemmatise"):
 				lemmatizer = WordNetLemmatizer()
-
+			if self.parameters.get("lemmatise_fin"):
+				nlp = spacy.load("fi_core_news_sm", disable=['parser', 'ner'])
+				
 		# Only keep unique words?
 		only_unique = self.parameters.get("only_unique")
 
@@ -426,6 +439,11 @@ class Tokenise(BasicProcessor):
 
 					if self.parameters["lemmatise"] and lemmatizer:
 						token = lemmatizer.lemmatize(token)
+					#finnish lemmatization
+					if self.parameters["lemmatise_fin"] and nlp:
+						token_lemma = nlp(token)
+						token = [token.lemma_ for token in token_lemma]
+						token = token[0]
 
 					# append tokens to the post's token list
 					post_tokens.append(token)
