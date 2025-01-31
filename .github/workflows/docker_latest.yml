@@ -29,12 +29,12 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v6.13
+        uses: docker/metadata-action@v5
         with:
           images: digitalmethodsinitiative/4cat
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6.13
         with:
           context: .
           file: docker/Dockerfile
