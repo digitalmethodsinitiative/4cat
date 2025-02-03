@@ -799,7 +799,7 @@ class SearchTelegram(Search):
                         if chat["id"] == channel_id or channel_id is None:
                             forwarded_username = chat["username"]
 
-            elif "_forward" in message and "_chat" in message["_forward"]:
+            elif message.get("_forward") and message["_forward"].get("_chat"):
                 if message["_forward"]["_chat"].get("username"):
                     forwarded_username = message["_forward"]["_chat"]["username"]
 
