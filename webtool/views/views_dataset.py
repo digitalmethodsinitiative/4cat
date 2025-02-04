@@ -327,9 +327,9 @@ def preview_items(key):
                     break
 
                 if len(rows) == 0:
-                    rows.append(list(row.keys()))
+                    rows.append({k: k for k in list(row.keys())})
 
-                rows.append(list(row.values()))
+                rows.append(row)
 
         except NotImplementedError:
             return error(404)
