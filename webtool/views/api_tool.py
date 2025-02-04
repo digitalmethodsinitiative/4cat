@@ -17,7 +17,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue, config, fourcat_modules
-from webtool.lib.helpers import error, setting_required
+from webtool.lib.helpers import error, setting_required, parse_markdown
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
 	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
@@ -444,7 +444,7 @@ def check_dataset():
 
 	status = {
 		"datasource": dataset.parameters.get("datasource"),
-		"status": dataset.get_status(),
+		"status": parse_markdown(dataset.get_status(), trim_container=True),
 		"status_html": render_template(template, dataset=dataset),
 		"label": dataset.get_label(),
 		"rows": dataset.data["num_rows"],
