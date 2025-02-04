@@ -549,7 +549,8 @@ class DataSet(FourcatModule):
 
 		# delete from drive
 		try:
-			self.get_results_path().unlink()
+			if self.get_results_path().exists():
+				self.get_results_path().unlink()
 			if self.get_results_path().with_suffix(".log").exists():
 				self.get_results_path().with_suffix(".log").unlink()
 			if self.get_results_folder_path().exists():
@@ -557,6 +558,8 @@ class DataSet(FourcatModule):
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
+		except PermissionError as e:
+			self.db.log.error(f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}")
 
 	def update_children(self, **kwargs):
 		"""
