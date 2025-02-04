@@ -147,7 +147,8 @@ class SearchInstagram(Search):
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
             # "usertags": ",".join(
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
-            "num_likes": node["edge_media_preview_like"]["count"],
+            "likes_hidden": "yes" if no_likes else "no",
+            "num_likes": node["edge_media_preview_like"]["count"] if not no_likes else MissingMappedField(0),
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
             "num_media": num_media,
             "location_name": location["name"],
@@ -239,7 +240,8 @@ class SearchInstagram(Search):
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
             # "usertags": ",".join(
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
-            "num_likes": node["like_count"],
+            "likes_hidden": "yes" if no_likes else "no",
+            "num_likes": node["like_count"] if not no_likes else MissingMappedField(0),
             "num_comments": num_comments,
             "num_media": num_media,
             "location_name": location["name"],
