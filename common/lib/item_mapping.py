@@ -90,7 +90,7 @@ class DatasetItem(dict):
         DatasetItem init
 
         :param callable mapper:  Mapper for this item. Currently unused, could
-        be used for abovementioned just-in-time mapping.
+        be used for above-mentioned just-in-time mapping.
         :param dict original:  Original item, e.g. from the csv or ndjson
         :param MappedItem mapped_object:  Mapped item, before resolving any
         potential missing data
