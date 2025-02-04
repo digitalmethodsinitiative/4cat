@@ -1076,8 +1076,22 @@ const tooltip = {
 
             let width = parseFloat(tooltip_container.css('width').replace('px', ''));
             let height = parseFloat(tooltip_container.css('height').replace('px', ''));
-            tooltip_container.css('top', (position.top - height - 5) + 'px');
-            tooltip_container.css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
+            let top_position = (position.top - height - 5);
+
+            // if out of viewport, position below element instead
+            if(top_position < 0) {
+                top_position = position.top + parseFloat($(parent).css('height').replace('px', '')) + 5;
+            }
+            tooltip_container.css('top', top_position + 'px');
+
+            // do the same for horizontal placement
+            let hor_position = Math.max(window.scrollX, position.left + (parent_width / 2) - (width / 2));
+            if(hor_position + tooltip_container.width() - window.scrollX > document.documentElement.clientWidth) {
+                const scrollbar_width = window.innerWidth - document.documentElement.clientWidth;
+                console.log(scrollbar_width);
+                hor_position = document.documentElement.clientWidth + window.scrollX - tooltip_container.width() - 5 - scrollbar_width;
+            }
+            tooltip_container.css('left', hor_position + 'px');
         }
     },
 

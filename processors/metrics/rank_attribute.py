@@ -185,6 +185,7 @@ class AttributeRanker(BasicProcessor):
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
+		progress = 0
 		for post in self.source_dataset.iterate_items(self, map_missing=missing_value_placeholder if self.include_missing_data else "default"):
 			# determine where to put this data
 			try:
@@ -212,6 +213,11 @@ class AttributeRanker(BasicProcessor):
 					items[time_unit][value] = 0
 
 				items[time_unit][value] += convert_to_int(post.get(weighby, 1))
+
+			progress += 1
+			if progress % 500 == 0:
+				self.dataset.update_status(f"Iterated through {progress:,} of {self.source_dataset.num_rows:,} items")
+				self.dataset.update_progress(progress / self.source_dataset.num_rows)
 
 		# sort by time and frequency
 		self.dataset.update_status("Sorting items")

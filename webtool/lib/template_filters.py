@@ -2,7 +2,6 @@ import urllib.parse
 import datetime
 from math import floor
 
-import markdown
 import json
 import ural
 import uuid
@@ -13,6 +12,7 @@ import requests
 
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
+from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify_long
 from common.config_manager import ConfigWrapper
 
@@ -166,11 +166,7 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
 
 @app.template_filter('markdown',)
 def _jinja2_filter_markdown(text, trim_container=False):
-	val = markdown.markdown(text)
-	if trim_container:
-		val = re.sub(r"^<p>", "", val)
-		val = re.sub(r"</p>$", "", val)
-	return val
+	return parse_markdown(text, trim_container)
 
 @app.template_filter('isbool')
 def _jinja2_filter_isbool(value):

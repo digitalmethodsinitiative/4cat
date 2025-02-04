@@ -635,6 +635,15 @@ body.csv-preview table tr:nth-child(2n+1) {
     vertical-align: bottom;
 }
 
+body.csv-preview .missing-field {
+    background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcBAMAAACAI8KnAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAElBMVEXu7u7v7O3z3uf11eP4y978wNnbft+uAAAARElEQVQY09XJUQmAQBQAwRUrGMASRrDAwfav4seDg43g5zAAwKWqa3S8w/sXSZPkSfIhKcnhzuFOSUpSkpKUpCQlKUk/jndCArsTDbwAAAAASUVORK5CYII=');
+    background-attachment: fixed;
+}
+
+body.csv-preview .missing-field:hover {
+    outline: 1px solid var(--accent);
+}
+
 .child.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
 	display: none;
 }

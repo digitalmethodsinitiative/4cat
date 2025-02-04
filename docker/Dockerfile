@@ -1,10 +1,11 @@
-FROM python:3.8-slim AS compile-image
+FROM python:3.11-slim
 
 RUN apt-get update && apt install -y \
     # General requirements:
     libpq-dev \
     python3-dev \
     python3-pip \
+    gcc \
     # Called in docker-entrypoint.sh:
     curl \
     netcat-traditional \
