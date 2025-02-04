@@ -3,6 +3,7 @@ Consolidate URLs using rules
 """
 import csv
 from urllib.parse import urlparse, urlunparse
+from ural import is_url
 
 from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
@@ -276,15 +277,22 @@ class ConsolidateURLs(BasicProcessor):
                 value = item.get(column)
                 consolidated_urls = []
                 if value:
+                    # Split URLs
+                    # This fails if URLs have commas in them
+                    # https://github.com/digitalmethodsinitiative/4cat_web_studies_extensions/blob/e034f11195ba173b1656ce83bc5dbaf0ace3f62b/selenium_scraper.py#L468
                     row_urls = value.split(",")
                     # Expand url shorteners
                     if expand_urls:
                         row_urls = [
-                            ExtractURLs.resolve_redirect(url=url, redirect_domains=ExtractURLs.redirect_domains, cache=redirect_cache) for url in
+                            ExtractURLs.resolve_redirect(url=url, redirect_domains=ExtractURLs.redirect_domains, cache=redirect_cache) if is_url(url) else url for url in
                             row_urls]
 
                     # Consolidate URLs
                     for url in row_urls:
+                        if not is_url(url):
+                            # Not a URL, skip
+                            consolidated_urls.append(url)
+                            continue
                         parsed_url = urlparse(url)
 
                         # Remove some common domain prefaces
