@@ -5,8 +5,6 @@ RUN apt-get update && apt install -y \
     libpq-dev \
     python3-dev \
     python3-pip \
-    # Needed for psycopg2 w/ python 3.11:
-    libpython3.11-dev \
     # Called in docker-entrypoint.sh:
     curl \
     netcat-traditional \
