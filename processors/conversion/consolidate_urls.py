@@ -50,33 +50,38 @@ class ConsolidateURLs(BasicProcessor):
                 "custom": "Customize rules (use settings below)",
                 "social_media": "Social Media rules; overrides other options",
             },
-            "default": "basics",
+            "default": "domain",
             "tooltip": "Social Media rules are predefined and available via GitHub link."
         },
         "remove_scheme": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove scheme (e.g., 'http', 'https', etc.)",
+            "requires": "method==custom"
         },
         "remove_path": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove path (e.g., '/path/to/article')",
+            "requires": "method==custom"
         },
         "remove_query": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove query (e.g., '?query=search_term' or '?ref=newsfeed')",
+            "requires": "method==custom"
         },
         "remove_parameters": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove parameters (e.g., ';key1=value1')",
+            "requires": "method==custom"
         },
         "remove_fragments": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove fragments (e.g., '#fragment')",
+            "requires": "method==custom"
         },
     }
 
