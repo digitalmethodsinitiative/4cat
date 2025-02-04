@@ -11,7 +11,7 @@ from ural import urls_from_text
 
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -361,7 +361,7 @@ class ExtractURLs(BasicProcessor):
         :return list:  	            list of identified URLs
         """
         if split_comma:
-            texts = text.split(",")
+            texts = split_urls(text)
         else:
             texts = [text]
 

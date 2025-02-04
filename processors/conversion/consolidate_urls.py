@@ -8,7 +8,7 @@ from ural import is_url
 from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -254,6 +254,7 @@ class ConsolidateURLs(BasicProcessor):
 
     def process(self):
         method = self.parameters.get("method", False)
+        url_parsing_issues = []
         column = self.parameters.get("column", False)
         if not method or not column:
             self.dataset.update_status("Invalid parameters; ensure column and method are correct", is_final=True)
@@ -278,14 +279,13 @@ class ConsolidateURLs(BasicProcessor):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
 
+                item_id = item.get("id")
                 row = item.copy()
                 value = item.get(column)
                 consolidated_urls = []
-                if value:
+                if value and isinstance(value, str):
                     # Split URLs
-                    # This fails if URLs have commas in them
-                    # https://github.com/digitalmethodsinitiative/4cat_web_studies_extensions/blob/e034f11195ba173b1656ce83bc5dbaf0ace3f62b/selenium_scraper.py#L468
-                    row_urls = value.split(",")
+                    row_urls = split_urls(value)
                     # Expand url shorteners
                     if expand_urls:
                         row_urls = [
@@ -296,6 +296,7 @@ class ConsolidateURLs(BasicProcessor):
                     for url in row_urls:
                         if not is_url(url):
                             # Not a URL, skip
+                            url_parsing_issues.append((item_id, url))
                             consolidated_urls.append(url)
                             continue
                         parsed_url = urlparse(url)
@@ -313,9 +314,16 @@ class ConsolidateURLs(BasicProcessor):
                         if method == "social_media":
                             if domain in self.social_media_rules:
                                 for rule in self.social_media_rules[domain]:
-                                    if rule["rule"](parsed_url):
-                                        # Rule matched, append result and stop checking rules
-                                        consolidated_urls.append(rule["result"](parsed_url))
+                                    try:
+                                        if rule["rule"](parsed_url):
+                                            # Rule matched, append result and stop checking rules
+                                            consolidated_urls.append(rule["result"](parsed_url))
+                                            break
+                                    except IndexError as e:
+                                        # Issue with
+                                        self.log.error(f"Error processing rule for {domain}: {e}")
+                                        url_parsing_issues.append((item_id, url))
+                                        consolidated_urls.append(domain)
                                         break
                             else:
                                 # Return only the domain if no other rules exist
@@ -345,6 +353,9 @@ class ConsolidateURLs(BasicProcessor):
 
         if redirect_cache:
             self.dataset.log(f"Expanded {len(redirect_cache)} URLs in dataset")
+        if url_parsing_issues:
+            self.dataset.log("Rules could not be applied to the following URLs: \n"+ '\n'.join([f"{item_id}: {url}" for item_id, url in url_parsing_issues]))
+            self.dataset.update_status("Rules could not be applied to some URLs; see log for details", is_final=True)
         self.dataset.finish(processed_items)
 
     @staticmethod
