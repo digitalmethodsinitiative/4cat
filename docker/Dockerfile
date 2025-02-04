@@ -5,6 +5,7 @@ RUN apt-get update && apt install -y \
     libpq-dev \
     python3-dev \
     python3-pip \
+    gcc \
     # Called in docker-entrypoint.sh:
     curl \
     netcat-traditional \
