@@ -101,6 +101,10 @@ class DatasetItem(dict):
         self._original = original
         self._mapped_object = mapped_object
 
+        if hasattr(mapped_object, "get_missing_fields"):
+            self.missing_fields = mapped_object.get_missing_fields()
+            self["missing_fields"] = ", ".join(self.missing_fields)
+
     @property
     def original(self):
         """
