@@ -1079,7 +1079,7 @@ const tooltip = {
             let top_position = (position.top - height - 5);
 
             // if out of viewport, position below element instead
-            if(top_position < 0) {
+            if(top_position < window.scrollY) {
                 top_position = position.top + parseFloat($(parent).css('height').replace('px', '')) + 5;
             }
             tooltip_container.css('top', top_position + 'px');
