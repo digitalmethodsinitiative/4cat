@@ -2,11 +2,9 @@ FROM python:3.11-slim
 
 RUN apt-get update && apt install -y \
     # General requirements:
-    build-essential \
     libpq-dev \
     python3-dev \
     python3-pip \
-    gcc \
     # Called in docker-entrypoint.sh:
     curl \
     netcat-traditional \

@@ -42,6 +42,7 @@ jobs:
           push: true
           tags: digitalmethodsinitiative/4cat:latest
 
+ # We could combine the two jobs into one (with continue-on-error: true). Running two jobs has the advantage of running them at the same time, but, possibly, requires more resources.
   push_to_registry_arm64:
     name: Push Docker image to Docker Hub (arm64)
     runs-on: ubuntu-latest
@@ -72,7 +73,8 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
-          platforms: linux/arm64
+          # python:3.11-slim is not available for arm64, so we build for arm64/v8
+          # https://hub.docker.com/_/python/
+          platforms: linux/arm64/v8
           push: true
           tags: digitalmethodsinitiative/4cat:latest
-  
