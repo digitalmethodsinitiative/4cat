@@ -39,25 +39,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 
 -- queries
 CREATE TABLE IF NOT EXISTS datasets (
-  id                SERIAL PRIMARY KEY,
-  key               text,
-  type              text DEFAULT 'search',
-  key_parent        text DEFAULT '' NOT NULL,
-  creator           VARCHAR DEFAULT 'anonymous',
-  query             text,
-  job               BIGINT DEFAULT 0,
-  parameters        text,
-  result_file       text DEFAULT '',
-  timestamp         integer,
-  status            text,
-  num_rows          integer DEFAULT 0,
-  progress          float DEFAULT 0.0,
-  is_finished       boolean DEFAULT FALSE,
-  is_private        boolean DEFAULT TRUE,
-  software_version  text,
-  software_file     text DEFAULT '',
-  software_source   text DEFAULT '',
-  annotation_fields text DEFAULT ''
+  id                  SERIAL PRIMARY KEY,
+  key                 text,
+  type                text DEFAULT 'search',
+  key_parent          text DEFAULT '' NOT NULL,
+  creator             VARCHAR DEFAULT 'anonymous',
+  query               text,
+  job                 BIGINT DEFAULT 0,
+  parameters          text,
+  result_file         text DEFAULT '',
+  timestamp           integer,
+  status              text,
+  num_rows            integer DEFAULT 0,
+  progress            float DEFAULT 0.0,
+  is_finished         boolean DEFAULT FALSE,
+  timestamp_finished  integer DEFAULT NULL,
+  is_private          boolean DEFAULT TRUE,
+  software_version    text,
+  software_file       text DEFAULT '',
+  software_source     text DEFAULT '',
+  annotation_fields   text DEFAULT ''
 );
 
 CREATE TABLE datasets_owners (
