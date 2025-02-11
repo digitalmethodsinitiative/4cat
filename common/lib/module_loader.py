@@ -156,6 +156,8 @@ class ModuleCollector:
                     self.workers[component[1].type] = component[1]
                     self.workers[component[1].type].filepath = relative_path
                     self.workers[component[1].type].is_extension = is_extension
+                    if is_extension:
+                        self.workers[component[1].type].extension_name = module_name.split(".")[1]
 
                     # we can't use issubclass() because for that we would need
                     # to import BasicProcessor, which would lead to a circular

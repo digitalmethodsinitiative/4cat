@@ -69,6 +69,8 @@ class ExtensionManipulator(BasicWorker):
         elif task == "uninstall":
             self.uninstall_extension(extension_reference)
 
+        # TODO: 4CAT should restart here to load the new extension and run any installations or update the module loader on uninstall
+
         self.job.finish()
 
     def uninstall_extension(self, extension_name):
@@ -86,11 +88,27 @@ class ExtensionManipulator(BasicWorker):
         :param str extension_name:  ID of the extension (i.e. name of the
         folder it is in)
         """
+        self.extension_log.info(f"Uninstalling extension {extension_name}.")
         extensions_root = self.config.get("PATH_ROOT").joinpath("extensions")
         target_folder = extensions_root.joinpath(extension_name)
 
         if not target_folder.exists():
             return self.extension_log.error(f"Extension {extension_name} does not exist - cannot remove it.")
+        
+        # Collect job types and uninstall function in extension workers
+        extension_jobtypes = []
+        for extension_worker in self.modules.workers.values():
+            if extension_worker.is_extension and extension_worker.extension_name == extension_name:
+                extension_jobtypes.append(extension_worker.type)
+                if hasattr(extension_worker, "uninstall"):
+                    self.extension_log.info(f"Running uninstall function for extension {extension_name}.")
+                    extension_worker.uninstall()
+        
+        # Remove existing jobs for this extension
+        for job in self.queue.get_all_jobs(restrict_claimable=False):
+            if job.data["jobtype"] in extension_jobtypes:
+                self.extension_log.info(f"Removing job {job.data['jobtype']} - {job.data['remote_id']}.")
+                job.finish(delete=True)     
 
         try:
             shutil.rmtree(target_folder)
