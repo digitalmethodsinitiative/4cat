@@ -265,7 +265,7 @@ def find_extensions():
     extension_path = config.get("PATH_ROOT").joinpath("extensions")
     errors = []
     if not extension_path.exists() or not extension_path.is_dir():
-        return [], None
+        return {}, errors
 
     # each folder in the extensions folder is an extension
     extensions = {
@@ -274,7 +274,8 @@ def find_extensions():
             "version": "",
             "url": "",
             "git_url": "",
-            "is_git": False
+            "is_git": False,
+            "enabled": config.get("extensions.enabled").get(extension.name, {}).get("enabled")
         } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
     }
 

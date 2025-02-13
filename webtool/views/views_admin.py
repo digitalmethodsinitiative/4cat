@@ -631,13 +631,7 @@ def manipulate_settings():
         for datasource, info in fourcat_modules.datasources.items()}
 
     # similar deal for extensions
-    extension_config = {
-        extension: {
-            **info,
-            "enabled": config.get("extensions.enabled").get(extension, {}).get("enabled")
-        }
-        for extension, info in find_extensions()[0].items()
-    }
+    extension_config = find_extensions()[0]
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
