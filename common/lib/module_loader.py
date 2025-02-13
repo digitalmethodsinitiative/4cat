@@ -99,6 +99,7 @@ class ModuleCollector:
         # look for workers and processors in pre-defined folders and datasources
 
         extension_path = Path(config.get('PATH_ROOT'), "extensions")
+        enabled_extensions = [e for e, s in config.get("extensions.enabled").items() if s["enabled"]]
 
         paths = [Path(config.get('PATH_ROOT'), "processors"),
                  Path(config.get('PATH_ROOT'), "backend", "workers"),
@@ -115,6 +116,7 @@ class ModuleCollector:
                 # determine module name for file
                 # reduce path to be relative to 4CAT root
                 module_name = ".".join(file.parts[len(root_path.parts):-1] + (file.stem,))
+                extension_name = file.parts[len(extension_path.parts):][0] if is_extension else None
 
                 # check if we've already loaded this module
                 if module_name in self.ignore:
@@ -123,6 +125,9 @@ class ModuleCollector:
                 if module_name in sys.modules:
                     # This skips processors/datasources that were loaded by others and may not yet be captured
                     pass
+
+                if is_extension and len(module_name.split(".")) > 1 and extension_name not in enabled_extensions:
+                    continue
 
                 # try importing
                 try:
@@ -152,6 +157,8 @@ class ModuleCollector:
                     self.workers[component[1].type] = component[1]
                     self.workers[component[1].type].filepath = relative_path
                     self.workers[component[1].type].is_extension = is_extension
+                    if is_extension:
+                        self.workers[component[1].type].extension_name = extension_name
 
                     # we can't use issubclass() because for that we would need
                     # to import BasicProcessor, which would lead to a circular
@@ -221,7 +228,13 @@ class ModuleCollector:
 
         # Load extension datasources
         # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
-        for root, dirs, files in os.walk(Path(config.get('PATH_ROOT'), "extensions"), followlinks=True):
+        enabled_extensions = [e for e, s in config.get("extensions.enabled").items() if s["enabled"]]
+        extensions_root = Path(config.get('PATH_ROOT'), "extensions")
+        for root, dirs, files in os.walk(extensions_root, followlinks=True):
+            relative_root = Path(root).relative_to(extensions_root)
+            if relative_root.parts and relative_root.parts[0] not in enabled_extensions:
+                continue
+
             if "datasources" in dirs:
                 for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():
