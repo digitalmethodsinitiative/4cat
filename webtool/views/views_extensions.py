@@ -30,7 +30,7 @@ def extensions_panel():
         install_started = True
 
         if request.files["extension-file"].filename:
-            uploaded_file = request.files["extension-file"].filename
+            uploaded_file = request.files["extension-file"]
             stem = re.sub(r"[^a-zA-Z0-9_-]", "", uploaded_file.filename.replace(" ", "_")).strip()
             temporary_path = config.get("PATH_ROOT").joinpath("extensions").joinpath(f"temp-{stem}.zip")
             uploaded_file.save(temporary_path)
