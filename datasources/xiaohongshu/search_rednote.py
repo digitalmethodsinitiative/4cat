@@ -54,8 +54,6 @@ class SearchRedNote(Search):
             if "note" in post:
                 return SearchRedNote.map_item_from_json_embedded(post)
             else:
-                if post.get("type") == "video":
-                    post["note_card"] = post.copy()
                 return SearchRedNote.map_item_from_json_api_explore(post)
 
     @staticmethod
@@ -69,13 +67,19 @@ class SearchRedNote(Search):
         :param dict post:
         :return MappedItem:
         """
-        item = post["note_card"]
+        item = post["note_card"] if post.get("type") != "video" else post
         item_id = post.get("id", post.get("note_id"))
 
-        image = item["image_list"].pop(0)["url_default"] if item.get("image_list") else item["cover"]["url_default"]
+        import json
+
+        image = item["image_list"][0]["url_default"] if item.get("image_list") else item["cover"]["url_default"]
 
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={post['xsec_token']}" if post.get("xsec_token") else ""
+        if item.get("video"):
+            video_url = item["video"]["media"]["stream"]["h264"][0]["master_url"]
+        else:
+            video_url = MissingMappedField("")
 
         timestamp = item.get("time", None)
         return MappedItem({
@@ -87,6 +91,7 @@ class SearchRedNote(Search):
             "author": item["user"]["nickname"],
             "author_avatar_url": item["user"]["avatar"],
             "image_url": image,
+            "video_url": video_url,
             # only available when loading an individual post page, so skip
             # "tags": ",".join(t["name"] for t in item["tag_list"]),
             "likes": item["interact_info"]["liked_count"],
@@ -109,7 +114,7 @@ class SearchRedNote(Search):
         :return MappedItem:
         """
         note = item["note"]
-        image = note["imageList"].pop(0)["urlDefault"]
+        image = note["imageList"][0]["urlDefault"]
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={note['xsecToken']}"
         timestamp = item.get("time", None)
@@ -123,6 +128,7 @@ class SearchRedNote(Search):
             "author": note["user"]["nickname"],
             "author_avatar_url": note["user"]["avatar"],
             "image_url": image,
+            "video_url": MissingMappedField(""),
             # only available when loading an individual post page, so skip
             # "tags": ",".join(t["name"] for t in item["tag_list"]),
             "likes": item["interactInfo"]["likedCount"],
@@ -151,6 +157,7 @@ class SearchRedNote(Search):
             "author": item["author_name"],
             "author_avatar_url": item["author_avatar_url"],
             "image_url": item["thumbnail_url"],
+            "video_url": MissingMappedField(""),
             # "tags": MissingMappedField(""),
             "likes": item["likes"],
             # "collects": MissingMappedField(""),
