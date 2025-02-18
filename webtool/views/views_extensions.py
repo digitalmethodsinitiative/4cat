@@ -32,7 +32,7 @@ def extensions_panel():
         if request.files["extension-file"].filename:
             uploaded_file = request.files["extension-file"]
             stem = re.sub(r"[^a-zA-Z0-9_-]", "", uploaded_file.filename.replace(" ", "_")).strip()
-            temporary_path = config.get("PATH_ROOT").joinpath("extensions").joinpath(f"temp-{stem}.zip")
+            temporary_path = config.get("PATH_EXTENSIONS").joinpath(f"temp-{stem}.zip")
             uploaded_file.save(temporary_path)
             queue.add_job("manage-extension", details={"task": "install", "source": "local"},
                           remote_id=str(temporary_path))

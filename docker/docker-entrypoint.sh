@@ -41,7 +41,7 @@ else
   # Seed DB
   cd /usr/src/app && psql --host=$POSTGRES_HOST --port=$POSTGRES_PORT --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
   # No database exists, new build, no need to migrate so create .current-version file
-  cp VERSION config/.current-version
+  mkdir -p data/config && cp VERSION data/config/.current-version
 fi
 
 # If backend did gracefully shutdown, PID lockfile remains; Remove lockfile
@@ -51,7 +51,7 @@ rm -f ./backend/4cat.pid
 export PYTHONPATH=/usr/src/app:$PYTHONPATH
 
 # Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
-python3 helper-scripts/migrate.py -y -o logs/migrate-backend.log
+python3 helper-scripts/migrate.py -y -o data/logs/migrate-backend.log
 
 # Run docker_setup to update any environment variables if they were changed
 python3 -m docker.docker_setup
@@ -61,4 +61,6 @@ python3 4cat-daemon.py start
 
 # Tail logs and wait for SIGTERM
 sleep 1  # give the logger time to initialise
-exec tail -f -n 3 logs/backend_4cat.log & wait $!
+# get log location from python config.get("PATH_LOGS")
+LOG_PATH=$(python3 -c "from common.config_manager import config; print(config.get('PATH_LOGS'))")
+exec tail -f -n 3 $LOG_PATH/backend_4cat.log & wait $!

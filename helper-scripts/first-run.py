@@ -30,11 +30,14 @@ if not version_file.exists():
     print("VERSION file not found. You should re-install 4CAT before continuing.", file=sys.stderr)
     exit(1)
 
-current_version_file = version_file.parent.joinpath("config/.current-version")
-if current_version_file.exists():
-    # this file does not exist by default, so if it does, that means we don't
-    # need to do further on-boarding since 4CAT has already been run
-    exit(0)
+# If any .current-version file exists, we don't need to do anything (though the sys admin may need to run migrate.py)
+current_version_files = [".current-version", "config/.current-version", "data/config/.current-version"]
+for current_version_file in current_version_files:
+    current_version_file = version_file.parent.joinpath(current_version_file)
+    if current_version_file.exists():
+        # this file does not exist by default, so if it does, that means we don't
+        # need to do further on-boarding since 4CAT has already been run
+        exit(0)
 
 shutil.copy(version_file, current_version_file)
 

@@ -166,7 +166,7 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    return send_from_directory(directory=config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')), path=query_file)
+    return send_from_directory(directory=config.get('PATH_DATA'), path=query_file)
 
 
 @app.route('/mapped-result/<string:key>/')

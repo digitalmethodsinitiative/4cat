@@ -374,7 +374,7 @@ def inject_now():
 
 	wrapped_config = ConfigWrapper(config, user=current_user, request=request)
 
-	cv_path = wrapped_config.get("PATH_ROOT").joinpath("config/.current-version")
+	cv_path = wrapped_config.get("PATH_CONFIG").joinpath(".current-version")
 	if cv_path.exists():
 		with cv_path.open() as infile:
 			version = infile.readline().strip()

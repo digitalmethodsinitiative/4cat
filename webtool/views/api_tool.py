@@ -80,7 +80,7 @@ def api_status():
 	jobs_sorted["total"] = jobs_count
 
 	# determine if backend is live by checking if the process is running
-	lockfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
+	lockfile = config.get('PATH_LOCKFILE').joinpath("4cat.pid")
 	if os.path.isfile(lockfile):
 		with lockfile.open() as pidfile:
 			pid = pidfile.read()

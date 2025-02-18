@@ -24,7 +24,6 @@ ENV PYTHONUNBUFFERED=1
 # Install dependencies
 RUN pip3 install --upgrade pip
 COPY ./requirements.txt /usr/src/app/requirements.txt
-COPY ./extensions /usr/src/app/extensions
 COPY ./setup.py /usr/src/app/setup.py
 COPY ./VERSION /usr/src/app/VERSION
 COPY ./README.md /usr/src/app/README.md

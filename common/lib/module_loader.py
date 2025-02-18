@@ -60,7 +60,7 @@ class ModuleCollector:
                 if hasattr(worker, "config") and type(worker.config) is dict:
                     module_config.update(worker.config)
 
-            with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+            with config.get("PATH_CONFIG").joinpath("module_config.bin").open("wb") as outfile:
                 pickle.dump(module_config, outfile)
 
         # load from cache
@@ -98,16 +98,16 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        extension_path = Path(config.get('PATH_ROOT'), "extensions")
+        extension_path = config.get('PATH_EXTENSIONS')
         enabled_extensions = [e for e, s in config.get("extensions.enabled").items() if s["enabled"]]
 
-        paths = [Path(config.get('PATH_ROOT'), "processors"),
-                 Path(config.get('PATH_ROOT'), "backend", "workers"),
+        paths = [config.get('PATH_ROOT').joinpath("processors"),
+                 config.get('PATH_ROOT').joinpath("backend/workers"),
                  extension_path,
                  *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
 
         root_match = re.compile(r"^%s" % re.escape(str(config.get('PATH_ROOT'))))
-        root_path = Path(config.get('PATH_ROOT'))
+        root_path = config.get('PATH_ROOT')
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
@@ -199,7 +199,7 @@ class ModuleCollector:
             Load a single datasource
             """
             # determine module name (path relative to 4CAT root w/ periods)
-            module_name = ".".join(subdirectory.relative_to(Path(config.get("PATH_ROOT"))).parts)
+            module_name = ".".join(subdirectory.relative_to(config.get("PATH_ROOT")).parts)
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
@@ -222,14 +222,14 @@ class ModuleCollector:
             }
 
         # Load 4CAT core datasources
-        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
+        for subdirectory in config.get('PATH_ROOT').joinpath("datasources").iterdir():
             if subdirectory.is_dir():
                 _load_datasource(subdirectory)
 
         # Load extension datasources
         # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
         enabled_extensions = [e for e, s in config.get("extensions.enabled").items() if s["enabled"]]
-        extensions_root = Path(config.get('PATH_ROOT'), "extensions")
+        extensions_root = config.get('PATH_EXTENSIONS')
         for root, dirs, files in os.walk(extensions_root, followlinks=True):
             relative_root = Path(root).relative_to(extensions_root)
             if relative_root.parts and relative_root.parts[0] not in enabled_extensions:

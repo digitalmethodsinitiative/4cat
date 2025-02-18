@@ -748,7 +748,7 @@ def get_log(logfile):
     else:
         filename = f"{logfile}.log"
 
-    log_file = config.get("PATH_ROOT").joinpath(config.get("PATH_LOGS")).joinpath(filename)
+    log_file = config.get("PATH_LOGS").joinpath(filename)
     if log_file.exists():
         with log_file.open() as infile:
             return "\n".join(tailer.tail(infile, 250))
@@ -1034,7 +1034,7 @@ def import_dataset_from():
     except ValueError:
         raise QueryParametersException(f"Unexpected response when trying to fetch metadata for dataset {keys[0]}.")
 
-    version_file = config.get("PATH_ROOT", user=user).joinpath("config/.current-version")
+    version_file = config.get("PATH_CONFIG", user=user).joinpath(".current-version")
     with version_file.open() as infile:
         version = infile.readline().strip()
 

@@ -174,7 +174,7 @@ class Logger:
         log_level = self.levels.get(log_level, logging.INFO)
 
         self.print_logs = output
-        log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
+        log_folder = config.get('PATH_LOGS')
         if not log_folder.exists():
             log_folder.mkdir(parents=True)
 

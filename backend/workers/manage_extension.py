@@ -53,7 +53,7 @@ class ExtensionManipulator(BasicWorker):
         # installations etc and display those separately in e.g. the web
         # interface
 
-        log_file = Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_LOGS")).joinpath("extensions.log")
+        log_file = self.config.get("PATH_LOGS").joinpath("extensions.log")
         logger = logging.getLogger(self.type)
         if not logger.handlers:
             handler = RotatingFileHandler(log_file, backupCount=1, maxBytes=50000)
@@ -89,7 +89,7 @@ class ExtensionManipulator(BasicWorker):
         folder it is in)
         """
         self.extension_log.info(f"Uninstalling extension {extension_name}.")
-        extensions_root = self.config.get("PATH_ROOT").joinpath("extensions")
+        extensions_root = self.config.get("PATH_EXTENSIONS")
         target_folder = extensions_root.joinpath(extension_name)
 
         if not target_folder.exists():
@@ -202,7 +202,7 @@ class ExtensionManipulator(BasicWorker):
             return self.extension_log.error(f"Extension file does not exist at {archive_path} - cannot install."), None
 
         extension_name = archive_path.stem
-        extensions_root = self.config.get("PATH_ROOT").joinpath("extensions")
+        extensions_root = self.config.get("PATH_EXTENSIONS")
         temp_name = self.get_temporary_folder(extensions_root)
         try:
             with zipfile.ZipFile(archive_path, "r") as archive_file:
@@ -246,7 +246,7 @@ class ExtensionManipulator(BasicWorker):
                 f"Cannot install 4CAT extension - the repository URL seems invalid or unreachable ({e})"), None
 
         # ok, we have a valid URL that is reachable - try cloning from it
-        extensions_root = self.config.get("PATH_ROOT").joinpath("extensions")
+        extensions_root = self.config.get("PATH_EXTENSIONS")
         os.chdir(extensions_root)
 
         temp_name = self.get_temporary_folder(extensions_root)
