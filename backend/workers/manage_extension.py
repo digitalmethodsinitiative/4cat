@@ -1,6 +1,7 @@
 """
 Manage a 4CAT extension
 """
+import datetime
 import subprocess
 import requests
 import logging
@@ -65,11 +66,30 @@ class ExtensionManipulator(BasicWorker):
         self.extension_log = logger
 
         if task == "install":
-            self.install_extension(extension_reference)
+            success = self.install_extension(extension_reference)
+            if success:
+                # Add job to restart 4CAT; include upgrade to ensure migrate.py runs which will install any extension updates and new python packages
+                lock_file = config.get("PATH_CONFIG").joinpath("restart.lock")
+                if lock_file.exists():
+                    # restart already in progress
+                    self.extension_log.info("4CAT restart already in progress. Upgrade will be applied on next restart.")
+                else:
+                    self.extension_log.info("Adding job to restart 4CAT and apply extension upgrade.")
+                     # ensure lockfile exists - will be written to later by worker
+                    lock_file.touch()
+                    # this log file is used to keep track of the progress, and will also
+                    # be viewable in the web interface
+                    restart_log_file = config.get("PATH_CONFIG").joinpath("restart.log")
+                    with restart_log_file.open("w") as outfile:
+                        outfile.write(
+                            f"Upgrade initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
+                        outfile.write(f"Telling 4CAT to upgrade via job queue...\n")
+                    
+                    # add job to restart 4CAT
+                    self.queue.add_job("restart-4cat", {}, "upgrade")
+                
         elif task == "uninstall":
             self.uninstall_extension(extension_reference)
-
-        # TODO: 4CAT should restart here to load the new extension and run any installations or update the module loader on uninstall
 
         self.job.finish()
 
@@ -130,6 +150,7 @@ class ExtensionManipulator(BasicWorker):
         path.
         :param bool overwrite:  Overwrite extension if one exists? Set to
         `true` to upgrade existing extensions (for example)
+        :return bool:  `True` if installation was successful, `False` otherwise
         """
         if self.job.details.get("source") == "remote":
             extension_folder, extension_name = self.clone_from_url(repository_reference)
@@ -137,22 +158,25 @@ class ExtensionManipulator(BasicWorker):
             extension_folder, extension_name = self.unpack_from_zip(repository_reference)
 
         if not extension_name:
-            return self.extension_log.error("The 4CAT extension could not be installed.")
+            self.extension_log.error("The 4CAT extension could not be installed.")
+            return False
 
         # read manifest file
         manifest_file = extension_folder.joinpath("metadata.json")
         if not manifest_file.exists():
             shutil.rmtree(extension_folder)
-            return self.extension_log.error(f"Manifest file of newly cloned 4CAT extension {repository_reference} does "
+            self.extension_log.error(f"Manifest file of newly cloned 4CAT extension {repository_reference} does "
                                             f"not exist. Cannot install as a 4CAT extension.")
+            return False
         else:
             try:
                 with manifest_file.open() as infile:
                     manifest_data = json.load(infile)
             except json.JSONDecodeError:
                 shutil.rmtree(extension_folder)
-                return self.extension_log.error(f"Manifest file of newly cloned 4CAT extension {repository_reference} "
+                self.extension_log.error(f"Manifest file of newly cloned 4CAT extension {repository_reference} "
                                                 f"could not be parsed. Cannot install as a 4CAT extension.")
+                return False
 
         canonical_name = manifest_data.get("name", extension_name)
         canonical_id = manifest_data.get("id", extension_name)
@@ -171,19 +195,21 @@ class ExtensionManipulator(BasicWorker):
                     except json.JSONDecodeError:
                         pass
 
-            shutil.rmtree(canonical_folder)
             if overwrite:
                 self.extension_log.warning(f"Uninstalling existing 4CAT extension {existing_name} (version "
                                            f"{existing_version}.")
+                shutil.rmtree(canonical_folder)
             else:
-                return self.extension_log.error(f"An extension with ID {canonical_id} is already installed "
+                self.extension_log.error(f"An extension with ID {canonical_id} is already installed "
                                                 f"({extension_name}, version {existing_version}). Cannot install "
                                                 f"another one with the same ID - uninstall it first.")
+                return False
 
         extension_folder.rename(canonical_folder)
         version = f"version {manifest_data.get('version', 'unknown')}"
         self.extension_log.info(f"Finished installing extension {canonical_name} (version {version}) with ID "
                                 f"{canonical_id}.")
+        return True
 
 
     def unpack_from_zip(self, archive_path):

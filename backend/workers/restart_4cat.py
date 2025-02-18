@@ -162,11 +162,14 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_restart.close()  # close, because front-end will be writing to it
                 upgrade_ok = False
                 upgrade_timeout = False
+                upgrade_error_message = False
                 try:
                     upgrade_url = api_host + "/admin/trigger-frontend-upgrade/"
                     with lock_file.open() as infile:
                         frontend_upgrade = requests.post(upgrade_url, data={"token": infile.read()}, timeout=(10 * 60))
                     upgrade_ok = frontend_upgrade.json()["status"] == "OK"
+                    upgrade_error_message = frontend_upgrade.json().get("message")
+                    self.log.error("Front-end upgrade failed: %s" % upgrade_error_message)
                 except requests.RequestException:
                     pass
                 except TimeoutError:
@@ -176,8 +179,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 if not upgrade_ok:
                     if upgrade_timeout:
                         log_stream_restart.write("Upgrade timed out.")
-                    log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart"
+                    log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart "
                                              "containers manually.\n")
+                    if upgrade_error_message:
+                        log_stream_restart.write(f"Error message: {upgrade_error_message}\n")
                     lock_file.unlink()
                     return self.job.finish()
 
