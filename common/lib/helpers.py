@@ -544,7 +544,7 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
     return canvas
 
 
-def call_api(action, payload=None):
+def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
@@ -552,6 +552,8 @@ def call_api(action, payload=None):
 
     :param str action: API action
     :param payload: API payload
+    :param bool wait_for_response:  Wait for response? If not close connection
+    immediately after sending data.
 
     :return: API response, or timeout message in case of timeout
     """
@@ -562,16 +564,17 @@ def call_api(action, payload=None):
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
 
-    try:
-        response = ""
-        while True:
-            bytes = connection.recv(2048)
-            if not bytes:
-                break
+    if wait_for_response:
+        try:
+            response = ""
+            while True:
+                bytes = connection.recv(2048)
+                if not bytes:
+                    break
 
-            response += bytes.decode("ascii", "ignore")
-    except (socket.timeout, TimeoutError):
-        response = "(Connection timed out)"
+                response += bytes.decode("ascii", "ignore")
+        except (socket.timeout, TimeoutError):
+            response = "(Connection timed out)"
 
     try:
         connection.shutdown(socket.SHUT_RDWR)
@@ -581,7 +584,7 @@ def call_api(action, payload=None):
     connection.close()
 
     try:
-        return json.loads(response)
+        return json.loads(response) if wait_for_response else None
     except json.JSONDecodeError:
         return response
 

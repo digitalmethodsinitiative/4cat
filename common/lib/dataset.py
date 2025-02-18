@@ -15,7 +15,7 @@ from pathlib import Path
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -523,14 +523,14 @@ class DataSet(FourcatModule):
 
 		return copy
 
-	def delete(self, commit=True):
+	def delete(self, commit=True, queue=None):
 		"""
 		Delete the dataset, and all its children
 
 		Deletes both database records and result files. Note that manipulating
 		a dataset object after it has been deleted is undefined behaviour.
 
-		:param commit bool:  Commit SQL DELETE query?
+		:param bool commit:  Commit SQL DELETE query?
 		"""
 		# first, recursively delete children
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
@@ -541,6 +541,27 @@ class DataSet(FourcatModule):
 			except DataSetException:
 				# dataset already deleted - race condition?
 				pass
+
+		# delete any queued jobs for this dataset
+		try:
+			job = Job.get_by_remote_ID(self.key, self.db, self.type)
+			if job.is_claimed:
+				# tell API to stop any jobs running for this dataset
+				# level 2 = cancel job
+				# we're not interested in the result - if the API is available,
+				# it will do its thing, if it's not the backend is probably not
+				# running so the job also doesn't need to be interrupted
+				call_api(
+					"cancel-job",
+					{"remote_id": self.key, "jobtype": self.type, "level": 2},
+					False
+				)
+
+			# this deletes the job from the database
+			job.finish(True)
+
+		except JobNotFoundException:
+			pass
 
 		# delete from database
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
@@ -555,6 +576,7 @@ class DataSet(FourcatModule):
 				self.get_results_path().with_suffix(".log").unlink()
 			if self.get_results_folder_path().exists():
 				shutil.rmtree(self.get_results_folder_path())
+
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
