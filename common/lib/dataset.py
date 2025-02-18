@@ -477,7 +477,7 @@ class DataSet(FourcatModule):
 			raise RuntimeError("Cannot finish a finished dataset again")
 
 		self.db.update("datasets", where={"key": self.data["key"]},
-					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
+					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0, "timestamp_finished": int(time.time())})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
@@ -570,7 +570,8 @@ class DataSet(FourcatModule):
 
 		# delete from drive
 		try:
-			self.get_results_path().unlink()
+			if self.get_results_path().exists():
+				self.get_results_path().unlink()
 			if self.get_results_path().with_suffix(".log").exists():
 				self.get_results_path().with_suffix(".log").unlink()
 			if self.get_results_folder_path().exists():
@@ -579,6 +580,8 @@ class DataSet(FourcatModule):
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
+		except PermissionError as e:
+			self.db.log.error(f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}")
 
 	def update_children(self, **kwargs):
 		"""
@@ -1340,6 +1343,10 @@ class DataSet(FourcatModule):
 		available = {}
 		for processor_type, processor in processors.items():
 			if processor.is_from_collector():
+				continue
+
+			own_processor = self.get_own_processor()
+			if own_processor and own_processor.exclude_followup_processors(processor_type):
 				continue
 
 			# consider a processor compatible if its is_compatible_with

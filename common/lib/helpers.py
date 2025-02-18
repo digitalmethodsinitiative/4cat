@@ -14,6 +14,7 @@ import copy
 import time
 import json
 import math
+import csv
 import ssl
 import re
 import os
@@ -102,6 +103,27 @@ def sniff_encoding(file):
         maybe_bom = False
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
+
+def sniff_csv_dialect(csv_input):
+    """
+    Determine CSV dialect for an input stream
+
+    :param csv_input:  Input stream
+    :return tuple:  Tuple: Dialect object and a boolean representing whether
+    the CSV file seems to have a header
+    """
+    encoding = sniff_encoding(csv_input)
+    if type(csv_input) is io.TextIOWrapper:
+        wrapped_input = csv_input
+    else:
+        wrapped_input = io.TextIOWrapper(csv_input, encoding=encoding)
+    wrapped_input.seek(0)
+    sample = wrapped_input.read(1024 * 1024)
+    wrapped_input.seek(0)
+    has_header = csv.Sniffer().has_header(sample)
+    dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+
+    return dialect, has_header
 
 
 def get_git_branch():
@@ -1000,6 +1022,79 @@ def sets_to_lists(d: MutableMapping):
                 yield k, v
 
     return dict(_sets_to_lists_gen(d))
+
+
+def url_to_hash(url, remove_scheme=True, remove_www=True):
+    """
+    Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
+    rest of the URL.
+    """
+    parsed_url = urlparse(url.lower())
+    if parsed_url:
+        if remove_scheme:
+            parsed_url = parsed_url._replace(scheme="")
+        if remove_www:
+            netloc = re.sub(r"^www\.", "", parsed_url.netloc)
+            parsed_url = parsed_url._replace(netloc=netloc)
+
+        url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
+    else:
+        # Unable to parse URL; use regex
+        if remove_scheme:
+            url = re.sub(r"^https?://", "", url)
+        if remove_www:
+            if not remove_scheme:
+                scheme = re.match(r"^https?://", url).group()
+                temp_url = re.sub(r"^https?://", "", url)
+                url = scheme + re.sub(r"^www\.", "", temp_url)
+            else:
+                url = re.sub(r"^www\.", "", url)
+
+        url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
+
+    return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+
+
+def split_urls(url_string, allowed_schemes=None):
+    """
+    Split URL text by \n and commas.
+
+    4CAT allows users to input lists by either separating items with a newline or a comma. This function will split URLs
+    and also check for commas within URLs using schemes.
+
+    Note: some urls may contain scheme (e.g., https://web.archive.org/web/20250000000000*/http://economist.com);
+    this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
+    """
+    if allowed_schemes is None:
+        allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
+    potential_urls = []
+    # Split the text by \n
+    for line in url_string.split('\n'):
+        # Handle commas that may exist within URLs
+        parts = line.split(',')
+        recombined_url = ""
+        for part in parts:
+            if part.startswith(allowed_schemes):  # Other schemes exist
+                # New URL start detected
+                if recombined_url:
+                    # Already have a URL, add to list
+                    potential_urls.append(recombined_url)
+                # Start new URL
+                recombined_url = part
+            elif part:
+                if recombined_url:
+                    # Add to existing URL
+                    recombined_url += "," + part
+                else:
+                    # No existing URL, start new
+                    recombined_url = part
+            else:
+                # Ignore empty strings
+                pass
+        if recombined_url:
+            # Add any remaining URL
+            potential_urls.append(recombined_url)
+    return potential_urls
 
 
 def folder_size(path='.'):

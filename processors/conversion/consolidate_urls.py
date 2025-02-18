@@ -3,11 +3,12 @@ Consolidate URLs using rules
 """
 import csv
 from urllib.parse import urlparse, urlunparse
+from ural import is_url
 
 from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -49,33 +50,38 @@ class ConsolidateURLs(BasicProcessor):
                 "custom": "Customize rules (use settings below)",
                 "social_media": "Social Media rules; overrides other options",
             },
-            "default": "basics",
+            "default": "domain",
             "tooltip": "Social Media rules are predefined and available via GitHub link."
         },
         "remove_scheme": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove scheme (e.g., 'http', 'https', etc.)",
+            "requires": "method==custom"
         },
         "remove_path": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove path (e.g., '/path/to/article')",
+            "requires": "method==custom"
         },
         "remove_query": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove query (e.g., '?query=search_term' or '?ref=newsfeed')",
+            "requires": "method==custom"
         },
         "remove_parameters": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove parameters (e.g., ';key1=value1')",
+            "requires": "method==custom"
         },
         "remove_fragments": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Remove fragments (e.g., '#fragment')",
+            "requires": "method==custom"
         },
     }
 
@@ -248,6 +254,7 @@ class ConsolidateURLs(BasicProcessor):
 
     def process(self):
         method = self.parameters.get("method", False)
+        url_parsing_issues = []
         column = self.parameters.get("column", False)
         if not method or not column:
             self.dataset.update_status("Invalid parameters; ensure column and method are correct", is_final=True)
@@ -272,19 +279,26 @@ class ConsolidateURLs(BasicProcessor):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
 
+                item_id = item.get("id")
                 row = item.copy()
                 value = item.get(column)
                 consolidated_urls = []
-                if value:
-                    row_urls = value.split(",")
+                if value and isinstance(value, str):
+                    # Split URLs
+                    row_urls = split_urls(value)
                     # Expand url shorteners
                     if expand_urls:
                         row_urls = [
-                            ExtractURLs.resolve_redirect(url=url, redirect_domains=ExtractURLs.redirect_domains, cache=redirect_cache) for url in
+                            ExtractURLs.resolve_redirect(url=url, redirect_domains=ExtractURLs.redirect_domains, cache=redirect_cache) if is_url(url) else url for url in
                             row_urls]
 
                     # Consolidate URLs
                     for url in row_urls:
+                        if not is_url(url):
+                            # Not a URL, skip
+                            url_parsing_issues.append((item_id, url))
+                            consolidated_urls.append(url)
+                            continue
                         parsed_url = urlparse(url)
 
                         # Remove some common domain prefaces
@@ -300,9 +314,16 @@ class ConsolidateURLs(BasicProcessor):
                         if method == "social_media":
                             if domain in self.social_media_rules:
                                 for rule in self.social_media_rules[domain]:
-                                    if rule["rule"](parsed_url):
-                                        # Rule matched, append result and stop checking rules
-                                        consolidated_urls.append(rule["result"](parsed_url))
+                                    try:
+                                        if rule["rule"](parsed_url):
+                                            # Rule matched, append result and stop checking rules
+                                            consolidated_urls.append(rule["result"](parsed_url))
+                                            break
+                                    except IndexError as e:
+                                        # Issue with
+                                        self.log.error(f"Error processing rule for {domain}: {e}")
+                                        url_parsing_issues.append((item_id, url))
+                                        consolidated_urls.append(domain)
                                         break
                             else:
                                 # Return only the domain if no other rules exist
@@ -332,6 +353,9 @@ class ConsolidateURLs(BasicProcessor):
 
         if redirect_cache:
             self.dataset.log(f"Expanded {len(redirect_cache)} URLs in dataset")
+        if url_parsing_issues:
+            self.dataset.log("Rules could not be applied to the following URLs: \n"+ '\n'.join([f"{item_id}: {url}" for item_id, url in url_parsing_issues]))
+            self.dataset.update_status("Rules could not be applied to some URLs; see log for details", is_final=True)
         self.dataset.finish(processed_items)
 
     @staticmethod

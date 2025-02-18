@@ -139,7 +139,7 @@ config_definition = {
     "privileges.admin.can_manipulate_all_datasets": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can manipulate datasets",
+        "help": "Can manipulate all datasets",
         "tooltip": "Controls whether users can manipulate all datasets as if they were an owner, e.g. sharing it with "
                    "others, running processors, et cetera."
     },

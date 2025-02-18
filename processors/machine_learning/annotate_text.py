@@ -11,7 +11,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
-from common.lib.helpers import sniff_encoding
+from common.lib.helpers import sniff_encoding, sniff_csv_dialect
 from common.config_manager import config
 
 __author__ = "Stijn Peeters"
@@ -141,7 +141,6 @@ class TextClassifier(BasicProcessor):
 
         model = self.parameters.get("model")
         textfield = self.parameters.get("text-column")
-        labels = {l.strip(): [] for l in self.parameters.get("categories").split(",") if l.strip()}
 
         # Make output dir
         staging_area = self.dataset.get_staging_area()
@@ -171,6 +170,28 @@ class TextClassifier(BasicProcessor):
                 else:
                     return self.dataset.finish_with_error(
                         "Cannot connect to DMI Service Manager. Verify that this 4CAT server has access to it.")
+
+        if self.parameters["shotstyle"] == "fewshot":
+            # do we have examples?
+            example_path = self.dataset.get_results_path().with_suffix(".importing")
+            if not example_path.exists():
+                return self.dataset.finish_with_error("Cannot open example file")
+
+            labels = {}
+            with example_path.open() as infile:
+                dialect, has_header = sniff_csv_dialect(infile)
+                reader = csv.reader(infile, dialect=dialect)
+                for row in reader:
+                    if row[0] not in labels:
+                        labels[row[0]] = []
+                    labels[row[0]].append(row[1])
+
+            example_path.unlink()
+
+        else:
+            # if we have no examples, just include an empty list
+            labels = {l.strip(): [] for l in self.parameters.get("categories").split(",") if l.strip()}
+
 
         # store labels in a file (since we don't know how much data this is)
         labels_path = staging_area.joinpath("labels.temp.json")
@@ -281,22 +302,18 @@ class TextClassifier(BasicProcessor):
             if not labels or len([l for l in labels if l.strip()]) < 2:
                 raise QueryParametersException("At least two labels should be provided for text classification.")
         else:
-            file = request.files["option-category_file"]
+            file = request.files["option-category-file"]
             if not file:
                 raise QueryParametersException(
                     "No label file provided. A label file is required when using few-shot classification.")
 
             # we want a very specific type of CSV file!
             encoding = sniff_encoding(file)
-
             wrapped_file = io.TextIOWrapper(file, encoding=encoding)
             try:
-                sample = wrapped_file.read(1024 * 1024)
                 wrapped_file.seek(0)
-                has_header = csv.Sniffer().has_header(sample)
-                dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
-
-                reader = csv.reader(wrapped_file) if not has_header else csv.DictReader(wrapped_file)
+                dialect, has_header = sniff_csv_dialect(wrapped_file)
+                reader = csv.reader(wrapped_file, dialect=dialect) if not has_header else csv.DictReader(wrapped_file)
                 row = next(reader)
                 if len(list(row)) != 2:
                     raise QueryParametersException("The label file must have exactly two columns.")
@@ -326,7 +343,7 @@ class TextClassifier(BasicProcessor):
         if query.get("shotstyle") != "fewshot":
             return
 
-        file = request.files["option-category_file"]
+        file = request.files["option-category-file"]
         file.seek(0)
         with dataset.get_results_path().with_suffix(".importing").open("wb") as outfile:
             while True:

@@ -10,6 +10,7 @@ with open("VERSION") as versionfile:
 # Universal packages
 packages = set([
 	"anytree~=2.8.0",
+	"atproto==0.0.57",
 	"bcrypt~=3.2.0",
 	"beautifulsoup4",#~=4.11.0",
 	"clarifai-grpc~=9.0",
@@ -34,6 +35,7 @@ packages = set([
 	"nltk~=3.9.1",
 	"networkx~=2.8.0",
 	"numpy>=1.19.2",
+	"openai==1.59.3",
 	"opencv-python>=4.6.0.66",
 	"packaging",
 	"pandas==1.5.3",
@@ -48,7 +50,6 @@ packages = set([
 	"razdel~=0.5",
 	"requests~=2.27",
 	"requests_futures",
-	"scikit_learn",
 	"scenedetect==0.6.0.3",
 	"scikit-learn",
 	"scipy==1.10.1",

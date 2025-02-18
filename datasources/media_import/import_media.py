@@ -8,7 +8,7 @@ from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
 from common.config_manager import config
-from common.lib.exceptions import QueryParametersException
+from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
 
@@ -65,9 +65,10 @@ class SearchMedia(BasicProcessor):
         seen_types = set()
         all_files = 0
 
-        uploaded_files = request.files.getlist("option-data_upload")
+        uploaded_files = request.files.getlist("option-data_upload") # if multiple files are uploaded; the first validate_query only has a single file
         single_zip_file = uploaded_files and len(uploaded_files) == 1 and uploaded_files[0].filename.lower().endswith(".zip")
 
+        # option-data_upload-entries is passed the first time the form is submitted if the user has uploaded a zip file
         if "option-data_upload-entries" in request.form or single_zip_file:
             # we have a zip file!
             try:
@@ -96,6 +97,8 @@ class SearchMedia(BasicProcessor):
                 # figure out if we have mixed media types
                 seen_types = set()
                 for file in files:
+                    if not query.get("frontend-confirm") and file["filename"].endswith(".svg"):
+                        raise QueryNeedsExplicitConfirmationException("SVG files may not be processed correctly by some 4CAT processors. Are you sure you want to proceed?")
                     try:
                         file_type = mimetypes.guess_type(file["filename"])[0].split("/")[0]
                         seen_types.add(file_type)
@@ -120,6 +123,11 @@ class SearchMedia(BasicProcessor):
                 # Allow metadata files and log files to be uploaded
                 if file.filename == ".metadata.json" or file.filename.endswith(".log"):
                     continue
+
+                # Warn on SVG files
+                if not query.get("frontend-confirm") and file.filename.lower().endswith(".svg"):
+                    raise QueryNeedsExplicitConfirmationException(
+                        "SVG files may not be processed correctly by some 4CAT processors. Are you sure you want to proceed?")
 
                 # when uploading multiple files, we don't want zips
                 if file.filename.lower().endswith(".zip"):
@@ -231,6 +239,7 @@ class SearchMedia(BasicProcessor):
         # update the number of files in the dataset
         dataset.num_files = saved_files
         dataset.media_type = mime_type
+        # TODO: use job's 'details' to save data to share/log?
         if skipped_files:
             # todo: this now doesn't actually get logged because the log is
             # re-initialised after after_create runs?
@@ -241,7 +250,16 @@ class SearchMedia(BasicProcessor):
         """
         Step 3: Ummmm, we kinda did everything
         """
-        self.dataset.log(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}")
+        # Check for SVG files
+        svg_warning = 0
+        if self.parameters.get("media_type") == "image":
+            for file in self.iterate_archive_contents(self.dataset.get_results_path()):
+                if file.suffix == ".svg":
+                    if svg_warning == 0:
+                        self.dataset.log("SVG files may not be processed correctly by some 4CAT processors.")
+                    self.dataset.log(f"SVG file detected: {file.name}")
+                    svg_warning += 1
+        self.dataset.update_status(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}{'' if svg_warning == 0 else f' ({svg_warning} SVG files; see log)'}", is_final=True)
         self.dataset.finish(self.parameters.get("num_files"))
 
     @staticmethod
