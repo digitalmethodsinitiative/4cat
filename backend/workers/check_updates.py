@@ -25,7 +25,7 @@ class UpdateChecker(BasicWorker):
     ensure_job = {"remote_id": config.get("4cat.github_url"), "interval": 10800}
 
     def work(self):
-        versionfile = Path(config.get("PATH_ROOT"), "config/.current-version")
+        versionfile = config.get("PATH_CONFIG").joinpath(".current-version")
         repo_url = config.get("4cat.github_url")
 
         if not versionfile.exists() or not repo_url:
