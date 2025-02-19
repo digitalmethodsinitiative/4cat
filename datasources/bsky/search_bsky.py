@@ -604,23 +604,28 @@ class SearchBluesky(Search):
             "author_display_name": item["author"]["display_name"],
             "author_profile": author_profile,
             "author_avatar": item["author"]["avatar"],
-            "author_created_at": SearchBluesky.bsky_convert_datetime_string(item["author"]["created_at"], mode="iso_string"),
+            "author_created_at": SearchBluesky.bsky_convert_datetime_string(item["author"]["created_at"], mode="iso_string", raise_error=False),
 
             "timestamp": created_at.timestamp(),
         }, message=f"Bluesky new mappings: {unmapped_data}")
 
     @staticmethod
-    def bsky_convert_datetime_string(datetime_string, mode="datetime"):
+    def bsky_convert_datetime_string(datetime_string, mode="datetime", raise_error=True):
         """
-        Bluesky datetime string to datetime object. If unable to parse, return the string.
+        Bluesky datetime string to datetime object.
+
+        Mode "datetime" returns a datetime object, while "iso_string" returns an ISO formatted string.
 
         :param str datetime_string:  The datetime string to convert
         :param str mode:  The mode to return the datetime object in [datetime, iso_string]
-        :return datetime:  The converted datetime object
+        :param bool raise_error:  Raise error if unable to parse else return datetime_string
+        :return datetime/str:  The converted datetime object
         """
         try:
             datetime_object = parser.isoparse(datetime_string)
-        except ValueError:
+        except ValueError as e:
+            if raise_error:
+                raise e
             return datetime_string
         
         if mode == "datetime":
