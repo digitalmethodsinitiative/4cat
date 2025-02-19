@@ -40,6 +40,7 @@ def create_dataset():
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
+@app.time_this
 @login_required
 def show_results(page):
     """
@@ -267,6 +268,7 @@ def view_log(key):
 
 
 @app.route("/preview/<string:key>/")
+@app.time_this
 def preview_items(key):
     """
     Preview a dataset file
@@ -396,6 +398,7 @@ Individual result pages
 """
 @app.route('/results/<string:key>/processors/')
 @app.route('/results/<string:key>/')
+@app.time_this
 def show_result(key):
     """
     Show result page
