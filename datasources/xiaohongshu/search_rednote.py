@@ -76,7 +76,7 @@ class SearchRedNote(Search):
 
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={post['xsec_token']}" if post.get("xsec_token") else ""
-        if item.get("video"):
+        if item.get("video", {}).get("media"):
             video_url = item["video"]["media"]["stream"]["h264"][0]["master_url"]
         else:
             video_url = MissingMappedField("")
