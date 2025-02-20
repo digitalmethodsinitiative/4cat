@@ -283,7 +283,7 @@ class DataSet(FourcatModule):
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
-				reader = csv.DictReader(wrapped_infile, **csv_parameters)
+				reader = csv.DictReader(wrapped_infile)
 
 				if not self.get_own_processor():
 					# Processor was deprecated or removed; CSV file is likely readable but some legacy types are not
@@ -630,7 +630,7 @@ class DataSet(FourcatModule):
 			column_options.add("word_1")
 
 		with self.get_results_path().open(encoding="utf-8") as infile:
-			reader = csv.DictReader(infile, {})
+			reader = csv.DictReader(infile)
 			try:
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
