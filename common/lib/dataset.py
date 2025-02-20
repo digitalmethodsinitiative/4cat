@@ -289,6 +289,13 @@ class DataSet(FourcatModule):
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
 				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
+				if not self.get_own_processor():
+					# Processor was deprecated or removed; CSV file is likely readable but some legacy types are not
+					first_item = next(reader)
+					if first_item is None or any([True for key in first_item if type(key) is not str]):
+						raise NotImplementedError(f"Cannot iterate through CSV file (deprecated processor {self.type})")
+					yield first_item
+
 				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
@@ -423,7 +430,7 @@ class DataSet(FourcatModule):
 		items = self.iterate_items(processor, warn_unmappable=False)
 		try:
 			keys = list(items.__next__().keys())
-		except StopIteration:
+		except (StopIteration, NotImplementedError):
 			return []
 		finally:
 			del items
