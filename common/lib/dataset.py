@@ -408,31 +408,6 @@ class DataSet(FourcatModule):
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 
-	def get_item_keys(self, processor=None):
-		"""
-		Get item attribute names
-
-		It can be useful to know what attributes an item in the dataset is
-		stored with, e.g. when one wants to produce a new dataset identical
-		to the source_dataset one but with extra attributes. This method provides
-		these, as a list.
-
-		:param BasicProcessor processor:  A reference to the processor
-		asking for the item keys, to pass on to iterate_mapped_items
-		:return list:  List of keys, may be empty if there are no items in the
-		  dataset
-		"""
-
-		items = self.iterate_items(processor, warn_unmappable=False)
-		try:
-			keys = list(items.__next__().keys())
-		except (StopIteration, NotImplementedError):
-			return []
-		finally:
-			del items
-
-		return keys
-
 	def get_staging_area(self):
 		"""
 		Get path to a temporary folder in which files can be stored before
@@ -836,13 +811,20 @@ class DataSet(FourcatModule):
 
 		:return list:  List of dataset columns; empty list if unable to parse
 		"""
-
 		if not self.get_results_path().exists():
 			# no file to get columns from
-			return False
+			return []
 
 		if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor() is not None and self.get_own_processor().map_item_method_available(dataset=self)):
-			return self.get_item_keys(processor=self.get_own_processor())
+			items = self.iterate_items(warn_unmappable=False)
+			try:
+				keys = list(items.__next__().keys())
+			except (StopIteration, NotImplementedError):
+				# No items or otherwise unable to iterate
+				return []
+			finally:
+				del items
+			return keys
 		else:
 			# Filetype not CSV or an NDJSON with `map_item`
 			return []
