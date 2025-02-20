@@ -884,13 +884,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
 		return False
 
-	@classmethod
-	def get_csv_parameters(cls, csv_library):
-		"""
-		Returns CSV parameters if they are changed from 4CAT's defaults.
-		"""
-		return {}
-
 	@abc.abstractmethod
 	def process(self):
 		"""

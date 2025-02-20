@@ -282,10 +282,6 @@ class DataSet(FourcatModule):
 		# Yield through items one by one
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
-				# Processor (that created this dataset) may have a custom CSV dialect and parameters
-				own_processor = self.get_own_processor()
-				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
 				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
@@ -634,10 +630,7 @@ class DataSet(FourcatModule):
 			column_options.add("word_1")
 
 		with self.get_results_path().open(encoding="utf-8") as infile:
-			own_processor = self.get_own_processor()
-			csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
-			reader = csv.DictReader(infile, **csv_parameters)
+			reader = csv.DictReader(infile, {})
 			try:
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
