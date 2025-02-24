@@ -263,7 +263,7 @@ class ConsolidateURLs(BasicProcessor):
         expand_urls = self.parameters.get("expand_urls", False)
 
         # Get fieldnames
-        fieldnames = self.source_dataset.get_item_keys(self) + ["4CAT_consolidated_urls_"+method]
+        fieldnames = self.source_dataset.get_columns() + ["4CAT_consolidated_urls_"+method]
         # Avoid requesting the same URL multiple times (if redirects are to be resolved)
         redirect_cache = {}
 

@@ -99,7 +99,7 @@ class HatebaseAnalyser(BasicProcessor):
 		processed = 0
 		matches = 0
 		with self.dataset.get_results_path().open("w") as output:
-			fieldnames = self.source_dataset.get_item_keys(self)
+			fieldnames = self.source_dataset.get_columns()
 			fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
 					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
 					"hatebase_offensiveness_avg")

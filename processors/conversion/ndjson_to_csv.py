@@ -44,7 +44,7 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 		# We first collect all possible columns for the csv file, then
 		# for each item make sure there is a value for all the columns (in the
 		# second step)
-		all_keys = self.source_dataset.get_item_keys()
+		all_keys = self.source_dataset.get_columns()
 
 		self.dataset.update_status("Converting file")
 		staging_area = self.dataset.get_staging_area()

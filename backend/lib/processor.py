@@ -431,7 +431,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# go through items one by one, optionally mapping them
 		if parent_path.suffix.lower() == ".csv":
 			# Get field names
-			fieldnames = which_parent.get_item_keys(self)
+			fieldnames = which_parent.get_columns()
 			if not update_existing and field_name in fieldnames:
 				raise ProcessorException('field_name %s already exists!' % field_name)
 			fieldnames.append(field_name)
@@ -883,13 +883,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :return bool:  True if processor should be excluded, False otherwise
         """
 		return False
-
-	@classmethod
-	def get_csv_parameters(cls, csv_library):
-		"""
-		Returns CSV parameters if they are changed from 4CAT's defaults.
-		"""
-		return {}
 
 	@abc.abstractmethod
 	def process(self):
