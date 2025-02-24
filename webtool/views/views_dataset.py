@@ -11,7 +11,7 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, config, fourcat_modules
+from webtool import app, db, config, fourcat_modules, time_this
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
@@ -40,7 +40,7 @@ def create_dataset():
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
-@app.time_this
+@time_this
 @login_required
 def show_results(page):
     """
@@ -268,7 +268,7 @@ def view_log(key):
 
 
 @app.route("/preview/<string:key>/")
-@app.time_this
+@time_this
 def preview_items(key):
     """
     Preview a dataset file
@@ -398,7 +398,7 @@ Individual result pages
 """
 @app.route('/results/<string:key>/processors/')
 @app.route('/results/<string:key>/')
-@app.time_this
+@time_this
 def show_result(key):
     """
     Show result page
