@@ -143,12 +143,12 @@
 
     {# 'More' button to show further analysis and preview #}
     <div class="processor-expand button-wrap">
-        {% if item.is_finished() and (item.children or (item.num_rows > 0 and current_user.is_authenticated and item.get_available_processors(exclude_hidden=True))) %}
+        {% if item.is_finished() and (item.get_children() or (item.num_rows > 0 and current_user.is_authenticated and item.get_available_processors(exclude_hidden=True))) %}
         <button aria-controls="child-{{ item.key }}-details" class="toggle-button">
             <span class="headline">
             <i class="fa fa-sitemap" aria-hidden="true"></i> <span class="sr-only">More info</span>
-            {% if item.children %}
-                +{{ item.children|length }}
+            {% if item.get_children() %}
+                +{{ item.get_children()|length }}
             {% endif %}
             </span>
             <span class="byline" aria-hidden="true">More...</span>
@@ -160,7 +160,7 @@
     <div class="processor-details" id="child-{{ item.key }}-details" aria-expanded="false">
         {# Child processors, recursively #}
         <ol class="children-datasets child-list">
-            {% for child in item.children %}
+            {% for child in item.get_children() %}
                 {% include "components/result-child.html" %}
             {% endfor %}
         </ol>
