@@ -75,8 +75,9 @@ class SearchBluesky(Search):
             "password": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Bluesky Password",
-                "cache": True,
-                "sensitive": True,
+                "cache": True, # tells the frontend to cache this value
+                "sensitive": True, # tells the backend to delete this value after use
+                "password": True, # tells the frontend this is a password type
             },
             "divider": {
                 "type": UserInput.OPTION_DIVIDER
