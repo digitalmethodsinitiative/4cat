@@ -35,6 +35,7 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
+    OPTION_EXTENSIONS = "extensions"  # extension toggling
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
@@ -142,6 +143,12 @@ class UserInput:
 
                 parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
                 parsed_input[option.split(".")[0] + ".expiration"] = datasources
+
+            elif settings.get("type") == UserInput.OPTION_EXTENSIONS:
+                # also a special case
+                parsed_input[option] = {extension: {
+                    "enabled": f"{option}-enable-{extension}" in input
+                } for extension in input[option].split(",")}
 
             elif option not in input:
                 # not provided? use default

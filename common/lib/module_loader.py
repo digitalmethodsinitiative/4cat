@@ -60,7 +60,7 @@ class ModuleCollector:
                 if hasattr(worker, "config") and type(worker.config) is dict:
                     module_config.update(worker.config)
 
-            with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+            with config.get("PATH_CONFIG").joinpath("module_config.bin").open("wb") as outfile:
                 pickle.dump(module_config, outfile)
 
         # load from cache
@@ -98,15 +98,16 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        extension_path = Path(config.get('PATH_ROOT'), "extensions")
+        extension_path = config.get('PATH_EXTENSIONS')
+        enabled_extensions = [e for e, s in config.get("extensions.enabled").items() if s["enabled"]]
 
-        paths = [Path(config.get('PATH_ROOT'), "processors"),
-                 Path(config.get('PATH_ROOT'), "backend", "workers"),
+        paths = [config.get('PATH_ROOT').joinpath("processors"),
+                 config.get('PATH_ROOT').joinpath("backend/workers"),
                  extension_path,
                  *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
 
         root_match = re.compile(r"^%s" % re.escape(str(config.get('PATH_ROOT'))))
-        root_path = Path(config.get('PATH_ROOT'))
+        root_path = config.get('PATH_ROOT')
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
@@ -115,6 +116,7 @@ class ModuleCollector:
                 # determine module name for file
                 # reduce path to be relative to 4CAT root
                 module_name = ".".join(file.parts[len(root_path.parts):-1] + (file.stem,))
+                extension_name = file.parts[len(extension_path.parts):][0] if is_extension else None
 
                 # check if we've already loaded this module
                 if module_name in self.ignore:
@@ -123,6 +125,9 @@ class ModuleCollector:
                 if module_name in sys.modules:
                     # This skips processors/datasources that were loaded by others and may not yet be captured
                     pass
+
+                if is_extension and len(module_name.split(".")) > 1 and extension_name not in enabled_extensions:
+                    continue
 
                 # try importing
                 try:
@@ -152,6 +157,8 @@ class ModuleCollector:
                     self.workers[component[1].type] = component[1]
                     self.workers[component[1].type].filepath = relative_path
                     self.workers[component[1].type].is_extension = is_extension
+                    if is_extension:
+                        self.workers[component[1].type].extension_name = extension_name
 
                     # we can't use issubclass() because for that we would need
                     # to import BasicProcessor, which would lead to a circular
@@ -192,7 +199,7 @@ class ModuleCollector:
             Load a single datasource
             """
             # determine module name (path relative to 4CAT root w/ periods)
-            module_name = ".".join(subdirectory.relative_to(Path(config.get("PATH_ROOT"))).parts)
+            module_name = ".".join(subdirectory.relative_to(config.get("PATH_ROOT")).parts)
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
@@ -215,13 +222,19 @@ class ModuleCollector:
             }
 
         # Load 4CAT core datasources
-        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
+        for subdirectory in config.get('PATH_ROOT').joinpath("datasources").iterdir():
             if subdirectory.is_dir():
                 _load_datasource(subdirectory)
 
         # Load extension datasources
         # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
-        for root, dirs, files in os.walk(Path(config.get('PATH_ROOT'), "extensions"), followlinks=True):
+        enabled_extensions = [e for e, s in config.get("extensions.enabled").items() if s["enabled"]]
+        extensions_root = config.get('PATH_EXTENSIONS')
+        for root, dirs, files in os.walk(extensions_root, followlinks=True):
+            relative_root = Path(root).relative_to(extensions_root)
+            if relative_root.parts and relative_root.parts[0] not in enabled_extensions:
+                continue
+
             if "datasources" in dirs:
                 for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():

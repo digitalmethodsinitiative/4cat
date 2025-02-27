@@ -171,7 +171,7 @@ class YouTubeImageWall(BasicProcessor):
 					image_archive.extract(file + ".jpg", results_path)
 					delete_after_use = True
 			else:
-				temp_path = Path(config.get('PATH_ROOT'), "common/assets/no-video.jpg")
+				temp_path = config.get('PATH_ROOT').joinpath("common/assets/no-video.jpg")
 
 			# Resize the image
 			image = Image.open(temp_path)

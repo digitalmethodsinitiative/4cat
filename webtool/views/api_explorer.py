@@ -508,7 +508,7 @@ def get_image_file(img_file, limit=0):
 	if not re.match(r"([a-zA-Z0-9]+)\.([a-z]+)", img_file):
 		abort(404)
 
-	image_path = Path(config.get('PATH_ROOT'), config.get('PATH_IMAGES'), img_file)
+	image_path = config.get('PATH_IMAGES').joinpath(img_file)
 	if not image_path.exists():
 		abort(404)
 

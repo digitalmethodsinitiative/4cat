@@ -1,6 +1,6 @@
 """
 Creates and/or manages the 4CAT configuration file located at
-config/config.ini.
+data/config/config.ini.
 
 For Docker, it is necessary to keep this file in a shared volume as both the
 backend and frontend use it. The config_manager will also read and edit this
@@ -44,15 +44,24 @@ if __name__ == "__main__":
     import os
     import configparser
     import bcrypt
+    import shutil
     from pathlib import Path
 
     # Configuration file location
-    CONFIG_FILE = 'config/config.ini'
+    OLD_CONFIG_FILE = 'config/config.ini' # Pre v1.46; moved to accomodate a single Docker volume
+    CONFIG_FILE = 'data/config/config.ini'
+
+    # Check if old config file exists
+    # TODO: if migrating actual files; remove this check (DO NOT RECREATE, but it needs to be updated with new paths)
+    if os.path.exists(OLD_CONFIG_FILE):
+        print(f'Old config file {OLD_CONFIG_FILE} exists. Moving to new location {CONFIG_FILE}')
+        os.makedirs(Path(CONFIG_FILE).parent, exist_ok=True)
+        shutil.move(OLD_CONFIG_FILE, CONFIG_FILE)
 
     # Check if file does not already exist
     if not os.path.exists(CONFIG_FILE):
         # Create the config file
-        print('Creating config/config.ini file')
+        print('Creating data/config/config.ini file')
         config_parser = configparser.ConfigParser()
 
         # Flag 4CAT as using Docker
@@ -71,12 +80,13 @@ if __name__ == "__main__":
         config_parser['API']['api_port'] = '4444'  # backend internal port set in docker-compose.py; NOT API_PUBLIC_PORT as that is what port Docker exposes to host network
 
         # File paths
+        # Docker volumes are defined in docker-compose.yml; these rely on one shared volume `data` in the 4CAT root directory
         config_parser.add_section('PATHS')
-        config_parser['PATHS']['path_images'] = 'data'  # shared volume defined in docker-compose.yml
-        config_parser['PATHS']['path_data'] = 'data'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_images'] = 'data/images'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_data'] = 'data/datasets'  # shared volume defined in docker-compose.yml
         config_parser['PATHS']['path_lockfile'] = 'backend'  # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
-        config_parser['PATHS']['path_sessions'] = 'config/sessions'  # shared volume defined in docker-compose.yml
-        config_parser['PATHS']['path_logs'] = 'logs/'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_sessions'] = 'data/sessions'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_logs'] = 'data/logs/'  # shared volume defined in docker-compose.yml
 
         # Generated variables
         config_parser.add_section('GENERATE')
@@ -86,7 +96,7 @@ if __name__ == "__main__":
         # Write environment variables to database
         # Must write prior to importing config (where the values are read)
         update_config_from_environment(CONFIG_FILE, config_parser)
-        print('Created config/config.ini file')
+        print('Created data/config/config.ini file')
 
         # Ensure filepaths exist
         from common.config_manager import config
@@ -99,11 +109,12 @@ if __name__ == "__main__":
                      config.get('PATH_LOGS'),
                      config.get('PATH_LOCKFILE'),
                      config.get('PATH_SESSIONS'),
+                     config.get('PATH_EXTENSIONS')
                      ]:
-            if Path(config.get('PATH_ROOT'), path).is_dir():
+            if config.get('PATH_ROOT').joinpath(path).is_dir():
                 pass
             else:
-                os.makedirs(Path(config.get('PATH_ROOT'), path))
+                os.makedirs(config.get('PATH_ROOT').joinpath(path))
 
         # Use .env provided SERVER_NAME on first run
         frontend_servername = os.environ['SERVER_NAME']
@@ -116,7 +127,7 @@ if __name__ == "__main__":
 
     # Config file already exists; Update .env variables if they changed
     else:
-        print('Configuration file config/config.ini already exists')
+        print('Configuration file data/config/config.ini already exists')
         print('Checking Docker .env variables and updating if necessary')
         config_parser = configparser.ConfigParser()
         config_parser.read(CONFIG_FILE)
