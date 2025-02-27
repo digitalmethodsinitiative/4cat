@@ -15,7 +15,7 @@ class SimilarWords(ProcessorPreset):
 	type = "preset-similar-words"  # job type ID
 	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
 	title = "Find similar words"  # title displayed in UI
-	description = "Uses Word2Vec models (Mikolov et al.) to find words used in a similar context as the queried word(s). Note that this will usually not give useful results for small (<100.000 items) datasets."
+	description = "Uses Word2Vec models (Mikolov et al.) to find words used in a similar context as the queried word(s). Note that this will usually not give useful results for small (<100.000 items) datasets. This method uses default settings. If you want to customise the settings, use the processors 'tokenise', 'generate word embedding models' (choose the Word2Vec model) and 'extract similar words'."
 	extension = "csv"
 
 	options = {
