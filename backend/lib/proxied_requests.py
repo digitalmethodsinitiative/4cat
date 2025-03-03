@@ -10,7 +10,7 @@ from collections import namedtuple
 from common.config_manager import config
 
 
-class FailedRequest():
+class FailedRequest:
     """
     A delegated request that has failed for whatever reason
 
@@ -22,17 +22,18 @@ class FailedRequest():
         self.context = context
 
 
-class ProxyStatus():
+class ProxyStatus:
     """
     An enum of possible statuses of a SophisticatedFuturesProxy
     """
+
     AVAILABLE = 3
     CLAIMED = 4
     RUNNING = 5
     COOLING_OFF = 6
 
 
-class SophisticatedFuturesProxy():
+class SophisticatedFuturesProxy:
     """
     A proxy that can be used in combination with the DelegatedRequestHandler
 
@@ -44,13 +45,16 @@ class SophisticatedFuturesProxy():
     request as long as each is on a separate hostname, but need to be more
     careful when requesting from a single host.
     """
+
     log = None
 
     COOLOFF = 0
     MAX_CONCURRENT_OVERALL = 0
     MAX_CONCURRENT_PER_HOST = 0
 
-    def __init__(self, url, log=None, cooloff=3, concurrent_overall=5, concurrent_host=2):
+    def __init__(
+        self, url, log=None, cooloff=3, concurrent_overall=5, concurrent_host=2
+    ):
         self.proxy_url = url
         self.hostnames = {}
         self.log = log
@@ -71,7 +75,9 @@ class SophisticatedFuturesProxy():
         """
         hostname = hostname.lower()
         if hostname not in self.hostnames:
-            self.hostnames[hostname] = namedtuple("HostnameForProxiedRequests", ("last_request_start", "running"))
+            self.hostnames[hostname] = namedtuple(
+                "HostnameForProxiedRequests", ("last_request_start", "running")
+            )
             self.hostnames[hostname].last_request_start = 0
             self.hostnames[hostname].running = []
 
@@ -85,8 +91,13 @@ class SophisticatedFuturesProxy():
         """
         for hostname, metadata in self.hostnames.items():
             for i, request in enumerate(metadata.running):
-                if request.status == ProxyStatus.COOLING_OFF and request.timestamp_started < time.time() - self.COOLOFF:
-                    self.log.debug(f"Releasing proxy {self.proxy_url} for host name {hostname}")
+                if (
+                    request.status == ProxyStatus.COOLING_OFF
+                    and request.timestamp_started < time.time() - self.COOLOFF
+                ):
+                    self.log.debug(
+                        f"Releasing proxy {self.proxy_url} for host name {hostname}"
+                    )
                     del self.hostnames[hostname].running[i]
 
     def claim_for(self, url):
@@ -110,13 +121,16 @@ class SophisticatedFuturesProxy():
             return False
 
         if len(self.hostnames[hostname].running) < self.MAX_CONCURRENT_PER_HOST:
-            request = namedtuple("ProxiedRequest", ("url", "status", "timestamp_started"))
+            request = namedtuple(
+                "ProxiedRequest", ("url", "status", "timestamp_started")
+            )
             request.url = url
             request.status = ProxyStatus.CLAIMED
             request.timestamp_started = 0
             self.hostnames[hostname].running.append(request)
             self.log.debug(
-                f"Claiming proxy {self.proxy_url} for host name {hostname} ({len(self.hostnames[hostname].running)} of {self.MAX_CONCURRENT_PER_HOST} for host)")
+                f"Claiming proxy {self.proxy_url} for host name {hostname} ({len(self.hostnames[hostname].running)} of {self.MAX_CONCURRENT_PER_HOST} for host)"
+            )
             return self
         else:
             return False
@@ -165,7 +179,7 @@ class SophisticatedFuturesProxy():
         raise ValueError(f"No proxy is currently running a request for URL {url}!")
 
 
-class DelegatedRequestHandler():
+class DelegatedRequestHandler:
     queue = {}
     requests = {}
     session = None
@@ -211,17 +225,24 @@ class DelegatedRequestHandler():
             # build a proxy pool with some information per available proxy
             proxies = config.get("proxies.urls")
             for proxy_url in proxies:
-                self.proxy_pool[proxy_url] = namedtuple("ProxyEntry", ("proxy", "last_used"))
-                self.proxy_pool[proxy_url].proxy = SophisticatedFuturesProxy(proxy_url, self.log,
-                                                                             config.get("proxies.cooloff"),
-                                                                             config.get("proxies.concurrent-overall"),
-                                                                             config.get("proxies.concurrent-host"))
+                self.proxy_pool[proxy_url] = namedtuple(
+                    "ProxyEntry", ("proxy", "last_used")
+                )
+                self.proxy_pool[proxy_url].proxy = SophisticatedFuturesProxy(
+                    proxy_url,
+                    self.log,
+                    config.get("proxies.cooloff"),
+                    config.get("proxies.concurrent-overall"),
+                    config.get("proxies.concurrent-host"),
+                )
                 self.proxy_pool[proxy_url].last_used = 0
 
             self.log.debug(f"Proxy pool has {len(self.proxy_pool)} available proxies.")
 
         # within the pool, find the least recently used proxy that is available
-        sorted_by_cooloff = sorted(self.proxy_pool, key=lambda p: self.proxy_pool[p].last_used)
+        sorted_by_cooloff = sorted(
+            self.proxy_pool, key=lambda p: self.proxy_pool[p].last_used
+        )
         for proxy_id in sorted_by_cooloff:
             claimed_proxy = self.proxy_pool[proxy_id].proxy.claim_for(url)
             if claimed_proxy:
@@ -249,11 +270,14 @@ class DelegatedRequestHandler():
                 # is there a request for the url?
                 have_request = False
                 for request in self.requests[queue_name]:
-                    if request.url != url or request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
+                    if (
+                        request.url != url
+                        or request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD
+                    ):
                         # look for the first request with this URL that is not
                         # done yet and then break (see below) - this means we
                         # can handle multiple requests for the same URL
-                        have_request = (request.url == url)
+                        have_request = request.url == url
                         continue
 
                     have_request = True
@@ -267,7 +291,10 @@ class DelegatedRequestHandler():
                             response = request.request.result()
                             request.result = response
                         except (
-                        ConnectionError, requests.exceptions.RequestException, urllib3.exceptions.HTTPError) as e:
+                            ConnectionError,
+                            requests.exceptions.RequestException,
+                            urllib3.exceptions.HTTPError,
+                        ) as e:
                             request.result = FailedRequest(e)
                         finally:
                             request.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
@@ -286,16 +313,22 @@ class DelegatedRequestHandler():
                         continue
 
                     proxy_url = proxy.proxy_url
-                    proxy_definition = {"http": proxy_url,
-                                        "https": proxy_url} if proxy_url != self.PROXY_LOCALHOST else None
+                    proxy_definition = (
+                        {"http": proxy_url, "https": proxy_url}
+                        if proxy_url != self.PROXY_LOCALHOST
+                        else None
+                    )
 
                     # start request for URL
                     self.log.debug(f"Request for {url} started")
-                    request = namedtuple("DelegatedRequest", (
-                        "request", "created", "status", "result", "proxy", "url"
-                    ))
+                    request = namedtuple(
+                        "DelegatedRequest",
+                        ("request", "created", "status", "result", "proxy", "url"),
+                    )
                     request.created = time.time()
-                    request.request = self.session.get(url, timeout=30, proxies=proxy_definition)
+                    request.request = self.session.get(
+                        url, timeout=30, proxies=proxy_definition
+                    )
                     request.status = self.REQUEST_STATUS_STARTED
                     request.proxy = proxy
                     request.url = url
@@ -318,7 +351,10 @@ class DelegatedRequestHandler():
         self.manage_requests()
         for url in self.queue[queue_name]:
             for i, request in enumerate(self.requests[queue_name]):
-                if request.url == url and request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
+                if (
+                    request.url == url
+                    and request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD
+                ):
                     yield url, request.result
                     del self.requests[queue_name][i]
                     self.queue[queue_name].pop(0)
