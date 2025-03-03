@@ -4,6 +4,8 @@ The heart of the app - manages jobs and workers
 import signal
 import time
 
+from backend.lib.proxied_requests import DelegatedRequestHandler
+
 from common.lib.module_loader import ModuleCollector
 from common.lib.exceptions import JobClaimedException
 
@@ -16,6 +18,7 @@ class WorkerManager:
 	db = None
 	log = None
 	modules = None
+	proxy_delegator = None
 
 	worker_pool = {}
 	job_mapping = {}
@@ -35,6 +38,7 @@ class WorkerManager:
 		self.db = database
 		self.log = logger
 		self.modules = ModuleCollector(write_config=True)
+		self.proxy_delegator = DelegatedRequestHandler(self.log)
 
 		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)

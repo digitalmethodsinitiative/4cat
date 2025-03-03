@@ -236,6 +236,41 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
+    # proxy stuff
+    "proxies.urls": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": ["__localhost__"],
+        "help": "Proxy URLs",
+        "tooltip": "A JSON Array of full proxy URLs. Include any proxy login details in the URL itself (e.g. "
+                   "http://username:password@proxy:port). There is one special value, '__localhost__'; this means a " 
+                   "direct request, without using a proxy."
+    },
+    "proxies.cooloff": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": float,
+        "help": "Cooloff",
+        "tooltip": "After a request is started, do not use the proxy again for this many seconds.",
+        "default": 0.1,
+        "min": 0.0
+    },
+    "proxies.concurrent-overall": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": int,
+        "default": 1,
+        "min": 1,
+        "help": "Max concurrent requests (overall)",
+        "tooltip": "Per proxy, this many requests can run concurrently overall."
+    },
+    "proxies.concurrent-host": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": int,
+        "default": 1,
+        "min": 1,
+        "help": "Max concurrent requests (per host)",
+        "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
+                   "overall limit."
+    },
+    # logging
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
@@ -553,5 +588,6 @@ categories = {
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
     "ui": "User interface",
+    "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
 }
