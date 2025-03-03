@@ -63,7 +63,7 @@ class SophisticatedFuturesProxy:
         self.MAX_CONCURRENT_OVERALL = concurrent_overall
         self.MAX_CONCURRENT_PER_HOST = concurrent_host
 
-    def know_hostname(self, hostname):
+    def know_hostname(self, url):
         """
         Make sure the hostname is known to this proxy
 
@@ -71,15 +71,18 @@ class SophisticatedFuturesProxy:
         for this hostname. If the hostname is not known yet, the statistics are
         re-initialised.
 
-        :param str hostname:  Host name to keep stats for. Case-insensitive.
+        :param str url:  URL with host name to keep stats for. Case-insensitive.
+        :param str:  The host name, as parsed for internal use
         """
-        hostname = hostname.lower()
+        hostname = ural.get_hostname(url).lower()
         if hostname not in self.hostnames:
             self.hostnames[hostname] = namedtuple(
                 "HostnameForProxiedRequests", ("last_request_start", "running")
             )
             self.hostnames[hostname].last_request_start = 0
             self.hostnames[hostname].running = []
+
+        return hostname
 
     def release_cooled_off(self):
         """
@@ -113,8 +116,7 @@ class SophisticatedFuturesProxy:
         `SophisticatedFuturesProxy` object if one is.
         """
         self.release_cooled_off()
-        hostname = ural.get_hostname(url)
-        self.know_hostname(hostname)
+        hostname = self.know_hostname(url)
 
         total_running = sum([len(m.running) for h, m in self.hostnames.items()])
         if total_running >= self.MAX_CONCURRENT_OVERALL:
@@ -145,8 +147,7 @@ class SophisticatedFuturesProxy:
 
         :param str url:  URL of the proxied request.
         """
-        hostname = ural.get_hostname(url)
-        self.know_hostname(hostname)
+        hostname = self.know_hostname(url)
 
         self.hostnames[hostname].last_request_start = time.time()
         for i, metadata in enumerate(self.hostnames[hostname].running):
@@ -168,8 +169,7 @@ class SophisticatedFuturesProxy:
 
         :param str url:  URL of the proxied request.
         """
-        hostname = ural.get_hostname(url)
-        self.know_hostname(hostname)
+        hostname = self.know_hostname(url)
 
         for i, metadata in enumerate(self.hostnames[hostname].running):
             if metadata.status == ProxyStatus.RUNNING and metadata.url == url:
