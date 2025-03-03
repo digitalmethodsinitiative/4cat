@@ -17,6 +17,7 @@ from webtool.lib.helpers import pad_interval, error
 from webtool.views.views_dataset import create_dataset, show_results
 
 from common.config_manager import ConfigWrapper
+from common.lib.helpers import get_datasource_example_keys
 config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -129,6 +130,7 @@ def data_overview(datasource=None):
     daily_counts = None
     references = None
     labels = None
+    example_keys = None
 
     if datasource:
 
@@ -155,6 +157,10 @@ def data_overview(datasource=None):
 
         if hasattr(worker_class, "is_from_zeeschuimer"):
             labels.append("zeeschuimer")
+
+        # Get example keys for the datasource
+        if datasource_id not in ["upload"]: # ignore upload as keys are variable
+            example_keys = get_datasource_example_keys(db=db, modules=fourcat_modules, dataset_type=datasource_id + "-search")
 
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":
@@ -185,7 +191,7 @@ def data_overview(datasource=None):
 
         references = worker_class.references if hasattr(worker_class, "references") else None        
 
-    return render_template('data-overview.html', datasources=datasources, datasource_id=datasource_id, description=description, labels=labels, total_counts=total_counts, daily_counts=daily_counts, github_url=github_url, references=references)
+    return render_template('data-overview.html', datasources=datasources, datasource_id=datasource_id, description=description, labels=labels, total_counts=total_counts, daily_counts=daily_counts, github_url=github_url, references=references, example_keys=example_keys)
 
 @app.route('/get-boards/<string:datasource>/')
 @login_required

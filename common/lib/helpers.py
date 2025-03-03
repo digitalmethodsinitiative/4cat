@@ -46,6 +46,17 @@ def init_datasource(database, logger, queue, name):
     """
     pass
 
+def get_datasource_example_keys(db, modules, dataset_type):
+    """
+    Get example keys for a datasource
+    """
+    from common.lib.dataset import DataSet
+    example_dataset_key = db.fetchone("SELECT key from datasets WHERE type = %s and is_finished = True and num_rows > 0 LIMIT 1", (dataset_type,))
+    if example_dataset_key:
+        example_dataset = DataSet(db=db, key=example_dataset_key["key"], modules=modules)
+        return example_dataset.get_columns()
+    return []
+
 def strip_tags(html, convert_newlines=True):
     """
     Strip HTML from a string
