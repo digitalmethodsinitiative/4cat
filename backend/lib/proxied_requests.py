@@ -197,12 +197,26 @@ class DelegatedRequestHandler:
         self.session = FuturesSession(executor=pool)
         self.log = log
 
-    def add_urls(self, urls, queue_name="_"):
+    def add_urls(self, urls, queue_name="_", **kwargs):
+        """
+        Add URLs to the request queue
+
+        :param urls:  An iterable of URLs.
+        :param queue_name:  Queue name to add to.
+        :param kwargs: Other keyword arguments will be passed on to
+        `requests.get()`
+        """
         if queue_name not in self.queue:
             self.queue[queue_name] = []
             self.requests[queue_name] = []
 
-        self.queue[queue_name].extend(urls)
+        for url in urls:
+            url_metadata = namedtuple("UrlForDelegatedRequest", ("url", "args"))
+            url_metadata.url = url
+            url_metadata.kwargs = kwargs
+
+            self.queue[queue_name].append(url_metadata)
+
         self.manage_requests()
 
     def get_queue_length(self, queue_name="_"):
@@ -267,9 +281,11 @@ class DelegatedRequestHandler:
         """
         # go through queue and look at the status of each URL
         for queue_name in self.queue:
-            for url in self.queue[queue_name]:
+            for url_metadata in self.queue[queue_name]:
                 # is there a request for the url?
+                url = url_metadata.url
                 have_request = False
+
                 for request in self.requests[queue_name]:
                     if (
                         request.url != url
@@ -291,6 +307,7 @@ class DelegatedRequestHandler:
                         try:
                             response = request.request.result()
                             request.result = response
+
                         except (
                             ConnectionError,
                             requests.exceptions.RequestException,
@@ -328,7 +345,8 @@ class DelegatedRequestHandler:
                     )
                     request.created = time.time()
                     request.request = self.session.get(
-                        url, timeout=30, proxies=proxy_definition
+                        url=url, timeout=30, proxies=proxy_definition,
+                        **url_metadata.kwargs,
                     )
                     request.status = self.REQUEST_STATUS_STARTED
                     request.proxy = proxy
@@ -350,6 +368,11 @@ class DelegatedRequestHandler:
         :return:
         """
         self.manage_requests()
+
+        # no results, no return
+        if queue_name not in self.requests:
+            raise StopIteration
+
         for url in self.queue[queue_name]:
             for i, request in enumerate(self.requests[queue_name]):
                 if (
@@ -360,4 +383,4 @@ class DelegatedRequestHandler:
                     del self.requests[queue_name][i]
                     self.queue[queue_name].pop(0)
                 else:
-                    break
+                    raise StopIteration

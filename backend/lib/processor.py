@@ -15,7 +15,6 @@ import os
 from pathlib import Path, PurePath
 
 from backend.lib.worker import BasicWorker
-from backend.lib.proxied_requests import FailedRequest
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email
@@ -482,7 +481,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
-	def iterate_proxied_requests(self, urls):
+	def iterate_proxied_requests(self, urls, **kwargs):
 		"""
 		Request an iterable of URLs and return results
 
@@ -495,6 +494,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		processor, potentially triggering rate limits.
 
 		:param urls:  Something that can be iterated over and yields URLs
+		:param kwargs:  Other keyword arguments are passed on to `add_urls`
+		and eventually to `requests.get()`.
 		:return:  A generator yielding request results, i.e. `requests`
 		response objects
 		"""
@@ -519,14 +520,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 						have_urls = False
 						break
 
-				delegator.add_urls(batch)
+				delegator.add_urls(batch, **kwargs)
 
 			time.sleep(0.05)  # arbitrary...
 			for url, result in delegator.get_results():
-				if type(result) is FailedRequest:
-					raise FailedRequest.context
-				else:
-					yield result
+				# result may also be a FailedProxiedRequest!
+				# up to the processor to decide how to deal with it
+				yield url, result
 
 	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
