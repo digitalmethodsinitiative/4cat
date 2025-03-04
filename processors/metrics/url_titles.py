@@ -4,7 +4,7 @@ Retrieve HTML title (and other metadata) for URLs
 import csv
 
 from backend.lib.processor import BasicProcessor
-from backend.lib.proxied_requests import FailedRequest
+from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -176,7 +176,7 @@ class URLFetcher(BasicProcessor):
                 if self.interrupted:
                     raise ProcessorInterruptedException()
 
-                if type(response) is FailedRequest:
+                if type(response) is FailedProxiedRequest:
                     self.dataset.log(
                         f"Error getting URL {url} ({response.context}), skipping")
                     urls_failed += 1

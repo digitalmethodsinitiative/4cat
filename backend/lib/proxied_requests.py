@@ -12,7 +12,7 @@ from collections import namedtuple
 from common.config_manager import config
 
 
-class FailedRequest:
+class FailedProxiedRequest:
     """
     A delegated request that has failed for whatever reason
 
@@ -318,7 +318,7 @@ class DelegatedRequestHandler:
                             requests.exceptions.RequestException,
                             urllib3.exceptions.HTTPError,
                         ) as e:
-                            request.result = FailedRequest(e)
+                            request.result = FailedProxiedRequest(e)
                         finally:
                             request.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
                     else:
