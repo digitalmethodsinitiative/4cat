@@ -164,6 +164,7 @@ class URLFetcher(BasicProcessor):
 
             for url, response in self.iterate_proxied_requests(
                     all_urls,
+                    preserve_order=False,
                     headers={"User-Agent": ua}, hooks={
                         # use hooks to download the content (stream=True) in parallel
                         "response": URLFetcher.stream_url

@@ -481,7 +481,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
-	def iterate_proxied_requests(self, urls, **kwargs):
+	def iterate_proxied_requests(self, urls, preserve_order=True, **kwargs):
 		"""
 		Request an iterable of URLs and return results
 
@@ -496,8 +496,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param urls:  Something that can be iterated over and yields URLs
 		:param kwargs:  Other keyword arguments are passed on to `add_urls`
 		and eventually to `requests.get()`.
-		:return:  A generator yielding request results, i.e. `requests`
-		response objects
+		:param bool preserve_order:  Return items in the original order. Use
+		`False` to potentially speed up processing, if order is not important.
+		:return:  A generator yielding request results, i.e. tuples of a
+		URL and a `requests` response objects
 		"""
 		queue_name = f"{self.type}-{self.dataset.key}"
 		delegator = self.manager.proxy_delegator
@@ -523,7 +525,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				delegator.add_urls(batch, queue_name, **kwargs)
 
 			time.sleep(0.05)  # arbitrary...
-			for url, result in delegator.get_results(queue_name):
+			for url, result in delegator.get_results(queue_name, preserve_order=preserve_order):
 				# result may also be a FailedProxiedRequest!
 				# up to the processor to decide how to deal with it
 				yield url, result

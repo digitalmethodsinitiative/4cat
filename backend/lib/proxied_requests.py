@@ -358,7 +358,7 @@ class DelegatedRequestHandler:
                     self.requests[queue_name].append(request)
                     proxy.request_started(url)
 
-    def get_results(self, queue_name="_"):
+    def get_results(self, queue_name="_", preserve_order=True):
         """
         Return available results, without skipping
 
@@ -367,6 +367,15 @@ class DelegatedRequestHandler:
         stop returning. This ensures that in the end, values are only ever
         returned in the original queue order, at the cost of potential
         buffering.
+
+        :param str queue_name:  Queue name to get results from
+        :param bool preserve_order:  Return results in the order they were
+        added to the queue. This means that other results are buffered and
+        potentially remain in the queue, which may in the worst case
+        significantly slow down data collection. For example, if the first
+        request in the queue takes a really long time while all other
+        requests are already finished, the queue will nevertheless remain
+        'full'.
 
         :return:
         """
@@ -378,20 +387,22 @@ class DelegatedRequestHandler:
 
         for url_metadata in self.queue[queue_name]:
             # for each URL in the queue...
-            url = url_metadata.url
             have_result = False
             for request in self.requests[queue_name]:
                 if (
-                    request.url == url
+                    request.url == url_metadata.url
+                    and request.index == url_metadata.index
                     and request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD
                 ):
                     # see if a finished request is available...
-                    yield url, request.result
+                    yield url_metadata.url, request.result
                     self.queue[queue_name].remove(url_metadata)
                     self.requests[queue_name].remove(request)
                     have_result = True
                     break
 
-            if not have_result:
+            if not have_result and preserve_order:
                 # ...but as soon as a URL has no finished result, return
+                # unless we don't care about the order, then continue and yield
+                # as much as possible
                 return
