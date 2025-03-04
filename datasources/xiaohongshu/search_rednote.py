@@ -72,11 +72,30 @@ class SearchRedNote(Search):
 
         import json
 
-        image = item["image_list"][0]["url_default"] if item.get("image_list") else item["cover"]["url_default"]
+        # Images
+        images = []
+        if item.get("image_list"):
+            for image in item["image_list"]:
+                if "url_default" in image and image["url_default"]:
+                    images.append(image["url_default"])
+                elif "info_list" in image and image["info_list"]:
+                    for img_info in image["info_list"]:
+                        found = False
+                        if img_info.get("image_scene") == "WB_DFT":
+                            images.append(img_info["url"])
+                            found = True
+                            break
+                    if not found:
+                        images.append(image["info_list"][0]["url"])
+        elif item.get("cover"):
+            images.append(item["cover"]["url_default"])
+        else:
+            # no image found;
+            images = MissingMappedField("")       
 
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={post['xsec_token']}" if post.get("xsec_token") else ""
-        if item.get("video"):
+        if item.get("video", {}).get("media"):
             video_url = item["video"]["media"]["stream"]["h264"][0]["master_url"]
         else:
             video_url = MissingMappedField("")
@@ -90,7 +109,7 @@ class SearchRedNote(Search):
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
             "author": item["user"]["nickname"],
             "author_avatar_url": item["user"]["avatar"],
-            "image_url": image,
+            "image_urls": ",".join(images) if type(images) is list else images,
             "video_url": video_url,
             # only available when loading an individual post page, so skip
             # "tags": ",".join(t["name"] for t in item["tag_list"]),

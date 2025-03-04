@@ -75,8 +75,9 @@ class SearchBluesky(Search):
             "password": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Bluesky Password",
-                "cache": True,
-                "sensitive": True,
+                "cache": True, # tells the frontend to cache this value
+                "sensitive": True, # tells the backend to delete this value after use
+                "password": True, # tells the frontend this is a password type
             },
             "divider": {
                 "type": UserInput.OPTION_DIVIDER
@@ -604,20 +605,35 @@ class SearchBluesky(Search):
             "author_display_name": item["author"]["display_name"],
             "author_profile": author_profile,
             "author_avatar": item["author"]["avatar"],
-            "author_created_at": SearchBluesky.bsky_convert_datetime_string(item["author"]["created_at"]).isoformat(),
+            "author_created_at": SearchBluesky.bsky_convert_datetime_string(item["author"]["created_at"], mode="iso_string", raise_error=False),
 
             "timestamp": created_at.timestamp(),
         }, message=f"Bluesky new mappings: {unmapped_data}")
 
     @staticmethod
-    def bsky_convert_datetime_string(datetime_string):
+    def bsky_convert_datetime_string(datetime_string, mode="datetime", raise_error=True):
         """
-        Bluesky datetime string to datetime object
+        Bluesky datetime string to datetime object.
+
+        Mode "datetime" returns a datetime object, while "iso_string" returns an ISO formatted string.
 
         :param str datetime_string:  The datetime string to convert
-        :return datetime:  The converted datetime object
+        :param str mode:  The mode to return the datetime object in [datetime, iso_string]
+        :param bool raise_error:  Raise error if unable to parse else return datetime_string
+        :return datetime/str:  The converted datetime object
         """
-        return parser.isoparse(datetime_string)
+        try:
+            datetime_object = parser.isoparse(datetime_string)
+        except ValueError as e:
+            if raise_error:
+                raise e
+            return datetime_string
+        
+        if mode == "datetime":
+            return datetime_object
+        elif mode == "iso_string":
+            return datetime_object.isoformat()
+
 
     @staticmethod
     def get_bsky_link(handle, post_id):

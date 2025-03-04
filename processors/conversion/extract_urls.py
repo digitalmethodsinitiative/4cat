@@ -230,7 +230,7 @@ class ExtractURLs(BasicProcessor):
         correct_croudtangle = self.parameters.get("correct_croudtangle", False)
 
         # Create fieldnames
-        fieldnames = self.source_dataset.get_item_keys(self) + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
+        fieldnames = self.source_dataset.get_columns() + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
