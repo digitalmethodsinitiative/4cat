@@ -1,3 +1,5 @@
+from operator import index
+
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
 
@@ -92,8 +94,8 @@ class SophisticatedFuturesProxy:
         This method removes cooled off requests, so that new ones may fill
         their slot.
         """
-        for hostname, metadata in self.hostnames.items():
-            for i, request in enumerate(metadata.running):
+        for hostname, metadata in self.hostnames.copy().items():
+            for request in metadata.running:
                 if (
                     request.status == ProxyStatus.COOLING_OFF
                     and request.timestamp_started < time.time() - self.COOLOFF
@@ -101,7 +103,7 @@ class SophisticatedFuturesProxy:
                     self.log.debug(
                         f"Releasing proxy {self.proxy_url} for host name {hostname}"
                     )
-                    del self.hostnames[hostname].running[i]
+                    self.hostnames[hostname].running.remove(request)
 
                     # get rid of hostnames with no running or cooling off
                     # requests, else this might grow indefinitely
@@ -189,6 +191,7 @@ class DelegatedRequestHandler:
     session = None
     proxy_pool = {}
     log = None
+    index = 0
 
     # some magic values
     REQUEST_STATUS_STARTED = 1
@@ -217,6 +220,8 @@ class DelegatedRequestHandler:
             url_metadata = namedtuple("UrlForDelegatedRequest", ("url", "args"))
             url_metadata.url = url
             url_metadata.kwargs = kwargs
+            url_metadata.index = self.index
+            self.index += 1
 
             self.queue[queue_name].append(url_metadata)
 
@@ -287,20 +292,17 @@ class DelegatedRequestHandler:
             for url_metadata in self.queue[queue_name]:
                 # is there a request for the url?
                 url = url_metadata.url
-                have_request = False
+                have_request = [r.url for r in self.requests[queue_name] if r.url == url and r.index == url_metadata.index]
 
                 for request in self.requests[queue_name]:
                     if (
                         request.url != url
                         or request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD
                     ):
-                        # look for the first request with this URL that is not
-                        # done yet and then break (see below) - this means we
-                        # can handle multiple requests for the same URL
-                        have_request = request.url == url
+                        # the request is not for this URL or already done -
+                        # will be cleaned up by get_results()
                         continue
 
-                    have_request = True
                     # is the request done?
                     if request.request.done():
                         # collect result and buffer it for yielding (see below for
@@ -344,16 +346,14 @@ class DelegatedRequestHandler:
                     self.log.debug(f"Request for {url} started")
                     request = namedtuple(
                         "DelegatedRequest",
-                        ("request", "created", "status", "result", "proxy", "url"),
+                        ("request", "created", "status", "result", "proxy", "url", "index"),
                     )
                     request.created = time.time()
-                    request.request = self.session.get(
-                        url=url, timeout=30, proxies=proxy_definition,
-                        **url_metadata.kwargs,
-                    )
+                    request.request = self.session.get(**{"url": url, "timeout": 30, "proxies": proxy_definition, **url_metadata.kwargs})
                     request.status = self.REQUEST_STATUS_STARTED
                     request.proxy = proxy
                     request.url = url
+                    request.index = url_metadata.index  # this is to allow for multiple requests for the same URL
 
                     self.requests[queue_name].append(request)
                     proxy.request_started(url)
@@ -374,16 +374,24 @@ class DelegatedRequestHandler:
 
         # no results, no return
         if queue_name not in self.requests:
-            raise StopIteration
+            return
 
-        for url in self.queue[queue_name]:
-            for i, request in enumerate(self.requests[queue_name]):
+        for url_metadata in self.queue[queue_name]:
+            # for each URL in the queue...
+            url = url_metadata.url
+            have_result = False
+            for request in self.requests[queue_name]:
                 if (
                     request.url == url
                     and request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD
                 ):
+                    # see if a finished request is available...
                     yield url, request.result
-                    del self.requests[queue_name][i]
-                    self.queue[queue_name].pop(0)
-                else:
-                    raise StopIteration
+                    self.queue[queue_name].remove(url_metadata)
+                    self.requests[queue_name].remove(request)
+                    have_result = True
+                    break
+
+            if not have_result:
+                # ...but as soon as a URL has no finished result, return
+                return
