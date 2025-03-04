@@ -482,52 +482,51 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
+	def iterate_proxied_requests(self, urls):
+		"""
+		Request an iterable of URLs and return results
 
-def iterate_proxied_requests(self, urls):
-    """
-    Request an iterable of URLs and return results
+		This method takes an iterable yielding URLs and yields the result for
+		a GET request for that URL in return. This is done through the worker
+		manager's DelegatedRequestHandler, which can run multiple requests in
+		parallel and divide them over the proxies configured in 4CAT (if any).
+		Proxy cooloff and queueing is shared with other processors, so that a
+		processor will never accidentally request from the same site as another
+		processor, potentially triggering rate limits.
 
-    This method takes an iterable yielding URLs and yields the result for
-    a GET request for that URL in return. This is done through the worker
-    manager's DelegatedRequestHandler, which can run multiple requests in
-    parallel and divide them over the proxies configured in 4CAT (if any).
-    Proxy cooloff and queueing is shared with other processors, so that a
-    processor will never accidentally request from the same site as another
-    processor, potentially triggering rate limits.
+		:param urls:  Something that can be iterated over and yields URLs
+		:return:  A generator yielding request results, i.e. `requests`
+		response objects
+		"""
+		queue_name = f"{self.type}-{self.dataset.key}"
+		delegator = self.manager.proxy_delegator
 
-    :param urls:  Something that can be iterated over and yields URLs
-    :return:  A generator yielding request results, i.e. `requests`
-    response objects
-    """
-    queue_name = f"{self.type}-{self.dataset.key}"
-    delegator = self.manager.proxy_delegator
+		# 50 is an arbitrary batch size - but we top up every 0.05s, so
+		# that should be sufficient
+		batch_size = 50
 
-    # 50 is an arbitrary batch size - but we top up every 0.05s, so
-    # that should be sufficient
-    batch_size = 50
+		# we need an iterable, so we can use next() and StopIteration
+		urls = iter(urls)
 
-    # we need an iterable, so we can use next() and StopIteration
-    urls = iter(urls)
+		have_urls = len(urls) > 0
+		while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
+			if queue_length < batch_size and have_urls:
+				batch = []
+				while len(batch) < (batch_size - queue_length):
+					try:
+						batch.append(next(urls))
+					except StopIteration:
+						have_urls = False
+						break
 
-    have_urls = len(urls) > 0
-    while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
-        if queue_length < batch_size and have_urls:
-            batch = []
-            while len(batch) < (batch_size - queue_length):
-                try:
-                    batch.append(next(urls))
-                except StopIteration:
-                    have_urls = False
-                    break
+				delegator.add_urls(batch)
 
-            delegator.add_urls(batch)
-
-        time.sleep(0.05)  # arbitrary...
-        for url, result in delegator.get_results():
-            if type(result) is FailedRequest:
-                raise FailedRequest.context
-            else:
-                yield result
+			time.sleep(0.05)  # arbitrary...
+			for url, result in delegator.get_results():
+				if type(result) is FailedRequest:
+					raise FailedRequest.context
+				else:
+					yield result
 
 	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
