@@ -103,6 +103,7 @@ class SearchRedNote(Search):
         timestamp = item.get("time", None)
         return MappedItem({
             "id": item_id,
+            "thread_id": item_id,
             "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
             "title": item.get("display_title", ""),
             "body": item.get("desc", "") if "desc" in item else MissingMappedField(""),
@@ -140,6 +141,7 @@ class SearchRedNote(Search):
 
         return MappedItem({
             "id": item["id"],
+            "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com/explore/{item['id']}{xsec_bit}",
             "title": note.get("title", ""),
             "body": note.get("desc", "") if "desc" in note else MissingMappedField(""),
@@ -169,6 +171,7 @@ class SearchRedNote(Search):
         """
         return MappedItem({
             "id": item["id"],
+            "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com{item['url']}",
             "title": item["title"],
             "body": MissingMappedField(""),
