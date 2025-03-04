@@ -17,6 +17,7 @@ class FailedRequest:
     The failure context (usually the exception) is stored in the `context`
     property.
     """
+    context = None
 
     def __init__(self, context=None):
         self.context = context

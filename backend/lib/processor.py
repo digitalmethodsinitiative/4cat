@@ -508,21 +508,27 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         queue_name = f"{self.type}-{self.dataset.key}"
         delegator = self.manager.proxy_delegator
 
+        # 50 is an arbitrary batch size - but we top up every 0.05s, so
+        # that should be sufficient
+        batch_size = 50
+
+        # we need an iterable, so we can use next() and StopIteration
+        urls = iter(urls)
+
         have_urls = len(urls) > 0
-        queue_length = 0
-        while have_urls or queue_length > 0:
-            queue_length = delegator.get_queue_length(queue_name)
-            if queue_length < 50:
+        while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
+            if queue_length < batch_size and have_urls:
                 batch = []
-                while len(batch) < (50 - queue_length):
+                while len(batch) < (batch_size - queue_length):
                     try:
                         batch.append(next(urls))
                     except StopIteration:
                         have_urls = False
+                        break
 
-            delegator.add_urls(batch)
+                delegator.add_urls(batch)
 
-            time.sleep(0.1)
+            time.sleep(0.05)  # arbitrary...
             for url, result in delegator.get_results():
                 if type(result) is FailedRequest:
                     raise FailedRequest.context
