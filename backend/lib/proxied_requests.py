@@ -78,9 +78,8 @@ class SophisticatedFuturesProxy:
         hostname = ural.get_hostname(url).lower()
         if hostname not in self.hostnames:
             self.hostnames[hostname] = namedtuple(
-                "HostnameForProxiedRequests", ("last_request_start", "running")
+                "HostnameForProxiedRequests", ("running",)
             )
-            self.hostnames[hostname].last_request_start = 0
             self.hostnames[hostname].running = []
 
         return hostname
@@ -103,6 +102,11 @@ class SophisticatedFuturesProxy:
                         f"Releasing proxy {self.proxy_url} for host name {hostname}"
                     )
                     del self.hostnames[hostname].running[i]
+
+                    # get rid of hostnames with no running or cooling off
+                    # requests, else this might grow indefinitely
+                    if len(self.hostnames[hostname].running) == 0:
+                        del self.hostnames[hostname]
 
     def claim_for(self, url):
         """
@@ -150,7 +154,6 @@ class SophisticatedFuturesProxy:
         """
         hostname = self.know_hostname(url)
 
-        self.hostnames[hostname].last_request_start = time.time()
         for i, metadata in enumerate(self.hostnames[hostname].running):
             if metadata.status == ProxyStatus.CLAIMED and metadata.url == url:
                 self.hostnames[hostname].running[i].status = ProxyStatus.RUNNING
