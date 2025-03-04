@@ -509,7 +509,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# we need an iterable, so we can use next() and StopIteration
 		urls = iter(urls)
 
-		have_urls = len(urls) > 0
+		have_urls = True
 		while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
 			if queue_length < batch_size and have_urls:
 				batch = []
@@ -520,10 +520,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 						have_urls = False
 						break
 
-				delegator.add_urls(batch, **kwargs)
+				delegator.add_urls(batch, queue_name, **kwargs)
 
 			time.sleep(0.05)  # arbitrary...
-			for url, result in delegator.get_results():
+			for url, result in delegator.get_results(queue_name):
 				# result may also be a FailedProxiedRequest!
 				# up to the processor to decide how to deal with it
 				yield url, result
