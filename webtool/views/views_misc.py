@@ -32,8 +32,12 @@ def log_exception(e):
         # Could handle specific HTTP errors here
     else:
         status_code = None
-    log.error(f"{str(status_code) + ' - ' if status_code else ''}{e}")
-    return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
+    if not status_code or status_code >= 500:
+        log.error(f"{str(status_code) + ' - ' if status_code else ''}{e}")
+        return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
+    else:
+        # Should be just 4xx errors
+        raise e
 
 @app.errorhandler(413)
 def request_entity_too_large(this_error):
