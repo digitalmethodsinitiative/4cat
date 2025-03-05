@@ -544,7 +544,7 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
     return canvas
 
 
-def call_api(action, payload=None):
+def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
@@ -552,6 +552,8 @@ def call_api(action, payload=None):
 
     :param str action: API action
     :param payload: API payload
+    :param bool wait_for_response:  Wait for response? If not close connection
+    immediately after sending data.
 
     :return: API response, or timeout message in case of timeout
     """
@@ -562,16 +564,17 @@ def call_api(action, payload=None):
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
 
-    try:
-        response = ""
-        while True:
-            bytes = connection.recv(2048)
-            if not bytes:
-                break
+    if wait_for_response:
+        try:
+            response = ""
+            while True:
+                bytes = connection.recv(2048)
+                if not bytes:
+                    break
 
-            response += bytes.decode("ascii", "ignore")
-    except (socket.timeout, TimeoutError):
-        response = "(Connection timed out)"
+                response += bytes.decode("ascii", "ignore")
+        except (socket.timeout, TimeoutError):
+            response = "(Connection timed out)"
 
     try:
         connection.shutdown(socket.SHUT_RDWR)
@@ -581,7 +584,7 @@ def call_api(action, payload=None):
     connection.close()
 
     try:
-        return json.loads(response)
+        return json.loads(response) if wait_for_response else None
     except json.JSONDecodeError:
         return response
 
@@ -1050,6 +1053,49 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
         url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
 
     return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+
+
+def split_urls(url_string, allowed_schemes=None):
+    """
+    Split URL text by \n and commas.
+
+    4CAT allows users to input lists by either separating items with a newline or a comma. This function will split URLs
+    and also check for commas within URLs using schemes.
+
+    Note: some urls may contain scheme (e.g., https://web.archive.org/web/20250000000000*/http://economist.com);
+    this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
+    """
+    if allowed_schemes is None:
+        allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
+    potential_urls = []
+    # Split the text by \n
+    for line in url_string.split('\n'):
+        # Handle commas that may exist within URLs
+        parts = line.split(',')
+        recombined_url = ""
+        for part in parts:
+            if part.startswith(allowed_schemes):  # Other schemes exist
+                # New URL start detected
+                if recombined_url:
+                    # Already have a URL, add to list
+                    potential_urls.append(recombined_url)
+                # Start new URL
+                recombined_url = part
+            elif part:
+                if recombined_url:
+                    # Add to existing URL
+                    recombined_url += "," + part
+                else:
+                    # No existing URL, start new
+                    recombined_url = part
+            else:
+                # Ignore empty strings
+                pass
+        if recombined_url:
+            # Add any remaining URL
+            potential_urls.append(recombined_url)
+    return potential_urls
+
 
 def folder_size(path='.'):
     """

@@ -17,7 +17,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue, config, fourcat_modules
-from webtool.lib.helpers import error, setting_required
+from webtool.lib.helpers import error, setting_required, parse_markdown
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
 	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
@@ -449,7 +449,7 @@ def check_dataset():
 
 	status = {
 		"datasource": dataset.parameters.get("datasource"),
-		"status": dataset.get_status(),
+		"status": parse_markdown(dataset.get_status(), trim_container=True),
 		"status_html": render_template(template, dataset=dataset),
 		"label": dataset.get_label(),
 		"rows": dataset.data["num_rows"],
@@ -554,7 +554,7 @@ def convert_dataset(key):
 		"label": dataset.get_label()
 	})
 
-@app.route("/api/nuke-query/", methods=["DELETE"])
+@app.route("/api/nuke-query/<string:key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @openapi.endpoint("tool")
@@ -667,29 +667,6 @@ def delete_dataset(key=None):
 
 	if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, message="Not allowed")
-
-	# if there is an active or queued job for some child dataset, cancel and
-	# delete it
-	children = dataset.get_all_children()
-	for child in children:
-		try:
-			job = Job.get_by_remote_ID(child.key, database=db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
-			job.finish()
-		except JobNotFoundException:
-			pass
-		except ConnectionRefusedError:
-			return error(500, message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
-
-	# now cancel and delete the job for this one (if it exists)
-	try:
-		job = Job.get_by_remote_ID(dataset.key, database=db, jobtype=dataset.type)
-		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
-	except JobNotFoundException:
-		pass
-	except ConnectionRefusedError:
-		return error(500,
-					 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
 	# do we have a parent?
 	parent_dataset = DataSet(key=dataset.key_parent, db=db, modules=fourcat_modules) if dataset.key_parent else None

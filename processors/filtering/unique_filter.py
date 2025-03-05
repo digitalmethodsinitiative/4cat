@@ -145,6 +145,6 @@ class UniqueFilter(BaseFilter):
 			columns = parent_dataset.get_columns()
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "body" if "body" in columns else None
+			options["columns"]["default"] = "body" if "body" in columns else ""
 
 		return options

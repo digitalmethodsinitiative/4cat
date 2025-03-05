@@ -167,7 +167,7 @@ class ColumnNetworker(BasicProcessor):
 
             processed += 1
             if processed % 500 == 0:
-                self.dataset.update_status("Processed %i items (%i nodes found)" % (processed, len(network.nodes)))
+                self.dataset.update_status(f"Processed {processed:,} items ({len(network.nodes):,} nodes found)")
                 self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
             # both columns need to have a value for an edge to be possible

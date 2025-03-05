@@ -470,6 +470,7 @@ nav > ul.flat > li:not(:last-child)::after {
 	position: absolute;
 	max-width: 25em;
 	border: 2px solid var(--contrast-dark);
+    z-index: 10;
 }
 
 *[role=tooltip].force-width, article p[role=toolip].force-width {

@@ -2,6 +2,7 @@
 General helper functions for Flask templating and 4CAT views
 """
 import datetime
+import markdown
 import colorsys
 import math
 import csv
@@ -334,3 +335,11 @@ def setting_required(setting, required_value=True):
 		return decorated_view
 
 	return checking_decorator
+
+
+def parse_markdown(text, trim_container=False):
+	val = markdown.markdown(text)
+	if trim_container:
+		val = re.sub(r"^<p>", "", val)
+		val = re.sub(r"</p>$", "", val)
+	return val

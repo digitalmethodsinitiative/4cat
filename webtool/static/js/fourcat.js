@@ -208,6 +208,7 @@ const processor = {
                     }
                 })
                 .catch(function (response) {
+                    console.log(`Error: ${response}`);
                     try {
                         response = JSON.parse(response.responseText);
                         popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
@@ -362,10 +363,10 @@ const query = {
         if (!for_real) {
             // just for validation
             // limit file upload size
+            let newFormData = new FormData();
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    console.log(pair[1].type)
                     if (!['application/zip', 'application/x-zip-compressed'].includes(pair[1].type)) {
                         const sample_size = Math.min(pair[1].size, snippet_size);
                         const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
@@ -373,13 +374,13 @@ const query = {
                         // make sure we're submitting utf-8 - read and then re-encode to be sure
                         const blobAsText = await FileReaderPromise(blob);
                         const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
-                        formdata.set(pair[0], snippet);
+                        newFormData.append(pair[0], snippet);
                     } else {
                         // if this is a zip file, don't bother with a snippet (which won't be
                         // useful) but do send a list of files in the zip
                         const reader = new zip.ZipReader(new zip.BlobReader(pair[1]));
                         const entries = await reader.getEntries();
-                        formdata.set(pair[0] + '-entries', JSON.stringify(
+                        newFormData.append(pair[0] + '-entries', JSON.stringify(
                            entries.map(function(e) {
                                return {
                                    filename: e.filename,
@@ -387,10 +388,13 @@ const query = {
                                }
                            })
                         ));
-                        formdata.set(pair[0], null);
+                        newFormData.append(pair[0], null);
                     }
+                } else {
+                    newFormData.append(pair[0], pair[1]);
                 }
             }
+            formdata = newFormData;
         }
 
         if (extra_data) {
@@ -1072,8 +1076,22 @@ const tooltip = {
 
             let width = parseFloat(tooltip_container.css('width').replace('px', ''));
             let height = parseFloat(tooltip_container.css('height').replace('px', ''));
-            tooltip_container.css('top', (position.top - height - 5) + 'px');
-            tooltip_container.css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
+            let top_position = (position.top - height - 5);
+
+            // if out of viewport, position below element instead
+            if(top_position < window.scrollY) {
+                top_position = position.top + parseFloat($(parent).css('height').replace('px', '')) + 5;
+            }
+            tooltip_container.css('top', top_position + 'px');
+
+            // do the same for horizontal placement
+            let hor_position = Math.max(window.scrollX, position.left + (parent_width / 2) - (width / 2));
+            if(hor_position + tooltip_container.width() - window.scrollX > document.documentElement.clientWidth) {
+                const scrollbar_width = window.innerWidth - document.documentElement.clientWidth;
+                console.log(scrollbar_width);
+                hor_position = document.documentElement.clientWidth + window.scrollX - tooltip_container.width() - 5 - scrollbar_width;
+            }
+            tooltip_container.css('left', hor_position + 'px');
         }
     },
 
@@ -1846,8 +1864,6 @@ const ui_helpers = {
                 const negate = requirement[2] === '!=';
                 const other_field = 'option-' + requirement[1];
                 const other_element = form.querySelector("*[name='" + other_field + "']");
-
-                console.log(other_field);
 
                 if (!other_element) { //invalid reference
                     return;

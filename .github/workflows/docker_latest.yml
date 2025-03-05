@@ -17,7 +17,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -34,10 +34,12 @@ jobs:
           images: digitalmethodsinitiative/4cat
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6.13.0
         with:
           context: .
           file: docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          # python:3.11-slim is not available for arm64, so we build for arm64/v8
+          # https://hub.docker.com/_/python/
+          platforms: linux/amd64, linux/arm64/v8
           push: true
           tags: digitalmethodsinitiative/4cat:latest

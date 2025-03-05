@@ -33,7 +33,7 @@ class ExportDatasets(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.is_top_dataset() and user.can_access_dataset(dataset=module, role="owner")
+		return module.is_top_dataset() and module.is_accessible_by(user, role="owner")
 
 	def process(self):
 		"""

@@ -2,7 +2,6 @@ import urllib.parse
 import datetime
 from math import floor
 
-import markdown
 import json
 import ural
 import uuid
@@ -13,6 +12,7 @@ import requests
 
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
+from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify_long
 from common.config_manager import ConfigWrapper
 
@@ -121,6 +121,25 @@ def _jinja2_filter_httpquery(data):
 	except TypeError:
 		return ""
 
+@app.template_filter("add_colour")
+def _jinja2_add_colours(data):
+	"""
+	Add colour preview to hexadecimal colour values.
+
+	Cute little preview for #FF0099-like strings. Used (at time of writing) for
+	Pinterest data, which has a "dominant colour" field.
+
+	Only works on strings that are *just* the value, to avoid messing up HTML
+	etc
+
+	:param str data:  String
+	:return str:  HTML
+	"""
+	if type(data) is not str or not re.match(r"#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\b", data):
+		return data
+
+	return f'<span class="colour-preview"><i style="background:{data}" aria-hidden="true"></i> {data}</span>'
+
 @app.template_filter("add_ahref")
 def _jinja2_filter_add_ahref(content, ellipsiate=0):
 	"""
@@ -147,11 +166,7 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
 
 @app.template_filter('markdown',)
 def _jinja2_filter_markdown(text, trim_container=False):
-	val = markdown.markdown(text)
-	if trim_container:
-		val = re.sub(r"^<p>", "", val)
-		val = re.sub(r"</p>$", "", val)
-	return val
+	return parse_markdown(text, trim_container)
 
 @app.template_filter('isbool')
 def _jinja2_filter_isbool(value):
