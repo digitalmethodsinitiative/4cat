@@ -1,0 +1,350 @@
+\bsuomi\b \bsuomalaisille\b
+\blyhytkasvui
+\bseksuaali .* \btaipumu
+\bbabbe\b
+\bryssitel
+\bautismi
+\bfag\b
+gay(?!e)
+pilakuv
+kansallispu(?!isto)
+\bmustalai
+muslim
+\bsynskada
+\bjeesu
+\byhteiskunnan\b \belät
+\bkuulovamma
+\bpois\b \bsuomesta\b
+\bromsk
+laestadi
+\bhor
+\bhelluntai
+\bliikuntaestei
+\brampa\b
+\bfrikyrk
+syndrooma
+\blesta
+\bortodoks
+\bbimie
+\btransihmi
+\bdvärg
+\bbinai
+\b(?<!hanka)lahko
+\bmenkää\b \bsinne\b \bmistä\b
+\btakaisin\b \bsinne\b \bmistä\b
+\bhomppel
+\brasism
+\bkristit
+\bprofet
+\btransmie
+\bheikkolahjai
+(?<!asenne)vammai
+\blespo
+manne(?!n\b|r|lin\b)
+\bsukupuol .* \bilmaisu
+\bmutakep
+hetero
+\bsyntyperä .* \bvuoksi\b
+\betni
+\bterrorist
+\buskonlahko
+\brullstol
+\bjutku
+\bkemali\b
+\bsaame
+\bsekt\b
+\bliikuntaeste
+\bmulatti
+\bvähemmistö
+\bvihariko
+\bhindu
+\bkuulapä
+\bsvedu
+\bähl
+\bmoske
+\bvenäläi .* \bhuor
+\bsukupuol .* \bidentiteet
+\bpride
+\bmulatt
+\bdöv
+\bääri .* \bislam
+\bseparei
+\btoisuskoiset\b
+\bateist
+\bsexuell .* \bläggnin
+\bteckenspråk
+burka(?!r)
+rotu(?!aari)
+\bromani
+\bimaami
+\bbibel
+\blesbo
+\bmustolainen\b
+\bjutsku
+\bpolttopul
+\btransperso
+\bliikuntarajoit
+\bOdin
+\bkrishna
+\blestoi
+\badventis
+\bcp .* \bvamma
+\bmusse\b
+\btvångsrörels
+rollaattor
+\bLold
+\bslöja
+\bklux\b
+\bsomppu
+\boireyhtym
+\bblatte\b
+\bmongo
+\bwhite\b
+\bmutakuon
+\bkoranen
+pyörätuol
+\bsocialfall
+\bänkyt
+\bminorite
+\bfags\b
+rullatuol
+\bpainu .* \bkotimaa
+\bpatriot
+\baivovamma
+\butlänning .* \bhat
+\bmustanaam
+\bmormooni
+\bjuutalai
+\bbög
+\bseta
+\bmutapä
+\binva
+\bfunktionshindra
+\bneger
+\bfikus\b
+\btaliban
+\bihonväri
+\blakrits
+\bkehityshäiriö
+\bjesus\b
+\bmaitonaama\b
+\bal\b \bqaida
+\bmutuainen\b
+\bapartheid
+\barbeit\b \bmacht\b \bfrei
+\bvirolai .* \bhuor
+\bhuivipä
+\bpilotti
+\b(?<!sade)kuuro
+\bbin\b \bladen
+\bsomali
+\bjehova
+\bnaispari
+\bjälkeenjään
+\bburkha
+\bliikuntavamma
+\bliikuntakyvyt
+\bkehar
+jumala(?!uta\b)
+\bvapaa \bajattelij
+\brodun\b
+\bmaahanmuuttaj
+\bkristinusko
+\bhurri
+\bbi-seksu
+\bnekru
+\bsikhi
+\btransseksu
+puhevi(?!est)
+invaliid
+\btillbaka\b \btill\b \bhemland
+\bturbaan
+seurakun
+\bantisem
+\bsnedög
+\bkarvakä
+\basperger
+\barab\b
+\bfinnjäv
+\bkinkke
+\bmottagningscentral
+\bfrämlingsfient
+sompu(?!järv)
+uskovai
+\bvinosilm
+\bapa\b
+\bulkomaalaisvastai
+huntu(?!s\b)
+\bmenkää\b \bkotimaahan\b
+\bhatbrott
+\bflykting
+\btransvesti
+\bmiespari
+\bnigger
+mykkä(?!puhelu)
+\bpelastusarmeija
+\bcp .* \bskada
+\bvenakko\b
+\befterbliven\b
+\bprofeet
+\brenras
+\bsukupuol .* \bvaihdo
+lepak(?!komie)
+\bhakkors
+\bkatoli
+\bsukupuol .* \bsuuntautu\b
+kääpiö(?!villa|nautser|pin)
+\bauschwitz\b
+\bhintti
+\bfatwa
+\bhuonokuulo
+\bkoraani
+\brukou
+\bpakkoliik
+\brodullinen\b
+\buskonto
+\bfasis
+\bmonikulttuuri
+\bjud
+\bvajaaälyi
+\bturban
+\bsyrjintä\b
+\bennakkoluulo
+transu
+\bharhaop
+\bsyjivä
+\befterbliv
+\bnatsi
+\bautism
+\brasist
+\btattar
+\basberger
+\bideologi
+\bgo\b \bhome\b
+\binvandra
+\brättipä
+\barjalai
+syndrom
+\bviittomakiel
+\bfördom
+\bbisexu
+\bvajuk
+\bzigenar
+\bkehitystaso
+\bheil\b
+jew(?!el|elry)
+\bmutiai
+\btorakka
+\bapina
+kinkki(?!nen)
+\bpalata\b \bsinne\b \bmistä\b
+\bkinuk
+\bkuulolait
+\bstammar\b
+luterilai
+\bregistrera .* \bparförh
+\bmuukalaisviha
+\bvääräuskoi
+\bhitler
+\bhakaris
+\bvajak
+\btakaisin\b \bafrikkaan\b
+\bsosiaalipumm
+\bdysfasia
+\but\b \bur\b \bskåpet\b
+\bvakaumu
+\bmolotov \bkoktail
+\bbananplockare\b
+\bnegro
+lestadio
+\bvapaakirk
+\bneeker
+\bviharyhm
+\btransnai
+\bryssittel
+\bhinttari
+\braamat
+\bstum\b
+\bras\b
+\bsvartskalle\b
+\bkainalosauv
+\bfrälsningsarm
+\bvammaseksi\b
+\breligion
+transsu
+\bnahkapä
+\bhunnu
+\btalfel\b
+\bal\b \bgaida
+\byöntimo\b
+\berityislaps
+\bbiseksu
+\blessar
+\bkryck
+\bautist
+\bsepari
+\bkyynärsauv
+\bopaskoir
+\bskinnskall
+\bvalkonaam
+\bmustilai
+\bberikare\b
+\bnazist\b
+\bdiskriminer
+\bböne
+\bsukupuol .* \bkorjau
+\bbuddha
+\bfolkdräkt
+\bkehitysvamma
+\bromaani
+\bislam
+\bnokikep
+\bulkomaalai .* \bviha
+\buskonno
+\brekisteröi .* \bparisuh
+\bpainua\b \bsinne\b \bmistä\b
+\bsharia
+\bhuononäkö
+\bseksuaal .* \bsuuntautu
+\bvajaamieli
+\bnäkövamma
+\bvalkolai
+\bpakolai
+\bortodox
+\bflato\b
+\bmolotov \bcocktail
+\bpatriootti\b
+\ballah
+\bracis
+\bqueer\b
+\brollator
+\bhudfärg
+\bhomo
+\bvastaanottokesku
+\bmormon
+pilapiirro
+\b(?<!kyy)ryssä
+\btransvest
+\bulos\b \bkaapista\b
+\bflata\b
+\bblind
+\bbapdis
+\bosama\b
+\bkristendom
+troende
+sokea
+\bsyrjityksi\b
+\bmetodis
+\btakaisin .* \bkotimaa
+\bkristilli
+\bromane
+\bvajaakuntoi
+\brajoittei
+\butvecklingsstörd
+\bpuhevamma
+invalid
+\bpuppel
+\bfägär
+\bneukku\b
+skin(?!nari)
+\bvammanen\b
