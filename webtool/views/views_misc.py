@@ -11,8 +11,9 @@ from datetime import datetime
 
 from flask import request, render_template, jsonify, Response
 from flask_login import login_required, current_user
+from werkzeug.exceptions import HTTPException
 
-from webtool import app, db, config, fourcat_modules
+from webtool import app, db, config, fourcat_modules, log
 from webtool.lib.helpers import pad_interval, error
 from webtool.views.views_dataset import create_dataset, show_results
 
@@ -20,6 +21,23 @@ from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
+
+@app.errorhandler(Exception)
+def log_exception(e):
+    """
+    Log all exceptions
+    """
+    if isinstance(e, HTTPException):
+        status_code = e.code
+        # Could handle specific HTTP errors here
+    else:
+        status_code = None
+    if not status_code or status_code >= 500:
+        log.error(f"{(str(status_code) + ' - ') if status_code else ''}{e}")
+        return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
+    else:
+        # Should be just 4xx errors; return and allow Flask to handle them
+        return e
 
 @app.errorhandler(413)
 def request_entity_too_large(this_error):
@@ -73,7 +91,7 @@ def show_about():
 
     datasources = {k: v for k, v in fourcat_modules.datasources.items() if
                    k in config.get("datasources.enabled") and not v["importable"]}
-    importables = {k: v for k, v in fourcat_modules.datasources.items() if v["importable"]}
+    importables = {k: v for k, v in fourcat_modules.datasources.items() if (v["importable"] and k in config.get("datasources.enabled"))}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 

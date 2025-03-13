@@ -94,7 +94,7 @@ class Search(BasicProcessor, ABC):
 		if self.import_warning_count == 0 and self.import_error_count == 0:
 			self.dataset.finish(num_rows=num_items)
 		else:
-			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=True)
+			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}\n\nMissing data is noted in the `missing_fields` column of this dataset's CSV file; see also the dataset log for details.", is_final=True)
 			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
@@ -170,10 +170,22 @@ class Search(BasicProcessor, ABC):
 				if self.interrupted:
 					raise WorkerInterruptedException()
 
-				# remove NUL bytes here because they trip up a lot of other
-				# things
-				# also include import metadata in item
-				item = json.loads(line.replace("\0", ""))
+				try:
+					# remove NUL bytes here because they trip up a lot of other
+					# things
+					# also include import metadata in item
+					item = json.loads(line.replace("\0", ""))
+				except json.JSONDecodeError:
+					warning = (f"An item on line {i:,} of the imported file could not be parsed as JSON - this may "
+							   f"indicate that the file you uploaded was incomplete and you need to try uploading it "
+							   f"again. The item will be ignored.")
+
+					if warning not in import_warnings:
+						import_warnings[warning] = 0
+					import_warnings[warning] += 1
+					continue
+
+
 				new_item = {
 					**item["data"],
 					"__import_meta": {k: v for k, v in item.items() if k != "data"}

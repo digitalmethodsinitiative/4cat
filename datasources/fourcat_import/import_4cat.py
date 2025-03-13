@@ -5,6 +5,7 @@ import requests
 import json
 import time
 import zipfile
+from pathlib import Path
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import (QueryParametersException, FourcatException, ProcessorInterruptedException,
@@ -136,6 +137,7 @@ class SearchImportFromFourcat(BasicProcessor):
         imported = []
         processed_files = 1 # take into account the export.log file
         failed_imports = []
+        primary_dataset_original_log = None
         with zipfile.ZipFile(temp_file, "r") as zip_ref:
             zip_contents = zip_ref.namelist()
 
@@ -151,7 +153,8 @@ class SearchImportFromFourcat(BasicProcessor):
             parent_child_mapping = {}
             for file in metadata_files:
                 with zip_ref.open(file) as f:
-                    metadata = json.load(f)
+                    content = f.read().decode('utf-8')  # Decode the binary content using the desired encoding
+                    metadata = json.loads(content)
                     if not metadata.get("key_parent"):
                         primary_dataset_keys.add(metadata.get("key"))
                         datasets.append(metadata)
@@ -178,22 +181,27 @@ class SearchImportFromFourcat(BasicProcessor):
                 new_dataset = self.create_dataset(processed_metadata, dataset_key, dataset_key in primary_dataset_keys)
                 processed_files += 1
 
-                # TODO: I am now noticing that we do not update the results_file; it is even more unlikely to collide as it is both a random key and label combined... but...
                 # Copy the log file
                 self.halt_and_catch_fire()
-                log_filename = new_dataset.get_log_path().name
+                log_filename = Path(metadata["result_file"]).with_suffix(".log").name
                 if log_filename in zip_contents:
                     self.dataset.update_status(f"Transferring log file for dataset {new_dataset.key}")
                     with zip_ref.open(log_filename) as f:
-                        with new_dataset.get_log_path().open("wb") as outfile:
-                            outfile.write(f.read())
+                        content = f.read().decode('utf-8')
+                        if new_dataset.key == self.dataset.key:
+                            # Hold the original log for the primary dataset and add at the end
+                            primary_dataset_original_log = content
+                        else:
+                            new_dataset.log("Original dataset log included below:")
+                            with new_dataset.get_log_path().open("a") as outfile:
+                                outfile.write(content)
                     processed_files += 1
                 else:
                     self.dataset.log(f"Log file not found for dataset {new_dataset.key} (original key {dataset_key}).")
 
                 # Copy the results
                 self.halt_and_catch_fire()
-                results_filename = new_dataset.get_results_path().name
+                results_filename = metadata["result_file"]
                 if results_filename in zip_contents:
                     self.dataset.update_status(f"Transferring data file for dataset {new_dataset.key}")
                     with zip_ref.open(results_filename) as f:
@@ -205,7 +213,6 @@ class SearchImportFromFourcat(BasicProcessor):
                         # first dataset - use num rows as 'overall'
                         num_rows = metadata["num_rows"]
                 else:
-                    # TODO: should I just delete the new_dataset here?
                     self.dataset.log(f"Results file not found for dataset {new_dataset.key} (original key {dataset_key}).")
                     new_dataset.finish_with_error(f"Results file not found for dataset {new_dataset.key} (original key {dataset_key}).")
                     failed_imports.append(dataset_key)
@@ -253,6 +260,12 @@ class SearchImportFromFourcat(BasicProcessor):
                 # complete
                 self.dataset.finish(num_rows)
 
+            # Add the original log for the primary dataset
+            if primary_dataset_original_log:
+                self.dataset.log("Original dataset log included below:\n")
+                with self.dataset.get_log_path().open("a") as outfile:
+                    outfile.write(primary_dataset_original_log)
+
 
     @staticmethod
     def process_metadata(metadata):
@@ -290,6 +303,8 @@ class SearchImportFromFourcat(BasicProcessor):
             # import query in the interface, similar to the workflow for
             # other data sources
             new_dataset = self.dataset
+
+            # Update metadata and file
             metadata.pop("key")  # key already OK (see above)
             self.db.update("datasets", where={"key": new_dataset.key}, data=metadata)
 
@@ -315,28 +330,26 @@ class SearchImportFromFourcat(BasicProcessor):
                 self.db.insert("datasets", data=metadata)
                 new_dataset = DataSet(key=metadata["key"], db=self.db, modules=self.modules)
 
-        # make sure the dataset path uses the new key and local dataset
-        # path settings. this also makes sure the log file is created in
-        # the right place (since it is derived from the results file path)
-        extension = metadata["result_file"].split(".")[-1]
-        new_dataset.reserve_result_file(parameters=new_dataset.parameters, extension=extension)
-
-        new_dataset.update_status("Imported dataset created")
         if new_dataset.key != original_key:
             # could not use original key because it was already in use
             # so update any references to use the new key
             self.remapped_keys[original_key] = new_dataset.key
-            new_dataset.update_status(f"Cannot import with same key - already in use on this server. Using key "
+            self.dataset.update_status(f"Cannot import with same key - already in use on this server. Using key "
                                       f"{new_dataset.key} instead of key {original_key}!")
 
         # refresh object, make sure it's in sync with the database
         self.created_datasets.add(new_dataset.key)
         new_dataset = DataSet(key=new_dataset.key, db=self.db, modules=self.modules)
+        current_log = None
         if new_dataset.key == self.dataset.key:
             # this ensures that the first imported dataset becomes the
             # processor's "own" dataset, and that the import logs go to
             # that dataset's log file. For later imports, this evaluates to
             # False.
+
+            # Read the current log and store it; it needs to be after the result_file is updated (as it is used to determine the log file path)
+            current_log = self.dataset.get_log_path().read_text()
+            # Update the dataset
             self.dataset = new_dataset
 
         # if the key of the parent dataset was changed, change the
@@ -351,6 +364,19 @@ class SearchImportFromFourcat(BasicProcessor):
         new_dataset.imported = True
         new_dataset.timestamp = int(time.time())
         new_dataset.db.commit()
+
+        # make sure the dataset path uses the new key and local dataset
+        # path settings. this also makes sure the log file is created in
+        # the right place (since it is derived from the results file path)
+        extension = metadata["result_file"].split(".")[-1]
+        updated = new_dataset.reserve_result_file(parameters=new_dataset.parameters, extension=extension)
+        if not updated:
+            self.dataset.log(f"Could not reserve result file for {new_dataset.key}!")
+
+        if current_log:
+            # Add the current log to the new dataset
+            with new_dataset.get_log_path().open("a") as outfile:
+                outfile.write(current_log)
 
         return new_dataset
 
@@ -407,6 +433,7 @@ class SearchImportFromFourcat(BasicProcessor):
             self.halt_and_catch_fire()
             try:
                 self.dataset.update_status(f"Transferring log file for dataset {new_dataset.key}")
+                # TODO: for the primary, this ends up in the middle of the log as we are still adding to it...
                 log = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "log")
                 logpath = new_dataset.get_log_path()
                 new_dataset.log("Original dataset log included below:")
@@ -660,6 +687,8 @@ class SearchImportFromFourcat(BasicProcessor):
         :param dict query:  Input from the user, through the front-end
         :return str:  Desired dataset key
         """
+        #TODO: Can this be done for the zip method as well? The original keys are in the zip file; we save them after
+        # this method is called via `after_create`. We could download here and also identify the primary dataset key...
         urls = query.get("url", "").split(",")
         keys = SearchImportFromFourcat.get_keys_from_urls(urls)
         return keys[0]

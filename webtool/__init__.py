@@ -47,10 +47,10 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 if config.get("USING_DOCKER"):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
-    log = Logger(filename='frontend_4cat.log')
+    log = Logger(logger_name='4cat-frontend', filename='frontend_4cat.log')
 
 else:
-    log = Logger()
+    log = Logger(logger_name='4cat-frontend')
 
 # Set up logging for Gunicorn
 if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):

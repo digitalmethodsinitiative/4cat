@@ -60,7 +60,7 @@ class DatasetMerger(BasicProcessor):
         return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
 
     @staticmethod
-    def get_dataset_from_url(url, db):
+    def get_dataset_from_url(url, db, modules=None):
         """
         Get dataset object based on dataset URL
 
@@ -68,6 +68,7 @@ class DatasetMerger(BasicProcessor):
 
         :param str url:  Dataset URL
         :param db:  Database handler (to retrieve metadata)
+        :param modules:  Modules handler (pass through to DataSet)
         :return DataSet:  The dataset
         """
         if not url:
@@ -75,7 +76,7 @@ class DatasetMerger(BasicProcessor):
 
         source_url = ural.normalize_url(url)
         source_key = source_url.split("/")[-1]
-        return DataSet(key=source_key, db=db)
+        return DataSet(key=source_key, db=db, modules=modules)
 
     def process(self):
         """
@@ -96,7 +97,7 @@ class DatasetMerger(BasicProcessor):
                 continue
 
             try:
-                source_dataset = self.get_dataset_from_url(source_dataset_url, self.db)
+                source_dataset = self.get_dataset_from_url(source_dataset_url, self.db, modules=self.modules)
             except DataSetException:
                 return self.dataset.finish_with_error(f"Dataset URL '{source_dataset_url} not found - cannot perform "
                                                       f"merge.")

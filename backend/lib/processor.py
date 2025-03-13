@@ -432,7 +432,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# go through items one by one, optionally mapping them
 		if parent_path.suffix.lower() == ".csv":
 			# Get field names
-			fieldnames = which_parent.get_item_keys(self)
+			fieldnames = which_parent.get_columns()
 			if not update_existing and field_name in fieldnames:
 				raise ProcessorException('field_name %s already exists!' % field_name)
 			fieldnames.append(field_name)
@@ -481,7 +481,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
-	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True):
+	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
 		A generator that iterates through files in an archive
 
@@ -498,6 +498,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param bool immediately_delete:  Temporary files are removed after yielded;
 		  False keeps files until the staging_area is removed (usually during processor
 		  cleanup)
+		:param list filename_filter:  Whitelist of filenames to iterate.
+		Other files will be ignored. If empty, do not ignore anything.
 		:return:  An iterator with a Path item for each file
 		"""
 
@@ -514,6 +516,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			archive_contents = sorted(archive_file.namelist())
 
 			for archived_file in archive_contents:
+				if filename_filter and archived_file not in filename_filter:
+					continue
+
 				info = archive_file.getinfo(archived_file)
 				if info.is_dir():
 					continue
@@ -921,13 +926,23 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		return False
 
-
 	@classmethod
-	def get_csv_parameters(cls, csv_library):
+	def exclude_followup_processors(cls, processor_type=None):
 		"""
-		Returns CSV parameters if they are changed from 4CAT's defaults.
-		"""
-		return {}
+        Used for processor compatibility
+
+        To be defined by the child processor if it should exclude certain follow-up processors.
+        e.g.:
+
+        def exclude_followup_processors(cls, processor_type):
+			if processor_type in ["undesirable-followup-processor"]:
+				return True
+			return False
+
+        :param str processor_type:  Processor type to exclude
+        :return bool:  True if processor should be excluded, False otherwise
+        """
+		return False
 
 	@abc.abstractmethod
 	def process(self):

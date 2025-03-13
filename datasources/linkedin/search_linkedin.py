@@ -198,7 +198,7 @@ class SearchLinkedIn(Search):
         author = {
             "username": post["actor"]["navigationContext"]["actionTarget"].split("linkedin.com/").pop().split("?")[0],
             "name": post["actor"]["name"]["text"],
-            "description": post["actor"].get("description", {}).get("text", ""),
+            "description": post["actor"].get("description", {}).get("text", "") if post["actor"].get("description") else "",
             "pronouns": "",
             "avatar_url": "",
             "is_company": "no",

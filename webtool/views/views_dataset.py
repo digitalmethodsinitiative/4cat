@@ -70,7 +70,7 @@ def show_results(page):
         filters["sort_by"] = "timestamp"
 
     if not request.args:
-        filters["hide_empty"] = True
+        filters["hide_empty"] = False
 
     # handle 'depth'; all, own datasets, or favourites?
     # 'all' is limited to admins
@@ -305,9 +305,9 @@ def preview_items(key):
                     break
 
                 if len(rows) == 0:
-                    rows.append(list(row.keys()))
+                    rows.append({k: k for k in list(row.keys())})
 
-                rows.append(list(row.values()))
+                rows.append(row)
 
         except NotImplementedError:
             return error(404)

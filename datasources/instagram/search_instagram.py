@@ -113,7 +113,7 @@ class SearchInstagram(Search):
             media_types = set([s["node"]["__typename"] for s in node["edge_sidecar_to_children"]["edges"]])
             media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
-        location = {"name": MissingMappedField(""), "location_id": MissingMappedField(""), "latlong": MissingMappedField(""), "city": MissingMappedField("")}
+        location = {"name": "", "latlong": "", "city": "", "location_id": ""}
         # location has 'id', 'has_public_page', 'name', and 'slug' keys in tested examples; no lat long or "city" though name seems
         if node.get("location"):
             location["name"] = node["location"].get("name")
@@ -122,6 +122,8 @@ class SearchInstagram(Search):
             location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
                 "location"].get("lat") else ""
             location["city"] = node["location"].get("city")
+
+        no_likes = bool(node.get("like_and_view_counts_disabled"))
 
         user = node.get("user")
         owner = node.get("owner")
@@ -147,7 +149,8 @@ class SearchInstagram(Search):
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
             # "usertags": ",".join(
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
-            "num_likes": node["edge_media_preview_like"]["count"],
+            "likes_hidden": "yes" if no_likes else "no",
+            "num_likes": node["edge_media_preview_like"]["count"] if not no_likes else MissingMappedField(0),
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
             "num_media": num_media,
             "location_name": location["name"],
@@ -208,7 +211,7 @@ class SearchInstagram(Search):
         else:
             num_comments = -1
 
-        location = {"name": MissingMappedField(""), "location_id": MissingMappedField(""), "latlong": MissingMappedField(""), "city": MissingMappedField("")}
+        location = {"name": "", "latlong": "", "city": "", "location_id": ""}
         if node.get("location"):
             location["name"] = node["location"].get("name")
             location["location_id"] = node["location"].get("pk")
@@ -229,6 +232,8 @@ class SearchInstagram(Search):
             coauthor["coauthor"] = coauthor_node.get("username")
             coauthor["coauthor_fullname"] = coauthor_node.get("full_name")
             coauthor["coauthor_id"] = coauthor_node.get("id")
+
+        no_likes = bool(node.get("like_and_view_counts_disabled"))
 
         mapped_item = {
             "id": node["code"],
@@ -251,7 +256,8 @@ class SearchInstagram(Search):
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
             # "usertags": ",".join(
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
-            "num_likes": node["like_count"],
+            "likes_hidden": "yes" if no_likes else "no",
+            "num_likes": node["like_count"] if not no_likes else MissingMappedField(0),
             "num_comments": num_comments,
             "num_media": num_media,
             "location_name": location["name"],

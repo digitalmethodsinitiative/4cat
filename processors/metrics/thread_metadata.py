@@ -44,6 +44,7 @@ class ThreadMetadata(BasicProcessor):
 		threads = {}
 
 		self.dataset.update_status("Reading source file")
+		progress = 0
 		for post in self.source_dataset.iterate_items(self):
 			if post["thread_id"] not in threads:
 				threads[post["thread_id"]] = {
@@ -75,6 +76,12 @@ class ThreadMetadata(BasicProcessor):
 			threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
 			threads[post["thread_id"]]["last_post"] = max(timestamp, threads[post["thread_id"]]["last_post"])
 			threads[post["thread_id"]]["count"] += 1
+
+			progress += 1
+			if progress % 500 == 0:
+				self.dataset.update_status(f"Iterated through {progress:,} of {self.source_dataset.num_rows:,} items")
+				self.dataset.update_progress(progress / self.source_dataset.num_rows)
+
 
 		results = [{
 			"thread_id": thread_id,

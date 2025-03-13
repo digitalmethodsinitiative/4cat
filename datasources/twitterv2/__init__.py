@@ -9,4 +9,4 @@ from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
 DATASOURCE = "twitterv2"
-NAME = "Twitter API (v2) Search"
+NAME = "X/Twitter API (v2) Search"

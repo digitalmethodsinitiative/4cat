@@ -103,7 +103,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 		views = {}
 		intervals = set()
 
-		fieldnames = self.source_dataset.get_item_keys(self)
+		fieldnames = self.source_dataset.get_columns()
 		if "views" in fieldnames:
 			engagement_field = "views"
 		elif "score" in fieldnames:

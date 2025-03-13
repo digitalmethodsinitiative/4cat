@@ -15,7 +15,7 @@
 {% endif %}
 {% if dataset.get_place_in_queue() <= 0 %}
     {% if dataset.get_status() %}
-        {{ dataset.get_status() }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
+        {{ dataset.get_status()|markdown(True)|safe }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
     {% elif not dataset.is_finished() %}
         Creating dataset
     {% endif %}

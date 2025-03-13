@@ -27,14 +27,14 @@ config_definition = {
     },
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
-        "default": ["ninegag", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
+        "default": ["ninegag", "bsky", "douban", "douyin", "imgur", "upload", "instagram", "import_4cat", "linkedin", "media-import",
                     "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "gab": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": False, "allow_optout": False, "timeout": 0}, "truthsocial": {"enabled": True, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
+        "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "bsky": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "import_4cat": {"enabled": True, "allow_optout": False, "timeout": 0},"gab": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "media-import": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": True, "allow_optout": False, "timeout": 0}, "truthsocial": {"enabled": True, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
         "help": "Data source-specific expiration",
         "tooltip": "Allows setting expiration settings per datasource. Configured by proxy via the 'data sources' "
                    "setting.",
@@ -142,7 +142,7 @@ config_definition = {
     "privileges.admin.can_manipulate_all_datasets": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can manipulate datasets",
+        "help": "Can manipulate all datasets",
         "tooltip": "Controls whether users can manipulate all datasets as if they were an owner, e.g. sharing it with "
                    "others, running processors, et cetera."
     },
@@ -529,11 +529,10 @@ config_definition = {
         "type": UserInput.OPTION_MULTI_SELECT,
         "help": "Pages in navigation",
         "options": {
-            "faq": "FAQ",
             "data-policy": "Data Policy",
             "citing": "How to cite",
         },
-        "default": ["faq"],
+        "default": [],
         "tooltip": "These pages will be included in the navigation bar at the top of the interface."
     },
     "ui.prefer_mapped_preview": {
