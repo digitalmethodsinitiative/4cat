@@ -1,6 +1,6 @@
 # Architecture for 'common'
 
-## Classes
+## classes
 
 :::mermaid
 classDiagram
@@ -386,7 +386,7 @@ classDiagram
   ModuleCollector --* DataSet : modules
 :::
 
-## Packages
+## packages
 
 :::mermaid
 classDiagram
@@ -451,3 +451,4 @@ classDiagram
   user_input --> exceptions
   user_input --> helpers
 :::
+

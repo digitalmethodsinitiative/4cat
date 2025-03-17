@@ -1,6 +1,6 @@
 # Architecture for 'webtool'
 
-## Classes
+## classes
 
 :::mermaid
 classDiagram
@@ -26,7 +26,7 @@ classDiagram
   }
 :::
 
-## Packages
+## packages
 
 :::mermaid
 classDiagram
@@ -86,3 +86,4 @@ classDiagram
   views_user --> helpers
   views_user --> api_tool
 :::
+

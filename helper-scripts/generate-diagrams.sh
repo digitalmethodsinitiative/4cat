@@ -26,19 +26,19 @@ do
     echo "Writing to file '$OUTPUT_FILE'..."
     echo "# Architecture for '$PACKAGE_NAME'" > $OUTPUT_FILE
     echo "" >> $OUTPUT_FILE
-    
-    echo "## Classes" >> $OUTPUT_FILE    
-    echo "" >> $OUTPUT_FILE
-    echo ":::mermaid" >> $OUTPUT_FILE
-    cat classes_$PACKAGE_NAME.$OUTPUT_FORMAT >> $OUTPUT_FILE
-    rm classes_$PACKAGE_NAME.$OUTPUT_FORMAT
-    echo ":::" >> $OUTPUT_FILE
-    echo "" >> $OUTPUT_FILE
 
-    echo "## Packages" >> $OUTPUT_FILE
-    echo "" >> $OUTPUT_FILE
-    echo ":::mermaid" >> $OUTPUT_FILE
-    cat packages_$PACKAGE_NAME.$OUTPUT_FORMAT >> $OUTPUT_FILE
-    rm packages_$PACKAGE_NAME.$OUTPUT_FORMAT
-    echo ":::" >> $OUTPUT_FILE
+    for PREFIX in "classes" "packages"
+    do
+        echo "## $PREFIX" >> $OUTPUT_FILE
+        echo "" >> $OUTPUT_FILE
+        echo ":::mermaid" >> $OUTPUT_FILE
+        
+        MERMAID_FILE=${PREFIX}_${PACKAGE_NAME}.${OUTPUT_FORMAT}
+        cat $MERMAID_FILE >> $OUTPUT_FILE
+        rm $MERMAID_FILE
+        
+        echo ":::" >> $OUTPUT_FILE
+        echo "" >> $OUTPUT_FILE
+
+    done
 done

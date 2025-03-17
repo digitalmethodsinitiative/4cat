@@ -1,6 +1,6 @@
 # Architecture for 'backend'
 
-## Classes
+## classes
 
 :::mermaid
 classDiagram
@@ -213,7 +213,7 @@ classDiagram
   FourcatRestarterAndUpgrader --|> BasicWorker
 :::
 
-## Packages
+## packages
 
 :::mermaid
 classDiagram
@@ -269,3 +269,4 @@ classDiagram
   expire_items --> worker
   restart_4cat --> worker
 :::
+
