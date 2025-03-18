@@ -422,8 +422,6 @@ def show_result(key):
         elif dataset.parameters.get("expires-after"):
             timestamp_expires = dataset.parameters.get("expires-after")
 
-    has_explorer = config.get("explorer.config", {}).get(datasource, {}).get("enabled", False)
-
     # if the dataset has parameters with credentials, give user the option to
     # erase them
     has_credentials = [p for p in dataset.parameters if p.startswith("api_") and p not in ("api_type", "api_track")]
@@ -436,7 +434,7 @@ def show_result(key):
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=fourcat_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, has_explorer=has_explorer,
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
                            datasources=datasources)
 
 

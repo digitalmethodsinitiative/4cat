@@ -59,9 +59,6 @@ def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 	if not results_path:
 		return error(404, error="This dataset didn't finish executing.")
 
-	if not config.get("explorer.config", {}).get(datasource,{}).get("enabled"):
-		return error(404, error="Explorer functionality disabled for %s." % datasource)
-
 	# The amount of posts to show on a page
 	posts_per_page = config.get("explorer.posts_per_page", 50)
 

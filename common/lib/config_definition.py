@@ -328,25 +328,13 @@ config_definition = {
     },
     "explorer.config_explanation": {
         "type": UserInput.OPTION_INFO,
-        "help": "Per data source, you can enable or disable the Explorer. Posts will be formatted through a <em>generic</em> template "
+        "help": "Data sources use <em>Explorer templates</em> that determine their look and data. "
+                "These are made of [custom HTML templates](https://github.com/digitalmethodsinitiative/4cat/tree/master/"
+                "webtool/datasource-templates/explorer/templates) and [custom CSS files](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer). "
+                "If no template is available, a <em>generic</em> template is used "
                 "made of [this HTML file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/templates/explorer/"
                 "templates/generic.html) and [this CSS file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/"
-                "static/css/explorer/generic.css). For various data sources, <em>data source-specific</em> templates are also available. "
-                "These are made of a custom HTML template in [this directory](https://github.com/digitalmethodsinitiative/4cat/tree/master/"
-                "webtool/datasource-templates/explorer/templates) and a custom CSS file [in this directory](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer)."
-    },
-    "explorer.config": {
-        "type": UserInput.OPTION_DATASOURCES_TABLE,
-        "help": "Explorer settings per data source",
-        "default": {"fourchan": {"enabled": True}, "eightchan": {"enabled": True}, "eightkun": {"enabled": True}, "ninegag": {"enabled": True}, "bitchute": {"enabled": True}, "dmi-tcat": {"enabled": True}, "dmi-tcatv2": {"enabled": True}, "douban": {"enabled": True}, "douyin": {"enabled": False}, "imgur": {"enabled": True}, "upload": {"enabled": True}, "instagram": {"enabled": True}, "linkedin": {"enabled": True}, "parler": {"enabled": True}, "reddit": {"enabled": True}, "telegram": {"enabled": True}, "tiktok": {"enabled": True}, "tiktok-urls": {"enabled": True}, "tumblr": {"enabled": True}, "twitter": {"enabled": True}, "twitterv2": {"enabled": True}, "usenet": {"enabled": True}, "vk": {"enabled": True}},
-        "columns": {
-            "enabled": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Enable Explorer",
-                "tooltip": "Whether the Explorer is available for this data source",
-                "default": True
-            }
-        }
+                "static/css/explorer/generic.css)."
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
