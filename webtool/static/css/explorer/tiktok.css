@@ -30,10 +30,12 @@
 	display: table-cell;
 	width: 11%;
 	vertical-align: top;
+	padding: 10px;
 }
 
 .posts .post .profile-picture img {
 	border-radius: 100%;
+	width: 100%;
 }
 
 .posts .post .post-content {
