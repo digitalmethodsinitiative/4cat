@@ -607,7 +607,7 @@ class SearchBluesky(Search):
             "author_avatar": item["author"]["avatar"],
             "author_created_at": SearchBluesky.bsky_convert_datetime_string(item["author"]["created_at"], mode="iso_string", raise_error=False),
 
-            "timestamp": created_at.timestamp(),
+            "timestamp": int(created_at.timestamp()),
         }, message=f"Bluesky new mappings: {unmapped_data}")
 
     @staticmethod
