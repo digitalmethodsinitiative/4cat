@@ -110,24 +110,19 @@ class OpenAI(BasicProcessor):
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "I understand that my data is sent to OpenAI and that OpenAI may incur costs.",
 				"default": False,
+			},
+			"write_annotations": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Add output as annotations to the parent dataset.",
+				"default": True
+			},
+			"annotation_label": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Annotation label",
+				"default": "",
+				"requires": "write_annotations==true"
 			}
 		}
-
-		# Allow adding prompt answers as annotations to the top-level dataset
-		# if this is a direct child
-		# if parent_dataset and parent_dataset.is_top_dataset():
-		# todo: update when explorer is integrated
-		# 	options["write_annotations"] = {
-		# 			"type": UserInput.OPTION_TOGGLE,
-		# 			"help": "Add output as annotations to the parent dataset.",
-		# 			"default": True
-		# 	}
-		# 	options["annotation_label"] = {
-		# 			"type": UserInput.OPTION_TEXT,
-		# 			"help": "Annotation label",
-		# 			"default": "",
-		# 			"requires": "write_annotations==true"
-		# 	}
 
 		api_key = config.get("api.openai.api_key", user=user)
 		if not api_key:
