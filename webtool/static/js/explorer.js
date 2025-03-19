@@ -17,6 +17,8 @@ function init() {
 	// Annotations
 	annotations.init();
 
+	annotations.showAnnotations();
+
 }
 
 /*
@@ -568,6 +570,11 @@ const annotations = {
 	},
 
 	showAnnotations: function() {
+
+		// Nothing to show when there's no annotations
+		if (!annotations.fieldsExist()) {
+			return null
+		}
 
 		// Change button
 		let ta = $("#toggle-annotations");
