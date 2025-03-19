@@ -80,6 +80,7 @@ class SearchPinterest(Search):
 
         return MappedItem({
             "id": post_id,
+            "thread_id": post_id,
             "author": post["pinner"]["username"],
             "author_fullname": post["pinner"].get("fullName", post["pinner"].get("full_name", "")),
             "author_original": post["nativeCreator"]["username"] if post.get("nativeCreator") else post["pinner"]["username"],
@@ -117,6 +118,7 @@ class SearchPinterest(Search):
         """
         return MappedItem({
             "id": int(post["id"]),
+            "thread_id": int(post["id"]),
             "author": MissingMappedField(""),
             "author_fullname": MissingMappedField(""),
             "author_original": MissingMappedField(""),

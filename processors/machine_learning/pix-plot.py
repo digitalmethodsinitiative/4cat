@@ -350,7 +350,11 @@ class PixPlotGenerator(BasicProcessor):
                     # If images repeat this will overwrite prior value
                     # I really dislike that the download images is not a one to one with posts...
                     if 'timestamp' in post.keys():
-                        image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+                        if type(post['timestamp']) in [int, float]:
+                            image['year'] = datetime.fromtimestamp(post['timestamp']).year
+                        elif type(post['timestamp']) == str:
+                            image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+                        
         self.dataset.log(f"Image metadata added to {posts_with_images} posts")
 
         # Get path for metadata file

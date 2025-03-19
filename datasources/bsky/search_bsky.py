@@ -75,8 +75,9 @@ class SearchBluesky(Search):
             "password": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Bluesky Password",
-                "cache": True,
-                "sensitive": True,
+                "cache": True, # tells the frontend to cache this value
+                "sensitive": True, # tells the backend to delete this value after use
+                "password": True, # tells the frontend this is a password type
             },
             "divider": {
                 "type": UserInput.OPTION_DIVIDER
@@ -606,7 +607,7 @@ class SearchBluesky(Search):
             "author_avatar": item["author"]["avatar"],
             "author_created_at": SearchBluesky.bsky_convert_datetime_string(item["author"]["created_at"], mode="iso_string", raise_error=False),
 
-            "timestamp": created_at.timestamp(),
+            "timestamp": int(created_at.timestamp()),
         }, message=f"Bluesky new mappings: {unmapped_data}")
 
     @staticmethod

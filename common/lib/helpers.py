@@ -139,7 +139,16 @@ def get_git_branch():
         branch = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
-        return branch.stdout.decode("utf-8").strip()
+        branch_name = branch.stdout.decode("utf-8").strip()
+        if not branch_name:
+            # Check for detached HEAD state
+            # Most likely occuring because of checking out release tags (which are not branches) or commits
+            head_status = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} status"), stdout=subprocess.PIPE)
+            if head_status.returncode == 0:
+                for line in head_status.stdout.decode("utf-8").split("\n"):
+                    if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
+                        branch_name = line.split("/")[-1] if "/" in line else line.split(" ")[-1]
+                        return branch_name.strip()
     except (subprocess.SubprocessError, ValueError, FileNotFoundError):
         return ""
 

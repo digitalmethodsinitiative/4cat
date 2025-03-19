@@ -549,7 +549,7 @@ def convert_dataset(key):
 		"label": dataset.get_label()
 	})
 
-@app.route("/api/nuke-query/", methods=["DELETE"])
+@app.route("/api/nuke-query/<string:key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @openapi.endpoint("tool")

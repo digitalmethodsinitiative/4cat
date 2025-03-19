@@ -26,8 +26,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - ${PUBLIC_API_PORT}:4444
     volumes:
       - ./data/datasets/:/usr/src/app/data/
       - ./data/config/:/usr/src/app/config/

@@ -72,7 +72,26 @@ class SearchRedNote(Search):
 
         import json
 
-        image = item["image_list"][0]["url_default"] if item.get("image_list") else item["cover"]["url_default"]
+        # Images
+        images = []
+        if item.get("image_list"):
+            for image in item["image_list"]:
+                if "url_default" in image and image["url_default"]:
+                    images.append(image["url_default"])
+                elif "info_list" in image and image["info_list"]:
+                    for img_info in image["info_list"]:
+                        found = False
+                        if img_info.get("image_scene") == "WB_DFT":
+                            images.append(img_info["url"])
+                            found = True
+                            break
+                    if not found:
+                        images.append(image["info_list"][0]["url"])
+        elif item.get("cover"):
+            images.append(item["cover"]["url_default"])
+        else:
+            # no image found;
+            images = MissingMappedField("")       
 
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={post['xsec_token']}" if post.get("xsec_token") else ""
@@ -84,13 +103,14 @@ class SearchRedNote(Search):
         timestamp = item.get("time", None)
         return MappedItem({
             "id": item_id,
+            "thread_id": item_id,
             "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
             "title": item.get("display_title", ""),
             "body": item.get("desc", "") if "desc" in item else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
             "author": item["user"]["nickname"],
             "author_avatar_url": item["user"]["avatar"],
-            "image_url": image,
+            "image_urls": ",".join(images) if type(images) is list else images,
             "video_url": video_url,
             # only available when loading an individual post page, so skip
             # "tags": ",".join(t["name"] for t in item["tag_list"]),
@@ -121,6 +141,7 @@ class SearchRedNote(Search):
 
         return MappedItem({
             "id": item["id"],
+            "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com/explore/{item['id']}{xsec_bit}",
             "title": note.get("title", ""),
             "body": note.get("desc", "") if "desc" in note else MissingMappedField(""),
@@ -150,6 +171,7 @@ class SearchRedNote(Search):
         """
         return MappedItem({
             "id": item["id"],
+            "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com{item['url']}",
             "title": item["title"],
             "body": MissingMappedField(""),
