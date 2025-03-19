@@ -226,12 +226,19 @@ class SearchInstagram(Search):
                 raise MapItemException("Unable to parse item: different user and owner")
 
         # Instagram posts also allow 'Collabs' with up to one co-author
-        coauthor = {"coauthor": "", "coauthor_fullname": "", "coauthor_id": ""}
+        coauthors = []
+        coauthor_fullnames = []
+        coauthor_ids = []
         if node.get("coauthor_producers"):
-            coauthor_node = node["coauthor_producers"][0]
-            coauthor["coauthor"] = coauthor_node.get("username")
-            coauthor["coauthor_fullname"] = coauthor_node.get("full_name")
-            coauthor["coauthor_id"] = coauthor_node.get("id")
+            for coauthor_node in node["coauthor_producers"]:
+                print(coauthor_node)
+                coauthors.append(coauthor_node.get("username"))
+                coauthor_fullnames.append(coauthor_node.get("full_name"))
+                coauthor_ids.append(coauthor_node.get("id"))
+
+        coauthors = {"coauthors": ",".join(coauthors),
+                     "coauthor_fullnames": ",".join(coauthor_fullnames),
+                     "coauthor_ids": ",".join(coauthor_ids)}
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
@@ -245,9 +252,7 @@ class SearchInstagram(Search):
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
             "verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
-            "coauthor": coauthor["coauthor"],
-            "coauthor_fullname": coauthor["coauthor_fullname"],
-            "coauthor_id": coauthor["coauthor_id"],
+            **coauthors,
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["code"],
