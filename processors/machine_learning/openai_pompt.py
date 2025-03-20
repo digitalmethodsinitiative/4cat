@@ -130,7 +130,8 @@ class OpenAI(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
 				"help": "OpenAI API key",
-				"tooltip": "Can be created on platform.openapi.com"
+				"tooltip": "Can be created on platform.openapi.com",
+				"sensitive": True
 			}
 
 		return options
@@ -199,8 +200,7 @@ class OpenAI(BasicProcessor):
 			return
 
 		write_annotations = False
-		# todo: update when explorer is integrated
-		#write_annotations = self.parameters.get("write_annotations", False)
+		write_annotations = self.parameters.get("write_annotations", False)
 
 		if write_annotations:
 			label = self.parameters.get("annotation_label", "")
@@ -265,9 +265,8 @@ class OpenAI(BasicProcessor):
 			i += 1
 
 		# Write annotations
-		# todo: update when explorer is integrated
-		# if write_annotations:
-		#	self.write_annotations(annotations, overwrite=True)
+		if write_annotations:
+			self.write_annotations(annotations, overwrite=True)
 
 		# Write to csv file
 		self.write_csv_items_and_finish(results)
