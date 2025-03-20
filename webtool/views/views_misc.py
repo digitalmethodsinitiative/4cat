@@ -5,6 +5,7 @@ import re
 import csv
 import json
 import markdown
+import traceback
 
 from pathlib import Path
 from datetime import datetime
@@ -33,7 +34,9 @@ def log_exception(e):
     else:
         status_code = None
     if not status_code or status_code >= 500:
-        log.error(f"{(str(status_code) + ' - ') if status_code else ''}{e}")
+        # Capture the correct frame and log
+        tb = traceback.extract_tb(e.__traceback__)
+        log.error(f"{type(e).__name__}: {e}", frame=tb[-1] if tb else None)
         return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
     else:
         # Should be just 4xx errors; return and allow Flask to handle them
