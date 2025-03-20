@@ -49,7 +49,7 @@ class WildcardFilter(BaseFilter):
         :return generator:
         """
 
-        matches = [match.strip().replace("*", "[^\s]*") for match in self.parameters.get("match").split(",")]
+        matches = [match.strip().replace("*", r"[^\s]*") for match in self.parameters.get("match").split(",")]
 
         # load lexicons from word lists
 

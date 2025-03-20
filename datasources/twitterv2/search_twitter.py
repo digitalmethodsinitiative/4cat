@@ -350,7 +350,7 @@ class SearchWithTwitterAPIv2(Search):
         splices the metadata into it where appropriate, and returns the
         enriched object.
 
-        /!\ This is not an efficient way to store things /!\ but it is more
+        **This is not an efficient way to store things** but it is more
         convenient.
 
         :param dict tweet:  The tweet object

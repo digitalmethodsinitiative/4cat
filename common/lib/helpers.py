@@ -146,9 +146,9 @@ def get_git_branch():
             head_status = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} status"), stdout=subprocess.PIPE)
             if head_status.returncode == 0:
                 for line in head_status.stdout.decode("utf-8").split("\n"):
-                    if "HEAD detached at" in line:
+                    if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
                         branch_name = line.split("/")[-1] if "/" in line else line.split(" ")[-1]
-                        return branch_name
+                        return branch_name.strip()
     except (subprocess.SubprocessError, ValueError, FileNotFoundError):
         return ""
 

@@ -40,7 +40,7 @@ class DataSet(FourcatModule):
 	data = None
 	key = ""
 
-	children = None
+	_children = None
 	available_processors = None
 	genealogy = None
 	preset_parent = None
@@ -92,7 +92,6 @@ class DataSet(FourcatModule):
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}
-		self.children = []
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
@@ -169,11 +168,6 @@ class DataSet(FourcatModule):
 
 			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
-
-		# retrieve analyses and processors that may be run for this dataset
-		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db, modules=self.modules) for analysis in analyses],
-							   key=lambda dataset: dataset.is_finished(), reverse=True)
 
 		self.refresh_owners()
 
@@ -576,9 +570,7 @@ class DataSet(FourcatModule):
 
 		:param kwargs:  Parameters corresponding to known dataset attributes
 		"""
-		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
-		for child in children:
-			child = DataSet(key=child["key"], db=self.db, modules=self.modules)
+		for child in self.get_children(update=True):
 			for attr, value in kwargs.items():
 				child.__setattr__(attr, value)
 
@@ -711,7 +703,7 @@ class DataSet(FourcatModule):
 			self.refresh_owners()
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(update=True):
 			child.add_owner(username, role)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -742,7 +734,7 @@ class DataSet(FourcatModule):
 			del self.tagged_owners[username]
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(update=True):
 			child.remove_owner(username)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -787,7 +779,7 @@ class DataSet(FourcatModule):
 
 		self.db.commit()
 		if recursive:
-			for child in self.children:
+			for child in self.get_children(update=True):
 				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
@@ -1256,7 +1248,22 @@ class DataSet(FourcatModule):
 		self.genealogy = genealogy
 		return self.genealogy
 
-	def get_all_children(self, recursive=True):
+	def get_children(self, update=False):
+		"""
+		Get children of this dataset
+
+		:param bool update:  Update the list of children from database if True, else return cached value
+		:return list:  List of child datasets
+		"""
+		if self._children is not None and not update:
+			return self._children
+
+		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC",
+										(self.key,))
+		self._children = [DataSet(data=analysis, db=self.db, modules=self.modules) for analysis in analyses]
+		return self._children
+		
+	def get_all_children(self, recursive=True, update=True):
 		"""
 		Get all children of this dataset
 
@@ -1266,11 +1273,11 @@ class DataSet(FourcatModule):
 
 		:return list:  List of DataSets
 		"""
-		children = [DataSet(data=record, db=self.db, modules=self.modules) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		children = self.get_children(update=update)
 		results = children.copy()
 		if recursive:
 			for child in children:
-				results += child.get_all_children(recursive)
+				results += child.get_all_children(recursive=recursive, update=update)
 
 		return results
 
@@ -1433,11 +1440,12 @@ class DataSet(FourcatModule):
 
 		processors = self.get_compatible_processors(user=user)
 
-		for analysis in self.children:
+		for analysis in self.get_children(update=True):
 			if analysis.type not in processors:
 				continue
 
 			if not processors[analysis.type].get_options():
+				# No variable options; this processor has been run so remove
 				del processors[analysis.type]
 				continue
 

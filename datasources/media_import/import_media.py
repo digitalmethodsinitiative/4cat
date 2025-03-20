@@ -13,7 +13,8 @@ from common.lib.user_input import UserInput
 from common.lib.helpers import andify
 
 # approximate number of files that can be uploaded in a single request rounded to 100
-max_files_approx = int((math.floor(config.get('flask.max_form_parts', 1000)-50)/100)) * 100
+# todo: bring this back into get_options after merging #455
+# max_files_approx = int((math.floor(config.get('flask.max_form_parts', 1000)-50)/100)) * 100
 
 class SearchMedia(BasicProcessor):
     type = "media-import-search"  # job ID
@@ -39,7 +40,7 @@ class SearchMedia(BasicProcessor):
                         "Please include only one type of file per dataset (image, audio, or video) and "
                         "4CAT will be able to run various processors on these media collections. "
                         f"\n\nFor collections **larger than a few hundred**, please upload a single "
-                        f"ZIP file. More than ~{max_files_approx} files will fail (and a ZIP file will also load much faster)."
+                        f"ZIP file. More than ~500 files will fail (and a ZIP file will also load much faster)."
             },
             "data_upload": {
                 "type": UserInput.OPTION_FILE,
