@@ -95,7 +95,7 @@ class WorkerManager:
 
 				# if a job is of a known type, and that job type has open
 				# worker slots, start a new worker to run it
-				if len(self.worker_pool[jobtype]) < worker_class.max_workers:
+				if worker_class.check_worker_available(manager=self):
 					try:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=self.modules)
