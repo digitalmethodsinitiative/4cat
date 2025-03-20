@@ -18,18 +18,18 @@ config = ConfigWrapper(config, user=current_user, request=request)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 
-@app.route("/results/<string:dataset_key>/explorer/", defaults={"page": 1, "show_annotations": False})
+@app.route("/results/<string:dataset_key>/explorer/", defaults={"page": 1})
 @app.route("/results/<string:dataset_key>/explorer/page/<int:page>")
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
-def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
+def explorer_dataset(dataset_key: str, page=1):
 	"""
-	Show posts from a dataset
+	Show items from a dataset
 
-	:param str dataset_key:  Dataset key
-
+	:param str dataset_key:		Dataset key
+	:param str page:			Page number
 	:return-schema: {type=array,items={type=integer}}
 
 	:return-error 404: If the dataset does not exist.
@@ -66,7 +66,7 @@ def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 	max_posts = config.get('explorer.max_posts', 500000)
 
 	# The offset for posts depending on the current page
-	offset = ((page - 1) * posts_per_page) if page else 0
+	offset = ((int(page) - 1) * posts_per_page) if page else 0
 
 	# If the dataset is generated from an API-accessible database, we can add 
 	# extra features like the ability to navigate across posts.
@@ -82,9 +82,6 @@ def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 	post_ids = []
 	posts = []
 	count = 0
-
-	# Load annotations with post IDs as keys and their annotations as lists.
-	annotations = {}
 
 	# We don't need to sort if we're showing the existing dataset order (default).
 	# If we're sorting, we need to iterate over the entire dataset first.
@@ -117,11 +114,14 @@ def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 	if not posts:
 		return error(404, error="No posts or posts could not be displayed")
 
-	# Check whether there's already annotations made.
-	# If so, also pass these to the template and set the post ID
-	# as key, so we can easily retrieve them.
+	# Check whether there's already annotations made for these posts.
+	# We're not using `get_annotations()` because we don't need *all* annotations.
+	# If there's annotations made, pass these to the template and set the post ID
+	# as key so we can easily retrieve them later.
+	post_annotations = {}
 	for post_id in post_ids:
-		annotations[post_id] = dataset.get_annotations(item_id=post_id)
+		annotations = dataset.get_annotations_for_item(post_id)
+		post_annotations[post_id] = [a for a in annotations if a]
 
 	# We can use either a generic or a pre-made, data source-specific template.
 	template = "datasource" if has_datasource_template(datasource) else "generic"
@@ -135,7 +135,23 @@ def explorer_dataset(dataset_key: str, page=1, show_annotations=False):
 		posts_css = css.read()
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", dataset=dataset, datasource=datasource, has_database=has_database, posts=posts, annotation_fields=annotation_fields, annotations=annotations, template=template, posts_css=posts_css, page=page, offset=offset, posts_per_page=posts_per_page, post_count=post_count, max_posts=max_posts, warning=warning)
+	return render_template(
+		"explorer/explorer.html",
+		dataset=dataset,
+		datasource=datasource,
+		has_database=has_database,
+		posts=posts,
+		annotation_fields=annotation_fields,
+		annotations=post_annotations,
+		template=template,
+		posts_css=posts_css,
+		page=page,
+		offset=offset,
+		posts_per_page=posts_per_page,
+		post_count=post_count,
+		max_posts=max_posts,
+		warning=warning
+	)
 
 @app.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
 @api_ratelimit

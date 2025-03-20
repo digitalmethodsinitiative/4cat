@@ -6,6 +6,7 @@ Annotation class
 import time
 import json
 
+from common.lib.database import Database
 from common.lib.helpers import hash_to_md5
 from common.lib.exceptions import AnnotationException
 
@@ -228,8 +229,39 @@ class Annotation:
         """
         return self.db.delete("annotations", {"id": self.id})
 
+
     @staticmethod
-    def delete_many(db, dataset_key=None, annotation_id=None, field_id=None):
+    def get_annotations_for_dataset(db: Database, dataset_key: str, item_id=None) -> list:
+        """
+        Returns all annotations for a dataset.
+        :param db:                  Database object.
+        :param str dataset_key:     A dataset key.
+        :param str item_id:         An optional item ID to only get annotations from one item (i.g. social media post).
+
+        :return list: List with annotations.
+        """
+        if not dataset_key:
+            return []
+
+        if item_id:
+            data = db.fetchall(
+                "SELECT * FROM annotations WHERE dataset = %s AND item_id = %s",
+                (dataset_key, str(item_id),)
+            )
+        else:
+            data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s", (dataset_key,))
+        if not data:
+            return []
+
+        for i in range(len(data)):
+            if data[i]["type"] == "checkbox":
+                data[i]["value"] = data[i]["value"].split(",")
+            data[i]["metadata"] = json.loads(data[i]["metadata"])
+
+        return [Annotation(data=d, db=db) for d in data]
+
+    @staticmethod
+    def delete_many(db: Database, dataset_key=None, annotation_id=None, field_id=None):
         """
         Deletes annotations for an entire dataset or by a list of (field) IDs.
 
@@ -254,7 +286,7 @@ class Annotation:
         return db.delete("annotations", where)
 
     @staticmethod
-    def update_annotations_via_fields(dataset_key, old_fields: dict, new_fields: dict, db) -> int:
+    def update_annotations_via_fields(dataset_key: str, old_fields: dict, new_fields: dict, db: Database) -> int:
         """
         Updates annotations in the annotations table if the input fields
         themselves have been changed, for instance if a dropdown label is renamed

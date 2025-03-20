@@ -4,17 +4,16 @@
 		{% if annotations and post.id in annotations %}
 			{% set post_annotations = annotations[post.id] %}
 		{% endif %}
-
 		{% for field in annotation_fields %}
 
             {% set type = annotation_fields[field]["type"] %}
 			{% set label = annotation_fields[field]["label"] %}
 
             {# Loop through annotations for this post and
-            retrieve the data from the one matching this annotation field #}
+            retrieve the data from the one matching this annotation field id #}
             {% set an = namespace(an={}) %}
 			{% for post_annotation in post_annotations %}
-				{% if post_annotation.field_id == field %}
+				{% if post_annotation.field_id  == field %}
                     {% set an.an = post_annotation %}
     			{% endif %}
             {% endfor %}

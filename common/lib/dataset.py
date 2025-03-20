@@ -412,19 +412,21 @@ class DataSet(FourcatModule):
 			# Add possible annotations
 			if annotation_labels:
 
+				annotations = self.get_annotations_for_item(mapped_item.data["id"])
+
 				# We're always handling annotated data as a MappedItem object,
 				# even if no map_item() function is available for the data source.
 				if not isinstance(mapped_item, MappedItem):
 					mapped_item = MappedItem(mapped_item)
 
-				# Get annotations for this specific post
-				post_annotations = self.get_annotations(item_id=mapped_item.data["id"])
-
 				for annotation_label in annotation_labels:
+					# Get annotations for this specific post
+
 					value = ""
-					for post_annotation in post_annotations:
-						if post_annotation.label == annotation_label:
-							value = post_annotation.value
+					if annotations:
+						for annotation in annotations:
+							if annotation.label == annotation_label:
+								value = annotation.value
 							if isinstance(value, list):
 								value = ",".join(value)
 
@@ -1658,40 +1660,35 @@ class DataSet(FourcatModule):
 
 		return True if annotation else False
 
-	def get_annotations(self, item_id=[]) -> list:
+	def get_annotation(self, data: dict) -> Annotation | None:
 		"""
-		Retrieves the annotations for this dataset.
+		Retrieves a specific annotation if it exists.
 
-		:param item_id:	A list of item IDs to get the annotations from.
-						May also be a string or int to get a specific annotation.
-						If left empty, get all the annotations for this dataset.
+		:param data:		A dictionary with which to get the annotations from.
+							To get specific annotations, include either an `id` field or `field_id` and `label` fields.
+
+		return Annotation:	Annotation object.
+		"""
+
+		if "id" not in data or ("field_id" not in data and "label" not in data):
+			return None
+
+		return Annotation(data=data, db=self.db)
+
+	def get_annotations(self) -> list:
+		"""
+		Retrieves all annotations for this dataset.
 
 		return list: 	List of Annotation objects.
 		"""
 
-		annotations = []
+		return Annotation.get_annotations_for_dataset(self.db, self.key)
 
-		# Get annotation IDs first
-		if item_id:
-			# Cast to string
-			if isinstance(item_id, str) or isinstance(item_id, int):
-				item_id = [item_id]
-			item_id = [str(i) for i in item_id]
-			ids = self.db.fetchall("SELECT id FROM annotations WHERE dataset = %s AND item_id IN %s;",
-								   (self.key, tuple(item_id)))
-		else:
-			# Else just get all the annotation data from this dataset
-			ids = self.db.fetchall("SELECT id FROM annotations WHERE dataset = %s;", (self.key,))
-
-		if not ids:
-			return []
-
-		# Then get the annotations by ID
-		ids = [i["id"] for i in ids]
-		for annotation_id in ids:
-			annotations.append(Annotation(annotation_id=annotation_id, db=self.db))
-
-		return annotations
+	def get_annotations_for_item(self, item_id: str) -> list:
+		"""
+		Retrieves all annotations from this dataset for a specific item (e.g. social media post).
+		"""
+		return Annotation.get_annotations_for_dataset(self.db, self.key, item_id=item_id)
 
 	def has_annotation_fields(self) -> bool:
 		"""
@@ -1901,7 +1898,8 @@ class DataSet(FourcatModule):
 
 		# We're saving the new annotation fields as-is.
 		# Ordering of fields is preserved this way.
-		self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
+		#self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
+		self.annotation_fields = json.dumps(new_fields)
 
 		# If anything changed with the annotation fields, possibly update
 		# existing annotations (e.g. to delete them or change their labels).
