@@ -59,7 +59,7 @@ class SearchRedNoteComments(Search):
             "timestamp": timestamp,
             "author": item["user_info"]["nickname"],
             "author_avatar_url": item["user_info"]["image"],
-            "ip_location": item["ip_location"],
+            "ip_location": item["ip_location"] if item.get("ip_location") else MissingMappedField(""),
             "likes": item["like_count"],
             "replies": item["sub_comment_count"],
             "unix_timestamp": int(item["create_time"] / 1000)

@@ -557,21 +557,31 @@ def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
-    Calls the internal API and returns interpreted response.
+    Calls the internal API and returns interpreted response. "status" is always 
+    None if wait_for_response is False.
 
     :param str action: API action
     :param payload: API payload
     :param bool wait_for_response:  Wait for response? If not close connection
     immediately after sending data.
 
-    :return: API response, or timeout message in case of timeout
+    :return: API response {"status": "success"|"error", "response": response, "error": error}
     """
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
-    connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    try:
+        connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    except ConnectionRefusedError:
+        return {"status": "error", "error": "Connection refused"}
 
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
+
+    response_data = {
+        "status": None,
+        "response": None,
+        "error": None
+    }
 
     if wait_for_response:
         try:
@@ -583,7 +593,8 @@ def call_api(action, payload=None, wait_for_response=True):
 
                 response += bytes.decode("ascii", "ignore")
         except (socket.timeout, TimeoutError):
-            response = "(Connection timed out)"
+            response_data["status"] = "error"
+            response_data["error"] = "Connection timed out"
 
     try:
         connection.shutdown(socket.SHUT_RDWR)
@@ -592,10 +603,18 @@ def call_api(action, payload=None, wait_for_response=True):
         pass
     connection.close()
 
-    try:
-        return json.loads(response) if wait_for_response else None
-    except json.JSONDecodeError:
-        return response
+    if wait_for_response:
+        try:
+            json_response = json.loads(response)
+            response_data["response"] = json_response["response"]
+            response_data["error"] = json_response.get("error", None)
+            response_data["status"] = "error" if json_response.get("error") else "success"
+        except json.JSONDecodeError:
+            response_data["status"] = "error"
+            response_data["error"] = "Invalid JSON response"
+            response_data["response"] = response
+    
+    return response_data
 
 
 def get_interval_descriptor(item, interval):

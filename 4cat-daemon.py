@@ -264,14 +264,20 @@ elif command == "status":
             sys.exit(0)
 
         print("\n     Active workers:\n-------------------------")
-        active_workers = call_api("workers")["response"]
-        active_workers = {worker: active_workers[worker] for worker in
-                          sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if
-                          active_workers[worker] > 0}
-        for worker in active_workers:
-            print("%s: %i" % (worker, active_workers[worker]))
+        api_response = call_api("workers")
+        if api_response["status"] == "success":
+            active_workers = api_response["response"]
+            active_workers = {worker: active_workers[worker] for worker in
+                            sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if
+                            active_workers[worker] > 0}
+            for worker in active_workers:
+                print("%s: %i" % (worker, active_workers[worker]))
 
-        print("\n")
+            print("\n")
+        else:
+            print("...error: could not fetch worker status.\n")
+            print(api_response["error"])
+            print("4CAT Backend Daemon may have crashed.")
 
 
     else:
