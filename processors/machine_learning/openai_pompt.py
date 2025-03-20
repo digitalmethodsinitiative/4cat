@@ -110,24 +110,19 @@ class OpenAI(BasicProcessor):
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "I understand that my data is sent to OpenAI and that OpenAI may incur costs.",
 				"default": False,
+			},
+			"write_annotations": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Add output as annotations to the parent dataset.",
+				"default": False
+			},
+			"annotation_label": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Annotation label",
+				"default": "",
+				"requires": "write_annotations==true"
 			}
 		}
-
-		# Allow adding prompt answers as annotations to the top-level dataset
-		# if this is a direct child
-		# if parent_dataset and parent_dataset.is_top_dataset():
-		# todo: update when explorer is integrated
-		# 	options["write_annotations"] = {
-		# 			"type": UserInput.OPTION_TOGGLE,
-		# 			"help": "Add output as annotations to the parent dataset.",
-		# 			"default": True
-		# 	}
-		# 	options["annotation_label"] = {
-		# 			"type": UserInput.OPTION_TEXT,
-		# 			"help": "Annotation label",
-		# 			"default": "",
-		# 			"requires": "write_annotations==true"
-		# 	}
 
 		api_key = config.get("api.openai.api_key", user=user)
 		if not api_key:
@@ -135,7 +130,8 @@ class OpenAI(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
 				"help": "OpenAI API key",
-				"tooltip": "Can be created on platform.openapi.com"
+				"tooltip": "Can be created on platform.openapi.com",
+				"sensitive": True
 			}
 
 		return options
@@ -203,9 +199,7 @@ class OpenAI(BasicProcessor):
 										   "column names")
 			return
 
-		write_annotations = False
-		# todo: update when explorer is integrated
-		#write_annotations = self.parameters.get("write_annotations", False)
+		write_annotations = self.parameters.get("write_annotations", False)
 
 		if write_annotations:
 			label = self.parameters.get("annotation_label", "")
@@ -242,6 +236,12 @@ class OpenAI(BasicProcessor):
 			except openai.AuthenticationError as e:
 				self.dataset.finish_with_error(e.message)
 				return
+			except openai.RateLimitError as e:
+				self.dataset.finish_with_error(e.message)
+				return
+			except openai.APIConnectionError as e:
+				self.dataset.finish_with_error(e.message)
+				return
 
 			if "id" in item:
 				item_id = item["id"]
@@ -270,9 +270,8 @@ class OpenAI(BasicProcessor):
 			i += 1
 
 		# Write annotations
-		# todo: update when explorer is integrated
-		# if write_annotations:
-		#	self.write_annotations(annotations, overwrite=True)
+		if write_annotations:
+			self.write_annotations(annotations, overwrite=True)
 
 		# Write to csv file
 		self.write_csv_items_and_finish(results)

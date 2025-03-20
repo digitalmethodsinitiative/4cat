@@ -827,6 +827,12 @@ class SearchTelegram(Search):
                     # Failsafe; can be updated to support formatting of new datastructures in the future
                     reactions += f"{reaction}, "
 
+        is_reply = False
+        reply_to = ""
+        if message.get("reply_to"):
+            is_reply = True
+            reply_to = message["reply_to"].get("reply_to_msg_id", "")
+
         # t.me links
         linked_entities = set()
         all_links = ural.urls_from_text(message["message"])
@@ -868,7 +874,9 @@ class SearchTelegram(Search):
             "author_name": fullname,
             "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
-            "reply_to": message.get("reply_to_msg_id", ""),
+            "body_markdown": message["message_markdown"],
+            "is_reply": is_reply,
+            "reply_to": reply_to,
             "views": message["views"] if message["views"] else "",
             # "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
@@ -963,6 +971,11 @@ class SearchTelegram(Search):
         # Add the _type if the original object was a telethon type
         if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
             mapped_obj["_type"] = type(input_obj).__name__
+
+        # Store the markdown-formatted text
+        if type(input_obj).__name__ == "Message":
+            mapped_obj["message_markdown"] = input_obj.text
+
         return mapped_obj
 
     @staticmethod

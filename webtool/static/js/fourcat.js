@@ -1671,7 +1671,6 @@ const ui_helpers = {
         }
     },
 
-
     /**
      * Ask for confirmation before doing whatever happens when the event goes through
      *
