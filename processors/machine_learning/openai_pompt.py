@@ -114,7 +114,7 @@ class OpenAI(BasicProcessor):
 			"write_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add output as annotations to the parent dataset.",
-				"default": True
+				"default": False
 			},
 			"annotation_label": {
 				"type": UserInput.OPTION_TEXT,
@@ -199,7 +199,6 @@ class OpenAI(BasicProcessor):
 										   "column names")
 			return
 
-		write_annotations = False
 		write_annotations = self.parameters.get("write_annotations", False)
 
 		if write_annotations:
@@ -235,6 +234,12 @@ class OpenAI(BasicProcessor):
 				self.dataset.finish_with_error(e.message)
 				return
 			except openai.AuthenticationError as e:
+				self.dataset.finish_with_error(e.message)
+				return
+			except openai.RateLimitError as e:
+				self.dataset.finish_with_error(e.message)
+				return
+			except openai.APIConnectionError as e:
 				self.dataset.finish_with_error(e.message)
 				return
 
