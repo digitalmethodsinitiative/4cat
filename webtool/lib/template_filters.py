@@ -314,8 +314,8 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 	# Base URLs after which tags and @-mentions follow, per platform
 	base_urls = {
 		"twitter": {
-			"hashtag": "https://twitter.com/hashtag/",
-			"mention": "https://twitter.com/"
+			"hashtag": "https://x.com/hashtag/",
+			"mention": "https://x.com/"
 		},
 		"tiktok": {
 			"hashtag": "https://tiktok.com/tag/",
