@@ -603,7 +603,7 @@ def call_api(action, payload=None, wait_for_response=True):
         pass
     connection.close()
 
-    if wait_for_response:
+    if wait_for_response and response:
         try:
             json_response = json.loads(response)
             response_data["response"] = json_response["response"]
