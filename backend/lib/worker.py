@@ -137,10 +137,13 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.clean_up()
 
 	@classmethod
-	def check_worker_available(cls, manager):
+	def check_worker_available(cls, manager, modules):
 		"""
 		Check if the worker can run. Here we check if there are too many
 		workers of this type running already.
+
+		modules is passed in so decendents can check if they have the necessary
+		modules to run.
 
 		:return bool:  True if the worker can run, False if not
 		"""
