@@ -124,13 +124,12 @@ span.divider {
 
 .post-annotation > .annotation-label {
     display: inline-block;
-    vertical-align: middle;
-    font-weight: bold;
     text-align: right;
-    min-width: 150px;
+    width: 150px;
     margin-right: 5px;
     line-height: 1.6em;
-    overflow-x: hidden;
+    position: relative;
+    word-break: break-all;
 }
 
 .post-annotation.checkbox > .post-annotation-options {
@@ -144,4 +143,8 @@ span.divider {
 
 .post-annotation-options > input {
     display: inline-block;
+}
+
+textarea.post-annotation-input {
+
 }
