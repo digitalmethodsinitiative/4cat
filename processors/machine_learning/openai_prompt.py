@@ -2,13 +2,13 @@
 Prompt OpenAI GPT LLMs.
 """
 
-import json
 import re
 import openai
 
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.config_manager import config
+from openai.types.chat.chat_completion import ChatCompletion
 
 class OpenAI(BasicProcessor):
 	"""
@@ -38,7 +38,7 @@ class OpenAI(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, user=None) -> dict:
 		options = {
 			"per_item": {
 				"type": UserInput.OPTION_INFO,
@@ -121,7 +121,7 @@ class OpenAI(BasicProcessor):
 				"help": "Annotation label",
 				"default": "",
 				"requires": "write_annotations==true",
-				"tooltip": "May be left empty."
+				"tooltip": "May be empty."
 			}
 		}
 
@@ -138,7 +138,7 @@ class OpenAI(BasicProcessor):
 		return options
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, user=None) -> bool:
 		"""
 		Determine if processor is compatible with a dataset or processor
 
@@ -278,7 +278,7 @@ class OpenAI(BasicProcessor):
 		self.write_csv_items_and_finish(results)
 
 	@staticmethod
-	def prompt_gpt(prompt, client, model="gpt-4-turbo", temperature=0.2, max_tokens=50):
+	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50) -> ChatCompletion:
 
 		# Get response
 		response = client.chat.completions.create(
