@@ -212,6 +212,27 @@ article.result > section:first-child {
     content: '\02022';
 }
 
+.annotation-fields-list {
+    position: relative;
+}
+
+.annotation-fields-list ul {
+    list-style: none;
+    margin: 0;
+    padding-right: 5em;
+}
+
+.annotation-fields-list li {
+    display: inline-block;
+}
+
+.annotation-fields-list #edit-annotation-fields {
+    position: absolute;
+    top: 0;
+    right: 0.5em;
+    line-height: 1.3em;
+}
+
 /** dataset toolbox **/
 .dataset-toolbox {
     border-bottom: 1px solid var(--gray-light);
