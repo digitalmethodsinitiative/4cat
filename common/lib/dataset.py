@@ -1741,7 +1741,7 @@ class DataSet(FourcatModule):
 
 		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
 										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
-		:param bool overwrite:			Whether to overwrite the annotation if it already present.
+		:param bool overwrite:			Whether to overwrite the annotation if it is already present.
 
 		:returns int:					How many annotations were saved.
 
