@@ -748,8 +748,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not source_dataset:
 			source_dataset = self.source_dataset
 
-		already_exists_error = False
-
 		# Check if this dataset already has annotation fields
 		existing_labels = source_dataset.get_annotation_field_labels()
 
@@ -762,6 +760,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			else:
 				# If we have a custom label, use that
 				label = annotation["label"]
+				# Shorten if necessary
+				if len(label) > 100:
+					label = label[:100]
 
 			# If the processor has already generated annotation fields,
 			# or if we have a custom label that already exists
