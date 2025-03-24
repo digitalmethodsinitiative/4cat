@@ -120,7 +120,8 @@ class OpenAI(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Annotation label",
 				"default": "",
-				"requires": "write_annotations==true"
+				"requires": "write_annotations==true",
+				"tooltip": "May be left empty."
 			}
 		}
 
@@ -271,7 +272,7 @@ class OpenAI(BasicProcessor):
 
 		# Write annotations
 		if write_annotations:
-			self.write_annotations(annotations, overwrite=True)
+			self.save_annotations(annotations, overwrite=False)
 
 		# Write to csv file
 		self.write_csv_items_and_finish(results)
