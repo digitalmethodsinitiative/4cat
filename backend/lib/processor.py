@@ -722,7 +722,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		return standalone
 
-	def write_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
+	def save_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
 		"""
 		Saves annotations made by this processor on the basis of another dataset.
 		Also adds some data regarding this processor: set `author` and `label` to processor name,
@@ -734,7 +734,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 								Defaults to the parent dataset.
 		:param bool overwrite:	Whether to overwrite annotations if the label is already present
 								for the dataset. If this is False and the label is already present,
-								we'll add a number to the label to differentiate it (e.g. `count-posts1`).
+								we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
 								Else we'll just replace the old data.
 
 		:returns int:			How many annotations were saved.
@@ -756,17 +756,20 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# Set some values
 		for annotation in annotations:
 
-			# Set the default label to this processor's name
 			if not annotation.get("label"):
-				# If the processor has already generated annotation fields,
-				# add a number to differentiate the label
+				# If there's no label, set the default label to this processor's name
 				label = self.name
-				if not overwrite and label in existing_labels:
-					label += "-" + str(len([l for l in existing_labels if l.startswith(label)]))
-				annotation["label"] = label
-			elif annotation.get("label") and not overwrite:
-				if annotation["label"] in existing_labels:
-					raise AnnotationException("Annotation label '%s' already exists for this dataset" % annotation["label"])
+			else:
+				# If we have a custom label, use that
+				label = annotation["label"]
+
+			# If the processor has already generated annotation fields,
+			# or if we have a custom label that already exists
+			# add a number suffix to differentiate
+			if not overwrite and label in existing_labels:
+				label += "-" + str(len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
+			# Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
+			annotation["label"] = label
 
 			# Set the author to this processor's name
 			if not annotation.get("author"):
