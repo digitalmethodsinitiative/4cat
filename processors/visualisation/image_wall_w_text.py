@@ -191,6 +191,14 @@ class ImageTextWallGenerator(BasicProcessor):
 					max_images = max_images - 1
 				continue
 
+			# Check image loads prior to any modifications to canvas space
+			try:
+				frame = Image.open(str(image_path))
+			except UnidentifiedImageError as e:
+				load_errors.append(image_path.name)
+				self.dataset.log(f"Unable to open image {image_path.name}: {e}")
+				continue
+
 			if total_images_collected == 0:
 				offset_y += fontsize * 2  # add some space at the top for header
 
@@ -202,13 +210,6 @@ class ImageTextWallGenerator(BasicProcessor):
 				row_widths[current_row] = 0
 				category_image = SVG(insert=(0, offset_y), size=(0, row_height))
 				offset_w = 0
-			
-			try:
-				frame = Image.open(str(image_path))
-			except UnidentifiedImageError as e:
-				load_errors.append(image_path.name)
-				self.dataset.log(f"Unable to open image {image_path.name}: {e}")
-				continue
 
 			if tile_type == "square":
 				# resize to square
