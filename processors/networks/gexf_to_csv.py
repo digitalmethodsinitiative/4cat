@@ -5,6 +5,7 @@ from backend.lib.processor import BasicProcessor
 
 import networkx as nx
 import csv
+import heapq
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -37,11 +38,18 @@ class GexfToCsv(BasicProcessor):
         """
         self.dataset.update_status("Reading network file")
         graph = nx.read_gexf(self.source_dataset.get_results_path())
+        # Use a generator to lazily sort edges by frequency
+        sorted_edges = heapq.nlargest(
+            len(graph.edges),  # Number of edges to process
+            graph.edges(data=True),
+            key=lambda edge: edge[2].get("frequency", 0)  # Sort by edge frequency
+        )
+
         self.dataset.update_status("Writing CSV file")
         with self.dataset.get_results_path().open("w", newline="") as output:
             writer = False
             lines = 0
-            for source, target, edge_attributes in graph.edges(data=True):
+            for source, target, edge_attributes in sorted_edges:
                 source_attributes = graph.nodes[source]
                 target_attributes = graph.nodes[target]
 
