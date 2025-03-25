@@ -1,4 +1,3 @@
-import urllib.parse
 import datetime
 from math import floor
 
@@ -17,7 +16,6 @@ from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify_long
 from common.config_manager import ConfigWrapper
 
-from pathlib import Path
 from flask import request
 from flask_login import current_user
 from ural import urls_from_text
@@ -266,10 +264,11 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
 		# First we're going to try to get the image link through the 4plebs API.
 		api_url = "https://archive.4plebs.org/_/api/chan/post/?board=%s&num=%s" % (board, post_id)
+		api_json = None
 		try:
 			api_json = requests.get(api_url, headers=headers)
 		except requests.RequestException as e:
-		 	pass
+			pass
 		if api_json.status_code != 200:
 			pass
 		try:
@@ -304,9 +303,16 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
 
 @app.template_filter('social_mediafy')
-def _jinja2_filter_social_mediafy(body, datasource=""):
-	# Adds links to a text body with hashtags, @-mentions, and URLs
-	# A data source must be given to generate the correct URLs.
+def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
+	"""
+	Adds links to a text body with hashtags, @-mentions, and URLs.
+	A data source must be given to generate the correct URLs.
+
+	:param str body:  Text to parse
+	:param str datasource:  Name of the data source (e.g. "twitter")
+
+	:return str:  Parsed text
+	"""
 
 	if not datasource:
 		return body
@@ -336,6 +342,10 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 		},
 		"telegram": {
 			"markdown": True
+		},
+		"bsky": {
+			"hashtag": "https://bsky.app/hashtag/",
+			"mention": "https://bsky.app/profile/",
 		}
 	}
 
@@ -363,7 +373,10 @@ def _jinja2_filter_social_mediafy(body, datasource=""):
 
 	# Add @-mention links
 	if "mention" in base_urls[datasource]:
-		mentions = re.findall(r"@[\w0-9-]+", body)
+		if datasource == "bsky":
+			mentions = re.findall(r"@[\w0-9-.]+", body)
+		else:
+			mentions = re.findall(r"@[\w0-9-]+", body)
 		mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
 		for mention in mentions:
 			body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (

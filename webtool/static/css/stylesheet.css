@@ -39,6 +39,10 @@
     src: url("../fonts/fsex300-webfont.woff")
 }
 
+@font-face {
+    font-family: 'Inter';
+    src: url("../fonts/Inter-VariableFont_opsz,wght.ttf");
+}
 
 /** --------------------- *
      Basic HTML elements
