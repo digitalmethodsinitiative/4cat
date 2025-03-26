@@ -398,7 +398,7 @@ function init() {
 				error: function (error) {
 					console.log(error);
 
-					if (error.status == 400) {
+					if (error.status === 400) {
 						annotations.warnEditor(error.responseJSON.error);
 					}
 					else {
@@ -507,7 +507,7 @@ function init() {
 				},
 				error: function (error) {
 					console.log(error)
-					if (error.status == 400) {
+					if (error.status === 400) {
 						annotations.warnEditor(error.responseJSON.error);
 					}
 					else {
