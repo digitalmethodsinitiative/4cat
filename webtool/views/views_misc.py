@@ -12,7 +12,7 @@ from datetime import datetime
 
 from flask import request, render_template, jsonify, Response
 from flask_login import login_required, current_user
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, InternalServerError
 
 from webtool import app, db, config, fourcat_modules, log
 from webtool.lib.helpers import pad_interval, error
@@ -34,10 +34,21 @@ def log_exception(e):
         # Could handle specific HTTP errors here
     else:
         status_code = None
+
+    # Check if it's an InternalServerError and extract the original exception
+    if isinstance(e, InternalServerError) and e.original_exception:
+        cause = e.original_exception
+    else:
+        cause = e
+
     if not status_code or status_code >= 500:
         # Capture the correct frame and log
-        tb = traceback.extract_tb(e.__traceback__)
-        log.error(f"{type(e).__name__}: {e}", frame=tb[-1] if tb else None)
+        tb = traceback.extract_tb(cause.__traceback__)
+
+        # Get the request URL
+        request_url = request.url
+
+        log.error(f"{type(cause).__name__}{(' ('+request_url+')') if request_url else ''}: {cause}", frame=tb[-1] if tb else None)
         return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
     else:
         # Should be just 4xx errors; return and allow Flask to handle them
