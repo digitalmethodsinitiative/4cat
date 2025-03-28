@@ -34,8 +34,17 @@ class ProcessorPreset(BasicProcessor):
 			last = pipeline.pop()
 			pipeline[-1]["parameters"]["next"] = [last]
 
-		analysis_pipeline = DataSet(parameters=pipeline[0]["parameters"], type=pipeline[0]["type"], db=self.db,
-								 parent=self.dataset.key, modules=self.modules)
+		analysis_pipeline = DataSet(
+			parameters=pipeline[0]["parameters"],
+			db=self.db,
+			type=pipeline[0]["type"],
+			owner=self.dataset.creator,
+			is_private=self.dataset.is_private,
+			parent=self.dataset.key, 
+			modules=self.modules)
+		
+		# give same ownership as parent dataset
+		analysis_pipeline.copy_ownership_from(self.dataset)
 
 		# this starts the pipeline
 		self.queue.add_job(pipeline[0]["type"], remote_id=analysis_pipeline.key)

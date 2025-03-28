@@ -262,6 +262,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					owner=self.dataset.creator,
 					modules=self.modules
 				)
+				# copy ownership from parent dataset
+				next_analysis.copy_ownership_from(self.dataset)
+				# add to queue
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
 				can_run_next = False
