@@ -23,16 +23,19 @@ class ProcessorPreset(BasicProcessor):
 		"""
 		pipeline = self.get_processor_pipeline()
 
-		# make sure the last item in the pipeline copies to the preset's dataset
-		# also make sure there is always a "parameters" key
-		pipeline = [{"parameters": {}, **p} for p in pipeline.copy()]
+		if pipeline:
+			# make sure the last item in the pipeline copies to the preset's dataset
+			# also make sure there is always a "parameters" key
+			pipeline = [{"parameters": {}, **p} for p in pipeline.copy()]
 
-		pipeline[-1]["parameters"]["attach_to"] = self.dataset.key
+			pipeline[-1]["parameters"]["attach_to"] = self.dataset.key
 
-		# map the linear pipeline to a nested processor parameter set
-		while len(pipeline) > 1:
-			last = pipeline.pop()
-			pipeline[-1]["parameters"]["next"] = [last]
+			# map the linear pipeline to a nested processor parameter set
+			while len(pipeline) > 1:
+				last = pipeline.pop()
+				pipeline[-1]["parameters"]["next"] = [last]
+		else:
+			pipeline = self.get_advanced_processor_pipeline(attach_to=self.dataset.key)
 
 		analysis_pipeline = DataSet(
 			parameters=pipeline[0]["parameters"],
@@ -61,7 +64,6 @@ class ProcessorPreset(BasicProcessor):
 		self.dataset.update_status("Awaiting completion of underlying analyses...")
 		self.job.finish()
 
-	@abc.abstractmethod
 	def get_processor_pipeline(self):
 		"""
 		Preset pipeline definition
@@ -71,6 +73,25 @@ class ProcessorPreset(BasicProcessor):
 		processor parameters. The order of the list is the order in which the
 		processors are run. Compatibility of processors in the list is not
 		checked.
+
+		:return list: Processor pipeline definition
+		"""
+		pass
+
+	def get_advanced_processor_pipeline(self, attach_to):
+		"""
+		Advanced preset pipeline definition
+
+		Similar to `get_processor_pipeline`, but allows for more advanced
+		processing. This allows multiple processors to be queued in parallel
+		or in a nested structure. (i.e., "next" contains a list of processors
+		to run in sequence after the each processor.)
+
+		"attach_to" must be added as a parameter to one of the processors. Failure
+		to do so will cause the preset to never finish.
+
+		"next" must be added as a parameter with a list of processors and their parameters
+		to run in sequence after the processor finishes.
 
 		:return list: Processor pipeline definition
 		"""
