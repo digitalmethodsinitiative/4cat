@@ -10,6 +10,7 @@ import networkx as nx
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
@@ -24,9 +25,23 @@ class WikiURLCoLinker(BasicProcessor):
 	type = "wiki-category-network"  # job type ID
 	category = "Networks"  # category
 	title = "Wikipedia category network"  # title displayed in UI
-	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
+	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English and Finnish Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
-
+	
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+		"""
+		options = {
+			"language": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "English",
+				"options": {"en": "English", "fi": "Finnish"},
+				"help": "Select language"
+			}
+		}
+		return options
+	
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
@@ -42,9 +57,12 @@ class WikiURLCoLinker(BasicProcessor):
 		with all posts containing the original query exactly, ignoring any
 		* or " in the query
 		"""
-
+		language = self.parameters.get("language")
 		# we use these to extract URLs and host names if needed
-		link_regex = re.compile(r"https?://en.wikipedia\.org/wiki/[^\s.]+")
+		if language == "fi":
+			link_regex = re.compile(r"https?://fi.wikipedia\.org/wiki/[^\s.]+")
+		else:
+			link_regex = re.compile(r"https?://en.wikipedia\.org/wiki/[^\s.]+")
 		wiki_page = re.compile(r"[\[\[[^\]]+\]\]")
 		category_regex = re.compile(r"\[\[Category:[^\]]+\]\]")
 		trailing_comma = re.compile(r",$")
@@ -116,7 +134,11 @@ class WikiURLCoLinker(BasicProcessor):
 				counter += 1
 
 				# fetch wikipedia source
-				url = "https://en.wikipedia.org/w/index.php?title=" + link + "&action=edit"
+				if language == "fi":
+					url = "https://fi.wikipedia.org/w/index.php?title=" + link + "&action=edit"
+				else:
+					url = "https://en.wikipedia.org/w/index.php?title=" + link + "&action=edit"
+				
 				try:
 					page = requests.get(url)
 				except requests.RequestException:
