@@ -15,7 +15,7 @@ from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
 from backend.lib.processor import BasicProcessor
-from backend.lib.preset import ProcessorPreset
+from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -26,7 +26,7 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class VideoHasherPreset(ProcessorPreset):
+class VideoHasherPreset(ProcessorAdvancedPreset):
     """
     Run processor pipeline to create video hashes
     """
@@ -80,7 +80,7 @@ class VideoHasherPreset(ProcessorPreset):
                config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 		
-    def get_advanced_processor_pipeline(self, attach_to=None):
+    def get_processor_advanced_pipeline(self, attach_to=None):
         """
 		This queues a series of post-processors to visualise videos.
 

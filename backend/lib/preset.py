@@ -10,7 +10,7 @@ from common.lib.dataset import DataSet
 class ProcessorPreset(BasicProcessor):
 	"""
 	Processor preset
-	"""
+	"""	
 	def process(self):
 		"""
 		ALL PRESETS MUST PREPEND 'preset-' TO THEIR TYPE.
@@ -23,19 +23,7 @@ class ProcessorPreset(BasicProcessor):
 		"""
 		pipeline = self.get_processor_pipeline()
 
-		if pipeline:
-			# make sure the last item in the pipeline copies to the preset's dataset
-			# also make sure there is always a "parameters" key
-			pipeline = [{"parameters": {}, **p} for p in pipeline.copy()]
-
-			pipeline[-1]["parameters"]["attach_to"] = self.dataset.key
-
-			# map the linear pipeline to a nested processor parameter set
-			while len(pipeline) > 1:
-				last = pipeline.pop()
-				pipeline[-1]["parameters"]["next"] = [last]
-		else:
-			pipeline = self.get_advanced_processor_pipeline(attach_to=self.dataset.key)
+		pipeline = self.format_linear_pipeline(pipeline)
 
 		analysis_pipeline = DataSet(
 			parameters=pipeline[0]["parameters"],
@@ -64,6 +52,7 @@ class ProcessorPreset(BasicProcessor):
 		self.dataset.update_status("Awaiting completion of underlying analyses...")
 		self.job.finish()
 
+	@abc.abstractmethod
 	def get_processor_pipeline(self):
 		"""
 		Preset pipeline definition
@@ -78,21 +67,83 @@ class ProcessorPreset(BasicProcessor):
 		"""
 		pass
 
-	def get_advanced_processor_pipeline(self, attach_to):
+	def format_linear_pipeline(self, pipeline):
+		"""
+		Format a linear pipeline to a nested processor parameter set
+
+		:param list pipeline:  Linear pipeline
+		:return list:  Nested pipeline
+		"""
+		if not pipeline:
+			raise ValueError("Pipeline is empty")
+		
+		# make sure the last item in the pipeline copies to the preset's dataset
+		# also make sure there is always a "parameters" key
+		pipeline = [{"parameters": {}, **p} for p in pipeline.copy()]
+
+		pipeline[-1]["parameters"]["attach_to"] = self.dataset.key
+
+		# map the linear pipeline to a nested processor parameter set
+		while len(pipeline) > 1:
+			last = pipeline.pop()
+			pipeline[-1]["parameters"]["next"] = [last]
+	
+		return pipeline
+	
+class ProcessorAdvancedPreset(ProcessorPreset):
+	"""
+	Similar to ProcessorPreset, but allows for more advanced processor trees with multiple 
+	branches and nested processors.
+	"""
+	def format_linear_pipeline(self, pipeline):
+		"""
+		No formatting of pipeline is needed for advanced presets
+		:param list pipeline:  Linear pipeline
+		:return list:  Nested pipeline
+		"""
+		return pipeline
+	
+	def get_processor_pipeline(self):
+		"""
+		Preset pipeline definition
+		Should return a list of dictionaries, each dictionary having a `type`
+		key with the processor type ID and a `parameters` key with the
+		processor parameters. The order of the list is the order in which the
+		processors are run. Compatibility of processors in the list is not
+		"""
+		advanced_pipeline = self.get_processor_advanced_pipeline(attach_to=self.dataset.key)
+		if not advanced_pipeline:
+			raise ValueError("Pipeline is empty")
+		
+		# Ensure one of the processors in the advanced pipeline has the attach_to parameter
+		all_processors = []
+		def collect_processors(processor):
+			if "next" in processor["parameters"]:
+				for sub_processor in processor["parameters"]["next"]:
+					collect_processors(sub_processor)
+			all_processors.append(processor)
+		for processor in advanced_pipeline:
+			collect_processors(processor)
+		
+		if not any("attach_to" in processor["parameters"] for processor in all_processors):
+			raise ValueError("No processor in the advanced pipeline has the attach_to parameter")
+
+		return advanced_pipeline
+	
+	@abc.abstractmethod
+	def get_processor_advanced_pipeline(self, attach_to):
 		"""
 		Advanced preset pipeline definition
 
-		Similar to `get_processor_pipeline`, but allows for more advanced
+		Similar to base class `get_processor_pipeline`, but allows for more advanced
 		processing. This allows multiple processors to be queued in parallel
 		or in a nested structure. (i.e., "next" contains a list of processors
 		to run in sequence after the each processor.)
+		Format a linear pipeline to a nested processor parameter set
 
 		"attach_to" must be added as a parameter to one of the processors. Failure
 		to do so will cause the preset to never finish.
-
-		"next" must be added as a parameter with a list of processors and their parameters
-		to run in sequence after the processor finishes.
-
-		:return list: Processor pipeline definition
+		:param list pipeline:  Linear pipeline
+		:return list:  Nested pipeline
 		"""
 		pass
