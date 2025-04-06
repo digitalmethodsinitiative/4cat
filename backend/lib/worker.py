@@ -136,6 +136,23 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		# Clean up after work successfully completed or terminates
 		self.clean_up()
 
+	@classmethod
+	def check_worker_available(cls, manager, modules):
+		"""
+		Check if the worker can run. Here we check if there are too many
+		workers of this type running already.
+
+		modules is passed in so decendents can check if they have the necessary
+		modules to run.
+
+		:return bool:  True if the worker can run, False if not
+		"""
+		# check if we have too many workers of this type running
+		if len(manager.worker_pool[cls.type]) < cls.max_workers:
+			return True
+		else:
+			return False
+
 	def clean_up(self):
 		"""
 		Clean up after a processor runs successfully or results in error.
