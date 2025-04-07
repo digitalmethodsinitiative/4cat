@@ -35,11 +35,12 @@ if result.returncode != 0:
 # ---------------------------------------------
 if not args.no_version_check:
     target_version_file = Path("VERSION")
-    current_version_file = Path("config/.current-version")
+    current_version_file = Path("data/config/.current-version")
 
     if not current_version_file.exists():
-        # this is the latest version lacking version files
-        current_version = "1.9"
+        # 1.9 was the latest version lacking version files
+        # version files moved over time for various reasons
+        current_version = "unknown"
     else:
         with current_version_file.open() as handle:
             current_version = re.split(r"\s", handle.read())[0].strip()
@@ -97,7 +98,7 @@ else:
     import daemon
 
 # determine PID file
-pidfile = config.get('PATH_ROOT').joinpath(config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
+pidfile = config.get('PATH_LOCKFILE').joinpath("4cat.pid")  # pid file location
 
 # ---------------------------------------------
 #   These functions start and stop the daemon
@@ -126,7 +127,7 @@ def start():
         with daemon.DaemonContext(
                 working_directory=os.path.abspath(os.path.dirname(__file__)),
                 umask=0x002,
-                stderr=open(Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), "4cat.stderr"), "w+"),
+                stderr=open(config.get('PATH_LOGS').joinpath("4cat.stderr"), "w+"),
                 detach_process=True
         ) as context:
             import backend.bootstrap as bootstrap

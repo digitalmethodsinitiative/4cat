@@ -1,5 +1,6 @@
 import itertools
 import pickle
+import shutil
 import time
 import json
 
@@ -62,7 +63,7 @@ class ConfigManager:
         # module settings can't be loaded directly because modules need the
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
-        module_config_path = self.get("PATH_ROOT").joinpath("config/module_config.bin")
+        module_config_path = self.get("PATH_CONFIG").joinpath("module_config.bin")
         if module_config_path.exists():
             try:
                 with module_config_path.open("rb") as infile:
@@ -100,7 +101,12 @@ class ConfigManager:
 
         :return:
         """
-        config_file = Path(__file__).parent.parent.joinpath("config/config.ini")
+        old_config_file = Path(__file__).parent.parent.joinpath("config/config.ini")
+        config_file = Path(__file__).parent.parent.joinpath("data/config/config.ini")
+        if old_config_file.exists():
+            # move old config file to new location
+            shutil.move(old_config_file, config_file)
+            print("Moved config file to new location: data/config/config.ini")
 
         config_reader = configparser.ConfigParser()
         in_docker = False
@@ -111,7 +117,11 @@ class ConfigManager:
                 in_docker = True
         else:
             # config should be created!
-            raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
+            raise ConfigException("No data/config/config.ini file exists! Update and rename the config.ini-example file.")
+        
+        # Set up core settings
+        # Using Path.joinpath() will ensure paths are relative to ROOT_PATH or absolute (if /some/path is provided)
+        root_path = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve() # better don"t change this
 
         self.core_settings.update({
             "CONFIG_FILE": config_file.resolve(),
@@ -125,13 +135,14 @@ class ConfigManager:
             "API_HOST": config_reader["API"].get("api_host"),
             "API_PORT": config_reader["API"].getint("api_port"),
 
-            "PATH_ROOT": Path(os.path.abspath(os.path.dirname(__file__))).joinpath(
-                "..").resolve(),  # better don"t change this
-            "PATH_LOGS": Path(config_reader["PATHS"].get("path_logs", "")),
-            "PATH_IMAGES": Path(config_reader["PATHS"].get("path_images", "")),
-            "PATH_DATA": Path(config_reader["PATHS"].get("path_data", "")),
-            "PATH_LOCKFILE": Path(config_reader["PATHS"].get("path_lockfile", "")),
-            "PATH_SESSIONS": Path(config_reader["PATHS"].get("path_sessions", "")),
+            "PATH_ROOT": root_path,
+            "PATH_CONFIG": root_path.joinpath("data/config"), # .current-version, config.ini are hardcoded here via docker/docker_setup.py and helper-scripts/migrate.py
+            "PATH_EXTENSIONS": root_path.joinpath("data/extensions"), # Must match setup.py and migrate.py
+            "PATH_LOGS": root_path.joinpath(config_reader["PATHS"].get("path_logs", "")),
+            "PATH_IMAGES": root_path.joinpath(config_reader["PATHS"].get("path_images", "")),
+            "PATH_DATA": root_path.joinpath(config_reader["PATHS"].get("path_data", "")),
+            "PATH_LOCKFILE": root_path.joinpath(config_reader["PATHS"].get("path_lockfile", "")),
+            "PATH_SESSIONS": root_path.joinpath(config_reader["PATHS"].get("path_sessions", "")),
 
             "ANONYMISATION_SALT": config_reader["GENERATE"].get("anonymisation_salt"),
             "SECRET_KEY": config_reader["GENERATE"].get("secret_key")

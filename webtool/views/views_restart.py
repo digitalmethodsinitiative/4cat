@@ -46,7 +46,7 @@ def trigger_restart():
     common in e.g. mod_wsgi) it should trigger a reload.
     """
     # figure out the versions we are dealing with
-    current_version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    current_version_file = config.get("PATH_CONFIG").joinpath(".current-version")
     if current_version_file.exists():
         current_version = current_version_file.open().readline().strip()
     else:
@@ -66,7 +66,7 @@ def trigger_restart():
     can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
         current_version) >= packaging.version.parse(github_version))
 
-    lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+    lock_file = config.get("PATH_CONFIG").joinpath("restart.lock")
     if request.method == "POST" and lock_file.exists():
         flash("A restart is already in progress. Wait for it to complete. Check the process log for more details.")
 
@@ -85,7 +85,7 @@ def trigger_restart():
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
-        restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+        restart_log_file = config.get("PATH_LOGS").joinpath("restart.log")
         with restart_log_file.open("w") as outfile:
             outfile.write(
                 f"{mode.capitalize().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
@@ -120,9 +120,9 @@ def upgrade_frontend():
     procedure. The request ends after migrate.py has finished running after
     which it is up to the back-end to determine what to do next.
 
-    This route expects a file config/.current-version-frontend to exist. This
+    This route expects a file data/config/.current-version-frontend to exist. This
     file should be created before requesting this route so that the front-end
-    knows what version it is running, since config/.current-version will have
+    knows what version it is running, since data/config/.current-version will have
     been updated by the back-end at this point to reflect the newer version
     after that container's upgrade.
     """
@@ -130,8 +130,8 @@ def upgrade_frontend():
     if not config.get("USING_DOCKER") or not check_restart_request():
         return app.login_manager.unauthorized()
 
-    restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
-    frontend_version_file = Path(config.get("PATH_ROOT"), "config/.current-version-frontend")
+    restart_log_file = config.get("PATH_LOGS").joinpath("restart.log")
+    frontend_version_file = config.get("PATH_CONFIG").joinpath(".current-version-frontend")
     if not frontend_version_file.exists():
         return jsonify({"status": "error", "message": "No version file found"})
 
@@ -286,7 +286,7 @@ def restart_log():
 
     :return:
     """
-    log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+    log_file = config.get("PATH_LOGS").joinpath("restart.log")
     if log_file.exists():
         with log_file.open() as infile:
             return infile.read()

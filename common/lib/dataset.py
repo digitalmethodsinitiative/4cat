@@ -88,7 +88,7 @@ class DataSet(FourcatModule):
 		this dataset.
 		"""
 		self.db = db
-		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+		self.folder = config.get('PATH_DATA')
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}

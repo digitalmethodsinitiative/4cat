@@ -241,7 +241,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		md5 = hashlib.md5()
 		md5.update(base64.b64decode(post["md5"]))
 
-		image_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_IMAGES'))
+		image_folder = config.get('PATH_IMAGES')
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
 		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():

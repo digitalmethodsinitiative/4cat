@@ -26,7 +26,7 @@ from webtool import app, db, config, fourcat_modules
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
-from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
+from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch, find_extensions
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -591,7 +591,7 @@ def manipulate_settings():
         option_owner = option.split(".")[0]
         submenu = "other"
         if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
-                                    "logging", "ui"):
+                                    "logging", "ui", "extensions"):
             submenu = "core"
         elif option_owner.endswith("-search"):
             submenu = "datasources"
@@ -637,10 +637,13 @@ def manipulate_settings():
         }
         for datasource, info in fourcat_modules.datasources.items()}
 
+    # similar deal for extensions
+    extension_config = find_extensions()[0]
+
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
                            datasources_config=datasources, changed=changed_categories,
-                           expire_override=expire_override)
+                           expire_override=expire_override, extensions_config=extension_config)
 
 
 @app.route("/manage-notifications/", methods=["GET", "POST"])
@@ -742,7 +745,7 @@ def get_log(logfile):
     :param str logfile: 'backend' or 'stderr'
     :return:
     """
-    if logfile not in ("stderr", "backend", "import"):
+    if logfile not in ("stderr", "backend", "import", "extensions"):
         return "Not Found", 404
 
     if logfile == "backend":
@@ -752,7 +755,7 @@ def get_log(logfile):
     else:
         filename = f"{logfile}.log"
 
-    log_file = config.get("PATH_ROOT").joinpath(config.get("PATH_LOGS")).joinpath(filename)
+    log_file = config.get("PATH_LOGS").joinpath(filename)
     if log_file.exists():
         with log_file.open() as infile:
             return "\n".join(tailer.tail(infile, 250))
@@ -1038,7 +1041,7 @@ def import_dataset_from():
     except ValueError:
         raise QueryParametersException(f"Unexpected response when trying to fetch metadata for dataset {keys[0]}.")
 
-    version_file = config.get("PATH_ROOT", user=user).joinpath("config/.current-version")
+    version_file = config.get("PATH_CONFIG", user=user).joinpath(".current-version")
     with version_file.open() as infile:
         version = infile.readline().strip()
 

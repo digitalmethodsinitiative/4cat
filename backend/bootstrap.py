@@ -14,7 +14,7 @@ from common.lib.logger import Logger
 from common.config_manager import config
 
 def run(as_daemon=True, log_level="INFO"):
-	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
+	pidfile = config.get('PATH_LOCKFILE').joinpath("4cat.pid")
 
 	if as_daemon:
 		with pidfile.open("w") as outfile:
