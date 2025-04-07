@@ -62,6 +62,7 @@ class SearchThreads(Search):
 
         return MappedItem({
             "id": post["code"],
+            "thread_id": post["code"],
             "url": f"https://www.threads.net/@{post['user']['username']}/post/{post['code']}",
             "body": post["caption"]["text"] if post["caption"] else "",
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
