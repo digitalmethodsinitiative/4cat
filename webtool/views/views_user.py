@@ -27,6 +27,7 @@ from pathlib import Path
 
 from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user, request=request)
+access_request_limit = config.get("4cat.access_request_limit", default="100/day")
 
 @login_manager.user_loader
 def load_user(user_name):
@@ -195,7 +196,11 @@ def first_run_dialog():
     has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'")["amount"]
     wants_phone_home = not config.get("4cat.phone_home_asked", False)
 
-    version_file = config.get("PATH_CONFIG").joinpath(".current-version")
+    if has_admin_user and not wants_phone_home:
+        return error(403, message="The 'first run' page is not available")
+
+    version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+
     if version_file.exists():
         with version_file.open() as infile:
             version = infile.readline().strip()
@@ -203,9 +208,7 @@ def first_run_dialog():
         version = "unknown"
 
     missing = []
-    if has_admin_user and not wants_phone_home:
-        return error(403, message="The 'first run' page is not available")
-
+    
     # choose a random adjective to differentiate this 4CAT instance (this can
     # be edited by the user)
     adjective_file = Path(config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
@@ -354,6 +357,7 @@ def logout():
 
 @app.route("/request-access/", methods=["GET", "POST"])
 @setting_required("4cat.allow_access_request")
+@limiter.limit(access_request_limit, methods=["POST"])
 def request_access():
     """
     Request a 4CAT Account

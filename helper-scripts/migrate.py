@@ -71,10 +71,12 @@ def check_for_nltk():
 	try:
 		nltk.data.find('tokenizers/punkt_tab')
 	except LookupError:
+		print("Downloading NLTK punkt data...")	
 		nltk.download('punkt_tab', quiet=True)
 	try:
 		nltk.data.find('corpora/wordnet')
 	except LookupError:
+		print("Downloading NLTK wordnet data...")	
 		nltk.download("wordnet", quiet=True)
 	
 	nltk.download("omw-1.4", quiet=True)

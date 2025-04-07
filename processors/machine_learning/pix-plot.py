@@ -347,10 +347,20 @@ class PixPlotGenerator(BasicProcessor):
 
                     # Category could perhaps be a user chosen column...
 
-                    # If images repeat this will overwrite prior value
-                    # I really dislike that the download images is not a one to one with posts...
+                    # Add year for Pixplot date view
                     if 'timestamp' in post.keys():
-                        image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+                        if not post['timestamp']:
+                            # no data
+                            pass 
+                        elif type(post['timestamp']) in [int, float]:
+                            image['year'] = datetime.fromtimestamp(post['timestamp']).year
+                        elif type(post['timestamp']) == str:
+                            try:
+                                image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+                            except ValueError:
+                                # the timestamp field ought to be integers in 4CAT
+                                pass
+                        
         self.dataset.log(f"Image metadata added to {posts_with_images} posts")
 
         # Get path for metadata file

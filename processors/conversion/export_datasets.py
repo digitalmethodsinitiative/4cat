@@ -23,7 +23,7 @@ class ExportDatasets(BasicProcessor):
 	type = "export-datasets"  # job type ID
 	category = "Conversion"  # category
 	title = "Export Dataset and All Analyses"  # title displayed in UI
-	description = "Creates a ZIP file containing the dataset and all analyses to be archived and uploaded to a 4CAT instance in the future. Automatically expires after 1 day, after which you must run again."  # description displayed in UI
+	description = "Creates a ZIP file containing the dataset and all analyses to be archived and uploaded to a 4CAT instance in the future. Filters are *not* included and must be exported separately as new datasets. Results automatically expire after 1 day, after which you must run again."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -33,13 +33,18 @@ class ExportDatasets(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.is_top_dataset() and user.can_access_dataset(dataset=module, role="owner")
+		return module.is_top_dataset() and module.is_accessible_by(user, role="owner")
 
 	def process(self):
 		"""
 		This takes a CSV file as input and writes the same data as a JSON file
 		"""
 		self.dataset.update_status("Collecting dataset and all analyses")
+		primary_dataset = self.dataset.top_parent()
+		if not primary_dataset.is_finished():
+			# This ought not happen as processors (i.e., this processor) should only be available for finished datasets
+			self.dataset.finish_with_error("You cannot export unfinished datasets; please wait until dataset is finished to export.")
+			return
 
 		results_path = self.dataset.get_staging_area()
 
@@ -52,25 +57,26 @@ class ExportDatasets(BasicProcessor):
 
 			try:
 				dataset = DataSet(key=dataset_key, db=self.db)
-			# TODO: these two should fail for the primary dataset, but should they fail for the children too?
 			except DataSetException:
-				self.dataset.finish_with_error("Dataset not found.")
-				return
+				self.dataset.update_status(f"Dataset {dataset_key} not found: it may have been deleted prior to export; skipping.")
+				failed_exports.append(dataset_key)
+				continue
 			if not dataset.is_finished():
-				self.dataset.finish_with_error("You cannot export unfinished datasets.")
-				return
+				self.dataset.update_status(f"Dataset {dataset_key} not finished: cannot export unfinished datasets; skipping.")
+				failed_exports.append(dataset_key)
+				continue
 
 			# get metadata
 			metadata = dataset.get_metadata()
 			if metadata["num_rows"] == 0:
-				self.dataset.update_status(f"Skipping empty dataset {dataset_key}")
+				self.dataset.update_status(f"Dataset {dataset_key} has no results; skipping.")
 				failed_exports.append(dataset_key)
 				continue
 
 			# get data
 			data_file = dataset.get_results_path()
 			if not data_file.exists():
-				self.dataset.finish_with_error(f"Dataset {dataset_key} has no data; skipping.")
+				self.dataset.update_status(f"Dataset {dataset_key} has no data file; skipping.")
 				failed_exports.append(dataset_key)
 				continue
 

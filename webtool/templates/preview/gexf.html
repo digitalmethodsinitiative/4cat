@@ -169,7 +169,7 @@
 <div id="loading">Loading...</div>
 
 {% if with_gephi_lite %}
-<a class="gephi-link" target="_blank" href="https://gephi.org/gephi-lite/?gexf={{ url_for('get_result', query_file=dataset.result_file, _external=True) }}">
+<a class="gephi-link" target="_blank" href="https://gephi.org/gephi-lite/?file={{ url_for('get_result', query_file=dataset.result_file, _external=True) }}">
     <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Gephi Lite
 </a>
 {% endif %}

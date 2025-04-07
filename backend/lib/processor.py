@@ -262,6 +262,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					owner=self.dataset.creator,
 					modules=self.modules
 				)
+				# copy ownership from parent dataset
+				next_analysis.copy_ownership_from(self.dataset)
+				# add to queue
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
 				can_run_next = False
@@ -431,7 +434,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# go through items one by one, optionally mapping them
 		if parent_path.suffix.lower() == ".csv":
 			# Get field names
-			fieldnames = which_parent.get_item_keys(self)
+			fieldnames = which_parent.get_columns()
 			if not update_existing and field_name in fieldnames:
 				raise ProcessorException('field_name %s already exists!' % field_name)
 			fieldnames.append(field_name)
@@ -866,13 +869,23 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		return False
 
-
 	@classmethod
-	def get_csv_parameters(cls, csv_library):
+	def exclude_followup_processors(cls, processor_type=None):
 		"""
-		Returns CSV parameters if they are changed from 4CAT's defaults.
-		"""
-		return {}
+        Used for processor compatibility
+
+        To be defined by the child processor if it should exclude certain follow-up processors.
+        e.g.:
+
+        def exclude_followup_processors(cls, processor_type):
+			if processor_type in ["undesirable-followup-processor"]:
+				return True
+			return False
+
+        :param str processor_type:  Processor type to exclude
+        :return bool:  True if processor should be excluded, False otherwise
+        """
+		return False
 
 	@abc.abstractmethod
 	def process(self):

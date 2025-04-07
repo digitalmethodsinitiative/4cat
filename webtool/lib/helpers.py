@@ -2,6 +2,7 @@
 General helper functions for Flask templating and 4CAT views
 """
 import datetime
+import markdown
 import colorsys
 import math
 import csv
@@ -95,30 +96,6 @@ def error(code=200, **kwargs):
 	response.status_code = code
 	return response
 
-
-def string_to_timestamp(string):
-	"""
-	Convert dd-mm-yyyy date to unix time
-
-	:param string: Date string to parse
-	:return: The unix time, or 0 if value could not be parsed
-	"""
-	bits = string.split("-")
-	if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", string):
-		bits = list(reversed(bits))
-
-	if len(bits) != 3:
-		return 0
-
-	try:
-		day = int(bits[0])
-		month = int(bits[1])
-		year = int(bits[2])
-		date = datetime.datetime(year, month, day)
-	except ValueError:
-		return 0
-
-	return int(date.timestamp())
 
 def pad_interval(intervals, first_interval=None, last_interval=None):
 	"""
@@ -299,25 +276,6 @@ def generate_css_colours(force=False):
 	)
 
 
-def get_preview(query):
-	"""
-	Generate a data preview of 25 rows of a results csv
-	
-	:param query 
-	:return list: 
-	"""
-	preview = []
-	with query.get_results_path().open(encoding="utf-8") as resultfile:
-		posts = csv.DictReader(resultfile)
-		i = 0
-		for post in posts:
-			i += 1
-			preview.append(post)
-			if i > 25:
-				break
-	return preview
-
-
 def format_chan_post(post):
 	"""
 	Format a plain-text imageboard post post for HTML display
@@ -377,3 +335,11 @@ def setting_required(setting, required_value=True):
 		return decorated_view
 
 	return checking_decorator
+
+
+def parse_markdown(text, trim_container=False):
+	val = markdown.markdown(text)
+	if trim_container:
+		val = re.sub(r"^<p>", "", val)
+		val = re.sub(r"</p>$", "", val)
+	return val

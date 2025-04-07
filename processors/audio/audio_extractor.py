@@ -76,7 +76,7 @@ class AudioExtractor(BasicProcessor):
 		staging_area = self.dataset.get_staging_area()
 		output_dir = self.dataset.get_staging_area()
 
-		total_possible_videos = max_files if max_files != 0 else self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = max(max_files if max_files != 0 else self.source_dataset.num_rows - 1, 1)  # for the metadata file that is included in archives
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video audio")

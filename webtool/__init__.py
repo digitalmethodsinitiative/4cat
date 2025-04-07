@@ -47,10 +47,10 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 if config.get("USING_DOCKER"):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
-    log = Logger(filename='frontend_4cat.log')
+    log = Logger(logger_name='4cat-frontend', filename='frontend_4cat.log')
 
 else:
-    log = Logger()
+    log = Logger(logger_name='4cat-frontend')
 
 # Set up logging for Gunicorn
 if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
@@ -69,6 +69,22 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
+
+if app.logger.getEffectiveLevel() == 10:
+    # if we're in debug mode, we want to see how long it takes to load datasets
+    import time
+    from functools import wraps
+    def time_this(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            r = func(*args, **kwargs)
+            app.logger.debug("%s dataset took %.2f seconds" % (func.__name__, time.time() - start_time))
+            return r
+        return wrapper
+else:
+    def time_this(func):
+        return func
 
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
               password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),

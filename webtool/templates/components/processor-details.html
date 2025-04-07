@@ -42,13 +42,7 @@
             </span>
             {% endif %}
 
-            {% if not inline %}
                 <p>{{ processor.description }}</p>
-            {% endif %}
-            {% if inline %}
-                <button class="property-badge tooltip-trigger" aria-controls="tooltip-processor-{{ dataset.key }}-{{ processor.type }}" aria-label="Post-processor details">?</button>
-                <p role="tooltip" id="tooltip-processor-{{ dataset.key }}-{{ processor.type }}">{{ processor.description }}</p>
-            {% endif %}
         </header>
 
         <input type="hidden" name="key" value="{{ dataset.key }}">

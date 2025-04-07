@@ -64,15 +64,16 @@ class TelegramImageDownloader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
+        # Get max number of images; if set to 0, there is no limit
         max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
 
-        return {
+        options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": f"No. of images (max {max_number_images:,})",
+                "help": "No. of images" if max_number_images == 0 else f"No. of images (max {max_number_images})",
                 "default": 100,
-                "min": 0,
-                "max": max_number_images
+                "min": 0 if max_number_images == 0 else 1,
+                "tooltip": f"Maximum number of images to download{' (set to 0 to download all images)' if max_number_images == 0 else ''}"
             },
             "video-thumbnails": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -86,6 +87,11 @@ class TelegramImageDownloader(BasicProcessor):
                 "tooltip": "This includes e.g. thumbnails for linked YouTube videos"
             }
         }
+        if max_number_images != 0:
+            # Only add max option if it is not set to 0 (unlimited)
+            options["amount"]["max"] = max_number_images
+
+        return options
 
 
     @classmethod

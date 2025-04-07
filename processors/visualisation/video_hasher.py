@@ -15,7 +15,7 @@ from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
 from backend.lib.processor import BasicProcessor
-from backend.lib.preset import ProcessorPreset
+from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -26,7 +26,7 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class VideoHasherPreset(ProcessorPreset):
+class VideoHasherPreset(ProcessorAdvancedPreset):
     """
     Run processor pipeline to create video hashes
     """
@@ -79,33 +79,41 @@ class VideoHasherPreset(ProcessorPreset):
         return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
                config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
-
-    def get_processor_pipeline(self):
+		
+    def get_processor_advanced_pipeline(self, attach_to=None):
         """
-        This queues a series of post-processors to visualise videos.
-        """
+		This queues a series of post-processors to visualise videos.
 
-        pipeline = [
-            # first, create colleges (and hashes) with the default settings
-            {
+		The advanced pipeline allows multiple processors to be queued in each stage.
+		"""
+        return [
+			# first, create colleges (and hashes) with the default settings
+			{
                 "type": "video-hasher-1",
 				"parameters": {
 					"frame_interval": self.parameters.get("frame_interval", 1),
 					"amount": self.parameters.get("amount", 100),
+					"next": [
+						# then create hash similarity network
+						{
+							"type": "video-hash-network",
+							"parameters": {
+								"percent": self.parameters.get("percent", 90),
+								"attach_to": attach_to
+							},
+						},
+						# and create hash similarity matrix
+						{
+							"type": "video-hash-similarity-matrix",
+							"parameters": {
+								"percent": self.parameters.get("percent", 90),
+							}
+						}
+					]
 				}
-            },
-			# then create hash similarity network
-			{
-				"type": "video-hash-network",
-				"parameters": {
-					"percent": self.parameters.get("percent", 90),
-				}
-			},
-        ]
-
-        return pipeline
-
-
+            }
+		]
+	
 class VideoHasher(BasicProcessor):
 	"""
 	Video Hasher
@@ -183,12 +191,13 @@ class VideoHasher(BasicProcessor):
 		self.dataset.log('Frames per seconds: %f' % frame_interval)
 
 		# Prepare staging area for videos and video tracking
+		# VideoHash creates various files that may not be cleaned up on error so we use an output directory
 		staging_area = self.dataset.get_staging_area()
-		self.dataset.log('Staging directory location: %s' % staging_area)
+		output_dir = self.dataset.get_staging_area()
 
 		video_hashes = {}
 		video_metadata = None
-		total_possible_videos = min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = max((min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
 		processed_videos = 0
 
 		self.dataset.update_status("Creating video hashes")
@@ -215,16 +224,17 @@ class VideoHasher(BasicProcessor):
 				self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
 				self.dataset.finish(0)
 				return
-			except FileNotFoundError as e:
-				self.dataset.update_status(f"Unable to find file {str(path)}")
+			except FileNotFoundError:
+				self.dataset.update_status(f"Unable to find file {path.name}")
 				continue
 			except FFmpegFailedToExtractFrames as e:
-				self.dataset.update_status(f"Unable to extract frame for {str(path)}: {e}")
+				self.dataset.update_status(f"Unable to extract frame for {path.name} (see log for details)")
+				self.dataset.log(f"Unable to extract frame for {str(path)}: {e}")
 				continue
 
 			video_hashes[path.name] = {'videohash': videohash}
 
-			shutil.copy(videohash.collage_path, staging_area.joinpath(path.stem + '.jpg'))
+			shutil.copy(videohash.collage_path, output_dir.joinpath(path.stem + '.jpg'))
 			video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
 
 			processed_videos += 1
@@ -233,6 +243,10 @@ class VideoHasher(BasicProcessor):
 			self.dataset.update_progress(processed_videos / total_possible_videos)
 			videohash.delete_storage_path()
 
+		if processed_videos == 0:
+			self.dataset.finish_with_error("Unable to create video hashes for any videos")
+			return
+
 		# Write hash file
 		# This file is held here and then copied as its own dataset via VideoHasherTwo
 		num_posts = 0
@@ -240,7 +254,7 @@ class VideoHasher(BasicProcessor):
 		if video_metadata is None:
 			# Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
 			try:
-				metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+				metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, output_dir)
 			except FileNotFoundError:
 				metadata_path = None
 			if metadata_path:
@@ -293,7 +307,7 @@ class VideoHasher(BasicProcessor):
 					num_posts += 1
 
 		writer = None
-		with staging_area.joinpath("video_hashes.csv").open("w", encoding="utf-8", newline="") as outfile:
+		with output_dir.joinpath("video_hashes.csv").open("w", encoding="utf-8", newline="") as outfile:
 			for row in rows:
 				if not writer:
 					writer = csv.DictWriter(outfile, fieldnames=row.keys())
@@ -303,7 +317,7 @@ class VideoHasher(BasicProcessor):
 
 		# Finish up
 		self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')
-		self.write_archive_and_finish(staging_area)
+		self.write_archive_and_finish(output_dir, num_items=processed_videos)
 
 class VideoHashNetwork(BasicProcessor):
 	"""
@@ -434,8 +448,8 @@ class VideoHashSimilarities(BasicProcessor):
 	"""
 	type = "video-hash-similarity-matrix"  # job type ID
 	category = "Visual"  # category
-	title = "Calculates hashes similarities"  # title displayed in UI
-	description = "Creates hashes network to identify duplicate or similar videos."  # description displayed in UI
+	title = "Calculates hashes and similarity groups"  # title displayed in UI
+	description = "Creates CSV with hashes and groups videos above similarity value."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [

@@ -67,6 +67,15 @@ class TopicModelWordExtractor(BasicProcessor):
         token_metadata_parameters = token_metadata.pop('parameters')
         model_metadata_parameters = model_metadata.pop('parameters')
 
+        # Check token metadata is correct format
+        first_key = next(iter(token_metadata))
+        for interval, token_data in token_metadata[first_key].items():
+            if any([required_keys not in token_data for required_keys in ['interval', 'document_numbers', 'filename']]):
+                self.dataset.finish_with_error(
+                    "Token metadata is not in correct format; please re-run tokenise-posts processor if not run since 4CAT update")
+                return
+            break
+
         # Start writing result file
         self.dataset.update_status("Collecting model predictions")
 
@@ -77,25 +86,28 @@ class TopicModelWordExtractor(BasicProcessor):
                 topics_count[interval+str(topic_number)] = 0
 
         # Loop through the token metadata and count documents in each topic
-        for post_id, token_data in token_metadata.items():
+        for post_id, post_intervals in token_metadata.items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while writing results file")
 
-            # Grab model metadata related to post
-            model_data = model_metadata[token_data.get('filename')]
-            interval = token_data['interval']
+            # Posts may have multiple intervals
+            for interval, token_data in post_intervals.items():
 
-            # Collect predictions for post
-            for document_number in token_data['document_numbers']:
-                doc_predictions = model_data['predictions'][str(document_number)]
+                # Grab model metadata related to post
+                model_data = model_metadata[token_data.get('filename')]
+                interval = token_data['interval']
 
-                top_topics = {f: doc_predictions[f] for f in sorted(doc_predictions, key=lambda k: doc_predictions[k], reverse=True)[:2]}
-                test_top_two = [weight for topic_number, weight in top_topics.items()]
-                if test_top_two[0] == test_top_two[1]:
-                    self.dataset.log('Document %s-%s equally probable in two or more topics; skipping' % (post_id, str(document_number)))
+                # Collect predictions for post
+                for document_number in token_data['document_numbers']:
+                    doc_predictions = model_data['predictions'][str(document_number)]
 
-                topic_number = str([topic_number for topic_number, weight in top_topics.items()][0])
-                topics_count[interval + topic_number] += 1
+                    top_topics = {f: doc_predictions[f] for f in sorted(doc_predictions, key=lambda k: doc_predictions[k], reverse=True)[:2]}
+                    test_top_two = [weight for topic_number, weight in top_topics.items()]
+                    if test_top_two[0] == test_top_two[1]:
+                        self.dataset.log('Document %s-%s equally probable in two or more topics; skipping' % (post_id, str(document_number)))
+
+                    topic_number = str([topic_number for topic_number, weight in top_topics.items()][0])
+                    topics_count[interval + topic_number] += 1
 
         # Reformat model data
         topics = []

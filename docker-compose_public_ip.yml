@@ -34,8 +34,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - ${PUBLIC_API_PORT}:4444
     volumes:
       - 4cat_data:/usr/src/app/data/
       - 4cat_config:/usr/src/app/config/

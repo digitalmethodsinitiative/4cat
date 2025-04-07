@@ -11,7 +11,7 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, config, fourcat_modules
+from webtool import app, db, config, fourcat_modules, time_this
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
@@ -40,6 +40,7 @@ def create_dataset():
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
+@time_this
 @login_required
 def show_results(page):
     """
@@ -267,6 +268,7 @@ def view_log(key):
 
 
 @app.route("/preview/<string:key>/")
+@time_this
 def preview_items(key):
     """
     Preview a dataset file
@@ -327,9 +329,9 @@ def preview_items(key):
                     break
 
                 if len(rows) == 0:
-                    rows.append(list(row.keys()))
+                    rows.append({k: k for k in list(row.keys())})
 
-                rows.append(list(row.values()))
+                rows.append(row)
 
         except NotImplementedError:
             return error(404)
@@ -396,6 +398,7 @@ Individual result pages
 """
 @app.route('/results/<string:key>/processors/')
 @app.route('/results/<string:key>/')
+@time_this
 def show_result(key):
     """
     Show result page

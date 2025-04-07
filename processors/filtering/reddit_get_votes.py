@@ -120,7 +120,7 @@ class RedditVoteChecker(BasicProcessor):
 
 		# now write a new CSV with the updated scores
 		# get field names
-		fieldnames = [*self.source_dataset.get_item_keys(self)]
+		fieldnames = [*self.source_dataset.get_columns()]
 		if "score" not in fieldnames:
 			fieldnames.append("score")
 

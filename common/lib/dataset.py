@@ -15,7 +15,7 @@ from pathlib import Path
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -40,7 +40,7 @@ class DataSet(FourcatModule):
 	data = None
 	key = ""
 
-	children = None
+	_children = None
 	available_processors = None
 	genealogy = None
 	preset_parent = None
@@ -92,7 +92,6 @@ class DataSet(FourcatModule):
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}
-		self.children = []
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
@@ -169,11 +168,6 @@ class DataSet(FourcatModule):
 
 			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
-
-		# retrieve analyses and processors that may be run for this dataset
-		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db, modules=self.modules) for analysis in analyses],
-							   key=lambda dataset: dataset.is_finished(), reverse=True)
 
 		self.refresh_owners()
 
@@ -282,12 +276,15 @@ class DataSet(FourcatModule):
 		# Yield through items one by one
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
-				# Processor (that created this dataset) may have a custom CSV dialect and parameters
-				own_processor = self.get_own_processor()
-				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
-				reader = csv.DictReader(wrapped_infile, **csv_parameters)
+				reader = csv.DictReader(wrapped_infile)
+
+				if not self.get_own_processor():
+					# Processor was deprecated or removed; CSV file is likely readable but some legacy types are not
+					first_item = next(reader)
+					if first_item is None or any([True for key in first_item if type(key) is not str]):
+						raise NotImplementedError(f"Cannot iterate through CSV file (deprecated processor {self.type})")
+					yield first_item
 
 				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
@@ -405,31 +402,6 @@ class DataSet(FourcatModule):
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 
-	def get_item_keys(self, processor=None):
-		"""
-		Get item attribute names
-
-		It can be useful to know what attributes an item in the dataset is
-		stored with, e.g. when one wants to produce a new dataset identical
-		to the source_dataset one but with extra attributes. This method provides
-		these, as a list.
-
-		:param BasicProcessor processor:  A reference to the processor
-		asking for the item keys, to pass on to iterate_mapped_items
-		:return list:  List of keys, may be empty if there are no items in the
-		  dataset
-		"""
-
-		items = self.iterate_items(processor, warn_unmappable=False)
-		try:
-			keys = list(items.__next__().keys())
-		except StopIteration:
-			return []
-		finally:
-			del items
-
-		return keys
-
 	def get_staging_area(self):
 		"""
 		Get path to a temporary folder in which files can be stored before
@@ -477,7 +449,7 @@ class DataSet(FourcatModule):
 			raise RuntimeError("Cannot finish a finished dataset again")
 
 		self.db.update("datasets", where={"key": self.data["key"]},
-					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
+					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0, "timestamp_finished": int(time.time())})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
@@ -523,14 +495,14 @@ class DataSet(FourcatModule):
 
 		return copy
 
-	def delete(self, commit=True):
+	def delete(self, commit=True, queue=None):
 		"""
 		Delete the dataset, and all its children
 
 		Deletes both database records and result files. Note that manipulating
 		a dataset object after it has been deleted is undefined behaviour.
 
-		:param commit bool:  Commit SQL DELETE query?
+		:param bool commit:  Commit SQL DELETE query?
 		"""
 		# first, recursively delete children
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
@@ -542,6 +514,27 @@ class DataSet(FourcatModule):
 				# dataset already deleted - race condition?
 				pass
 
+		# delete any queued jobs for this dataset
+		try:
+			job = Job.get_by_remote_ID(self.key, self.db, self.type)
+			if job.is_claimed:
+				# tell API to stop any jobs running for this dataset
+				# level 2 = cancel job
+				# we're not interested in the result - if the API is available,
+				# it will do its thing, if it's not the backend is probably not
+				# running so the job also doesn't need to be interrupted
+				call_api(
+					"cancel-job",
+					{"remote_id": self.key, "jobtype": self.type, "level": 2},
+					False
+				)
+
+			# this deletes the job from the database
+			job.finish(True)
+
+		except JobNotFoundException:
+			pass
+
 		# delete from database
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
@@ -549,14 +542,18 @@ class DataSet(FourcatModule):
 
 		# delete from drive
 		try:
-			self.get_results_path().unlink()
+			if self.get_results_path().exists():
+				self.get_results_path().unlink()
 			if self.get_results_path().with_suffix(".log").exists():
 				self.get_results_path().with_suffix(".log").unlink()
 			if self.get_results_folder_path().exists():
 				shutil.rmtree(self.get_results_folder_path())
+
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
+		except PermissionError as e:
+			self.db.log.error(f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}")
 
 	def update_children(self, **kwargs):
 		"""
@@ -567,9 +564,7 @@ class DataSet(FourcatModule):
 
 		:param kwargs:  Parameters corresponding to known dataset attributes
 		"""
-		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
-		for child in children:
-			child = DataSet(key=child["key"], db=self.db, modules=self.modules)
+		for child in self.get_children(update=True):
 			for attr, value in kwargs.items():
 				child.__setattr__(attr, value)
 
@@ -602,10 +597,7 @@ class DataSet(FourcatModule):
 			column_options.add("word_1")
 
 		with self.get_results_path().open(encoding="utf-8") as infile:
-			own_processor = self.get_own_processor()
-			csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
-			reader = csv.DictReader(infile, **csv_parameters)
+			reader = csv.DictReader(infile)
 			try:
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
@@ -705,7 +697,7 @@ class DataSet(FourcatModule):
 			self.refresh_owners()
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(update=True):
 			child.add_owner(username, role)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -736,7 +728,7 @@ class DataSet(FourcatModule):
 			del self.tagged_owners[username]
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(update=True):
 			child.remove_owner(username)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -781,7 +773,7 @@ class DataSet(FourcatModule):
 
 		self.db.commit()
 		if recursive:
-			for child in self.children:
+			for child in self.get_children(update=True):
 				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
@@ -811,13 +803,20 @@ class DataSet(FourcatModule):
 
 		:return list:  List of dataset columns; empty list if unable to parse
 		"""
-
 		if not self.get_results_path().exists():
 			# no file to get columns from
-			return False
+			return []
 
 		if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor() is not None and self.get_own_processor().map_item_method_available(dataset=self)):
-			return self.get_item_keys(processor=self.get_own_processor())
+			items = self.iterate_items(warn_unmappable=False)
+			try:
+				keys = list(items.__next__().keys())
+			except (StopIteration, NotImplementedError):
+				# No items or otherwise unable to iterate
+				return []
+			finally:
+				del items
+			return keys
 		else:
 			# Filetype not CSV or an NDJSON with `map_item`
 			return []
@@ -1231,7 +1230,22 @@ class DataSet(FourcatModule):
 		self.genealogy = genealogy
 		return self.genealogy
 
-	def get_all_children(self, recursive=True):
+	def get_children(self, update=False):
+		"""
+		Get children of this dataset
+
+		:param bool update:  Update the list of children from database if True, else return cached value
+		:return list:  List of child datasets
+		"""
+		if self._children is not None and not update:
+			return self._children
+
+		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC",
+										(self.key,))
+		self._children = [DataSet(data=analysis, db=self.db, modules=self.modules) for analysis in analyses]
+		return self._children
+		
+	def get_all_children(self, recursive=True, update=True):
 		"""
 		Get all children of this dataset
 
@@ -1241,11 +1255,11 @@ class DataSet(FourcatModule):
 
 		:return list:  List of DataSets
 		"""
-		children = [DataSet(data=record, db=self.db, modules=self.modules) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		children = self.get_children(update=update)
 		results = children.copy()
 		if recursive:
 			for child in children:
-				results += child.get_all_children(recursive)
+				results += child.get_all_children(recursive=recursive, update=update)
 
 		return results
 
@@ -1318,6 +1332,10 @@ class DataSet(FourcatModule):
 		available = {}
 		for processor_type, processor in processors.items():
 			if processor.is_from_collector():
+				continue
+
+			own_processor = self.get_own_processor()
+			if own_processor and own_processor.exclude_followup_processors(processor_type):
 				continue
 
 			# consider a processor compatible if its is_compatible_with
@@ -1404,11 +1422,12 @@ class DataSet(FourcatModule):
 
 		processors = self.get_compatible_processors(user=user)
 
-		for analysis in self.children:
+		for analysis in self.get_children(update=True):
 			if analysis.type not in processors:
 				continue
 
 			if not processors[analysis.type].get_options():
+				# No variable options; this processor has been run so remove
 				del processors[analysis.type]
 				continue
 
