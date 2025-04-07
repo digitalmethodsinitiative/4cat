@@ -86,9 +86,13 @@ def install_extensions(no_pip=True):
 	Check for extensions and run any installation scripts found.
 
 	Note: requirements texts are handled by setup.py
+
+	:param bool no_pip:  Do not run pip when running extension install script
+	(because migrate runs pip itself)
 	"""
 	if os.path.isdir("extensions") and not os.path.islink("extensions"):
 		# User already has existing extensions folder (and not a symbolic link)
+		# but it is in the wrong place (4CAT root rather than /data)
 		print("Migrating extensions folder...")
 		if not os.path.isdir("data/extensions"):
 			# No data/extensions folder, so we move the existing extensions folder
@@ -99,7 +103,12 @@ def install_extensions(no_pip=True):
 				for file in files:
 					# Do not overwrite existing files
 					if not os.path.exists(os.path.join("data/extensions", root, file)):
-						shutil.move(os.path.join(root, file), os.path.join("data/extensions", root, file))
+						try:
+							shutil.move(os.path.join(root, file), os.path.join("data/extensions", root, file))
+						except FileNotFoundError:
+							# this can happen with temporary OS files like .DS_Store
+							pass
+
 			shutil.rmtree("extensions")
 
 	if not os.path.isdir("data/extensions"):
@@ -189,9 +198,7 @@ pip_ran = False
 logger = logging.getLogger("migrate")
 logger.setLevel(logging.INFO)
 if args.output:
-	# Add both a file and a stream handler if output is set
-	handler = logging.StreamHandler(sys.stdout)
-	logger.addHandler(handler)
+	# Add ONLY a file handler if output is set
 	os.makedirs(os.path.dirname(args.output), exist_ok=True)
 	handler = logging.FileHandler(args.output)
 else:
