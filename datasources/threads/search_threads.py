@@ -53,8 +53,12 @@ class SearchThreads(Search):
         link_thumbnail = ""
         if post["text_post_app_info"].get("link_preview_attachment"):
             linked_url = post["text_post_app_info"]["link_preview_attachment"]["url"]
-            linked_url = parse_qs(urlparse(linked_url).query).get("u", "").pop()
-            link_thumbnail = post["text_post_app_info"]["link_preview_attachment"].get("image_url")
+            parsed_url = parse_qs(urlparse(linked_url).query).get("u")
+            if parsed_url:
+                linked_url = parsed_url.pop()
+                link_thumbnail = post["text_post_app_info"]["link_preview_attachment"].get("image_url")
+            else:
+                link_thumbnail = linked_url
 
         return MappedItem({
             "id": post["code"],
