@@ -351,52 +351,41 @@ class Tokenise(BasicProcessor):
         current_output_path = None
         output_file_handle = None
 
-        # dummy function to pass through data (as an alternative to sent_tokenize later)
-        def dummy_function(x, *args, **kwargs):
-            return [x]
+		# Get sentence tokenizer
+		sentence_method, sentence_error = self.get_sentence_method(language=language, grouping=grouping, dataset=self.dataset)
 
-        # if told so, first split the post into separate sentences
-        if grouping == "sentence":
-            if language == "Russian":
-                # for russian we use a special purpose splitter with better
-                # performance
-                sentence_method = razdel.sentenize
-            elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt')) if
-                                  'pickle' in lang]:
-                self.dataset.update_status(
-                    f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
-                sentence_method = dummy_function
-            else:
-                sentence_method = sent_tokenize
-        else:
-            sentence_method = dummy_function
+		# Collect metadata
+		metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'language':language, 'intervals':set()}}
+		processed = 0
+		for post in self.source_dataset.iterate_items(self):
+			# determine what output unit this post belongs to
+			if docs_per != "thread":
+				try:
+					document_descriptor = get_interval_descriptor(post, docs_per)
+				except ValueError as e:
+					self.dataset.update_status("%s, cannot count items per %s" % (str(e), docs_per), is_final=True)
+					self.dataset.update_status(0)
+					return
+			else:
+				document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
 
-        # Collect metadata
-        metadata = {'parameters': {'columns': columns, 'grouped_by': grouping, 'intervals': set()}}
-        multiple_docs_per_post = True if grouping == 'sentence' or len(columns) > 1 else False
-        processed = 0
-        for post in self.source_dataset.iterate_items(self):
-            # determine what output unit this post belongs to
-            if docs_per != "thread":
-                try:
-                    document_descriptor = get_interval_descriptor(post, docs_per)
-                except ValueError as e:
-                    self.dataset.update_status("%s, cannot count items per %s" % (str(e), docs_per), is_final=True)
-                    self.dataset.update_status(0)
-                    return
-            else:
-                document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
-
-            # Prep metadata
-            # document_numbers lists the indexes for documents found in filename relating to this post/item
-            # It should only have one index if grouped_by is "item", but may have more if grouped_by is "sentence" or multiple columns are provided
-            metadata['parameters']['intervals'].add(document_descriptor)
-            metadata[post.get('id')] = {
-                'interval': document_descriptor,
-                'filename': document_descriptor + ".json",
-                'document_numbers': [],
-                'documents': {},  # Only needed if there are more than one document per post/item
-            }
+			# Prep metadata
+			# document_numbers lists the indexes for documents found in filename relating to this post/item
+			# It should only have one index if grouped_by is "item", but may have more if grouped_by is "sentence" or multiple columns are provided
+			metadata['parameters']['intervals'].add(document_descriptor)
+			post_id = post.get('id')
+			if post_id in metadata:
+				# Posts may be processed multiple times over time, so we need to keep track of all documents
+				self.dataset.log(f"Note: duplicate post ID {post_id} found in dataset; posts will be processed multiple times")
+			else:
+				metadata[post_id] = {}
+			if document_descriptor not in metadata[post_id]:
+				metadata[post_id][document_descriptor] = {
+					'filename': document_descriptor + ".json",
+					'document_numbers': [],
+					'interval': document_descriptor,
+					'multiple_docs': False,
+				}
 
             groupings = []
             for column in columns:
@@ -417,9 +406,9 @@ class Tokenise(BasicProcessor):
                 self.dataset.update_progress(processed / self.source_dataset.num_rows)
             processed += 1
 
-            # tokenise...
-            for document in groupings:
-                post_tokens = []
+			# tokenise...
+			for i, document in enumerate(groupings):
+				post_tokens = []
 
                 # clean up text and get tokens from it
                 body = link_regex.sub("", document)
@@ -474,11 +463,14 @@ class Tokenise(BasicProcessor):
                     if output_files[current_output_path] > 0:
                         output_file_handle.write(",\n")
 
-                    output_file_handle.write(json.dumps(post_tokens))
-                    metadata[post.get('id')]['document_numbers'].append(output_files[output_path])
-                    if multiple_docs_per_post:
-                        metadata[post.get('id')]['documents'][output_files[output_path]] = document
-                    output_files[output_path] += 1
+					output_file_handle.write(json.dumps(post_tokens))
+					metadata[post_id][document_descriptor]['document_numbers'].append(output_files[output_path])
+					if i > 0:
+						# TODO: potentially store the different docs and map them to the post; the post_topic_matrix processor could make use of this
+						# However, why someone would want to predict topics for different parts of a post seems unclear
+						metadata[post_id][document_descriptor]['multiple_docs'] = True
+
+					output_files[output_path] += 1
 
         if output_file_handle:
             output_file_handle.close()
@@ -496,13 +488,45 @@ class Tokenise(BasicProcessor):
         with staging_area.joinpath(".token_metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
-        # create zip of archive and delete temporary files and folder
-        self.write_archive_and_finish(staging_area)
+		if sentence_error:
+			self.dataset.update_status(f"Finished tokenizing; Unable to group by sentence ({language} not supported), instead grouped by item.", is_final=True)
 
-    @staticmethod
-    def normalise_segment(segment):
-        """
-        Cast token or sentence to string
+		# create zip of archive and delete temporary files and folder
+		self.write_archive_and_finish(staging_area)
+
+	@staticmethod
+	def get_sentence_method(language, grouping, dataset=None):
+		"""
+		Choose the right sentence tokenizer for the language
+
+		:param str language:  Language to choose tokenizer for
+		:param str grouping:  Grouping method to choose tokenizer for (sentence or item)
+		:return function, error:  Tokenizer function, error bool if language not supported
+		"""
+
+		# dummy function to pass through data (as an alternative to sent_tokenize later)
+		def dummy_function(x, *args, **kwargs):
+			return [x]
+
+		# if told so, first split the post into separate sentences
+		if grouping == "sentence":
+			if language == "Russian":
+				# for russian we use a special purpose splitter with better
+				# performance
+				return razdel.sentenize, False
+			elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab'))]:
+				if dataset:
+					dataset.update_status(f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
+				return dummy_function, True
+			else:
+				return sent_tokenize, False
+		else:
+			return dummy_function, False
+
+	@staticmethod
+	def normalise_segment(segment):
+		"""
+		Cast token or sentence to string
 
         Various tokenisers and splitters return tokens/segments in different
         ways; this method ensures we always end up with a string.

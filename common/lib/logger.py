@@ -185,24 +185,24 @@ class Logger:
         self.logger.setLevel(log_level)
 
         # this handler manages the text log files
-        handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
-        handler.setLevel(log_level)
+        if not self.logger.handlers:
+            handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
+            handler.setLevel(log_level)
+            handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
+                                                   "%d-%m-%Y %H:%M:%S"))
+            self.logger.addHandler(handler)
 
-        handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
-                                               "%d-%m-%Y %H:%M:%S"))
-        self.logger.addHandler(handler)
-
-        # the slack webhook has its own handler, and is only active if the
-        # webhook URL is set
-        try:
-            if config.get("logging.slack.webhook"):
-                slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
-                slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
-                self.logger.addHandler(slack_handler)
-        except Exception:
-            # we *may* need the logger before the database is in working order
-            if config.db is not None:
-                config.db.rollback()
+            # the slack webhook has its own handler, and is only active if the
+            # webhook URL is set
+            try:
+                if config.get("logging.slack.webhook"):
+                    slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
+                    slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
+                    self.logger.addHandler(slack_handler)
+            except Exception:
+                # we *may* need the logger before the database is in working order
+                if config.db is not None:
+                    config.db.rollback()
 
     def log(self, message, level=logging.INFO, frame=None):
         """

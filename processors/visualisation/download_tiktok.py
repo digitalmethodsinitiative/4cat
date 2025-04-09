@@ -68,6 +68,15 @@ class TikTokVideoDownloader(BasicProcessor):
         options['amount']['max'] = max_number_videos
         options['amount']['help'] = f"No. of videos (max {max_number_videos:,})"
 
+        if parent_dataset:
+            if parent_dataset.type == "upload-search":
+                options["column"] = {
+                    "type": UserInput.OPTION_CHOICE,
+                    "help": "Column with TikTok Post IDs (not video URLs)",
+                    "options": {column: column for column in parent_dataset.get_columns()},
+                    "default": "id"
+                }
+
         return options
 
     @classmethod
@@ -78,7 +87,7 @@ class TikTokVideoDownloader(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.type in ["tiktok-search", "tiktok-urls-search"]
+        return module.type in ["tiktok-search", "tiktok-urls-search"] or (module.type == "upload-search" and "tiktok" in module.get_label().lower())
 
     def process(self):
         """
@@ -93,6 +102,11 @@ class TikTokVideoDownloader(BasicProcessor):
         # Process parameters
         amount = self.parameters.get("amount") if self.parameters.get("amount") != 0 else self.source_dataset.num_rows
         max_amount = min(amount, self.source_dataset.num_rows)
+        if self.source_dataset.type == "upload-search":
+            # Variable column name
+            column = self.parameters.get("column")
+        else:
+            column = "id"
 
         # Prepare staging area for downloads
         results_path = self.dataset.get_staging_area()
@@ -100,7 +114,17 @@ class TikTokVideoDownloader(BasicProcessor):
         self.dataset.update_status("Downloading TikTok media")
         video_ids_to_download = []
         for mapped_item in self.source_dataset.iterate_items(self):
-            video_ids_to_download.append(mapped_item.get("id"))
+            post_id = mapped_item.get(column)
+            if not post_id:
+                continue
+            try:
+                # Test post ID is an integer (as TikTok post IDs ought to be)
+                int(post_id)
+            except ValueError:
+                self.dataset.finish_with_error(f"Column {column} must contain TikTok post IDs")
+                return
+            
+            video_ids_to_download.append(post_id)
 
         # the downloader is an asynchronous method because we want to be able
         # to run multiple downloads in parallel
@@ -160,6 +184,7 @@ class TikTokImageDownloader(BasicProcessor):
             "options": {
                 "thumbnail": "Video Thumbnail",
                 "music": "Music Thumbnail",
+                "author_avatar": "User avatar"
             },
             "default": "thumbnail"
         }
@@ -216,6 +241,8 @@ class TikTokImageDownloader(BasicProcessor):
             url_column = "thumbnail_url"
         elif self.parameters.get("thumb_type") == "music":
             url_column = "music_thumbnail"
+        elif self.parameters.get("thumb_type") == "author_avatar":
+            url_column = "author_avatar"
         else:
             self.dataset.update_status("No image column selected.", is_final=True)
             self.dataset.finish(0)
@@ -391,18 +418,18 @@ class TikTokImageDownloader(BasicProcessor):
         """
         try:
             response = requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent})
-        except requests.exceptions.RequestException as e:
+
+            if response.status_code != 200 or "image" not in response.headers.get("content-type", ""):
+                raise FileNotFoundError(f"Unable to download image; status_code:{response.status_code} content-type:{response.headers.get('content-type', '')}")
+
+            # Process images
+            image_io = BytesIO(response.content)
+            try:
+                picture = Image.open(image_io)
+            except UnidentifiedImageError:
+                picture = Image.open(image_io.raw)
+        except (ConnectionError, requests.exceptions.RequestException) as e:
             raise FileNotFoundError(f"Unable to download TikTok image via {url} ({e}), skipping")
-
-        if response.status_code != 200 or "image" not in response.headers.get("content-type", ""):
-            raise FileNotFoundError(f"Unable to download image; status_code:{response.status_code} content-type:{response.headers.get('content-type', '')}")
-
-        # Process images
-        image_io = BytesIO(response.content)
-        try:
-            picture = Image.open(image_io)
-        except UnidentifiedImageError:
-            picture = Image.open(image_io.raw)
 
         # Grab extension from response
         extension = response.headers["Content-Type"].split("/")[-1]

@@ -50,16 +50,16 @@ class SearchTikTok(Search):
             # from intercepted API response
             user_nickname = post["author"]["uniqueId"]
             user_fullname = post["author"]["nickname"]
-            user_id = post["author"]["id"]
+            user_thumbnail = post["author"].get("avatarThumb", "")
         elif post.get("author"):
             # from embedded JSON object
             user_nickname = post["author"]
             user_fullname = post["nickname"]
-            user_id = ""
+            user_thumbnail = ""
         else:
             user_nickname = ""
             user_fullname = ""
-            user_id = ""
+            user_thumbnail = ""
 
         # there are various thumbnail URLs, some of them expire later than
         # others. Try to get the highest-resolution one that hasn't expired
@@ -84,13 +84,15 @@ class SearchTikTok(Search):
             "author_followers": post.get("authorStats", {}).get("followerCount", ""),
             "author_likes": post.get("authorStats", {}).get("diggCount", ""),
             "author_videos": post.get("authorStats", {}).get("videoCount", ""),
-            "author_avatar": post.get("avatarThumb", ""),
+            "author_avatar": user_thumbnail,
             "body": post["desc"],
             "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
             "unix_timestamp": int(post["createTime"]),
             "is_duet": "yes" if (post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False) else "no",
             "is_ad": "yes" if post.get("isAd", False) else "no",
             "is_paid_partnership": "yes" if post.get("adAuthorization") else "no",
+            "is_sensitive": "yes" if post.get("maskType") == 3 else "no",
+            "is_photosensitive": "yes" if post.get("maskType") == 4 else "no",
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
             "music_url": post["music"].get("playUrl", ""),

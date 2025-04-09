@@ -133,11 +133,14 @@ def list_users(page):
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_worker_status():
+    api_response = call_api("worker-status")
+    if api_response["status"] != "success":
+        return """<p class="content-placeholder">Backend unavailable; View logs</p>""", 200, {"Content-Type": "text/html"}
     workers = [
         {
             **worker,
             "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=db)
-        } for worker in call_api("worker-status")["response"]["running"]
+        } for worker in api_response["response"]["running"]
     ]
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=fourcat_modules.workers,
                            now=time.time())
@@ -147,7 +150,11 @@ def get_worker_status():
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_queue_status():
-    queue = call_api("worker-status")["response"]["queued"]
+    api_response = call_api("worker-status")
+    if api_response["status"] != "success":
+        return """<p class="content-placeholder">Backend unavailable; View logs</p>""", 200, {"Content-Type": "text/html"}
+
+    queue = api_response["response"]["queued"]
     return render_template("controlpanel/queue-status.html", queue=queue, worker_types=fourcat_modules.workers,
                            now=time.time())
 

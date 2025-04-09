@@ -239,6 +239,9 @@ class ImageCategoryWallGenerator(BasicProcessor):
                             category_type = float
                         # Special case
                         top_cats = post.get("top_categories")
+                        if not top_cats:
+                            self.dataset.log(f"Post {post.get('id')} has no top categories; skipping")
+                            continue
                         top_cat = top_cats.split(",")[0].split(":")[0].strip()
                         top_cat_score = float(top_cats.split(",")[0].split(":")[1].strip().replace("%", ""))
                         post_result = {"id": post.get("id"), "value": top_cat_score, "top_cats": top_cats}

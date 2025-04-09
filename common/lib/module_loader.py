@@ -35,7 +35,7 @@ class ModuleCollector:
     processors = {}
     datasources = {}
 
-    def __init__(self, config, write_cache=False):
+    def __init__(self, config, write_config=False):
         """
         Load data sources and workers
 
@@ -58,13 +58,13 @@ class ModuleCollector:
         self.expand_datasources()
 
         # cache module-defined config options for use by the config manager
-        if write_cache:
+        if write_config:
             module_config = {}
             for worker in self.workers.values():
                 if hasattr(worker, "config") and type(worker.config) is dict:
                     module_config.update(worker.config)
 
-            with self.config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+            with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
                 pickle.dump(module_config, outfile)
 
         # load from cache

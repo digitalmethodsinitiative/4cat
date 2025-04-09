@@ -146,16 +146,6 @@ class ConfigManager:
         """
         self.with_db()
 
-        # delete unknown keys
-        known_keys = tuple([names for names, settings in config.config_definition.items() if settings.get("type") not in UserInput.OPTIONS_COSMETIC])
-        unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
-
-        if unknown_keys:
-            self.db.log.info(f"Deleting unknown settings from database: {', '.join([key['name'] for key in unknown_keys])}")
-            self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
-
-        self.db.commit()
-
         # create global values for known keys with the default
         known_settings = self.get_all()
         for setting, parameters in self.config_definition.items():
@@ -279,11 +269,11 @@ class ConfigManager:
 
             if not is_json and value is not None:
                 value = json.loads(value)
-            # TODO: check this as it feels like it could cause a default to return even if value is not None. - Dale
-            elif default is not None:
-                value = default
+            # TODO: Which default should have priority? The provided default feels like it should be the highest priority, but I think that is an old implementation and perhaps should be removed. - Dale
             elif value is None and setting_name in self.config_definition and "default" in self.config_definition[setting_name]:
                 value = self.config_definition[setting_name]["default"]
+            elif value is None and default is not None:
+                value = default
 
             final_settings[setting_name] = value
 
@@ -326,8 +316,8 @@ class ConfigManager:
 
             if hasattr(user, "get_id"):
                 user = user.get_id()
-            elif user is not None:
-                raise TypeError(f"get() expects None, a User object or a string for argument 'user' ({type(user).__name__} given)")
+            elif user != None: # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
+                raise TypeError("get() expects None, a User object or a string for argument 'user'")
 
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups

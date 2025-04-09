@@ -127,7 +127,7 @@ class OpenAPICollector:
 				mime = mime[1].strip() if mime else "application/json"
 
 				# determine error codes
-				error_codes = {str(var[0]): {"description": re.sub("[\s]+", " ", var[1].strip())} for var in
+				error_codes = {str(var[0]): {"description": re.sub(r"[\s]+", " ", var[1].strip())} for var in
 							   re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)}
 
 			else:

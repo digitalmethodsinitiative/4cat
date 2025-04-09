@@ -20,6 +20,7 @@ class WorkerManager:
 	job_mapping = {}
 	pool = []
 	looping = True
+	unknown_jobs = set()
 
 	def __init__(self, queue, database, logger, modules, as_daemon=True):
 		"""
@@ -106,7 +107,9 @@ class WorkerManager:
 						# it's fine
 						pass
 			else:
-				self.log.error("Unknown job type: %s" % jobtype)
+				if jobtype not in self.unknown_jobs:
+					self.log.error("Unknown job type: %s" % jobtype)
+					self.unknown_jobs.add(jobtype)
 
 		time.sleep(1)
 
@@ -239,5 +242,6 @@ class WorkerManager:
 					time.sleep(0.25)
 
 				# now all queries are interrupted, formally request an abort
+				self.log.info(f"Requesting interrupt of job {worker.job.data['id']} ({worker.job.data['jobtype']}/{worker.job.data['remote_id']})")
 				worker.request_interrupt(interrupt_level)
 				return

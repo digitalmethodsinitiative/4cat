@@ -7,12 +7,13 @@ import json
 
 from pathlib import Path
 
+import telethon.errors
 from telethon import TelegramClient
-from telethon.errors import TimedOutError
+from telethon.errors import TimedOutError, BadRequestError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, timify_long
 from common.lib.dataset import DataSet
 from processors.visualisation.download_images import ImageDownloader
 
@@ -62,15 +63,16 @@ class TelegramImageDownloader(BasicProcessor):
         :param DataSet parent_dataset:  Dataset that will be uploaded
         """
 
+        # Get max number of images; if set to 0, there is no limit
         max_number_images = int(config.get('image-downloader-telegram.max', 1000))
 
-        return {
+        options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": f"No. of images (max {max_number_images:,})",
+                "help": "No. of images" if max_number_images == 0 else f"No. of images (max {max_number_images})",
                 "default": 100,
-                "min": 0,
-                "max": max_number_images
+                "min": 0 if max_number_images == 0 else 1,
+                "tooltip": f"Maximum number of images to download{' (set to 0 to download all images)' if max_number_images == 0 else ''}"
             },
             "video-thumbnails": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -84,6 +86,12 @@ class TelegramImageDownloader(BasicProcessor):
                 "tooltip": "This includes e.g. thumbnails for linked YouTube videos"
             }
         }
+        
+        if max_number_images != 0:
+            # Only add max option if it is not set to 0 (unlimited)
+            options["amount"]["max"] = max_number_images
+
+        return options
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -193,6 +201,13 @@ class TelegramImageDownloader(BasicProcessor):
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while downloading images")
 
+                    if not message:
+                        # message no longer exists
+                        self.dataset.log(f"Could not download image for message {msg_id} - message is unavailable (it "
+                                         f"may have been deleted)")
+                        self.flawless = False
+                        break
+
                     success = False
                     try:
                         # it's actually unclear if images are always jpegs, but this
@@ -215,14 +230,28 @@ class TelegramImageDownloader(BasicProcessor):
                         self.dataset.log(f"Could not download image for message {msg_id} ({e})")
                         self.flawless = False
 
-                    media_done += 1
-                    self.metadata[filename] = {
-                        "filename": filename,
-                        "success": success,
-                        "from_dataset": self.source_dataset.key,
-                        "post_ids": [msg_id]
-                    }
+                    finally:
+                        media_done += 1
+                        self.metadata[filename] = {
+                            "filename": filename,
+                            "success": success,
+                            "from_dataset": self.source_dataset.key,
+                            "post_ids": [msg_id]
+                        }
 
+            except BadRequestError as e:
+                self.dataset.log(f"Couldn't retrieve images for {entity} - the channel is no longer accessible ({e})")
+                self.flawless = False
+
+            except telethon.errors.FloodError as e:
+                later = "later"
+                if hasattr(e, "seconds"):
+                    later = f"in {timify_long(e.seconds)}"
+                self.dataset.update_status(f"Rate-limited by Telegram after downloading {media_done-1:,} image(s); "
+                                           f"halting download process. Try again {later}.", is_final=True)
+                self.flawless = False
+                break
+                    
             except ValueError as e:
                 self.dataset.log(f"Couldn't retrieve images for {entity}, it probably does not exist anymore ({e})")
                 self.flawless = False

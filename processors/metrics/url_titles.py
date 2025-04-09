@@ -146,7 +146,7 @@ can
         self.dataset.update_status("Finding URLs in dataset")
         for item in self.source_dataset.iterate_items(self):
             # combine column contents that we need to extract URLs from
-            source_text = " ".join([item[column] for column in columns])
+            source_text = " ".join([str(item[column]) for column in columns])
             urls = ural.urls_from_text(source_text)
 
             for url in urls:

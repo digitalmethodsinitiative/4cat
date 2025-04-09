@@ -163,23 +163,22 @@ class AttributeRanker(BasicProcessor):
             """
             return "missing_data"
 
-        # if we're interested in overall top-ranking items rather than a
-        # per-period ranking, we need to do a first pass in which all posts are
-        # inspected to determine those overall top-scoring items
-        overall_top = {}
-        if rank_style == "overall":
-            if cutoff:
-                self.dataset.update_status(f"Determining overall top-{cutoff} items")
-            else:
-                self.dataset.update_status("Determining overall top items")
-            for post in self.source_dataset.iterate_items(self,
-                                                          map_missing=missing_value_placeholder if self.include_missing_data else "default"):
-                values = self.get_values(post, columns, filter, split_comma, extract)
-                for value in values:
-                    if to_lowercase:
-                        value = value.lower()
-                    if value not in overall_top:
-                        overall_top[value] = 0
+		# if we're interested in overall top-ranking items rather than a
+		# per-period ranking, we need to do a first pass in which all posts are
+		# inspected to determine those overall top-scoring items
+		overall_top = {}
+		if rank_style == "overall":
+			if cutoff:
+				self.dataset.update_status(f"Determining overall top-{cutoff} items")
+			else:
+				self.dataset.update_status("Determining overall top items")
+			for post in self.source_dataset.iterate_items(self, map_missing=missing_value_placeholder if self.include_missing_data else "default"):
+				values = self.get_values(post, columns, filter, split_comma, extract)
+				for value in values:
+					if to_lowercase:
+						value = str(value).lower()
+					if value not in overall_top:
+						overall_top[value] = 0
 
                     overall_top[value] += convert_to_int(post.get(weighby, 1), 1)
 
@@ -187,17 +186,17 @@ class AttributeRanker(BasicProcessor):
             if cutoff:
                 overall_top = overall_top[:cutoff]
 
-        # now for the real deal
-        self.dataset.update_status("Reading source file")
-        for post in self.source_dataset.iterate_items(self,
-                                                      map_missing=missing_value_placeholder if self.include_missing_data else "default"):
-            # determine where to put this data
-            try:
-                time_unit = get_interval_descriptor(post, timeframe)
-            except ValueError as e:
-                self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
-                self.dataset.update_status(0)
-                return
+		# now for the real deal
+		self.dataset.update_status("Reading source file")
+		progress = 0
+		for post in self.source_dataset.iterate_items(self, map_missing=missing_value_placeholder if self.include_missing_data else "default"):
+			# determine where to put this data
+			try:
+				time_unit = get_interval_descriptor(post, timeframe)
+			except ValueError as e:
+				self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
+				self.dataset.update_status(0)
+				return
 
             if time_unit not in items:
                 items[time_unit] = OrderedDict()
@@ -205,10 +204,10 @@ class AttributeRanker(BasicProcessor):
             # get values from post
             values = self.get_values(post, columns, filter, split_comma, extract)
 
-            # keep track of occurrences of found items per relevant time period
-            for value in values:
-                if to_lowercase:
-                    value = value.lower()
+			# keep track of occurrences of found items per relevant time period
+			for value in values:
+				if to_lowercase:
+						value = str(value).lower()
 
                 if rank_style == "overall" and value not in overall_top:
                     continue
@@ -218,15 +217,20 @@ class AttributeRanker(BasicProcessor):
 
                 items[time_unit][value] += convert_to_int(post.get(weighby, 1))
 
-        # sort by time and frequency
-        self.dataset.update_status("Sorting items")
-        sorted_items = OrderedDict((key, items[key]) for key in sorted(items.keys()))
-        for time_unit in sorted_items:
-            sorted_unit = OrderedDict((item, sorted_items[time_unit][item]) for item in
-                                      sorted(sorted_items[time_unit], reverse=True,
-                                             key=lambda key: sorted_items[time_unit][key]))
-            sorted_items[time_unit].clear()
-            sorted_items[time_unit].update(sorted_unit)
+			progress += 1
+			if progress % 500 == 0:
+				self.dataset.update_status(f"Iterated through {progress:,} of {self.source_dataset.num_rows:,} items")
+				self.dataset.update_progress(progress / self.source_dataset.num_rows)
+
+		# sort by time and frequency
+		self.dataset.update_status("Sorting items")
+		sorted_items = OrderedDict((key, items[key]) for key in sorted(items.keys()))
+		for time_unit in sorted_items:
+			sorted_unit = OrderedDict((item, sorted_items[time_unit][item]) for item in
+									  sorted(sorted_items[time_unit], reverse=True,
+											 key=lambda key: sorted_items[time_unit][key]))
+			sorted_items[time_unit].clear()
+			sorted_items[time_unit].update(sorted_unit)
 
             if cutoff > 0:
                 # OrderedDict's API sucks and really needs some extra

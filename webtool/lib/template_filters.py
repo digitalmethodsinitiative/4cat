@@ -1,6 +1,7 @@
 import urllib.parse
 import datetime
-import markdown
+from math import floor
+
 import json
 import ural
 import uuid
@@ -11,6 +12,7 @@ import requests
 
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
+from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify_long
 
 from flask_login import current_user
@@ -117,8 +119,27 @@ def _jinja2_filter_httpquery(data):
 	except TypeError:
 		return ""
 
+@app.template_filter("add_colour")
+def _jinja2_add_colours(data):
+	"""
+	Add colour preview to hexadecimal colour values.
+
+	Cute little preview for #FF0099-like strings. Used (at time of writing) for
+	Pinterest data, which has a "dominant colour" field.
+
+	Only works on strings that are *just* the value, to avoid messing up HTML
+	etc
+
+	:param str data:  String
+	:return str:  HTML
+	"""
+	if type(data) is not str or not re.match(r"#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\b", data):
+		return data
+
+	return f'<span class="colour-preview"><i style="background:{data}" aria-hidden="true"></i> {data}</span>'
+
 @app.template_filter("add_ahref")
-def _jinja2_filter_add_ahref(content):
+def _jinja2_filter_add_ahref(content, ellipsiate=0):
 	"""
 	Add HTML links to text
 
@@ -133,17 +154,17 @@ def _jinja2_filter_add_ahref(content):
 		return content
 
 	for link in set(ural.urls_from_text(str(content))):
-		content = content.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link}</a>')
+		if ellipsiate > 0:
+			link_text = _jinja2_filter_ellipsiate(link, ellipsiate, True, "[&hellip;]")
+		else:
+			link_text = link
+		content = content.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
 
 	return content
 
 @app.template_filter('markdown',)
 def _jinja2_filter_markdown(text, trim_container=False):
-	val = markdown.markdown(text)
-	if trim_container:
-		val = re.sub(r"^<p>", "", val)
-		val = re.sub(r"</p>$", "", val)
-	return val
+	return parse_markdown(text, trim_container)
 
 @app.template_filter('isbool')
 def _jinja2_filter_isbool(value):
@@ -197,6 +218,30 @@ def _jinja2_filter_extension_to_noun(ext):
 		return "file"
 	else:
 		return "item"
+
+@app.template_filter("ellipsiate")
+def _jinja2_filter_ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
+	if len(text) <= length:
+		return text
+
+	elif not inside:
+		return text[:length] + ellipsis_str
+
+	else:
+		# two cases: URLs and normal text
+		# for URLs, try to only ellipsiate after the domain name
+		# this makes the URLs easier to read when shortened
+		if ural.is_url(text):
+			pre_part = "/".join(text.split("/")[:3])
+			if len(pre_part) < length - 6:  # kind of arbitrary
+				before = len(pre_part) + 1
+			else:
+				before = floor(length / 2)
+		else:
+			before = floor(length / 2)
+
+		after = len(text) - before
+		return text[:before] + ellipsis_str + text[after:]
 
 @app.template_filter('4chan_image')
 def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):

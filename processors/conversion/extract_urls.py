@@ -11,7 +11,7 @@ from ural import urls_from_text
 
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -233,7 +233,7 @@ class ExtractURLs(BasicProcessor):
         correct_croudtangle = self.parameters.get("correct_croudtangle", False)
 
         # Create fieldnames
-        fieldnames = self.source_dataset.get_item_keys(self) + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
+        fieldnames = self.source_dataset.get_columns() + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
@@ -364,7 +364,7 @@ class ExtractURLs(BasicProcessor):
         :return list:  	            list of identified URLs
         """
         if split_comma:
-            texts = text.split(",")
+            texts = split_urls(text)
         else:
             texts = [text]
 

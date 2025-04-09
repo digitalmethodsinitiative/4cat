@@ -216,6 +216,10 @@ class User:
 
         elif self.is_admin:
             return True
+        
+        elif self.config.get("privileges.can_view_private_datasets", user=self):
+            # Allowed to see dataset, but perhaps not run processors (need privileges.admin.can_manipulate_all_datasets or dataset ownership)
+            return True
 
         elif dataset.is_accessible_by(self, role=role):
             return True

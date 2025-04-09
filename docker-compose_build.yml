@@ -26,12 +26,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - ${PUBLIC_API_PORT}:4444
     volumes:
       - ./data/datasets/:/usr/src/app/data/
       - ./data/config/:/usr/src/app/config/
       - ./data/logs/:/usr/src/app/logs/
+#      - 4cat_data:/usr/src/app/data/
+#      - 4cat_config:/usr/src/app/config/
+#      - 4cat_logs:/usr/src/app/logs/
     entrypoint: docker/docker-entrypoint.sh
 
   frontend:
@@ -49,6 +50,9 @@ services:
       - ./data/datasets/:/usr/src/app/data/
       - ./data/config/:/usr/src/app/config/
       - ./data/logs/:/usr/src/app/logs/
+#      - 4cat_data:/usr/src/app/data/
+#      - 4cat_config:/usr/src/app/config/
+#      - 4cat_logs:/usr/src/app/logs/
     command: ["docker/wait-for-backend.sh"]
 
 volumes:

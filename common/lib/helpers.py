@@ -1,17 +1,20 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
-import hashlib
 import subprocess
+import imagehash
+import hashlib
 import requests
 import datetime
 import smtplib
 import fnmatch
 import socket
+import shlex
 import copy
 import time
 import json
 import math
+import csv
 import ssl
 import re
 import os
@@ -23,6 +26,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse, urlunparse
 from calendar import monthrange
 from packaging import version
+from PIL import Image
 
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -41,6 +45,17 @@ def init_datasource(database, logger, queue, name):
     :param string name:  ID of datasource that is being initialised
     """
     pass
+
+def get_datasource_example_keys(db, modules, dataset_type):
+    """
+    Get example keys for a datasource
+    """
+    from common.lib.dataset import DataSet
+    example_dataset_key = db.fetchone("SELECT key from datasets WHERE type = %s and is_finished = True and num_rows > 0 ORDER BY timestamp_finished DESC LIMIT 1", (dataset_type,))
+    if example_dataset_key:
+        example_dataset = DataSet(db=db, key=example_dataset_key["key"], modules=modules)
+        return example_dataset.get_columns()
+    return []
 
 def strip_tags(html, convert_newlines=True):
     """
@@ -100,6 +115,27 @@ def sniff_encoding(file):
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
+def sniff_csv_dialect(csv_input):
+    """
+    Determine CSV dialect for an input stream
+
+    :param csv_input:  Input stream
+    :return tuple:  Tuple: Dialect object and a boolean representing whether
+    the CSV file seems to have a header
+    """
+    encoding = sniff_encoding(csv_input)
+    if type(csv_input) is io.TextIOWrapper:
+        wrapped_input = csv_input
+    else:
+        wrapped_input = io.TextIOWrapper(csv_input, encoding=encoding)
+    wrapped_input.seek(0)
+    sample = wrapped_input.read(1024 * 1024)
+    wrapped_input.seek(0)
+    has_header = csv.Sniffer().has_header(sample)
+    dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+
+    return dialect, has_header
+
 
 def get_git_branch():
     """
@@ -110,13 +146,20 @@ def get_git_branch():
     repository or git is not installed an empty string is returned.
     """
     try:
-        cwd = os.getcwd()
-        os.chdir(config.get('PATH_ROOT'))
-        branch = subprocess.run(["git", "branch", "--show-current"], stdout=subprocess.PIPE)
-        os.chdir(cwd)
+        root_dir = str(config.get('PATH_ROOT').resolve())
+        branch = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
-        return branch.stdout.decode("utf-8").strip()
+        branch_name = branch.stdout.decode("utf-8").strip()
+        if not branch_name:
+            # Check for detached HEAD state
+            # Most likely occuring because of checking out release tags (which are not branches) or commits
+            head_status = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} status"), stdout=subprocess.PIPE)
+            if head_status.returncode == 0:
+                for line in head_status.stdout.decode("utf-8").split("\n"):
+                    if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
+                        branch_name = line.split("/")[-1] if "/" in line else line.split(" ")[-1]
+                        return branch_name.strip()
     except (subprocess.SubprocessError, ValueError, FileNotFoundError):
         return ""
 
@@ -143,7 +186,6 @@ def get_software_commit(worker=None):
     # try git command line within the 4CAT root folder
     # if it is a checked-out git repository, it will tell us the hash of
     # the currently checked-out commit
-    cwd = os.getcwd()
 
     # path has no Path.relative()...
     relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
@@ -153,24 +195,24 @@ def get_software_commit(worker=None):
         # useful version info (since the extension is by definition not in the
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
-            extension_dir = config.get("PATH_ROOT").joinpath(relative_filepath)
-            os.chdir(extension_dir)
+            working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
-            repo_level = subprocess.run(["git", "rev-parse", "--show-toplevel"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            git_cmd = f"git -C {shlex.quote(working_dir)} rev-parse --show-toplevel"
+            repo_level = subprocess.run(shlex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
                 # not its own repository
                 return ("", "")
 
         else:
-            os.chdir(config.get("PATH_ROOT"))
+            working_dir = str(config.get("PATH_ROOT").resolve())
 
-        show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        show = subprocess.run(shlex.split(f"git -C {shlex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if show.returncode != 0:
             raise ValueError()
         commit = show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
 
         # now get the repository the commit belongs to, if we can
-        origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        origin = subprocess.run(shlex.split(f"git -C {shlex.quote(working_dir)} config --get remote.origin.url"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if origin.returncode != 0 or not origin.stdout:
             raise ValueError()
         repository = origin.stdout.decode("utf-8").strip()
@@ -179,9 +221,6 @@ def get_software_commit(worker=None):
 
     except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
         return ("", "")
-
-    finally:
-        os.chdir(cwd)
 
     return (commit, repository)
 
@@ -278,7 +317,6 @@ def find_extensions():
 
     # collect metadata for extensions
     allowed_metadata_keys = ("name", "version", "url")
-    cwd = os.getcwd()
     for extension in extensions:
         extension_folder = extension_path.joinpath(extension)
         metadata_file = extension_folder.joinpath("metadata.json")
@@ -295,8 +333,8 @@ def find_extensions():
         if extensions[extension]["is_git"]:
             # try to get remote URL
             try:
-                os.chdir(extension_folder)
-                origin = subprocess.run(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.PIPE,
+                extension_root = str(extension_folder.resolve())
+                origin = subprocess.run(shlex.split(f"git -C {shlex.quote(extension_root)} config --get remote.origin.url"), stderr=subprocess.PIPE,
                                         stdout=subprocess.PIPE)
                 if origin.returncode != 0 or not origin.stdout:
                     raise ValueError()
@@ -308,8 +346,6 @@ def find_extensions():
             except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
                 print(e)
                 pass
-            finally:
-                os.chdir(cwd)
 
     return extensions, errors
 
@@ -422,6 +458,37 @@ def andify(items):
     return ", ".join([str(item) for item in items]) + result
 
 
+def hash_file(image_file, hash_type="file-hash"):
+    """
+    Generate an image hash
+
+    :param Path image_file:  Image file to hash
+    :param str hash_type:  Hash type, one of `file-hash`, `colorhash`,
+    `phash`, `average_hash`, `dhash`
+    :return str:  Hexadecimal hash value
+    """
+    if not image_file.exists():
+        raise FileNotFoundError()
+
+    if hash_type == "file-hash":
+        hasher = hashlib.sha1()
+
+        # Open the file in binary mode
+        with image_file.open("rb") as infile:
+            # Read and update hash in chunks to handle large files
+            while chunk := infile.read(1024):
+                hasher.update(chunk)
+
+        return hasher.hexdigest()
+
+    elif hash_type in ("colorhash", "phash", "average_hash", "dhash"):
+        image = Image.open(image_file)
+
+        return str(getattr(imagehash, hash_type)(image))
+
+    else:
+        raise NotImplementedError(f"Unknown hash type '{hash_type}'")
+
 def get_yt_compatible_ids(yt_ids):
     """
     :param yt_ids list, a list of strings
@@ -515,34 +582,48 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
     return canvas
 
 
-def call_api(action, payload=None):
+def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
-    Calls the internal API and returns interpreted response.
+    Calls the internal API and returns interpreted response. "status" is always 
+    None if wait_for_response is False.
 
     :param str action: API action
     :param payload: API payload
+    :param bool wait_for_response:  Wait for response? If not close connection
+    immediately after sending data.
 
-    :return: API response, or timeout message in case of timeout
+    :return: API response {"status": "success"|"error", "response": response, "error": error}
     """
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
-    connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    try:
+        connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    except ConnectionRefusedError:
+        return {"status": "error", "error": "Connection refused"}
 
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
 
-    try:
-        response = ""
-        while True:
-            bytes = connection.recv(2048)
-            if not bytes:
-                break
+    response_data = {
+        "status": None,
+        "response": None,
+        "error": None
+    }
 
-            response += bytes.decode("ascii", "ignore")
-    except (socket.timeout, TimeoutError):
-        response = "(Connection timed out)"
+    if wait_for_response:
+        try:
+            response = ""
+            while True:
+                bytes = connection.recv(2048)
+                if not bytes:
+                    break
+
+                response += bytes.decode("ascii", "ignore")
+        except (socket.timeout, TimeoutError):
+            response_data["status"] = "error"
+            response_data["error"] = "Connection timed out"
 
     try:
         connection.shutdown(socket.SHUT_RDWR)
@@ -551,10 +632,18 @@ def call_api(action, payload=None):
         pass
     connection.close()
 
-    try:
-        return json.loads(response)
-    except json.JSONDecodeError:
-        return response
+    if wait_for_response:
+        try:
+            json_response = json.loads(response)
+            response_data["response"] = json_response["response"]
+            response_data["error"] = json_response.get("error", None)
+            response_data["status"] = "error" if json_response.get("error") else "success"
+        except json.JSONDecodeError:
+            response_data["status"] = "error"
+            response_data["error"] = "Invalid JSON response"
+            response_data["response"] = response
+    
+    return response_data
 
 
 def get_interval_descriptor(item, interval):
@@ -1021,6 +1110,49 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
         url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
 
     return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+
+
+def split_urls(url_string, allowed_schemes=None):
+    """
+    Split URL text by \n and commas.
+
+    4CAT allows users to input lists by either separating items with a newline or a comma. This function will split URLs
+    and also check for commas within URLs using schemes.
+
+    Note: some urls may contain scheme (e.g., https://web.archive.org/web/20250000000000*/http://economist.com);
+    this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
+    """
+    if allowed_schemes is None:
+        allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
+    potential_urls = []
+    # Split the text by \n
+    for line in url_string.split('\n'):
+        # Handle commas that may exist within URLs
+        parts = line.split(',')
+        recombined_url = ""
+        for part in parts:
+            if part.startswith(allowed_schemes):  # Other schemes exist
+                # New URL start detected
+                if recombined_url:
+                    # Already have a URL, add to list
+                    potential_urls.append(recombined_url)
+                # Start new URL
+                recombined_url = part
+            elif part:
+                if recombined_url:
+                    # Add to existing URL
+                    recombined_url += "," + part
+                else:
+                    # No existing URL, start new
+                    recombined_url = part
+            else:
+                # Ignore empty strings
+                pass
+        if recombined_url:
+            # Add any remaining URL
+            potential_urls.append(recombined_url)
+    return potential_urls
+
 
 def folder_size(path='.'):
     """

@@ -75,7 +75,7 @@ class ImageWallGenerator(BasicProcessor):
 					"average": "Average image in set",
 					"fit-height": "Fit height"
 				},
-				"default": "square",
+				"default": "fit-height",
 				"help": "Image tile size",
 				"tooltip": "'Fit height' retains image ratios but makes them have the same height"
 			},
