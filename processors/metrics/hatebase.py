@@ -97,13 +97,13 @@ class HatebaseAnalyser(BasicProcessor):
             self.dataset.finish(0)
             return
 
-		processed = 0
-		matches = 0
-		with self.dataset.get_results_path().open("w") as output:
-			fieldnames = self.source_dataset.get_columns()
-			fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
-					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
-					"hatebase_offensiveness_avg")
+        processed = 0
+        matches = 0
+        with self.dataset.get_results_path().open("w") as output:
+            fieldnames = self.source_dataset.get_columns()
+            fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
+                    "hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
+                    "hatebase_offensiveness_avg")
 
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()

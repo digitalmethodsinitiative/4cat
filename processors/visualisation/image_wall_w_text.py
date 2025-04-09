@@ -174,39 +174,39 @@ class ImageTextWallGenerator(BasicProcessor):
 
 		# Create SVG with categories and images
 		# Base sizes for each image
-		base_height = self.parameters.get("size", 100)
-		fontsize = 12
+        base_height = self.parameters.get("size", 100)
+        fontsize = 12
 		#Note: SVG files are "documents" and so this is actually not direct to pixels but instead the fontsize is HTML/CSS style dependent
-		fontsize_to_pixels_multiplier = 0.56 # this is a rough multiplier and somehow ought to be variable based on width
-		characters_per_line = math.ceil(base_height / (fontsize * fontsize_to_pixels_multiplier)) # this is a rough estimate as width can be longer than height (works for square formats)
-		rows_of_text = min(math.ceil(max_text_len / characters_per_line), 6) # max of 6 rows of text
-		row_height = base_height + (rows_of_text * fontsize + 4) # 4 is for padding
-		offset_y = - row_height
-		# Object collectors and tracking
-		total_images_collected = 0
-		current_row = 0
-		images_in_row = 0
-		row_widths = {}
-		complete_categories = []
-		load_errors = []
-		self.dataset.update_status("Creating Image wall")
-		self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
-		for image_path in self.iterate_archive_contents(image_dataset.get_results_path()):
-			if image_path.name in [".metadata.json"]:
-				if convert_to_int(self.parameters.get("amount"), 100) == 0:
-					max_images = max_images - 1
-				continue
+        fontsize_to_pixels_multiplier = 0.56 # this is a rough multiplier and somehow ought to be variable based on width
+        characters_per_line = math.ceil(base_height / (fontsize * fontsize_to_pixels_multiplier)) # this is a rough estimate as width can be longer than height (works for square formats)
+        rows_of_text = min(math.ceil(max_text_len / characters_per_line), 6) # max of 6 rows of text
+        row_height = base_height + (rows_of_text * fontsize + 4) # 4 is for padding
+        offset_y = - row_height
+        # Object collectors and tracking
+        total_images_collected = 0
+        current_row = 0
+        images_in_row = 0
+        row_widths = {}
+        complete_categories = []
+        load_errors = []
+        self.dataset.update_status("Creating Image wall")
+        self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
+        for image_path in self.iterate_archive_contents(image_dataset.get_results_path()):
+            if image_path.name in [".metadata.json"]:
+                if convert_to_int(self.parameters.get("amount"), 100) == 0:
+                    max_images = max_images - 1
+                continue
 
 			# Check image loads prior to any modifications to canvas space
-			try:
-				frame = Image.open(str(image_path))
-			except UnidentifiedImageError as e:
-				load_errors.append(image_path.name)
-				self.dataset.log(f"Unable to open image {image_path.name}: {e}")
-				continue
+            try:
+                frame = Image.open(str(image_path))
+            except UnidentifiedImageError as e:
+                load_errors.append(image_path.name)
+                self.dataset.log(f"Unable to open image {image_path.name}: {e}")
+                continue
 
-			if total_images_collected == 0:
-				offset_y += fontsize * 2  # add some space at the top for header
+            if total_images_collected == 0:
+                offset_y += fontsize * 2  # add some space at the top for header
 
             if images_in_row % side_length == 0:
                 # reset and ready for the next row
@@ -217,18 +217,18 @@ class ImageTextWallGenerator(BasicProcessor):
                 category_image = SVG(insert=(0, offset_y), size=(0, row_height))
                 offset_w = 0
 
-			if tile_type == "square":
+            if tile_type == "square":
 				# resize to square
-				frame_width = base_height
-				frame.thumbnail((frame_width, base_height))
-			elif tile_type == "fill-square":
-				# fill square
-				frame_width = base_height
-				frame = ImageOps.fit(frame, (frame_width, base_height), method=Image.BILINEAR)
-			else:
+                frame_width = base_height
+                frame.thumbnail((frame_width, base_height))
+            elif tile_type == "fill-square":
+			    # fill square
+                frame_width = base_height
+                frame = ImageOps.fit(frame, (frame_width, base_height), method=Image.BILINEAR)
+            else:
 				# resize to height
-				frame_width = int(base_height * frame.width / frame.height)
-				frame.thumbnail((frame_width, base_height))
+                frame_width = int(base_height * frame.width / frame.height)
+                frame.thumbnail((frame_width, base_height))
 
             # add to SVG as data URI (so it is a self-contained file)
             frame_data = io.BytesIO()
@@ -289,12 +289,10 @@ class ImageTextWallGenerator(BasicProcessor):
             canvas.add(category_image)
 
 		# save as svg and finish up
-		canvas.save(pretty=True)
-		self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
-		if load_errors:
-			self.dataset.log(f"Unable to load {len(load_errors)} images: {', '.join(load_errors)}")
-			self.dataset.update_status(f"Created image wall; Unable to load {len(load_errors)} images of {total_images_collected}", is_final=True)
-		return self.dataset.finish(total_images_collected)
-
-
-
+        canvas.save(pretty=True)
+        self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
+        if load_errors:
+            self.dataset.log(f"Unable to load {len(load_errors)} images: {', '.join(load_errors)}")
+            self.dataset.update_status(f"Created image wall; Unable to load {len(load_errors)} images of {total_images_collected}", is_final=True)
+            
+        return self.dataset.finish(total_images_collected)

@@ -45,37 +45,37 @@ class ImageDownloader(BasicProcessor):
     followups = ["image-wall", "image-category-wall", "pix-plot", "image-to-categories", "image-captions",
                  "text-from-images", "metadata-viewer", "clarifai-api", "google-vision-api"]
 
-	options = {
-		"amount": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 100,
-		},
-		"columns": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Column to get image links from",
-			"default": "image_url",
-			"inline": True,
-			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
-		},
-		"split-comma": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Split column values by comma?",
-			"default": False,
-			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-					   "separately"
-		}
-	}
+    options = {
+        "amount": {
+            "type": UserInput.OPTION_TEXT,
+            "default": 100,
+        },
+        "columns": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Column to get image links from",
+            "default": "image_url",
+            "inline": True,
+            "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+        },
+        "split-comma": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Split column values by comma?",
+            "default": False,
+            "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+                       "separately"
+        }
+    }
 
-	config = {
-		"image-downloader.max": {
-			"type": UserInput.OPTION_TEXT,
-			"coerce_type": int,
-			"default": 1000,
-			"help": "Max images to download",
-			"tooltip": "Only allow downloading up to this many images per batch. Increasing this can easily lead to "
-					   "very long-running processors and large datasets. Set to 0 for no limit."
-		}
-	}
+    config = {
+        "image-downloader.max": {
+            "type": UserInput.OPTION_TEXT,
+            "coerce_type": int,
+            "default": 1000,
+            "help": "Max images to download",
+            "tooltip": "Only allow downloading up to this many images per batch. Increasing this can easily lead to "
+                       "very long-running processors and large datasets. Set to 0 for no limit."
+        }
+    }
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -96,17 +96,17 @@ class ImageDownloader(BasicProcessor):
         """
         options = cls.options
 
-		# Update the amount max and help from config
-		max_number_images = int(config.get('image-downloader.max', 1000, user=user))
-		if max_number_images != 0:
-			options['amount']['help'] = f"No. of images (max {max_number_images})"
-			options['amount']['max'] = max_number_images
-			options['amount']['min'] = 1
-		else:
-			# 0 can download all images
-			options['amount']['help'] = f"No. of images"
-			options['amount']["min"] = 0
-			options['amount']["tooltip"] = "Set to 0 to download all images"
+        # Update the amount max and help from config
+        max_number_images = int(config.get('image-downloader.max', default=1000))
+        if max_number_images != 0:
+            options['amount']['help'] = f"No. of images (max {max_number_images})"
+            options['amount']['max'] = max_number_images
+            options['amount']['min'] = 1
+        else:
+            # 0 can download all images
+            options['amount']['help'] = f"No. of images"
+            options['amount']["min"] = 0
+            options['amount']["tooltip"] = "Set to 0 to download all images"
 
         # Get the columns for the select columns option
         if parent_dataset and parent_dataset.get_columns():
@@ -568,32 +568,32 @@ class ImageDownloader(BasicProcessor):
         Try requests.get() and raise FileNotFoundError while logging actual
         error in dataset.log().
 
-		Retries ConnectionError three times
-		"""
-		try:
-			response = requests.get(url, **kwargs)
-		except requests.exceptions.Timeout as e:
-			self.dataset.log("Error: Timeout while trying to download image %s: %s" % (url, e))
-			raise FileNotFoundError()
-		except requests.exceptions.SSLError as e:
-			self.dataset.log("Error: SSLError while trying to download image %s: %s" % (url, e))
-			raise FileNotFoundError()
-		except requests.exceptions.TooManyRedirects as e:
-			self.dataset.log("Error: TooManyRedirects while trying to download image %s: %s" % (url, e))
-			raise FileNotFoundError()
-		except requests.exceptions.ConnectionError as e:
-			if retries < 3:
-				response = self.request_get_w_error_handling(url, retries + 1, **kwargs)
-			else:
-				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
-				raise FileNotFoundError()
-		except requests.exceptions.LocationParseError as e:
-			# not an valid url, just skip
-			self.dataset.log("Error: LocationParseError while trying to download image %s: %s" % (url, e))
-			raise FileNotFoundError()
-		except requests.exceptions.InvalidSchema:
-			# not an http url, just skip
-			raise FileNotFoundError()
+        Retries ConnectionError three times
+        """
+        try:
+            response = requests.get(url, **kwargs)
+        except requests.exceptions.Timeout as e:
+            self.dataset.log("Error: Timeout while trying to download image %s: %s" % (url, e))
+            raise FileNotFoundError()
+        except requests.exceptions.SSLError as e:
+            self.dataset.log("Error: SSLError while trying to download image %s: %s" % (url, e))
+            raise FileNotFoundError()
+        except requests.exceptions.TooManyRedirects as e:
+            self.dataset.log("Error: TooManyRedirects while trying to download image %s: %s" % (url, e))
+            raise FileNotFoundError()
+        except requests.exceptions.ConnectionError as e:
+            if retries < 3:
+                response = self.request_get_w_error_handling(url, retries + 1, **kwargs)
+            else:
+                self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
+                raise FileNotFoundError()
+        except requests.exceptions.LocationParseError as e:
+            # not an valid url, just skip
+            self.dataset.log("Error: LocationParseError while trying to download image %s: %s" % (url, e))
+            raise FileNotFoundError()
+        except requests.exceptions.InvalidSchema:
+            # not an http url, just skip
+            raise FileNotFoundError()
 
         return response
 

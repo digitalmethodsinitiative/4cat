@@ -28,7 +28,7 @@ class VectoriseByCategory(BasicProcessor):
 	followups = ["wordcloud", "render-graphs-isometric", "render-rankflow"]
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token sets
 
@@ -37,7 +37,7 @@ class VectoriseByCategory(BasicProcessor):
 		return module.type == "tokenise-posts"
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		"""
 		Allow user to select category column
 		"""

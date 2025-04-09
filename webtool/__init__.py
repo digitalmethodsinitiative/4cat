@@ -36,7 +36,6 @@ from webtool.lib.helpers import generate_css_colours
 # initialize global objects for interacting with all the things
 login_manager = LoginManager()
 app = Flask(__name__)
-fourcat_modules = ModuleCollector()
 
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy

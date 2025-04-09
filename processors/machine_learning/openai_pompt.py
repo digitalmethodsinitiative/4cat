@@ -8,7 +8,6 @@ import openai
 
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
-from common.config_manager import config
 
 class OpenAI(BasicProcessor):
 	"""
@@ -38,7 +37,7 @@ class OpenAI(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		options = {
 			"per_item": {
 				"type": UserInput.OPTION_INFO,
@@ -129,7 +128,7 @@ class OpenAI(BasicProcessor):
 		# 			"requires": "write_annotations==true"
 		# 	}
 
-		api_key = config.get("api.openai.api_key", user=user)
+		api_key = config.get("api.openai.api_key")
 		if not api_key:
 			options["api_key"] = {
 				"type": UserInput.OPTION_TEXT,
@@ -141,7 +140,7 @@ class OpenAI(BasicProcessor):
 		return options
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Determine if processor is compatible with a dataset or processor
 
@@ -171,7 +170,7 @@ class OpenAI(BasicProcessor):
 
 		api_key = self.parameters.get("api_key")
 		if not api_key:
-			api_key = config.get("api.openai.api_key", user=self.owner)
+			api_key = self.config.get("api.openai.api_key")
 		if not api_key:
 			self.dataset.finish_with_error("You need to provide a valid API key")
 			return

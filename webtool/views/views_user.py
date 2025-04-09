@@ -14,8 +14,6 @@ import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from common.config_manager import ConfigWrapper
-
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
 from flask_login import login_user, login_required, logout_user, current_user

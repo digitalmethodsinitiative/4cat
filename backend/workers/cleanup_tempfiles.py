@@ -28,7 +28,6 @@ class TempFileCleaner(BasicWorker):
     ensure_job = {"remote_id": "localhost", "interval": 10800}
 
     # Use tracking file to delay deletion of files that may still be in use
-    tracking_file = config.get('PATH_DATA').joinpath(".temp_file_cleaner")
     days_to_keep = 7
 
     def work(self):
@@ -38,10 +37,11 @@ class TempFileCleaner(BasicWorker):
         :return:
         """
         # Load tracking file
-        if not self.tracking_file.exists():
+        tracking_file = self.config.get('PATH_DATA').joinpath(".temp_file_cleaner")
+        if not tracking_file.exists():
             tracked_files = {}
         else:
-            tracked_files = json.loads(self.tracking_file.read_text())
+            tracked_files = json.loads(tracking_file.read_text())
 
         result_files = Path(self.config.get('PATH_DATA')).glob("*")
         for file in result_files:
@@ -50,7 +50,7 @@ class TempFileCleaner(BasicWorker):
                 continue
 
             if self.interrupted:
-                self.tracking_file.write_text(json.dumps(tracked_files))
+                tracking_file.write_text(json.dumps(tracked_files))
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
 
             # the key of the dataset files belong to can be extracted from the
@@ -103,6 +103,6 @@ class TempFileCleaner(BasicWorker):
                 shutil.rmtree(file)
 
         # Update tracked files
-        self.tracking_file.write_text(json.dumps(tracked_files))
+        tracking_file.write_text(json.dumps(tracked_files))
 
         self.job.finish()

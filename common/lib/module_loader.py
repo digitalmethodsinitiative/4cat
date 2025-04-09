@@ -35,7 +35,7 @@ class ModuleCollector:
     processors = {}
     datasources = {}
 
-    def __init__(self, config, write_config=False):
+    def __init__(self, config, write_cache=False):
         """
         Load data sources and workers
 
@@ -58,7 +58,7 @@ class ModuleCollector:
         self.expand_datasources()
 
         # cache module-defined config options for use by the config manager
-        if write_config:
+        if write_cache:
             module_config = {}
             for worker in self.workers.values():
                 if hasattr(worker, "config") and type(worker.config) is dict:

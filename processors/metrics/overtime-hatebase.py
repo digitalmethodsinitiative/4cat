@@ -103,17 +103,17 @@ class OvertimeHatefulAnalysis(BasicProcessor):
         views = {}
         intervals = set()
 
-		fieldnames = self.source_dataset.get_columns()
-		if "views" in fieldnames:
-			engagement_field = "views"
-		elif "score" in fieldnames:
-			engagement_field = "score"
-		elif "likes" in fieldnames:
-			engagement_field = "likes"
-		else:
-			self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
-			self.dataset.finish(0)
-			return
+        fieldnames = self.source_dataset.get_columns()
+        if "views" in fieldnames:
+            engagement_field = "views"
+        elif "score" in fieldnames:
+            engagement_field = "score"
+        elif "likes" in fieldnames:
+            engagement_field = "likes"
+        else:
+            self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
+            self.dataset.finish(0)
+            return
 
         with self.config.get('PATH_ROOT').joinpath(
                 f"common/assets/hatebase/hatebase-{language}.json").open() as hatebasedata:
