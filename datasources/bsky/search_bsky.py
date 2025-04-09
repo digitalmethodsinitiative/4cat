@@ -71,6 +71,7 @@ class SearchBluesky(Search):
                 "help": "Bluesky Username",
                 "cache": True,
                 "sensitive": True,
+                "tooltip": "If no server is specified, .bsky.social is used."
             },
             "password": {
                 "type": UserInput.OPTION_TEXT,
@@ -128,6 +129,13 @@ class SearchBluesky(Search):
 
         if not query.get("username", None) or not query.get("password", None) :
             raise QueryParametersException("You need to provide valid Bluesky login credentials first.")
+
+        # If no server is specified, default to .bsky.social
+        if "." not in query.get("username"):
+            query["username"] += ".bsky.social"
+        # Remove @ at the start
+        if query.get("username").startswith("@"):
+            query["username"] = query["username"][1:]
 
         # Test login credentials
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
