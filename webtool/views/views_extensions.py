@@ -8,10 +8,6 @@ from flask_login import current_user, login_required
 from webtool import app, config
 from common.lib.helpers import find_extensions
 
-from common.config_manager import ConfigWrapper
-
-config = ConfigWrapper(config, user=current_user, request=request)
-
 
 @app.route("/admin/extensions/")
 @login_required

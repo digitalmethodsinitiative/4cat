@@ -44,7 +44,7 @@ class TopicModelWordExtractor(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -53,10 +53,10 @@ class TopicModelWordExtractor(BasicProcessor):
         fine-grained options, e.g. in cases where the availability of options
         is partially determined by the parent dataset's parameters.
 
+        :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
         the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
+can
         be used to show some options only to privileges users.
         """
         options = cls.options
@@ -73,11 +73,12 @@ class TopicModelWordExtractor(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on topic models
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "topic-modeller"
 

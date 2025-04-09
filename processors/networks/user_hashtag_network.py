@@ -22,7 +22,7 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     extension = "gexf"  # extension of result file, used internally and in UI
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         return {
             "to-lowercase": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -33,11 +33,12 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
         }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on datasets containing a tags column
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         usable_columns = {"tags", "hashtags", "groups"}
         columns = module.get_columns()

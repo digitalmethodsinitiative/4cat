@@ -25,11 +25,12 @@ class BaseFilter(BasicProcessor):
     description = "This should not be available."
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         This is meant to be inherited by other child classes
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return False
 

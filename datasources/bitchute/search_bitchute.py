@@ -582,7 +582,7 @@ class SearchBitChute(Search):
         return response
 
 
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate BitChute query input
 

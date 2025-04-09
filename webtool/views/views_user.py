@@ -41,6 +41,8 @@ def load_user(user_name):
     user = User.get_by_name(db, user_name)
     if user:
         user.authenticate()
+        user.with_config(ConfigWrapper(config, user=user, request=request))
+
     return user
 
 
@@ -75,6 +77,7 @@ def load_user_from_request(request):
     else:
         db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
         user = User.get_by_name(db, user["user"])
+        user.with_config(config)
         user.authenticate()
         return user
 
@@ -150,6 +153,7 @@ def autologin_whitelist():
     # request only if the hostname or IP matches the whitelist
     if any([fnmatch.filter(filterables, hostmask) for hostmask in config.get("flask.autologin.hostnames", [])]):
         autologin_user = User.get_by_name(db, "autologin")
+        autologin_user.with_config(config)
         if not autologin_user:
             # this user should exist by default
             abort(500)
@@ -260,6 +264,7 @@ def first_run_dialog():
         db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
         db.commit()
         user = User.get_by_name(db=db, name=username)
+        user.with_config(config)
         user.set_password(password)
         user.add_tag("admin")  # first user is always admin
 
@@ -335,6 +340,7 @@ def show_login():
         flash('Username or Password is invalid.', 'error')
         return redirect(url_for('show_login'))
 
+    registered_user.with_config(config)
     login_user(registered_user, remember=True)
 
     return redirect(url_for("show_frontpage"))
@@ -452,6 +458,7 @@ def reset_password():
                                message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
 
     # check form
+    resetting_user.with_config(config)
     incomplete = []
     if request.method == "POST":
         # check password validity
@@ -500,6 +507,7 @@ def request_password():
 
         # is it also a valid username? that is not a 'special' user (like autologin)?
         resetting_user = User.get_by_name(db, username)
+        resetting_user.with_config(config)
         if resetting_user is None or resetting_user.is_special:
             incomplete.append("username")
             flash("That user is not known here. Note that your username is typically your e-mail address.")

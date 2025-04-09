@@ -42,11 +42,12 @@ class VectorRanker(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token vectors
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "vectorise-tokens"
 

@@ -17,7 +17,6 @@ from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitCo
     ProcessorInterruptedException
 from common.lib.helpers import timify_long
 from common.lib.user_input import UserInput
-from common.config_manager import config
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 class SearchBluesky(Search):
@@ -46,7 +45,7 @@ class SearchBluesky(Search):
     handle_lookup_error_messages = ['account is deactivated', "profile not found", "account has been suspended"]
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -101,7 +100,7 @@ class SearchBluesky(Search):
         }
 
         # Update the max_posts setting from config
-        max_posts = int(config.get('bsky-search.max_results', 100, user=user))
+        max_posts = int(config.get('bsky-search.max_results', default=100))
         if max_posts == 0:
             # This is potentially madness
             options["max_posts"]["tooltip"] = "Set to 0 to collect all posts."
@@ -113,7 +112,7 @@ class SearchBluesky(Search):
         return options
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate Bluesky query
 
@@ -132,7 +131,7 @@ class SearchBluesky(Search):
         # Test login credentials
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
         try:
-            SearchBluesky.bsky_login(username=query["username"], password=query["password"], session_id=session_id)
+            SearchBluesky.bsky_login(username=query["username"], password=query["password"], session_id=session_id, session_directory=config.get("PATH_ROOT").joinpath(config.get("PATH_SESSIONS")))
         except UnauthorizedError as e:
             raise QueryParametersException("Invalid Bluesky login credentials.")
         except RequestException as e:
@@ -189,7 +188,7 @@ class SearchBluesky(Search):
 
         session_id = SearchBluesky.create_session_id(query.get("username"), query.get("password")) if not query.get("session_id") else query["session_id"]
         try:
-            client = SearchBluesky.bsky_login(username=query.get("username"), password=query.get("password"), session_id=session_id)
+            client = SearchBluesky.bsky_login(username=query.get("username"), password=query.get("password"), session_id=session_id, session_directory=self.config.get("PATH_ROOT").joinpath(self.config.get("PATH_SESSIONS")))
         except (UnauthorizedError, RequestException, BadRequestError) as e:
             self.dataset.log(f"Bluesky login failed: {e}")
             return self.dataset.finish_with_error("Bluesky login failed; please re-create this datasource.")
@@ -569,11 +568,6 @@ class SearchBluesky(Search):
         # if item["record"].get("tags"):
         #     unmapped_data.append({"loc": "record.tags", "obj": item["record"].get("tags")})
 
-        if unmapped_data:
-            # TODO: Use MappedItem message; currently it is not called...
-            config.with_db()
-            config.db.log.warning(f"Bluesky new mappings ({item['uri']}): {unmapped_data}")
-
         return MappedItem({
             "collected_at": datetime.fromtimestamp(item["4CAT_metadata"]["collected_at"]).isoformat(),
             "query": item["4CAT_metadata"]["query"],
@@ -655,7 +649,7 @@ class SearchBluesky(Search):
                     return user_profile.handle
                 else:
                     return None
-            except InvokeTimeoutError as e:
+            except (NetworkError, InvokeTimeoutError) as e:
                 # Network error; try again
                 tries += 1
                 time.sleep(1)
@@ -668,13 +662,14 @@ class SearchBluesky(Search):
                 return None
 
     @staticmethod
-    def bsky_login(username, password, session_id):
+    def bsky_login(username, password, session_id, session_directory):
         """
         Login to Bluesky
 
         :param str username:  Username for Bluesky
         :param str password:  Password for Bluesky
         :param str session_id:  Session ID to use for login
+        :param Path session_directory:  Directory to save the session file
         :return Client:  Client object with login credentials
         """
         if not session_id:
@@ -682,7 +677,7 @@ class SearchBluesky(Search):
         elif (not username or not password) and not session_id:
             raise ValueError("Must provide both username and password or else session_id.")
 
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), "bsky_" + session_id + ".session")
+        session_path = session_directory.joinpath("bsky_" + session_id + ".session")
 
         def on_session_change(event: SessionEvent, session: Session) -> None:
             """

@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
@@ -63,7 +62,8 @@ class Search(BasicProcessor, ABC):
 		query_parameters = self.dataset.get_parameters()
 		results_file = self.dataset.get_results_path()
 
-		self.log.info("Querying: %s" % str({k: v for k, v in query_parameters.items() if not self.get_options().get(k, {}).get("sensitive", False)}))
+		self.log.info("Querying: %s" % str({k: v for k, v in query_parameters.items() if not self.get_options(
+            config=self.config).get(k, {}).get("sensitive", False)}))
 
 		# Execute the relevant query (string-based, random, countryflag-based)
 		try:
@@ -354,7 +354,7 @@ class Search(BasicProcessor, ABC):
 			# cache hashed author names, so the hashing function (which is
 			# relatively expensive) is not run too often
 			hasher = hashlib.blake2b(digest_size=24)
-			hasher.update(str(config.get('ANONYMISATION_SALT')).encode("utf-8"))
+			hasher.update(str(self.config.get('ANONYMISATION_SALT')).encode("utf-8"))
 			hash_cache = HashCache(hasher)
 
 		processed = 0

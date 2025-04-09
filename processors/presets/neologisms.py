@@ -7,93 +7,95 @@ from common.lib.helpers import UserInput
 
 
 class NeologismExtractor(ProcessorPreset):
-	"""
-	Run processor pipeline to extract neologisms
-	"""
-	type = "preset-neologisms"  # job type ID
-	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-	title = "Extract neologisms"  # title displayed in UI
-	description = "Retrieve uncommon terms by deleting all known words. Assumes English-language data. " \
-				  "Uses stopwords-iso as its stopword filter."
-	extension = "csv"
+    """
+    Run processor pipeline to extract neologisms
+    """
+    type = "preset-neologisms"  # job type ID
+    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
+    title = "Extract neologisms"  # title displayed in UI
+    description = "Retrieve uncommon terms by deleting all known words. Assumes English-language data. " \
+                  "Uses stopwords-iso as its stopword filter."
+    extension = "csv"
 
-	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
+    references = [
+        "Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
 
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
+        :param config:
+        """
+        options = {
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+                "help": "Extract neologisms per"
+            },
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column(s) from which to extract neologisms",
+                "tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
+            },
+        }
+        if parent_dataset and parent_dataset.get_columns():
+            columns = parent_dataset.get_columns()
+            options["columns"]["type"] = UserInput.OPTION_MULTI
+            options["columns"]["inline"] = True
+            options["columns"]["options"] = {v: v for v in columns}
+            default_options = [default for default in ["body", "text", "subject"] if default in columns]
+            if default_options:
+                options["columns"]["default"] = default_options.pop(0)
 
-	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Get processor options
-		"""
-		options = {
-			"timeframe": {
-				"type": UserInput.OPTION_CHOICE,
-				"default": "month",
-				"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-				"help": "Extract neologisms per"
-			},
-			"columns": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "Column(s) from which to extract neologisms",
-				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
-			},
-		}
-		if parent_dataset and parent_dataset.get_columns():
-			columns = parent_dataset.get_columns()
-			options["columns"]["type"] = UserInput.OPTION_MULTI
-			options["columns"]["inline"] = True
-			options["columns"]["options"] = {v: v for v in columns}
-			default_options = [default for default in ["body", "text", "subject"] if default in columns]
-			if default_options:
-				options["columns"]["default"] = default_options.pop(0)
+        return options
 
-		return options
+    @classmethod
+    def is_compatible_with(cls, module=None, config=None):
+        """
+        Allow processor to run on all csv and NDJSON datasets
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-		Allow processor to run on all csv and NDJSON datasets
+        :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        """
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
+        return module.get_extension() in ("csv", "ndjson")
 
-		return module.get_extension() in ("csv", "ndjson")
+    def get_processor_pipeline(self):
+        """
+        This queues a series of post-processors to extract neologisms from a
+        dataset through Van Soest (2019)'s protocol. The resulting top vector
+        ranking is used as the result of this processor, once available.
+        """
+        timeframe = self.parameters.get("timeframe")
+        columns = self.parameters.get("columns")
 
-	def get_processor_pipeline(self):
-		"""
-		This queues a series of post-processors to extract neologisms from a
-		dataset through Van Soest (2019)'s protocol. The resulting top vector
-		ranking is used as the result of this processor, once available.
-		"""
-		timeframe = self.parameters.get("timeframe")
-		columns = self.parameters.get("columns")
+        pipeline = [
+            # first, tokenise the posts, excluding all common words
+            {
+                "type": "tokenise-posts",
+                "parameters": {
+                    "stem": False,
+                    "strip_symbols": True,
+                    "lemmatise": False,
+                    "docs_per": timeframe,
+                    "columns": columns,
+                    "filter": ["wordlist-googlebooks-english", "stopwords-iso-en"]
+                }
+            },
+            # then, create vectors for those tokens
+            {
+                "type": "vectorise-tokens",
+                "parameters": {}
+            },
+            # finally, the top vectors constitute the result of this preset
+            {
+                "type": "vector-ranker",
+                "parameters": {
+                    "amount": True,
+                    "top": 15,
+                }
+            }
+        ]
 
-		pipeline = [
-			# first, tokenise the posts, excluding all common words
-			{
-				"type": "tokenise-posts",
-				"parameters": {
-					"stem": False,
-					"strip_symbols": True,
-					"lemmatise": False,
-					"docs_per": timeframe,
-					"columns": columns,
-					"filter": ["wordlist-googlebooks-english", "stopwords-iso-en"]
-				}
-			},
-			# then, create vectors for those tokens
-			{
-				"type": "vectorise-tokens",
-				"parameters": {}
-			},
-			# finally, the top vectors constitute the result of this preset
-			{
-				"type": "vector-ranker",
-				"parameters": {
-					"amount": True,
-					"top": 15,
-				}
-			}
-		]
-
-		return pipeline
+        return pipeline

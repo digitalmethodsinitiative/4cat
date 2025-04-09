@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_last_line
-from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -61,7 +60,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
@@ -69,15 +68,16 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         TCAT-compatible file.
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "convert-ndjson-for-tcat" and \
-            config.get('tcat-auto-upload.server_url', user=user) and \
-            config.get('tcat-auto-upload.token', user=user) and \
-            config.get('tcat-auto-upload.username', user=user) and \
-            config.get('tcat-auto-upload.password', user=user)
+            config.get('tcat-auto-upload.server_url') and \
+            config.get('tcat-auto-upload.token') and \
+            config.get('tcat-auto-upload.username') and \
+            config.get('tcat-auto-upload.password')
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -85,20 +85,20 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         TCAT servers are configured. Otherwise, no options are given since
         there is nothing to choose.
 
+        :param config:
         :param DataSet parent_dataset:  Dataset that will be uploaded
-        :param User user:  User that will be uploading it
-        :return dict:  Option definition
         """
-        if config.get('tcat-auto-upload.server_url', user=user) \
-                and type(config.get('tcat-auto-upload.server_url', user=user)) in (set, list, tuple) \
-                and len(config.get('tcat-auto-upload.server_url', user=user)) > 1:
+
+        if config.get('tcat-auto-upload.server_url') \
+                and type(config.get('tcat-auto-upload.server_url')) in (set, list, tuple) \
+                and len(config.get('tcat-auto-upload.server_url')) > 1:
             return {
                 "server": {
                     "type": UserInput.OPTION_CHOICE,
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.get('tcat-auto-upload.server_url', user=user)
+                            url: url for url in config.get('tcat-auto-upload.server_url')
                         }
                     },
                     "default": "random",
@@ -145,7 +145,8 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         response = self.send_request_to_TCAT(server_choice, auth, url_to_file, bin_name, query)
 
         if response.status_code == 404:
-            return self.dataset.finish_with_error("Cannot upload dataset to DMI-TCAT server: server responded with 404 not found.")
+            return self.dataset.finish_with_error(
+                "Cannot upload dataset to DMI-TCAT server: server responded with 404 not found.")
         if response.status_code == 504:
 
             # TODO: try a new TCAT server if there are more than one
@@ -153,7 +154,9 @@ class FourcatToDmiTcatUploader(BasicProcessor):
             self.dataset.update_status("TCAT server currently busy; please try again later")
             return self.dataset.finish(0)
         elif response.status_code != 200:
-            return self.dataset.finish_with_error("Cannot upload dataset to DMI-TCAT server: server responded with %i %s." % (response.status_code, str(response.reason)))
+            return self.dataset.finish_with_error(
+                "Cannot upload dataset to DMI-TCAT server: server responded with %i %s." % (
+                response.status_code, str(response.reason)))
 
         try:
             resp_content = response.json()
@@ -166,13 +169,17 @@ class FourcatToDmiTcatUploader(BasicProcessor):
                 return self.dataset.finish_with_error("DMI-TCAT bin already exists; unable to add to existing bin.")
             else:
                 # Something else is wrong...
-                self.log.error('DMI-TCAT Unexpected response: %s - %s - %s' % (response.status_code, str(response.reason), response.text))
-                return self.dataset.finish_with_error( "DMI-TCAT returned an unexpected response; the server may be misconfigured. Could not upload.")
+                self.log.error('DMI-TCAT Unexpected response: %s - %s - %s' % (
+                response.status_code, str(response.reason), response.text))
+                return self.dataset.finish_with_error(
+                    "DMI-TCAT returned an unexpected response; the server may be misconfigured. Could not upload.")
 
         if 'success' not in resp_content:
             # A json response was returned, but not the one we're expecting!
-            self.log.error('DMI-TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
-            return self.dataset.finish_with_error("DMI-TCAT returned an unexpected response; the server may be misconfigured. Could not upload.")
+            self.log.error('DMI-TCAT Unexpected response: %s - %s - %s' % (
+            response.status_code, str(response.reason), response.text))
+            return self.dataset.finish_with_error(
+                "DMI-TCAT returned an unexpected response; the server may be misconfigured. Could not upload.")
 
         elif not resp_content['success']:
             # success should be True if upload was successful
@@ -187,7 +194,8 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         parent_file = self.dataset.get_parent().get_results_path()
         start_date, end_date = self.get_first_and_last_dates(parent_file)
 
-        tcat_result_url = server_choice.replace('/api/import-from-4cat.php', '').rstrip('/') + '/analysis/index.php?dataset=' + bin_name + '&startdate=' + start_date + '&enddate=' + end_date
+        tcat_result_url = server_choice.replace('/api/import-from-4cat.php', '').rstrip(
+            '/') + '/analysis/index.php?dataset=' + bin_name + '&startdate=' + start_date + '&enddate=' + end_date
         html_file = self.get_html_page(tcat_result_url)
 
         # Write HTML file
@@ -218,11 +226,11 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         post_json_url = post_json_url + '/api/import-from-4cat.php'
         self.dataset.update_status("Sending dataset to DMI-TCAT: %s" % post_json_url)
         response = requests.post(post_json_url, auth=auth, data={
-                                                'url': url_to_file,
-                                                'name': bin_name,
-                                                'query': query,
-                                                'token': self.config.get('tcat-auto-upload.token'),
-                                                })
+            'url': url_to_file,
+            'name': bin_name,
+            'query': query,
+            'token': self.config.get('tcat-auto-upload.token'),
+        })
         return response
 
     def get_html_page(self, url):

@@ -9,7 +9,6 @@ from apiclient.discovery import build
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -36,11 +35,12 @@ class YouTubeThumbnails(BasicProcessor):
 	sleep_time = 10
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on YouTube metadata sets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "youtube-metadata"
 

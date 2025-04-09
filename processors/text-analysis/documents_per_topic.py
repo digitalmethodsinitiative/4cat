@@ -27,11 +27,12 @@ class TopicModelWordExtractor(BasicProcessor):
     followups = []
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on topic models
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "topic-modeller"
 

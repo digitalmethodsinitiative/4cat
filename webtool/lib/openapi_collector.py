@@ -22,8 +22,6 @@ import inspect
 import json
 import re
 
-from common.config_manager import config
-
 class OpenAPICollector:
 	"""
 	Flask-compatible OpenAPI generator
@@ -33,7 +31,7 @@ class OpenAPICollector:
 	flask_app = None
 	type_map = {"int": "integer", "str": "string"}  # openapi is picky about type names
 
-	def __init__(self, app):
+	def __init__(self, app, config):
 		"""
 		Store a reference to the used Flask app
 
@@ -43,6 +41,7 @@ class OpenAPICollector:
 		:param app:  Flask app
 		"""
 		self.flask_app = app
+		self.config = config
 
 	def endpoint(self, api_id="all"):
 		"""
@@ -194,15 +193,15 @@ class OpenAPICollector:
 		"""
 		spec = {
 			"swagger": "2.0",
-			"host": config.get("flask.server_name"),
+			"host": self.config.get("flask.server_name"),
 			"info": {
-				"title": config.get("4cat.name_long") + " RESTful API",
-				"description": "This API allows interfacing with the " + config.get("4cat.name") + " Capture and Analysis"
+				"title": self.config.get("4cat.name_long") + " RESTful API",
+				"description": "This API allows interfacing with the " + self.config.get("4cat.name") + " Capture and Analysis"
 							   "Toolkit, offering endpoints through which one may query our corpora via "
 							   "keyword-based search, and run further analysis on the results.",
 				"version": "1.0.0",
 				"contact": {
-					"email": config.get("mail.admin_email", "")
+					"email": self.config.get("mail.admin_email", "")
 				}
 			},
 			"paths": {
