@@ -1375,20 +1375,6 @@ class DataSet(FourcatModule):
 
 			return self._queue_position
 
-	def get_modules(self):
-		"""
-		Get 4CAT modules
-
-		Is a function because loading them is not free, and this way we can
-		cache the result.
-
-		:return:
-		"""
-		if not self.modules:
-			self.modules = ModuleCollector()
-
-		return self.modules
-
 	def get_own_processor(self):
 		"""
 		Get the processor class that produced this dataset
