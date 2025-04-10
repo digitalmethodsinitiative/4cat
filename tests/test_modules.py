@@ -6,7 +6,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.logger import Logger
 
 @pytest.fixture
-def mock_config(tmp_path):
+def mock_logger_config(tmp_path):
     # Mock the config manager in logger to return a temporary path for logs	
     with patch("common.lib.logger.config") as mock_config:
         mock_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
@@ -16,9 +16,9 @@ def mock_config(tmp_path):
         # Create necessary directories
         (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
         yield mock_config
-
+       
 @pytest.fixture
-def logger(mock_config):
+def logger(mock_logger_config):
     # Initialize the Logger and return it
     return Logger(logger_name="pytest", output=True, filename='test.log', log_level='DEBUG')
 
@@ -27,12 +27,12 @@ def fourcat_modules():
     # Initialize the ModuleCollector and return it
     return ModuleCollector()
 
-def test_logger(logger, mock_config):
+def test_logger(logger, mock_logger_config):
     # Initialize the logger
     log = logger
 
     # Verify that mock_config.get was called
-    mock_config.get.assert_any_call("PATH_LOGS")
+    mock_logger_config.get.assert_any_call("PATH_LOGS")
     
     # Check if the logger is initialized correctly
     assert log is not None
@@ -43,7 +43,7 @@ def test_logger(logger, mock_config):
     log.info("This is a test log message.")
     
     # Check if the message was logged (you would need to check the log file in a real test)
-    log_file_path = mock_config.get("PATH_LOGS") / 'test.log'
+    log_file_path = mock_logger_config.get("PATH_LOGS") / 'test.log'
     with open(log_file_path, 'r') as f:
         logs = f.read()
         assert "This is a test log message." in logs
@@ -75,8 +75,56 @@ def test_module_collector(logger, fourcat_modules):
         logger.info("No missing modules")
     assert len(fourcat_modules.missing_modules) == 0
 
+@pytest.fixture
+def mock_database():
+    # Mock the database connection in worker
+    with patch("backend.lib.worker.Database") as mock_database:
+        mock_database_instance = MagicMock()
+        mock_database.return_value = mock_database_instance
+        yield mock_database_instance
+
+@pytest.fixture
+def mock_job():
+    with patch("common.lib.job.Job") as mock_job:
+        mock_job_instance = MagicMock()
+        mock_job_instance.data = {
+            "id": "test_job_id",  # Provide a realistic job ID
+        }
+        mock_job.return_value = mock_job_instance
+        yield mock_job_instance
+
+@pytest.fixture
+def mock_job_queue():
+    # Mock the job queue
+    with patch("common.lib.queue.JobQueue") as mock_job_queue:
+        mock_job_queue_instance = MagicMock()
+        mock_job_queue.return_value = mock_job_queue_instance
+        yield mock_job_queue_instance
+
+def test_worker_initialization(mock_database, mock_job, mock_job_queue):
+    from backend.lib.worker import BasicWorker
+
+    class TestWorker(BasicWorker):
+        def work(self):
+            pass
+
+    # Initialize the worker with mocks
+    worker = TestWorker(
+        logger=MagicMock(),
+        job=mock_job,
+        queue=mock_job_queue,
+        manager=MagicMock(),
+        modules=MagicMock()
+    )
+
+    # Assert that the worker uses the mocked database
+    assert worker.db == mock_database
+
+    # Assert that the worker uses the mocked job queue
+    assert worker.queue == mock_job_queue
+
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_processors(logger, fourcat_modules):
+def test_processors(logger, fourcat_modules, mock_job, mock_job_queue):
     # Iterate over all processors in fourcat_modules
     for processor_name, processor_class in fourcat_modules.processors.items():
         logger.info(f"Testing processor: {processor_name}")
@@ -86,6 +134,7 @@ def test_processors(logger, fourcat_modules):
 
         # Check if required attributes are implemented
         required_attributes = ["type", "category", "title", "description", "extension"]
+        # TODO Ensure not defaults?
         for attr in required_attributes:
             assert hasattr(processor_class, attr), f"{processor_name} is missing required attribute: {attr}"
             assert getattr(processor_class, attr), f"{processor_name} has an empty value for attribute: {attr}"
@@ -97,5 +146,11 @@ def test_processors(logger, fourcat_modules):
         for method in required_methods:
             assert hasattr(processor_class, method), f"{processor_name} is missing required method: {method}"
             assert callable(getattr(processor_class, method)), f"{processor_name} has a non-callable method: {method}"
+        
+        # Check if the processor can be instantiated
+        try:
+            processor_instance = processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
+        except Exception as e:
+            pytest.fail(f"Failed to instantiate {processor_name}: {e}")
 
         logger.info(f"Processor {processor_name} passed all checks.")
