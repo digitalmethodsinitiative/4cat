@@ -1,4 +1,6 @@
 import pytest
+import time
+import json
 from unittest.mock import patch, MagicMock
 
 from common.lib.module_loader import ModuleCollector
@@ -123,8 +125,46 @@ def test_worker_initialization(mock_database, mock_job, mock_job_queue):
     # Assert that the worker uses the mocked job queue
     assert worker.queue == mock_job_queue
 
+@pytest.fixture
+def mock_dataset_database():
+    # Mock the database connection in dataset
+    with patch("common.lib.database.Database") as mock_database:
+        mock_database_instance = MagicMock()
+        # This should be a dataset record
+        mock_database_instance.fetchone.return_value = {
+            "key": "test_dataset",
+            "query": "pytest_test_dataset",
+            "parameters": json.dumps({"test": "parameters"}),
+            "result_file": "",
+            "creator": "test_owner",
+            "status": "",
+            "type": "test_type",
+            "timestamp": int(time.time()),
+            "is_finished": False,
+            "is_private": False,
+            "software_version": "4cat_test",
+            "software_source": "pytest",
+            "software_file": "",
+            "num_rows": 0,
+            "progress": 0.0,
+            "key_parent": ""
+        }
+        mock_database.return_value = mock_database_instance
+        yield mock_database_instance
+
+@pytest.fixture
+def mock_dataset(mock_dataset_database, fourcat_modules):
+    from common.lib.dataset import DataSet
+    # Patch the refresh_owners method to prevent it from running
+    # Patch get_parent to return a mock object; some get_options methods expect it (usually would not run due to is_compatible_with)
+    with patch.object(DataSet, "refresh_owners", return_value=None), \
+         patch.object(DataSet, "get_parent", return_value=MagicMock(type="test_parent")):
+        dataset = DataSet(key="test_dataset", db=mock_dataset_database, modules=fourcat_modules)
+        yield dataset
+
+
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_processors(logger, fourcat_modules, mock_job, mock_job_queue):
+def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset):
     # Iterate over all processors in fourcat_modules
     for processor_name, processor_class in fourcat_modules.processors.items():
         logger.info(f"Testing processor: {processor_name}")
@@ -141,11 +181,13 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue):
 
         # Check if required methods are implemented
         # TODO Add "is_compatible_with" ?
-        # TODO Test get_options w/ mock_dataset(s)
         required_methods = ["get_options", "process"]
         for method in required_methods:
             assert hasattr(processor_class, method), f"{processor_name} is missing required method: {method}"
             assert callable(getattr(processor_class, method)), f"{processor_name} has a non-callable method: {method}"
+        
+        # Test get_options w/ mock_dataset
+        processor_class.get_options(parent_dataset=mock_dataset, user=None)
         
         # Check if the processor can be instantiated
         try:
