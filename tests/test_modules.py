@@ -45,6 +45,8 @@ def test_logger(logger, mock_config):
 
 def test_module_collector(logger):
     fourcat_modules = ModuleCollector()
+    if fourcat_modules.log_buffer:
+        logger.warning(fourcat_modules.log_buffer)
 
     # Check workers
     assert isinstance(fourcat_modules.workers, dict)
@@ -66,3 +68,10 @@ def test_module_collector(logger):
     logger.info(f"Found {len(fourcat_modules.datasources)} datasources")
     for worker in fourcat_modules.datasources.values():
         pass
+
+    # Check if any modules could not be loaded
+    if fourcat_modules.missing_modules:
+        logger.error(f"Unable to import modules: {', '.join(fourcat_modules.missing_modules.keys())}")
+    else:
+        logger.info("No missing modules")
+    assert len(fourcat_modules.missing_modules) == 0
