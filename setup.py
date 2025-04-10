@@ -46,6 +46,7 @@ packages = set([
 	"pyahocorasick~=1.4.0",
 	"PyMySQL~=1.0",
 	"pytest",
+	"pytest-dependency",
 	"PyTumblr==0.1.0",
 	"razdel~=0.5",
 	"requests~=2.27",

@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from common.lib.module_loader import ModuleCollector
+from backend.lib.processor import BasicProcessor
 from common.lib.logger import Logger
 
 @pytest.fixture
@@ -21,6 +22,10 @@ def logger(mock_config):
     # Initialize the Logger and return it
     return Logger(logger_name="pytest", output=True, filename='test.log', log_level='DEBUG')
 
+@pytest.fixture
+def fourcat_modules():
+    # Initialize the ModuleCollector and return it
+    return ModuleCollector()
 
 def test_logger(logger, mock_config):
     # Initialize the logger
@@ -43,31 +48,25 @@ def test_logger(logger, mock_config):
         logs = f.read()
         assert "This is a test log message." in logs
 
-def test_module_collector(logger):
-    fourcat_modules = ModuleCollector()
+@pytest.mark.dependency()
+def test_module_collector(logger, fourcat_modules):
     if fourcat_modules.log_buffer:
         logger.warning(fourcat_modules.log_buffer)
 
-    # Check workers
+    # Assert workers
     assert isinstance(fourcat_modules.workers, dict)
     assert len(fourcat_modules.workers) > 0
     logger.info(f"Found {len(fourcat_modules.workers)} workers")
-    for worker in fourcat_modules.workers.values():
-        pass
 
-    # Check processors
+    # Assert processors
     assert isinstance(fourcat_modules.processors, dict)
     assert len(fourcat_modules.processors) > 0
     logger.info(f"Found {len(fourcat_modules.processors)} processors")
-    for worker in fourcat_modules.processors.values():
-        pass
 
-    # Check datasources
+    # Assert datasources
     assert isinstance(fourcat_modules.datasources, dict)
     assert len(fourcat_modules.datasources) > 0
     logger.info(f"Found {len(fourcat_modules.datasources)} datasources")
-    for worker in fourcat_modules.datasources.values():
-        pass
 
     # Check if any modules could not be loaded
     if fourcat_modules.missing_modules:
@@ -75,3 +74,28 @@ def test_module_collector(logger):
     else:
         logger.info("No missing modules")
     assert len(fourcat_modules.missing_modules) == 0
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_processors(logger, fourcat_modules):
+    # Iterate over all processors in fourcat_modules
+    for processor_name, processor_class in fourcat_modules.processors.items():
+        logger.info(f"Testing processor: {processor_name}")
+
+        # Check if the processor is a subclass of BasicProcessor
+        assert issubclass(processor_class, BasicProcessor), f"{processor_name} is not a subclass of BasicProcessor"
+
+        # Check if required attributes are implemented
+        required_attributes = ["type", "category", "title", "description", "extension"]
+        for attr in required_attributes:
+            assert hasattr(processor_class, attr), f"{processor_name} is missing required attribute: {attr}"
+            assert getattr(processor_class, attr), f"{processor_name} has an empty value for attribute: {attr}"
+
+        # Check if required methods are implemented
+        # TODO Add "is_compatible_with" ?
+        # TODO Test get_options w/ mock_dataset(s)
+        required_methods = ["get_options", "process"]
+        for method in required_methods:
+            assert hasattr(processor_class, method), f"{processor_name} is missing required method: {method}"
+            assert callable(getattr(processor_class, method)), f"{processor_name} has a non-callable method: {method}"
+
+        logger.info(f"Processor {processor_name} passed all checks.")
