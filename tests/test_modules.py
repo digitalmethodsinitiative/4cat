@@ -104,6 +104,7 @@ def mock_job_queue():
         yield mock_job_queue_instance
 
 def test_worker_initialization(mock_database, mock_job, mock_job_queue):
+    # Mostly to ensure testing and mocks are working as appropriate, but also check BasicWorker inits
     from backend.lib.worker import BasicWorker
 
     class TestWorker(BasicWorker):
@@ -164,7 +165,7 @@ def mock_dataset(mock_dataset_database, fourcat_modules):
 
 
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset):
+def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
     # Iterate over all processors in fourcat_modules
     for processor_name, processor_class in fourcat_modules.processors.items():
         logger.info(f"Testing processor: {processor_name}")
@@ -174,13 +175,13 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
 
         # Check if required attributes are implemented
         required_attributes = ["type", "category", "title", "description", "extension"]
-        # TODO Ensure not defaults?
+        # TODO Ensure not defaults inherited from BasicProcessor?
         for attr in required_attributes:
             assert hasattr(processor_class, attr), f"{processor_name} is missing required attribute: {attr}"
             assert getattr(processor_class, attr), f"{processor_name} has an empty value for attribute: {attr}"
 
         # Check if required methods are implemented
-        # TODO Add "is_compatible_with" ?
+        # TODO Add "is_compatible_with" (not all processors have and it is not an classmethod; probably ought to be...)?
         required_methods = ["get_options", "process"]
         for method in required_methods:
             assert hasattr(processor_class, method), f"{processor_name} is missing required method: {method}"
