@@ -4,6 +4,7 @@ Convert Google Vision API annotations to CSV
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -24,8 +25,17 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     type = "convert-google-vision-to-csv"  # job type ID
     category = "Conversion"  # category
     title = "Convert Vision results to CSV"  # title displayed in UI
-    description = "Convert the Vision API output to a simplified CSV file."  # description displayed in UI
+    description = ("Convert the Vision API output to a simplified CSV file. Also allows writing results as annotations "
+                   "to the original dataset.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    options = {
+        "write_annotations": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Add features as annotations to the original dataset.",
+            "default": False
+        }
+    }
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
@@ -49,6 +59,10 @@ class ConvertVisionOutputToCSV(BasicProcessor):
             self.dataset.update_status("No data was returned by the Google Vision API, so none can be converted.", is_final=True)
             self.dataset.finish(0)
             return
+
+        # Write annotations to original file?
+        write_annotations = self.parameters.get("write_annotations", False)
+        parent_annotations = []
 
         # recreate CSV file with the new dialect
         for annotations in self.source_dataset.iterate_items(self):
@@ -96,6 +110,22 @@ class ConvertVisionOutputToCSV(BasicProcessor):
             if done % 25 == 0:
                 self.dataset.update_status("Processed %i/%i image files" % (done, self.source_dataset.num_rows))
                 self.dataset.update_progress(done / self.source_dataset.num_rows)
+
+            # Get annotation data for source dataset
+            if write_annotations:
+                for item_id in annotations.get("post_ids", []):
+                    for label, value in file_result.items():
+                        parent_annotations.append({
+                            "item_id": item_id,
+                            "label": label,
+                            "value": value,
+                            "type": "textarea"
+                        })
+
+        # Write Vision annotations to source dataset
+        if write_annotations:
+            self.save_annotations(parent_annotations, source_dataset=self.source_dataset.top_parent(),
+                                  overwrite=False)
 
         for index, value in enumerate(result):
             result[index] = {**{annotation_type: "" for annotation_type in annotation_types}, **value}
