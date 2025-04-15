@@ -194,35 +194,47 @@ def mock_dataset(mock_dataset_database, fourcat_modules):
 
 @pytest.mark.dependency(depends=["test_module_collector"])
 def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
+    """
+    Test all processors separately ensuring they are valid and can be instantiated and report all failures at the end.
+    """
     from backend.lib.processor import BasicProcessor
+
+    failures = []  # Collect failures for reporting
+
     # Iterate over all processors in fourcat_modules
     for processor_name, processor_class in fourcat_modules.processors.items():
         logger.info(f"Testing processor: {processor_name}")
 
-        # Check if the processor is a subclass of BasicProcessor
-        assert issubclass(processor_class, BasicProcessor), f"{processor_name} is not a subclass of BasicProcessor"
-
-        # Check if required attributes are implemented
-        required_attributes = ["type", "category", "title", "description", "extension"]
-        # TODO Ensure not defaults inherited from BasicProcessor?
-        for attr in required_attributes:
-            assert hasattr(processor_class, attr), f"{processor_name} is missing required attribute: {attr}"
-            assert getattr(processor_class, attr), f"{processor_name} has an empty value for attribute: {attr}"
-
-        # Check if required methods are implemented
-        # TODO Add "is_compatible_with" (not all processors have and it is not an classmethod; probably ought to be...)?
-        required_methods = ["get_options", "process"]
-        for method in required_methods:
-            assert hasattr(processor_class, method), f"{processor_name} is missing required method: {method}"
-            assert callable(getattr(processor_class, method)), f"{processor_name} has a non-callable method: {method}"
-        
-        # Test get_options w/ mock_dataset
-        processor_class.get_options(parent_dataset=mock_dataset, user=None)
-        
-        # Check if the processor can be instantiated
         try:
-            processor_instance = processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
-        except Exception as e:
-            pytest.fail(f"Failed to instantiate {processor_name}: {e}")
+            # Check if the processor is a subclass of BasicProcessor
+            assert issubclass(processor_class, BasicProcessor), f"{processor_name} is not a subclass of BasicProcessor"
 
-        logger.info(f"Processor {processor_name} passed all checks.")
+            # Check if required attributes are implemented
+            required_attributes = ["type", "category", "title", "description", "extension"]
+            for attr in required_attributes:
+                assert hasattr(processor_class, attr), f"{processor_name} is missing required attribute: {attr}"
+                assert getattr(processor_class, attr), f"{processor_name} has an empty value for attribute: {attr}"
+
+            # Check if required methods are implemented
+            required_methods = ["get_options", "process"]
+            for method in required_methods:
+                assert hasattr(processor_class, method), f"{processor_name} is missing required method: {method}"
+                assert callable(getattr(processor_class, method)), f"{processor_name} has a non-callable method: {method}"
+
+            # Test get_options with mock_dataset
+            processor_class.get_options(parent_dataset=mock_dataset, user=None)
+
+            # Check if the processor can be instantiated
+            processor_instance = processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
+
+        except Exception as e:
+            # Log the failure and add it to the failures list
+            logger.error(f"Processor {processor_name} failed: {e}")
+            failures.append((processor_name, str(e)))
+
+    # Report all failures at the end
+    if failures:
+        failure_messages = "\n".join([f"{name}: {error}" for name, error in failures])
+        pytest.fail(f"The following processors failed:\n{failure_messages}")
+    else:
+        logger.info("All processors passed successfully.")
