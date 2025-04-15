@@ -163,7 +163,6 @@ const processor = {
                     return response.json();
                 })
                 .then(function (response) {
-                    console.log(response);
                     if (response.hasOwnProperty("messages") && response.messages.length > 0) {
                         popup.alert(response.messages.join("\n\n"));
                     } else if(response.hasOwnProperty('message')) {
