@@ -1,33 +1,52 @@
 import pytest
 import time
 import json
+from pathlib import Path
+import os
 from unittest.mock import patch, MagicMock
 
-from common.lib.module_loader import ModuleCollector
-from backend.lib.processor import BasicProcessor
-from common.lib.logger import Logger
+"""
+In order to ensure imports do not instantiate objects (e.g., `from config_manager import config`),
+we import within the test functions and utilize pytest.fixtures to mock the necessary components
+(e.g., `config`).
+"""
+
+PATH_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve()
 
 @pytest.fixture
-def mock_logger_config(tmp_path):
-    # Mock the config manager in logger to return a temporary path for logs	
-    with patch("common.lib.logger.config") as mock_config:
-        mock_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
+def mock_database():
+    """
+    Mock the database connection.
+    """
+    with patch("common.config_manager.Database") as mock_database, \
+         patch("backend.lib.worker.Database") as mock_database:
+        mock_database_instance = MagicMock()
+        mock_database.return_value = mock_database_instance
+        yield mock_database_instance
+
+@pytest.fixture
+def mock_logger_config(tmp_path, mock_database):
+    """
+    Mock the config manager in logger to return a temporary path for logs
+    """
+    with patch("common.lib.logger.config") as mock_logger_config:
+        mock_logger_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
             "PATH_ROOT": tmp_path,
             "PATH_LOGS": tmp_path / "logs",
         }.get(key, default))
         # Create necessary directories
         (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
-        yield mock_config
+        yield mock_logger_config
        
 @pytest.fixture
 def logger(mock_logger_config):
-    # Initialize the Logger and return it
-    return Logger(logger_name="pytest", output=True, filename='test.log', log_level='DEBUG')
+    """
+    Initialize the Logger and return it.
 
-@pytest.fixture
-def fourcat_modules():
-    # Initialize the ModuleCollector and return it
-    return ModuleCollector()
+    This also allows us to use our Logger for testing.
+    """
+    from common.lib.logger import Logger
+    return Logger(logger_name="pytest", output=True, filename='test.log', log_level='DEBUG')
 
 def test_logger(logger, mock_logger_config):
     # Initialize the logger
@@ -49,6 +68,22 @@ def test_logger(logger, mock_logger_config):
     with open(log_file_path, 'r') as f:
         logs = f.read()
         assert "This is a test log message." in logs
+
+@pytest.fixture
+def mock_module_config(mock_database):
+    """
+    Mock the module loader config; needs real PATH_ROOT to find modules
+    """
+    with patch("common.lib.module_loader.config") as mock_config:
+        mock_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
+            "PATH_ROOT": PATH_ROOT,
+        }.get(key, default))
+
+@pytest.fixture
+def fourcat_modules(mock_module_config):
+    from common.lib.module_loader import ModuleCollector
+    # Initialize the ModuleCollector and return it
+    return ModuleCollector()
 
 @pytest.mark.dependency()
 def test_module_collector(logger, fourcat_modules):
@@ -77,13 +112,6 @@ def test_module_collector(logger, fourcat_modules):
         logger.info("No missing modules")
     assert len(fourcat_modules.missing_modules) == 0
 
-@pytest.fixture
-def mock_database():
-    # Mock the database connection in worker
-    with patch("backend.lib.worker.Database") as mock_database:
-        mock_database_instance = MagicMock()
-        mock_database.return_value = mock_database_instance
-        yield mock_database_instance
 
 @pytest.fixture
 def mock_job():
@@ -166,6 +194,7 @@ def mock_dataset(mock_dataset_database, fourcat_modules):
 
 @pytest.mark.dependency(depends=["test_module_collector"])
 def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
+    from backend.lib.processor import BasicProcessor
     # Iterate over all processors in fourcat_modules
     for processor_name, processor_class in fourcat_modules.processors.items():
         logger.info(f"Testing processor: {processor_name}")
