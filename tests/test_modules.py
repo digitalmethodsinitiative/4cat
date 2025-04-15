@@ -238,3 +238,37 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
         pytest.fail(f"The following processors failed:\n{failure_messages}")
     else:
         logger.info("All processors passed successfully.")
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
+    from backend.lib.search import Search
+
+    failures = []  # Collect failures for reporting
+
+    # Iterate over all processors in fourcat_modules
+    for processor_name, processor_class in fourcat_modules.processors.items():
+        try:
+            # Identify Search processors and ensure they were named correctly
+            if issubclass(processor_class, Search):
+                assert (processor_name.replace("-search", "") in fourcat_modules.datasources or processor_name.replace("-import", "") in fourcat_modules.datasources), f"Search worker type {processor_name} is does not appear to be paired with a datasource; please check the naming convention (e.g., {processor_name}-search or {processor_name}-import)."
+
+        except Exception as e:
+            # Log the failure and add it to the failures list
+            logger.error(f"Datasource {processor_name} failed: {e}")
+            failures.append((processor_name, str(e)))
+
+    for datasource_name, datasource_data in fourcat_modules.datasources.items():
+        try:
+            assert datasource_data.get("has_worker", False), f"Datasource {datasource_name} does not have a worker"
+          
+        except Exception as e:
+            # Log the failure and add it to the failures list
+            logger.error(f"Datasource {datasource_name} failed: {e}")
+            failures.append((datasource_name, str(e)))
+    
+    # Report all failures at the end
+    if failures:
+        failure_messages = "\n".join([f"{name}: {error}" for name, error in failures])
+        pytest.fail(f"The following datasources failed:\n{failure_messages}")
+    else:
+        logger.info("All datasources passed successfully.")
