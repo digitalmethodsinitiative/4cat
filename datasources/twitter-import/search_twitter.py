@@ -15,7 +15,7 @@ class SearchTwitterViaZeeschuimer(Search):
     """
     Import scraped X/Twitter data
     """
-    type = "twitter-search"  # job ID
+    type = "twitter-import"  # job ID
     category = "Search"  # category
     title = "Import scraped X/Twitter data"  # title displayed in UI
     description = "Import X/Twitter data collected with an external tool such as Zeeschuimer."  # description displayed in UI
