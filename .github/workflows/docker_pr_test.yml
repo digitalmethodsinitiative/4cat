@@ -33,6 +33,10 @@ jobs:
               echo -e "Docker 4cat_frontend container is not running...\nPrinting 4cat_frontend logs:\n\n$(docker container logs 4cat_frontend)"
               exit 1
           fi
+      - name: Run modules tests
+        run: |
+          sleep 30
+          docker exec 4cat_backend pytest -v --maxfail=1 --disable-warnings --tb=short tests/test_modules.py
       - name: Check 4CAT backend log for expected INFO message
         run: |
           test_case=" INFO at api.py:65: Local API listening for requests at backend:4444"
