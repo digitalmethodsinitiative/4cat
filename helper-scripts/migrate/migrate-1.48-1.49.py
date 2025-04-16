@@ -153,7 +153,7 @@ else:
                     continue
 
                 ann_type = annotation_fields[field_id]["type"]
-                options = annotation_fields[field_id]["options"] if "options" in annotation_fields[field_id] else ""
+                options = annotation_fields[field_id]["options"] if "options" in annotation_fields[field_id] else {}
                 options = {k: v for d in options for k, v in d.items()} # flatten
 
                 if isinstance(value, list):
