@@ -22,12 +22,13 @@ db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"]
               host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
 
 print("  Checking if annotations table needs to be updated...")
-annotations_check = db.fetchall("SELECT * FROM annotations limit 1;")
+# Original annotations table had columns 'key' and 'annotations', new annotations has 'dataset' among others
+has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'annotations' AND column_name = 'dataset'")
 
 # Ensure we do not attempt to update the annotations table if it has already been updated
 # This will drop the annotations table and create a new one losing all annotations
 # (both backend and frontend run migrate.py in case they have to update different aspects)
-if  "key" not in annotations_check[0] and "dataset" in annotations_check[0]:
+if  has_column:
     print("    Annotations table seems to have been updated already")
 else:
     print("    Annotations table needs to be updated")
