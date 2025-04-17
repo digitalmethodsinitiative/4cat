@@ -38,9 +38,20 @@ if has_column["num"] == 0:
         key = dataset["key"]
         dataset = DataSet(key=key, db=db)
 
-        if dataset.get_log_path().exists():
+        log_path = dataset.get_log_path()
+        try:
+            log_exists = log_path.exists()
+        except OSError as e:
+            if "File name too long" in str(e):
+                # This is a known issue with long paths; skip this dataset
+                print(f" ...File name too long for dataset {key}; skipping.")
+                log_exists = False
+            else:
+                # Unexpected error
+                raise e
+        if log_exists:
             try:
-                timestamp_finished = datetime.datetime.strptime(get_last_line(dataset.get_log_path())[:24], "%c")
+                timestamp_finished = datetime.datetime.strptime(get_last_line(log_path)[:24], "%c")
                 update_data.append((key, int(timestamp_finished.timestamp())))
             except ValueError as e:
                 # Unable to parse datetime from last line
