@@ -11,7 +11,7 @@ done
 >&2 echo "Backend is up"
 
 # Run migrate to ensure 4CAT is up to date if version file has changed
-python3 -m helper-scripts.migrate.py -y -o logs/migrate-frontend.log --component frontend --current-version config/.current-version-frontend
+python3 helper-scripts/migrate.py -y -o logs/migrate-frontend.log --component frontend --current-version config/.current-version-frontend
 
 # Default values for Gunicorn (if not provided by environment)
 : "${worker_tmp_dir:=/dev/shm}"
