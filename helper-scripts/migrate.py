@@ -487,9 +487,13 @@ def main():
         # Try to import 4CAT's logger to send final log message of result
         # This has the benefit of the Slack webhook
         try:
-            from common.lib.logger import Logger
+            from common.lib.logger import Logger, SlackLogHandler
             log = Logger(logger_name='migrate-notify', filename='migrate.log')
-            log.slack_handler.setLevel(logging.INFO) # Ensure either message is sent to slack
+            # Adjust the log level of the Slack handler
+            for handler in log.logger.handlers:
+                if isinstance(handler, SlackLogHandler):  # Check if it's the Slack handler
+                    handler.setLevel(logging.INFO)  # Set the desired log level
+            
             if exit_code == 0:
                 log.info(f"Migration of {args.component} finished successfully.")
             else:
