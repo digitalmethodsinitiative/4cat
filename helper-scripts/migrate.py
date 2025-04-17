@@ -167,6 +167,7 @@ def main():
     Main function to handle migration logic with error handling and cleanup.
     """
     exit_code = 0  # Default exit code
+    error = None  # Initialize error frame
     try:
         print("")
         cwd = Path(os.getcwd())
@@ -469,6 +470,7 @@ def main():
         # Handle migration-specific errors
         logging.error(f"Migration error: {e}")
         exit_code = 1
+        error = e
 
     except FinishMigration as e:
         # Handle the special case of finishing migration without errors
@@ -479,6 +481,7 @@ def main():
         # Handle unexpected errors
         logging.error(f"An unexpected error occurred: {e}", exc_info=True)
         exit_code = 1
+        error = e
         
     finally:
         # Try to import 4CAT's logger to send final log message of result
@@ -489,7 +492,7 @@ def main():
             if exit_code == 0:
                 log.info(f"Migration of {args.component} finished successfully.")
             else:
-                log.error(f"Migration of {args.component} finished with errors; see {args.output if args.output else 'stderr'}.")
+                log.error(f"Migration {args.component}: {error}\nsee {args.output if args.output else 'stderr'}.", frame=error.__traceback__ if error else None)
         except ImportError:
             # If 4CAT's logger cannot be imported, fall back to the standard logger
             logger.error("Unable to import 4CAT log to inform about migration result.")
