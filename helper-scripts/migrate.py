@@ -492,7 +492,9 @@ def main():
             if exit_code == 0:
                 log.info(f"Migration of {args.component} finished successfully.")
             else:
-                log.error(f"Migration {args.component}: {error}\nsee {args.output if args.output else 'stderr'}.", frame=error.__traceback__ if error else None)
+                import traceback
+                error_stack = traceback.extract_tb(error.__traceback__) if error else None
+                log.error(f"Migration {args.component}: {error}\nsee {args.output if args.output else 'stderr'}.", frame=error_stack)
         except ImportError:
             # If 4CAT's logger cannot be imported, fall back to the standard logger
             logger.error("Unable to import 4CAT log to inform about migration result.")
