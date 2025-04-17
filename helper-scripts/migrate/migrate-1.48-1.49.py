@@ -21,172 +21,179 @@ db_config = ini["DATABASE"]
 db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
               host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
 
+print("  Checking if annotations table needs to be updated...")
+annotations_check = db.fetchall("SELECT * FROM annotations limit 1;")
 
-datasets = db.fetchall("SELECT * FROM datasets WHERE annotation_fields != ''")
-
-print("  Converting annotation options from lists to dicts...")
-for dataset in datasets:
-
-    annotation_fields = dataset["annotation_fields"]
-
-    # Flatten options from list of dicts to dict
-    options_converted = False
-    annotation_fields = json.loads(annotation_fields)
-    new_annotation_fields = annotation_fields
-
-    for field_id, annotation_field in annotation_fields.items():
-
-        if "options" in annotation_field:
-            flattened_options = {}
-
-            if isinstance(annotation_field["options"], list):
-                for op in annotation_field["options"]:
-                    flattened_options.update(op)
-                new_annotation_fields[field_id]["options"] = flattened_options
-                options_converted = True
-
-    if options_converted:
-        print("    Converting annotation options to list for dataset %s..." % dataset["key"])
-        db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_annotation_fields), dataset["key"]))
-
-print("  Expanding the 'annotations' table.")
-
-print("    Creating new annotations table...")
-db.execute("""
-CREATE TABLE IF NOT EXISTS annotations_new (
-  id                SERIAL PRIMARY KEY,
-  dataset           TEXT,
-  field_id          TEXT,
-  item_id           TEXT,
-  timestamp         INT DEFAULT 0,
-  timestamp_created INT DEFAULT 0,
-  label             TEXT,
-  type              TEXT,
-  options           TEXT,
-  value             TEXT,
-  author            TEXT,
-  author_original   TEXT,
-  by_processor      BOOLEAN DEFAULT FALSE,
-  metadata          TEXT
-);
-""")
-
-print("    Creating indexes for annotations table...")
-db.execute("""
-CREATE UNIQUE INDEX IF NOT EXISTS annotation_id
-  ON annotations_new (
-    id
-);
-CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
-  ON annotations_new (
-    label,
-    dataset,
-    item_id
-);
-CREATE INDEX IF NOT EXISTS annotation_value
-  ON annotations_new (
-    value
-);
-CREATE INDEX IF NOT EXISTS annotation_timestamp
-  ON annotations_new (
-    timestamp
-);
-""")
-
-print("    Transferring old annotations to new annotations table...")
-
-annotations = db.fetchall("SELECT * FROM annotations;")
-
-if not annotations:
-    print("    No annotation fields to transfer, skipping...")
-
-elif  "key" not in annotations[0] and "dataset" in annotations[0]:
+# Ensure we do not attempt to update the annotations table if it has already been updated
+# This will drop the annotations table and create a new one losing all annotations
+# (both backend and frontend run migrate.py in case they have to update different aspects)
+if  "key" not in annotations_check[0] and "dataset" in annotations_check[0]:
     print("    Annotations table seems to have been updated already")
-
 else:
-    
-    count = 0
-    skipped_count = 0
+    print("    Annotations table needs to be updated")
 
-    columns = "id,dataset,field_id,item_id,timestamp,timestamp_created,label,type,options,value,author,author_original,by_processor,metadata"
 
-    # Each row are **all** annotations per dataset
-    for row in annotations:
+    datasets = db.fetchall("SELECT * FROM datasets WHERE annotation_fields != ''")
 
-        dataset = db.fetchone("SELECT * FROM datasets WHERE key = '" + row["key"] + "';")
-        # If the dataset is not present anymore,
-        # we're going to skip these annotations;
-        # likely the dataset is expired.
-        if not dataset:
-            print("      No dataset found for key %s, skipping..." % row["key"])
-            skipped_count += 1
-            continue
+    print("  Converting annotation options from lists to dicts...")
+    for dataset in datasets:
 
         annotation_fields = dataset["annotation_fields"]
-        if annotation_fields:
-            annotation_fields = json.loads(dataset.get("annotation_fields"))
-        else: annotation_fields = {}
 
-        author = dataset.get("creator", "")
+        # Flatten options from list of dicts to dict
+        options_converted = False
+        annotation_fields = json.loads(annotation_fields)
+        new_annotation_fields = annotation_fields
 
-        if not row.get("annotations"):
-            print("      No annotations for dataset %s, skipping..." % row["key"])
-            skipped_count += 1
-            continue
+        for field_id, annotation_field in annotation_fields.items():
 
-        # Loop through all annotated posts
-        for post_id, post_annotations in json.loads(row["annotations"]).items():
+            if "options" in annotation_field:
+                flattened_options = {}
 
-            # Loop through individual annotations per post
-            for label, value in post_annotations.items():
+                if isinstance(annotation_field["options"], list):
+                    for op in annotation_field["options"]:
+                        flattened_options.update(op)
+                    new_annotation_fields[field_id]["options"] = flattened_options
+                    options_converted = True
 
-                # Get the ID of this particular annotation field
-                field_id = [k for k, v in annotation_fields.items() if v["label"] == label]
+        if options_converted:
+            print("    Converting annotation options to list for dataset %s..." % dataset["key"])
+            db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_annotation_fields), dataset["key"]))
 
-                if field_id:
-                    field_id = field_id[0]
-                    
-                # Skip if this field was not saved to the datasets table
-                if not field_id or field_id not in annotation_fields:
-                    print("      Annotation field ID not saved to datasets table, skipping...")
-                    skipped_count += 1
-                    continue
+    print("  Expanding the 'annotations' table.")
 
-                ann_type = annotation_fields[field_id]["type"]
-                options = annotation_fields[field_id]["options"] if "options" in annotation_fields[field_id] else {}
-                
-                if isinstance(value, list):
-                    value = ",".join(value)
+    print("    Creating new annotations table...")
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS annotations_new (
+    id                SERIAL PRIMARY KEY,
+    dataset           TEXT,
+    field_id          TEXT,
+    item_id           TEXT,
+    timestamp         INT DEFAULT 0,
+    timestamp_created INT DEFAULT 0,
+    label             TEXT,
+    type              TEXT,
+    options           TEXT,
+    value             TEXT,
+    author            TEXT,
+    author_original   TEXT,
+    by_processor      BOOLEAN DEFAULT FALSE,
+    metadata          TEXT
+    );
+    """)
 
-                inserts = [(
-                    row["dataset"],         # dataset
-                    int(field_id),          # field_id; this is an ID for the same type of input field.
-                    str(post_id),           # post_id; needs to be a string, changes per data source.
-                    dataset["timestamp"],   # timestamp
-                    dataset["timestamp"],   # timestamp_created
-                    label,                  # label
-                    ann_type,               # type
-                    json.dumps(options) if options else "",    # options; each option has a key and a value.
-                    value,                  # value
-                    author,                 # author
-                    author,                 # author_original
-                    False,                  # by_processor
-                    json.dumps({}),         # metadata
-                )]
+    print("    Creating indexes for annotations table...")
+    db.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS annotation_id
+    ON annotations_new (
+        id
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
+    ON annotations_new (
+        label,
+        dataset,
+        item_id
+    );
+    CREATE INDEX IF NOT EXISTS annotation_value
+    ON annotations_new (
+        value
+    );
+    CREATE INDEX IF NOT EXISTS annotation_timestamp
+    ON annotations_new (
+        timestamp
+    );
+    """)
 
-                db.execute("INSERT INTO annotations_new (" + columns + ") VALUES %s", replacements=inserts)
+    print("    Transferring old annotations to new annotations table...")
 
-                count += 1
+    annotations = db.fetchall("SELECT * FROM annotations;")
 
-        if count % 10 == 0:
-            print("      Transferred %s annotations..." % count)
+    if not annotations:
+        print("    No annotation fields to transfer, skipping...")
+
+    else:
         
-    print("    Done, transferred %s annotations and skipped %s annotations" % (count, skipped_count))
+        count = 0
+        skipped_count = 0
 
-print("  Deleting old annotations table...")
-db.execute("DROP TABLE annotations")
+        columns = "dataset,field_id,item_id,timestamp,timestamp_created,label,type,options,value,author,author_original,by_processor,metadata"
 
-print("  Renaming new annotations table...")
-db.execute("ALTER TABLE annotations_new RENAME TO annotations;")
+        # Each row are **all** annotations per dataset
+        for row in annotations:
 
-print("  - done!")
+            dataset = db.fetchone("SELECT * FROM datasets WHERE key = '" + row["key"] + "';")
+            # If the dataset is not present anymore,
+            # we're going to skip these annotations;
+            # likely the dataset is expired.
+            if not dataset:
+                print("      No dataset found for key %s, skipping..." % row["key"])
+                skipped_count += 1
+                continue
+
+            annotation_fields = dataset["annotation_fields"]
+            if annotation_fields:
+                annotation_fields = json.loads(dataset.get("annotation_fields"))
+            else: annotation_fields = {}
+
+            author = dataset.get("creator", "")
+
+            if not row.get("annotations"):
+                print("      No annotations for dataset %s, skipping..." % row["key"])
+                skipped_count += 1
+                continue
+
+            # Loop through all annotated posts
+            for post_id, post_annotations in json.loads(row["annotations"]).items():
+
+                # Loop through individual annotations per post
+                for label, value in post_annotations.items():
+                    # Get the ID of this particular annotation field
+                    field_id = [k for k, v in annotation_fields.items() if v["label"] == label]
+
+                    if field_id:
+                        field_id = field_id[0]
+                        
+                    # Skip if this field was not saved to the datasets table
+                    if not field_id or field_id not in annotation_fields:
+                        print("      Annotation field ID not saved to datasets table, skipping...")
+                        skipped_count += 1
+                        continue
+
+                    ann_type = annotation_fields[field_id]["type"]
+                    options = annotation_fields[field_id]["options"] if "options" in annotation_fields[field_id] else ""
+
+                    if isinstance(value, list):
+                        value = ",".join(value)
+
+                    inserts = [(
+                        row["key"],         # dataset
+                        int(field_id),          # field_id; this is an ID for the same type of input field.
+                        str(post_id),           # post_id; needs to be a string, changes per data source.
+                        dataset["timestamp"],   # timestamp
+                        dataset["timestamp"],   # timestamp_created
+                        label,                  # label
+                        ann_type,               # type
+                        json.dumps(options) if options else "",    # options; each option has a key and a value.
+                        value,                  # value
+                        author,                 # author
+                        author,                 # author_original
+                        False,                  # by_processor
+                        json.dumps({}),         # metadata
+                    )]
+
+                    db.execute("INSERT INTO annotations_new (" + columns + ") VALUES %s", replacements=inserts)
+
+                    count += 1
+
+            if count % 10 == 0:
+                print("      Transferred %s annotations..." % count)
+            
+        print("    Done, transferred %s annotations and skipped %s annotations" % (count, skipped_count))
+
+    print("  Deleting old annotations table...")
+    db.execute("DROP TABLE annotations")
+
+    print("  Renaming new annotations table...")
+    db.execute("ALTER TABLE annotations_new RENAME TO annotations;")
+
+    print("  - done!")
