@@ -218,7 +218,7 @@ class Logger:
         extrapolated
         """
         if type(frame) is traceback.StackSummary:
-            # Full strack was provided
+            # Full stack was provided
             stack = frame
             frame = stack[-1]
         else:
@@ -234,7 +234,7 @@ class Logger:
 
         # Logging uses the location, Slack uses the full stack
         location = frame.filename.split("/")[-1] + ":" + str(frame.lineno)
-        self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack})
+        self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack or []})
 
     def debug(self, message, frame=None):
         """

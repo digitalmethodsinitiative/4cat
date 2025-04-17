@@ -489,6 +489,7 @@ def main():
         try:
             from common.lib.logger import Logger
             log = Logger(logger_name='migrate-notify', filename='migrate.log')
+            log.slack_handler.setLevel(logging.INFO) # Ensure either message is sent to slack
             if exit_code == 0:
                 log.info(f"Migration of {args.component} finished successfully.")
             else:
