@@ -488,12 +488,7 @@ def main():
         # This has the benefit of the Slack webhook
         try:
             from common.lib.logger import Logger, SlackLogHandler
-            log = Logger(logger_name='migrate-notify', filename='migrate.log')
-            # Adjust the log level of the Slack handler
-            for handler in log.logger.handlers:
-                if isinstance(handler, SlackLogHandler):  # Check if it's the Slack handler
-                    handler.setLevel(logging.INFO)  # Set the desired log level
-            
+            log = Logger(logger_name='migrate-notify', filename='migrate.log')            
             if exit_code == 0:
                 log.info(f"Migration of {args.component} finished successfully.")
             else:
