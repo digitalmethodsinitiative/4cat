@@ -15,7 +15,7 @@ from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
+from common.lib.helpers import convert_to_float, get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_to_md5
 from common.lib.item_mapping import MappedItem, DatasetItem
@@ -437,6 +437,122 @@ class DataSet(FourcatModule):
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 
+	def sort_and_iterate_items(self, sort="", reverse=False, chunk_size=5000, **kwargs) -> dict:
+		"""
+		Loop through items in a dataset, sorted by a given key.
+
+		This is a wrapper function for `iterate_items()` with the
+		added functionality of sorting a dataset. 
+
+		:param sort:				The item key that determines the sort order.
+		:param reverse:				Whether to sort by largest values first.
+
+		:returns dict:				Yields iterated post
+		"""
+		if reverse is False and (sort == "dataset-order" or sort == ""):
+			# Sort by dataset order
+			yield from self.iterate_items(**kwargs)			
+
+		elif self.num_rows < chunk_size:
+			# Storing posts in the right order here
+			sorted_posts = []
+
+			# Use reversed() if we're reading the dataset from back to front.
+			if sort == "dataset-order" and reverse:
+				for item in reversed(list(self.iterate_items(**kwargs))):
+					sorted_posts.append(item)
+
+			# Sort on the basis of a column value
+			else:
+				try:
+					for item in sorted(self.iterate_items(**kwargs), key=lambda x: x.get(sort,""), reverse=reverse):
+						sorted_posts.append(item)
+				except TypeError:
+					# Dataset fields can contain integers and empty strings.
+					# Since these cannot be compared, we will convert every
+					# empty string to 0.
+					for item in sorted(self.iterate_items(**kwargs), key=lambda x: convert_to_float(x.get(sort,"")), reverse=reverse):
+						sorted_posts.append(item)
+
+			for post in sorted_posts:
+				yield post
+		else:
+			# For large datasets, we will use chunk sorting
+			staging_area = self.get_staging_area()
+			buffer = []
+			chunk_files = []
+
+			def write_sorted_chunk(buffer, chunk_index):
+				"""
+				Helper function to sort a buffer and write it to a temporary file.
+				If sort == "dataset-order" and reverse == True, reverse the buffer.
+				"""
+				if sort == "dataset-order" and reverse:
+					buffer.reverse()
+				else:
+					buffer.sort(key=lambda x: convert_to_float(x.get(sort, "")), reverse=reverse)
+				temp_file = staging_area.joinpath(f"chunk_{chunk_index}.csv")
+				with temp_file.open("w", encoding="utf-8") as chunk_file:
+					writer = csv.DictWriter(chunk_file, fieldnames=self.get_columns())
+					writer.writeheader()
+					writer.writerows(buffer)
+				return temp_file
+
+			# Divide the dataset into sorted chunks
+			for item in self.iterate_items(**kwargs):
+				buffer.append(item)
+				if len(buffer) >= chunk_size:
+					chunk_files.append(write_sorted_chunk(buffer, len(chunk_files)))
+					buffer.clear()
+
+			# Sort and write any remaining items in the buffer
+			if buffer:
+				chunk_files.append(write_sorted_chunk(buffer, len(chunk_files)))
+
+			# Merge sorted chunks into the final sorted file
+			sorted_file = staging_area.joinpath("sorted_" + self.key + ".csv")
+			with sorted_file.open("w", encoding="utf-8") as outfile:
+				writer = csv.DictWriter(outfile, fieldnames=self.get_columns())
+				writer.writeheader()
+
+				# Open all chunk files for reading
+				chunk_readers = [csv.DictReader(chunk.open("r", encoding="utf-8")) for chunk in chunk_files]
+				heap = []
+
+				# Initialize the heap with the first row from each chunk
+				for i, reader in enumerate(chunk_readers):
+					try:
+						row = next(reader)
+						# Use a reverse index for "dataset-order" and reverse=True
+						sort_key = -i if sort == "dataset-order" and reverse else convert_to_float(row.get(sort, ""))
+						heap.append((sort_key, i, row))
+					except StopIteration:
+						pass
+
+				# Use a heap to merge sorted chunks
+				import heapq
+				heapq.heapify(heap)
+				while heap:
+					_, chunk_index, smallest_row = heapq.heappop(heap)
+					writer.writerow(smallest_row)
+					try:
+						next_row = next(chunk_readers[chunk_index])
+						# Use a reverse index for "dataset-order" and reverse=True
+						sort_key = -chunk_index if sort == "dataset-order" and reverse else convert_to_float(next_row.get(sort, ""))
+						heapq.heappush(heap, (sort_key, chunk_index, next_row))
+					except StopIteration:
+						pass
+
+			# Read the sorted file and yield each item
+			with sorted_file.open("r", encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+				for item in reader:
+					yield item
+
+			# Remove the temporary files
+			if staging_area.is_dir():
+				shutil.rmtree(staging_area)
+
 	def get_staging_area(self):
 		"""
 		Get path to a temporary folder in which files can be stored before
@@ -449,7 +565,7 @@ class DataSet(FourcatModule):
 		:return Path:  Path to folder
 		"""
 		results_file = self.get_results_path()
-
+	
 		results_dir_base = results_file.parent
 		results_dir = results_file.name.replace(".", "") + "-staging"
 		results_path = results_dir_base.joinpath(results_dir)

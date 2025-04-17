@@ -247,7 +247,10 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs) -
 
 	:returns dict:				Yields iterated post
 	"""
-
+	# Use dataset's sort_and_iterate_items function which can accept chunk_size and
+	# creates a sorted temporary file (thus not using so much memory).
+	#yield from dataset.sort_and_iterate_items(sort=sort, reverse=reverse, **kwargs)
+	
 	# Storing posts in the right order here
 	sorted_posts = []
 
