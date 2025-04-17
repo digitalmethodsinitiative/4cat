@@ -82,6 +82,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     # migrate to latest release
                     command += " --release"
 
+                if config.get("USING_DOCKER"):
+                    # when using Docker, this working will only upgrade the backend (views_restart.py will handle the frontend)
+                    command += " --component backend"
+
             else:
                 command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 
