@@ -188,13 +188,13 @@ def get_software_commit(worker=None):
     # the currently checked-out commit
 
     # path has no Path.relative()...
-    relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
     try:
         # if extension, go to the extension file's path
         # we will run git here - if it is not its own repository, we have no
         # useful version info (since the extension is by definition not in the
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
+            relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
             working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
             git_cmd = f"git -C {shlex.quote(working_dir)} rev-parse --show-toplevel"
