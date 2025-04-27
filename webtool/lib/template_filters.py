@@ -1,6 +1,4 @@
-import urllib.parse
 import datetime
-from math import floor
 
 import json
 import ural
@@ -13,7 +11,7 @@ import requests
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify_long
+from common.lib.helpers import timify_long, ellipsiate
 from common.config_manager import ConfigWrapper
 
 from flask import request
@@ -222,28 +220,8 @@ def _jinja2_filter_extension_to_noun(ext):
 		return "item"
 
 @app.template_filter("ellipsiate")
-def _jinja2_filter_ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
-	if len(text) <= length:
-		return text
-
-	elif not inside:
-		return text[:length] + ellipsis_str
-
-	else:
-		# two cases: URLs and normal text
-		# for URLs, try to only ellipsiate after the domain name
-		# this makes the URLs easier to read when shortened
-		if ural.is_url(text):
-			pre_part = "/".join(text.split("/")[:3])
-			if len(pre_part) < length - 6:  # kind of arbitrary
-				before = len(pre_part) + 1
-			else:
-				before = floor(length / 2)
-		else:
-			before = floor(length / 2)
-
-		after = len(text) - before
-		return text[:before] + ellipsis_str + text[after:]
+def _jinja2_filter_ellipsiate(*args, **kwargs):
+	return ellipsiate(*args, **kwargs)
 
 @app.template_filter('4chan_image')
 def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
