@@ -322,7 +322,7 @@ class PixPlotGenerator(BasicProcessor):
 
                     # Update description
                     image['number_of_posts'] += 1
-                    image['description'] += '<b>Post ' + str(image['number_of_posts']) + '</b><br><br>'
+                    image['description'] += '<br><br><b>Post ' + str(image['number_of_posts']) + '</b><br><br>'
                     # Order of Description elements
                     ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
                     for detail in ordered_descriptions:
