@@ -413,8 +413,8 @@ class PixPlotGenerator(BasicProcessor):
         except ValueError:
             return content
 
-        for link in set(ural.urls_from_text(str(content))):
-            link_text = ellipsiate(link, ellipsiate, True, "[&hellip;]")
+        for link in set(ural.urls_from_text(content)):
+            link_text = ellipsiate(link, 50, True, "[&hellip;]")
             content = content.replace(link,
                                       f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
 
