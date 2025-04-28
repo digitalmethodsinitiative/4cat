@@ -54,6 +54,7 @@ packages = set([
 	"scikit-learn",
 	"scipy~=1.13",
 	"shapely",
+	"spacy==3.7.2",
 	"svgwrite~=1.4.0",
 	"tailer",
 	"Telethon~=1.36.0",
@@ -65,7 +66,8 @@ packages = set([
 	"imagedominantcolor @ git+https://github.com/dale-wahl/imagedominantcolor.git@pillow10",
 	"videohash @ git+https://github.com/dale-wahl/videohash@main",
 	"vk_api",
-	"yt-dlp"
+	"yt-dlp",
+	"fi_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fi_core_news_sm-3.7.0/fi_core_news_sm-3.7.0-py3-none-any.whl"	
 ])
 
 # Check for extension packages

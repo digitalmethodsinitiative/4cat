@@ -231,7 +231,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		if not self.dataset.is_finished():
 			self.dataset.finish()
-
+		
 		self.dataset.remove_staging_areas()
 
 		# see if we have anything else lined up to run next
