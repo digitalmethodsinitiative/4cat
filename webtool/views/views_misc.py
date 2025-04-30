@@ -179,7 +179,6 @@ def data_overview(datasource=None):
 
         # Status labels to display in query form
         labels = []
-        datasource_options = worker_class.get_options()
         is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
         is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
         labels.append(is_local)

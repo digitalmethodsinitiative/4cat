@@ -26,11 +26,12 @@ class QuoteNetworkGrapher(BasicProcessor):
 	extension = "gexf"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor to run on chan datasets
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
 		

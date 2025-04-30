@@ -26,13 +26,9 @@ from webtool import app, db, config, fourcat_modules
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
-from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
+from common.lib.helpers import call_api, send_email, UserInput, get_git_branch
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
-
-from common.config_manager import ConfigWrapper
-
-config = ConfigWrapper(config, user=current_user, request=request)
 
 
 @app.route("/admin/")
@@ -128,7 +124,7 @@ def list_users(page):
     distinct_users = [u["name"] for u in db.fetchall("SELECT DISTINCT name FROM users")]
 
     pagination = Pagination(page, page_size, num_users, "list_users")
-    return render_template("controlpanel/users.html", users=[User(db, user) for user in users],
+    return render_template("controlpanel/users.html", users=[User(db, user, config=config) for user in users],
                            filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
@@ -195,6 +191,7 @@ def add_user():
                                      "timestamp_created": int(time.time())})
 
             user = User.get_by_name(db, username)
+            user.with_config(config)
             if user is None:
                 response = {**response, **{"message": "User was created but could not be instantiated properly."}}
             else:
@@ -220,6 +217,7 @@ def add_user():
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
                 user = User.get_by_name(db, username)
+                user.with_config(config)
                 db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
@@ -317,6 +315,7 @@ def delete_user():
     """
     username = request.form.get("name")
     user = User.get_by_name(db=db, name=username)
+    user.with_config(config)
     if not username:
         return render_template("error.html", message=f"User {username} does not exist.",
                                title="User not found"), 404
@@ -354,6 +353,7 @@ def manipulate_user(mode):
     if user is None:
         return error(404, message="User not found")
 
+    user.with_config(config)
     incomplete = []
     if request.method == "POST":
         if not request.form.get("name", request.args.get("name")):
@@ -406,6 +406,7 @@ def manipulate_user(mode):
                     incomplete.append("name")
                     db.rollback()
 
+            user.with_config(config)
             if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
                 if not autodelete:
@@ -819,6 +820,7 @@ def user_bulk():
                 # the object
                 db.insert("users", {"name": user["name"], "timestamp_created": int(time.time())})
                 user_obj = User.get_by_name(db, user["name"])
+                user_obj.with_config(config)
 
                 if user.get("expires"):
                     try:

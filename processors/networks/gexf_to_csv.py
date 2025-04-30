@@ -24,7 +24,7 @@ class GexfToCsv(BasicProcessor):
     extension = "csv"
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor to run on all csv and NDJSON datasets
 

@@ -28,11 +28,12 @@ class WikiURLCoLinker(BasicProcessor):
 	extension = "gexf"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
         Allow processor on top datasets.
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 

@@ -5,13 +5,11 @@ The DMI OCR Server can be downloaded seperately here:
 https://github.com/digitalmethodsinitiative/ocr_server#readme
 and is run using the DMI Service Manager
 """
-import requests
 import json
 import os
 
-from common.config_manager import config
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.item_mapping import MappedItem
@@ -87,14 +85,14 @@ class ImageTextDetector(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on image sets
 
         :param module: Module to determine compatibility with
         """
-        return config.get('dmi-service-manager.eb_ocr_enabled', False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get('dmi-service-manager.eb_ocr_enabled', False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):

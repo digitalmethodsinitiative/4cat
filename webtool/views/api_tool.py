@@ -14,7 +14,6 @@ from pathlib import Path
 from flask import jsonify, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
 	get_flashed_messages, send_from_directory
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue, config, fourcat_modules
 from webtool.lib.helpers import error, setting_required, parse_markdown
@@ -23,14 +22,12 @@ from common.lib.exceptions import QueryParametersException, JobNotFoundException
 	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
-from common.config_manager import ConfigWrapper
 from common.lib.dataset import DataSet
 from common.lib.helpers import UserInput, call_api, get_software_version
 from common.lib.user import User
 from backend.lib.worker import BasicWorker
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
-config = ConfigWrapper(config, user=current_user, request=request)
 
 API_SUCCESS = 200
 API_FAIL = 404
@@ -142,7 +139,7 @@ def datasource_form(datasource_id):
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
-	worker_options = worker_class.get_options(None, current_user)
+	worker_options = worker_class.get_options(None, config)
 	if not worker_options:
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
@@ -309,11 +306,11 @@ def queue_dataset():
 		# just in case
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(None, current_user), request.form, silently_correct=False)
+			sanitised_query = UserInput.parse_all(search_worker.get_options(None, config), request.form, silently_correct=False)
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
-			sanitised_query = search_worker.validate_query(sanitised_query, request, current_user)
+			sanitised_query = search_worker.validate_query(sanitised_query, request, config)
 
 		except QueryNeedsFurtherInputException as e:
 			# ask the user for more input by returning a HTML snippet
@@ -744,7 +741,7 @@ def remove_tag():
 	all_tags += [s["tag"] for s in db.fetchall("SELECT DISTINCT tag FROM settings WHERE tag LIKE 'user:%'")]
 
 	for user in tagged_users:
-		user = User.get_by_name(db, user["name"])
+		user = User.get_by_name(db, user["name"], config=config)
 		user.remove_tag(tag)
 
 	if tag in all_tags:
@@ -810,7 +807,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 
 	for username in usernames.split(","):
 		username = username.strip()
-		new_owner = User.get_by_name(db, username)
+		new_owner = User.get_by_name(db, username, config=config)
 		if new_owner is None and not username.startswith("tag:"):
 			return error(404, error=f"The user '{username}' does not exist. Use tag:example to add a tag as an owner.")
 
@@ -872,7 +869,7 @@ def remove_dataset_owner(key=None, username=None):
 	if username == current_user.get_id():
 		return error(403, error="You cannot remove yourself from a dataset.")
 
-	owner = User.get_by_name(db, username)
+	owner = User.get_by_name(db, username, config=config)
 	if owner is None and not username.startswith("tag:"):
 		return error(404, error="User does not exist.")
 
@@ -1034,18 +1031,18 @@ def queue_processor(key=None, processor=None):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
-	available_processors = dataset.get_available_processors(user=current_user, exclude_hidden=True)
+	available_processors = dataset.get_available_processors(config=config, exclude_hidden=True)
 	if processor not in available_processors:
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 
 	processor_worker = available_processors[processor]
 	try:
-		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, current_user), request.form,
-											  silently_correct=False)
+		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, config), request.form,
+                                              silently_correct=False)
 
 		if hasattr(processor_worker, "validate_query"):
 			# validate_query is optional for processors
-			sanitised_query = processor_worker.validate_query(sanitised_query, request, current_user)
+			sanitised_query = processor_worker.validate_query(sanitised_query, request, config)
 
 	except QueryParametersException as e:
 		# parameters need amending

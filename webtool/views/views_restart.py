@@ -19,15 +19,12 @@ import os
 from pathlib import Path
 from flask import render_template, request, flash, get_flashed_messages, jsonify
 
-from flask_login import login_required, current_user
+from flask_login import login_required
 
 from webtool import app, queue, config
 from webtool.lib.helpers import setting_required, check_restart_request
 
 from common.lib.helpers import get_github_version, get_git_branch
-
-from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user, request=request)
 
 @app.route("/admin/trigger-restart/", methods=["POST", "GET"])
 @login_required

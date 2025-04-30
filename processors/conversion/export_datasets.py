@@ -27,13 +27,13 @@ class ExportDatasets(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Determine if processor is compatible with dataset
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.is_top_dataset() and module.is_accessible_by(user, role="owner")
+		return module.is_top_dataset() and module.is_accessible_by(config.user, role="owner")
 
 	def process(self):
 		"""

@@ -33,11 +33,8 @@ COPY ./README.md /usr/src/app/README.md
 RUN mkdir /usr/src/app/backend
 RUN mkdir /usr/src/app/webtool
 RUN mkdir /usr/src/app/datasources
-# Install python dependencies
-RUN pip3 install --upgrade pip && pip3 install --no-cache-dir setuptools==78.1.0 wheel==0.46.1 && pip3 install -r requirements.txt
-
-# Install frontend Docker requirements
-RUN pip3 install gunicorn
+# Install python dependencies; gunicorn is needed for 4cat_frontend
+RUN python3 -m pip install --upgrade pip && python3 -m pip install --no-cache-dir setuptools==78.1.0 wheel==0.46.1 && python3 -m pip install -r requirements.txt && python3 -m pip install gunicorn
 
 # Copy project
 COPY . /usr/src/app/
