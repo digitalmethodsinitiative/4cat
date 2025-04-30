@@ -96,7 +96,7 @@ from webtool.lib.openapi_collector import OpenAPICollector
 openapi = OpenAPICollector(app, config)
 
 # initialize rate limiter
-limiter = Limiter(app, key_func=get_remote_address)
+limiter = Limiter(app=app, key_func=get_remote_address)
 
 # make sure a secret key was set in the config file, for secure session cookies
 if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPLACE_THIS":

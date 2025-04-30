@@ -127,10 +127,10 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		except ProcessorException as e:
 			self.log.error(str(e), frame=e.frame)
 		except Exception as e:
-			frames = traceback.extract_tb(e.__traceback__)
-			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
+			stack = traceback.extract_tb(e.__traceback__)
+			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack]
 			location = "->".join(frames)
-			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
+			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location), frame=stack)
 
 		# Clean up after work successfully completed or terminates
 		self.clean_up()

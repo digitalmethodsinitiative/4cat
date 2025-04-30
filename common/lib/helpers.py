@@ -14,6 +14,7 @@ import copy
 import time
 import json
 import math
+import ural
 import csv
 import ssl
 import re
@@ -188,13 +189,13 @@ def get_software_commit(worker=None):
     # the currently checked-out commit
 
     # path has no Path.relative()...
-    relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
     try:
         # if extension, go to the extension file's path
         # we will run git here - if it is not its own repository, we have no
         # useful version info (since the extension is by definition not in the
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
+            relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
             working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
             git_cmd = f"git -C {shlex.quote(working_dir)} rev-parse --show-toplevel"
@@ -457,6 +458,28 @@ def andify(items):
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
 
+def ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
+    if len(text) <= length:
+        return text
+
+    elif not inside:
+        return text[:length] + ellipsis_str
+
+    else:
+        # two cases: URLs and normal text
+        # for URLs, try to only ellipsiate after the domain name
+        # this makes the URLs easier to read when shortened
+        if ural.is_url(text):
+            pre_part = "/".join(text.split("/")[:3])
+            if len(pre_part) < length - 6:  # kind of arbitrary
+                before = len(pre_part) + 1
+            else:
+                before = math.floor(length / 2)
+        else:
+            before = math.floor(length / 2)
+
+        after = len(text) - before
+        return text[:before] + ellipsis_str + text[after:]
 
 def hash_file(image_file, hash_type="file-hash"):
     """

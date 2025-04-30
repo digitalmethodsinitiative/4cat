@@ -144,7 +144,7 @@ def show_results(page):
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
     datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"]}
+                   metadata["has_worker"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
                            datasets=filtered, pagination=pagination, favourites=favourites)

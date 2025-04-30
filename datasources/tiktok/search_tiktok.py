@@ -86,6 +86,7 @@ class SearchTikTok(Search):
             "author_videos": post.get("authorStats", {}).get("videoCount", ""),
             "author_avatar": user_thumbnail,
             "body": post["desc"],
+            "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
             "unix_timestamp": int(post["createTime"]),
             "is_duet": "yes" if (post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False) else "no",
@@ -109,7 +110,6 @@ class SearchTikTok(Search):
             "challenges": ",".join(challenges),
             "diversification_labels": labels,
             "location_created": post.get("locationCreated", ""),
-            "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "effects": ",".join([e["name"] for e in post.get("effectStickers", [])]),
             "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])
         })
