@@ -157,6 +157,9 @@ const processor = {
             let reset_form = true;
             fetch(form.attr('data-async-action') + '?async', {method: form.attr('method'), body: new FormData(form[0])})
                 .then(function (response) {
+                    if (!response.ok) {
+                        throw response;
+                    }
                     return response.json();
                 })
                 .then(function (response) {
@@ -207,13 +210,20 @@ const processor = {
                         }
                     }
                 })
-                .catch(function (response) {
-                    console.log(`Error: ${response}`);
-                    try {
-                        response = JSON.parse(response.responseText);
-                        popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
-                    } catch {
-                        popup.alert('The analysis could not be queued: ' + response.responseText, 'Warning');
+                .catch(function (error) {
+                    // Check if the error is a Response object
+                    if (error instanceof Response) {
+                        error.json().then((data) => {
+                            // Handle the error response
+                            popup.alert('The analysis could not be queued: ' + (data.error || data.message || 'Unknown error'), 'Warning');
+                        }).catch(() => {
+                            // Handle cases where the response is not JSON
+                            popup.alert('The analysis could not be queued: ' + error.statusText, 'Warning');
+                        });
+                    } else {
+                        // Handle other types of errors (e.g., network errors)
+                        console.error(error);
+                        popup.alert('A network error occurred. Please try again later.', 'Error');
                     }
                 })
                 .finally(() => {

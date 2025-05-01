@@ -77,7 +77,7 @@
 
                         {% if dataset.is_finished() and dataset.num_rows > 0 %}
                             <div class="property-container analysis">
-                                <a class="button-like processor-link" href="{{ url_for('show_result', key=dataset.key) }}">Analysis{% if dataset.children|length > 0 %} (+{{ dataset.children|length }}){% endif %}</a>
+                                <a class="button-like processor-link" href="{{ url_for('show_result', key=dataset.key) }}">Analysis{% if dataset.get_children()|length > 0 %} (+{{ dataset.get_children()|length }}){% endif %}</a>
                             </div>
                         {% endif %}
                     </li>

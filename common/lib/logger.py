@@ -107,9 +107,13 @@ class SlackLogHandler(WebHookLogHandler):
             color = "#3CC619"  # green
 
         # simple stack trace
-        # the last 9 frames are not specific to the exception (general logging code etc)
-        # the frame before that is where the exception was raised
-        frames = traceback.extract_stack()[:-9]
+        if record.stack:
+            # this is the stack where the log was called
+            frames = record.stack
+        else:
+            # the last 9 frames are not specific to the exception (general logging code etc)
+            # the frame before that is where the exception was raised
+            frames = traceback.extract_stack()[:-9]
         location = "`%s`" % "` → `".join([frame.filename.split("/")[-1] + ":" + str(frame.lineno) for frame in frames])
 
         # prepare slack webhook payload
@@ -213,12 +217,24 @@ class Logger:
         :param frame:  Traceback frame. If no frame is given, it is
         extrapolated
         """
-        # logging can include the full stack trace in the log, but that's a
-        # bit excessive - instead, only include the location the log was called
-        if not frame:
-            frame = traceback.extract_stack()[-3]
+        if type(frame) is traceback.StackSummary:
+            # Full strack was provided
+            stack = frame
+            frame = stack[-1]
+        else:
+            # Collect the stack (used by Slack)
+            stack = traceback.extract_stack()[:-2]
+
+        if frame is None:
+            # Use the last frame in the stack
+            frame = stack[-1]
+        else:
+            # Frame was provided; use it
+            pass
+
+        # Logging uses the location, Slack uses the full stack
         location = frame.filename.split("/")[-1] + ":" + str(frame.lineno)
-        self.logger.log(level, message, extra={"location": location, "frame": frame})
+        self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack})
 
     def debug(self, message, frame=None):
         """

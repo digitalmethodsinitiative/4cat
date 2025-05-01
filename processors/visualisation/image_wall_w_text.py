@@ -13,7 +13,7 @@ from svgwrite.container import SVG
 from svgwrite.shapes import Rect
 from svgwrite.text import Text, TextArea
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
@@ -182,12 +182,21 @@ class ImageTextWallGenerator(BasicProcessor):
 		images_in_row = 0
 		row_widths = {}
 		complete_categories = []
+		load_errors = []
 		self.dataset.update_status("Creating Image wall")
 		self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
 		for image_path in self.iterate_archive_contents(image_dataset.get_results_path()):
 			if image_path.name in [".metadata.json"]:
 				if convert_to_int(self.parameters.get("amount"), 100) == 0:
 					max_images = max_images - 1
+				continue
+
+			# Check image loads prior to any modifications to canvas space
+			try:
+				frame = Image.open(str(image_path))
+			except UnidentifiedImageError as e:
+				load_errors.append(image_path.name)
+				self.dataset.log(f"Unable to open image {image_path.name}: {e}")
 				continue
 
 			if total_images_collected == 0:
@@ -202,7 +211,6 @@ class ImageTextWallGenerator(BasicProcessor):
 				category_image = SVG(insert=(0, offset_y), size=(0, row_height))
 				offset_w = 0
 
-			frame = Image.open(str(image_path))
 			if tile_type == "square":
 				# resize to square
 				frame_width = base_height
@@ -273,6 +281,9 @@ class ImageTextWallGenerator(BasicProcessor):
 		# save as svg and finish up
 		canvas.save(pretty=True)
 		self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
+		if load_errors:
+			self.dataset.log(f"Unable to load {len(load_errors)} images: {', '.join(load_errors)}")
+			self.dataset.update_status(f"Created image wall; Unable to load {len(load_errors)} images of {total_images_collected}", is_final=True)
 		return self.dataset.finish(total_images_collected)
 
 

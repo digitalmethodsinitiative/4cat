@@ -178,12 +178,12 @@
     </section>
 
     <section class="analysis-gallery">
-        <h3 class="blocktitle section-subheader{% if not dataset.children %} collapsed" aria-hidden="true{% endif %}" id="child-tree-header">
+        <h3 class="blocktitle section-subheader{% if not dataset.get_children() %} collapsed" aria-hidden="true{% endif %}" id="child-tree-header">
             <span>Analysis results</span>
             <button id="expand-datasets">Expand all</button>
         </h3>
         <ol class="child-list top-level">
-            {% for child in dataset.children %}
+            {% for child in dataset.get_children() %}
                 {% include "components/result-child.html" %}
             {% endfor %}
         </ol>
