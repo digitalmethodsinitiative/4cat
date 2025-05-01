@@ -1,13 +1,11 @@
 """
 Generate interval-based word embedding models for sentences
 """
-import hyperhyper
 import shutil
 import pickle
 import json
 
 from gensim.models import Word2Vec, FastText
-from gensim.corpora import Dictionary
 from gensim.models.phrases import Phrases, Phraser
 from pathlib import Path
 
@@ -42,8 +40,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 		"Word2Vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
 		"Word2Vec: [A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)",
 		"FastText: [Bojanowski, P., Grave, E., Joulin, A., & Mikolov, T. (2017). Enriching word vectors with subword information. *Transactions of the Association for Computational Linguistics*, 5, 135-146.](https://www.mitpressjournals.org/doi/abs/10.1162/tacl_a_00051)"
-		"hyperhyper: [GitHub repository](https://github.com/jfilter/hyperhyper?tab=readme-ov-file)",
-		"hyperhyper: [    Omer Levy, Yoav Goldberg, and Ido Dagan. 2015. Improving Distributional Similarity with Lessons Learned from Word Embeddings. Transactions of the Association for Computational Linguistics, 3:211–225.](https://aclanthology.org/Q15-1016/)"
 	]
 
 	options = {
@@ -52,8 +48,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"default": "Word2Vec",
 			"options": {
 				"Word2Vec": "Word2Vec",
-				"FastText": "FastText",
-				"hyperhyper": "Hyperhyper"
+				"FastText": "FastText"
 			},
 			"help": "Model type"
 		},
@@ -64,7 +59,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 				"cbow": "Continuous Bag of Words (CBOW)",
 				"skipgram": "Skip-gram"
 			},
-			"requires": "model-type!=hyperhyper",
 			"help": "Training algorithm",
 			"tooltip": "See processor references for a more detailed explanation."
 		},
@@ -73,7 +67,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"default": "5",
 			"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
 			"help": "Window",
-			"requires": "model-type!=hyperhyper",
 			"tooltip": "This sets the length of word sequences taken as the context. For instance, " \
 					   "a window of 3 with the sentence \"the quick brown fox\" will \"slide\" over \"the quick brown\" " \
 					   "and \"quick brown fox\"."
@@ -81,7 +74,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 		"dimensionality": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 100,
-			"requires": "model-type!=hyperhyper",
 			"min": 50,
 			"max": 1000,
 			"help": "Dimensionality of the vectors"
@@ -89,7 +81,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 		"min_count": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 5,
-			"requires": "model-type!=hyperhyper",
 			"help": "Minimum word occurrence",
 			"tooltip": "How often a word should occur in the corpus to be included"
 		},
@@ -97,20 +88,17 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
 			"min": 0,
-			"requires": "model-type!=hyperhyper",
 			"help": "Retain top n words",
 			"tooltip": "'0' retains all words, other values will discard less frequent words"
 		},
 		"negative": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
-			"requires": "model-type!=hyperhyper",
 			"help": "Use negative sampling"
 		},
 		"detect-bigrams": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
-			"requires": "model-type!=hyperhyper",
 			"help": "Detect bigrams",
 			"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
 		}
@@ -132,50 +120,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 		"""
 		self.dataset.update_status("Processing sentences")
 
-		model_type = self.parameters.get("model-type")
-		max_words = convert_to_int(self.parameters.get("max_words"))
-
-		if max_words == 0:
-			# unlimited amount of words in model
-			max_words = None
-
-		if model_type == "hyperhyper":
-			return self.with_hyperhyper()
-		else:
-			return self.with_gensim()
-
-	def with_hyperhyper(self):
-		models = 0
-		staging_area = self.dataset.get_staging_area()
-
-		for temp_file in self.iterate_archive_contents(self.source_file):
-			if temp_file.name == '.token_metadata.json':
-				# Skip metadata
-				continue
-
-			token_set_name = temp_file.name
-			self.dataset.update_status("Converting token set %s..." % token_set_name)
-			self.dataset.update_progress(models / self.source_dataset.num_rows)
-
-			vocab = hyperhyper.Vocab.from_documents(self.tokens_from_file(temp_file, staging_area))
-			corpus = hyperhyper.Corpus(vocab, lambda x: x, self.tokens_from_file(temp_file, staging_area))
-
-			model_name = token_set_name.split(".")[0] + ".model"
-			bunch = hyperhyper.Bunch(corpus, staging_area.joinpath(model_name))
-
-			models += 1
-
-			corpus.svd.save(str(staging_area.joinpath(model_name)))
-
-			# save vocabulary too, some processors need it
-			del model
-			models += 1
-
-
-	def with_gensim(self):
-		"""
-		Generate embeddings with Gensim
-		"""
 		use_skipgram = 1 if self.parameters.get("algorithm") == "skipgram" else 0
 		window = min(10, max(1, convert_to_int(self.parameters.get("window"))))
 		use_negative = 5 if self.parameters.get("negative") else 0
@@ -184,6 +128,10 @@ class GenerateWordEmbeddings(BasicProcessor):
 		detect_bigrams = self.parameters.get("detect-bigrams")
 		model_type = self.parameters.get("model-type")
 		max_words = convert_to_int(self.parameters.get("max_words"))
+
+		if max_words == 0:
+			# unlimited amount of words in model
+			max_words = None
 
 		staging_area = self.dataset.get_staging_area()
 		model_builder = {
