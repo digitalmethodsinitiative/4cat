@@ -232,7 +232,7 @@ def explorer_save_annotations(dataset_key: str):
 	# Else return the amount of fields saved.
 	return str(annotations_saved)
 
-def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs) -> dict:
+def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 	"""
 	Loop through both csv and NDJSON files.
 	This is basically a wrapper function for `iterate_items()` with the
@@ -247,32 +247,10 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs) -
 
 	:returns dict:				Yields iterated post
 	"""
+
 	# Use dataset's sort_and_iterate_items function which can accept chunk_size and
 	# creates a sorted temporary file (thus not using so much memory).
-	#yield from dataset.sort_and_iterate_items(sort=sort, reverse=reverse, **kwargs)
-	
-	# Storing posts in the right order here
-	sorted_posts = []
-
-	# Use reversed() if we're reading the dataset from back to front.
-	if sort == "dataset-order" and reverse:
-		for item in reversed(list(dataset.iterate_items(**kwargs))):
-			sorted_posts.append(item)
-
-	# Sort on the basis of a column value
-	else:
-		try:
-			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: x.get(sort,""), reverse=reverse):
-				sorted_posts.append(item)
-		except TypeError:
-			# Dataset fields can contain integers and empty strings.
-			# Since these cannot be compared, we will convert every
-			# empty string to 0.
-			for item in sorted(dataset.iterate_items(**kwargs), key=lambda x: convert_to_float(x.get(sort,"")), reverse=reverse):
-				sorted_posts.append(item)
-
-	for post in sorted_posts:
-		yield post
+	yield from dataset.sort_and_iterate_items(sort=sort, reverse=reverse, **kwargs)
 
 
 def has_datasource_template(datasource: str) -> bool:
