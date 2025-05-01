@@ -13,7 +13,7 @@
 
 	{% set parameters = request.url | parameter_str %}
 
-	<ol>
+    <ol>
 
 	{# show all pages if it's 10 or less #}
 	{% if pages <= 10 %}
@@ -32,25 +32,31 @@
 		{% endfor %}
 
 		{# Show lower 'edge' pages #}
-		{% if lower_bound <= page <= lower_bound + 2 %}
-			{% for i in range(lower_bound, page + 1) %}
-			<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}"><a href="/results/{{key}}/explorer/page/{{ i + 1 }}{{ parameters }}">{{ i + 1 }}</a>{% endif %}</li>
-			{% endfor %}
-		{% endif %}
+        {% if lower_bound <= page <= lower_bound + 2 %}
+            {% for i in range(lower_bound, page + 1) %}
+                <li class="page">
+                {% if page == i + 1 %}
+                    <strong class="current">{{ page }}</strong>
+                {% else %}
+                    <a href="/results/{{key}}/explorer/page/{{ i + 1 }}{{ parameters }}">{{ i + 1 }}</a>
+                {% endif %}
+                </li>
+            {% endfor %}
+        {% endif %}
+
 		<li class="ellipsis">...</li>
 
 		{# Show middle pages #}
 		{% if (lower_bound + 2) < page < (upper_bound - 2)  %}
-			{% set current_page = page %}
 			{% for i in range((page - 1), (page + 2)) %}
-			<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ i }}{{ parameters }}">{{ i }}</a>{% endif %}</li>
+			<li class="page">{% if page == i %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ i }}{{ parameters }}">{{ i }}</a>{% endif %}</li>
 			{% endfor %}
-			<li class="ellipsis">...</span>
+			<li class="ellipsis">...</li>
 
 		{# Show upper 'edge' pages #}
 		{% elif upper_bound - 2 <= page <= upper_bound %}
 			{% for i in range(page - 1, upper_bound) %}
-			<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ i - 1 }}{{ parameters }}">{{ i - 1 }}</a>{% endif %}</li>
+			<li class="page">{% if page == i %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ i }}{{ parameters }}">{{ i }}</a>{% endif %}</li>
 			{% endfor %}
 		{% endif %}
 
