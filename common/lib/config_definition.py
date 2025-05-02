@@ -229,6 +229,15 @@ config_definition = {
         "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
                    "provided e-mail settings are configured."
     },
+    "4cat.allow_access_request_limiter": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "100/day",
+        "help": "Access request limit",
+        "tooltip": "Limit the number of access requests per day. This is a rate limit for the number of requests "
+                   "that can be made per IP address. The format is a number followed by a time unit, e.g. '100/day', "
+                   "'10/hour', '5/minute'. You can also combine these, e.g. '100/day;10/hour'.",
+        "global": True
+    },
     "4cat.sphinx_host": {
         "type": UserInput.OPTION_TEXT,
         "default": "localhost",

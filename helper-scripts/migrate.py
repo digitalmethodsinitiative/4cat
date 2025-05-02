@@ -71,10 +71,12 @@ def check_for_nltk():
 	try:
 		nltk.data.find('tokenizers/punkt_tab')
 	except LookupError:
+		print("Downloading NLTK punkt data...")	
 		nltk.download('punkt_tab', quiet=True)
 	try:
 		nltk.data.find('corpora/wordnet')
 	except LookupError:
+		print("Downloading NLTK wordnet data...")	
 		nltk.download("wordnet", quiet=True)
 	
 	nltk.download("omw-1.4", quiet=True)
@@ -164,9 +166,8 @@ pip_ran = False
 logger = logging.getLogger("migrate")
 logger.setLevel(logging.INFO)
 if args.output:
-	# Add both a file and a stream handler if output is set
-	handler = logging.StreamHandler(sys.stdout)
-	logger.addHandler(handler)
+	# Add *only* a file handler if output is set
+	# i.e. script will not output to stdout!
 	handler = logging.FileHandler(args.output)
 else:
 	handler = logging.StreamHandler(sys.stdout)

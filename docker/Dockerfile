@@ -34,7 +34,7 @@ RUN mkdir /usr/src/app/backend
 RUN mkdir /usr/src/app/webtool
 RUN mkdir /usr/src/app/datasources
 # Install python dependencies
-RUN pip3 install --upgrade pip && pip3 install -r requirements.txt
+RUN pip3 install --upgrade pip && pip3 install --no-cache-dir setuptools==78.1.0 wheel==0.46.1 && pip3 install -r requirements.txt
 
 # Install frontend Docker requirements
 RUN pip3 install gunicorn

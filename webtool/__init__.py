@@ -70,6 +70,22 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
 
+if app.logger.getEffectiveLevel() == 10:
+    # if we're in debug mode, we want to see how long it takes to load datasets
+    import time
+    from functools import wraps
+    def time_this(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            r = func(*args, **kwargs)
+            app.logger.debug("%s dataset took %.2f seconds" % (func.__name__, time.time() - start_time))
+            return r
+        return wrapper
+else:
+    def time_this(func):
+        return func
+
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
               password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
               port=config.get("DB_PORT"), appname="frontend")
@@ -81,7 +97,7 @@ from webtool.lib.openapi_collector import OpenAPICollector
 openapi = OpenAPICollector(app)
 
 # initialize rate limiter
-limiter = Limiter(app, key_func=get_remote_address)
+limiter = Limiter(app=app, key_func=get_remote_address)
 
 # make sure a secret key was set in the config file, for secure session cookies
 if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPLACE_THIS":
