@@ -7,6 +7,7 @@ import zipfile
 import typing
 import shutil
 import json
+import time
 import abc
 import csv
 import os
@@ -482,6 +483,55 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
+	def iterate_proxied_requests(self, urls, preserve_order=True, **kwargs):
+		"""
+		Request an iterable of URLs and return results
+
+		This method takes an iterable yielding URLs and yields the result for
+		a GET request for that URL in return. This is done through the worker
+		manager's DelegatedRequestHandler, which can run multiple requests in
+		parallel and divide them over the proxies configured in 4CAT (if any).
+		Proxy cooloff and queueing is shared with other processors, so that a
+		processor will never accidentally request from the same site as another
+		processor, potentially triggering rate limits.
+
+		:param urls:  Something that can be iterated over and yields URLs
+		:param kwargs:  Other keyword arguments are passed on to `add_urls`
+		and eventually to `requests.get()`.
+		:param bool preserve_order:  Return items in the original order. Use
+		`False` to potentially speed up processing, if order is not important.
+		:return:  A generator yielding request results, i.e. tuples of a
+		URL and a `requests` response objects
+		"""
+		queue_name = f"{self.type}-{self.dataset.key}"
+		delegator = self.manager.proxy_delegator
+
+		# 50 is an arbitrary batch size - but we top up every 0.05s, so
+		# that should be sufficient
+		batch_size = 50
+
+		# we need an iterable, so we can use next() and StopIteration
+		urls = iter(urls)
+
+		have_urls = True
+		while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
+			if queue_length < batch_size and have_urls:
+				batch = []
+				while len(batch) < (batch_size - queue_length):
+					try:
+						batch.append(next(urls))
+					except StopIteration:
+						have_urls = False
+						break
+
+				delegator.add_urls(batch, queue_name, **kwargs)
+
+			time.sleep(0.05)  # arbitrary...
+			for url, result in delegator.get_results(queue_name, preserve_order=preserve_order):
+				# result may also be a FailedProxiedRequest!
+				# up to the processor to decide how to deal with it
+				yield url, result
+
 	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
 		A generator that iterates through files in an archive
@@ -902,7 +952,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		This is used to determine whether a class is a 4CAT
 		processor.
-		
+
 		:return:  True
 		"""
 		return True
