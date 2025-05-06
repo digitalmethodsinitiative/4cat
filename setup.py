@@ -10,7 +10,7 @@ with open("VERSION") as versionfile:
 # Universal packages
 packages = set([
 	"anytree~=2.8.0",
-	"atproto==0.0.57",
+	"atproto>=0.0.58",
 	"bcrypt~=3.2.0",
 	"beautifulsoup4",#~=4.11.0",
 	"clarifai-grpc~=9.0",
