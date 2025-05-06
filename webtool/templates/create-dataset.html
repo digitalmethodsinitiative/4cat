@@ -73,6 +73,25 @@
                         <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
                     </div>
                     {% endif %}
+                    {% if __user_config("privileges.can_schedule_datasources") %}
+                    <div class="form-element">
+                        <label for="data-schedule-collection">Schedule repeat collection:</label>
+                        <div class="filter-parameters">
+                            <label><input type="checkbox" name="schedule-collection" id="data-schedule-collection"></label>
+                            <label>Number of days between collection:<input id="data-schedule-interval" type="number" name="schedule-interval"></label>
+                            <button class="tooltip-trigger" aria-controls="tooltip-schedule-interval" aria-label="Extended help for option">?</button>
+                        </div>
+                        <p role="tooltip" id="tooltip-schedule-interval">Note: you will need to use the Scheduler view to stop continued collection.</p>
+                    </div>
+                    <div class="form-element">
+                        <label for="data-schedule-enddate">Until:</label>
+                        <div class="filter-parameters">
+                            <label>End after:<input id="data-schedule-enddate" type="date" name="schedule-enddate"></label>
+                            <button class="tooltip-trigger" aria-controls="tooltip-schedule-enddate" aria-label="Extended help for option">?</button>
+                        </div>
+                        <p role="tooltip" id="tooltip-schedule-enddate">No jobs additional jobs will be collected after this point.</p>
+                    </div>
+                    {% endif %}
                     <div class="form-element dataset-labeling">
                         <label for="dataset-label">Dataset name:</label>
                         <input id="dataset-label" name="label">

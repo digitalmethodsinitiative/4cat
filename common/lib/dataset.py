@@ -15,7 +15,7 @@ from pathlib import Path
 from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api, get_last_line
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -539,6 +539,12 @@ class DataSet(FourcatModule):
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
+		#TODO: remove when migrate script ensures scheduled_jobs table exists
+		scheduler = self.db.fetchone(
+			"SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )",
+			("public", "scheduled_jobs"))
+		if scheduler["exists"]:
+			self.db.delete("scheduled_jobs", where={"dataset_id": self.key}, commit=commit)
 
 		# delete from drive
 		try:
@@ -1098,6 +1104,18 @@ class DataSet(FourcatModule):
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"progress": progress})
 		return updated > 0
 
+	def get_last_update(self):
+		"""
+		Get the last update time of the dataset. If dataset is completed, this will be the last status update (usually
+		"Dataset Completed".
+
+		Returns None if there is no last update time.
+		"""
+		if self.get_log_path().exists():
+			return datetime.datetime.strptime(get_last_line(self.get_log_path())[:24], "%c")
+		else:
+			return None
+
 	def get_progress(self):
 		"""
 		Get dataset progress
@@ -1174,7 +1192,7 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_source"]:
+		if "software_source" not in self.data or not self.data["software_source"]:
 			return ""
 
 		filepath = self.data.get("software_file", "")
