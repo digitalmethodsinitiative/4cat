@@ -21,6 +21,7 @@ class WorkerManager:
 	job_mapping = {}
 	pool = []
 	looping = True
+	unknown_jobs = set()
 
 	def __init__(self, queue, database, logger, as_daemon=True):
 		"""
@@ -111,7 +112,9 @@ class WorkerManager:
 						# it's fine
 						pass
 			else:
-				self.log.error("Unknown job type: %s" % jobtype)
+				if jobtype not in self.unknown_jobs:
+					self.log.error("Unknown job type: %s" % jobtype)
+					self.unknown_jobs.add(jobtype)
 
 		time.sleep(1)
 

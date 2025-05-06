@@ -312,7 +312,7 @@ class ConfigManager:
         if type(user) is not str:
             if hasattr(user, "get_id"):
                 user = user.get_id()
-            elif user is not None:
+            elif user != None: # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
                 raise TypeError("get() expects None, a User object or a string for argument 'user'")
 
         # user-specific settings are just a special type of tag (which takes

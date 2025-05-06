@@ -38,11 +38,11 @@ class GexfToCsv(BasicProcessor):
         """
         self.dataset.update_status("Reading network file")
         graph = nx.read_gexf(self.source_dataset.get_results_path())
-        # Use a generator to lazily sort edges by frequency
+        # Use a generator to lazily sort edges by weight (frequency may be intervals; weight is overall edge frequency per 4CAT)
         sorted_edges = heapq.nlargest(
             len(graph.edges),  # Number of edges to process
             graph.edges(data=True),
-            key=lambda edge: edge[2].get("frequency", 0)  # Sort by edge frequency
+            key=lambda edge: edge[2].get("weight", 0)  # Sort by edge weight
         )
 
         self.dataset.update_status("Writing CSV file")

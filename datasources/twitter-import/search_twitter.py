@@ -13,7 +13,7 @@ from common.lib.item_mapping import MappedItem
 
 class SearchTwitterViaZeeschuimer(Search):
     """
-    Import scraped Imgur data
+    Import scraped X/Twitter data
     """
     type = "twitter-import"  # job ID
     category = "Search"  # category

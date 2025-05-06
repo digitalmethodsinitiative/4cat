@@ -96,7 +96,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 			else:
 				id = self.job.data["remote_id"]
 
-		if data.status_code == 404:
+		if data.status_code == 404 or data.status_code == 403:
 			# this should be handled differently from an actually erroneous response
 			# because it may indicate that the resource has been deleted
 			self.not_found()

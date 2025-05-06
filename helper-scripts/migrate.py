@@ -166,9 +166,8 @@ pip_ran = False
 logger = logging.getLogger("migrate")
 logger.setLevel(logging.INFO)
 if args.output:
-	# Add both a file and a stream handler if output is set
-	handler = logging.StreamHandler(sys.stdout)
-	logger.addHandler(handler)
+	# Add *only* a file handler if output is set
+	# i.e. script will not output to stdout!
 	handler = logging.FileHandler(args.output)
 else:
 	handler = logging.StreamHandler(sys.stdout)

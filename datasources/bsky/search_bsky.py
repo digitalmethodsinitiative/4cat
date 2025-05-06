@@ -386,9 +386,12 @@ class SearchBluesky(Search):
                     total_posts += 1
 
                 # Check if there is a cursor for the next page
-                cursor = response['cursor']
-                if max_posts != 0:
+                cursor = response['cursor']                
+                if max_posts != 0 and rank % (max_posts // 10) == 0:
+                    self.dataset.update_status(f"Progress query {query}: {rank} posts collected out of {max_posts}")
                     self.dataset.update_progress(total_posts / (max_posts * num_queries))
+                elif max_posts == 0 and rank % 1000 == 0:
+                    self.dataset.update_status(f"Progress query {query}: {rank} posts collected")
 
                 if 0 < max_posts <= rank:
                     self.dataset.update_status(
@@ -655,7 +658,7 @@ class SearchBluesky(Search):
                     return user_profile.handle
                 else:
                     return None
-            except InvokeTimeoutError as e:
+            except (NetworkError, InvokeTimeoutError) as e:
                 # Network error; try again
                 tries += 1
                 time.sleep(1)
@@ -701,7 +704,15 @@ class SearchBluesky(Search):
         if session_path.exists():
             with session_path.open() as session_file:
                 session_string = session_file.read()
-                client.login(session_string=session_string)
+                try:
+                    client.login(session_string=session_string)
+                except BadRequestError as e:
+                    if e.response.content.message == 'Token has expired':
+                        # Token has expired; try to refresh
+                        if username and password:
+                            client.login(login=username, password=password)
+                        else:
+                            raise ValueError("Session token has expired; please re-login with username and password.")
         else:
             # Were not able to log in via session string; login with username and password
             client.login(login=username, password=password)

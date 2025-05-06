@@ -95,6 +95,18 @@
                         </dd>
                     </div>
                     {% endif %}
+                    {% if example_keys %}
+                    <div class="fullwidth">
+                        <dt>DataSet keys</dt>
+                        <dd>
+                            <ul class="nobullet">
+                            {% for key in example_keys %}
+                                <span class="inline-label property-badge">{{ key }}</span>
+                            {% endfor %}
+                            </ul>
+                        </dd>
+                    </div>
+                    {% endif %}
                 </dl>
             </div>
             {% else %}
