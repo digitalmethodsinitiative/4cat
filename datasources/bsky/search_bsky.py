@@ -704,7 +704,15 @@ class SearchBluesky(Search):
         if session_path.exists():
             with session_path.open() as session_file:
                 session_string = session_file.read()
-                client.login(session_string=session_string)
+                try:
+                    client.login(session_string=session_string)
+                except BadRequestError as e:
+                    if e.response.content.message == 'Token has expired':
+                        # Token has expired; try to refresh
+                        if username and password:
+                            client.login(login=username, password=password)
+                        else:
+                            raise ValueError("Session token has expired; please re-login with username and password.")
         else:
             # Were not able to log in via session string; login with username and password
             client.login(login=username, password=password)
