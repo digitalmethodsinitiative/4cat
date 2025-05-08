@@ -431,7 +431,7 @@ class DataSet(FourcatModule):
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
 
-	def sort_and_iterate_items(self, sort="", reverse=False, chunk_size=5000, **kwargs) -> dict:
+	def sort_and_iterate_items(self, sort="", reverse=False, chunk_size=50000, **kwargs) -> dict:
 		"""
 		Loop through items in a dataset, sorted by a given key.
 
@@ -443,66 +443,85 @@ class DataSet(FourcatModule):
 
 		:returns dict:				Yields iterated post
 		"""
-		if reverse is False and (sort == "dataset-order" or sort == ""):
-			# Sort by dataset order
-			yield from self.iterate_items(**kwargs)			
+		def sort_items(items_to_sort, sort_key, reverse, convert_sort_to_float=False):
+			"""
+			Sort items based on the given key and order.
 
-		elif self.num_rows < chunk_size:
-			# Storing posts in the right order here
-			sorted_posts = []
-
-			# Use reversed() if we're reading the dataset from back to front.
-			if sort == "dataset-order" and reverse:
-				for item in reversed(list(self.iterate_items(**kwargs))):
-					sorted_posts.append(item)
-
-			# Sort on the basis of a column value
+			:param items_to_sort:  The items to sort
+			:param sort_key:  The key to sort by
+			:param reverse:  Whether to sort in reverse order
+			:return:  Sorted items
+			"""
+			if reverse is False and (sort_key == "dataset-order" or sort_key == ""):
+				# Sort by dataset order
+				yield from items_to_sort
+			elif sort_key == "dataset-order" and reverse:
+				# Sort by dataset order in reverse
+				yield from reversed(list(items_to_sort))
 			else:
-				try:
-					for item in sorted(self.iterate_items(**kwargs), key=lambda x: x.get(sort,""), reverse=reverse):
-						sorted_posts.append(item)
-				except TypeError:
+				# Sort on the basis of a column value
+				if not convert_sort_to_float:
+					yield from sorted(items_to_sort, key=lambda x: x.get(sort_key, ""), reverse=reverse)
+				else:
 					# Dataset fields can contain integers and empty strings.
 					# Since these cannot be compared, we will convert every
 					# empty string to 0.
-					for item in sorted(self.iterate_items(**kwargs), key=lambda x: convert_to_float(x.get(sort,"")), reverse=reverse):
-						sorted_posts.append(item)
+					yield from sorted(items_to_sort, key=lambda x: convert_to_float(x.get(sort_key, "")), reverse=reverse)	
 
-			for post in sorted_posts:
-				yield post
+		if self.num_rows < chunk_size:
+			try:
+				yield from sort_items(self.iterate_items(**kwargs), sort, reverse)
+			except TypeError:
+				# Dataset fields can contain integers and empty strings.
+				# Since these cannot be compared, we will convert every
+				# empty string to 0.
+				yield from sort_items(self.iterate_items(**kwargs), sort, reverse, convert_sort_to_float=True)
+
 		else:
 			# For large datasets, we will use chunk sorting
 			staging_area = self.get_staging_area()
 			buffer = []
 			chunk_files = []
+			convert_sort_to_float = False
+			fieldnames = self.get_columns()
 
-			def write_sorted_chunk(buffer, chunk_index):
+			def write_chunk(buffer, chunk_index):
 				"""
-				Helper function to sort a buffer and write it to a temporary file.
-				If sort == "dataset-order" and reverse == True, reverse the buffer.
+				Write a chunk of data to a temporary file
+
+				:param buffer:  The buffer containing the chunk of data
+				:param chunk_index:  The index of the chunk
+				:return:  The path to the temporary file
 				"""
-				if sort == "dataset-order" and reverse:
-					buffer.reverse()
-				else:
-					buffer.sort(key=lambda x: convert_to_float(x.get(sort, "")), reverse=reverse)
 				temp_file = staging_area.joinpath(f"chunk_{chunk_index}.csv")
 				with temp_file.open("w", encoding="utf-8") as chunk_file:
-					writer = csv.DictWriter(chunk_file, fieldnames=self.get_columns())
+					writer = csv.DictWriter(chunk_file, fieldnames=fieldnames)
 					writer.writeheader()
 					writer.writerows(buffer)
 				return temp_file
-
+			
 			# Divide the dataset into sorted chunks
 			for item in self.iterate_items(**kwargs):
 				buffer.append(item)
 				if len(buffer) >= chunk_size:
-					chunk_files.append(write_sorted_chunk(buffer, len(chunk_files)))
+					try:
+						buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+					except TypeError:
+						# Dataset fields can contain integers and empty strings.
+						# Since these cannot be compared, we will convert every
+						# empty string to 0.
+						convert_sort_to_float = True
+						buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+
+					chunk_files.append(write_chunk(buffer, len(chunk_files)))
 					buffer.clear()
 
 			# Sort and write any remaining items in the buffer
 			if buffer:
-				chunk_files.append(write_sorted_chunk(buffer, len(chunk_files)))
-
+				buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+				chunk_files.append(write_chunk(buffer, len(chunk_files)))
+				buffer.clear()
+				
 			# Merge sorted chunks into the final sorted file
 			sorted_file = staging_area.joinpath("sorted_" + self.key + ".csv")
 			with sorted_file.open("w", encoding="utf-8") as outfile:
@@ -517,8 +536,19 @@ class DataSet(FourcatModule):
 				for i, reader in enumerate(chunk_readers):
 					try:
 						row = next(reader)
-						# Use a reverse index for "dataset-order" and reverse=True
-						sort_key = -i if sort == "dataset-order" and reverse else convert_to_float(row.get(sort, ""))
+						if sort == "dataset-order" and reverse:
+							# Use a reverse index for "dataset-order" and reverse=True
+							sort_key = -i
+						elif convert_sort_to_float:
+							# Negate numeric keys for reverse sorting
+							sort_key = -convert_to_float(row.get(sort, "")) if reverse else convert_to_float(row.get(sort, ""))
+						else:
+							if reverse:
+                                # For reverse string sorting, invert string comparison by creating a tuple
+                                # with an inverted string - this makes Python's tuple comparison work in reverse
+								sort_key = (tuple(-ord(c) for c in row.get(sort, "")), -i)
+							else:
+								sort_key = (row.get(sort, ""), i)
 						heap.append((sort_key, i, row))
 					except StopIteration:
 						pass
@@ -531,8 +561,17 @@ class DataSet(FourcatModule):
 					writer.writerow(smallest_row)
 					try:
 						next_row = next(chunk_readers[chunk_index])
-						# Use a reverse index for "dataset-order" and reverse=True
-						sort_key = -chunk_index if sort == "dataset-order" and reverse else convert_to_float(next_row.get(sort, ""))
+						if sort == "dataset-order" and reverse:
+							# Use a reverse index for "dataset-order" and reverse=True
+							sort_key = -chunk_index
+						elif convert_sort_to_float:
+							sort_key = -convert_to_float(next_row.get(sort, "")) if reverse else convert_to_float(next_row.get(sort, ""))
+						else:
+							# Use the same inverted comparison for string values
+							if reverse:
+								sort_key = (tuple(-ord(c) for c in next_row.get(sort, "")), -chunk_index)
+							else:
+								sort_key = (next_row.get(sort, ""), chunk_index)
 						heapq.heappush(heap, (sort_key, chunk_index, next_row))
 					except StopIteration:
 						pass
