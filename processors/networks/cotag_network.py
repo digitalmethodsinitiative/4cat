@@ -39,6 +39,8 @@ class CoTaggerPreset(ProcessorPreset):
         }
     }
 
+    possible_tag_columns = {"tags", "hashtags", "groups"}
+
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
@@ -46,9 +48,8 @@ class CoTaggerPreset(ProcessorPreset):
 
         :param module: Module to determine compatibility with
         """
-        usable_columns = {"tags", "hashtags", "groups"}
         columns = module.get_columns()
-        return bool(set(columns) & usable_columns) if columns else False
+        return bool(set(columns) & cls.possible_tag_columns) if columns else False
 
     def get_processor_pipeline(self):
         """
@@ -67,7 +68,8 @@ class CoTaggerPreset(ProcessorPreset):
             # same for tumblr's tags
             tag_column = "tags"
         else:
-            tag_column = "hashtags"
+            columns = self.source_dataset.get_columns()
+            tag_column = next((col for col in columns if col in self.possible_tag_columns), None)
 
         pipeline = [
             {

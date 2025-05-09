@@ -113,10 +113,11 @@ class SearchInstagram(Search):
             media_types = set([s["node"]["__typename"] for s in node["edge_sidecar_to_children"]["edges"]])
             media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
-        location = {"name": "", "latlong": "", "city": ""}
+        location = {"name": "", "latlong": "", "city": "", "location_id": ""}
         # location has 'id', 'has_public_page', 'name', and 'slug' keys in tested examples; no lat long or "city" though name seems
         if node.get("location"):
             location["name"] = node["location"].get("name")
+            location["location_id"] = node["location"].get("pk")
             # Leaving this though it does not appear to be used in this type; maybe we'll be surprised in the future...
             location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
                 "location"].get("lat") else ""
@@ -139,6 +140,7 @@ class SearchInstagram(Search):
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
+            "is_verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["shortcode"],
@@ -152,6 +154,7 @@ class SearchInstagram(Search):
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
             "num_media": num_media,
             "location_name": location["name"],
+            "location_id": location["location_id"],
             "location_latlong": location["latlong"],
             "location_city": location["city"],
             "unix_timestamp": node["taken_at_timestamp"]
@@ -208,9 +211,10 @@ class SearchInstagram(Search):
         else:
             num_comments = -1
 
-        location = {"name": "", "latlong": "", "city": ""}
+        location = {"name": "", "latlong": "", "city": "", "location_id": ""}
         if node.get("location"):
             location["name"] = node["location"].get("name")
+            location["location_id"] = node["location"].get("pk")
             location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
                 "location"].get("lat") else ""
             location["city"] = node["location"].get("city")
@@ -220,6 +224,20 @@ class SearchInstagram(Search):
         if user and owner:
             if user.get("username") != owner.get("username"):
                 raise MapItemException("Unable to parse item: different user and owner")
+
+        # Instagram posts also allow 'Collabs' with up to one co-author
+        coauthors = []
+        coauthor_fullnames = []
+        coauthor_ids = []
+        if node.get("coauthor_producers"):
+            for coauthor_node in node["coauthor_producers"]:
+                coauthors.append(coauthor_node.get("username"))
+                coauthor_fullnames.append(coauthor_node.get("full_name"))
+                coauthor_ids.append(coauthor_node.get("id"))
+
+        coauthors = {"coauthors": ",".join(coauthors),
+                     "coauthor_fullnames": ",".join(coauthor_fullnames),
+                     "coauthor_ids": ",".join(coauthor_ids)}
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
@@ -231,7 +249,9 @@ class SearchInstagram(Search):
             "body": caption,
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
+            "verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
+            **coauthors,
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["code"],
@@ -245,6 +265,7 @@ class SearchInstagram(Search):
             "num_comments": num_comments,
             "num_media": num_media,
             "location_name": location["name"],
+            "location_id": location["location_id"],
             "location_latlong": location["latlong"],
             "location_city": location["city"],
             "unix_timestamp": node["taken_at"]

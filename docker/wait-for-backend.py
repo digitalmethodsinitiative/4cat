@@ -13,8 +13,11 @@ def main():
         sys.exit(1)
 
     try:
-        call_api("worker-status")["response"]["running"]
-        sys.exit(0)
+        api_response = call_api("worker-status")
+        if api_response["status"] == "success":
+            sys.exit(0)
+        else:
+            sys.exit(1)
     except ConnectionRefusedError:
         sys.exit(1)
 

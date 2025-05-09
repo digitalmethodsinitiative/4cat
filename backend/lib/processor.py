@@ -10,6 +10,7 @@ import json
 import abc
 import csv
 import os
+import random
 
 from pathlib import Path, PurePath
 
@@ -18,7 +19,7 @@ from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
-								   DataSetException, MapItemException)
+								   DataSetException, MapItemException, AnnotationException)
 from common.config_manager import config, ConfigWrapper
 from common.lib.user import User
 
@@ -197,9 +198,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.abort()
 			except Exception as e:
 				self.dataset.log("Processor crashed (%s), trying again later" % str(e))
-				frames = traceback.extract_tb(e.__traceback__)
-				last_frame = frames[-1]
-				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
+				stack = traceback.extract_tb(e.__traceback__)
+				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack[1:]]
 				location = "->".join(frames)
 
 				# Not all datasets have source_dataset keys
@@ -212,7 +212,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.remove_files()
 
 				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
-				self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=last_frame)
+				self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
 		else:
 			# dataset already finished, job shouldn't be open anymore
 			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))
@@ -262,6 +262,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					owner=self.dataset.creator,
 					modules=self.modules
 				)
+				# copy ownership from parent dataset
+				next_analysis.copy_ownership_from(self.dataset)
+				# add to queue
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
 				can_run_next = False
@@ -402,7 +405,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		TODO: could be improved by accepting different types of data depending on csv or ndjson.
 
-		:param str field_name: 	name of the desired
+		:param str field_name: 	Name of the desired new field
 		:param List new_data: 	List of data to be added to parent dataset
 		:param DataSet which_parent: 	DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
 		:param bool update_existing: 	False (default) will raise an error if the field_name already exists
@@ -721,6 +724,67 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		return standalone
 
+	def save_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
+		"""
+		Saves annotations made by this processor on the basis of another dataset.
+		Also adds some data regarding this processor: set `author` and `label` to processor name,
+		and add parameters to `metadata` (unless explicitly indicated).
+
+		:param annotations:		List of dictionaries with annotation items. Must have `item_id` and `value`.
+								E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
+		:param source_dataset:	The dataset that these annotations were based on.
+								Defaults to the parent dataset.
+		:param bool overwrite:	Whether to overwrite annotations if the label is already present
+								for the dataset. If this is False and the label is already present,
+								we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
+								Else we'll just replace the old data.
+
+		:returns int:			How many annotations were saved.
+
+		"""
+
+		if not annotations:
+			return 0
+
+		# Default to parent dataset
+		if not source_dataset:
+			source_dataset = self.source_dataset
+
+		# Check if this dataset already has annotation fields
+		existing_labels = source_dataset.get_annotation_field_labels()
+
+		# Set some values
+		for annotation in annotations:
+
+			if not annotation.get("label"):
+				# If there's no label, set the default label to this processor's name
+				label = self.name
+			else:
+				# If we have a custom label, use that
+				label = annotation["label"]
+				# Shorten if necessary
+				if len(label) > 100:
+					label = label[:100]
+
+			# If the processor has already generated annotation fields,
+			# or if we have a custom label that already exists
+			# add a number suffix to differentiate
+			if not overwrite and label in existing_labels:
+				label += "-" + str(len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
+			# Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
+			annotation["label"] = label
+
+			# Set the author to this processor's name
+			if not annotation.get("author"):
+				annotation["author"] = self.name
+			if not annotation.get("author_original"):
+				annotation["author_original"] = self.name
+
+			annotation["by_processor"] = True
+
+		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+		return annotations_saved
+
 	@classmethod
 	def map_item_method_available(cls, dataset):
 		"""
@@ -855,6 +919,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		else:
 			# A non filter processor updated the base Processor extension to None/False?
 			return None
+
+
 
 	@classmethod
 	def is_rankable(cls, multiple_items=True):

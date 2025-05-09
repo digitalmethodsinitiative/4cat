@@ -73,8 +73,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # being the process output
 
             if self.job.data["remote_id"].startswith("upgrade"):
-                command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart --output %s" % \
-                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_restart)))
+                command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart" % \
+                          (shlex.quote(config.get("4cat.github_url")))
                 if self.job.details and self.job.details.get("branch"):
                     # migrate to code in specific branch
                     command += f" --branch {shlex.quote(self.job.details['branch'])}"

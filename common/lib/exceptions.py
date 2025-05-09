@@ -44,6 +44,11 @@ class ProcessorException(FourcatException):
     """
     pass
 
+class AnnotationException(FourcatException):
+    """
+    Raise for exceptions with setting/getting annotations.
+    """
+    pass
 
 class MapItemException(ProcessorException):
     """

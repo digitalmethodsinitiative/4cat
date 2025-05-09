@@ -734,7 +734,7 @@ class SearchWithTwitterAPIv2(Search):
 
         hashtags = [tag["tag"] for tag in item.get("entities", {}).get("hashtags", [])]
         mentions = [tag["username"] for tag in item.get("entities", {}).get("mentions", [])]
-        urls = [tag.get("expanded_url", tag["display_url"]) for tag in item.get("entities", {}).get("urls", [])]
+        urls = [tag.get("expanded_url", tag["display_url"]) for tag in item.get("entities", {}).get("urls", []) if ("display_url" in tag or "expanded_url" in tag)]
         images = [attachment["url"] for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
         video_items = [attachment for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
@@ -762,7 +762,7 @@ class SearchWithTwitterAPIv2(Search):
             # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense
             [hashtags.append(tag["tag"]) for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]
             [mentions.append(tag["username"]) for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]
-            [urls.append(tag.get("expanded_url", tag["display_url"])) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
+            [urls.append(tag.get("expanded_url", tag["display_url"])) for tag in retweeted_tweet.get("entities", {}).get("urls", []) if ("display_url" in tag or "expanded_url" in tag)]
             # Images appear to be inheritted by retweets, but just in case
             [images.append(attachment["url"]) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
             [video_items.append(attachment) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
