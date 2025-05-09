@@ -235,11 +235,7 @@ def explorer_save_annotations(dataset_key: str):
 def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 	"""
 	Loop through both csv and NDJSON files.
-	This is basically a wrapper function for `iterate_items()` with the
-	added functionality of sorting a dataset. Because the Explorer is (currently)
-	the only feature that requires sorting, we define it here.
-	This first iterates through the entire file (with a max limit) to determine
-	an order. Then it yields items based on this order.
+	Wrapper function for `dataset.sort_and_iterate_items()`.
 
 	:param dataset:				The dataset object.
 	:param sort:				The item key that determines the sort order.
@@ -247,6 +243,12 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 
 	:returns dict:				Yields iterated post
 	"""
+
+	# Resort to regular iteration if the dataset is larger than the maximum
+	# allowed posts for the Explorer.
+	if dataset.data["num_rows"] > config.get("explorer.max_posts", 500000):
+		yield from dataset.iterate_items(**kwargs)
+		return
 
 	# Use dataset's sort_and_iterate_items function which can accept chunk_size and
 	# creates a sorted temporary file (thus not using so much memory).
