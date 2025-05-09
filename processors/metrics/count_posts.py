@@ -67,6 +67,7 @@ class CountPosts(BasicProcessor):
 			counter = 0
 
 			for post in self.source_dataset.iterate_items(self):
+
 				try:
 					date = get_interval_descriptor(post, timeframe)
 				except ValueError as e:

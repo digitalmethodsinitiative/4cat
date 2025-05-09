@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
+from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 class SearchDouyin(Search):
@@ -26,7 +27,7 @@ class SearchDouyin(Search):
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
         "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)"
     ]
-
+    
     def get_items(self, query):
         """
         Run custom search
