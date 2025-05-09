@@ -17,8 +17,8 @@ class OpenAI(BasicProcessor):
 	type = "openai-llms"  # job type ID
 	category = "Machine learning"  # category
 	title = "OpenAI prompting"  # title displayed in UI
-	description = ("Use OpenAI's LLM models (e.g. GPT-4) to generate text based on the parent dataset. This is a generic "
-				   "processor that can be used for a variety of tasks, like classification or entity extraction.") # description displayed in UI
+	description = ("Use OpenAI's LLMs or local models via LM Studio to generate text based on the parent dataset. "
+				   "This can be used for tasks like classification or entity extraction.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI. In this case it's variable!
 
 	references = [
@@ -109,6 +109,7 @@ class OpenAI(BasicProcessor):
 			},
 			"ethics_warning2": {
 				"type": UserInput.OPTION_INFO,
+				"requires": "model!=local-lmstudio",
 				"help": "<strong>Be very sensitive with running this processor on your datasets, as data will be "
 						"sent to OpenAI.</strong>"
 			},
