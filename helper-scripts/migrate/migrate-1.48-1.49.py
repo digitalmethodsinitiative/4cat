@@ -28,11 +28,10 @@ has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns
 # Ensure we do not attempt to update the annotations table if it has already been updated
 # This will drop the annotations table and create a new one losing all annotations
 # (both backend and frontend run migrate.py in case they have to update different aspects)
-if  has_column:
+if has_column["num"] > 0:
     print("    Annotations table seems to have been updated already")
 else:
     print("    Annotations table needs to be updated")
-
 
     datasets = db.fetchall("SELECT * FROM datasets WHERE annotation_fields != ''")
 
@@ -134,7 +133,8 @@ else:
             annotation_fields = dataset["annotation_fields"]
             if annotation_fields:
                 annotation_fields = json.loads(dataset.get("annotation_fields"))
-            else: annotation_fields = {}
+            else:
+                annotation_fields = {}
 
             author = dataset.get("creator", "")
 
@@ -155,7 +155,7 @@ else:
                         field_id = field_id[0]
                         
                     # Skip if this field was not saved to the datasets table
-                    if not field_id or field_id not in annotation_fields:
+                    if not field_id or field_id == "NaN" or field_id not in annotation_fields:
                         print("      Annotation field ID not saved to datasets table, skipping...")
                         skipped_count += 1
                         continue
