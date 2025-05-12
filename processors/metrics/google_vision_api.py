@@ -157,7 +157,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         self.dataset.update_status("Annotations retrieved for %i images (%i processed in total)" % (done, processed), is_final=True)
         self.dataset.finish(done)
 
-    def annotate_image(self, image_file: Path, api_key: str, features: list) -> list | None:
+    def annotate_image(self, image_file: Path, api_key: str, features: list):
         """
         Get annotations from the Google Vision API
 

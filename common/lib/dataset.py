@@ -1823,7 +1823,7 @@ class DataSet(FourcatModule):
 
 		return True if annotation else False
 
-	def get_annotation(self, data: dict) -> Annotation | None:
+	def get_annotation(self, data: dict):
 		"""
 		Retrieves a specific annotation if it exists.
 
