@@ -337,13 +337,16 @@ config_definition = {
     },
     "explorer.config_explanation": {
         "type": UserInput.OPTION_INFO,
-        "help": "Data sources use <em>Explorer templates</em> that determine their look and data. "
-                "These are made of [custom HTML templates](https://github.com/digitalmethodsinitiative/4cat/tree/master/"
-                "webtool/datasource-templates/explorer/templates) and [custom CSS files](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer). "
-                "If no template is available, a <em>generic</em> template is used "
-                "made of [this HTML file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/templates/explorer/"
-                "templates/generic.html) and [this CSS file](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/"
-                "static/css/explorer/generic.css)."
+        "help": "Data sources use <em>Explorer templates</em> that determine how they look and what information is "
+                "displayed. Explorer templates consist of [custom HTML templates](https://github.com/"
+                "digitalmethodsinitiative/4cat/tree/master/webtool/templates/explorer/datasource-templates) and "
+                "[custom CSS files](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/"
+                "explorer). If no template is available for a data source, a <em>generic</em> template is used "
+                "made of [this HTML file](https://github.com/digitalmethodsinitiative/4cat/blob/master/webtool/"
+                "templates/explorer/datasource-templates/generic.html) and [this CSS file](https://github.com/"
+                "digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer/generic.css).\n\n"
+                "You can request a new data source Explorer template by [creating a GitHub issue](https://github.com/"
+                "digitalmethodsinitiative/4cat/issues) or adding them yourself and opening a pull request."
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
