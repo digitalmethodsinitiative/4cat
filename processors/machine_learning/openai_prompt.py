@@ -144,7 +144,7 @@ class OpenAI(BasicProcessor):
 				"default": "",
 				"help": "OpenAI API key",
 				"tooltip": "Can be created on platform.openapi.com",
-				"requires": "model!==custom",
+				"requires": "model!=local-lmstudio",
 				"sensitive": True
 			}
 
