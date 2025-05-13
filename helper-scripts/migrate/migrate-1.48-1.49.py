@@ -88,19 +88,20 @@ else:
     ON annotations_new (
         id
     );
+    CREATE INDEX IF NOT EXISTS annotations_dataset
+    ON annotations_new (
+        dataset
+    );
     CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
     ON annotations_new (
-        label,
+        dataset,
+        item_id,
+        label
+    );
+    CREATE INDEX IF NOT EXISTS annotation_dataset
+    ON annotations_new (
         dataset,
         item_id
-    );
-    CREATE INDEX IF NOT EXISTS annotation_value
-    ON annotations_new (
-        value
-    );
-    CREATE INDEX IF NOT EXISTS annotation_timestamp
-    ON annotations_new (
-        timestamp
     );
     """)
 
