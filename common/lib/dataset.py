@@ -357,8 +357,9 @@ class DataSet(FourcatModule):
 		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
-		# Annotations are dynamically added and we're handling them as 'extra' map_item fields.
+		# Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
 		annotation_labels = self.get_annotation_field_labels()
+		num_annotations = 0 if not annotation_labels else self.num_annotations()
 
 		# missing field strategy can be for all fields at once, or per field
 		# if it is per field, it is a dictionary with field names and their strategy
@@ -411,7 +412,12 @@ class DataSet(FourcatModule):
 				if not isinstance(mapped_item, MappedItem):
 					mapped_item = MappedItem(mapped_item)
 
-				annotations = self.get_annotations_for_item(mapped_item.data["id"])
+				# If this dataset has less than n annotations, just retrieve them all.
+				if num_annotations <= 500:
+					annotations = self.get_annotations()
+				# Else get annotations per item (more queries but less memory usage).
+				else:
+					annotations = self.get_annotations_for_item(mapped_item.data["id"])
 
 				for annotation_label in annotation_labels:
 					# Get annotations for this specific post
@@ -1822,6 +1828,12 @@ class DataSet(FourcatModule):
 		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
 
 		return True if annotation else False
+
+	def num_annotations(self) -> int:
+		"""
+		Get the amount of annotations
+		"""
+		return self.db.fetchone("SELECT COUNT(*) FROM annotations WHERE dataset = %s", (self.key,))["count"]
 
 	def get_annotation(self, data: dict):
 		"""

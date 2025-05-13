@@ -88,22 +88,23 @@ CREATE TABLE IF NOT EXISTS annotations (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS annotation_id
-  ON annotations (
+ON annotations (
     id
 );
+CREATE INDEX IF NOT EXISTS annotations_dataset
+ON annotations (
+    dataset
+);
 CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
-  ON annotations (
-    label,
+ON annotations (
+    dataset,
+    item_id,
+    label
+);
+CREATE INDEX IF NOT EXISTS annotation_dataset
+ON annotations (
     dataset,
     item_id
-);
-CREATE INDEX IF NOT EXISTS annotation_value
-  ON annotations (
-    value
-);
-CREATE INDEX IF NOT EXISTS annotation_timestamp
-  ON annotations (
-    timestamp
 );
 
 -- metrics
