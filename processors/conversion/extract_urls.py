@@ -250,6 +250,9 @@ class ExtractURLs(BasicProcessor):
         # Avoid requesting the same URL multiple times
         cache = {}
 
+        write_annotations = self.parameters.get("write_annotations", False)
+        annotations = []
+
         # write a new file with the updated links
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
             writer = csv.DictWriter(output, fieldnames=fieldnames)
