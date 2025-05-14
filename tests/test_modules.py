@@ -234,8 +234,9 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
 
     # Report all failures at the end
     if failures:
+        names = [name for name, _ in failures]
         failure_messages = "\n".join([f"{name}: {error}" for name, error in failures])
-        pytest.fail(f"The following processors failed:\n{failure_messages}")
+        pytest.fail(f"The following processors failed: {names}\n{failure_messages}")
     else:
         logger.info("All processors passed successfully.")
 
@@ -268,7 +269,8 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
     
     # Report all failures at the end
     if failures:
+        names = [name for name, _ in failures]
         failure_messages = "\n".join([f"{name}: {error}" for name, error in failures])
-        pytest.fail(f"The following datasources failed:\n{failure_messages}")
+        pytest.fail(f"The following datasources failed: {names}\n{failure_messages}")
     else:
         logger.info("All datasources passed successfully.")
