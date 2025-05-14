@@ -243,11 +243,16 @@ class ExtractURLs(BasicProcessor):
         write_annotations = self.parameters.get("write_annotations", False)
         annotations = []
 
+        return_matches_only = self.parameters.get("return_matches_only", True)
+
         # Create fieldnames
         fieldnames = ["id", "number_unique_urls", "extracted_urls"] + ["content_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
+
+        write_annotations = self.parameters.get("write_annotations", False)
+        annotations = []
 
         # write a new file with the updated links
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
