@@ -732,8 +732,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		:param annotations:		List of dictionaries with annotation items. Must have `item_id` and `value`.
 								E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
-		:param source_dataset:	The dataset that these annotations were based on.
-								Defaults to the parent dataset.
+		:param source_dataset:	The dataset that these annotations will be saved on. If None, will use the top parent.
 		:param bool overwrite:	Whether to overwrite annotations if the label is already present
 								for the dataset. If this is False and the label is already present,
 								we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
@@ -748,7 +747,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# Default to parent dataset
 		if not source_dataset:
-			source_dataset = self.source_dataset
+			source_dataset = self.source_dataset.top_parent()
 
 		# Check if this dataset already has annotation fields
 		existing_labels = source_dataset.get_annotation_field_labels()
@@ -781,6 +780,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				annotation["author_original"] = self.name
 
 			annotation["by_processor"] = True
+
+		print(annotations)
 
 		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
 		return annotations_saved

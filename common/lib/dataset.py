@@ -360,6 +360,13 @@ class DataSet(FourcatModule):
 		# Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
 		annotation_labels = self.get_annotation_field_labels()
 		num_annotations = 0 if not annotation_labels else self.num_annotations()
+		all_annotations = None
+		# If this dataset has less than n annotations, just retrieve them all before iterating
+		if num_annotations <= 500:
+			# Convert to dict for faster lookup when iterating over items
+			all_annotations = collections.defaultdict(list)
+			for annotation in self.get_annotations():
+				all_annotations[annotation.item_id].append(annotation)
 
 		# missing field strategy can be for all fields at once, or per field
 		# if it is per field, it is a dictionary with field names and their strategy
@@ -404,7 +411,7 @@ class DataSet(FourcatModule):
 			else:
 				mapped_item = original_item
 
-			# Add possible annotations
+			# Add possible annotation values
 			if annotation_labels:
 
 				# We're always handling annotated data as a MappedItem object,
@@ -412,19 +419,21 @@ class DataSet(FourcatModule):
 				if not isinstance(mapped_item, MappedItem):
 					mapped_item = MappedItem(mapped_item)
 
-				# If this dataset has less than n annotations, just retrieve them all.
-				if num_annotations <= 500:
-					annotations = self.get_annotations()
-				# Else get annotations per item (more queries but less memory usage).
+				# Retrieve from all annotations
+				if all_annotations:
+					item_annotations = all_annotations.get(mapped_item.data["id"])
+				# Or get annotations per item for large datasets (more queries but less memory usage)
 				else:
-					annotations = self.get_annotations_for_item(mapped_item.data["id"])
+					item_annotations = self.get_annotations_for_item(mapped_item.data["id"])
 
+				# Loop through annotation field labels
 				for annotation_label in annotation_labels:
-					# Get annotations for this specific post
-
+					# Set default value to an empty string
 					value = ""
-					if annotations:
-						for annotation in annotations:
+					# Set value if this item has annotations
+					if item_annotations:
+						# Items can have multiple annotations
+						for annotation in item_annotations:
 							if annotation.label == annotation_label:
 								value = annotation.value
 							if isinstance(value, list):
@@ -1955,7 +1964,7 @@ class DataSet(FourcatModule):
 			if not annotation_data.get("author"):
 				annotation_data["author"] = self.get_owners()[0]
 
-			# The field ID can already exists for the same dataset/key combo,
+			# The field ID can already exist for the same dataset/key combo,
 			# if a previous label has been renamed.
 			# If we're not overwriting, create a new key with some salt.
 			if not overwrite:
