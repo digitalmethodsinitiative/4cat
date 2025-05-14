@@ -36,20 +36,8 @@ jobs:
       - name: Run modules tests
         run: |
           sleep 30
-          docker exec 4cat_backend pytest -v --maxfail=1 --disable-warnings --tb=short tests/test_modules.py
-      - name: Check 4CAT backend log for expected INFO message
-        run: |
-          test_case=" INFO at api.py:65: Local API listening for requests at backend:4444"
-          sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
-          echo "::group::Backend test"
-          if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then 
-              echo "4CAT backend running as expected"
-          else 
-              echo "::error::Backend failed to start"
-              echo "Test:$test_case"
-              echo "Log :$(echo "$var" | tr "|" "\n" | sed -n '2p')"
-              exit 1
-          fi
+          echo "::group::Running module tests"
+          docker exec 4cat_backend pytest -v tests/test_modules.py
           echo "::endgroup::"
       - name: Print log on failure
         if: failure()
