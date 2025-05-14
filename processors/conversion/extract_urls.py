@@ -28,8 +28,7 @@ class ExtractURLs(BasicProcessor):
     type = "extract-urls-filter"  # job type ID
     category = "Conversion"  # category
     title = "Extract URLs (and optionally expand)"  # title displayed in UI
-    description = "Extract any URLs from selected column(s) and, optionally, expand any shortened URLs. This will create" \
-                  " a new dataset."
+    description = "Extract any URLs from selected column(s) and, optionally, expand any shortened URLs."
     extension = "csv"
 
     options = {
@@ -40,11 +39,11 @@ class ExtractURLs(BasicProcessor):
             "inline": True,
             "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
         },
-        "correct_croudtangle": {
+        "correct_crowdtangle": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
-            "help": "CroudTangle dataset",
-            "tooltip": "CroudTangle text contains resolved links using :=: symbols; these are extracted directly",
+            "help": "CrowdTangle dataset",
+            "tooltip": "CrowdTangle text contains resolved links using :=: symbols; these are extracted directly",
         },
         "expand_urls": {
             "type": UserInput.OPTION_TOGGLE,
@@ -65,6 +64,11 @@ class ExtractURLs(BasicProcessor):
             "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
                    "separately"
         },
+        "write_annotations": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Add extracted URLs data as annotations to top dataset",
+            "default": False
+        }
     }
 
     # taken from https://github.com/timleland/url-shorteners
@@ -230,13 +234,16 @@ class ExtractURLs(BasicProcessor):
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
         return_matches_only = self.parameters.get("return_matches_only", True)
-        correct_croudtangle = self.parameters.get("correct_croudtangle", False)
+        correct_crowdtangle = self.parameters.get("correct_crowdtangle", False)
 
         # Create fieldnames
         fieldnames = self.source_dataset.get_columns() + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
+
+        write_annotations = self.parameters.get("write_annotations", False)
+        annotations = []
 
         # write a new file with the updated links
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
@@ -266,7 +273,7 @@ class ExtractURLs(BasicProcessor):
 
                     # Check for links
                     identified_urls = self.identify_links(value, self.parameters.get("split-comma", True))
-                    if correct_croudtangle:
+                    if correct_crowdtangle:
                         identified_urls = ["".join(id_url.split(":=:")[1:]) if ":=:" in id_url else id_url for id_url in identified_urls]
 
                     # Expand url shorteners
@@ -286,12 +293,25 @@ class ExtractURLs(BasicProcessor):
                     writer.writerow(row)
                     url_matches_found += 1
 
+                    if write_annotations:
+                        annotations.append({
+                            "label": "extracted_urls",
+                            "type": "text",
+                            "item_id": row.get("id", ""),
+                            "value": row["4CAT_extracted_urls"]
+                        })
+
                 processed_items += 1
                 if processed_items % progress_interval_size == 0:
                     self.dataset.update_status(f"Processed {processed_items}/{total_items} items; {url_matches_found} items with url(s)")
                     self.dataset.update_progress(processed_items / total_items)
         if cache:
             self.dataset.log(f"Expanded {len(cache)} URLs in dataset")
+
+        if write_annotations and annotations:
+            self.save_annotations(annotations, overwrite=False)
+            self.dataset.log(f"URLs written as annotations to top dataset")
+
         self.dataset.finish(url_matches_found)
 
     @staticmethod
