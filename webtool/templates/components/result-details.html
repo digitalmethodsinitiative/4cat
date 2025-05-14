@@ -117,6 +117,25 @@
                         <dd>{% include 'components/result-metadata.html' %}</dd>
                     </div>
 
+                    {% set annotation_fields = dataset.get_annotation_fields() %}
+                    {% if annotation_fields %}
+                    <div class="fullwidth annotation-fields-list">
+                        <dt>Annotations</dt>
+                        <dd>
+                            <ul>
+                            {% set annotations = dataset.get_annotations() %}
+                            {% if annotations %}
+                                <li>{{ annotations|length|numberify }} annotation{% if annotations|length > 1 %}s{% endif %}</li>
+                            {% endif %}
+                            {% for annotation_field in annotation_fields.items() %}
+                                <li><span class="property-badge">{{ annotation_field[1].label }}</span></li>
+                            {% endfor %}
+                            </ul>
+                            <a class="button-like-small" id="edit-annotation-fields" href="{{ url_for('explorer_dataset', dataset_key=dataset.key) }}?edit=true"><i class="fas fa-edit" aria-hidden="true"></i> Edit fields</a>
+                        </dd>
+                    </div>
+                    {% endif %}
+
                     {% if has_credentials and current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
                     <div class="fullwidth">
                       <dt>API Credentials</dt>
@@ -193,7 +212,7 @@
             </h3>
             {% set part = "main" %}
             <div class="intro">
-                <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>. Click on <i class="fa fa-sitemap" aria-hidden="true"></i> to see what processors can be run afterwards.</p>
+                <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>.</p>
                 <p>Some processors may take a while to complete.</p>
                 <p>See <a href="https://docs.google.com/document/d/1po-sOB8tDRZlvWrEayu97cGh_qsBuW0URd4md0_tv7k/edit?usp=sharing">this exercise sheet</a> for step-by-step tutorials.</p>
             </div>

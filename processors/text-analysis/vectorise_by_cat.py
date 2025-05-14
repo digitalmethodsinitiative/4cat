@@ -20,8 +20,8 @@ class VectoriseByCategory(BasicProcessor):
 	"""
 	type = "vectorise-tokens-by-category"  # job type ID
 	category = "Text analysis"  # category
-	title = "Count words by Category"  # title displayed in UI
-	description = "Counts all tokens and categorizes them so they are transformed into category => token => frequency counts." \
+	title = "Count words by category"  # title displayed in UI
+	description = "Counts all tokens and categorizes them so they are transformed into category => token => frequency counts. " \
 				  "This is also known as a bag of words."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 

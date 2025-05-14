@@ -198,12 +198,39 @@ article.result > section:first-child {
     line-height: 1.3em;
 }
 
+.button-like-small.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+
 .dataset-owner-list li {
     display: inline-block;
 }
 
 .dataset-owner-list li:not(:last-child)::after {
     content: '\02022';
+}
+
+.annotation-fields-list {
+    position: relative;
+}
+
+.annotation-fields-list ul {
+    list-style: none;
+    margin: 0;
+    padding-right: 5em;
+}
+
+.annotation-fields-list li {
+    display: inline-block;
+}
+
+.annotation-fields-list #edit-annotation-fields {
+    position: absolute;
+    top: 0;
+    right: 0.5em;
+    line-height: 1.3em;
 }
 
 /** dataset toolbox **/
@@ -225,6 +252,7 @@ article.result > section:first-child {
     background: var(--gray-light);
     border: 1px solid var(--gray-dark);
     font-size: 0.8em;
+    cursor: pointer;
 }
 
 .dataset-toolbox a:hover, a.button-like-small:hover {
@@ -319,6 +347,7 @@ article.result > section:first-child {
 }
 
 .child-wrapper .button-wrap.processor-result-indicator a {
+    display: inline-block;
     color: inherit;
 }
 
@@ -333,6 +362,7 @@ article.result > section:first-child {
 }
 
 .child-wrapper .button-wrap .byline {
+    cursor: default;
     font-size: 0.8em;
 }
 
@@ -410,7 +440,7 @@ article.result > section:first-child {
     display: none;
 }
 
-.child-list .processor-header .property-badge {
+.child-list .processor-header .property-badge, p[role=tooltip] .property-badge {
     border: 0;
     background: var(--gray);
     display: inline;
@@ -710,4 +740,110 @@ body.image-preview {
 #image-zoom:checked + label img {
     max-height: none;
     cursor: zoom-out;
+}
+
+/* EXPLORER VIEW */
+#annotation-fields-editor {
+    height: 0;
+    overflow-y: hidden;
+}
+
+#annotation-fields-editor-controls {
+}
+
+#annotation-fields-editor-controls li {
+    position: relative;
+    background: white;
+}
+
+#annotation-fields-editor-controls li:not(:last-child) {
+  border-bottom: 1px dotted var(--contrast-dark);
+}
+
+.annotation-field > span, .annotation-field > i, .annotation-field > select {
+    vertical-align: top;
+}
+
+.annotation-field > i {
+    padding-top: 10px;
+}
+
+.option-fields {
+    display: inline-block;
+    max-width: 250px;
+}
+
+.option-field {
+    display: inline-block;
+}
+
+#edit-annotation-fields #input-warning {
+    color: var(--accent-error);
+}
+
+/* Remove all styles for Explorer posts */
+/* these ought to be defined specifically, */
+/* and 4CAT styles shouldn't interfere. */
+#explorer-posts, #explorer-posts > ol li {
+    all: initial;
+    padding: 0;
+}
+
+.explorer-content-container {
+    margin-top: 1em;
+}
+
+#explorer-content {
+    all: initial;
+    padding: 0;
+}
+
+.post-annotations {
+    height: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    border-width: 0;
+}
+
+.annotation-control-button {
+    min-width: 140px;
+}
+
+.annotation-field-label.invalid, .option-field > input.invalid {
+    border: 1px solid red;
+}
+
+#edit-annotation-fields {
+    padding: 0.5em
+}
+
+.post-annotations p[role="tooltip"] .property-badge {
+    display: inline-block;
+    margin: 2px 0px 2px 0px;
+    background-color: white;
+    border: 1px solid black;
+}
+
+#save-annotations-notice {
+    position: fixed;
+    background-color: var(--accent-okay);
+    color: var(--contrast-bright);
+    display: none;
+    right: 20px;
+    bottom: 64px;
+    width: 200px;
+    text-align: center;
+    padding: 10px 5px 10px 5px;
+    border-radius: 10px;
+}
+
+.delete-input {
+    float: right;
+}
+
+.spinner {
+    animation: fa-spin;
+    animation-duration: 1000ms;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
 }

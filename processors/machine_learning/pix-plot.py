@@ -3,6 +3,7 @@ Create an PixPlot of downloaded images
 """
 import shutil
 import json
+import ural
 from datetime import datetime
 import csv
 import os
@@ -11,7 +12,7 @@ from werkzeug.utils import secure_filename
 
 from common.config_manager import config
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, ellipsiate
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
@@ -303,7 +304,7 @@ class PixPlotGenerator(BasicProcessor):
                 # Add to metadata
                 images[url] = {'filename': filename,
                                     'permalink': url,
-                                    'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(data.get('post_ids'))),
+                                    'description': '<b>Number of posts with this image:</b> ' + str(len(data.get('post_ids'))),
                                     'tags': '',
                                     'number_of_posts': 0,
                                     }
@@ -321,15 +322,15 @@ class PixPlotGenerator(BasicProcessor):
 
                     # Update description
                     image['number_of_posts'] += 1
-                    image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
+                    image['description'] += '<br><br><b>Post ' + str(image['number_of_posts']) + '</b><br><br>'
                     # Order of Description elements
                     ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
                     for detail in ordered_descriptions:
                         if post.get(detail):
-                            image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
+                            image['description'] += '<p><span class="fieldname">' + detail + '</span>' + self.make_nice_link(post.get(detail)) + '</p>'
                     for key, value in post.items():
                         if key not in ordered_descriptions:
-                            image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
+                            image['description'] += '<p><span class="fieldname">' + key + '</span> ' + self.make_nice_link(value) + '</p>'
 
                     # Add tags or hashtags
                     if image['tags']:
@@ -397,3 +398,24 @@ class PixPlotGenerator(BasicProcessor):
         invalid_chars = '<>:;,"/\\|?*[]'
         for i in invalid_chars: s = s.replace(i, '')
         return s
+
+    def make_nice_link(self, content):
+        """
+        Add HTML links to text
+
+        Replaces URLs with a clickable link
+
+        :param str content:  Text to parse
+        :return str:  Parsed text
+        """
+        try:
+            content = str(content)
+        except ValueError:
+            return content
+
+        for link in set(ural.urls_from_text(content)):
+            link_text = ellipsiate(link, 50, True, "[&hellip;]")
+            content = content.replace(link,
+                                      f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
+
+        return content

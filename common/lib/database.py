@@ -105,8 +105,8 @@ class Database:
 		Update a database record
 
 		:param string table:  Table to update
-		:param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
 		:param dict data:  Data to set, Column => Value
+		:param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
 		:param bool commit:  Whether to commit after executing the query
 
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`

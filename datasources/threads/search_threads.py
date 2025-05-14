@@ -43,12 +43,14 @@ class SearchThreads(Search):
         post_timestamp = datetime.fromtimestamp(post["taken_at"])
 
         if post["carousel_media"]:
-            image_urls = [c["image_versions2"]["candidates"].pop(0)["url"] for c in post["carousel_media"] if c["image_versions2"]]
+            image_urls = [c["image_versions2"]["candidates"].pop(0)["url"] for c in post["carousel_media"] if c["image_versions2"] and c["image_versions2"].get("candidates")]
             video_urls = [c["video_versions"].pop(0)["url"] for c in post["carousel_media"] if c["video_versions"]]
-        else:
-            image_urls = [post["image_versions2"]["candidates"].pop(0)["url"]] if post["image_versions2"].get("candidates") else []
-            video_urls = [post["video_versions"].pop(0)["url"]] if post["video_versions"] else []
 
+        else:
+            image_urls = [post["image_versions2"]["candidates"].pop(0)["url"]] if post["image_versions2"] and post["image_versions2"].get("candidates") else []
+            video_urls = [post["video_versions"].pop(0)["url"]] if post["video_versions"] else []
+        audio_url = post["audio"]["audio_src"] if post["audio"] else ""
+        
         linked_url = ""
         link_thumbnail = ""
         if post["text_post_app_info"].get("link_preview_attachment"):
@@ -63,7 +65,7 @@ class SearchThreads(Search):
         return MappedItem({
             "id": post["code"],
             "thread_id": post["code"],
-            "url": f"https://www.threads.net/@{post['user']['username']}/post/{post['code']}",
+            "url": f"https://www.threads.com/@{post['user']['username']}/post/{post['code']}",
             "body": post["caption"]["text"] if post["caption"] else "",
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "author": post["user"]["username"],
@@ -71,6 +73,7 @@ class SearchThreads(Search):
             "author_avatar": post["user"].get("profile_pic_url"),
             "image_url": ",".join(image_urls),
             "video_url": ",".join(video_urls),
+            "audio_url": audio_url,
             "link_url": linked_url,
             "link_thumbnail_url": link_thumbnail if link_thumbnail else "",
             "is_paid_partnership": "yes" if post["is_paid_partnership"] else "no",

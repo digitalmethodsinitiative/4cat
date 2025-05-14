@@ -288,7 +288,7 @@ def restart_log():
     """
     log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
     if log_file.exists():
-        with log_file.open() as infile:
+        with open(log_file, encoding="utf-8") as infile:
             return infile.read()
     else:
         return "Not Found", 404

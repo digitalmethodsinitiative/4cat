@@ -35,7 +35,7 @@ class SearchGab(Search):
         """
         Parse Truth Social post
 
-        :param node:  Data as received from Truth Social
+        :param post:  Data as received from Truth Social
         :return dict:  Mapped item
         """
         errors = []

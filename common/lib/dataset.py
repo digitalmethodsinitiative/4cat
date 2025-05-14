@@ -1,7 +1,6 @@
 import collections
 import itertools
 import datetime
-import hashlib
 import fnmatch
 import random
 import shutil
@@ -13,13 +12,16 @@ import re
 from pathlib import Path
 
 from common.config_manager import config
+from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
+from common.lib.helpers import convert_to_float, get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
 from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_to_md5
+from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-								   MapItemException, MappedItemIncompleteException)
+								   MapItemException, MappedItemIncompleteException, AnnotationException)
 
 
 class DataSet(FourcatModule):
@@ -232,7 +234,7 @@ class DataSet(FourcatModule):
 		extension.
 		"""
 		log_path = self.get_log_path()
-		with log_path.open("w") as outfile:
+		with log_path.open("w"):
 			pass
 
 	def log(self, log):
@@ -355,9 +357,13 @@ class DataSet(FourcatModule):
 		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
+		# Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
+		annotation_labels = self.get_annotation_field_labels()
+		num_annotations = 0 if not annotation_labels else self.num_annotations()
+
 		# missing field strategy can be for all fields at once, or per field
 		# if it is per field, it is a dictionary with field names and their strategy
-		# if it is for all fields, it is may be a callback, 'abort', or 'default'
+		# if it is for all fields, it may be a callback, 'abort', or 'default'
 		default_strategy = "default"
 		if type(map_missing) is not dict:
 			default_strategy = map_missing
@@ -395,12 +401,196 @@ class DataSet(FourcatModule):
 							mapped_item.data[missing_field] = mapped_item.data[missing_field].value
 						else:
 							raise ValueError("map_missing must be 'abort', 'default', or a callback.")
-
 			else:
 				mapped_item = original_item
 
+			# Add possible annotations
+			if annotation_labels:
+
+				# We're always handling annotated data as a MappedItem object,
+				# even if no map_item() function is available for the data source.
+				if not isinstance(mapped_item, MappedItem):
+					mapped_item = MappedItem(mapped_item)
+
+				# If this dataset has less than n annotations, just retrieve them all.
+				if num_annotations <= 500:
+					annotations = self.get_annotations()
+				# Else get annotations per item (more queries but less memory usage).
+				else:
+					annotations = self.get_annotations_for_item(mapped_item.data["id"])
+
+				for annotation_label in annotation_labels:
+					# Get annotations for this specific post
+
+					value = ""
+					if annotations:
+						for annotation in annotations:
+							if annotation.label == annotation_label:
+								value = annotation.value
+							if isinstance(value, list):
+								value = ",".join(value)
+
+					# We're always adding an annotation value
+					# as an empty string, even if it's absent.
+					mapped_item.data[annotation_label] = value
+
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
+
+	def sort_and_iterate_items(self, sort="", reverse=False, chunk_size=50000, **kwargs) -> dict:
+		"""
+		Loop through items in a dataset, sorted by a given key.
+
+		This is a wrapper function for `iterate_items()` with the
+		added functionality of sorting a dataset. 
+
+		:param sort:				The item key that determines the sort order.
+		:param reverse:				Whether to sort by largest values first.
+
+		:returns dict:				Yields iterated post
+		"""
+		def sort_items(items_to_sort, sort_key, reverse, convert_sort_to_float=False):
+			"""
+			Sort items based on the given key and order.
+
+			:param items_to_sort:  The items to sort
+			:param sort_key:  The key to sort by
+			:param reverse:  Whether to sort in reverse order
+			:return:  Sorted items
+			"""
+			if reverse is False and (sort_key == "dataset-order" or sort_key == ""):
+				# Sort by dataset order
+				yield from items_to_sort
+			elif sort_key == "dataset-order" and reverse:
+				# Sort by dataset order in reverse
+				yield from reversed(list(items_to_sort))
+			else:
+				# Sort on the basis of a column value
+				if not convert_sort_to_float:
+					yield from sorted(items_to_sort, key=lambda x: x.get(sort_key, ""), reverse=reverse)
+				else:
+					# Dataset fields can contain integers and empty strings.
+					# Since these cannot be compared, we will convert every
+					# empty string to 0.
+					yield from sorted(items_to_sort, key=lambda x: convert_to_float(x.get(sort_key, "")), reverse=reverse)	
+
+		if self.num_rows < chunk_size:
+			try:
+				yield from sort_items(self.iterate_items(**kwargs), sort, reverse)
+			except TypeError:
+				# Dataset fields can contain integers and empty strings.
+				# Since these cannot be compared, we will convert every
+				# empty string to 0.
+				yield from sort_items(self.iterate_items(**kwargs), sort, reverse, convert_sort_to_float=True)
+
+		else:
+			# For large datasets, we will use chunk sorting
+			staging_area = self.get_staging_area()
+			buffer = []
+			chunk_files = []
+			convert_sort_to_float = False
+			fieldnames = self.get_columns()
+
+			def write_chunk(buffer, chunk_index):
+				"""
+				Write a chunk of data to a temporary file
+
+				:param buffer:  The buffer containing the chunk of data
+				:param chunk_index:  The index of the chunk
+				:return:  The path to the temporary file
+				"""
+				temp_file = staging_area.joinpath(f"chunk_{chunk_index}.csv")
+				with temp_file.open("w", encoding="utf-8") as chunk_file:
+					writer = csv.DictWriter(chunk_file, fieldnames=fieldnames)
+					writer.writeheader()
+					writer.writerows(buffer)
+				return temp_file
+			
+			# Divide the dataset into sorted chunks
+			for item in self.iterate_items(**kwargs):
+				buffer.append(item)
+				if len(buffer) >= chunk_size:
+					try:
+						buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+					except TypeError:
+						# Dataset fields can contain integers and empty strings.
+						# Since these cannot be compared, we will convert every
+						# empty string to 0.
+						convert_sort_to_float = True
+						buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+
+					chunk_files.append(write_chunk(buffer, len(chunk_files)))
+					buffer.clear()
+
+			# Sort and write any remaining items in the buffer
+			if buffer:
+				buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+				chunk_files.append(write_chunk(buffer, len(chunk_files)))
+				buffer.clear()
+				
+			# Merge sorted chunks into the final sorted file
+			sorted_file = staging_area.joinpath("sorted_" + self.key + ".csv")
+			with sorted_file.open("w", encoding="utf-8") as outfile:
+				writer = csv.DictWriter(outfile, fieldnames=self.get_columns())
+				writer.writeheader()
+
+				# Open all chunk files for reading
+				chunk_readers = [csv.DictReader(chunk.open("r", encoding="utf-8")) for chunk in chunk_files]
+				heap = []
+
+				# Initialize the heap with the first row from each chunk
+				for i, reader in enumerate(chunk_readers):
+					try:
+						row = next(reader)
+						if sort == "dataset-order" and reverse:
+							# Use a reverse index for "dataset-order" and reverse=True
+							sort_key = -i
+						elif convert_sort_to_float:
+							# Negate numeric keys for reverse sorting
+							sort_key = -convert_to_float(row.get(sort, "")) if reverse else convert_to_float(row.get(sort, ""))
+						else:
+							if reverse:
+                                # For reverse string sorting, invert string comparison by creating a tuple
+                                # with an inverted string - this makes Python's tuple comparison work in reverse
+								sort_key = (tuple(-ord(c) for c in row.get(sort, "")), -i)
+							else:
+								sort_key = (row.get(sort, ""), i)
+						heap.append((sort_key, i, row))
+					except StopIteration:
+						pass
+
+				# Use a heap to merge sorted chunks
+				import heapq
+				heapq.heapify(heap)
+				while heap:
+					_, chunk_index, smallest_row = heapq.heappop(heap)
+					writer.writerow(smallest_row)
+					try:
+						next_row = next(chunk_readers[chunk_index])
+						if sort == "dataset-order" and reverse:
+							# Use a reverse index for "dataset-order" and reverse=True
+							sort_key = -chunk_index
+						elif convert_sort_to_float:
+							sort_key = -convert_to_float(next_row.get(sort, "")) if reverse else convert_to_float(next_row.get(sort, ""))
+						else:
+							# Use the same inverted comparison for string values
+							if reverse:
+								sort_key = (tuple(-ord(c) for c in next_row.get(sort, "")), -chunk_index)
+							else:
+								sort_key = (next_row.get(sort, ""), chunk_index)
+						heapq.heappush(heap, (sort_key, chunk_index, next_row))
+					except StopIteration:
+						pass
+
+			# Read the sorted file and yield each item
+			with sorted_file.open("r", encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+				for item in reader:
+					yield item
+
+			# Remove the temporary files
+			if staging_area.is_dir():
+				shutil.rmtree(staging_area)
 
 	def get_staging_area(self):
 		"""
@@ -414,7 +604,7 @@ class DataSet(FourcatModule):
 		:return Path:  Path to folder
 		"""
 		results_file = self.get_results_path()
-
+	
 		results_dir_base = results_file.parent
 		results_dir = results_file.name.replace(".", "") + "-staging"
 		results_path = results_dir_base.joinpath(results_dir)
@@ -536,6 +726,7 @@ class DataSet(FourcatModule):
 			pass
 
 		# delete from database
+		self.delete_annotations()
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
@@ -644,7 +835,7 @@ class DataSet(FourcatModule):
 
 		# owners that are owner by being part of a tag
 		owners.extend(itertools.chain(*[tagged_owners for tag, tagged_owners in self.tagged_owners.items() if
-									   role is None or self.owners[f"tag:{tag}"]["role"] == role]))
+										role is None or self.owners[f"tag:{tag}"]["role"] == role]))
 
 		# de-duplicate before returning
 		return set(owners)
@@ -821,40 +1012,12 @@ class DataSet(FourcatModule):
 			# Filetype not CSV or an NDJSON with `map_item`
 			return []
 
-	def get_annotation_fields(self):
-		"""
-		Retrieves the saved annotation fields for this dataset.
-		:return dict: The saved annotation fields.
-		"""
-
-		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
-		
-		if annotation_fields and annotation_fields.get("annotation_fields"):
-			annotation_fields = json.loads(annotation_fields["annotation_fields"])
-		else:
-			annotation_fields = {}
-
-		return annotation_fields
-
-	def get_annotations(self):
-		"""
-		Retrieves the annotations for this dataset.
-		return dict: The annotations
-		"""
-
-		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
-
-		if annotations and annotations.get("annotations"):
-			return json.loads(annotations["annotations"])
-		else:
-			return None
-
 	def update_label(self, label):
 		"""
 		Update label for this dataset
 
-		:param str label:  New label
-		:return str:  The new label, as returned by get_label
+		:param str label:  	New label
+		:return str: 		The new label, as returned by get_label
 		"""
 		self.parameters["label"] = label
 
@@ -992,7 +1155,7 @@ class DataSet(FourcatModule):
 
 		parent_key = str(parent) if parent else ""
 		plain_key = repr(param_key) + str(query) + parent_key
-		hashed_key = hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		hashed_key = hash_to_md5(plain_key)
 
 		if self.db.fetchone("SELECT key FROM datasets WHERE key = %s", (hashed_key,)):
 			# key exists, generate a new one
@@ -1352,7 +1515,7 @@ class DataSet(FourcatModule):
 		Determine dataset's position in queue
 
 		If the dataset is already finished, the position is -1. Else, the
-		position is the amount of datasets to be completed before this one will
+		position is the number of datasets to be completed before this one will
 		be processed. A position of 0 would mean that the dataset is currently
 		being executed, or that the backend is not running.
 
@@ -1629,7 +1792,7 @@ class DataSet(FourcatModule):
 		"""
 		filename = self.get_results_path().name
 		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
-						config.get("flask.server_name") + '/result/' + filename
+					  config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
 	def warn_unmappable_item(self, item_count, processor=None, error_message=None, warn_admins=True):
@@ -1655,6 +1818,278 @@ class DataSet(FourcatModule):
 			else:
 				# No other log available
 				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
+
+	# Annotation functions (most of it is handled in Annotations)
+	def has_annotations(self) -> bool:
+		"""
+		Whether this dataset has annotations
+		"""
+
+		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+
+		return True if annotation else False
+
+	def num_annotations(self) -> int:
+		"""
+		Get the amount of annotations
+		"""
+		return self.db.fetchone("SELECT COUNT(*) FROM annotations WHERE dataset = %s", (self.key,))["count"]
+
+	def get_annotation(self, data: dict):
+		"""
+		Retrieves a specific annotation if it exists.
+
+		:param data:		A dictionary with which to get the annotations from.
+							To get specific annotations, include either an `id` field or `field_id` and `label` fields.
+
+		return Annotation:	Annotation object.
+		"""
+
+		if "id" not in data or ("field_id" not in data and "label" not in data):
+			return None
+
+		return Annotation(data=data, db=self.db)
+
+	def get_annotations(self) -> list:
+		"""
+		Retrieves all annotations for this dataset.
+
+		return list: 	List of Annotation objects.
+		"""
+
+		return Annotation.get_annotations_for_dataset(self.db, self.key)
+
+	def get_annotations_for_item(self, item_id: str) -> list:
+		"""
+		Retrieves all annotations from this dataset for a specific item (e.g. social media post).
+		"""
+		return Annotation.get_annotations_for_dataset(self.db, self.key, item_id=item_id)
+
+	def has_annotation_fields(self) -> bool:
+		"""
+		Returns True if there's annotation fields saved tot the dataset table
+		"""
+
+		annotation_fields = self.get_annotation_fields()
+
+		return True if annotation_fields else False
+
+	def get_annotation_fields(self) -> dict:
+		"""
+		Retrieves the saved annotation fields for this dataset.
+		These are stored in the annotations table.
+
+		:return dict: The saved annotation fields.
+		"""
+
+		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.key,))
+
+		if annotation_fields and annotation_fields.get("annotation_fields"):
+			annotation_fields = json.loads(annotation_fields["annotation_fields"])
+		else:
+			annotation_fields = {}
+
+		return annotation_fields
+
+	def get_annotation_field_labels(self) -> list:
+		"""
+		Retrieves the saved annotation field labels for this dataset.
+		These are stored in the annotations table.
+
+		:return list: List of annotation field labels.
+		"""
+
+		annotation_fields = self.get_annotation_fields()
+
+		if not annotation_fields:
+			return []
+
+		labels = [v["label"] for v in annotation_fields.values()]
+
+		return labels
+
+	def save_annotations(self, annotations: list, overwrite=True) -> int:
+		"""
+		Takes a list of annotations and saves them to the annotations table.
+		If a field is not yet present in the `annotation_fields` column in
+		the datasets table, it also adds it there.
+
+		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
+										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
+		:param bool overwrite:			Whether to overwrite the annotation if it is already present.
+
+		:returns int:					How many annotations were saved.
+
+		"""
+
+		if not annotations:
+			return 0
+
+		count = 0
+		annotation_fields = self.get_annotation_fields()
+		annotation_labels = self.get_annotation_field_labels()
+
+		field_id = ""
+		salt = str(random.randrange(0, 1000000))
+
+		# Add some dataset data to annotations, if not present
+		for annotation_data in annotations:
+
+			# Check if the required fields are present
+			if "item_id" not in annotation_data:
+				raise AnnotationException("Can't save annotations; annotation must have an `item_id` referencing "
+										  "the item it annotated, got %s" % annotation_data)
+			if "label" not in annotation_data or not isinstance(annotation_data["label"], str):
+				raise AnnotationException("Can't save annotations; annotation must have a `label` field, "
+										  "got %s" % annotation_data)
+			if not overwrite and annotation_data["label"] in annotation_labels:
+				raise AnnotationException("Can't save annotations; annotation field with label %s "
+										  "already exists" % annotation_data["label"])
+
+			# Set dataset key
+			if not annotation_data.get("dataset"):
+				annotation_data["dataset"] = self.key
+
+			# Set default author to this dataset owner
+			# If this annotation is made by a processor, it will have the processor name
+			if not annotation_data.get("author"):
+				annotation_data["author"] = self.get_owners()[0]
+
+			# The field ID can already exists for the same dataset/key combo,
+			# if a previous label has been renamed.
+			# If we're not overwriting, create a new key with some salt.
+			if not overwrite:
+				if not field_id:
+					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] + salt)
+				if field_id in annotation_fields:
+					annotation_data["field_id"] = field_id
+
+			# Create Annotation object, which also saves it to the database
+			# If this dataset/item ID/label combination already exists, this retrieves the
+			# existing data and updates it with new values.
+			annotation = Annotation(data=annotation_data, db=self.db)
+
+			# Add data on the type of annotation field, if it is not saved to the datasets table yet.
+			# For now this is just a simple dict with a field ID, type, label, and possible options.
+			if not annotation_fields or annotation.field_id not in annotation_fields:
+				annotation_fields[annotation.field_id] = {
+					"label": annotation.label,
+					"type": annotation.type		# Defaults to `text`
+				}
+				if annotation.options:
+					annotation_fields[annotation.options] = annotation.options
+
+			count += 1
+
+		# Save annotation fields if things changed
+		if annotation_fields != self.get_annotation_fields():
+			self.save_annotation_fields(annotation_fields)
+
+		return count
+
+	def delete_annotations(self, id=None, field_id=None):
+		"""
+		Deletes all annotations for an entire dataset.
+		If `id` or `field_id` are also given, it only deletes those annotations for this dataset.
+
+		:param li id:			A list or string of unique annotation IDs.
+		:param li field_id:		A list or string of IDs for annotation fields.
+
+		:return int: The number of removed records.
+		"""
+
+		where = {"dataset": self.key}
+
+		if id:
+			where["id"] = id
+		if field_id:
+			where["field_id"] = field_id
+
+		return self.db.delete("annotations", where)
+
+	def save_annotation_fields(self, new_fields: dict, add=False) -> int:
+		"""
+		Save annotation field data to the datasets table (in the `annotation_fields` column).
+		If changes to the annotation fields affect existing annotations,
+		this function will also call `update_annotations_via_fields()` to change them.
+
+		:param dict new_fields:  		New annotation fields, with a field ID as key.
+
+		:param bool add:				Whether we're merely adding new fields
+										or replacing the whole batch. If add is False,
+										`new_fields` should contain all fields.
+
+		:return int:					The number of annotation fields saved.
+
+		"""
+
+		# Get existing annotation fields to see if stuff changed.
+		old_fields = self.get_annotation_fields()
+		changes = False
+
+		# Do some validation
+		# Annotation field must be valid JSON.
+		try:
+			json.dumps(new_fields)
+		except ValueError:
+			raise AnnotationException("Can't save annotation fields: not valid JSON (%s)" % new_fields)
+
+		# No duplicate IDs
+		if len(new_fields) != len(set(new_fields)):
+			raise AnnotationException("Can't save annotation fields: field IDs must be unique")
+
+		# Annotation fields must at minimum have `type` and `label` keys.
+		seen_labels = []
+		for field_id, annotation_field in new_fields.items():
+			if not isinstance(field_id, str):
+				raise AnnotationException("Can't save annotation fields: field ID %s is not a valid string" % field_id)
+			if "label" not in annotation_field:
+				raise AnnotationException("Can't save annotation fields: all fields must have a label" % field_id)
+			if "type" not in annotation_field:
+				raise AnnotationException("Can't save annotation fields: all fields must have a type" % field_id)
+			if annotation_field["label"] in seen_labels:
+				raise AnnotationException("Can't save annotation fields: labels must be unique (%s)" % annotation_field["label"])
+			seen_labels.append(annotation_field["label"])
+
+			# Keep track of whether existing fields have changed; if so, we're going to
+			# update the annotations table.
+			if field_id in old_fields:
+				if old_fields[field_id] != annotation_field:
+					changes = True
+
+		# Check if fields are removed
+		if not add:
+			for field_id in old_fields.keys():
+				if field_id not in new_fields:
+					changes = True
+
+		# If we're just adding fields, add them to the old fields.
+		# If the field already exists, overwrite the old field.
+		if add and old_fields:
+			all_fields = old_fields
+			for field_id, annotation_field in new_fields.items():
+				all_fields[field_id] = annotation_field
+			new_fields = all_fields
+
+		# We're saving the new annotation fields as-is.
+		# Ordering of fields is preserved this way.
+		#self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
+		self.annotation_fields = json.dumps(new_fields)
+
+		# If anything changed with the annotation fields, possibly update
+		# existing annotations (e.g. to delete them or change their labels).
+		if changes:
+			Annotation.update_annotations_via_fields(self.key, old_fields, new_fields, self.db)
+
+		return len(new_fields)
+
+	def get_annotation_metadata(self) -> dict:
+		"""
+		Retrieves all the data for this dataset from the annotations table.
+		"""
+
+		annotation_data = self.db.fetchall("SELECT * FROM annotations WHERE dataset = '%s';" % self.key)
+		return annotation_data
 
 	def __getattr__(self, attr):
 		"""

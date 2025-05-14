@@ -71,6 +71,7 @@ class SearchBluesky(Search):
                 "help": "Bluesky Username",
                 "cache": True,
                 "sensitive": True,
+                "tooltip": "If no server is specified, .bsky.social is used."
             },
             "password": {
                 "type": UserInput.OPTION_TEXT,
@@ -128,6 +129,13 @@ class SearchBluesky(Search):
 
         if not query.get("username", None) or not query.get("password", None) :
             raise QueryParametersException("You need to provide valid Bluesky login credentials first.")
+
+        # If no server is specified, default to .bsky.social
+        if "." not in query.get("username"):
+            query["username"] += ".bsky.social"
+        # Remove @ at the start
+        if query.get("username").startswith("@"):
+            query["username"] = query["username"][1:]
 
         # Test login credentials
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
@@ -704,7 +712,15 @@ class SearchBluesky(Search):
         if session_path.exists():
             with session_path.open() as session_file:
                 session_string = session_file.read()
-                client.login(session_string=session_string)
+                try:
+                    client.login(session_string=session_string)
+                except BadRequestError as e:
+                    if e.response.content.message == 'Token has expired':
+                        # Token has expired; try to refresh
+                        if username and password:
+                            client.login(login=username, password=password)
+                        else:
+                            raise ValueError("Session token has expired; please re-login with username and password.")
         else:
             # Were not able to log in via session string; login with username and password
             client.login(login=username, password=password)
