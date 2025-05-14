@@ -781,8 +781,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 			annotation["by_processor"] = True
 
-		print(annotations)
-
 		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
 		return annotations_saved
 
