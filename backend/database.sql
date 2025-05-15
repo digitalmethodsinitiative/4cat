@@ -68,6 +68,7 @@ CREATE TABLE datasets_owners (
 );
 
 CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("name" text_ops,key text_ops);
+CREATE INDEX datasets_owners_key ON datasets_owners (key);
 
 -- annotations
 CREATE TABLE IF NOT EXISTS annotations (
