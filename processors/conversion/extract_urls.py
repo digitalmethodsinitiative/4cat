@@ -233,6 +233,7 @@ class ExtractURLs(BasicProcessor):
         if type(columns) is str:
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
+        return_matches_only = self.parameters.get("return_matches_only", True)
         correct_crowdtangle = self.parameters.get("correct_crowdtangle", False)
 
         eager = self.parameters.get("eager", False)
@@ -243,16 +244,11 @@ class ExtractURLs(BasicProcessor):
         write_annotations = self.parameters.get("write_annotations", False)
         annotations = []
 
-        return_matches_only = self.parameters.get("return_matches_only", True)
-
         # Create fieldnames
         fieldnames = ["id", "number_unique_urls", "extracted_urls"] + ["content_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
-
-        write_annotations = self.parameters.get("write_annotations", False)
-        annotations = []
 
         # write a new file with the updated links
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
