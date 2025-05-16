@@ -75,7 +75,7 @@ class SearchInstagram(Search):
     def parse_graph_item(node):
         """
         Parse Instagram post in Graph format
-        
+
         2025-6-5: potentially legacy format
 
         :param node:  Data as received from Instagram
@@ -142,24 +142,24 @@ class SearchInstagram(Search):
             "parent_id": node["shortcode"],
             "url": "https://www.instagram.com/p/" + node["shortcode"],
             "body": caption,
-            
-            
+
+
             # Author data
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
             "is_verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
             # Unable to find graph type posts to test
-            "coauthors": MissingMappedField(""), 
+            "coauthors": MissingMappedField(""),
             "coauthor_fullnames": MissingMappedField(""),
             "coauthor_ids": MissingMappedField(""),
-            
+
             # Media
             "media_type": media_type,
             "num_media": num_media,
             "image_urls": node["display_url"],
             "media_urls": media_url,
-            
+
             # Engagement
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", caption)),
             # Unsure if usertags will work; need data (this could raise it to attention...)
@@ -168,13 +168,13 @@ class SearchInstagram(Search):
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["edge_media_preview_like"]["count"] if not no_likes else MissingMappedField(0),
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
-            
+
             # Location data
             "location_name": location["name"],
             "location_id": location["location_id"],
             "location_latlong": location["latlong"],
             "location_city": location["city"],
-            
+
             # Metadata
             "unix_timestamp": node["taken_at_timestamp"],
             "missing_media": None
@@ -205,7 +205,7 @@ class SearchInstagram(Search):
             media_nodes = node["carousel_media"]
         else:
             media_nodes = [node]
-            
+
         for media_node in media_nodes:
             if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
                 # Videos
@@ -216,7 +216,7 @@ class SearchInstagram(Search):
                     # no image links at all :-/
                     # video is all we have
                     display_urls.append(media_node["video_versions"][0]["url"])
-                    
+
             elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO and media_node.get("image_versions2"):
                 # Images
                 media_url = media_node["image_versions2"]["candidates"][0]["url"]
@@ -224,9 +224,9 @@ class SearchInstagram(Search):
                 media_urls.append(media_url)
             else:
                 missing_media = MissingMappedField("")
-                
+
             media_types.add(type_map.get(media_node["media_type"], "unknown"))
-                
+
         # type, 'mixed' means carousel with video and photo
         media_type = "mixed" if len(media_types) > 1 else media_types.pop()
 
@@ -262,7 +262,7 @@ class SearchInstagram(Search):
                 coauthor_ids.append(coauthor_node.get("id", ""))
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
-        
+
         # usertags
         if "usertags" in node:
             usertags = ",".join([user["user"]["username"] for user in node["usertags"]["in"]]) if node["usertags"] else ""
@@ -279,7 +279,7 @@ class SearchInstagram(Search):
             "parent_id": node["code"],
             "url": "https://www.instagram.com/p/" + node["code"],
             "body": caption,
-            
+
             # Authors
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
@@ -288,26 +288,26 @@ class SearchInstagram(Search):
             "coauthors": ",".join(coauthors),
             "coauthor_fullnames": ",".join(coauthor_fullnames),
             "coauthor_ids": ",".join(coauthor_ids),
-            
+
             # Media
             "media_type": media_type,
             "num_media": num_media,
             "image_urls": ",".join(display_urls),
             "media_urls": ",".join(media_urls),
-            
+
             # Engagement
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)),
             "usertags": usertags,
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["like_count"] if not no_likes else MissingMappedField(0),
             "num_comments": num_comments,
-            
+
             # Location
             "location_name": location["name"],
             "location_id": location["location_id"],
             "location_latlong": location["latlong"],
             "location_city": location["city"],
-            
+
             # Metadata
             "unix_timestamp": node["taken_at"],
             "missing_media": missing_media, # This denotes media that is unable to be mapped and is otherwise None
