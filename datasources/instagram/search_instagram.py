@@ -231,9 +231,9 @@ class SearchInstagram(Search):
         coauthor_ids = []
         if node.get("coauthor_producers"):
             for coauthor_node in node["coauthor_producers"]:
-                coauthors.append(coauthor_node.get("username"))
-                coauthor_fullnames.append(coauthor_node.get("full_name"))
-                coauthor_ids.append(coauthor_node.get("id"))
+                coauthors.append(coauthor_node.get("username", ""))
+                coauthor_fullnames.append(coauthor_node.get("full_name", ""))
+                coauthor_ids.append(coauthor_node.get("id", ""))
 
         coauthors = {"coauthors": ",".join(coauthors),
                      "coauthor_fullnames": ",".join(coauthor_fullnames),
