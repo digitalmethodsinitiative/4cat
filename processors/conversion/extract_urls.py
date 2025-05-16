@@ -11,7 +11,7 @@ from ural import urls_from_text
 
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, split_urls
+from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -28,7 +28,7 @@ class ExtractURLs(BasicProcessor):
     type = "extract-urls-filter"  # job type ID
     category = "Conversion"  # category
     title = "Extract URLs (and optionally expand)"  # title displayed in UI
-    description = "Extract any URLs from selected column(s) and, optionally, expand any shortened URLs."
+    description = "Extract any URLs from selected column(s) with the option to expand shortened URLs."
     extension = "csv"
 
     options = {
@@ -37,13 +37,20 @@ class ExtractURLs(BasicProcessor):
             "help": "Columns to extract URLs",
             "default": "body",
             "inline": True,
-            "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
+            "tooltip": "Multiple columns can be selected.",
         },
-        "correct_crowdtangle": {
+        "eager": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
-            "help": "CrowdTangle dataset",
-            "tooltip": "CrowdTangle text contains resolved links using :=: symbols; these are extracted directly",
+            "help": "Eagerly extract URLs without 'http(s)://' or 'www.' prepended",
+            "tooltip": "This will likely introduce false positives.",
+        },
+        "eager_domains": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "",
+            "help": "Only eagerly extract these domain names",
+            "tooltip": "E.g. youtube.com, wikipedia.org. Leave empty for all.",
+            "requires": "eager==true"
         },
         "expand_urls": {
             "type": UserInput.OPTION_TOGGLE,
@@ -51,22 +58,15 @@ class ExtractURLs(BasicProcessor):
             "help": "Expand shortened URLs",
             "tooltip": "This can take a long time for large datasets and it is NOT recommended to run this processor on datasets larger than 10,000 items.",
         },
-        "return_matches_only": {
+        "correct_crowdtangle": {
             "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Only return rows with URLs",
-            "tooltip": "If selected, only rows with URLs are added to the new dataset, else all rows are retained",
-        },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Split column values by comma?",
-            "default": True,
-            "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-                   "separately"
+            "default": False,
+            "help": "CrowdTangle dataset",
+            "tooltip": "CrowdTangle text contains resolved links using :=: symbols; these are extracted directly",
         },
         "write_annotations": {
             "type": UserInput.OPTION_TOGGLE,
-            "help": "Add extracted URLs data as annotations to top dataset",
+            "help": "Add extracted URLs to top dataset",
             "default": False
         }
     }
@@ -233,17 +233,21 @@ class ExtractURLs(BasicProcessor):
         if type(columns) is str:
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
-        return_matches_only = self.parameters.get("return_matches_only", True)
         correct_crowdtangle = self.parameters.get("correct_crowdtangle", False)
 
-        # Create fieldnames
-        fieldnames = self.source_dataset.get_columns() + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
-
-        # Avoid requesting the same URL multiple times
-        cache = {}
+        eager = self.parameters.get("eager", False)
+        eager_domains = self.parameters.get("eager_domains", [])
+        if eager_domains:
+            eager_domains = [eager_domain.strip().lower() for eager_domain in eager_domains.split(",")]
 
         write_annotations = self.parameters.get("write_annotations", False)
         annotations = []
+
+        # Create fieldnames
+        fieldnames = ["id", "number_unique_urls", "extracted_urls"] + ["content_" + column for column in columns]
+
+        # Avoid requesting the same URL multiple times
+        cache = {}
 
         # write a new file with the updated links
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
@@ -254,51 +258,62 @@ class ExtractURLs(BasicProcessor):
             url_matches_found = 0
             total_items = self.source_dataset.num_rows
             progress_interval_size = max(int(total_items / 10), 1)  # 1/10 of total number of records
-            for item in self.source_dataset.iterate_items(self):
+            for row in self.source_dataset.iterate_items(self):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
 
-                row = item.copy()
-                row["4CAT_extracted_urls"] = set()
+                items = {"id": "", "extracted_urls": set()}
 
                 for column in columns:
-                    value = item.get(column)
+                    value = row.get(column)
                     if not value:
                         continue
-                    if type(value) is not str:
+                    if not isinstance(value, str):
                         self.dataset.update_status(f"Column \"{column}\" is not text and will be ignored.")
                         # Remove from future
                         columns.remove(column)
                         continue
 
-                    # Check for links
-                    identified_urls = self.identify_links(value, self.parameters.get("split-comma", True))
+                    # Extract links
+                    identified_urls = self.identify_links(
+                        value,
+                        eager=eager,
+                        eager_domains=eager_domains
+                    )
+
                     if correct_crowdtangle:
                         identified_urls = ["".join(id_url.split(":=:")[1:]) if ":=:" in id_url else id_url for id_url in identified_urls]
 
                     # Expand url shorteners
                     if expand_urls:
-                        identified_urls = [self.resolve_redirect(url=url, redirect_domains=self.redirect_domains, cache=cache) for url in identified_urls]
+                        identified_urls = [self.resolve_redirect(
+                            url=url,
+                            redirect_domains=self.redirect_domains,
+                            cache=cache) for url in identified_urls]
 
                     # Add identified links
-                    row["4CAT_extracted_from_"+column] = identified_urls
-                    row["4CAT_extracted_urls"] |= set(identified_urls)
+                    items["content_"+column] = row[column]
+                    items["extracted_urls"] |= set(identified_urls)
 
-                if (return_matches_only and row["4CAT_extracted_urls"]) or not return_matches_only:
-                    row["4CAT_number_unique_urls"] = len(row["4CAT_extracted_urls"])
+                if identified_urls:
+                    items["number_unique_urls"] = len(items["extracted_urls"])
                     # Edit list/sets
                     for column in fieldnames:
                         if column in row.keys() and type(row[column]) in [list, set]:
                             row[column] = ','.join(row[column])
-                    writer.writerow(row)
+
+                    items["id"] = row.get("id", "")
+                    items["extracted_urls"] = ",".join(items["extracted_urls"])
+
+                    writer.writerow(items)
                     url_matches_found += 1
 
                     if write_annotations:
                         annotations.append({
                             "label": "extracted_urls",
-                            "type": "text",
-                            "item_id": row.get("id", ""),
-                            "value": row["4CAT_extracted_urls"]
+                            "type": "textarea",
+                            "item_id": items.get("id", ""),
+                            "value": items["extracted_urls"]
                         })
 
                 processed_items += 1
@@ -375,30 +390,60 @@ class ExtractURLs(BasicProcessor):
         return url
 
     @staticmethod
-    def identify_links(text, split_comma=True):
+    def identify_links(text, eager=False, eager_domains=None) -> list:
         """
         Search string of text for URLs that may contain links.
 
         :param str text:            string that may contain URLs
-        :param bool split_comma:    if True text will be split by commas
+        :param bool eager:          whether to also attempt to extract URLs without a protocol or www. prepended.
+        :param list eager_domains:  only eagerly extract these domain names (e.g. `youtube.com/`).
         :return list:  	            list of identified URLs
         """
 
         # We also extract texts that don't start with a protocol;
         # put https:// before those that start with just www.
+        www_url_pattern = r"(?<!https:\/\/)(?<!http:\/\/)www\.(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,6}(?:\/\S*)?\b"
         if "www." in text:
-            pattern = r"(?<!https://)(?<!http://)www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?"
-            # Replace matches with 'https://' prepended so it plays along with ural
-            text = re.sub(pattern, r"https://\g<0>", text)
+            # Replace matches with 'https://' prepended, so it plays along with ural
+            text = re.sub(www_url_pattern, r"https://\g<0>", text)
 
-        if split_comma:
-            texts = split_urls(text)
-        else:
-            texts = [text]
+        eager_url_pattern = re.compile(r'\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,6}(?:\/\S*)?\b')
 
         # Extracting all links
         urls = set()
-        for string in texts:
-            urls |= set([url for url in urls_from_text(string)])
+
+        # Use ural's URL extractor if we're looking for well-formed URLs
+        if not eager:
+            urls |= set([url for url in urls_from_text(text)])
+
+        # Else we're relying on our own eager regex
+        else:
+            eager_urls = re.findall(eager_url_pattern, text)
+
+            # If we're only greedily extracting certain domain names,
+            # also use the non-eager method and append the urls without a protocol
+            urls = set([url for url in urls_from_text(text)])
+            if eager_domains:
+                eager_urls = [eager_url for eager_url in eager_urls
+                              if any(domain in eager_url for domain in eager_domains)]
+
+            # Make sure we don't duplicate eager and regular URLs...
+            to_remove = []
+            for i, eager_url in enumerate(eager_urls):
+                for url in urls:
+                    if eager_url in url:
+                        to_remove.append(i)
+            if to_remove:
+                eager_urls = [eager_url for i, eager_url in enumerate(eager_urls) if i not in to_remove]
+
+            # Prepend with https://, so we can interact with it.
+            # Will introduce a small amount of faulty http:// links though.
+            eager_urls = ["https://" + eager_url if not eager_url.startswith("http") else eager_url
+                          for eager_url in eager_urls]
+
+            urls = urls | set(eager_urls)
+
+        # remove trailing punctuation
+        urls = [re.sub(r"[^\w\s)]+$", "", url) for url in urls]
 
         return list(urls)
