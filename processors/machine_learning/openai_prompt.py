@@ -125,7 +125,7 @@ class OpenAI(BasicProcessor):
 			},
 			"write_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add output as annotations to the parent dataset.",
+				"help": "Add output as annotations to top dataset",
 				"default": False
 			},
 			"annotation_label": {
