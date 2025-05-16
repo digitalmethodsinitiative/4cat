@@ -75,7 +75,7 @@ class YouTubeMetadata(BasicProcessor):
 			},
 			"write_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add YouTube metadata to top dataset",
+				"help": "Add YouTube links to top dataset",
 				"default": False
 			}
 		}
@@ -152,6 +152,7 @@ class YouTubeMetadata(BasicProcessor):
 				if not data or not isinstance(data, str):
 					continue
 
+				# Split by URL by default
 				urls = data.split(",")
 
 				for url in urls:
@@ -379,7 +380,7 @@ class YouTubeMetadata(BasicProcessor):
 							result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
 
 						elif yt_type == "playlist":
-							result["retrieved_from_id"] = original_items[metadata["id"]]
+							result["retrieved_from_id"] = ",".join(original_items[metadata["id"]])
 							result["type"] = "playlist"
 							result["url"] = f"https://youtube.com/playlist?list=" + metadata["id"]
 							result["channel_id"] = metadata["snippet"].get("channelId", "")
