@@ -71,7 +71,7 @@ class YouTubeMetadata(BasicProcessor):
 				"default": "url",
 				"inline": True,
 				"tooltip": "These should be valid YouTube URLs. Separate by comma. "
-						   "Use the Extract URLs processor if you need to extract URLs from other columns."
+						   "Use the Extract URLs processor if you need to extract URLs from text columns."
 			},
 			"write_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
@@ -138,10 +138,7 @@ class YouTubeMetadata(BasicProcessor):
 		self.dataset.update_status(f"Extracting YouTube links and IDs from {','.join(columns)}")
 		youtube_urls = set()
 		youtube_ids = []
-		videos_to_retrieve = set()
-		channels_to_retrieve = set()
-		channel_handles_to_retrieve = set()
-		playlists_to_retrieve = set()
+		items_to_retrieve = []
 
 		# Loop through initial datasets to extract IDs
 		for row in self.source_dataset.iterate_items(self):
@@ -173,26 +170,17 @@ class YouTubeMetadata(BasicProcessor):
 
 					# Get the ID
 					try:
-						yt_id = self.get_yt_id(url)
+						yt_id = self.get_yt_id(url, original_id=row.get("id", ""))
 					except ValueError:
 						self.dataset.update_status("Could not extract YouTube ID from " + url)
 						continue
 
 					# Already seen
-					if yt_id in youtube_ids:
+					if yt_id[0] in youtube_ids:
 						continue
-					youtube_ids.append(yt_id)
+					youtube_ids.append(yt_id[0])
 
-					if yt_id[1] == "video":
-						videos_to_retrieve.add(yt_id[0])
-					elif yt_id[1] == "channel":
-						channels_to_retrieve.add(yt_id[0])
-					elif yt_id[1] == "channel_handle":
-						channel_handles_to_retrieve.add(yt_id[0])
-					elif yt_id[1] == "playlist":
-						playlists_to_retrieve.add(yt_id[0])
-					else:
-						self.dataset.update_status("Could not extract YouTube ID from " + url)
+					items_to_retrieve.append(yt_id)
 
 		# Finish if there's no YouTube IDs
 		if not youtube_ids:
@@ -203,183 +191,222 @@ class YouTubeMetadata(BasicProcessor):
 		self.start_youtube_client()
 
 		# Get YouTube API data for all videos, playlists, and channels.
-		# Call this separately because there's different endpoints, and we're batching IDs.
-		video_data = []
-		channel_data = []
-		playlist_data = []
+		youtube_items = self.get_youtube_metadata(items_to_retrieve)
 
-		fieldnames = {"failed_to_retrieve"}
-		if videos_to_retrieve:
-			video_data = self.get_youtube_metadata(list(videos_to_retrieve), yt_type="video")
-			fieldnames |= video_data[0].keys()
-		if channels_to_retrieve:
-			channel_data = self.get_youtube_metadata(list(channels_to_retrieve), yt_type="channel")
-			fieldnames |= channel_data[0].keys()
-		if channel_handles_to_retrieve:
-			channel_data += self.get_youtube_metadata(list(channel_handles_to_retrieve), yt_type="channel_handle")
-			fieldnames |= channel_data[0].keys()
-		if playlists_to_retrieve:
-			playlist_data = self.get_youtube_metadata(list(playlists_to_retrieve), yt_type="playlist")
-			fieldnames |= playlist_data[0].keys()
+		if not youtube_items:
+			self.dataset.finish_with_error("No items retrieved from the YouTube API")
+			return
 
-		youtube_items = video_data + channel_data + playlist_data
-		# Ensure all items have the same keys
-		for i in range(len(youtube_items)):
-			for fieldname in fieldnames:
-				if fieldname not in youtube_items[i]:
-					youtube_items[i][fieldname] = ""
+		# Possibly add to top-level dataset
+		if write_annotations:
+			annotations = []
+			for youtube_item in youtube_items:
+				if "retrieved_from_id" in youtube_item:
+					for retrieved_from_id in youtube_item["retrieved_from_id"].split(","):
+						annotation = {
+							"item_id": retrieved_from_id,
+							"type": "textarea",
+							"label": "youtube_urls",
+							"value": youtube_item["url"]
+						}
+						annotations.append(annotation)
 
-		print(youtube_items)
+			self.save_annotations(annotations, overwrite=True)
+
 		self.dataset.update_status("Writing results to csv.")
 		self.write_csv_items_and_finish(youtube_items)
 
-	def get_youtube_metadata(self, ids: list, yt_type="video") -> list:
+	def get_youtube_metadata(self, yt_ids: list[tuple]) -> list:
 		"""
 		Use the YouTube API to fetch metadata from videos or channels.
 
-		:param ids, list:			A list of valid YouTube IDs
-		:param yt_type, str:		The type of object to query (`video`, `channel`, `playlist`).
+		:param yt_ids:	A list of tuples, where the first value is a YouTube ID (video, channel, playlist)
+						or a username handle.
+						The second value should be one of:
+							`video`, `channel`, `channel_handle`, `playlist`
+						so we know what API  endpoint to call.
+						A third value can indicate what original item IDs references this YouTube ID, so we
+						can re-add this value for traceability and annotation writing.
 
-		:returns list, containing dicts with YouTube's response metadata.
+		:returns list with dicts with YouTube's response metadata.
 
 		"""
 
 		results = []
+		keys = set()
+		original_items = {yi[0]: [] for yi in yt_ids}  # Use this to re-add the original IDs
+
+		ids_per_type = {}
+		for youtube_id in yt_ids:
+			if youtube_id[1] not in ids_per_type:
+				ids_per_type[youtube_id[1]] = [youtube_id[0]]
+			else:
+				ids_per_type[youtube_id[1]].append(youtube_id[0])
+
+			# Keep track of the item IDs where this YouTube link was mentioned
+			if youtube_id[2]:
+				original_items[youtube_id[0]].append(youtube_id[2])
 
 		# Loop in batches of 50
-		for i, ids_string in enumerate(self.batch_strings(ids)):
-			retries = 0
-			response = None
+		for yt_type, ids in ids_per_type.items():
+			for i, ids_string in enumerate(self.batch_strings(ids)):
+				retries = 0
+				response = None
 
-			while retries < self.max_retries:
-				try:
-					if yt_type == "video":
-						response = self.client.videos().list(
-							part = 'snippet,contentDetails,statistics',
-							id = ids_string,
-							maxResults = 50
-							).execute()
-					elif yt_type == "channel":
-						response = self.client.channels().list(
-							part = "snippet,topicDetails,statistics,brandingSettings",
-							id = ids_string,
-							maxResults = 50
-						).execute()
-					elif yt_type == "channel_handle":
-						response = {"items": []}
-						# Handles have to be done per handle...
-						for handle in ids_string.split(","):
-							single_response = self.client.channels().list(
+				while retries < self.max_retries:
+					try:
+						if yt_type == "video":
+							response = self.client.videos().list(
+								part='snippet,contentDetails,statistics',
+								id=ids_string,
+								maxResults=50
+								).execute()
+						elif yt_type == "channel":
+							response = self.client.channels().list(
 								part="snippet,topicDetails,statistics,brandingSettings",
-								forHandle=handle,
+								id=ids_string,
 								maxResults=50
 							).execute()
-							if single_response.get("items"):
-								response["items"] += single_response["items"]
+						elif yt_type == "channel_handle":
+							response = {"items": []}
+							# Handles have to be done per handle...
+							for handle in ids_string.split(","):
+								single_response = self.client.channels().list(
+									part="snippet,topicDetails,statistics,brandingSettings",
+									forHandle=handle,
+									maxResults=50
+								).execute()
+								if single_response.get("items"):
+									response["items"] += single_response["items"]
 
-					elif yt_type == "playlist":
-						response = self.client.playlists().list(
-							part = "snippet,contentDetails,id,player,status",
-							id = ids_string,
-							maxResults = 50
-						).execute()
+						elif yt_type == "playlist":
+							response = self.client.playlists().list(
+								part="snippet,contentDetails,id,player,status",
+								id=ids_string,
+								maxResults=50
+							).execute()
 
-					self.api_limit_reached = False
-					break
+						self.api_limit_reached = False
+						break
 
-				# Check rate limits
-				except HttpError as e:
+					# Check rate limits
+					except HttpError as e:
 
-					status_code = e.resp.status
+						status_code = e.resp.status
 
-					if status_code == 403: # "Forbidden", what Google returns with rate limits
-						retries += 1
-						self.api_limit_reached = True
-						self.dataset.update_status("API quota limit might be reached (HTTP" + str(status_code) + "), sleeping for " + str(self.sleep_time))
-						time.sleep(self.sleep_time) # Wait a bit before trying again
-						pass
+						if status_code == 403: # "Forbidden", what Google returns with rate limits
+							retries += 1
+							self.api_limit_reached = True
+							self.dataset.update_status(f"API quota limit likely exceeded (http {status_code}, sleeping "
+													   f"for {self.sleep_time} seconds")
+							time.sleep(self.sleep_time) # Wait a bit before trying again
+							pass
 
-					else:
-						retries += 1
-						self.dataset.update_status("API error encountered (HTTP" + str(status_code) + "), sleeping for " + str(self.sleep_time))
-						time.sleep(self.sleep_time) # Wait a bit before trying again
-						pass
+						else:
+							retries += 1
+							self.dataset.update_status(f"API error encountered (http {status_code}), "
+														f"sleeping for {self.sleep_time}")
+							time.sleep(self.sleep_time)  # Wait a bit before trying again
+							pass
 
-			# Do nothing with the results if the requests failed after retries
-			if retries >= self.max_retries:
-				self.dataset.update_status(f"Failed to get metadata from {yt_type}s after {retries} attempts (ids {ids_string}).")
-				if self.api_limit_reached:
-					self.dataset.update_status("Daily YouTube API requests exceeded.")
+				# Do nothing with the results if the requests failed after retries
+				if retries >= self.max_retries:
+					self.dataset.update_status(f"Failed to get metadata from {yt_type}s after {retries} attempts (ids {ids_string}).")
+					if self.api_limit_reached:
+						self.dataset.update_status("Daily YouTube API requests exceeded.")
 
-				return results
+					return results
 
-			# Sometimes there's no results and "response" won't have an item key.
-			elif response is not None:
-				if "items" not in response:
-					for id_string in ids_string.split(","):
-						results.append({"id": id_string, "type": yt_type, "failed_to_retrieve": True})
-					continue
+				# Sometimes there's no results and "response" won't have an item key.
+				elif response is not None:
 
-				# Get and return results for each video
-				for metadata in response["items"]:
 					result = {}
 
-					if yt_type == "video":
-						result["type"] = "video"
-						result["url"] = f"https://youtube.com/watch?v=" + metadata["id"]
-						result["video_id"] = metadata["id"],
-						result["upload_time"] = metadata["snippet"].get("publishedAt")
-						result["channel_id"] = metadata["snippet"].get("channelId")
-						result["channel_title"] = metadata["snippet"].get("channelTitle")
-						result["video_title"] = metadata["snippet"].get("title")
-						result["video_duration"] = metadata.get("contentDetails").get("duration")
-						result["video_view_count"] = metadata["statistics"].get("viewCount")
-						result["video_comment_count"] = metadata["statistics"].get("commentCount")
-						result["video_likes_count"] = metadata["statistics"].get("likeCount")
-						result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
-						result["video_topic_ids"] = metadata.get("topicDetails")
-						result["video_category_id"] = metadata["snippet"].get("categoryId")
-						result["video_tags"] = metadata["snippet"].get("tags")
+					if "items" not in response:
+						for id_string in ids_string.split(","):
+							result["youtube_id"] = id_string
+							result["type"] = yt_type
+							result["retrieved"] = False
+							results.append(result)
+						continue
 
-					elif yt_type.startswith("channel"):
-						result["type"] = "channel"
-						result["url"] = f"https://youtube.com/channel/" + metadata["snippet"].get("channelId", "")
-						result["channel_id"] = metadata["snippet"].get("channelId")
-						result["channel_title"] = metadata["snippet"].get("title")
-						result["channel_description"] = metadata["snippet"].get("description")
-						result["channel_default_language"] = metadata["snippet"].get("defaultLanguage")
-						result["channel_country"] = metadata["snippet"].get("country")
-						result["channel_viewcount"] = metadata["statistics"].get("viewCount")
-						result["channel_commentcount"] = metadata["statistics"].get("commentCount")
-						result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
-						result["channel_videocount"] = metadata["statistics"].get("videoCount")
-						# This one sometimes fails for some reason
-						if "topicDetails" in metadata:
-							result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
-							result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
-						result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
+					# Get and return results for each video
+					for metadata in response["items"]:
 
-					elif yt_type == "playlist":
-						result["type"] = "playlist"
-						result["url"] = f"https://youtube.com/playlist?list=" + metadata["id"]
-						result["channel_id"] = metadata["snippet"].get("channelId", "")
-						result["channel_title"] = metadata["snippet"].get("channelTitle", "")
-						result["playlist_id"] = metadata["id"]
-						result["playlist_title"] = metadata["snippet"].get("title", "")
-						result["playlist_description"] = metadata["snippet"].get("channelTitle", "")
-						result["playlist_thumbnail"] = metadata["snippet"].get("thumbnails", {}).get("high", {}).get("url", "")
-						result["playlist_video_count"] = metadata["contentDetails"].get("itemCount", ""),
-						result["playlist_status"] = metadata["status"].get("privacyStatus", "")
+						result = {"retrieved": True}
 
-					results.append(result)
+						if yt_type == "video":
+							video_id = metadata["id"]
+							result["retrieved_from_id"] = ",".join(original_items[video_id])
+							result["type"] = "video"
+							result["url"] = f"https://youtube.com/watch?v=" + metadata["id"]
+							result["video_id"] = video_id
+							result["upload_time"] = metadata["snippet"].get("publishedAt")
+							result["channel_id"] = metadata["snippet"].get("channelId")
+							result["channel_title"] = metadata["snippet"].get("channelTitle")
+							result["video_title"] = metadata["snippet"].get("title")
+							result["video_duration"] = metadata.get("contentDetails").get("duration")
+							result["video_view_count"] = metadata["statistics"].get("viewCount")
+							result["video_comment_count"] = metadata["statistics"].get("commentCount")
+							result["video_likes_count"] = metadata["statistics"].get("likeCount")
+							result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
+							result["video_topic_ids"] = metadata.get("topicDetails")
+							result["video_category_id"] = metadata["snippet"].get("categoryId")
+							result["video_tags"] = metadata["snippet"].get("tags")
 
-			# Update status per response item
-			self.dataset.update_status(f"Got metadata for {i * 50}/{len(ids)} {yt_type} objects")
+						elif yt_type.startswith("channel"):
+							channel_id = metadata["snippet"].get("channelId", "")
+							channel_handle = metadata["snippet"].get("customUrl", "")
+							result["retrieved_from_id"] = ",".join(
+								original_items.get(channel_id, []) + original_items.get(channel_handle, []))
+							result["type"] = "channel"
+							result["url"] = f"https://youtube.com/channel/" + channel_id
+							result["channel_id"] = channel_id
+							result["channel_handle"] = channel_handle
+							result["channel_title"] = metadata["snippet"].get("title", "")
+							result["channel_description"] = metadata["snippet"].get("description", "")
+							result["channel_start"] = metadata["snippet"].get("publishedAt", "")
+							result["channel_default_language"] = metadata["snippet"].get("defaultLanguage", "")
+							result["channel_country"] = metadata["snippet"].get("country", "")
+							result["channel_viewcount"] = metadata["statistics"].get("viewCount", "")
+							result["channel_commentcount"] = metadata["statistics"].get("commentCount", "")
+							result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount", "")
+							result["channel_videocount"] = metadata["statistics"].get("videoCount", "")
+							# This one sometimes fails for some reason
+							if "topicDetails" in metadata:
+								result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
+								result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
+							result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
+
+						elif yt_type == "playlist":
+							result["retrieved_from_id"] = original_items[metadata["id"]]
+							result["type"] = "playlist"
+							result["url"] = f"https://youtube.com/playlist?list=" + metadata["id"]
+							result["channel_id"] = metadata["snippet"].get("channelId", "")
+							result["channel_title"] = metadata["snippet"].get("channelTitle", "")
+							result["playlist_id"] = metadata["id"]
+							result["playlist_title"] = metadata["snippet"].get("title", "")
+							result["playlist_description"] = metadata["snippet"].get("channelTitle", "")
+							result["playlist_thumbnail"] = metadata["snippet"].get("thumbnails", {}).get("high", {}).get("url", "")
+							result["playlist_video_count"] = metadata["contentDetails"].get("itemCount", ""),
+							result["playlist_status"] = metadata["status"].get("privacyStatus", "")
+
+						results.append(result)
+						keys |= set(result.keys())
+
+				# Update status per response item
+				self.dataset.update_status(f"Got metadata for {i * 50}/{len(ids)} {yt_type} objects")
+
+		# Make sure all items have the same keys for csv writing
+		for i in range(len(results)):
+			for key in keys:
+				if key not in results[i].keys():
+					results[i][key] = ""
 
 		return results
 
 	@staticmethod
-	def get_yt_id(url: str) -> tuple[str, str]:
+	def get_yt_id(url: str, original_id="") -> tuple[str, str, str]:
 		"""
 		Extracts IDs from YouTube URLs.
 		Supports videos, channel IDs, channel names, and playlist IDs.
@@ -441,7 +468,7 @@ class YouTubeMetadata(BasicProcessor):
 		if yt_id and not yt_type:
 			yt_type = "video"
 
-		return yt_id, yt_type
+		return yt_id, yt_type, original_id
 
 	def start_youtube_client(self):
 		"""
@@ -460,8 +487,8 @@ class YouTubeMetadata(BasicProcessor):
 	@staticmethod
 	def batch_strings(strings: list, batch_size=50):
 		"""
-        A generator function to yield strings in batches of comma-separated values.
-        """
+		A generator function to yield strings in batches of comma-separated values.
+		"""
 		for i in range(0, len(strings), batch_size):
 			yield ','.join(strings[i:i + batch_size])
 
@@ -473,8 +500,11 @@ class YouTubeMetadata(BasicProcessor):
 		"""
 		super().after_process()
 		if self.api_limit_reached:
-			self.dataset.update_status("YouTube API quota limit exceeded. Saving the results retreived thus far. To get all data, use your own API key, or try to split up the dataset and get the YouTube data over the course of a few days.")
+			self.dataset.update_status("YouTube API quota limit exceeded. Saving the results retreived thus far. "
+										"To get all data, use your own API key, or try to split up the dataset and get "
+										"the YouTube data over the course of a few days.")
 		elif self.invalid_api_key:
-			self.dataset.update_status("Invalid API key. Extracted YouTube links but did not retreive any video information.")
+			self.dataset.update_status("Invalid API key. Extracted YouTube links but did not retreive any video "
+										"information.")
 		else:
 			self.dataset.update_status("Dataset saved.")
