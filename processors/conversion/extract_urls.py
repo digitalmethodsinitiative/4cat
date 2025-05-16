@@ -198,7 +198,7 @@ class ExtractURLs(BasicProcessor):
         """
         All processor on CSV and NDJSON datasets
         """
-        return module.get_extension() in ["csv", "ndjson"]
+        return module.get_extension() in ["csv", "ndjson"] and module.type != "extract-urls-filter"
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -380,6 +380,14 @@ class ExtractURLs(BasicProcessor):
         :param bool split_comma:    if True text will be split by commas
         :return list:  	            list of identified URLs
         """
+
+        # We also extract texts that don't start with a protocol;
+        # put https:// before those that start with just www.
+        if "www." in text:
+            pattern = r"(?<!https://)(?<!http://)www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?"
+            # Replace matches with 'https://' prepended so it plays along with ural
+            text = re.sub(pattern, r"https://\g<0>", text)
+
         if split_comma:
             texts = split_urls(text)
         else:
@@ -389,4 +397,5 @@ class ExtractURLs(BasicProcessor):
         urls = set()
         for string in texts:
             urls |= set([url for url in urls_from_text(string)])
+
         return list(urls)
