@@ -24,7 +24,7 @@ packages = set([
 	"Flask_Limiter==3.8.0",
 	"Flask_Login~=0.6",
 	"gensim>=4.3.3, <4.4.0",
-	"google_api_python_client==2.0.2",
+	"google_api_python_client==2.169.0",
 	"html2text==2020.*",
 	"ImageHash>4.2.0",
 	"jieba~=0.42",
