@@ -580,10 +580,11 @@ class SearchBluesky(Search):
         # if item["record"].get("tags"):
         #     unmapped_data.append({"loc": "record.tags", "obj": item["record"].get("tags")})
 
-        if unmapped_data:
-            # TODO: Use MappedItem message; currently it is not called...
-            config.with_db()
-            config.db.log.warning(f"Bluesky new mappings ({item['uri']}): {unmapped_data}")
+        # DEBUG logging
+        # TODO: Use MappedItem message; currently it is not called...
+        # if unmapped_data:
+        #     config.with_db()
+        #     config.db.log.warning(f"Bluesky new mappings ({item['uri']}): {unmapped_data}")
 
         return MappedItem({
             "collected_at": datetime.fromtimestamp(item["4CAT_metadata"]["collected_at"]).isoformat(),
