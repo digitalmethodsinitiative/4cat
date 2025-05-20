@@ -71,6 +71,8 @@ class SearchTwitterViaZeeschuimer(Search):
             # sometimes this is one level deeper, sometimes not...
             quote_tweet["result"] = quote_tweet["result"]["tweet"]
 
+        author_avatar_url = tweet["core"]["user_results"]["result"]["avatar"]["image_url"] if "avatar" in tweet["core"]["user_results"]["result"] else tweet["core"]["user_results"]["result"]["legacy"]["profile_image_url_https"]
+
         return {
             "id": tweet["rest_id"],
             "thread_id": tweet["legacy"]["conversation_id_str"],
@@ -81,7 +83,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "author": tweet["core"]["user_results"]["result"]["legacy"]["screen_name"],
             "author_fullname": tweet["core"]["user_results"]["result"]["legacy"]["name"],
             "author_id": tweet["legacy"]["user_id_str"],
-            "author_avatar_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_image_url_https"],
+            "author_avatar_url": author_avatar_url,
             "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"].get("profile_banner_url", ""), # key does not exist when author does not have a banner
             "verified": tweet["core"]["user_results"]["result"].get("is_blue_verified", ""),
             "source": strip_tags(tweet["source"]),
