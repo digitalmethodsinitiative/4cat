@@ -413,7 +413,7 @@ class SearchWithinTCATBins(Search):
             "author_user": {
                 "protected": None,  # bool; Missing in TCAT data
                 "verified": True if tcat_tweet["from_user_verified"] == 1 else False if tcat_tweet["from_user_verified"] == 0 else None,  # bool
-                "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["from_user_created_at"]),  # str
+                "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["from_user_created_at"]) if tcat_tweet["from_user_created_at"] else "",  # str; may be Missing in TCAT data
                 "name": tcat_tweet["from_user_realname"],  # str
                 "entities": {
                     "description": None,  # dict; contains entities from author description such as mentions, URLs, etc.; Missing in TCAT data
