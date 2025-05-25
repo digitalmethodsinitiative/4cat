@@ -61,8 +61,8 @@ class SearchTwitterViaZeeschuimer(Search):
                 withheld = True
                 tweet["legacy"]["full_text"] = retweet["result"]["legacy"]["full_text"]
             else:
-                t_text = "RT @" + retweet["result"]["core"]["user_results"]["result"]["legacy"]["screen_name"] + \
-                     ": " + retweet["result"]["legacy"]["full_text"]
+                t_text = "RT @" + retweet["result"]["core"]["user_results"]["result"]["core"]["screen_name"] + \
+                      ": " + retweet["result"]["legacy"]["full_text"]
                 tweet["legacy"]["full_text"] = t_text
 
         quote_tweet = tweet.get("quoted_status_result")
@@ -76,12 +76,12 @@ class SearchTwitterViaZeeschuimer(Search):
             "thread_id": tweet["legacy"]["conversation_id_str"],
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(timestamp.timestamp()),
-            "link": f"https://x.com/{tweet['core']['user_results']['result']['legacy']['screen_name']}/status/{tweet['id']}",
+            "link": f"https://x.com/{tweet['core']['user_results']['result']['core']['screen_name']}/status/{tweet['id']}",
             "body": tweet["legacy"]["full_text"],
-            "author": tweet["core"]["user_results"]["result"]["legacy"]["screen_name"],
-            "author_fullname": tweet["core"]["user_results"]["result"]["legacy"]["name"],
+            "author": tweet["core"]["user_results"]["result"]["core"]["screen_name"],
+            "author_fullname": tweet["core"]["user_results"]["result"]["core"]["name"],
             "author_id": tweet["legacy"]["user_id_str"],
-            "author_avatar_url": tweet["core"]["user_results"]["result"]["legacy"]["profile_image_url_https"],
+            "author_avatar_url": tweet["core"]["user_results"]["result"]["avatar"]["image_url"],
             "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"].get("profile_banner_url", ""), # key does not exist when author does not have a banner
             "verified": tweet["core"]["user_results"]["result"].get("is_blue_verified", ""),
             "source": strip_tags(tweet["source"]),
@@ -149,6 +149,9 @@ class SearchTwitterViaZeeschuimer(Search):
             "author": tweet["user"]["screen_name"],
             "author_fullname": tweet["user"]["name"],
             "author_id": tweet["user"]["id_str"],
+            "author_avatar_url": "", # todo: add
+            "author_banner_url": "", # todo: add
+            "verified": "", # todo: add
             "source": strip_tags(tweet["legacy"]["source"]),
             "language_guess": tweet["legacy"].get("lang"),
             "possibly_sensitive": "yes" if tweet["legacy"].get("possibly_sensitive") else "no",
@@ -160,7 +163,12 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_retweet": "yes" if retweet else "no",
             "retweeted_user": retweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if retweet else "",
             "is_quote_tweet": "yes" if quote_tweet else "no",
+            "quote_tweet_id": "", # todo: add
             "quote_author": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if quote_tweet else "",
+            "quote_body": "", # todo: add
+            "quote_images": "", # todo: add
+            "quote_videos": "",  # todo: add
+            "is_quote_withheld": "", # todo: add
             "is_reply": "yes" if str(tweet["legacy"]["conversation_id_str"]) != tweet_id else "no",
             "replied_author": tweet["legacy"].get("in_reply_to_screen_name", "") if tweet["legacy"].get(
                 "in_reply_to_screen_name") else "",
