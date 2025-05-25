@@ -73,7 +73,12 @@ class DateFilter(BaseFilter):
                 self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
             # Attempt to parse timestamp
-            item_date = dateutil.parser.parse(mapped_item.get(date_column_name))
+            item_date = mapped_item.get(date_column_name)
+            if type(item_date) is int:
+                # If the date is an int, it is a timestamp
+                item_date = datetime.fromtimestamp(item_date)
+            else:
+                item_date = dateutil.parser.parse(mapped_item.get(date_column_name))
 
             # Only use date for comparison (not time)
             item_date = item_date.date()

@@ -43,6 +43,7 @@ class DataSet(FourcatModule):
 	key = ""
 
 	_children = None
+	_cached_columns = None
 	available_processors = None
 	genealogy = None
 	preset_parent = None
@@ -1007,19 +1008,22 @@ class DataSet(FourcatModule):
 			# no file to get columns from
 			return []
 
-		if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor() is not None and self.get_own_processor().map_item_method_available(dataset=self)):
-			items = self.iterate_items(warn_unmappable=False)
-			try:
-				keys = list(items.__next__().keys())
-			except (StopIteration, NotImplementedError):
-				# No items or otherwise unable to iterate
-				return []
-			finally:
-				del items
-			return keys
-		else:
-			# Filetype not CSV or an NDJSON with `map_item`
-			return []
+		if self._cached_columns is None:
+			if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor() is not None and self.get_own_processor().map_item_method_available(dataset=self)):
+				items = self.iterate_items(warn_unmappable=False)
+				try:
+					keys = list(items.__next__().keys())
+					self._cached_columns = keys
+				except (StopIteration, NotImplementedError):
+					# No items or otherwise unable to iterate
+					self._cached_columns = []
+				finally:
+					del items
+			else:
+				# Filetype not CSV or an NDJSON with `map_item`
+				self._cached_columns = []
+
+		return self._cached_columns
 
 	def update_label(self, label):
 		"""
@@ -1994,6 +1998,8 @@ class DataSet(FourcatModule):
 		if annotation_fields != self.get_annotation_fields():
 			self.save_annotation_fields(annotation_fields)
 
+		# columns may have changed if there are new annotations
+		self._cached_columns = None
 		return count
 
 	def delete_annotations(self, id=None, field_id=None):
