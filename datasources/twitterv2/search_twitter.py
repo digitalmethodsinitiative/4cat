@@ -734,7 +734,7 @@ class SearchWithTwitterAPIv2(Search):
 
         hashtags = [tag["tag"] for tag in item.get("entities", {}).get("hashtags", [])]
         mentions = [tag["username"] for tag in item.get("entities", {}).get("mentions", [])]
-        urls = [tag.get("expanded_url", tag["display_url"]) for tag in item.get("entities", {}).get("urls", []) if ("display_url" in tag or "expanded_url" in tag)]
+        urls = [tag.get("expanded_url", tag.get("display_url")) for tag in item.get("entities", {}).get("urls", []) if ("display_url" in tag or "expanded_url" in tag)]
         images = [attachment["url"] for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
         video_items = [attachment for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
