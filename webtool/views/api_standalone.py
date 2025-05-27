@@ -18,6 +18,7 @@ from common.lib.exceptions import JobNotFoundException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
+from backend.lib.search import Search
 
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
@@ -49,14 +50,101 @@ def get_standalone_processors():
 		}
 	}
 	"""
+	class FakeDataset():
+		"""
+		Fake dataset class to allow processor introspection without having
+		to create a real dataset.
+
+		This is meant to represent a dataset compatible with /api/process/<processor>/
+		
+		TODO: this could be modified for a base dataset class for more advanced tests
+		"""
+		type = "fake_dataset"
+		parameters = {"datasource": "fake"} # TODO: refactor how processors check module.parameters.get("datasource") to function call we can override here
+		
+		def get_extension(self):
+			"""
+			Return CSV which is expected by /api/process/<processor>/
+
+			NDJSON processors work on CSV and NDJSON
+			"""
+			return "csv"
+		
+		def get_media_type(self):
+			"""
+			Return media type expected by /api/process/<processor>/
+			"""
+			return "text"
+		
+		def get_columns(self):
+			"""
+			Return columns expected by /api/process/<processor>/
+			"""
+			return ["id", "thread_id", "body", "author"]
+		
+		def is_top_dataset(self):
+			"""
+			Return True to indicate that this is a top-level dataset
+			"""
+			return True
+		
+		def is_accessible_by(self, user, role="owner"):
+			"""
+			Return True to indicate that this dataset is accessible by the
+			current user
+			"""
+			# Could check to see if the processors are avaiable to the user,
+			# but this is not necessary for the fake dataset
+			return True
+		
+		def is_from_collector(self):
+			"""
+			Return True to indicate that it is a "datasource"
+
+			This is a lie, but so is the cake
+			"""
+			return True
+			
+		def is_dataset(self):
+			"""
+			Return True to indicate that this is a dataset
+			"""
+			# TODO: I think all is_compatible_with methods ONLY receive DataSet objects; verify and perhaps modify the functions to specify
+			return True
+		
+		def has_annotations(self):
+			"""
+			Return False to indicate that this dataset does not have
+			annotations
+			"""
+			return False
+		
+		def is_rankable(self, multiple_items=False):
+			"""
+			Return True...
+
+			TODO: Unsure if this makes sense here, but trying no to be exclusive here
+			"""
+			return True
+		
+	fake_dataset = FakeDataset()
+
 	available_processors = {}
 
-	for processor in fourcat_modules.processors:
-		if not fourcat_modules.processors[processor].hasattr("datasources") and not hasattr(fourcat_modules.processors[processor], "accepts"):
-			available_processors[processor] = fourcat_modules.processors[processor]
+	for processor_type, processor in fourcat_modules.processors.items():
+		# Skip datasources as they do not conform to /api/process/<processor>/ API
+		if issubclass(processor, Search) or processor_type.endswith("-search"):
+			# ALMOST all datasources are subclasses of Search, almost.
+			continue
+
+		# Check if the processor is compatible with the fake dataset
+		if hasattr(processor, "is_compatible_with") and not processor.is_compatible_with(fake_dataset):
+			continue
+
+		available_processors[processor_type] = processor
 
 	return jsonify({processor: {
-		"name": available_processors[processor].name,
+		"type": available_processors[processor].type,
 		"category": available_processors[processor].category,
 		"description": available_processors[processor].description,
 		"extension": available_processors[processor].extension
