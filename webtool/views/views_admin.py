@@ -680,18 +680,29 @@ def manipulate_notifications():
             flash("User '%s' does not exist" % params["username"])
             incomplete.append("username")
 
-        if params["expires"]:
+        expires = None
+        if params["expires-seconds"] and params["expires-date"]:
+            flash("Please specify either 'expires seconds' or 'expires date', not both.")
+            incomplete.append("expires-seconds")
+            incomplete.append("expires-date")
+        elif params["expires-seconds"]:
             try:
-                expires = int(params["expires"])
+                expires = int(time.time() + int(params["expires-seconds"]))
             except ValueError:
-                incomplete.append("expires")
-        else:
-            expires = None
-
+                incomplete.append("expires-seconds")
+                flash("Please provide a valid number of seconds.")
+        elif params["expires-date"]:
+            try:
+                parsed_choice = parse_datetime(params["expires-date"])
+                expires = int(parsed_choice.timestamp())
+            except ValueError:
+                incomplete.append("expires-date")
+                flash("Please provide a valid date in YYYY-MM-DD format.")
+        
         notification = {
             "username": params.get("username"),
             "notification": params.get("notification"),
-            "timestamp_expires": int(time.time() + expires) if expires else None,
+            "timestamp_expires": expires if expires else None,
             "allow_dismiss": not not params.get("allow_dismiss")
         }
 
