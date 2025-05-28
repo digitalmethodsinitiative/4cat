@@ -39,6 +39,7 @@ class SearchTwitterViaZeeschuimer(Search):
 
     @staticmethod
     def map_item(item):
+
         if item.get("rest_id"):
             return MappedItem(SearchTwitterViaZeeschuimer.map_item_modern(item))
         elif item.get("type") == "adaptive":
@@ -48,6 +49,12 @@ class SearchTwitterViaZeeschuimer(Search):
 
     @staticmethod
     def map_item_modern(tweet):
+
+        # Sometimes a "core" key appears in user_results, sometimes not.
+        # This has effect on where to get user data.
+        has_core = tweet.get("core", {}).get("user_results", {}).get("result", {}).get("core", False)
+        user_key = "core" if has_core else "legacy"
+
         timestamp = datetime.strptime(tweet["legacy"]["created_at"], "%a %b %d %H:%M:%S %z %Y")
         withheld = False
 
@@ -61,7 +68,7 @@ class SearchTwitterViaZeeschuimer(Search):
                 withheld = True
                 tweet["legacy"]["full_text"] = retweet["result"]["legacy"]["full_text"]
             else:
-                t_text = "RT @" + retweet["result"]["core"]["user_results"]["result"]["core"]["screen_name"] + \
+                t_text = "RT @" + retweet["result"]["core"]["user_results"]["result"][user_key]["screen_name"] + \
                       ": " + retweet["result"]["legacy"]["full_text"]
                 tweet["legacy"]["full_text"] = t_text
 
@@ -71,24 +78,22 @@ class SearchTwitterViaZeeschuimer(Search):
             # sometimes this is one level deeper, sometimes not...
             quote_tweet["result"] = quote_tweet["result"]["tweet"]
 
-        author_avatar_url = tweet["core"]["user_results"]["result"]["avatar"]["image_url"] if "avatar" in tweet["core"]["user_results"]["result"] else tweet["core"]["user_results"]["result"]["legacy"]["profile_image_url_https"]
-
         return {
             "id": tweet["rest_id"],
             "thread_id": tweet["legacy"]["conversation_id_str"],
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(timestamp.timestamp()),
-            "link": f"https://x.com/{tweet['core']['user_results']['result']['core']['screen_name']}/status/{tweet['id']}",
+            "link": f"https://x.com/{tweet['core']['user_results']['result'][user_key]['screen_name']}/status/{tweet['id']}",
             "body": tweet["legacy"]["full_text"],
-            "author": tweet["core"]["user_results"]["result"]["core"]["screen_name"],
-            "author_fullname": tweet["core"]["user_results"]["result"]["core"]["name"],
+            "author": tweet["core"]["user_results"]["result"][user_key]["screen_name"],
+            "author_fullname": tweet["core"]["user_results"]["result"][user_key]["name"],
             "author_id": tweet["legacy"]["user_id_str"],
-            "author_avatar_url": author_avatar_url,
+            "author_avatar_url": tweet["core"]["user_results"]["result"]["avatar"]["image_url"] if "avatar" in tweet["core"]["user_results"]["result"] else tweet["core"]["user_results"]["result"]["legacy"].get("profile_image_url_https", ""),
             "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"].get("profile_banner_url", ""), # key does not exist when author does not have a banner
             "verified": tweet["core"]["user_results"]["result"].get("is_blue_verified", ""),
             "source": strip_tags(tweet["source"]),
             "language_guess": tweet["legacy"].get("lang"),
-            "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
+            "possibly_sensitive": "yes" if tweet.get("possibly_sensitive", False) or tweet["legacy"].get("possibly_sensitive", False) else "no",
             "retweet_count": tweet["legacy"]["retweet_count"],
             "reply_count": tweet["legacy"]["reply_count"],
             "like_count": tweet["legacy"]["favorite_count"],
@@ -99,7 +104,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_quote_tweet": "yes" if quote_tweet else "no",
             "quote_tweet_id": quote_tweet["result"].get("rest_id") if quote_tweet else "",
             "quote_author": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if (quote_tweet and "tombstone" not in quote_tweet["result"]) else "",
-            "quote_body": quote_tweet["result"]["legacy"].get("full_text","") if quote_tweet else "",
+            "quote_body": quote_tweet["result"]["legacy"].get("full_text", "") if quote_tweet else "",
             "quote_images": ",".join([media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", []) if media["type"] == "photo"]) if quote_tweet else "",
             "quote_videos": ",".join([media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", []) if media["type"] == "video"]) if quote_tweet else "",
             "is_quote_withheld": "yes" if (quote_tweet and "tombstone" in quote_tweet["result"]) else "no",
