@@ -64,7 +64,7 @@ config_definition = {
         "default": "",
         "help": "Server information",
         "tooltip": "Custom server information that is displayed on the 'About' page. Can for instance be used to show "
-                   "information about who maintains the tool or what its intended purpose is."
+                   "information about who maintains the tool or what its intended purpose is. Accepts Markdown markup.",
     },
     "4cat.crash_message": {
         "type": UserInput.OPTION_TEXT_LARGE,
