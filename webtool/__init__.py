@@ -107,7 +107,7 @@ if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPL
 app.config.from_mapping({
     "FLASK_APP": config.get("flask.flask_app"),
     "SECRET_KEY": config.get("flask.secret_key"),
-    "SERVER_NAME": config.get("flask.server_name") if not config.get("USING_DOCKER") else None,
+    "SERVER_NAME": config.get("flask.server_name"),
     "SERVER_HTTPS": config.get("flask.https"),
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
