@@ -181,6 +181,11 @@ class Tokenise(BasicProcessor):
 				"help": "Only keep unique tokens per item",
 				"tooltip": "If a token occurs multiple times in the same item, only process once. Can be useful to "
 						   "filter out spam."
+			},
+			"write_annotations": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Add tokens to top dataset",
+				"default": False
 			}
 		}
 
@@ -234,6 +239,8 @@ class Tokenise(BasicProcessor):
 
 		if type(columns) is not list:
 			columns = [columns]
+
+		save_annotations = self.parameters.get("write_annotations", False)
 
 		self.dataset.update_status("Building filtering automaton")
 
@@ -353,6 +360,8 @@ class Tokenise(BasicProcessor):
 		# Collect metadata
 		metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'language':language, 'intervals':set()}}
 		processed = 0
+		annotations = []
+
 		for post in self.source_dataset.iterate_items(self):
 			# determine what output unit this post belongs to
 			if docs_per != "thread":
@@ -464,7 +473,22 @@ class Tokenise(BasicProcessor):
 						# However, why someone would want to predict topics for different parts of a post seems unclear
 						metadata[post_id][document_descriptor]['multiple_docs'] = True
 
+					# Possibly save tokens as annotations, in batches of 1000
+					if save_annotations:
+						annotations.append({
+							"label": "tokens",
+							"item_id": post_id,
+							"value": ",".join(post_tokens)
+						})
+						if processed % 1000 == 0:
+							self.save_annotations(annotations, overwrite=True)
+							annotations = []
+
 					output_files[output_path] += 1
+
+		# Safe leftover annotations
+		if annotations:
+			self.save_annotations(annotations, overwrite=True)
 
 		if output_file_handle:
 			output_file_handle.close()
