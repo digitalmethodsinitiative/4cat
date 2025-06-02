@@ -104,7 +104,7 @@ class Perspective(BasicProcessor):
 		annotations = []
 		api_attributes = {attribute: {} for attribute in self.parameters["attributes"]}
 
-		for item in self.source_dataset.iterate_items(self.source_file):
+		for item in self.source_dataset.iterate_items(self):
 
 			if item["body"]:
 
@@ -134,7 +134,7 @@ class Perspective(BasicProcessor):
 
 		# Write annotations
 		if write_annotations:
-			self.save_annotations(annotations, overwrite=False)
+			self.save_annotations(annotations, overwrite=True)
 
 		# Write to file
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
