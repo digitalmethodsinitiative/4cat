@@ -67,7 +67,8 @@ class Perspective(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
 				"help": "Google API key",
-				"tooltip": "Can be created on console.cloud.google.com"
+				"tooltip": "Can be created on console.cloud.google.com",
+				"sensitive": True
 			}
 
 		return options
@@ -75,7 +76,7 @@ class Perspective(BasicProcessor):
 	def process(self):
 
 		api_key = self.parameters.get("api_key")
-		self.dataset.delete_parameter("api_key")  # sensitive, delete after use
+
 		if not api_key:
 			api_key = config.get("api.google.api_key", user=self.owner)
 		if not api_key:
@@ -86,7 +87,7 @@ class Perspective(BasicProcessor):
 			self.dataset.finish_with_error("You need to provide a at least one attribute to score")
 			return
 
-		write_annotations = self.parameters.get("api_key", True)
+		write_annotations = self.parameters.get("write_annotations", False)
 
 		try:
 			client = discovery.build(
