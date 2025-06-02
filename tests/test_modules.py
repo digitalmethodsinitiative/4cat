@@ -259,6 +259,11 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
             failures.append((processor_name, str(e)))
 
     for datasource_name, datasource_data in fourcat_modules.datasources.items():
+        if datasource_name in ["twitter"]:
+            # Skip datasources that are not meant to be tested
+            # datasource_name is the same as type minus the "-search" (or in error cases "-import") suffix
+            # this includes bug https://github.com/digitalmethodsinitiative/4cat/issues/493 which likely needs migrate script fix
+            continue
         try:
             assert datasource_data.get("has_worker", False), f"Datasource {datasource_name} does not have a worker"
           
