@@ -69,7 +69,7 @@ class CountPosts(BasicProcessor):
 
 			for post in self.source_dataset.iterate_items(self):
 				# Ensure the post has a date
-				if not post.get("timestamp"):
+				if timeframe != "all" and not post.get("timestamp"):
 					# Count these as "unknown_date"
 					unknown_dates += 1
 				else:
