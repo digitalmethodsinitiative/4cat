@@ -325,14 +325,25 @@ class SearchCustom(BasicProcessor):
                 # stop parsing because no complete rows will follow
                 raise StopIteration
 
-            try:
-                if row[timestamp_column].isdecimal():
-                    datetime.fromtimestamp(float(row[timestamp_column]))
+            if row[timestamp_column]:
+                try:
+                    if row[timestamp_column].isdecimal():
+                        datetime.fromtimestamp(float(row[timestamp_column]))
+                    else:
+                        parse_datetime(row[timestamp_column])
+                except (ValueError, OSError):
+                    raise QueryParametersException(
+                        "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+            else:
+                # the timestamp column is empty or contains empty values
+                if not query.get("frontend-confirm"):
+                    # WARNING: two frontend-confirm exceptions are possible, so it is possible this was not the intended one!
+                    # TODO: Unsure how to handles this possibility; frontend-confirm exceptions would need to be made unique
+                    raise QueryNeedsExplicitConfirmationException(
+                        "Your 'timestamp' column contains empty values. Continue anyway?")
                 else:
-                    parse_datetime(row[timestamp_column])
-            except (ValueError, OSError):
-                raise QueryParametersException(
-                    "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+                    # `None` value will be used
+                    pass
 
         except StopIteration:
             pass
