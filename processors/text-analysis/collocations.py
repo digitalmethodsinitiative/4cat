@@ -93,7 +93,7 @@ class GetCollocations(BasicProcessor):
 		},
 		"write_annotations": {
 			"type": UserInput.OPTION_TOGGLE,
-			"help": "Add co-words to top dataset",
+			"help": "Add all co-words per item to top dataset",
 			"default": False
 		}
 	}
@@ -151,7 +151,7 @@ class GetCollocations(BasicProcessor):
 
 		# Dictionary to save queries from
 		results = []
-		annotations = []
+		annotations = {}
 
 		# Go through all archived token sets and generate collocations for each
 		for token_file in self.iterate_archive_contents(self.source_file):
@@ -186,10 +186,12 @@ class GetCollocations(BasicProcessor):
 				collocations += post_collocations
 
 				if save_annotations:
+					if date_string not in annotations:
+						annotations[date_string] = []
 					annotation_value = ""
 					if post_collocations:
 						annotation_value = ",".join([f"{c[0]} {c[1]}" for c in post_collocations])
-					annotations.append({
+					annotations[date_string].append({
 						"label": "co-words",
 						"value": annotation_value
 					})
@@ -256,14 +258,17 @@ class GetCollocations(BasicProcessor):
 		if not results:
 			return
 
+		# Save annotations; match item IDs with time-sorted token sets, using the metadata file.
 		if save_annotations and annotations:
+			doc_no = 0
 			for item_id, item_data in metadata.items():
 				if item_id == "parameters":
 					continue
 				for time_grouping, time_data in item_data.items():
-					for doc_no in time_data["document_numbers"]:
-						annotations[doc_no]["item_id"] = item_id
-
+					for doc_line in time_data["document_numbers"]:
+						annotations[time_data["interval"]][doc_line]["item_id"] = item_id
+						doc_no += 1
+			annotations = [ann for ann_list in list(annotations.values()) for ann in ann_list]
 			self.save_annotations(annotations, overwrite=False)
 
 		# Generate csv and finish
