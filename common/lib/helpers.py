@@ -677,14 +677,14 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
     "month", "week", "day"
     :param str item_column:  Column name in the item dictionary that contains
     the timestamp. Defaults to "timestamp".
-    :return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
+    :return str:  Interval descriptor, e.g. "overall", "unknown_date", "2020", "2020-08",
     "2020-43", "2020-08-01"
     """
     if interval in ("all", "overall"):
         return interval
     
     if not item.get(item_column, None):
-        raise ValueError("No date available for item in dataset")
+        return "unknown_date"
 
     # Catch cases where a custom timestamp has an epoch integer as value.
     try:

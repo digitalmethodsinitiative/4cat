@@ -112,6 +112,10 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 			# make sure the months and days are zero-padded
 			interval = row.get("date", "")
+			if interval == "unknown_date":
+				# this is a special case we cannot graph, so we can skip it
+				continue
+			
 			interval = "-".join([str(bit).zfill(2 if len(bit) != 4 else 4) for bit in interval.split("-")])
 			first_date = min(first_date, interval)
 			last_date = max(last_date, interval)
