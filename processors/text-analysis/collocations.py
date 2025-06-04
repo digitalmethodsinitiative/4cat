@@ -93,7 +93,7 @@ class GetCollocations(BasicProcessor):
 		},
 		"write_annotations": {
 			"type": UserInput.OPTION_TOGGLE,
-			"help": "Add all co-words per item to top dataset",
+			"help": "Add co-words to top dataset",
 			"default": False
 		}
 	}
