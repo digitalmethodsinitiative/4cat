@@ -86,6 +86,10 @@ class SearchTikTokByID(Search):
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
+        if not query.get("urls"):
+            # no URLs provided
+            raise QueryParametersException("Missing \"Post URLs\" (\"urls\" parameter). Please provide a list of TikTok video URLs.")
+        
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
