@@ -260,8 +260,8 @@ config_definition = {
     "proxies.cooloff": {
         "type": UserInput.OPTION_TEXT,
         "coerce_type": float,
-        "help": "Cooloff",
-        "tooltip": "After a request is started, do not use the proxy again for this many seconds.",
+        "help": "Cool-off time",
+        "tooltip": "After a request has finished, do not use the proxy again for this many seconds.",
         "default": 0.1,
         "min": 0.0
     },

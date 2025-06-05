@@ -98,7 +98,7 @@ class SophisticatedFuturesProxy:
             for request in metadata.running:
                 if (
                     request.status == ProxyStatus.COOLING_OFF
-                    and request.timestamp_started < time.time() - self.COOLOFF
+                    and request.timestamp_finished < time.time() - self.COOLOFF
                 ):
                     self.log.debug(
                         f"Releasing proxy {self.proxy_url} for host name {hostname}"
@@ -131,11 +131,12 @@ class SophisticatedFuturesProxy:
 
         if len(self.hostnames[hostname].running) < self.MAX_CONCURRENT_PER_HOST:
             request = namedtuple(
-                "ProxiedRequest", ("url", "status", "timestamp_started")
+                "ProxiedRequest", ("url", "status", "timestamp_started", "timestamp_finished")
             )
             request.url = url
             request.status = ProxyStatus.CLAIMED
             request.timestamp_started = 0
+            request.timestamp_finished = 0
             self.hostnames[hostname].running.append(request)
             self.log.debug(
                 f"Claiming proxy {self.proxy_url} for host name {hostname} ({len(self.hostnames[hostname].running)} of {self.MAX_CONCURRENT_PER_HOST} for host)"
@@ -179,6 +180,7 @@ class SophisticatedFuturesProxy:
 
         for i, metadata in enumerate(self.hostnames[hostname].running):
             if metadata.status == ProxyStatus.RUNNING and metadata.url == url:
+                self.hostnames[hostname].running[i].timestamp_finished = time.time()
                 self.hostnames[hostname].running[i].status = ProxyStatus.COOLING_OFF
                 return
 
