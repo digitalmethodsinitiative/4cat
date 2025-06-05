@@ -19,6 +19,7 @@ class FailedProxiedRequest:
     The failure context (usually the exception) is stored in the `context`
     property.
     """
+
     context = None
 
     def __init__(self, context=None):
@@ -131,7 +132,8 @@ class SophisticatedFuturesProxy:
 
         if len(self.hostnames[hostname].running) < self.MAX_CONCURRENT_PER_HOST:
             request = namedtuple(
-                "ProxiedRequest", ("url", "status", "timestamp_started", "timestamp_finished")
+                "ProxiedRequest",
+                ("url", "status", "timestamp_started", "timestamp_finished"),
             )
             request.url = url
             request.status = ProxyStatus.CLAIMED
@@ -304,7 +306,11 @@ class DelegatedRequestHandler:
             for url_metadata in self.queue[queue_name]:
                 # is there a request for the url?
                 url = url_metadata.url
-                have_request = [r.url for r in self.requests[queue_name] if r.url == url and r.index == url_metadata.index]
+                have_request = [
+                    r.url
+                    for r in self.requests[queue_name]
+                    if r.url == url and r.index == url_metadata.index
+                ]
 
                 for request in self.requests[queue_name]:
                     if (
@@ -364,14 +370,31 @@ class DelegatedRequestHandler:
                     self.log.debug(f"Request for {url} started")
                     request = namedtuple(
                         "DelegatedRequest",
-                        ("request", "created", "status", "result", "proxy", "url", "index"),
+                        (
+                            "request",
+                            "created",
+                            "status",
+                            "result",
+                            "proxy",
+                            "url",
+                            "index",
+                        ),
                     )
                     request.created = time.time()
-                    request.request = self.session.get(**{"url": url, "timeout": 30, "proxies": proxy_definition, **url_metadata.kwargs})
+                    request.request = self.session.get(
+                        **{
+                            "url": url,
+                            "timeout": 30,
+                            "proxies": proxy_definition,
+                            **url_metadata.kwargs,
+                        }
+                    )
                     request.status = self.REQUEST_STATUS_STARTED
                     request.proxy = proxy
                     request.url = url
-                    request.index = url_metadata.index  # this is to allow for multiple requests for the same URL
+                    request.index = (
+                        url_metadata.index
+                    )  # this is to allow for multiple requests for the same URL
 
                     self.requests[queue_name].append(request)
                     proxy.request_started(url)
@@ -437,10 +460,10 @@ class DelegatedRequestHandler:
         """
         for queue in self.queue:
             if queue_name == "_" or queue_name == queue:
-                del self.queue[queue_name]
+                del self.queue[queue]
 
         for queue, requests in self.requests:
             if queue_name == "_" or queue_name == queue:
-                for request in self.requests[queue_name]:
+                for request in self.requests[queue]:
                     if not request.request.done():
                         request.cancel()
