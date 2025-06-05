@@ -1476,6 +1476,8 @@ class DataSet(FourcatModule):
 			while key_parent:
 				try:
 					parent = self.db.fetchone("SELECT key_parent FROM datasets WHERE key = %s", (key_parent,))
+					if not parent:
+						break
 				except TypeError:
 					break
 

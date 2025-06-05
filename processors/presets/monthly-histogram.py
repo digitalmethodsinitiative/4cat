@@ -3,6 +3,7 @@ Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
 from processors.metrics.count_posts import CountPosts
+import copy
 
 
 class MonthlyHistogramCreator(ProcessorPreset):
@@ -29,8 +30,8 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
-		count_options = CountPosts.get_options(parent_dataset=parent_dataset, user=user)
-		if "all" in count_options["timeframe"]:
+		count_options = copy.deepcopy(CountPosts.get_options(parent_dataset=parent_dataset, user=user))
+		if "all" in count_options["timeframe"].get("options", {}):
 			# Cannot graph overall counts (or rather it would be a single bar)
 			count_options["timeframe"]["options"].pop("all")
 		return count_options

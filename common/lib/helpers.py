@@ -667,8 +667,7 @@ def call_api(action, payload=None, wait_for_response=True):
     
     return response_data
 
-
-def get_interval_descriptor(item, interval):
+def get_interval_descriptor(item, interval, item_column="timestamp"):
     """
     Get interval descriptor based on timestamp
 
@@ -676,18 +675,20 @@ def get_interval_descriptor(item, interval):
     "timestamp" key
     :param str interval:  Interval, one of "all", "overall", "year",
     "month", "week", "day"
-    :return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
+    :param str item_column:  Column name in the item dictionary that contains
+    the timestamp. Defaults to "timestamp".
+    :return str:  Interval descriptor, e.g. "overall", "unknown_date", "2020", "2020-08",
     "2020-43", "2020-08-01"
     """
     if interval in ("all", "overall"):
         return interval
-
-    if "timestamp" not in item:
-        raise ValueError("No date available for item in dataset")
+    
+    if not item.get(item_column, None):
+        return "unknown_date"
 
     # Catch cases where a custom timestamp has an epoch integer as value.
     try:
-        timestamp = int(item["timestamp"])
+        timestamp = int(item[item_column])
         try:
             timestamp = datetime.datetime.fromtimestamp(timestamp)
         except (ValueError, TypeError) as e:
