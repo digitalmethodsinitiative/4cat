@@ -26,18 +26,30 @@ class ImageDownloader(BasicProcessor):
 
     Downloads top images and saves as zip archive
     """
+
     type = "image-downloader"  # job type ID
     category = "Visual"  # category
     title = "Download images"  # title displayed in UI
-    description = "Download images and store in a a zip file. May take a while to complete as images are retrieved " \
-                  "externally. Note that not always all images can be saved. For imgur galleries, only the first " \
-                  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
-                  "is included in the output archive."  # description displayed in UI
+    description = (
+        "Download images and store in a a zip file. May take a while to complete as images are retrieved "
+        "externally. Note that not always all images can be saved. For imgur galleries, only the first "
+        "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file "
+        "is included in the output archive."
+    )  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image"  # media type of the dataset
 
-    followups = ["image-wall", "image-category-wall", "pix-plot", "image-to-categories", "image-captions",
-                 "text-from-images", "metadata-viewer", "clarifai-api", "google-vision-api"]
+    followups = [
+        "image-wall",
+        "image-category-wall",
+        "pix-plot",
+        "image-to-categories",
+        "image-captions",
+        "text-from-images",
+        "metadata-viewer",
+        "clarifai-api",
+        "google-vision-api",
+    ]
 
     options = {
         "amount": {
@@ -49,15 +61,15 @@ class ImageDownloader(BasicProcessor):
             "help": "Column to get image links from",
             "default": "image_url",
             "inline": True,
-            "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+            "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
         },
         "split-comma": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Split column values by comma?",
-            "default": False,
+            "default": True,
             "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-                       "separately"
-        }
+            "separately",
+        },
     }
 
     config = {
@@ -67,7 +79,7 @@ class ImageDownloader(BasicProcessor):
             "default": 1000,
             "help": "Max images to download",
             "tooltip": "Only allow downloading up to this many images per batch. Increasing this can easily lead to "
-                       "very long-running processors and large datasets. Set to 0 for no limit."
+            "very long-running processors and large datasets. Set to 0 for no limit.",
         }
     }
 
@@ -90,16 +102,16 @@ class ImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get('image-downloader.max', 1000, user=user))
+        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
         if max_number_images != 0:
-            options['amount']['help'] = f"No. of images (max {max_number_images})"
-            options['amount']['max'] = max_number_images
-            options['amount']['min'] = 1
+            options["amount"]["help"] = f"No. of images (max {max_number_images})"
+            options["amount"]["max"] = max_number_images
+            options["amount"]["min"] = 1
         else:
             # 0 can download all images
-            options['amount']['help'] = f"No. of images"
-            options['amount']["min"] = 0
-            options['amount']["tooltip"] = "Set to 0 to download all images"
+            options["amount"]["help"] = f"No. of images"
+            options["amount"]["min"] = 0
+            options["amount"]["tooltip"] = "Set to 0 to download all images"
 
         # Get the columns for the select columns option
         if parent_dataset and parent_dataset.get_columns():
@@ -107,14 +119,13 @@ class ImageDownloader(BasicProcessor):
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["options"] = {v: v for v in columns}
             # Pick a good default
-            if "image_md5" in columns:
-                # 4CHAN image column
-                options["columns"]["default"] = "image_md5"
-            elif "image_url" in columns:
+            if "image_url" in columns:
                 options["columns"]["default"] = "image_url"
-            elif "image" in ''.join(columns):
+            elif "image" in "".join(columns):
                 # Any image will do
-                options["columns"]["default"] = sorted(columns, key=lambda k: "image" in k).pop()
+                options["columns"]["default"] = sorted(
+                    columns, key=lambda k: "image" in k
+                ).pop()
             else:
                 options["columns"]["default"] = "body"
 
@@ -127,9 +138,17 @@ class ImageDownloader(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return (module.type == "top-images" or module.is_from_collector()) \
-            and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search", "fourchan-search"] \
+        return (
+            (module.type == "top-images" or module.is_from_collector())
+            and module.type
+            not in [
+                "tiktok-search",
+                "tiktok-urls-search",
+                "telegram-search",
+                "fourchan-search",
+            ]
             and module.get_extension() in ("csv", "ndjson")
+        )
 
     def process(self):
         """
@@ -142,7 +161,7 @@ class ImageDownloader(BasicProcessor):
         split_comma = self.parameters.get("split-comma", False)
 
         if amount == 0:
-            amount = self.config.get('image-downloader.max', 1000)
+            amount = self.config.get("image-downloader.max", 1000)
         columns = self.parameters.get("columns")
         if type(columns) is str:
             columns = [columns]
@@ -153,7 +172,8 @@ class ImageDownloader(BasicProcessor):
 
         if not columns:
             return self.dataset.finish_with_error(
-                "No columns selected; no image URLs can be extracted from the dataset")
+                "No columns selected; no image URLs can be extracted from the dataset"
+            )
 
         # prepare
         self.staging_area = self.dataset.get_staging_area()
@@ -164,12 +184,16 @@ class ImageDownloader(BasicProcessor):
         # more complicated ones like
         # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
         img_link_regex = re.compile(
-            r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*", re.IGNORECASE)
+            r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*",
+            re.IGNORECASE,
+        )
 
         # Imgur and gfycat links that do not end in an extension are also accepted.
         # These can later be downloaded by adding an extension.
-        img_domain_regex = re.compile(r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*",
-                                      re.IGNORECASE)
+        img_domain_regex = re.compile(
+            r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*",
+            re.IGNORECASE,
+        )
 
         # first, get URLs to download images from
         self.dataset.update_status("Reading source file")
@@ -186,7 +210,8 @@ class ImageDownloader(BasicProcessor):
             item_index += 1
             if item_index % 50 == 0:
                 self.dataset.update_status(
-                    f"Extracting image links from item {item_index:,} of {self.source_dataset.num_rows:,}")
+                    f"Extracting image links from item {item_index:,} of {self.source_dataset.num_rows:,}"
+                )
 
             # loop through all columns and process values for item
             item_urls = set()
@@ -198,7 +223,7 @@ class ImageDownloader(BasicProcessor):
                 # remove all whitespace from beginning and end (needed for single URL check)
                 values = [str(value).strip()]
                 if split_comma:
-                    values = values[0].split(',')
+                    values = values[0].split(",")
 
                 for value in values:
                     if re.match(r"https?://(\S+)$", value):
@@ -213,18 +238,22 @@ class ImageDownloader(BasicProcessor):
                         item_urls |= set(img_link_regex.findall(value))
                         item_urls |= set(img_domain_regex.findall(value))
 
-
             item_urls = self.preprocess_urls(item_urls)
             for item_url in item_urls:
                 if item_url not in item_map:
                     item_map[item_url] = []
 
-                item_map[item_url] += item.get("ids").split(",") if "ids" in item else item.get("item_id", "")
+                item_map[item_url] += (
+                    item.get("ids").split(",")
+                    if "ids" in item
+                    else item.get("item_id", "")
+                )
                 urls.append(item_url)
 
         if not urls:
             return self.dataset.finish_with_error(
-                "No image URLs could be extracted from the dataset within the given parameters.")
+                "No image URLs could be extracted from the dataset within the given parameters."
+            )
         else:
             self.dataset.log(f"Extracted {len(urls):,} image urls.")
 
@@ -242,15 +271,16 @@ class ImageDownloader(BasicProcessor):
             self.filenames[url] = self.make_filename(url)
 
         for url, response in self.iterate_proxied_requests(
-                urls,
-                preserve_order=False,
-                headers={"User-Agent": ua}, hooks={
-                    # use hooks to download the content (stream=True) in parallel
-                    "response": self.stream_url
-                },
-                verify=False,
-                timeout=20,
-                stream=True
+            urls,
+            preserve_order=False,
+            headers={"User-Agent": ua},
+            hooks={
+                # use hooks to download the content (stream=True) in parallel
+                "response": self.stream_url
+            },
+            verify=False,
+            timeout=20,
+            stream=True,
         ):
             downloaded_file = self.staging_area.joinpath(self.filenames[url])
             failure = False
@@ -261,28 +291,42 @@ class ImageDownloader(BasicProcessor):
 
             if type(response) is FailedProxiedRequest:
                 if type(response.context) is requests.exceptions.Timeout:
-                    self.dataset.log(f"Error: Timeout while trying to download image {url}: {response.context}")
+                    self.dataset.log(
+                        f"Error: Timeout while trying to download image {url}: {response.context}"
+                    )
                 elif type(response.context) is requests.exceptions.SSLError:
-                    self.dataset.log(f"Error: SSL Error for image {url}: {response.context}")
+                    self.dataset.log(
+                        f"Error: SSL Error for image {url}: {response.context}"
+                    )
                 elif type(response.context) is requests.exceptions.TooManyRedirects:
-                    self.dataset.log(f"Error: Too many redirects for image {url}: {response.context}")
+                    self.dataset.log(
+                        f"Error: Too many redirects for image {url}: {response.context}"
+                    )
                 elif type(response.context) is requests.exceptions.ConnectionError:
-                    self.dataset.log(f"Error: Connection Error for image {url}: {response.context}")
+                    self.dataset.log(
+                        f"Error: Connection Error for image {url}: {response.context}"
+                    )
                 else:
-                    self.dataset.log(f"Error: Error for image {url}: {response.context}")
+                    self.dataset.log(
+                        f"Error: Error for image {url}: {response.context}"
+                    )
 
                 # other failures are generally invalid URL which probably
                 # shouldn't have been downloaded in the first place
                 failure = True
 
             elif response.status_code != 200:
-                self.dataset.log(f"Error: Image not found (status {response.status_code}) at {url}")
+                self.dataset.log(
+                    f"Error: Image not found (status {response.status_code}) at {url}"
+                )
                 failure = True
 
             if not failure:
                 url_domain = url.split("/")[2].lower()
                 url_trail = url.split("/")[-1]
-                if url_domain in ("www.imgur.com", "imgur.com") and (url.endswith(".json") or "." not in url_trail):
+                if url_domain in ("www.imgur.com", "imgur.com") and (
+                    url.endswith(".json") or "." not in url_trail
+                ):
                     # imgur galleries or previews - not actual images
                     # but they contain a reference to one...
                     with downloaded_file.open() as infile:
@@ -291,11 +335,17 @@ class ImageDownloader(BasicProcessor):
                                 # extract URL from gallery metadata and push it to the
                                 # front of the queue so it gets downloaded next
                                 gallery = json.load(infile)
-                                imgur_ref = gallery["data"]["image"]["album_images"]["images"][0]
-                                image_url = "https://i.imgur.com/" + imgur_ref["hash"] + imgur_ref["ext"]
+                                imgur_ref = gallery["data"]["image"]["album_images"]["images"]
+                                imgur_ref = imgur_ref[0]
+                                image_url = (f"https://i.imgur.com/{imgur_ref['hash']}{imgur_ref['ext']}")
                             else:
                                 # get reference from HTML meta for preview pages
-                                image_url = infile.read().split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[0]
+                                image_url = (
+                                    infile.read()
+                                    .split('<meta property="og:image"')[1]
+                                    .split('content="')[1]
+                                    .split('?fb">')[0]
+                                )
 
                             self.filenames[image_url] = self.make_filename(image_url)
                             self.push_proxied_request(image_url, 0)
@@ -308,15 +358,18 @@ class ImageDownloader(BasicProcessor):
                             continue
 
                         except (json.JSONDecodeError, KeyError, IndexError):
-                            self.dataset.log(f"Error: Could not get image URL for Imgur album {url}")
+                            self.dataset.log(
+                                f"Error: Could not get image URL for Imgur album {url}"
+                            )
                             failures.append(url)
 
                 elif response.headers.get("content-type", "")[:5] != "image":
-                    self.dataset.log(f"Error: URL does not seem to be an image ({response.headers.get('content-type', '')} found instead) at {url}")
+                    self.dataset.log(
+                        f"Error: URL does not seem to be an image ({response.headers.get('content-type', '')} found instead) at {url}"
+                    )
                     failure = True
 
                 else:
-
                     # file has been downloaded, but is it also a valid image?
                     # test by trying to read it with PIL
                     try:
@@ -324,13 +377,22 @@ class ImageDownloader(BasicProcessor):
                         if not picture.format:
                             raise TypeError("Image format could not be determined")
 
-                        if downloaded_file.suffix.split(".")[-1].lower() != picture.format.lower():
+                        if (
+                            downloaded_file.suffix.split(".")[-1].lower()
+                            != picture.format.lower()
+                        ):
                             # rename with correct extension
-                            downloaded_file.rename(downloaded_file.with_suffix(f".{picture.format.lower()}"))
+                            downloaded_file.rename(
+                                downloaded_file.with_suffix(
+                                    f".{picture.format.lower()}"
+                                )
+                            )
                             self.filenames[url] = downloaded_file.name
 
                     except (UnidentifiedImageError, AttributeError, TypeError) as e:
-                        self.dataset.log(f"Error: Image downloaded from {url}, but does not seem to be an image file ({e})")
+                        self.dataset.log(
+                            f"Error: Image downloaded from {url}, but does not seem to be an image file ({e})"
+                        )
                         failure = True
 
                 if not failure:
@@ -356,16 +418,19 @@ class ImageDownloader(BasicProcessor):
                 "filename": self.filenames[url],
                 "success": not failure,
                 "from_dataset": self.source_dataset.key,
-                "post_ids": item_map[url]
+                "post_ids": item_map[url],
             }
 
-        with self.staging_area.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
+        with self.staging_area.joinpath(".metadata.json").open(
+            "w", encoding="utf-8"
+        ) as outfile:
             json.dump(metadata, outfile)
 
         # finish up
         self.dataset.update_progress(1.0)
-        self.write_archive_and_finish(self.staging_area, len([x for x in metadata.values() if x.get("success")]))
-
+        self.write_archive_and_finish(
+            self.staging_area, len([x for x in metadata.values() if x.get("success")])
+        )
 
     def preprocess_urls(self, urls):
         """
@@ -459,7 +524,9 @@ class ImageDownloader(BasicProcessor):
         file_path = self.staging_area.joinpath(filename)
         file_index = 1
         while file_path.exists():
-            filename = base_filename.split(".")[0] + f"-{file_index}" + f".{base_filename.split('.')[1]}"
+            filename = (
+                f"{base_filename.split('.')[0]}-{file_index}.{base_filename.split('.')[1]}"
+            )
             file_index += 1
             file_path = self.staging_area.joinpath(filename)
 
@@ -479,7 +546,7 @@ class ImageDownloader(BasicProcessor):
             "number_of_posts_with_url": len(data.get("post_ids", [])),
             "post_ids": ", ".join(data.get("post_ids", [])),
             "filename": data.get("filename"),
-            "download_successful": data.get('success', "")
+            "download_successful": data.get("success", ""),
         }
 
         yield row
