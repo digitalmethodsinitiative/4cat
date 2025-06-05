@@ -425,14 +425,22 @@ class DelegatedRequestHandler:
                 # as much as possible
                 return
 
-    def halt(self):
+    def halt(self, queue_name="_"):
         """
         Interrupt fetching of results
 
         Can be used when 4CAT is interrupted. Clears queue and cancels any
         running requests.
+
+        :param str queue_name:  Queue name to stop fetching results for. By
+        default, halt all queues.
         """
-        self.queue = {}
-        for request in self.requests:
-            if not request.done():
-                request.cancel()
+        for queue in self.queue:
+            if queue_name == "_" or queue_name == queue:
+                del self.queue[queue_name]
+
+        for queue, requests in self.requests:
+            if queue_name == "_" or queue_name == queue:
+                for request in self.requests[queue_name]:
+                    if not request.request.done():
+                        request.cancel()

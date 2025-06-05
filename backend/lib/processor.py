@@ -545,6 +545,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		queue_name = f"{self.type}-{self.dataset.key}"
 		self.manager.proxy_delegator.add_urls([url], queue_name, position=position, **kwargs)
 
+	def halt_proxied_requests(self):
+		"""
+		Halt all proxied requests currently running for this processor
+		"""
+		self.manager.proxy_delegator.halt(f"{self.type}-{self.dataset.key}")
+
 	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
 		A generator that iterates through files in an archive

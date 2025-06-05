@@ -335,8 +335,18 @@ class ImageDownloader(BasicProcessor):
 
                 if not failure:
                     downloaded_images += 1
-                    self.dataset.update_status(f"Downloaded {downloaded_images:,} of {len(self.filenames):,} image(s)")
-                    self.dataset.update_progress(downloaded_images / len(self.filenames))
+                    self.dataset.update_status(
+                        f"Downloaded {downloaded_images:,} of {len(self.filenames):,} image(s)"
+                    )
+                    self.dataset.update_progress(
+                        downloaded_images / len(self.filenames)
+                    )
+
+                    if downloaded_images >= amount:
+                        # parallel requests may still be running so halt these
+                        # before ending the loop and wrapping up
+                        self.halt_proxied_requests()
+                        break
 
             if failure:
                 failures.append(url)
