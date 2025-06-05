@@ -408,3 +408,15 @@ class DelegatedRequestHandler:
                 # unless we don't care about the order, then continue and yield
                 # as much as possible
                 return
+
+    def halt(self):
+        """
+        Interrupt fetching of results
+
+        Can be used when 4CAT is interrupted. Clears queue and cancels any
+        running requests.
+        """
+        self.queue = {}
+        for request in self.requests:
+            if not request.done():
+                request.cancel()

@@ -132,6 +132,10 @@ class WorkerManager:
 				self.looping = False
 
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
+
+		# stop any proxied requests
+		self.proxy_delegator.halt()
+
 		# request shutdown from all workers except the API
 		# this allows us to use the API to figure out if a certain worker is
 		# hanging during shutdown, for example
