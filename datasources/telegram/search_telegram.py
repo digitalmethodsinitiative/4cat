@@ -271,7 +271,9 @@ class SearchTelegram(Search):
         # order to avoid having to re-enter the security code
         query = self.parameters
 
-        session_id = SearchTelegram.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
+        session_id = SearchTelegram.create_session_id(query["api_phone"].strip(),
+                                                      query["api_id"].strip(),
+                                                      query["api_hash"].strip())
         self.dataset.log(f'Telegram session id: {session_id}')
         session_path = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_SESSIONS"), session_id + ".session")
 

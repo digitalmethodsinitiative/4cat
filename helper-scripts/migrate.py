@@ -16,7 +16,7 @@ import requests
 import argparse
 import logging
 import shutil
-import shlex
+import oslex
 import time
 import json
 import sys
@@ -261,12 +261,12 @@ if args.release or args.branch:
 			finish(args, logger, no_pip=pip_ran)
 
 	logger.info("  ...ensuring repository %s is a known remote" % args.repository)
-	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
+	remote = subprocess.run(oslex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd, text=True)
 	if remote.stderr:
 		if remote.stderr.strip() == "error: remote 4cat_migrate already exists.":
 			# Update URL
-			remote = subprocess.run(shlex.split("git remote set-url 4cat_migrate %s" % args.repository),
+			remote = subprocess.run(oslex.split("git remote set-url 4cat_migrate %s" % args.repository),
 									stdout=subprocess.PIPE,
 									stderr=subprocess.PIPE, cwd=cwd, text=True)
 			if remote.stderr:
@@ -279,7 +279,7 @@ if args.release or args.branch:
 			exit(1)
 
 	logger.info("  ...fetching tags from repository")
-	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+	fetch = subprocess.run(oslex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
 		if "fatal: could not read Username" in fetch.stderr:
@@ -287,8 +287,8 @@ if args.release or args.branch:
 			from common.config_manager import config
 			if config.get("USING_DOCKER"):
 				# update git config setting
-				unset_authorization = subprocess.run(shlex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
-				fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
+				unset_authorization = subprocess.run(oslex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+				fetch = subprocess.run(oslex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
 									   stdout=subprocess.PIPE, cwd=cwd, text=True)
 				if fetch.returncode != 0:
 					logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
@@ -304,10 +304,10 @@ if args.release or args.branch:
 		command = f"git checkout --force 4cat_migrate/{args.branch}"
 	else:
 		logger.info("  ...checking out latest release")
-		tag_ref = shlex.quote("refs/tags/" + tag)
+		tag_ref = oslex.quote("refs/tags/" + tag)
 		command = "git checkout --force %s" % tag_ref
 
-	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
+	result = subprocess.run(oslex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
