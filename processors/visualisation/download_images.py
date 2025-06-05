@@ -246,7 +246,7 @@ class ImageDownloader(BasicProcessor):
                 item_map[item_url] += (
                     item.get("ids").split(",")
                     if "ids" in item
-                    else item.get("item_id", "")
+                    else item.get("id", "")
                 )
                 urls.append(item_url)
 
