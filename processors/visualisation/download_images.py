@@ -244,9 +244,7 @@ class ImageDownloader(BasicProcessor):
                     item_map[item_url] = []
 
                 item_map[item_url] += (
-                    item.get("ids").split(",")
-                    if "ids" in item
-                    else item.get("id", "")
+                    item.get("ids").split(",") if "ids" in item else item.get("id", "")
                 )
                 urls.append(item_url)
 
@@ -335,9 +333,11 @@ class ImageDownloader(BasicProcessor):
                                 # extract URL from gallery metadata and push it to the
                                 # front of the queue so it gets downloaded next
                                 gallery = json.load(infile)
-                                imgur_ref = gallery["data"]["image"]["album_images"]["images"]
+                                imgur_ref = gallery["data"]["image"]["album_images"][
+                                    "images"
+                                ]
                                 imgur_ref = imgur_ref[0]
-                                image_url = (f"https://i.imgur.com/{imgur_ref['hash']}{imgur_ref['ext']}")
+                                image_url = f"https://i.imgur.com/{imgur_ref['hash']}{imgur_ref['ext']}"
                             else:
                                 # get reference from HTML meta for preview pages
                                 image_url = (
@@ -524,9 +524,7 @@ class ImageDownloader(BasicProcessor):
         file_path = self.staging_area.joinpath(filename)
         file_index = 1
         while file_path.exists():
-            filename = (
-                f"{base_filename.split('.')[0]}-{file_index}.{base_filename.split('.')[1]}"
-            )
+            filename = f"{base_filename.split('.')[0]}-{file_index}.{base_filename.split('.')[1]}"
             file_index += 1
             file_path = self.staging_area.joinpath(filename)
 
