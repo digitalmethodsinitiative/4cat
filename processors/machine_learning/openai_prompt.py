@@ -243,23 +243,8 @@ class OpenAI(BasicProcessor):
 				except KeyError as e:
 					self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
 					return
-			try:
-				response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
-			except openai.NotFoundError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.BadRequestError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.AuthenticationError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.RateLimitError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.APIConnectionError as e:
-				self.dataset.finish_with_error(e.message)
-				return
+
+			response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
 
 			if "id" in item:
 				item_id = item["id"]
@@ -294,18 +279,34 @@ class OpenAI(BasicProcessor):
 		# Write to csv file
 		self.write_csv_items_and_finish(results)
 
-	@staticmethod
-	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50) -> ChatCompletion:
 
-		# Get response
-		response = client.chat.completions.create(
-			model=model,
-			temperature=temperature,
-			max_tokens=max_tokens,
-			messages=[{
-				"role": "user",
-				"content": prompt
-			}]
-		)
+	def prompt_gpt(self, prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50):
+
+		try:
+			# Get response
+			response = client.chat.completions.create(
+				model=model,
+				temperature=temperature,
+				max_tokens=max_tokens,
+				messages=[{
+					"role": "user",
+					"content": prompt
+				}]
+			)
+		except openai.NotFoundError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.BadRequestError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.AuthenticationError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.RateLimitError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.APIConnectionError as e:
+			self.dataset.finish_with_error(e.message)
+			return
 
 		return response
