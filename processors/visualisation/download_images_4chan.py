@@ -18,6 +18,7 @@ from io import StringIO, BytesIO
 
 from common.config_manager import config
 from common.lib.helpers import UserInput
+from common.lib.dataset import DataSet
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -133,8 +134,6 @@ class ImageDownloader(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		if type(module) is DataSet:
-			# we need these to actually instantiate a telegram client and
-			# download the images
 			return module.type == "fourchan-search" and \
 				"board" in module.parameters
 		else:
