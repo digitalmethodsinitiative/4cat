@@ -533,6 +533,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				# up to the processor to decide how to deal with it
 				yield url, result
 
+	def push_proxied_request(self, url, position=-1, **kwargs):
+		"""
+		Add a single URL to the proxied requests queue
+
+		:param str url:  URL to add
+		:param position:  Position to add to queue; can be used to add priority
+		requests, adds to end of queue by default
+		:param kwargs:
+		"""
+		queue_name = f"{self.type}-{self.dataset.key}"
+		self.manager.proxy_delegator.add_urls([url], queue_name, position=position, **kwargs)
+
 	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
 		A generator that iterates through files in an archive

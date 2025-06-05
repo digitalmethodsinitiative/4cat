@@ -205,12 +205,13 @@ class DelegatedRequestHandler:
         self.session = FuturesSession(executor=pool)
         self.log = log
 
-    def add_urls(self, urls, queue_name="_", **kwargs):
+    def add_urls(self, urls, queue_name="_", position=-1, **kwargs):
         """
         Add URLs to the request queue
 
         :param urls:  An iterable of URLs.
         :param queue_name:  Queue name to add to.
+        :param position:  Where in queue to insert; -1 adds to end of queue
         :param kwargs: Other keyword arguments will be passed on to
         `requests.get()`
         """
@@ -218,18 +219,27 @@ class DelegatedRequestHandler:
             self.queue[queue_name] = []
             self.requests[queue_name] = []
 
-        for url in urls:
+        for i, url in enumerate(urls):
             url_metadata = namedtuple("UrlForDelegatedRequest", ("url", "args"))
             url_metadata.url = url
             url_metadata.kwargs = kwargs
             url_metadata.index = self.index
             self.index += 1
 
-            self.queue[queue_name].append(url_metadata)
+            if position == -1:
+                self.queue[queue_name].append(url_metadata)
+            else:
+                self.queue[queue_name].insert(position + i, url_metadata)
 
         self.manage_requests()
 
     def get_queue_length(self, queue_name="_"):
+        """
+        Get the length, of the queue
+
+        :param str queue_name:  Queue name
+        :return int: Amount of URLs in the queue (regardless of status)
+        """
         if queue_name not in self.queue:
             self.queue[queue_name] = []
             self.requests[queue_name] = []
@@ -309,6 +319,9 @@ class DelegatedRequestHandler:
                     if request.request.done():
                         # collect result and buffer it for yielding (see below for
                         # why we do not immediately yield)
+                        # done() here doesn't necessarily mean the request
+                        # finished successfully, just that it has returned
+                        # a timed out request will also be done()!
                         self.log.debug(f"Request for {url} finished, collecting result")
                         request.proxy.request_finished(url)
                         try:
@@ -320,18 +333,21 @@ class DelegatedRequestHandler:
                             requests.exceptions.RequestException,
                             urllib3.exceptions.HTTPError,
                         ) as e:
+                            # this is where timeouts, etc, go
                             request.result = FailedProxiedRequest(e)
                         finally:
+                            # success or fail, we can pass it on
                             request.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
                     else:
                         # running - ignore for now
-                        # potentially check for timeouts, etc
+                        # could do some health checks here...
                         # logging.debug(f"Request for {url} running...")
                         pass
 
                     break
 
                 if not have_request:
+                    # no request running for this URL yet, try to start one
                     proxy = self.claim_proxy(url)
                     if not proxy:
                         # no available proxies, try again next loop
