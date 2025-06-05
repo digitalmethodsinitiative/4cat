@@ -10,7 +10,7 @@ import datetime
 import smtplib
 import fnmatch
 import socket
-import shlex
+import oslex
 import copy
 import time
 import json
@@ -149,14 +149,14 @@ def get_git_branch():
     """
     try:
         root_dir = str(config.get('PATH_ROOT').resolve())
-        branch = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
+        branch = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
         branch_name = branch.stdout.decode("utf-8").strip()
         if not branch_name:
             # Check for detached HEAD state
             # Most likely occuring because of checking out release tags (which are not branches) or commits
-            head_status = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} status"), stdout=subprocess.PIPE)
+            head_status = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} status"), stdout=subprocess.PIPE)
             if head_status.returncode == 0:
                 for line in head_status.stdout.decode("utf-8").split("\n"):
                     if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
@@ -199,8 +199,8 @@ def get_software_commit(worker=None):
             relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
             working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
-            git_cmd = f"git -C {shlex.quote(working_dir)} rev-parse --show-toplevel"
-            repo_level = subprocess.run(shlex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            git_cmd = f"git -C {oslex.quote(working_dir)} rev-parse --show-toplevel"
+            repo_level = subprocess.run(oslex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
                 # not its own repository
                 return ("", "")
@@ -208,13 +208,13 @@ def get_software_commit(worker=None):
         else:
             working_dir = str(config.get("PATH_ROOT").resolve())
 
-        show = subprocess.run(shlex.split(f"git -C {shlex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        show = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if show.returncode != 0:
             raise ValueError()
         commit = show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
 
         # now get the repository the commit belongs to, if we can
-        origin = subprocess.run(shlex.split(f"git -C {shlex.quote(working_dir)} config --get remote.origin.url"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        origin = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} config --get remote.origin.url"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if origin.returncode != 0 or not origin.stdout:
             raise ValueError()
         repository = origin.stdout.decode("utf-8").strip()
@@ -336,7 +336,7 @@ def find_extensions():
             # try to get remote URL
             try:
                 extension_root = str(extension_folder.resolve())
-                origin = subprocess.run(shlex.split(f"git -C {shlex.quote(extension_root)} config --get remote.origin.url"), stderr=subprocess.PIPE,
+                origin = subprocess.run(oslex.split(f"git -C {oslex.quote(extension_root)} config --get remote.origin.url"), stderr=subprocess.PIPE,
                                         stdout=subprocess.PIPE)
                 if origin.returncode != 0 or not origin.stdout:
                     raise ValueError()
