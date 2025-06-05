@@ -290,6 +290,8 @@ class SearchWithinTCATBins(Search):
         fieldnames = None
         items = 0
         encoding = None
+        api_map_errors = 0
+        mapping_errors = 0
         for chunk in response.iter_content(chunk_size=1024):
             # see if this chunk contains a newline, in which case we have a
             # full line to process (e.g. as a tweet)
@@ -336,11 +338,36 @@ class SearchWithinTCATBins(Search):
                     if items % 250 == 0:
                         self.dataset.update_status("Loaded %i tweets from bin %s@%s" % (items, bin_name, bin_host))
 
-                    yield self.tcat_to_APIv2(tweet)
+                    try:
+                        formatted_tweet = self.tcat_to_APIv2(tweet)
+                    except (KeyError, IndexError) as e:
+                        self.dataset.log(f"Error converting TCAT tweet ({items}) to APIv2 format: {e}")
+                        api_map_errors += 1
+                        continue
+                    
+                    # Check mapping errors
+                    try:
+                        SearchWithTwitterAPIv2.map_item(formatted_tweet)
+                    except (KeyError, IndexError) as e:
+                        # these tweets will not be usable by 4CAT processors, but we can still yield and they are availalbe for download as NDJSON
+                        self.dataset.log(f"Error mapping TCAT tweet ({items}) to 4CAT Twitter format: {e}")
+                        mapping_errors += 1
+
+                    # yield formatted_tweet which contains some TCAT specific fields; mapping to X/Twitter APIv2 format is done later
+                    yield formatted_tweet
 
             if not chunk:
                 # end of file
                 break
+
+        if mapping_errors or api_map_errors:
+            error_message = ""
+            if mapping_errors:
+                error_message += f"{mapping_errors} tweets were unable to be imported from TCAT. "
+            if api_map_errors:
+                error_message += f"{api_map_errors} tweets were unable to be formmated corrected and 4CAT will not be able to analyse them."
+            self.log.warning(f"SearchWithinTCATBins: import mapping issue detected ({self.dataset.key})")
+            self.dataset.update_status(error_message, is_final=True)
 
     @ staticmethod
     def tcat_to_4cat_time(tcat_time):
@@ -413,7 +440,7 @@ class SearchWithinTCATBins(Search):
             "author_user": {
                 "protected": None,  # bool; Missing in TCAT data
                 "verified": True if tcat_tweet["from_user_verified"] == 1 else False if tcat_tweet["from_user_verified"] == 0 else None,  # bool
-                "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["from_user_created_at"]),  # str
+                "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["from_user_created_at"]) if tcat_tweet["from_user_created_at"] else "",  # str; may be Missing in TCAT data
                 "name": tcat_tweet["from_user_realname"],  # str
                 "entities": {
                     "description": None,  # dict; contains entities from author description such as mentions, URLs, etc.; Missing in TCAT data

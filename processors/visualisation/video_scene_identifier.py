@@ -283,7 +283,7 @@ class VideoSceneDetector(BasicProcessor):
 		for every video. If multiple videos are to be combined, one SceneManager could be used.
 		"""
 		scene_manager = SceneManager()
-		if self.parameters.get("detector_type") == 'contenct_detector':
+		if self.parameters.get("detector_type") == 'content_detector':
 			from scenedetect.detectors import ContentDetector
 			scene_manager.add_detector(
 				ContentDetector(threshold=self.parameters.get("cd_threshold"),

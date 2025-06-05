@@ -58,6 +58,7 @@ class CountPosts(BasicProcessor):
 
 		timeframe = self.parameters.get("timeframe")
 		add_relative = self.parameters.get("add_relative", False)
+		unknown_dates = 0 # seperate counter as padding will not interpret this correctly
 
 		first_interval = "9999"
 		last_interval = "0000"
@@ -67,22 +68,27 @@ class CountPosts(BasicProcessor):
 			counter = 0
 
 			for post in self.source_dataset.iterate_items(self):
-				try:
-					date = get_interval_descriptor(post, timeframe)
-				except ValueError as e:
-					self.dataset.update_status(f"{e}, cannot count items per {timeframe}", is_final=True)
-					self.dataset.update_status(0)
-					return
-
-				# Add a count for the respective timeframe
-				if date not in intervals:
-					intervals[date] = {}
-					intervals[date]["absolute"] = 1
+				# Ensure the post has a date
+				if timeframe != "all" and not post.get("timestamp"):
+					# Count these as "unknown_date"
+					unknown_dates += 1
 				else:
-					intervals[date]["absolute"] += 1
+					try:
+						date = get_interval_descriptor(post, timeframe)
+					except ValueError as e:
+						self.dataset.update_status(f"{e}, cannot count items per {timeframe}", is_final=True)
+						self.dataset.update_status(0)
+						return
 
-				first_interval = min(first_interval, date)
-				last_interval = max(last_interval, date)
+					# Add a count for the respective timeframe
+					if date not in intervals:
+						intervals[date] = {}
+						intervals[date]["absolute"] = 1
+					else:
+						intervals[date]["absolute"] += 1
+
+					first_interval = min(first_interval, date)
+					last_interval = max(last_interval, date)
 
 				counter += 1
 
@@ -145,6 +151,17 @@ class CountPosts(BasicProcessor):
 						intervals[interval]["relative"] = intervals[interval]["absolute"] / total_counts[interval]
 
 			rows = []
+			# Add unknown dates if needed
+			if unknown_dates > 0:
+				rows.append({
+					"date": "unknown_date",
+					"item": "activity",
+					"value": unknown_dates
+				})
+				if add_relative:
+					# This should not exist as all database items have a date
+					rows[-1]["value_relative"] = None
+				
 			for interval in intervals:
 
 				row = {

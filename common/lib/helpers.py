@@ -5,6 +5,7 @@ import subprocess
 import imagehash
 import hashlib
 import requests
+import hashlib
 import datetime
 import smtplib
 import fnmatch
@@ -14,6 +15,7 @@ import copy
 import time
 import json
 import math
+import ural
 import csv
 import ssl
 import re
@@ -45,6 +47,17 @@ def init_datasource(database, logger, queue, name):
     :param string name:  ID of datasource that is being initialised
     """
     pass
+
+def get_datasource_example_keys(db, modules, dataset_type):
+    """
+    Get example keys for a datasource
+    """
+    from common.lib.dataset import DataSet
+    example_dataset_key = db.fetchone("SELECT key from datasets WHERE type = %s and is_finished = True and num_rows > 0 ORDER BY timestamp_finished DESC LIMIT 1", (dataset_type,))
+    if example_dataset_key:
+        example_dataset = DataSet(db=db, key=example_dataset_key["key"], modules=modules)
+        return example_dataset.get_columns()
+    return []
 
 def strip_tags(html, convert_newlines=True):
     """
@@ -139,7 +152,16 @@ def get_git_branch():
         branch = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
-        return branch.stdout.decode("utf-8").strip()
+        branch_name = branch.stdout.decode("utf-8").strip()
+        if not branch_name:
+            # Check for detached HEAD state
+            # Most likely occuring because of checking out release tags (which are not branches) or commits
+            head_status = subprocess.run(shlex.split(f"git -C {shlex.quote(root_dir)} status"), stdout=subprocess.PIPE)
+            if head_status.returncode == 0:
+                for line in head_status.stdout.decode("utf-8").split("\n"):
+                    if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
+                        branch_name = line.split("/")[-1] if "/" in line else line.split(" ")[-1]
+                        return branch_name.strip()
     except (subprocess.SubprocessError, ValueError, FileNotFoundError):
         return ""
 
@@ -168,13 +190,13 @@ def get_software_commit(worker=None):
     # the currently checked-out commit
 
     # path has no Path.relative()...
-    relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
     try:
         # if extension, go to the extension file's path
         # we will run git here - if it is not its own repository, we have no
         # useful version info (since the extension is by definition not in the
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
+            relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
             working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
             git_cmd = f"git -C {shlex.quote(working_dir)} rev-parse --show-toplevel"
@@ -347,6 +369,22 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
+def convert_to_float(value, default=0) -> float:
+    """
+    Convert a value to a floating point, with a fallback
+
+    The fallback is used if an Error is thrown during converstion to float.
+    This is a convenience function, but beats putting try-catches everywhere
+    we're using user input as a floating point number.
+
+    :param value:  Value to convert
+    :param int default:  Default value, if conversion not possible
+    :return float:  Converted value
+    """
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
 
 def timify_long(number):
     """
@@ -419,6 +457,28 @@ def andify(items):
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
 
+def ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
+    if len(text) <= length:
+        return text
+
+    elif not inside:
+        return text[:length] + ellipsis_str
+
+    else:
+        # two cases: URLs and normal text
+        # for URLs, try to only ellipsiate after the domain name
+        # this makes the URLs easier to read when shortened
+        if ural.is_url(text):
+            pre_part = "/".join(text.split("/")[:3])
+            if len(pre_part) < length - 6:  # kind of arbitrary
+                before = len(pre_part) + 1
+            else:
+                before = math.floor(length / 2)
+        else:
+            before = math.floor(length / 2)
+
+        after = len(text) - before
+        return text[:before] + ellipsis_str + text[after:]
 
 def hash_file(image_file, hash_type="file-hash"):
     """
@@ -548,21 +608,31 @@ def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
-    Calls the internal API and returns interpreted response.
+    Calls the internal API and returns interpreted response. "status" is always 
+    None if wait_for_response is False.
 
     :param str action: API action
     :param payload: API payload
     :param bool wait_for_response:  Wait for response? If not close connection
     immediately after sending data.
 
-    :return: API response, or timeout message in case of timeout
+    :return: API response {"status": "success"|"error", "response": response, "error": error}
     """
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
-    connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    try:
+        connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    except ConnectionRefusedError:
+        return {"status": "error", "error": "Connection refused"}
 
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
+
+    response_data = {
+        "status": None,
+        "response": None,
+        "error": None
+    }
 
     if wait_for_response:
         try:
@@ -574,7 +644,8 @@ def call_api(action, payload=None, wait_for_response=True):
 
                 response += bytes.decode("ascii", "ignore")
         except (socket.timeout, TimeoutError):
-            response = "(Connection timed out)"
+            response_data["status"] = "error"
+            response_data["error"] = "Connection timed out"
 
     try:
         connection.shutdown(socket.SHUT_RDWR)
@@ -583,13 +654,20 @@ def call_api(action, payload=None, wait_for_response=True):
         pass
     connection.close()
 
-    try:
-        return json.loads(response) if wait_for_response else None
-    except json.JSONDecodeError:
-        return response
+    if wait_for_response:
+        try:
+            json_response = json.loads(response)
+            response_data["response"] = json_response["response"]
+            response_data["error"] = json_response.get("error", None)
+            response_data["status"] = "error" if json_response.get("error") else "success"
+        except json.JSONDecodeError:
+            response_data["status"] = "error"
+            response_data["error"] = "Invalid JSON response"
+            response_data["response"] = response
+    
+    return response_data
 
-
-def get_interval_descriptor(item, interval):
+def get_interval_descriptor(item, interval, item_column="timestamp"):
     """
     Get interval descriptor based on timestamp
 
@@ -597,18 +675,20 @@ def get_interval_descriptor(item, interval):
     "timestamp" key
     :param str interval:  Interval, one of "all", "overall", "year",
     "month", "week", "day"
-    :return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
+    :param str item_column:  Column name in the item dictionary that contains
+    the timestamp. Defaults to "timestamp".
+    :return str:  Interval descriptor, e.g. "overall", "unknown_date", "2020", "2020-08",
     "2020-43", "2020-08-01"
     """
     if interval in ("all", "overall"):
         return interval
-
-    if "timestamp" not in item:
-        raise ValueError("No date available for item in dataset")
+    
+    if not item.get(item_column, None):
+        return "unknown_date"
 
     # Catch cases where a custom timestamp has an epoch integer as value.
     try:
-        timestamp = int(item["timestamp"])
+        timestamp = int(item[item_column])
         try:
             timestamp = datetime.datetime.fromtimestamp(timestamp)
         except (ValueError, TypeError) as e:
@@ -981,7 +1061,7 @@ def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     Lists will be converted to json strings via json.dumps()
 
     :param MutableMapping d:  Dictionary like object
-    :param str partent_key: The original parent key prepending future nested keys
+    :param str parent_key: The original parent key prepending future nested keys
     :param str sep: A seperator string used to combine parent and child keys
     :return dict:  A new dictionary with the no nested values
     """
@@ -1108,3 +1188,9 @@ def folder_size(path='.'):
         elif entry.is_dir():
             total += folder_size(entry.path)
     return total
+
+def hash_to_md5(string: str) -> str:
+    """
+    Hash a string with an md5 hash.
+    """
+    return hashlib.md5(string.encode("utf-8")).hexdigest()

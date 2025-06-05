@@ -71,6 +71,7 @@ class SearchBluesky(Search):
                 "help": "Bluesky Username",
                 "cache": True,
                 "sensitive": True,
+                "tooltip": "If no server is specified, .bsky.social is used."
             },
             "password": {
                 "type": UserInput.OPTION_TEXT,
@@ -128,6 +129,13 @@ class SearchBluesky(Search):
 
         if not query.get("username", None) or not query.get("password", None) :
             raise QueryParametersException("You need to provide valid Bluesky login credentials first.")
+
+        # If no server is specified, default to .bsky.social
+        if "." not in query.get("username"):
+            query["username"] += ".bsky.social"
+        # Remove @ at the start
+        if query.get("username").startswith("@"):
+            query["username"] = query["username"][1:]
 
         # Test login credentials
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
@@ -386,9 +394,12 @@ class SearchBluesky(Search):
                     total_posts += 1
 
                 # Check if there is a cursor for the next page
-                cursor = response['cursor']
-                if max_posts != 0:
+                cursor = response['cursor']                
+                if max_posts != 0 and rank % (max_posts // 10) == 0:
+                    self.dataset.update_status(f"Progress query {query}: {rank} posts collected out of {max_posts}")
                     self.dataset.update_progress(total_posts / (max_posts * num_queries))
+                elif max_posts == 0 and rank % 1000 == 0:
+                    self.dataset.update_status(f"Progress query {query}: {rank} posts collected")
 
                 if 0 < max_posts <= rank:
                     self.dataset.update_status(
@@ -569,10 +580,11 @@ class SearchBluesky(Search):
         # if item["record"].get("tags"):
         #     unmapped_data.append({"loc": "record.tags", "obj": item["record"].get("tags")})
 
-        if unmapped_data:
-            # TODO: Use MappedItem message; currently it is not called...
-            config.with_db()
-            config.db.log.warning(f"Bluesky new mappings ({item['uri']}): {unmapped_data}")
+        # DEBUG logging
+        # TODO: Use MappedItem message; currently it is not called...
+        # if unmapped_data:
+        #     config.with_db()
+        #     config.db.log.warning(f"Bluesky new mappings ({item['uri']}): {unmapped_data}")
 
         return MappedItem({
             "collected_at": datetime.fromtimestamp(item["4CAT_metadata"]["collected_at"]).isoformat(),
@@ -607,7 +619,7 @@ class SearchBluesky(Search):
             "author_avatar": item["author"]["avatar"],
             "author_created_at": SearchBluesky.bsky_convert_datetime_string(item["author"]["created_at"], mode="iso_string", raise_error=False),
 
-            "timestamp": created_at.timestamp(),
+            "timestamp": int(created_at.timestamp()),
         }, message=f"Bluesky new mappings: {unmapped_data}")
 
     @staticmethod
@@ -655,7 +667,7 @@ class SearchBluesky(Search):
                     return user_profile.handle
                 else:
                     return None
-            except InvokeTimeoutError as e:
+            except (NetworkError, InvokeTimeoutError) as e:
                 # Network error; try again
                 tries += 1
                 time.sleep(1)
@@ -701,7 +713,15 @@ class SearchBluesky(Search):
         if session_path.exists():
             with session_path.open() as session_file:
                 session_string = session_file.read()
-                client.login(session_string=session_string)
+                try:
+                    client.login(session_string=session_string)
+                except BadRequestError as e:
+                    if e.response.content.message == 'Token has expired':
+                        # Token has expired; try to refresh
+                        if username and password:
+                            client.login(login=username, password=password)
+                        else:
+                            raise ValueError("Session token has expired; please re-login with username and password.")
         else:
             # Were not able to log in via session string; login with username and password
             client.login(login=username, password=password)

@@ -15,7 +15,7 @@ from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
 from backend.lib.processor import BasicProcessor
-from backend.lib.preset import ProcessorPreset
+from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 from common.config_manager import config
@@ -26,7 +26,7 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class VideoHasherPreset(ProcessorPreset):
+class VideoHasherPreset(ProcessorAdvancedPreset):
     """
     Run processor pipeline to create video hashes
     """
@@ -79,33 +79,41 @@ class VideoHasherPreset(ProcessorPreset):
         return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
                config.get("video-downloader.ffmpeg_path", user=user) and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
-
-    def get_processor_pipeline(self):
+		
+    def get_processor_advanced_pipeline(self, attach_to=None):
         """
-        This queues a series of post-processors to visualise videos.
-        """
+		This queues a series of post-processors to visualise videos.
 
-        pipeline = [
-            # first, create colleges (and hashes) with the default settings
-            {
+		The advanced pipeline allows multiple processors to be queued in each stage.
+		"""
+        return [
+			# first, create colleges (and hashes) with the default settings
+			{
                 "type": "video-hasher-1",
 				"parameters": {
 					"frame_interval": self.parameters.get("frame_interval", 1),
 					"amount": self.parameters.get("amount", 100),
+					"next": [
+						# then create hash similarity network
+						{
+							"type": "video-hash-network",
+							"parameters": {
+								"percent": self.parameters.get("percent", 90),
+								"attach_to": attach_to
+							},
+						},
+						# and create hash similarity matrix
+						{
+							"type": "video-hash-similarity-matrix",
+							"parameters": {
+								"percent": self.parameters.get("percent", 90),
+							}
+						}
+					]
 				}
-            },
-			# then create hash similarity network
-			{
-				"type": "video-hash-network",
-				"parameters": {
-					"percent": self.parameters.get("percent", 90),
-				}
-			},
-        ]
-
-        return pipeline
-
-
+            }
+		]
+	
 class VideoHasher(BasicProcessor):
 	"""
 	Video Hasher
@@ -440,8 +448,8 @@ class VideoHashSimilarities(BasicProcessor):
 	"""
 	type = "video-hash-similarity-matrix"  # job type ID
 	category = "Visual"  # category
-	title = "Calculates hashes similarities"  # title displayed in UI
-	description = "Creates hashes network to identify duplicate or similar videos."  # description displayed in UI
+	title = "Calculates hashes and similarity groups"  # title displayed in UI
+	description = "Creates CSV with hashes and groups videos above similarity value."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [

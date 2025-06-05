@@ -165,7 +165,8 @@ def datasource_form(datasource_id):
 		"status": "success",
 		"datasource": datasource_id,
 		"type": labels,
-		"html": html
+		"html": html,
+		"options": worker_options
 	})
 
 
