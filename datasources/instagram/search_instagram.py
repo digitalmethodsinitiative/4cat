@@ -257,12 +257,12 @@ class SearchInstagram(Search):
         coauthor_ids = []
         if node.get("coauthor_producers"):
             for coauthor_node in node["coauthor_producers"]:
-                coauthors.append(coauthor_node.get("username", ""))
-                coauthor_fullnames.append(coauthor_node.get("full_name", ""))
-                coauthor_ids.append(coauthor_node.get("id", ""))
+                coauthors.append(coauthor_node.get("username"))
+                coauthor_fullnames.append(coauthor_node.get("full_name"))
+                coauthor_ids.append(coauthor_node.get("id"))
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
-        
+
         # usertags
         if "usertags" in node:
             usertags = ",".join([user["user"]["username"] for user in node["usertags"]["in"]]) if node["usertags"] else ""
@@ -279,7 +279,7 @@ class SearchInstagram(Search):
             "parent_id": node["code"],
             "url": "https://www.instagram.com/p/" + node["code"],
             "body": caption,
-            
+
             # Authors
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
@@ -288,26 +288,26 @@ class SearchInstagram(Search):
             "coauthors": ",".join(coauthors),
             "coauthor_fullnames": ",".join(coauthor_fullnames),
             "coauthor_ids": ",".join(coauthor_ids),
-            
+
             # Media
             "media_type": media_type,
             "num_media": num_media,
             "image_urls": ",".join(display_urls),
             "media_urls": ",".join(media_urls),
-            
+
             # Engagement
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)),
             "usertags": usertags,
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["like_count"] if not no_likes else MissingMappedField(0),
             "num_comments": num_comments,
-            
+
             # Location
             "location_name": location["name"],
             "location_id": location["location_id"],
             "location_latlong": location["latlong"],
             "location_city": location["city"],
-            
+
             # Metadata
             "unix_timestamp": node["taken_at"],
             "missing_media": missing_media, # This denotes media that is unable to be mapped and is otherwise None
