@@ -159,7 +159,7 @@ class AudioToText(BasicProcessor):
                            "\"--logprob_threshold\": -0.5}.",
                 "requires": "model_host==local"
             },
-            "write_annotations": {
+            "save_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add transcriptions as annotations to top dataset",
 				"default": False
@@ -244,7 +244,7 @@ class AudioToText(BasicProcessor):
 
         prompt = self.parameters.get("prompt", "")
         translate = self.parameters.get("translate", False)
-        save_annotations = self.parameters.get("write_annotations", False)
+        save_annotations = self.parameters.get("save_annotations", False)
 
         # Initialize DMI Service Manager when using local model
         if model_host != "external":

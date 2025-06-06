@@ -64,7 +64,7 @@ class ExtractURLs(BasicProcessor):
             "help": "CrowdTangle dataset",
             "tooltip": "CrowdTangle text contains resolved links using :=: symbols; these are extracted directly",
         },
-        "write_annotations": {
+        "save_annotations": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Add extracted URLs to top dataset",
             "default": False
@@ -240,7 +240,7 @@ class ExtractURLs(BasicProcessor):
         if eager_domains:
             eager_domains = [eager_domain.strip().lower() for eager_domain in eager_domains.split(",")]
 
-        write_annotations = self.parameters.get("write_annotations", False)
+        save_annotations = self.parameters.get("save_annotations", False)
         annotations = []
 
         # Create fieldnames
@@ -308,7 +308,7 @@ class ExtractURLs(BasicProcessor):
                     writer.writerow(items)
                     url_matches_found += 1
 
-                    if write_annotations:
+                    if save_annotations:
                         annotations.append({
                             "label": "extracted_urls",
                             "type": "textarea",
@@ -323,7 +323,7 @@ class ExtractURLs(BasicProcessor):
         if cache:
             self.dataset.log(f"Expanded {len(cache)} URLs in dataset")
 
-        if write_annotations and annotations:
+        if save_annotations and annotations:
             self.save_annotations(annotations, overwrite=False)
             self.dataset.log(f"URLs written as annotations to top dataset")
 

@@ -186,7 +186,7 @@ class Tokenise(BasicProcessor):
 				"tooltip": "If a token occurs multiple times in the same item, only process once. Can be useful to "
 						   "filter out spam."
 			},
-			"write_annotations": {
+			"save_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add tokens to top dataset",
 				"default": False
@@ -244,7 +244,7 @@ class Tokenise(BasicProcessor):
         if type(columns) is not list:
             columns = [columns]
 
-		save_annotations = self.parameters.get("write_annotations", False)
+		save_annotations = self.parameters.get("save_annotations", False)
 
 		self.dataset.update_status("Building filtering automaton")
 

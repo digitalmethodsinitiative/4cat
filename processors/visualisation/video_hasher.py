@@ -31,7 +31,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     """
     type = "preset-video-hashes"  # job type ID
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
+    title = "Create video hashes to identify near duplicate videos"  # title displayed in UI
     description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
     extension = "gexf"
 
@@ -78,7 +78,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
         return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
                config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
-        
+
     def get_processor_advanced_pipeline(self, attach_to=None):
         """
         This queues a series of post-processors to visualise videos.
@@ -112,7 +112,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
                 }
             }
         ]
-    
+
 class VideoHasher(BasicProcessor):
     """
     Video Hasher
@@ -125,19 +125,19 @@ class VideoHasher(BasicProcessor):
     dominant color. The collage being divided into 64 "images" or "pixels" and ultimately defined by those two aspects
     (one "image"/"pixel" per bit).
 
-    Increasing the frames per second has proven necessary for short videos (if there are ultimately less than 64 frames,
-    there will essentially be black frames that will be shared with every other video with less than 64 frames). It also
-    seems necessary to collect the same frames per second for comparison between videos as variation in this will cause
-    different frames to be collected per video (more testing needs to be done here). Additionally, short videos often
-    do not have much differentiating information particularly if there is little difference between frames (i.e. no
-    "scene" changes) and have lead to unwanted collision in tests.
-    """
-    type = "video-hasher-1"  # job type ID
-    category = "Visual"  # category
-    title = "Create Video collages"  # title displayed in UI
-    description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
-    extension = "zip"  # extension of result file, used internally and in UI
-    media_type = "image"  # media type of the result
+	Increasing the frames per second has proven necessary for short videos (if there are ultimately less than 64 frames,
+	there will essentially be black frames that will be shared with every other video with less than 64 frames). It also
+	seems necessary to collect the same frames per second for comparison between videos as variation in this will cause
+	different frames to be collected per video (more testing needs to be done here). Additionally, short videos often
+	do not have much differentiating information particularly if there is little difference between frames (i.e. no
+	"scene" changes) and have lead to unwanted collision in tests.
+	"""
+	type = "video-hasher-1"  # job type ID
+	category = "Visual"  # category
+	title = "Create video collages"  # title displayed in UI
+	description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
+	extension = "zip"  # extension of result file, used internally and in UI
+	media_type = "image" # media type of the result
 
     followups = ["video-hash-network", "video-hash-similarity-matrix"]
 
