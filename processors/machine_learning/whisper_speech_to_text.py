@@ -12,6 +12,8 @@ from common.lib.user_input import UserInput
 from common.config_manager import config
 from common.lib.item_mapping import MappedItem
 
+from requests.exceptions import ConnectionError
+
 import openai
 
 __author__ = "Dale Wahl"
@@ -27,11 +29,14 @@ class AudioToText(BasicProcessor):
     type = "audio-to-text"  # job type ID
     category = "Audio"  # category
     title = "Audio to text"  # title displayed in UI
-    description = ("Detect speech and other sounds in audio and convert to text. Uses either a local Whisper model "
-                   "(configurable in 4CAT settings) or the OpenAI API.")  # description displayed in UI
+    description = ("Detect speech and other sounds in audio and convert to text with either OpenAI's Whisper or "
+                   " GPT models (GPT only via API).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     followups = []
+
+    local_whisper = True if (config.get("dmi-service-manager.bc_whisper_enabled", False) and
+                    config.get("dmi-service-manager.ab_server_address", False)) else False
 
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
@@ -78,6 +83,11 @@ class AudioToText(BasicProcessor):
         Collect maximum number of audio files from configuration and update options accordingly
         """
         options = {
+            "host_model_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Local Whisper models can be enabled through the DMI Service Manager (Settings -> DMI Service "
+                        "Manager)"
+            },
             "model_host": {
                 "type": UserInput.OPTION_CHOICE,
                 "default": "local",
@@ -89,9 +99,9 @@ class AudioToText(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "requires": "model_host==local"
             },
-            # Whisper model options
-            # TODO: Could limit model availability in conjunction with "amount"
             "local_model": {
+                # Whisper model options
+                # TODO: Could limit model availability in conjunction with "amount"
                 "type": UserInput.OPTION_CHOICE,
                 "help": f"Whisper model",
                 "default": "base",
@@ -125,8 +135,8 @@ class AudioToText(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Prompt",
                 "default": "",
-                "tooltip": "Prompts can aid the model in specific vocabulary detection, to add punctuation or filler "
-                           "words."
+                "tooltip": "Optional; prompts can aid the model in specific vocabulary detection or to add punctuation "
+                           "and filler words."
             },
             "language": {
                 "type": UserInput.OPTION_TEXT,
@@ -157,18 +167,22 @@ class AudioToText(BasicProcessor):
 			}
         }
 
-        # Update the amount max and help from config
-        max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100, user=user))
-        if max_number_audio_files == 0:  # Unlimited allowed
-            options["amount"]["help"] = "Number of audio files"
-            options["amount"]["default"] = 100
-            options["amount"]["min"] = 0
-            options["amount"]["tooltip"] = "Use '0' to convert all audio (this can take a very long time)"
+        if cls.local_whisper:
+            # Update the amount max and help from config
+            max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100, user=user))
+            if max_number_audio_files == 0:  # Unlimited allowed
+                options["amount"]["help"] = "Number of audio files"
+                options["amount"]["default"] = 100
+                options["amount"]["min"] = 0
+                options["amount"]["tooltip"] = "Use '0' to convert all audio (this can take a very long time)"
+            else:
+                options["amount"]["help"] = f"Number of audio files (max {max_number_audio_files})"
+                options["amount"]["default"] = min(max_number_audio_files, 100)
+                options["amount"]["max"] = max_number_audio_files
+                options["amount"]["min"] = 1
         else:
-            options["amount"]["help"] = f"Number of audio files (max {max_number_audio_files})"
-            options["amount"]["default"] = min(max_number_audio_files, 100)
-            options["amount"]["max"] = max_number_audio_files
-            options["amount"]["min"] = 1
+            options["model_host"]["options"] = {"external": "External (OpenAI API)"}
+            options["model_host"]["default"] = "external"
 
         api_key = config.get("api.openai.api_key", user=user)
         if not api_key:
@@ -195,10 +209,16 @@ class AudioToText(BasicProcessor):
             return
 
         model_host = self.parameters.get("model_host", "external")
+
+        if model_host == "local" and not self.local_whisper:
+            self.dataset.finish_with_error("Can't run a self-hosted Whisper model. Admins can configure this in the "
+                                           "4CAT settings (settings -> DMI Service Manager).")
+            return
+
         api_key = self.parameters.get("api_key")
         if not api_key and model_host == "external":
             api_key = config.get("api.openai.api_key", user=self.owner)
-        else:
+        elif model_host == "external":
             self.dataset.finish_with_error("You need to provide a valid API key when using an external model")
             return
 
@@ -242,6 +262,9 @@ class AudioToText(BasicProcessor):
                     gpu_response = None
                 else:
                     return self.dataset.finish_with_error(str(e))
+            except ConnectionError as e:
+                self.dataset.finish_with_error("Can't reach DMI Service Manager.")
+                return
 
             if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
                 self.dataset.finish_with_error("DMI Service Manager currently busy; no GPU memory available. Please try again later.")
