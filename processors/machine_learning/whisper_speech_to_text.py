@@ -3,6 +3,8 @@ Convert speech in audio to text
 """
 import os
 import json
+import openai
+from requests.exceptions import ConnectionError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
@@ -10,9 +12,6 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
-from requests.exceptions import ConnectionError
-
-import openai
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -161,7 +160,7 @@ class AudioToText(BasicProcessor):
             },
             "save_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add transcriptions as annotations to top dataset",
+				"help": "Add transcriptions to top dataset",
 				"default": False
 			}
         }
