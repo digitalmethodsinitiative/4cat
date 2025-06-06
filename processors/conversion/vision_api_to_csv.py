@@ -125,8 +125,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
 
         # Write Vision annotations to source dataset
         if save_annotations:
-            self.save_annotations(parent_annotations, source_dataset=self.source_dataset.top_parent(),
-                                  overwrite=False)
+            self.save_annotations(parent_annotations, overwrite=False)
 
         for index, value in enumerate(result):
             result[index] = {**{annotation_type: "" for annotation_type in annotation_types}, **value}
