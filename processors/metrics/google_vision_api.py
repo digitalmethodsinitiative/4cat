@@ -80,6 +80,11 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 "OBJECT_LOCALIZATION": "Object Localization"
             },
             "default": ["LABEL_DETECTION"]
+        },
+        "annotation_info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "The output can be made human-readable through the following 'Convert Vision results to CSV' "
+                    "processor. This also lets you write the labels to the original dataset."
         }
     }
 
