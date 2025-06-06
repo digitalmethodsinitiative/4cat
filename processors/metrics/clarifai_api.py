@@ -63,8 +63,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "help": "API Key",
             "cache": True,
             "sensitive": True,
-            "tooltip": "The API Key for the Clarifai account you want to query with. You can generate and find this"
-                       "key on the API dashboard."
+            "tooltip": "The API key for your Clarifai account. You'll need to go to clarifai.com and create a new "
+                       "project to generate a key."
         },
         "models": {
             "type": UserInput.OPTION_MULTI,
@@ -82,6 +82,18 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 "texture-recognition": "Materials & textures (texture-recognition)"
             },
             "default": ["general-image-recognition"]
+        },
+        "save_annotations": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Add labels to top dataset",
+            "default": False
+        },
+        "annotation_threshold": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Only add labels above this confidence",
+            "default": "0.95",
+            "coerce_type": "float",
+            "requires": "save_annotations==true"
         }
     }
 
@@ -93,6 +105,9 @@ class ClarifaiAPIFetcher(BasicProcessor):
         """
         api_key = self.parameters.get("api_key")
         #application_id = self.parameters.get("application_id")
+        save_annotations = self.parameters.get("save_annotations", False)
+        annotation_threshold = float(self.parameters.get("annotation_threshold", 0))
+
 
         models = self.parameters.get("models")
         if type(models) is str:
@@ -134,8 +149,11 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     send_batch = True
 
                 if image:
-                    if image.name.startswith(".") or image.suffix in (".json", ".log"):
-                        # .metadata.json
+                    if image.name == ".metadata.json":
+                        # Metadata, we keep this for writing annotations
+                        image_metadata = json.load(open(image, "r"))
+
+                    if image.suffix in (".json", ".log"):
                         continue
 
                     # we can attach the image as a binary file
@@ -171,7 +189,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     elif response.status.code != status_code_pb2.SUCCESS:
                         # this is bad!
                         self.dataset.log(f"Error fetching {model_id} annotations from Clarifai annotated ({response.status.code}"
-                                                   f"/{response.status.description})")
+                                         f"/{response.status.description})")
                         return self.dataset.finish_with_error(f"Error connecting to Clarifai ({response.status.description}), stopping.")
 
                     # collect annotated concepts
@@ -193,6 +211,11 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     images_names = {}
                     batch = []
 
+        # Get original post IDs for annotations
+        fourcat_annotations = []
+        if save_annotations:
+            filename_and_post_ids = {v["filename"]: v["post_ids"] for v in image_metadata.values()}
+
         # save the buffered results (we do this only now so we can also store
         # combined annotations)
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
@@ -207,6 +230,22 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     "combined": all_annotations
                 }
                 outfile.write(json.dumps(item) + "\n")
+
+                # Potentially write all labels above a threshold as annotations
+                if save_annotations:
+                    for label, confidence in all_annotations.items():
+                        if confidence > annotation_threshold:
+                            for item_id in filename_and_post_ids[image]:
+                                fourcat_annotation = {
+                                    "label": "clarifai_" + label,
+                                    "value": confidence,
+                                    "item_id": item_id
+                                }
+                                fourcat_annotations.append(fourcat_annotation)
+
+        if save_annotations and fourcat_annotations:
+            self.save_annotations(fourcat_annotations, overwrite=True)
+            self.dataset.update_status(f"Saved {len(fourcat_annotations)} labels as annotations")
 
         if errors:
             self.dataset.update_status(f"Collected {annotated} annotations, {errors} skipped - see dataset log for details",
