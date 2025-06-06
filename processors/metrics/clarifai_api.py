@@ -95,6 +95,11 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "default": "0.95",
             "coerce_type": "float",
             "requires": "save_annotations==true"
+        },
+        "csv_info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "The output can be made human-readable through the following 'Convert Clarifai results to CSV' "
+                    "processor."
         }
     }
 
