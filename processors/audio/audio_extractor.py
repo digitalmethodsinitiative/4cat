@@ -30,7 +30,7 @@ class AudioExtractor(BasicProcessor):
 	type = "audio-extractor"  # job type ID
 	category = "Audio"  # category
 	title = "Extract audio from videos"  # title displayed in UI
-	description = "Extract audio from videos"  # description displayed in UI
+	description = "Create audio files per video"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	followups = ["audio-to-text"]

@@ -123,16 +123,16 @@ class OpenAI(BasicProcessor):
 				"requires": "model!=local-lmstudio",
 				"default": False,
 			},
-			"write_annotations": {
+			"save_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add output as annotations to the parent dataset.",
+				"help": "Add output as annotations to top dataset",
 				"default": False
 			},
 			"annotation_label": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Annotation label",
 				"default": "",
-				"requires": "write_annotations==true",
+				"requires": "save_annotations==true",
 				"tooltip": "May be empty."
 			}
 		}
@@ -213,9 +213,9 @@ class OpenAI(BasicProcessor):
 										   "column names")
 			return
 
-		write_annotations = self.parameters.get("write_annotations", False)
+		save_annotations = self.parameters.get("save_annotations", False)
 
-		if write_annotations:
+		if save_annotations:
 			label = self.parameters.get("annotation_label", "")
 			if not label:
 				label = model + " output"
@@ -243,23 +243,8 @@ class OpenAI(BasicProcessor):
 				except KeyError as e:
 					self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
 					return
-			try:
-				response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
-			except openai.NotFoundError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.BadRequestError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.AuthenticationError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.RateLimitError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.APIConnectionError as e:
-				self.dataset.finish_with_error(e.message)
-				return
+
+			response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
 
 			if "id" in item:
 				item_id = item["id"]
@@ -275,7 +260,7 @@ class OpenAI(BasicProcessor):
 				model + " output": response
 			})
 
-			if write_annotations:
+			if save_annotations:
 				annotation = {
 					"label": label,
 					"item_id": item_id,
@@ -288,24 +273,40 @@ class OpenAI(BasicProcessor):
 			i += 1
 
 		# Write annotations
-		if write_annotations:
+		if save_annotations:
 			self.save_annotations(annotations, overwrite=False)
 
 		# Write to csv file
 		self.write_csv_items_and_finish(results)
 
-	@staticmethod
-	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50) -> ChatCompletion:
 
-		# Get response
-		response = client.chat.completions.create(
-			model=model,
-			temperature=temperature,
-			max_tokens=max_tokens,
-			messages=[{
-				"role": "user",
-				"content": prompt
-			}]
-		)
+	def prompt_gpt(self, prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50):
+
+		try:
+			# Get response
+			response = client.chat.completions.create(
+				model=model,
+				temperature=temperature,
+				max_tokens=max_tokens,
+				messages=[{
+					"role": "user",
+					"content": prompt
+				}]
+			)
+		except openai.NotFoundError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.BadRequestError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.AuthenticationError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.RateLimitError as e:
+			self.dataset.finish_with_error(e.message)
+			return
+		except openai.APIConnectionError as e:
+			self.dataset.finish_with_error(e.message)
+			return
 
 		return response
