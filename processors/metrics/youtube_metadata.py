@@ -73,7 +73,7 @@ class YouTubeMetadata(BasicProcessor):
 				"tooltip": "These should be valid YouTube URLs. Separate by comma. "
 						   "Use the Extract URLs processor if you need to extract URLs from text columns."
 			},
-			"write_annotations": {
+			"save_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add YouTube links to top dataset",
 				"default": False
@@ -130,7 +130,7 @@ class YouTubeMetadata(BasicProcessor):
 			columns = [columns]
 
 		# Are we writing annotations?
-		write_annotations = self.parameters.get("write_annotations", False)
+		save_annotations = self.parameters.get("save_annotations", False)
 		annotations = []
 
 		# First thing to do is to extract IDs from YouTube links.
@@ -199,7 +199,7 @@ class YouTubeMetadata(BasicProcessor):
 			return
 
 		# Possibly add to top-level dataset
-		if write_annotations:
+		if save_annotations:
 			annotations = []
 			for youtube_item in youtube_items:
 				if "retrieved_from_id" in youtube_item:

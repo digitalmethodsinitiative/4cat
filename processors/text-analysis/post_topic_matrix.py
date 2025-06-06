@@ -45,7 +45,7 @@ class TopicModelWordExtractor(BasicProcessor):
             "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always "
                        "included."
         },
-		"write_annotations": {
+		"save_annotations": {
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Add topic weights to top dataset",
 			"default": False
@@ -97,7 +97,7 @@ class TopicModelWordExtractor(BasicProcessor):
         # Find metadata files
         self.dataset.update_status("Collecting token and model metadata")
 
-        save_annotations = self.parameters.get("write_annotations", False)
+        save_annotations = self.parameters.get("save_annotations", False)
         annotations = []
 
         staging_area = self.dataset.get_staging_area()

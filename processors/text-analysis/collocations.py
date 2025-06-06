@@ -91,7 +91,7 @@ class GetCollocations(BasicProcessor):
 			"default": 0,
 			"help": "Maximum number of top co-words to extract (0 = all)"
 		},
-		"write_annotations": {
+		"save_annotations": {
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Add all co-words per item to top dataset",
 			"default": False
@@ -127,7 +127,7 @@ class GetCollocations(BasicProcessor):
 
 		query_string = self.parameters.get("query_string", "").replace(" ", "")
 
-		save_annotations = self.parameters.get("write_annotations", False)
+		save_annotations = self.parameters.get("save_annotations", False)
 
 		# n_size smaller than window_size does not make sense
 		n_size = min(n_size, window_size)

@@ -54,7 +54,7 @@ class Perspective(BasicProcessor):
 				},
 				"default": ["TOXICITY"]
 			},
-			"write_annotations": {
+			"save_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add attribute scores as annotations to the parent dataset.",
 				"default": True
@@ -87,7 +87,7 @@ class Perspective(BasicProcessor):
 			self.dataset.finish_with_error("You need to provide a at least one attribute to score")
 			return
 
-		write_annotations = self.parameters.get("write_annotations", False)
+		save_annotations = self.parameters.get("save_annotations", False)
 
 		try:
 			client = discovery.build(
@@ -124,7 +124,7 @@ class Perspective(BasicProcessor):
 				response["body"] = item["body"]
 				results.append(response)
 
-				if write_annotations:
+				if save_annotations:
 					for attribute in self.parameters["attributes"]:
 						annotation = {
 							"label": attribute,
@@ -134,7 +134,7 @@ class Perspective(BasicProcessor):
 						annotations.append(annotation)
 
 		# Write annotations
-		if write_annotations:
+		if save_annotations:
 			self.save_annotations(annotations, overwrite=True)
 
 		# Write to file

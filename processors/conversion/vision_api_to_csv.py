@@ -30,7 +30,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
-        "write_annotations": {
+        "save_annotations": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Add features as annotations to the original dataset.",
             "default": False
@@ -61,7 +61,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
             return
 
         # Write annotations to original file?
-        write_annotations = self.parameters.get("write_annotations", False)
+        save_annotations = self.parameters.get("save_annotations", False)
         parent_annotations = []
 
         # recreate CSV file with the new dialect
@@ -112,7 +112,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                 self.dataset.update_progress(done / self.source_dataset.num_rows)
 
             # Get annotation data for source dataset
-            if write_annotations:
+            if save_annotations:
                 for item_id in annotations.get("post_ids", []):
                     for label, value in file_result.items():
                         parent_annotations.append({
@@ -123,7 +123,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                         })
 
         # Write Vision annotations to source dataset
-        if write_annotations:
+        if save_annotations:
             self.save_annotations(parent_annotations, source_dataset=self.source_dataset.top_parent(),
                                   overwrite=False)
 

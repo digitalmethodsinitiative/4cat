@@ -32,7 +32,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     """
     type = "preset-video-hashes"  # job type ID
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
+    title = "Create video hashes to identify near duplicate videos"  # title displayed in UI
     description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
     extension = "gexf"
 
@@ -135,7 +135,7 @@ class VideoHasher(BasicProcessor):
 	"""
 	type = "video-hasher-1"  # job type ID
 	category = "Visual"  # category
-	title = "Create Video collages"  # title displayed in UI
+	title = "Create video collages"  # title displayed in UI
 	description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 	media_type = "image" # media type of the result
@@ -164,6 +164,9 @@ class VideoHasher(BasicProcessor):
 				"min": 0,
 				"max": 5,
 			},
+			"save_annotations": {
+				"type":
+			}
 		}
 
 		return options

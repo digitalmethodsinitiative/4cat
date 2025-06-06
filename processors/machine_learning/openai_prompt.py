@@ -123,7 +123,7 @@ class OpenAI(BasicProcessor):
 				"requires": "model!=local-lmstudio",
 				"default": False,
 			},
-			"write_annotations": {
+			"save_annotations": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Add output as annotations to top dataset",
 				"default": False
@@ -132,7 +132,7 @@ class OpenAI(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Annotation label",
 				"default": "",
-				"requires": "write_annotations==true",
+				"requires": "save_annotations==true",
 				"tooltip": "May be empty."
 			}
 		}
@@ -213,9 +213,9 @@ class OpenAI(BasicProcessor):
 										   "column names")
 			return
 
-		write_annotations = self.parameters.get("write_annotations", False)
+		save_annotations = self.parameters.get("save_annotations", False)
 
-		if write_annotations:
+		if save_annotations:
 			label = self.parameters.get("annotation_label", "")
 			if not label:
 				label = model + " output"
@@ -260,7 +260,7 @@ class OpenAI(BasicProcessor):
 				model + " output": response
 			})
 
-			if write_annotations:
+			if save_annotations:
 				annotation = {
 					"label": label,
 					"item_id": item_id,
@@ -273,7 +273,7 @@ class OpenAI(BasicProcessor):
 			i += 1
 
 		# Write annotations
-		if write_annotations:
+		if save_annotations:
 			self.save_annotations(annotations, overwrite=False)
 
 		# Write to csv file
