@@ -224,7 +224,7 @@ class URLFetcher(BasicProcessor):
         :param requests.Response response: requests response object
         """
         response._content_consumed = True
-        response._content = ""
+        response._content = False
         response.page_title = ""
 
         # we set _content_consumed and _content here because if not, requests
