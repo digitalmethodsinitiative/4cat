@@ -9,14 +9,11 @@ import time
 import csv
 import re
 
-from pathlib import Path
-
 from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
 from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import convert_to_float, get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
-from common.lib.item_mapping import MappedItem, MissingMappedField, DatasetItem
+from common.lib.helpers import convert_to_float, get_software_version, call_api
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_to_md5
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
