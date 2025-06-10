@@ -2,22 +2,29 @@
 Download images linked in dataset
 """
 import requests
+import urllib3
 import shutil
 import json
 import re
 
 from PIL import Image, UnidentifiedImageError
+from urllib.parse import quote_plus
+from requests.structures import CaseInsensitiveDict
 
 from common.config_manager import config
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, FourcatException
 
-__author__ = "Stijn Peeters, Sal Hagen"
-__credits__ = ["Stijn Peeters, Sal Hagen"]
-__maintainer__ = "Stijn Peeters, Sal Hagen"
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+
+class InvalidDownloadedFileException(FourcatException):
+    pass
 
 
 class ImageDownloader(BasicProcessor):
@@ -153,9 +160,12 @@ class ImageDownloader(BasicProcessor):
     def process(self):
         """
         This takes a 4CAT results file as input, and outputs a zip file with
-        images along with a file, .metadata.json, that contains identifying
+        files along with a file, .metadata.json, that contains identifying
         information.
         """
+        # don't care about certificates for this one
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         # Get the source file data path
         amount = self.parameters.get("amount", 100)
         split_comma = self.parameters.get("split-comma", False)
@@ -168,34 +178,19 @@ class ImageDownloader(BasicProcessor):
 
         # is there anything for us to download?
         if self.source_dataset.num_rows == 0:
-            return self.dataset.finish_with_error("No images to download.")
+            return self.dataset.finish_with_error("No files to download.")
 
         if not columns:
             return self.dataset.finish_with_error(
-                "No columns selected; no image URLs can be extracted from the dataset"
+                "No columns selected; no URLs can be extracted from the dataset"
             )
 
         # prepare
         self.staging_area = self.dataset.get_staging_area()
+        self.complete = False
         urls = list()
 
-        # for image URL extraction, we use the following heuristic:
-        # Makes sure that it gets "http://site.com/img.jpg", but also
-        # more complicated ones like
-        # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
-        img_link_regex = re.compile(
-            r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*",
-            re.IGNORECASE,
-        )
-
-        # Imgur and gfycat links that do not end in an extension are also accepted.
-        # These can later be downloaded by adding an extension.
-        img_domain_regex = re.compile(
-            r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*",
-            re.IGNORECASE,
-        )
-
-        # first, get URLs to download images from
+        # first, get URLs to download files from
         self.dataset.update_status("Reading source file")
         item_index = 0
         item_map = {}
@@ -204,13 +199,13 @@ class ImageDownloader(BasicProcessor):
                 raise ProcessorInterruptedException()
 
             # note that we do not check if the amount of URLs exceeds the max
-            # `amount` of images; images may fail, so the limit is on the
-            # amount of downloaded images, not the amount of potentially
-            # downloadable image URLs
+            # `amount` of files; downloads may fail, so the limit is on the
+            # amount of downloaded files, not the amount of potentially
+            # downloadable file URLs
             item_index += 1
             if item_index % 50 == 0:
                 self.dataset.update_status(
-                    f"Extracting image links from item {item_index:,} of {self.source_dataset.num_rows:,}"
+                    f"Extracting URLs from item {item_index:,} of {self.source_dataset.num_rows:,}"
                 )
 
             # loop through all columns and process values for item
@@ -230,41 +225,43 @@ class ImageDownloader(BasicProcessor):
                         # single URL
                         item_urls.add(value)
                     else:
-                        # # Debug
-                        # if re.match(r"https?://[^\s]+", value):
-                        # 	self.dataset.log("Debug: OLD single detect url %s" % value)
-
-                        # search for image URLs in string
-                        item_urls |= set(img_link_regex.findall(value))
-                        item_urls |= set(img_domain_regex.findall(value))
+                        # search for URLs in string
+                        for regex in self.get_link_regexes():
+                            item_urls |= set(regex.findall(value))
 
             item_urls = self.preprocess_urls(item_urls)
             for item_url in item_urls:
                 if item_url not in item_map:
                     item_map[item_url] = []
 
-                item_map[item_url] += (
-                    item.get("ids").split(",") if "ids" in item else item.get("id", "")
+                item_map[item_url].extend(
+                    item.get("ids").split(",") if "ids" in item else [item.get("id", "")]
                 )
                 urls.append(item_url)
 
         if not urls:
             return self.dataset.finish_with_error(
-                "No image URLs could be extracted from the dataset within the given parameters."
+                "No download URLs could be extracted from the dataset within the given parameters."
             )
         else:
-            self.dataset.log(f"Extracted {len(urls):,} image urls.")
+            # dedupe
+            urls = set(urls)
+            self.dataset.update_status(
+                f"Extracted {len(urls):,} URLs to try to download."
+            )
 
-        # next, loop through images and download them - until we have as many images
-        # as required. Note that images that cannot be downloaded or parsed do
+        # next, loop through files and download them - until we have as many files
+        # as required. Note that files that cannot be downloaded or parsed do
         # not count towards that limit
         ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0"
-        downloaded_images = 0
+        downloaded_files = set()
         failures = []
         metadata = {}
 
         # prepare filenames for each url
-        self.filenames = {}
+        self.filenames = CaseInsensitiveDict()
+        self.url_redirects = {}
+
         for url in urls:
             self.filenames[url] = self.make_filename(url)
 
@@ -284,38 +281,36 @@ class ImageDownloader(BasicProcessor):
             failure = False
 
             if self.interrupted:
+                self.completed = True
+                self.flush_proxied_requests()
                 shutil.rmtree(self.staging_area)
                 raise ProcessorInterruptedException()
 
             if type(response) is FailedProxiedRequest:
                 if type(response.context) is requests.exceptions.Timeout:
                     self.dataset.log(
-                        f"Error: Timeout while trying to download image {url}: {response.context}"
+                        f"Error: Timeout while trying to download from {url}: {response.context}"
                     )
                 elif type(response.context) is requests.exceptions.SSLError:
                     self.dataset.log(
-                        f"Error: SSL Error for image {url}: {response.context}"
+                        f"Error: SSL Error for URL {url}: {response.context}"
                     )
                 elif type(response.context) is requests.exceptions.TooManyRedirects:
                     self.dataset.log(
-                        f"Error: Too many redirects for image {url}: {response.context}"
+                        f"Error: Too many redirects for URL {url}: {response.context}"
                     )
                 elif type(response.context) is requests.exceptions.ConnectionError:
                     self.dataset.log(
-                        f"Error: Connection Error for image {url}: {response.context}"
+                        f"Error: Connection Error for URL {url}: {response.context}"
                     )
                 else:
-                    self.dataset.log(
-                        f"Error: Error for image {url}: {response.context}"
-                    )
+                    self.dataset.log(f"Error: Error for URL {url}: {response.context}")
 
-                # other failures are generally invalid URL which probably
-                # shouldn't have been downloaded in the first place
                 failure = True
 
             elif response.status_code != 200:
                 self.dataset.log(
-                    f"Error: Image not found (status {response.status_code}) at {url}"
+                    f"Error: File not found (status {response.status_code}) at {url}"
                 )
                 failure = True
 
@@ -347,6 +342,8 @@ class ImageDownloader(BasicProcessor):
                                     .split('?fb">')[0]
                                 )
 
+                            image_url = self.clean_url(image_url)
+                            self.url_redirects[url] = image_url
                             self.filenames[image_url] = self.make_filename(image_url)
                             self.push_proxied_request(image_url, 0)
                             item_map[image_url] = item_map[url]
@@ -363,52 +360,37 @@ class ImageDownloader(BasicProcessor):
                             )
                             failures.append(url)
 
-                elif response.headers.get("content-type", "")[:5] != "image":
+                elif not response.headers.get("content-type", "").startswith("image"):
                     self.dataset.log(
-                        f"Error: URL does not seem to be an image ({response.headers.get('content-type', '')} found instead) at {url}"
+                        f"Error: URL does not seem to be of the required type ({response.headers.get('content-type', '').split(';')[0]} found instead) at {url}"
                     )
                     failure = True
 
                 else:
-                    # file has been downloaded, but is it also a valid image?
+                    # file has been downloaded, but is it also a valid file?
                     # test by trying to read it with PIL
                     try:
-                        picture = Image.open(downloaded_file)
-                        if not picture.format:
-                            raise TypeError("Image format could not be determined")
+                        extension = self.get_valid_file_extension(downloaded_file)
+                        downloaded_file.rename(downloaded_file.with_suffix(extension))
 
-                        if (
-                            downloaded_file.suffix.split(".")[-1].lower()
-                            != picture.format.lower()
-                        ):
-                            # rename with correct extension
-                            downloaded_file.rename(
-                                downloaded_file.with_suffix(
-                                    f".{picture.format.lower()}"
-                                )
-                            )
-                            self.filenames[url] = downloaded_file.name
-
-                    except (UnidentifiedImageError, AttributeError, TypeError) as e:
+                    except InvalidDownloadedFileException as e:
                         self.dataset.log(
-                            f"Error: Image downloaded from {url}, but does not seem to be an image file ({e})"
+                            f"Error: File downloaded from {url}, but does not seem to be valid file ({e})"
                         )
                         failure = True
 
                 if not failure:
-                    downloaded_images += 1
-                    self.dataset.update_status(
-                        f"Downloaded {downloaded_images:,} of {len(self.filenames):,} image(s)"
-                    )
-                    self.dataset.update_progress(
-                        downloaded_images / len(self.filenames)
-                    )
+                    if len(downloaded_files) < amount:
+                        downloaded_files.add(url)
+                        self.dataset.update_status(
+                            f"Downloaded {len(downloaded_files):,} of {amount:,} file(s)"
+                        )
+                        self.dataset.update_progress(len(downloaded_files) / amount)
 
-                    if downloaded_images >= amount:
+                    if len(downloaded_files) >= amount:
                         # parallel requests may still be running so halt these
                         # before ending the loop and wrapping up
-                        self.halt_proxied_requests()
-                        break
+                        self.complete = True
 
             if failure:
                 failures.append(url)
@@ -416,21 +398,47 @@ class ImageDownloader(BasicProcessor):
 
             metadata[url] = {
                 "filename": self.filenames[url],
+                "url": self.resolve_url(url),
                 "success": not failure,
                 "from_dataset": self.source_dataset.key,
                 "post_ids": item_map[url],
             }
+
+            if self.complete:
+                break
 
         with self.staging_area.joinpath(".metadata.json").open(
             "w", encoding="utf-8"
         ) as outfile:
             json.dump(metadata, outfile)
 
+        # delete supernumerary partially downloaded files
+        self.flush_proxied_requests()  # get rid of remaining queue
+
+        for url, filename in self.filenames.items():
+            url_file = self.staging_area.joinpath(filename)
+            if url_file.exists() and url not in downloaded_files:
+                url_file.unlink()
+
         # finish up
         self.dataset.update_progress(1.0)
         self.write_archive_and_finish(
             self.staging_area, len([x for x in metadata.values() if x.get("success")])
         )
+
+    def clean_url(self, url):
+        # always lower case domain
+        url = url.split("/")
+        url[2] = url[2].lower()
+        url = "/".join(url)
+
+        if url.endswith("?"):
+            url = url[:-1]
+
+        if url.endswith("/"):
+            url = url[:-1]
+
+        return url.split("#")[0].replace(" ", "%20")
 
     def preprocess_urls(self, urls):
         """
@@ -452,6 +460,8 @@ class ImageDownloader(BasicProcessor):
             domain = url.split("/")[2].lower()
             url_ext = url.split(".")[-1].lower()
             image_exts = ["png", "jpg", "jpeg", "gif", "gifv"]
+
+            url = self.clean_url(url)
 
             if domain in ("www.imgur.com", "imgur.com"):
                 # gifv files on imgur are actually small mp4 files. Since
@@ -491,23 +501,54 @@ class ImageDownloader(BasicProcessor):
 
         :param requests.Response response: requests response object
         """
-        if not response.encoding and not response.ok:
-            return
+        response_url = self.clean_url(response.url)
+
+        # we have a problem here which is determining the file name to write
+        # this URL to - and no context that would contain that file name is
+        # passed to the hook!
+        # we do have the URL of the request but it may not be the same as the
+        # one the request started with on account of redirects, etc
+        # so do two things - detect redirects and use them to map URLs, and for
+        # non-redirects, use some heuristics to find the original URL
+        if redirect := response.headers.get("location"):
+            if redirect.startswith("/"):
+                # URLs without a domain - add it
+                redirect = "/".join(response_url.split("/")[:3]) + redirect
+
+            redirect = self.clean_url(redirect)
+            if redirect != response_url:
+                self.url_redirects[response_url] = redirect
+                self.filenames[redirect] = self.filenames[response_url]
+                return
 
         while chunk := response.raw.read(1024, decode_content=True):
-            destination = self.staging_area.joinpath(self.filenames[response.url])
+            if not response.ok or self.interrupted or self.complete:
+                # stop reading when request is bad, or we have enough already
+                # try to make the request finish ASAP so it can be cleaned up
+                response._content_consumed = True
+                response._content = False
+                response.raw.close()
+                return
+
+            destination = self.staging_area.joinpath(self.filenames[response_url])
             with destination.open("ab") as outfile:
-                outfile.write(chunk)
+                try:
+                    outfile.write(chunk)
+                except FileNotFoundError:
+                    # this can happen if processing finished *after* the while
+                    # loop started (i.e. self.complete flipped); safe to ignore
+                    # in that case
+                    pass
 
     def make_filename(self, url):
         """
-        Determine filenames for saved images
+        Determine filenames for saved files
 
         Prefer the original filename (extracted from the URL), but this may not
         always be possible or be an actual filename. Also, avoid using the same
         filename multiple times.
 
-        Note that this is done before any images are downloaded; thus not all
+        Note that this is done before any files are downloaded; thus not all
         filenames are guaranteed to actually exist when processing finishes,
         if some URLs cannot be downloaded.
 
@@ -518,7 +559,7 @@ class ImageDownloader(BasicProcessor):
         if re.match(r"[^.]+\.[a-zA-Z]{3,4}", clean_filename):
             base_filename = clean_filename
         else:
-            base_filename = "image.png"
+            base_filename = "file.png"
 
         filename = base_filename
         file_path = self.staging_area.joinpath(filename)
@@ -529,6 +570,68 @@ class ImageDownloader(BasicProcessor):
             file_path = self.staging_area.joinpath(filename)
 
         return filename
+
+    def resolve_url(self, url):
+        """
+        Find final redirect for URL
+
+        While downloading files, we may encounter redirects, and the final file
+        may be downloaded from a different URL than originally given. These are
+        saved in `self.url_redirects` and this simple function maps the original
+        to the redirected URL if one exists.
+
+        :param str url:  URL to resolve
+        :return str:  Final URL
+        """
+        while url in self.url_redirects:
+            url = self.url_redirects[url]
+
+        return url
+
+    def get_link_regexes(self):
+        """
+        Get regexes to extract relevant links from text
+
+        :return list:  List of compiled regular expressions
+        """
+        return [
+            # for image URL extraction, we use the following heuristic:
+            # Makes sure that it gets "http://site.com/img.jpg", but also
+            # more complicated ones like
+            # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
+            re.compile(
+                r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*",
+                re.IGNORECASE,
+            ),
+            # Imgur and gfycat links that do not end in an extension are also accepted.
+            # These can later be downloaded by adding an extension.
+            re.compile(
+                r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*",
+                re.IGNORECASE,
+            ),
+        ]
+
+    def get_valid_file_extension(self, file):
+        """
+        Get file extension for file
+
+        URLs don't necessarily come with a file extension included; determine
+        it based on the file that was downloaded. If the file is not a valid
+        file and should be discarded, raise an InvalidDownloadedFileException
+        to mark the file as such.
+
+        :param Path file:  Path to the file
+        :return:  File extension including leading period
+        """
+        try:
+            picture = Image.open(file)
+            if not picture.format:
+                raise TypeError("Image format could not be determined")
+
+            return f".{picture.format.lower()}"
+
+        except (UnidentifiedImageError, AttributeError, TypeError) as e:
+            raise InvalidDownloadedFileException(getattr(e, "message", str(e))) from e
 
     @staticmethod
     def map_metadata(url, data):
