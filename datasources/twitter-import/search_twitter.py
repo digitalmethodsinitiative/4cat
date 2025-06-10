@@ -73,10 +73,11 @@ class SearchTwitterViaZeeschuimer(Search):
                 tweet["legacy"]["full_text"] = t_text
 
         quote_tweet = tweet.get("quoted_status_result")
-
         if quote_tweet and "tweet" in quote_tweet.get("result", {}):
             # sometimes this is one level deeper, sometimes not...
             quote_tweet["result"] = quote_tweet["result"]["tweet"]
+        # check if the quote tweet is available or not
+        quote_withheld = True if (quote_tweet and "tombstone" in quote_tweet["result"]) else False
 
         return {
             "id": tweet["rest_id"],
@@ -102,12 +103,17 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_retweet": "yes" if retweet else "no",
             "retweeted_user": retweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if retweet else "",
             "is_quote_tweet": "yes" if quote_tweet else "no",
-            "quote_tweet_id": quote_tweet["result"].get("rest_id") if quote_tweet else "",
-            "quote_author": quote_tweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if (quote_tweet and "tombstone" not in quote_tweet["result"]) else "",
-            "quote_body": quote_tweet["result"]["legacy"].get("full_text", "") if quote_tweet else "",
-            "quote_images": ",".join([media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", []) if media["type"] == "photo"]) if quote_tweet else "",
-            "quote_videos": ",".join([media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", []) if media["type"] == "video"]) if quote_tweet else "",
-            "is_quote_withheld": "yes" if (quote_tweet and "tombstone" in quote_tweet["result"]) else "no",
+            "quote_tweet_id": quote_tweet["result"].get("rest_id", "") if quote_tweet else "",
+            "quote_author": quote_tweet["result"]["core"]["user_results"]["result"].get(user_key, {}).get("screen_name", "") if
+                        (quote_tweet and not quote_withheld) else "",
+            "quote_body": quote_tweet["result"]["legacy"].get("full_text", "") if quote_tweet and not quote_withheld else "",
+            "quote_images": ",".join(
+                [media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", [])
+                 if media["type"] == "photo"]) if quote_tweet and not quote_withheld else "",
+            "quote_videos": ",".join(
+                [media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", [])
+                 if media["type"] == "video"]) if quote_tweet and not quote_withheld else "",
+            "is_quote_withheld": "yes" if quote_withheld else "no",
             "is_reply": "yes" if str(tweet["legacy"]["conversation_id_str"]) != str(tweet["rest_id"]) else "no",
             "replied_author": tweet["legacy"].get("in_reply_to_screen_name", ""),
             "is_withheld": "yes" if withheld else "no",
