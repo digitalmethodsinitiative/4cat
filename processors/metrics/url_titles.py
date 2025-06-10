@@ -175,6 +175,7 @@ class URLFetcher(BasicProcessor):
                     stream=True
             ):
                 if self.interrupted:
+                    self.flush_proxied_requests()
                     raise ProcessorInterruptedException()
 
                 if type(response) is FailedProxiedRequest:
