@@ -100,6 +100,4 @@ RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint.sh
 RUN find /usr/src/app -name "*.pyc" -delete && \
     find /usr/src/app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
     find /usr/src/app -name "*.pyo" -delete && \
-    find /usr/src/app -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/src/app -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/src/app -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+    find /usr/src/app -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true 
