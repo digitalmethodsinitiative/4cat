@@ -17,7 +17,7 @@ services:
       retries: 5
 
   backend:
-    image: 4cat
+    image: 4cat:slim
     build:
       context: .
       dockerfile: docker/Dockerfile_slim
@@ -37,7 +37,7 @@ services:
     entrypoint: docker/docker-entrypoint.sh
 
   frontend:
-    image: 4cat
+    image: 4cat:slim
     container_name: 4cat_frontend
     env_file:
       - .env
