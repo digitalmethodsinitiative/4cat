@@ -1,5 +1,3 @@
-from operator import index
-
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
 
@@ -51,6 +49,7 @@ class SophisticatedFuturesProxy:
     """
 
     log = None
+    looping = True
 
     COOLOFF = 0
     MAX_CONCURRENT_OVERALL = 0
@@ -147,7 +146,7 @@ class SophisticatedFuturesProxy:
         else:
             return False
 
-    def request_started(self, url):
+    def mark_request_started(self, url):
         """
         Mark a request for a URL as started
 
@@ -167,7 +166,7 @@ class SophisticatedFuturesProxy:
 
         raise ValueError(f"No proxy is waiting for a request with URL {url} to start!")
 
-    def request_finished(self, url):
+    def mark_request_finished(self, url):
         """
         Mark a request for a URL as finished
 
@@ -191,13 +190,14 @@ class SophisticatedFuturesProxy:
 
 class DelegatedRequestHandler:
     queue = {}
-    requests = {}
     session = None
     proxy_pool = {}
+    halted = set()
     log = None
     index = 0
 
     # some magic values
+    REQUEST_STATUS_QUEUED = 0
     REQUEST_STATUS_STARTED = 1
     REQUEST_STATUS_WAITING_FOR_YIELD = 2
     PROXY_LOCALHOST = "__localhost__"
@@ -217,15 +217,22 @@ class DelegatedRequestHandler:
         :param kwargs: Other keyword arguments will be passed on to
         `requests.get()`
         """
+        if queue_name in self.halted or "_" in self.halted:
+            # do not add URLs while delegator is shutting down
+            return
+
         if queue_name not in self.queue:
             self.queue[queue_name] = []
-            self.requests[queue_name] = []
 
         for i, url in enumerate(urls):
-            url_metadata = namedtuple("UrlForDelegatedRequest", ("url", "args"))
+            url_metadata = namedtuple(
+                "UrlForDelegatedRequest", ("url", "args", "status", "proxied")
+            )
             url_metadata.url = url
             url_metadata.kwargs = kwargs
             url_metadata.index = self.index
+            url_metadata.proxied = None
+            url_metadata.status = self.REQUEST_STATUS_QUEUED
             self.index += 1
 
             if position == -1:
@@ -242,11 +249,12 @@ class DelegatedRequestHandler:
         :param str queue_name:  Queue name
         :return int: Amount of URLs in the queue (regardless of status)
         """
-        if queue_name not in self.queue:
-            self.queue[queue_name] = []
-            self.requests[queue_name] = []
+        queue_length = 0
+        for queue in self.queue:
+            if queue == queue_name or queue_name == "_":
+                queue_length += len(self.queue[queue_name])
 
-        return len(self.queue[queue_name])
+        return queue_length
 
     def claim_proxy(self, url):
         """
@@ -303,56 +311,45 @@ class DelegatedRequestHandler:
         """
         # go through queue and look at the status of each URL
         for queue_name in self.queue:
-            for url_metadata in self.queue[queue_name]:
-                # is there a request for the url?
+            for i, url_metadata in enumerate(self.queue[queue_name]):
                 url = url_metadata.url
-                have_request = [
-                    r.url
-                    for r in self.requests[queue_name]
-                    if r.url == url and r.index == url_metadata.index
-                ]
 
-                for request in self.requests[queue_name]:
-                    if (
-                        request.url != url
-                        or request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD
-                    ):
-                        # the request is not for this URL or already done -
-                        # will be cleaned up by get_results()
-                        continue
+                if url_metadata.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
+                    # waiting to be flushed or passed by `get_result()`
+                    continue
 
-                    # is the request done?
-                    if request.request.done():
-                        # collect result and buffer it for yielding (see below for
-                        # why we do not immediately yield)
-                        # done() here doesn't necessarily mean the request
-                        # finished successfully, just that it has returned
-                        # a timed out request will also be done()!
-                        self.log.debug(f"Request for {url} finished, collecting result")
-                        request.proxy.request_finished(url)
-                        try:
-                            response = request.request.result()
-                            request.result = response
+                if url_metadata.proxied and url_metadata.proxied.request.done():
+                    # collect result and buffer it for yielding
+                    # done() here doesn't necessarily mean the request finished
+                    # successfully, just that it has returned - a timed out
+                    # request will also be done()!
+                    self.log.debug(f"Request for {url} finished, collecting result")
+                    url_metadata.proxied.proxy.mark_request_finished(url)
+                    try:
+                        response = url_metadata.proxied.request.result()
+                        url_metadata.proxied.result = response
 
-                        except (
-                            ConnectionError,
-                            requests.exceptions.RequestException,
-                            urllib3.exceptions.HTTPError,
-                        ) as e:
-                            # this is where timeouts, etc, go
-                            request.result = FailedProxiedRequest(e)
-                        finally:
-                            # success or fail, we can pass it on
-                            request.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
-                    else:
-                        # running - ignore for now
-                        # could do some health checks here...
-                        # logging.debug(f"Request for {url} running...")
-                        pass
+                    except (
+                        ConnectionError,
+                        requests.exceptions.RequestException,
+                        urllib3.exceptions.HTTPError,
+                    ) as e:
+                        # this is where timeouts, etc, go
+                        url_metadata.proxied.result = FailedProxiedRequest(e)
 
-                    break
+                    finally:
+                        # success or fail, we can pass it on
+                        url_metadata.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
 
-                if not have_request:
+                else:
+                    # running - ignore for now
+                    # could do some health checks here...
+                    # logging.debug(f"Request for {url} running...")
+                    pass
+
+                if not url_metadata.proxied and not (
+                    queue_name in self.halted or "_" in self.halted
+                ):
                     # no request running for this URL yet, try to start one
                     proxy = self.claim_proxy(url)
                     if not proxy:
@@ -373,7 +370,6 @@ class DelegatedRequestHandler:
                         (
                             "request",
                             "created",
-                            "status",
                             "result",
                             "proxy",
                             "url",
@@ -386,18 +382,22 @@ class DelegatedRequestHandler:
                             "url": url,
                             "timeout": 30,
                             "proxies": proxy_definition,
-                            **url_metadata.kwargs,
+                            **url_metadata.kwargs
                         }
                     )
-                    request.status = self.REQUEST_STATUS_STARTED
+
                     request.proxy = proxy
                     request.url = url
                     request.index = (
                         url_metadata.index
                     )  # this is to allow for multiple requests for the same URL
 
-                    self.requests[queue_name].append(request)
-                    proxy.request_started(url)
+                    url_metadata.status = self.REQUEST_STATUS_STARTED
+                    url_metadata.proxied = request
+
+                    proxy.mark_request_started(url)
+
+                self.queue[queue_name][i] = url_metadata
 
     def get_results(self, queue_name="_", preserve_order=True):
         """
@@ -423,47 +423,66 @@ class DelegatedRequestHandler:
         self.manage_requests()
 
         # no results, no return
-        if queue_name not in self.requests:
+        if queue_name not in self.queue:
             return
 
-        for url_metadata in self.queue[queue_name]:
+        # use list comprehensions here to avoid having to modify the
+        # lists while iterating through them
+        for url_metadata in [u for u in self.queue[queue_name]]:
             # for each URL in the queue...
-            have_result = False
-            for request in self.requests[queue_name]:
-                if (
-                    request.url == url_metadata.url
-                    and request.index == url_metadata.index
-                    and request.status == self.REQUEST_STATUS_WAITING_FOR_YIELD
-                ):
-                    # see if a finished request is available...
-                    yield url_metadata.url, request.result
-                    self.queue[queue_name].remove(url_metadata)
-                    self.requests[queue_name].remove(request)
-                    have_result = True
-                    break
+            if url_metadata.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
+                # see if a finished request is available...
+                self.queue[queue_name].remove(url_metadata)
+                yield url_metadata.url, url_metadata.proxied.result
 
-            if not have_result and preserve_order:
+            elif preserve_order:
                 # ...but as soon as a URL has no finished result, return
                 # unless we don't care about the order, then continue and yield
                 # as much as possible
                 return
 
-    def halt(self, queue_name="_"):
+    def _halt(self, queue_name="_"):
         """
         Interrupt fetching of results
 
-        Can be used when 4CAT is interrupted. Clears queue and cancels any
+        Can be used when 4CAT is interrupted. Clears queue and tries to cancel
         running requests.
+
+        Note that running requests *cannot* always be cancelled via `.cancel()`
+        particularly when using `stream=True`. It is therefore recommended to
+        use `halt_and_wait()` which is blocking until all running requests have
+        properly terminated, instead of calling this method directly.
 
         :param str queue_name:  Queue name to stop fetching results for. By
         default, halt all queues.
         """
+        self.halted.add(queue_name)
+
         for queue in self.queue:
             if queue_name == "_" or queue_name == queue:
-                del self.queue[queue]
+                # use a list comprehension here to avoid having to modify the
+                # list while iterating through it
+                for url_metadata in [u for u in self.queue[queue]]:
+                    if url_metadata.status != self.REQUEST_STATUS_STARTED:
+                        self.queue[queue].remove(url_metadata)
+                    else:
+                        url_metadata.proxied.request.cancel()
 
-        for queue, requests in self.requests:
-            if queue_name == "_" or queue_name == queue:
-                for request in self.requests[queue]:
-                    if not request.request.done():
-                        request.cancel()
+        self.halted.remove(queue_name)
+
+    def halt_and_wait(self, queue_name="_"):
+        """
+        Cancel any queued requests and wait until ongoing ones are finished
+
+        Blocking!
+
+        :param str queue_name:  Queue name to stop fetching results for. By
+        default, halt all queues.
+        """
+        self._halt(queue_name)
+        while self.get_queue_length(queue_name) > 0:
+            # exhaust generator without doing something w/ results
+            all(self.get_results(queue_name, preserve_order=False))
+
+        if queue_name in self.queue:
+            del self.queue[queue_name]
