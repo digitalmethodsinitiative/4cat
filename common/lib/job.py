@@ -150,6 +150,39 @@ class Job:
 		:return bool: If the job is not claimed yet and also isn't finished.
 		"""
 		return not self.is_claimed and not self.is_finished
+	
+	def get_status(self, with_details=False):
+		"""
+		Get the status of this job
+
+		:return str: Status of the job
+		"""
+		# TODO: add error/crash status
+		if self.is_finished:
+			return "Finished"
+		elif self.is_claimed:
+			if with_details:
+				elapsed = int(time.time()) - self.data["timestamp_claimed"]
+				hours, remainder = divmod(elapsed, 3600)
+				minutes, seconds = divmod(remainder, 60)
+				return f"Running ({' '.join([f'{hours} h' if hours > 0 else '', f'{minutes} m' if minutes > 0 else '', f'{seconds} s' if seconds > 0 or (hours == 0 and minutes == 0) else '']).strip()})"
+			return "Running"
+		elif self.data["timestamp_after"] > 0 and self.data["timestamp_after"] > int(time.time()):
+			if with_details:
+				wait_time = self.data["timestamp_after"] - int(time.time())
+				hours, remainder = divmod(wait_time, 3600)
+				minutes, seconds = divmod(remainder, 60)
+				return f"Scheduled (in {' '.join([f'{hours} h' if hours > 0 else '', f'{minutes} m' if minutes > 0 else '', f'{seconds} s' if seconds > 0 or (hours == 0 and minutes == 0) else '']).strip()})"
+			return "Scheduled"
+		elif self.data["interval"] > 0 and (self.data["timestamp_lastclaimed"] + self.data["interval"]) > int(time.time()):
+			if with_details:
+				interval_time = (self.data["timestamp_lastclaimed"] + self.data["interval"]) - int(time.time())
+				hours, remainder = divmod(interval_time, 3600)
+				minutes, seconds = divmod(remainder, 60)
+				return f"Scheduled (interval) (in {' '.join([f'{hours} h' if hours > 0 else '', f'{minutes} m' if minutes > 0 else '', f'{seconds} s' if seconds > 0 or (hours == 0 and minutes == 0) else '']).strip()})"
+			return "Scheduled (interval)"
+		else:
+			return "Queued"
 
 	def get_place_in_queue(self):
 		"""
