@@ -1,6 +1,7 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
+from backend.lib.worker import BasicWorker
 import markdown2
 import datetime
 import psycopg2
@@ -220,6 +221,13 @@ def delete_job():
         
         # Delete the dataset
         dataset.delete()
+
+    # Tell backend to cancel job if running
+    try:
+        call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["type"], "level": BasicWorker.INTERRUPT_CANCEL})
+    except ConnectionRefusedError:
+        return error(500,
+                        message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
     
     # Delete the job
     job.finish(delete=True)
