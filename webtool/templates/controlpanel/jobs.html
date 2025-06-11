@@ -1,0 +1,99 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}Job Queue{% endblock %}
+{% block body_class %}plain-page admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "jobs" %}{% endblock %}
+
+{% block body %}
+    <article class="with-aside">
+        <section class="result-list">
+            <h2><span>Jobs</span></h2>
+            <div class="user-panel">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                <!-- <nav class="view-controls block">
+                    Sort by
+                    <a class="button-like" href="{{ url_for("list_users") }}?sort=name"><i class="fa fa-arrow-down-a-z" aria-hidden="true"></i> Name</a>
+                    <a class="button-like" href="{{ url_for("list_users") }}?sort=age"><i class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Age</a>
+                    <a class="button-like" href="{{ url_for("list_users") }}?sort=status"><i class="fa fa-user-shield" aria-hidden="true"></i> Status</a>
+                </nav> -->
+                <table class="fullwidth user-table cp-table">
+                    <colgroup>
+                        <col class="id">
+                        <col class="job-type">
+                        <col class="status">
+                        <col class="actions" style="width: 1%;">
+                    </colgroup>
+                    <tr>
+                        <th>ID</th>
+                        <th>Job Type</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                    {% for job in jobs %}
+                        <tr>
+                            <td>
+                                <div class="job-id">
+                                    {{ job.data["id"] }}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="job-type">
+                                    {{ job.data["jobtype"] }}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="job-status">
+                                    {{ job.get_status(with_details=True) }}
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <!-- Could add other types e.g. (clean-temp-files, check-for-updates, datasource-metrics, expire-datasets) -->
+                                {% if job.data["jobtype"] not in ("api") %} 
+                                    <form class="inline" action="{{ url_for("delete_job") }}" method="POST">
+                                        <input type="hidden" name="job_id" value="{{ job.data["id"] }}">
+                                        <input type="hidden" name="redirect_to_page" value="true">
+                                        <button class="confirm-first"><i class="fa fa-times"
+                                                                         aria-hidden="true"></i><span class="sr-only">Delete job</span>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not jobs %}
+                        <tr>
+                            <td colspan="5">No jobs found.</td>
+                        </tr>
+                    {% endif %}
+                </table>
+
+                {% include "components/pagination.html" %}
+            </div>
+        </section>
+        <aside>
+            <h2><span>Manage</span></h2>
+            
+            <nav class="job-controls">
+                <hr>
+                <form action="{{ url_for("list_jobs") }}" method="GET">
+                    <input aria-label="Job Type filter" placeholder="Search by job type" name="name"
+                           value="{{ filter.jobtype }}" list="all-jobs">
+
+                    <button><i class="fa fa-search" aria-hidden="true"></i> Search</button>
+                </form>
+                <datalist id="all-jobs">
+                    {% for job_type in all_jobs %}
+                        <option>{{ job_type }}</option>{% endfor %}
+                </datalist>
+                {% if filter.jobtype %}
+                    <hr>
+                    <form action="{{ url_for("list_users") }}" method="GET">
+                        <button><i class="fa fa-times" aria-hidden="true"></i> Clear filter</button>
+                    </form>
+                {% endif %}
+            </nav>
+        </aside>
+    </article>
+{% endblock %}
