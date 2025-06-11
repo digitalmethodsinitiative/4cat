@@ -6,6 +6,7 @@ import time
 import json
 import math
 from common.lib.exceptions import JobClaimedException, JobNotFoundException
+from common.lib.helpers import timify_long
 
 
 class Job:
@@ -163,23 +164,17 @@ class Job:
 		elif self.is_claimed:
 			if with_details:
 				elapsed = int(time.time()) - self.data["timestamp_claimed"]
-				hours, remainder = divmod(elapsed, 3600)
-				minutes, seconds = divmod(remainder, 60)
-				return f"Running ({' '.join([f'{hours} h' if hours > 0 else '', f'{minutes} m' if minutes > 0 else '', f'{seconds} s' if seconds > 0 or (hours == 0 and minutes == 0) else '']).strip()})"
+				return f"Running ({timify_long(elapsed)})"
 			return "Running"
 		elif self.data["timestamp_after"] > 0 and self.data["timestamp_after"] > int(time.time()):
 			if with_details:
 				wait_time = self.data["timestamp_after"] - int(time.time())
-				hours, remainder = divmod(wait_time, 3600)
-				minutes, seconds = divmod(remainder, 60)
-				return f"Scheduled (in {' '.join([f'{hours} h' if hours > 0 else '', f'{minutes} m' if minutes > 0 else '', f'{seconds} s' if seconds > 0 or (hours == 0 and minutes == 0) else '']).strip()})"
+				return f"Scheduled (in {timify_long(wait_time)})"
 			return "Scheduled"
 		elif self.data["interval"] > 0 and (self.data["timestamp_lastclaimed"] + self.data["interval"]) > int(time.time()):
 			if with_details:
 				interval_time = (self.data["timestamp_lastclaimed"] + self.data["interval"]) - int(time.time())
-				hours, remainder = divmod(interval_time, 3600)
-				minutes, seconds = divmod(remainder, 60)
-				return f"Scheduled (interval) (in {' '.join([f'{hours} h' if hours > 0 else '', f'{minutes} m' if minutes > 0 else '', f'{seconds} s' if seconds > 0 or (hours == 0 and minutes == 0) else '']).strip()})"
+				return f"Scheduled (interval) (in {timify_long(interval_time)})"
 			return "Scheduled (interval)"
 		else:
 			return "Queued"
