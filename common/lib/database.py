@@ -71,9 +71,12 @@ class Database:
 				time.sleep(wait)
 		self.log.error("Failed to reconnect to database after %d tries" % tries)
 
-	def query(self, query, replacements=None, cursor=None):
+	def _execute_query(self, query, replacements=None, cursor=None):
 		"""
 		Execute a query
+
+		Simple wrapper to get a cursor to execute a query with. Do not call
+		from outside this class - use `execute()` instead.
 
 		:param string query: Query
 		:param args: Replacement values
@@ -97,14 +100,16 @@ class Database:
 		"""
 		Execute a query, and commit afterwards
 
-		This is required for UPDATE/INSERT/DELETE/etc to stick
+		This is required for UPDATE/INSERT/DELETE/etc to stick!
+
 		:param string query:  Query
-		:param cursor: Cursor to use. Default - use get_cursor method for common cursor
+		:param cursor: Cursor to use. By default, use the result of
+		`get_cursor()`.
 		:param replacements: Replacement values
 		:param bool commit:  Commit transaction after query?
 		:param bool close_cursor:  Close cursor after query?
 		"""
-		cursor = self.query(query, replacements, cursor)
+		cursor = self._execute_query(query, replacements, cursor)
 
 		if commit:
 			self.commit()
@@ -297,7 +302,7 @@ class Database:
 		:param commit:  Commit transaction after query?
 		:return list: The result rows, as a list
 		"""
-		cursor = self.query(query, *args)
+		cursor = self._execute_query(query, *args)
 
 		try:
 			result = cursor.fetchall()
@@ -326,7 +331,7 @@ class Database:
 		:param commit:  Commit transaction after query?
 		:return: The row, as a dictionary, or None if there were no rows
 		"""
-		cursor = self.query(query, *args)
+		cursor = self._execute_query(query, *args)
 
 		try:
 			result = cursor.fetchone()
@@ -371,7 +376,7 @@ class Database:
 		# run the query
 		cursor = self.get_cursor()
 		try:
-			cursor = self.query(query, cursor=cursor, *args)
+			cursor = self._execute_query(query, cursor=cursor, *args)
 		except psycopg2.extensions.QueryCanceledError:
 			# interrupted with cancellation worker (or manually)
 			self.log.debug("Query in connection %s was interrupted..." % self.appname)
