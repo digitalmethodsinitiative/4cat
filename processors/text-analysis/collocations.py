@@ -90,6 +90,11 @@ class GetCollocations(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
 			"help": "Maximum number of top co-words to extract (0 = all)"
+		},
+		"save_annotations": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Add all co-words per item to top dataset",
+			"default": False
 		}
 	}
 
@@ -122,6 +127,8 @@ class GetCollocations(BasicProcessor):
 
 		query_string = self.parameters.get("query_string", "").replace(" ", "")
 
+		save_annotations = self.parameters.get("save_annotations", False)
+
 		# n_size smaller than window_size does not make sense
 		n_size = min(n_size, window_size)
 
@@ -137,17 +144,26 @@ class GetCollocations(BasicProcessor):
 		unique = self.parameters.get("unique", True)
 		sort_words = self.parameters.get("sort_words", False)
 
+
 		# Get token sets
 		self.dataset.update_status("Processing token sets")
 		dirname = Path(self.dataset.get_results_path().parent, self.dataset.get_results_path().name.replace(".", ""))
 
 		# Dictionary to save queries from
 		results = []
+		annotations = {}
 
 		# Go through all archived token sets and generate collocations for each
 		for token_file in self.iterate_archive_contents(self.source_file):
+
 			if token_file.name == '.token_metadata.json':
-				# Skip metadata
+
+				# Get metadata if we write annotations
+				if save_annotations:
+					with token_file.open("rb") as metadata_file:
+						metadata = json.load(metadata_file)
+
+				# Don't get co-words from metadata
 				continue
 			# we support both pickle and json dumps of vectors
 			token_unpacker = pickle if token_file.suffix == "pb" else json
@@ -168,6 +184,17 @@ class GetCollocations(BasicProcessor):
 			for post_tokens in tokens:
 				post_collocations = self.get_collocations(post_tokens, window_size, n_size, query_string=query_string, forbidden_words=forbidden_words, unique=unique)
 				collocations += post_collocations
+
+				if save_annotations:
+					if date_string not in annotations:
+						annotations[date_string] = []
+					annotation_value = ""
+					if post_collocations:
+						annotation_value = ",".join([f"{c[0]} {c[1]}" for c in post_collocations])
+					annotations[date_string].append({
+						"label": "co-words",
+						"value": annotation_value
+					})
 
 			# Loop through the collocation per post, merge, and store in the results list
 			tokenset_results = {}
@@ -230,6 +257,19 @@ class GetCollocations(BasicProcessor):
 
 		if not results:
 			return
+
+		# Save annotations; match item IDs with time-sorted token sets, using the metadata file.
+		if save_annotations and annotations:
+			doc_no = 0
+			for item_id, item_data in metadata.items():
+				if item_id == "parameters":
+					continue
+				for time_grouping, time_data in item_data.items():
+					for doc_line in time_data["document_numbers"]:
+						annotations[time_data["interval"]][doc_line]["item_id"] = item_id
+						doc_no += 1
+			annotations = [ann for ann_list in list(annotations.values()) for ann in ann_list]
+			self.save_annotations(annotations, overwrite=False)
 
 		# Generate csv and finish
 		self.dataset.update_status("Writing to csv and finishing")
