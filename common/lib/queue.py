@@ -69,7 +69,7 @@ class JobQueue:
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
-	def get_all_jobs(self, jobtype="*", remote_id=False, restrict_claimable=True):
+	def get_all_jobs(self, jobtype="*", limit=None, offset=None, remote_id=False, restrict_claimable=True):
 		"""
 		Get all unclaimed (and claimable) jobs
 
@@ -101,6 +101,13 @@ class JobQueue:
 			replacements.append(now)
 
 		query += "         ORDER BY timestamp ASC"
+
+		if limit is not None:
+			query += " LIMIT %s"
+			replacements.append(limit)
+		if offset is not None:
+			query += " OFFSET %s"
+			replacements.append(offset)
 
 		jobs = self.db.fetchall(query, replacements)
 
