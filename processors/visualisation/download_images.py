@@ -141,7 +141,8 @@ class ImageDownloader(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
-        Allow processor on top image rankings
+        Allow processor on top image rankings, collectors, but not specific collectors with their own image
+        collection methods
 
         :param module: Dataset or processor to determine compatibility with
         """
@@ -380,14 +381,14 @@ class ImageDownloader(BasicProcessor):
                         failure = True
 
                 if not failure:
-                    if len(downloaded_files) < amount:
+                    if len(downloaded_files) < amount or amount == 0:
                         downloaded_files.add(url)
                         self.dataset.update_status(
                             f"Downloaded {len(downloaded_files):,} of {amount:,} file(s)"
                         )
                         self.dataset.update_progress(len(downloaded_files) / amount)
 
-                    if len(downloaded_files) >= amount:
+                    if len(downloaded_files) >= amount and amount != 0:
                         # parallel requests may still be running so halt these
                         # before ending the loop and wrapping up
                         self.complete = True
