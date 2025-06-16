@@ -23,7 +23,7 @@ class ViewMetadata(BasicProcessor):
 	"""
 	type = "metadata-viewer"  # job type ID
 	category = "Conversion"  # category
-	title = "View Metadata"  # title displayed in UI
+	title = "View media metadata"  # title displayed in UI
 	description = "Reformats the .metadata.json file and calculates analytics"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 

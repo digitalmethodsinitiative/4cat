@@ -35,7 +35,7 @@ packages = set([
 	"nltk~=3.9.1",
 	"networkx~=2.8.0",
 	"numpy>=1.19.2",
-	"openai==1.59.3",
+	"openai",
 	"oslex",
 	"packaging",
 	"pandas==1.5.3",
