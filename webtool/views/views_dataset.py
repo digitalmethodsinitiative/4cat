@@ -316,14 +316,14 @@ def preview_items(key):
             return view_image_plot(dataset.key)
 
         # Check if a children are plotable (e.g., a plot was created from the zip)
-        for child in dataset.get_children(instantiate_datasets=True):
+        for child in dataset.get_children(update=True):
             child_processor = child.get_own_processor()
             if hasattr(child_processor, "is_plot") and child_processor.is_plot:
                 return view_image_plot(child.key)
             # TODO: Better way to identify this edge case?
             elif child.type.startswith("image-downloader"):
                 # Images were downloaded from this zip; this is the case for presets
-                for grandkid in child.get_children(instantiate_datasets=True):
+                for grandkid in child.get_children(update=True):
                     grandkid_processor = grandkid.get_own_processor()
                     if hasattr(grandkid_processor, "is_plot") and grandkid_processor.is_plot:
                         return view_image_plot(grandkid.key)
@@ -614,7 +614,7 @@ def keep_dataset(key):
 @login_required
 def view_image_plot(key):
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 

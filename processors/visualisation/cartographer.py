@@ -741,7 +741,7 @@ class ImagePlotGenerator(BasicProcessor):
         :param DataSet parent_dataset: The parent dataset of the current dataset
         """
         top_dataset = parent_dataset.top_parent()
-        return [dataset for dataset in top_dataset.get_all_children(instantiate_datasets=False) if dataset.type == "coordinate-map"]
+        return [dataset for dataset in top_dataset.get_all_children() if dataset.type == "coordinate-map"]
 
 
 # Adapted from YaleDHLab's PixPlot here:
