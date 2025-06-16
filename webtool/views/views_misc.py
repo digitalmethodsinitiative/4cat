@@ -5,24 +5,59 @@ import re
 import csv
 import json
 import markdown
+import traceback
 
 from pathlib import Path
 from datetime import datetime
 
-import backend
-
 from flask import request, render_template, jsonify, Response
 from flask_login import login_required, current_user
+from werkzeug.exceptions import HTTPException, InternalServerError
 
-from webtool import app, db, config
-from webtool.lib.helpers import pad_interval, error, setting_required
+from webtool import app, db, config, fourcat_modules, log
+from webtool.lib.helpers import pad_interval, error
 from webtool.views.views_dataset import create_dataset, show_results
 
 from common.config_manager import ConfigWrapper
+from common.lib.helpers import get_datasource_example_keys
 config = ConfigWrapper(config, user=current_user, request=request)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+@app.errorhandler(Exception)
+def log_exception(e):
+    """
+    Log all exceptions
+    """
+    if isinstance(e, HTTPException):
+        status_code = e.code
+        # Could handle specific HTTP errors here
+    else:
+        status_code = None
+
+    # Check if it's an InternalServerError and extract the original exception
+    if isinstance(e, InternalServerError) and e.original_exception:
+        cause = e.original_exception
+    else:
+        cause = e
+
+    if not status_code or status_code >= 500:
+        # Capture the correct frame and log
+        tb = traceback.extract_tb(cause.__traceback__)
+
+        # Get the request URL
+        request_url = request.url
+
+        log.error(f"{type(cause).__name__}{(' ('+request_url+')') if request_url else ''}: {cause}", frame=tb if tb else None)
+        return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
+    else:
+        # Should be just 4xx errors; return and allow Flask to handle them
+        return e
+
+@app.errorhandler(413)
+def request_entity_too_large(this_error):
+    message = f"File too large; try uploading as a ZIP file instead."
+    return error(413, message=message, status="error")
 
 @app.route('/')
 @login_required
@@ -69,9 +104,9 @@ def show_about():
     else:
         news = None
 
-    datasources = {k: v for k, v in backend.all_modules.datasources.items() if
+    datasources = {k: v for k, v in fourcat_modules.datasources.items() if
                    k in config.get("datasources.enabled") and not v["importable"]}
-    importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
+    importables = {k: v for k, v in fourcat_modules.datasources.items() if (v["importable"] and k in config.get("datasources.enabled"))}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 
@@ -112,7 +147,7 @@ def data_overview(datasource=None):
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
                    metadata["has_worker"] and datasource in config.get("datasources.enabled")}
 
     if datasource not in datasources:
@@ -127,11 +162,12 @@ def data_overview(datasource=None):
     daily_counts = None
     references = None
     labels = None
+    example_keys = None
 
     if datasource:
 
         datasource_id = datasource
-        worker_class = backend.all_modules.workers.get(datasource_id + "-search")
+        worker_class = fourcat_modules.workers.get(datasource_id + "-search")
         # Database IDs may be different from the Datasource ID (e.g. the datasource "4chan" became "fourchan" but the database ID remained "4chan")
         database_db_id = worker_class.prefix if hasattr(worker_class, "prefix") else datasource_id
 
@@ -151,8 +187,12 @@ def data_overview(datasource=None):
         if is_static:
             labels.append("static")
 
-        if hasattr(worker_class, "is_from_extension"):
-            labels.append("extension")
+        if hasattr(worker_class, "is_from_zeeschuimer"):
+            labels.append("zeeschuimer")
+
+        # Get example keys for the datasource
+        if datasource_id not in ["upload"]: # ignore upload as keys are variable
+            example_keys = get_datasource_example_keys(db=db, modules=fourcat_modules, dataset_type=datasource_id + "-search")
 
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":
@@ -183,7 +223,7 @@ def data_overview(datasource=None):
 
         references = worker_class.references if hasattr(worker_class, "references") else None        
 
-    return render_template('data-overview.html', datasources=datasources, datasource_id=datasource_id, description=description, labels=labels, total_counts=total_counts, daily_counts=daily_counts, github_url=github_url, references=references)
+    return render_template('data-overview.html', datasources=datasources, datasource_id=datasource_id, description=description, labels=labels, total_counts=total_counts, daily_counts=daily_counts, github_url=github_url, references=references, example_keys=example_keys)
 
 @app.route('/get-boards/<string:datasource>/')
 @login_required

@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
+from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 class SearchDouyin(Search):
@@ -18,7 +19,7 @@ class SearchDouyin(Search):
     title = "Import scraped Douyin data"  # title displayed in UI
     description = "Import Douyin data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -26,7 +27,7 @@ class SearchDouyin(Search):
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
         "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)"
     ]
-
+    
     def get_items(self, query):
         """
         Run custom search
@@ -176,7 +177,8 @@ class SearchDouyin(Search):
                 [tag["tag_name"] for tag in (item["video_tag"] if item["video_tag"] is not None else []) if
                  "tag_name" in tag])
 
-            mix_current_episode = item.get(mix_info_key, {}).get("statis", {}).get("current_episode", "N/A")
+            mix_current_episode = item.get(mix_info_key).get("statis", {}).get("current_episode", "N/A") if item.get(
+                mix_info_key) else "N/A"
 
         # Stream Stats
         count_total_streams_viewers = stats.get("total_user", "N/A")
@@ -203,11 +205,11 @@ class SearchDouyin(Search):
 
         # Collection
         mix_current_episode = mix_current_episode if mix_current_episode != "$undefined" else "N/A"
-        collection_id = item.get(mix_info_key, {}).get(mix_id_key, "N/A")
+        collection_id = item.get(mix_info_key).get(mix_id_key, "N/A") if item.get(mix_info_key) else "N/A"
         collection_id = collection_id if collection_id != "$undefined" else "N/A"
-        collection_name = item.get(mix_info_key, {}).get(mix_name_key, "N/A")
+        collection_name = item.get(mix_info_key).get(mix_name_key, "N/A") if item.get(mix_info_key) else "N/A"
         collection_name = collection_name if collection_name != "$undefined" else "N/A"
-        part_of_collection = "yes" if mix_info_key in item and mix_id_key in item[
+        part_of_collection = "yes" if  item.get(mix_info_key) and mix_id_key in item[
             mix_info_key] and collection_id != "N/A" else "no"
 
         return MappedItem({
@@ -218,14 +220,14 @@ class SearchDouyin(Search):
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),
             # Adding this as different Douyin pages contain different data
-            "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}",
-            "region": item.get("region"),
+            "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}" if subject == "Post" else f"https://live.douyin.com/{author.get('web_rid')}",
+            "region": item.get("region", ""),
             "hashtags": ",".join(
                 [tag[hashtag_key] for tag in (item[text_extra_key] if item[text_extra_key] is not None else []) if
-                 hashtag_key in tag]),
+                 tag.get(hashtag_key)]),
             "mentions": ",".join([f"https://www.douyin.com/user/{tag[mention_key]}" for tag in
                                   (item[text_extra_key] if item[text_extra_key] is not None else []) if
-                                  mention_key in tag]),
+                                  tag.get(mention_key)]),
             # Actual username does not appear in object, but the sec_uid can be used to form a link to their profile
             "video_tags": video_tags,
             "prevent_download": prevent_download,

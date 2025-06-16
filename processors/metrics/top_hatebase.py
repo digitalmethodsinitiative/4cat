@@ -26,6 +26,8 @@ class HatebaseRanker(BasicProcessor):
 	description = "Count frequencies for hateful words and phrases found in the dataset and rank the results (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""

@@ -6,7 +6,7 @@
 import configparser
 import subprocess
 import shutil
-import shlex
+import oslex
 import json
 import sys
 import os
@@ -164,7 +164,7 @@ else:
         config_set("video_downloader.ffmpeg-path", ffmpeg)
     elif in_docker:
         print("  - ffmpeg not found, detected Docker environment, installing via apt")
-        ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ffmpeg_install = subprocess.run(oslex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if ffmpeg_install.returncode == 0:
             print("  - ffmpeg intalled with apt!")
             config_set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"))

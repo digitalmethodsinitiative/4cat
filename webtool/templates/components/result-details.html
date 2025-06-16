@@ -76,14 +76,21 @@
                 {% endif %}
 
                     <div class="onequarter">
-                        <dt>Created</dt>
-                        <dd>
-                            {% if dataset.parameters.original_timestamp %}
-                                <i class="fa fa-file-import tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-imported"></i> <span class="sr-only">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
-                                <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-imported">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
-                            {% endif %}
-                            {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
-                        </dd>
+                        {% if dataset.is_finished() and dataset.timestamp_finished %}
+                            <dt>Finished</dt>
+                            <dd>
+                                {{ dataset.timestamp_finished|int|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+                            </dd>
+                        {% else %}
+                            <dt>Created</dt>
+                            <dd>
+                                {% if dataset.parameters.original_timestamp %}
+                                    <i class="fa fa-file-import tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-imported"></i> <span class="sr-only">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
+                                    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-imported">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
+                                {% endif %}
+                                {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+                            </dd>
+                        {% endif %}
                     </div>
 
                     <div class="threequarters dataset-owner-list">
@@ -109,6 +116,25 @@
                         <dt>Parameters</dt>
                         <dd>{% include 'components/result-metadata.html' %}</dd>
                     </div>
+
+                    {% set annotation_fields = dataset.get_annotation_fields() %}
+                    {% if annotation_fields %}
+                    <div class="fullwidth annotation-fields-list">
+                        <dt>Annotations</dt>
+                        <dd>
+                            <ul>
+                            {% set annotations = dataset.get_annotations() %}
+                            {% if annotations %}
+                                <li>{{ annotations|length|numberify }} annotation{% if annotations|length > 1 %}s{% endif %}</li>
+                            {% endif %}
+                            {% for annotation_field in annotation_fields.items() %}
+                                <li><span class="property-badge">{{ annotation_field[1].label }}</span></li>
+                            {% endfor %}
+                            </ul>
+                            <a class="button-like-small" id="edit-annotation-fields" href="{{ url_for('explorer_dataset', dataset_key=dataset.key) }}?edit=true"><i class="fas fa-edit" aria-hidden="true"></i> Edit fields</a>
+                        </dd>
+                    </div>
+                    {% endif %}
 
                     {% if has_credentials and current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
                     <div class="fullwidth">
@@ -152,21 +178,21 @@
     </section>
 
     <section class="analysis-gallery">
-        <h3 class="blocktitle section-subheader{% if not dataset.get_children(instantiate_datasets=False) %} collapsed" aria-hidden="true{% endif %}" id="child-tree-header">
+        <h3 class="blocktitle section-subheader{% if not dataset.get_children() %} collapsed" aria-hidden="true{% endif %}" id="child-tree-header">
             <span>Analysis results</span>
             <button id="expand-datasets">Expand all</button>
         </h3>
         <ol class="child-list top-level">
-            {% for child in dataset.get_children(instantiate_datasets=True) %}
+            {% for child in dataset.get_children() %}
                 {% include "components/result-child.html" %}
             {% endfor %}
         </ol>
     </section>
 
-    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) %}
+    {% if __user_config("ui.inline_preview") and (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item or (dataset.get_extension() in ("ndjson",) and not __user_config("ui.prefer_mapped_preview"))) %}
         <section class="inline-preview">
             <h2 class="blocktitle section-subheader">
-                <span>Preview</span>
+                <span>{% if dataset.get_extension == "html" %}View dataset{% else %}Dataset preview{% endif %}</span>
                 <button
                     data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
                     aria-controls="popup-preview-{{ dataset.key }}">
@@ -186,7 +212,7 @@
             </h3>
             {% set part = "main" %}
             <div class="intro">
-                <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>. Click on <i class="fa fa-sitemap" aria-hidden="true"></i> to see what processors can be run afterwards.</p>
+                <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>.</p>
                 <p>Some processors may take a while to complete.</p>
                 <p>See <a href="https://docs.google.com/document/d/1po-sOB8tDRZlvWrEayu97cGh_qsBuW0URd4md0_tv7k/edit?usp=sharing">this exercise sheet</a> for step-by-step tutorials.</p>
             </div>

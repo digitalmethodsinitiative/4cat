@@ -16,6 +16,9 @@ do
     -p ) # set public option to use public IP address as SERVER_NAME
         echo 'Setting SERVER_NAME to public IP'
         SERVER_NAME=$(curl -s https://api.ipify.org);;
+    -h ) # set public option to use server hostname as SERVER_NAME
+        echo 'Setting SERVER_NAME to server hostname'
+        SERVER_NAME=$(hostnamectl --static);;
     * )  # Invalid option
         echo "Error: Invalid option"
         exit;;
@@ -48,7 +51,7 @@ rm -f ./backend/4cat.pid
 export PYTHONPATH=/usr/src/app:$PYTHONPATH
 
 # Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
-python3 helper-scripts/migrate.py -y
+python3 helper-scripts/migrate.py -y 
 
 # Run docker_setup to update any environment variables if they were changed
 python3 -m docker.docker_setup

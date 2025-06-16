@@ -19,6 +19,7 @@ class NeologismExtractor(ProcessorPreset):
 
 	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
 
+
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
 		"""
@@ -48,6 +49,16 @@ class NeologismExtractor(ProcessorPreset):
 
 		return options
 
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+		Allow processor to run on all csv and NDJSON datasets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+
+		return module.get_extension() in ("csv", "ndjson")
+
 	def get_processor_pipeline(self):
 		"""
 		This queues a series of post-processors to extract neologisms from a
@@ -67,7 +78,7 @@ class NeologismExtractor(ProcessorPreset):
 					"lemmatise": False,
 					"docs_per": timeframe,
 					"columns": columns,
-					"filter": ["wordlist-googlebooks-english", "stopwords-iso-all"]
+					"filter": ["wordlist-googlebooks-english", "stopwords-iso-en"]
 				}
 			},
 			# then, create vectors for those tokens

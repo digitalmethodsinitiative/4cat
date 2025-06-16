@@ -1,16 +1,16 @@
 import hashlib
+import zipfile
 import secrets
-import shutil
 import random
 import json
 import math
 import csv
+import os
 
 from pathlib import Path
 from abc import ABC, abstractmethod
 
 from common.config_manager import config
-from common.lib.dataset import DataSet
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
@@ -71,7 +71,6 @@ class Search(BasicProcessor, ABC):
 				items = self.import_from_file(query_parameters.get("file"))
 			else:
 				items = self.search(query_parameters)
-
 		except WorkerInterruptedException:
 			raise ProcessorInterruptedException("Interrupted while collecting data, trying again later.")
 
@@ -79,10 +78,12 @@ class Search(BasicProcessor, ABC):
 		num_items = 0
 		if items:
 			self.dataset.update_status("Writing collected data to dataset file")
-			if results_file.suffix == ".ndjson":
-				num_items = self.items_to_ndjson(items, results_file)
-			elif results_file.suffix == ".csv":
+			if self.extension == "csv":
 				num_items = self.items_to_csv(items, results_file)
+			elif self.extension == "ndjson":
+				num_items = self.items_to_ndjson(items, results_file)
+			elif self.extension == "zip":
+				num_items = self.items_to_archive(items, results_file)
 			else:
 				raise NotImplementedError("Datasource query cannot be saved as %s file" % results_file.suffix)
 
@@ -119,7 +120,7 @@ class Search(BasicProcessor, ABC):
 		if self.import_warning_count == 0 and self.import_error_count == 0:
 			self.dataset.finish(num_rows=num_items)
 		else:
-			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}Check the dataset log for details.", is_final=True)
+			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}\n\nMissing data is noted in the `missing_fields` column of this dataset's CSV file; see also the dataset log for details.", is_final=True)
 			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
@@ -195,10 +196,22 @@ class Search(BasicProcessor, ABC):
 				if self.interrupted:
 					raise WorkerInterruptedException()
 
-				# remove NUL bytes here because they trip up a lot of other
-				# things
-				# also include import metadata in item
-				item = json.loads(line.replace("\0", ""))
+				try:
+					# remove NUL bytes here because they trip up a lot of other
+					# things
+					# also include import metadata in item
+					item = json.loads(line.replace("\0", ""))
+				except json.JSONDecodeError:
+					warning = (f"An item on line {i:,} of the imported file could not be parsed as JSON - this may "
+							   f"indicate that the file you uploaded was incomplete and you need to try uploading it "
+							   f"again. The item will be ignored.")
+
+					if warning not in import_warnings:
+						import_warnings[warning] = 0
+					import_warnings[warning] += 1
+					continue
+
+
 				new_item = {
 					**item["data"],
 					"__import_meta": {k: v for k, v in item.items() if k != "data"}
@@ -387,6 +400,22 @@ class Search(BasicProcessor, ABC):
 
 		return processed
 
+	def items_to_archive(self, items, filepath):
+		"""
+		Save retrieved items as an archive
+
+		Assumes that items is an iterable with one item, a Path object
+		referring to a folder containing files to be archived. The folder will
+		be removed afterwards.
+
+		:param items:
+		:param filepath:  Where to store the archive
+		:return int:  Number of items
+		"""
+		num_items = len(os.listdir(items))
+		self.write_archive_and_finish(items, None, zipfile.ZIP_STORED, False)
+		return num_items
+
 
 class SearchWithScope(Search, ABC):
 	"""
@@ -430,7 +459,7 @@ class SearchWithScope(Search, ABC):
 			# proportion of items matches
 			# first, get amount of items for all threads in which matching
 			# items occur and that are long enough
-			thread_ids = tuple([post["thread_id"] for post in items])
+			thread_ids = tuple([item["thread_id"] for item in items])
 			self.dataset.update_status("Retrieving thread metadata for %i threads" % len(thread_ids))
 			try:
 				min_length = int(query.get("scope_length", 30))

@@ -12,27 +12,41 @@ jobs:
     name: Test docker-compose up with build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run docker compose up
         run: docker compose -f docker-compose_build.yml up -d
-      - name: Wait and check log
+      - name: Check backend container is running
         run: |
-          test_case=" INFO at api.py:65: Local API listening for requests at backend:4444"
-          sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
-          echo "::group::Backend test"
-          if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then 
-              echo "Backend running as expected"
+          sleep 30
+          if [ "$(docker ps | grep 4cat_backend)" ]; then 
+              echo "Docker 4cat_backend container is running..."
           else 
-              echo "::error::Backend failed to start"
-              echo "Test:$test_case"
-              echo "Log :$(echo "$var" | tr "|" "\n" | sed -n '2p')"
+              echo -e "Docker 4cat_backend container is not running...\nPrinting 4cat_backend logs:\n\n$(docker container logs 4cat_backend)"
               exit 1
           fi
+      - name: Check frontend container is running
+        run: |
+          sleep 10
+          if [ "$(docker ps | grep 4cat_frontend)" ]; then 
+              echo "Docker 4cat_frontend container is running..."
+          else 
+              echo -e "Docker 4cat_frontend container is not running...\nPrinting 4cat_frontend logs:\n\n$(docker container logs 4cat_frontend)"
+              exit 1
+          fi
+      - name: Run modules tests
+        run: |
+          sleep 30
+          echo "::group::Running module tests"
+          docker exec 4cat_backend pytest -v tests/test_modules.py
           echo "::endgroup::"
       - name: Print log on failure
         if: failure()
         run: |
-          docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
-          echo "::group::Backend logs"
-          cat backend_4cat.log
-          echo "::endgroup::"
+          if [ "$(docker ps | grep 4cat)" ]; then 
+              docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
+              echo "::group::Backend logs"
+              cat backend_4cat.log
+              echo "::endgroup::"
+          else 
+              echo "Docker containers not running; check logs in previous steps"
+          fi

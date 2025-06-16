@@ -35,6 +35,8 @@ class YouTubeMetadata(BasicProcessor):
 	description = "Extract information from YouTube videos and channels linked-to in the dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["youtube-thumbnails"]
+
 	max_retries = 3
 	sleep_time = 20
 
@@ -73,7 +75,7 @@ class YouTubeMetadata(BasicProcessor):
 		:param module: Module to determine compatibility with
 		"""
 		# Compatible with every top-level dataset.
-		return module.is_top_dataset()
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""

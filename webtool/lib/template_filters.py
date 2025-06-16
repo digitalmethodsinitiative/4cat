@@ -1,19 +1,23 @@
 import datetime
-import markdown
+
 import json
+import ural
 import uuid
 import math
 import os
 import re
 import requests
+import regex
 
 from urllib.parse import urlencode, urlparse
 from webtool import app, config
-from common.lib.helpers import timify_long
+from webtool.lib.helpers import parse_markdown
+from common.lib.helpers import timify_long, ellipsiate
 from common.config_manager import ConfigWrapper
 
 from flask import request
 from flask_login import current_user
+from ural import urls_from_text
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
@@ -117,10 +121,52 @@ def _jinja2_filter_httpquery(data):
 	except TypeError:
 		return ""
 
-@app.template_filter('markdown')
-def _jinja2_filter_markdown(text):
-	val = markdown.markdown(text)
-	return val
+@app.template_filter("add_colour")
+def _jinja2_add_colours(data):
+	"""
+	Add colour preview to hexadecimal colour values.
+
+	Cute little preview for #FF0099-like strings. Used (at time of writing) for
+	Pinterest data, which has a "dominant colour" field.
+
+	Only works on strings that are *just* the value, to avoid messing up HTML
+	etc
+
+	:param str data:  String
+	:return str:  HTML
+	"""
+	if type(data) is not str or not re.match(r"#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\b", data):
+		return data
+
+	return f'<span class="colour-preview"><i style="background:{data}" aria-hidden="true"></i> {data}</span>'
+
+@app.template_filter("add_ahref")
+def _jinja2_filter_add_ahref(content, ellipsiate=0):
+	"""
+	Add HTML links to text
+
+	Replaces URLs with a clickable link
+
+	:param str content:  Text to parse
+	:return str:  Parsed text
+	"""
+	try:
+		content = str(content)
+	except ValueError:
+		return content
+
+	for link in set(ural.urls_from_text(str(content))):
+		if ellipsiate > 0:
+			link_text = _jinja2_filter_ellipsiate(link, ellipsiate, True, "[&hellip;]")
+		else:
+			link_text = link
+		content = content.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
+
+	return content
+
+@app.template_filter('markdown',)
+def _jinja2_filter_markdown(text, trim_container=False):
+	return parse_markdown(text, trim_container)
 
 @app.template_filter('isbool')
 def _jinja2_filter_isbool(value):
@@ -175,6 +221,11 @@ def _jinja2_filter_extension_to_noun(ext):
 	else:
 		return "item"
 
+@app.template_filter("ellipsiate")
+def _jinja2_filter_ellipsiate(*args, **kwargs):
+	return ellipsiate(*args, **kwargs)
+
+
 @app.template_filter('4chan_image')
 def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
@@ -192,10 +243,11 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
 		# First we're going to try to get the image link through the 4plebs API.
 		api_url = "https://archive.4plebs.org/_/api/chan/post/?board=%s&num=%s" % (board, post_id)
+		api_json = None
 		try:
 			api_json = requests.get(api_url, headers=headers)
 		except requests.RequestException as e:
-		 	pass
+			pass
 		if api_json.status_code != 200:
 			pass
 		try:
@@ -229,97 +281,107 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 	return "retrieve:https://archived.moe/_/search/image/" + image_md5
 
 
+@app.template_filter('social_mediafy')
+def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
+	"""
+	Adds links to a text body with hashtags, @-mentions, and URLs.
+	A data source must be given to generate the correct URLs.
 
-@app.template_filter('post_field')
-def _jinja2_filter_post_field(field, post):
-	# Extracts string values between {{ two curly brackets }} and uses that
-	# as a dictionary key for the given dict. It then returns the corresponding value.
-	# Mainly used in the Explorer.
+	:param str body:  Text to parse
+	:param str datasource:  Name of the data source (e.g. "twitter")
 
-	matches = False
-	formatted_field = field
+	:return str:  Parsed text
+	"""
 
-	field = str(field)
-	
-	for key in re.findall(r"\{\{(.*?)\}\}", field):
+	if not datasource:
+		return body
 
-		original_key = key
+	# Base URLs after which tags and @-mentions follow, per platform
+	base_urls = {
+		"twitter": {
+			"hashtag": "https://x.com/hashtag/",
+			"mention": "https://x.com/"
+		},
+		"tiktok": {
+			"hashtag": "https://tiktok.com/tag/",
+			"mention": "https://tiktok.com/@"
+		},
+		"instagram": {
+			"hasthag": "https://instagram.com/explore/tags/",
+			"mention": "https://instagram.com/"
+		},
+		"tumblr": {
+			"mention": "https://tumblr.com/",
+			"markdown": True
+			# Hashtags aren't linked in the post body
+		},
+		"linkedin": {
+			"hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
+			"mention": "https://linkedin.com/in/"
+		},
+		"telegram": {
+			"markdown": True
+		},
+		"bsky": {
+			"hashtag": "https://bsky.app/hashtag/",
+			"mention": "https://bsky.app/profile/",
+		}
+	}
 
-		# Remove possible slice strings so we get the original key
-		string_slice = None
-		if "[" in original_key and "]" in original_key:
-			string_slice = re.search(r"\[(.*?)\]", original_key)
-			if string_slice:
-				string_slice = string_slice.group(1)
-				key = key.replace("[" + string_slice + "]", "")
+	# Supported data sources
+	known_datasources = list(base_urls.keys())
+	if datasource not in known_datasources:
+		return body
 
-		# We're also gonna extract any other filters present
-		extra_filters = []
-		if "|" in key:
-			extra_filters = key.split("|")[1:]
-			key = key.split("|")[0]
+	# Add URL links
+	if not base_urls[datasource].get("markdown"):
+		for url in urls_from_text(body):
+			body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
 
-		# They keys can also be subfields (e.g. "author.username")
-		# So we're splitting and looping until we get the value.
-		keys = key.split(".")
-		val = post
+	# Add hashtag links
+	if "hashtag" in base_urls[datasource]:
+		tags = re.findall(r"#[\w0-9]+", body)
+		# We're sorting tags by length so we don't incorrectly
+		# replace tags that are a substring of another, longer tag.
+		tags = sorted(tags, key=lambda x: len(x), reverse=True)
+		for tag in tags:
+			# Match the string, but not if it's preceded by a >, which indicates that we've already added an anchor tag.
+			body = re.sub(r"(?<!'>)(" + tag + ")",
+						  "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag),
+						  body)
 
-		for k in keys:
-			if isinstance(val, list):
-				val = val[0]
-			if isinstance(val, dict):
-				val = val.get(k.strip(), "")
+	# Add @-mention links
+	if "mention" in base_urls[datasource]:
+		if datasource == "bsky":
+			mentions = re.findall(r"@[\w0-9-.]+", body)
+		else:
+			mentions = re.findall(r"@[\w0-9-]+", body)
+		mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
+		for mention in mentions:
+			body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (
+			base_urls[datasource]["mention"] + mention[1:], mention), body)
 
-		# Return nothing if one of the fields is not found.
-		# We see 0 as a valid value - e.g. '0 retweets'.
-		if not val and val != 0:
-			return ""
-		
-		# Support some basic string slicing
-		if string_slice:
-			field = field.replace("[" + string_slice + "]", "")
-			if ":" not in string_slice:
-				string_slice = slice(int(string_slice), int(string_slice) + 1)
-			else:
-				sl = string_slice.split(":")
-				if not sl[0] and sl[0] != "0":
-					sl1 = 0
-					sl2 = sl[1]
-				elif not sl[-1]:
-					sl1 = sl[0]
-					sl2 = len(st)
-				else:
-					sl1 = sl[0]
-					sl2 = sl[1]
-				string_slice = slice(int(sl1), int(sl2))
+	return body
 
-		# Apply further filters, if present (e.g. lower)
-		for extra_filter in extra_filters:
-			
-			extra_filter = extra_filter.strip()
 
-			# We're going to parse possible parameters to pass to the filter
-			# These are passed as unnamed variables to the function.
-			params = ()
-			if "(" in extra_filter:
-				params = extra_filter.split("(")[-1][:-1].strip()
-				extra_filter = extra_filter.split("(")[0]
-				params = [p.strip() for p in params.split(",")]
-				params = [post[param] for param in params]
-			
-			val = app.jinja_env.filters[extra_filter](val, *params)
+@app.template_filter('string_counter')
+def _jinja2_filter_string_counter(string, emoji=False):
+	# Returns a dictionary with counts of characters in a string.
+	# Also handles emojis.
 
-		if string_slice:
-			val = val[string_slice]
+	# We need to convert multi-character emojis ("graphemes") to one character.
+	if emoji == True:
+		string = regex.finditer(r"\X", string) # \X matches graphemes
+		string = [m.group(0) for m in string]
 
-		# Extract single list item
-		if isinstance(val, list) and len(val) == 1:
-			val = val[0]
+	# Count 'em
+	counter = {}
+	for s in string:
+		if s not in counter:
+			counter[s] = 0
+		counter[s] += 1
 
-		formatted_field = formatted_field.replace("{{" + original_key + "}}", str(val))
-
-	return formatted_field
-
+	return counter
 
 @app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):
@@ -366,3 +428,7 @@ def inject_now():
 		"__version": version,
 		"uniqid": uniqid
 	}
+
+@app.template_filter('log')
+def _jinja2_filter_log(text):
+	app.logger.info(text)

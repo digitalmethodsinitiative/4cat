@@ -6,7 +6,7 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from common.config_manager import config
 
@@ -33,12 +33,14 @@ class AudioExtractor(BasicProcessor):
 	description = "Extract audio from videos"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["audio-to-text"]
+
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow on tiktok-search only for dev
+		Allow on videos only
 		"""
-		return module.type.startswith("video-downloader") and \
+		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
 			   config.get("video-downloader.ffmpeg_path", user=user) and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
@@ -74,7 +76,7 @@ class AudioExtractor(BasicProcessor):
 		staging_area = self.dataset.get_staging_area()
 		output_dir = self.dataset.get_staging_area()
 
-		total_possible_videos = max_files if max_files != 0 else self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = max(max_files if max_files != 0 else self.source_dataset.num_rows - 1, 1)  # for the metadata file that is included in archives
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video audio")
@@ -94,9 +96,9 @@ class AudioExtractor(BasicProcessor):
 			# ffmpeg -i video.mkv -map 0:a -acodec libmp3lame audio.mp4
 			command = [
 				shutil.which(config.get("video-downloader.ffmpeg_path")),
-				"-i", shlex.quote(str(path)),
+				"-i", oslex.quote(str(path)),
 				"-ar", str(16000),
-				shlex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
+				oslex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
 			]
 
 			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

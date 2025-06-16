@@ -22,11 +22,13 @@ from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug import Request
 
 from common.config_manager import config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
+from common.lib.module_loader import ModuleCollector
 
 from common.lib.user import User
 from webtool.lib.helpers import generate_css_colours
@@ -34,6 +36,7 @@ from webtool.lib.helpers import generate_css_colours
 # initialize global objects for interacting with all the things
 login_manager = LoginManager()
 app = Flask(__name__)
+fourcat_modules = ModuleCollector()
 
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy
@@ -44,10 +47,10 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 if config.get("USING_DOCKER"):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
-    log = Logger(filename='frontend_4cat.log')
+    log = Logger(logger_name='4cat-frontend', filename='frontend_4cat.log')
 
 else:
-    log = Logger()
+    log = Logger(logger_name='4cat-frontend')
 
 # Set up logging for Gunicorn
 if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
@@ -67,6 +70,22 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
 
+if app.logger.getEffectiveLevel() == 10:
+    # if we're in debug mode, we want to see how long it takes to load datasets
+    import time
+    from functools import wraps
+    def time_this(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            r = func(*args, **kwargs)
+            app.logger.debug("%s dataset took %.2f seconds" % (func.__name__, time.time() - start_time))
+            return r
+        return wrapper
+else:
+    def time_this(func):
+        return func
+
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
               password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
               port=config.get("DB_PORT"), appname="frontend")
@@ -78,7 +97,7 @@ from webtool.lib.openapi_collector import OpenAPICollector
 openapi = OpenAPICollector(app)
 
 # initialize rate limiter
-limiter = Limiter(app, key_func=get_remote_address)
+limiter = Limiter(app=app, key_func=get_remote_address)
 
 # make sure a secret key was set in the config file, for secure session cookies
 if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPLACE_THIS":
@@ -88,7 +107,7 @@ if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPL
 app.config.from_mapping({
     "FLASK_APP": config.get("flask.flask_app"),
     "SECRET_KEY": config.get("flask.secret_key"),
-    "SERVER_NAME": config.get("flask.server_name") if not config.get("USING_DOCKER") else None,
+    "SERVER_NAME": config.get("flask.server_name"),
     "SERVER_HTTPS": config.get("flask.https"),
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
@@ -99,15 +118,19 @@ login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous"
 login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
+# Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
+Request.max_form_parts = config.get("flask.max_form_parts", 1000)
+
 # import all views
 import webtool.views.views_admin
+import webtool.views.views_extensions
 import webtool.views.views_restart
 import webtool.views.views_user
 
 import webtool.views.views_dataset
 import webtool.views.views_misc
+import webtool.views.views_explorer
 
-import webtool.views.api_explorer
 import webtool.views.api_standalone
 import webtool.views.api_tool
 

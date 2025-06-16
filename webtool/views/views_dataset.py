@@ -14,11 +14,10 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context, Response
 from flask_login import login_required, current_user
 
-from webtool import app, db, config, log
+from webtool import app, db, config, log, fourcat_modules, time_this
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
-import backend
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
 from common.config_manager import ConfigWrapper
@@ -34,7 +33,7 @@ def create_dataset():
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
                    metadata["has_worker"] and metadata["has_options"] and datasource in config.get(
                        "datasources.enabled", {})}
 
@@ -43,6 +42,7 @@ def create_dataset():
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
+@time_this
 @login_required
 def show_results(page):
     """
@@ -73,7 +73,7 @@ def show_results(page):
         filters["sort_by"] = "timestamp"
 
     if not request.args:
-        filters["hide_empty"] = True
+        filters["hide_empty"] = False
 
     # handle 'depth'; all, own datasets, or favourites?
     # 'all' is limited to admins
@@ -143,12 +143,15 @@ def show_results(page):
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = [DataSet(key=dataset["key"], db=db) for dataset in datasets]
+    filtered = [DataSet(key=dataset["key"], db=db, modules=fourcat_modules) for dataset in datasets]
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    return render_template("results.html", filter=filters, depth=depth, datasources=backend.all_modules.datasources,
+    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
+                   metadata["has_worker"]}
+
+    return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
                            datasets=filtered, pagination=pagination, favourites=favourites)
 
 
@@ -204,32 +207,18 @@ def get_mapped_result(key):
     processor of the dataset has a method for mapping its data to CSV, then this
     route uses that to convert the data to CSV on the fly and serve it as such.
 
+    We also use this if there's annotation data saved.
+
     :param str key:  Dataset key
     """
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
             config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
-
-    if dataset.get_extension() == ".csv":
-        # if it's already a csv, just return the existing file
-        return url_for("get_result", query_file=dataset.get_results_path().name)
-
-    if not hasattr(dataset.get_own_processor(), "map_item"):
-        # cannot map without a mapping method
-        return error(404, error="File not found.")
-
-    # Also add possibly added annotation items.
-    # These cannot be added to the static `map_item` function.
-    annotation_labels = None
-    annotation_fields = dataset.get_annotation_fields()
-    if annotation_fields:
-        annotation_labels = ["annotation_" + v["label"] for v in annotation_fields.values()]
-        annotations = dataset.get_annotations()
 
     def map_response():
         """
@@ -244,20 +233,12 @@ def get_mapped_result(key):
         for item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
                 fieldnames = list(item.keys())
-                if annotation_labels:
-                    for label in annotation_labels:
-                        if label not in fieldnames:
-                            fieldnames.append(label)
 
                 writer = csv.DictWriter(buffer, fieldnames=fieldnames)
                 writer.writeheader()
                 yield buffer.getvalue()
                 buffer.truncate(0)
                 buffer.seek(0)
-
-            if annotation_fields:
-                for label in annotation_labels:
-                    item[label] = annotations.get(item.get("id"), {}).get(label, "")
 
             writer.writerow(item)
             yield buffer.getvalue()
@@ -273,7 +254,7 @@ def get_mapped_result(key):
 @login_required
 def view_log(key):
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -292,6 +273,7 @@ def view_log(key):
 
 
 @app.route("/preview/<string:key>/")
+@time_this
 def preview_items(key):
     """
     Preview a dataset file
@@ -303,7 +285,7 @@ def preview_items(key):
     :return:  HTML preview
     """
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -369,6 +351,11 @@ def preview_items(key):
         # just show image in an empty page
         return render_template("preview/image.html", dataset=dataset)
 
+    elif dataset.get_extension() == "html":
+        # just render the file!
+        with dataset.get_results_path().open() as infile:
+            return render_template("preview/html.html", html=infile.read())
+
     elif dataset.get_extension() not in ("json", "ndjson") or use_mapper:
         # iterable data, which we use iterate_items() for, which in turn will
         # use map_item if the underlying data is not CSV but JSON
@@ -379,9 +366,9 @@ def preview_items(key):
                     break
 
                 if len(rows) == 0:
-                    rows.append(list(row.keys()))
+                    rows.append({k: k for k in list(row.keys())})
 
-                rows.append(list(row.values()))
+                rows.append(row)
 
         except NotImplementedError:
             return error(404)
@@ -448,6 +435,7 @@ Individual result pages
 """
 @app.route('/results/<string:key>/processors/')
 @app.route('/results/<string:key>/')
+@time_this
 def show_result(key):
     """
     Show result page
@@ -459,9 +447,9 @@ def show_result(key):
     :return:  Rendered template
     """
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
-        return error(404)
+        return error(404, error="This dataset cannot be found.")
 
     if not current_user.can_access_dataset(dataset):
         return error(403, error="This dataset is private.")
@@ -479,10 +467,10 @@ def show_result(key):
 
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
-    datasources = backend.all_modules.datasources
+    datasources = fourcat_modules.datasources
     datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
-    can_unexpire = ((config.get('expire.allow_optout') and \
+    can_unexpire = ((config.get("expire.allow_optout") and \
                      datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout",
                                                                                                    False)) \
                    and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
@@ -505,10 +493,11 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "result.html" if standalone else "components/result-details.html"
 
-    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
+    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=fourcat_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
+                           datasources=datasources)
 
 
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
@@ -590,7 +579,7 @@ def toggle_private_interactive(key):
 @login_required
 def keep_dataset(key):
     try:
-        dataset = DataSet(key=key, db=db)
+        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
     except DataSetException:
         return error(404, message="Dataset not found.")
 

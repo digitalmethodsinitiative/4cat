@@ -31,6 +31,8 @@ class TfIdf(BasicProcessor):
 	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["wordcloud"]
+
 	options = {
 		"library": {
 			"type": UserInput.OPTION_CHOICE,
@@ -287,3 +289,12 @@ class TfIdf(BasicProcessor):
 				results.append(result)
 
 		return results
+
+	@classmethod
+	def exclude_followup_processors(cls, processor_type):
+		"""
+		Exclude followups if they are not compatible with the module
+		"""
+		if processor_type in ["consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts", "image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter"]:
+			return True
+		return False

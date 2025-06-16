@@ -17,37 +17,36 @@
     </div>
   {% if dataset.is_finished() and dataset.num_rows > 0 %}
     <ul class="dataset-actions">
-    <li>
-        <a href="{{ url_for('get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
-            <i class="fas fa-download" aria-hidden="true"></i>
-            {{ dataset.result_file.split(".")[-1] }} ({{ dataset.get_results_path()|filesize }})
-        </a>
-        <p role="tooltip" id="tooltip-get-result-{{ dataset.key }}" aria-hidden="true">Download original data</p>
-    </li>
-    {% if dataset.get_extension() != "csv" and dataset.get_own_processor().map_item %}
+    {% if dataset.get_own_processor().map_item or dataset.get_annotation_fields() %}
         <li>
             <a href="{{ url_for('get_mapped_result', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-get-mapped-result-{{ dataset.key }}" >
                 <i class="fas fa-download" aria-hidden="true"></i>
-                csv
+                Download csv
             </a>
-        <p role="tooltip" id="tooltip-get-mapped-result-{{ dataset.key }}" aria-hidden="true">Download data as CSV w/ 4CAT defined columns</p>
+        <p role="tooltip" id="tooltip-get-mapped-result-{{ dataset.key }}" aria-hidden="true">Download data as csv with 4CAT-defined columns and/or annotation columns</p>
         </li>
     {% endif %}
-    {% if (dataset.get_extension() in ("csv", "gexf") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
+    <li>
+        <a href="{{ url_for('get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
+            <i class="fas fa-download" aria-hidden="true"></i>
+            Original {{ dataset.get_extension() }} ({{ dataset.get_results_path()|filesize }})
+        </a>
+        <p role="tooltip" id="tooltip-get-result-{{ dataset.key }}" aria-hidden="true">Download original data as provided by the data source</p>
+    </li>
+    {% if (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
         <li>
             <a href="{{ url_for('preview_items', key=dataset.key) }}"
-               data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="tooltip-trigger popup-trigger"
-               aria-controls="tooltip-preview-{{ dataset.key }} popup-preview-{{ dataset.key }}">
+               data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
+               aria-controls="popup-preview-{{ dataset.key }}">
                 <i class="fa fa-eye" aria-hidden="true"></i> Preview
             </a>
-            <p role="tooltip" id="tooltip-preview-{{ dataset.key }}" aria-hidden="true">Preview data as table w/ 4CAT defined columns</p>
         <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
         </li>
     {% endif %}
     <li>
     {% if __user_config("privileges.can_use_explorer") %}
-        <a href="{{ url_for('explorer_dataset', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
-            <i class="fa fa-binoculars" aria-hidden="true"></i> Explore
+        <a href="{{ url_for('explorer_dataset', dataset_key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
+            <i class="fa fa-binoculars" aria-hidden="true"></i> Explore & annotate
         </a>
         <p role="tooltip" id="tooltip-explore-items-{{ dataset.key }}" aria-hidden="true">Explore, sort, and add annotations to data interactively</p>
     {% endif %}

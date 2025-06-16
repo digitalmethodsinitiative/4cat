@@ -51,6 +51,15 @@ class URLCoLinker(BasicProcessor):
 		}
 	}
 
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+        Allow processor on top datasets.
+
+        :param module: Module to determine compatibility with
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

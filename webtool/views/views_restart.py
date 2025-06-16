@@ -10,7 +10,7 @@ import requests
 import datetime
 import signal
 import shutil
-import shlex
+import oslex
 import time
 import json
 import sys
@@ -142,16 +142,16 @@ def upgrade_frontend():
     upgrade_ok = False
 
     command = sys.executable + " -m helper-scripts.migrate.py --component frontend --repository %s --yes --current-version %s" % (
-        shlex.quote(config.get("4cat.github_url")), shlex.quote(str(frontend_version_file)))
+        oslex.quote(config.get("4cat.github_url")), oslex.quote(str(frontend_version_file)))
 
     # there should be one and only one job of this type, with the parameters of
     # our upgrade. it determines if we update to the latest release or to a
     # branch
     upgrade_job = queue.get_job("restart-4cat", restrict_claimable=False)
-    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {shlex.quote(upgrade_job.details['branch'])}"
+    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {oslex.quote(upgrade_job.details['branch'])}"
 
     try:
-        response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
+        response = subprocess.run(oslex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
                                   check=True, cwd=str(config.get("PATH_ROOT")), stdin=subprocess.DEVNULL)
         if response.returncode != 0:
             raise RuntimeError(f"Unexpected return code {response.returncode}")
@@ -288,7 +288,7 @@ def restart_log():
     """
     log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
     if log_file.exists():
-        with log_file.open() as infile:
+        with open(log_file, encoding="utf-8") as infile:
             return infile.read()
     else:
         return "Not Found", 404

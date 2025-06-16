@@ -4,7 +4,7 @@ Restart 4CAT and optionally upgrade it to the latest release
 import subprocess
 import requests
 import hashlib
-import shlex
+import oslex
 import json
 import time
 import uuid
@@ -73,11 +73,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # being the process output
 
             if self.job.data["remote_id"].startswith("upgrade"):
-                command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart --output %s" % \
-                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_restart)))
+                command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart" % \
+                          (oslex.quote(config.get("4cat.github_url")))
                 if self.job.details and self.job.details.get("branch"):
                     # migrate to code in specific branch
-                    command += f" --branch {shlex.quote(self.job.details['branch'])}"
+                    command += f" --branch {oslex.quote(self.job.details['branch'])}"
                 else:
                     # migrate to latest release
                     command += " --release"
@@ -100,7 +100,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # restarts and we re-attempt to make a daemon, it will fail
                 # when trying to close the stdin file descriptor of the
                 # subprocess (man, that was a fun bug to hunt down)
-                process = subprocess.Popen(shlex.split(command), cwd=str(config.get("PATH_ROOT")),
+                process = subprocess.Popen(oslex.split(command), cwd=str(config.get("PATH_ROOT")),
                                            stdout=log_stream_restart, stderr=log_stream_restart,
                                            stdin=subprocess.DEVNULL)
 

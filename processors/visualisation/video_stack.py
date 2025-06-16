@@ -8,7 +8,7 @@ assumes that ffprobe is also present in the same location.
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 import re
 
 from packaging import version
@@ -85,17 +85,18 @@ class VideoStack(BasicProcessor):
         """
         Determine compatibility
 
-        :param str module:  Module ID to determine compatibility with
+        :param DataSet module:  Module ID to determine compatibility with
         :return bool:
         """
-        # also need ffprobe to determine video lengths
-        # is usually installed in same place as ffmpeg
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path", user=user))
-        ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
-
-        return module.type.startswith("video-downloader") and \
-               ffmpeg_path and \
-               ffprobe_path
+        if not (module.get_media_type() == "video" or module.type.startswith("video-downloader")):
+            return False
+        else:
+            # Only check these if we have a video dataset
+            # also need ffprobe to determine video lengths
+            # is usually installed in same place as ffmpeg
+            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path", user=user))
+            ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
+            return ffmpeg_path and ffprobe_path
 
     def process(self):
         """
@@ -119,7 +120,10 @@ class VideoStack(BasicProcessor):
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack
-        video_dataset = self.source_dataset.nearest("video-downloader*")
+        video_dataset = None
+        for video_dataset_type in ["video-downloader*", "media-import-search"]:
+            if video_dataset is None:
+                video_dataset = self.source_dataset.nearest(video_dataset_type)
         if not video_dataset:
             self.log.error(
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
@@ -163,7 +167,7 @@ class VideoStack(BasicProcessor):
             if len(videos) >= max_videos:
                 break
 
-            video_path = shlex.quote(str(video))
+            video_path = oslex.quote(str(video))
 
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
@@ -190,7 +194,7 @@ class VideoStack(BasicProcessor):
         # loop again, this time to construct the ffmpeg command
         last_index = num_videos - 1
         for video in videos:
-            video_path = shlex.quote(str(video))
+            video_path = oslex.quote(str(video))
             # video to stack
             command += ["-i", video_path]
             if index > 0:
@@ -219,7 +223,7 @@ class VideoStack(BasicProcessor):
             self.dataset.update_status(f"Unpacked {index:,} of {num_videos:,} videos")
 
         # create final complex filter chain
-        ffmpeg_filter = shlex.quote(";".join(transparency_filter) + ";" + ";".join(merge_filter))[1:-1]
+        ffmpeg_filter = oslex.quote(";".join(transparency_filter) + ";" + ";".join(merge_filter))[1:-1]
         command += ["-filter_complex", ffmpeg_filter]
 
         # ensure mixed audio
@@ -231,7 +235,7 @@ class VideoStack(BasicProcessor):
         command += ["-map", "[final]", *fps_params]
 
         # output file
-        command.append(shlex.quote(str(self.dataset.get_results_path())))
+        command.append(oslex.quote(str(self.dataset.get_results_path())))
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
 
         if self.interrupted:

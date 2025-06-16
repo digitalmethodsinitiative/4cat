@@ -28,6 +28,8 @@ class HatebaseAnalyser(BasicProcessor):
 	description = "Assign scores for 'offensiveness' and hate speech propability to each post by using Hatebase."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["hatebase-frequencies"]
+
 	token_expires = 0
 	token = ""
 
@@ -53,6 +55,16 @@ class HatebaseAnalyser(BasicProcessor):
 		}
 	}
 
+	@staticmethod
+	def is_compatible_with(module=None, user=None):
+		"""
+        Determine compatibility
+
+        :param Dataset module:  Module ID to determine compatibility with
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -64,6 +76,7 @@ class HatebaseAnalyser(BasicProcessor):
 		# determine what vocabulary to use
 		language = self.parameters.get("language")
 		columns = self.parameters.get("columns")
+		self.dataset.log(f"Language: {language}; Columns: {columns}")
 
 		if not columns:
 			self.dataset.update_status("No columns selected; no data analysed.", is_final=True)
@@ -75,11 +88,18 @@ class HatebaseAnalyser(BasicProcessor):
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}
+		self.dataset.log(f"Number of hatebase terms: {len(hatebase)}")
 		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase]) + r")\b")
 
+		if not hatebase or not hatebase_regex:
+			self.dataset.update_status("No hatebase data found for the selected language.", is_final=True)
+			self.dataset.finish(0)
+			return
+
 		processed = 0
+		matches = 0
 		with self.dataset.get_results_path().open("w") as output:
-			fieldnames = self.source_dataset.get_item_keys(self)
+			fieldnames = self.source_dataset.get_columns()
 			fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
 					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
 					"hatebase_offensiveness_avg")
@@ -112,6 +132,7 @@ class HatebaseAnalyser(BasicProcessor):
 
 				post_text = ' '.join([str(post.get(c, "")).lower() for c in columns])
 				for term in hatebase_regex.findall(post_text):
+					matches += 1
 					if hatebase[term]["plural_of"]:
 						if hatebase[term]["plural_of"] in terms:
 							continue
@@ -145,6 +166,7 @@ class HatebaseAnalyser(BasicProcessor):
 					self.dataset.finish(0)
 					return
 
+		self.dataset.log(f"Total terms matched: {matches}")
 		self.dataset.update_status("Finished")
 		self.dataset.finish(processed)
 
@@ -170,6 +192,6 @@ class HatebaseAnalyser(BasicProcessor):
 			columns = parent_dataset.get_columns()
 			options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "body" if "body" in columns else sorted(columns).pop()
+			options["columns"]["default"] = ["body"] if "body" in columns else [sorted(columns).pop()]
 
 		return options

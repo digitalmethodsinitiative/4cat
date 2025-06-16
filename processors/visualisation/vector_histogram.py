@@ -55,6 +55,7 @@ class SVGHistogramRenderer(BasicProcessor):
 		self.dataset.update_status("Reading source file")
 		header = self.parameters.get("header")
 		max_posts = 0
+		removed_non_date_intervals = False
 
 		# collect post numbers per month
 		intervals = {}
@@ -66,6 +67,13 @@ class SVGHistogramRenderer(BasicProcessor):
 
 			intervals[post["date"]] = value
 			max_posts = max(max_posts, value)
+
+		# Remove non-date intervals
+		for non_date in ["unknown_date", "all"]:
+			if non_date in intervals:
+				del intervals[non_date]
+				removed_non_date_intervals = True
+				self.dataset.log("Removed non-date interval: %s" % non_date)
 
 		if len(intervals) <= 1:
 			self.dataset.update_status("Not enough data available for a histogram; need more than one time series.")
@@ -262,5 +270,7 @@ class SVGHistogramRenderer(BasicProcessor):
 
 		canvas.save(pretty=True)
 
+		if removed_non_date_intervals:
+			self.dataset.update_status("Finished; Removed non date intervals (e.g., \"unknown_date\").", is_final=True)
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(intervals))

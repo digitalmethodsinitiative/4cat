@@ -391,7 +391,7 @@ class SearchWithinTCATBinsV2(Search):
         :return dict:  Safe query parameters
         """
         # no query 4 u
-        if not query.get("bin", "").strip():
+        if not query.get("bin", ""):
             raise QueryParametersException("You must choose a query bin to get tweets from.")
 
         # the dates need to make sense as a range to search within
@@ -401,6 +401,7 @@ class SearchWithinTCATBinsV2(Search):
             raise QueryParametersException("A date range must start before it ends")
 
         query["min_date"], query["max_date"] = query.get("daterange")
+        query["bin"] = query.get("bin", "").strip()
         del query["daterange"]
 
         # simple!
