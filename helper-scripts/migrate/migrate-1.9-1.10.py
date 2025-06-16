@@ -16,7 +16,7 @@ except (SyntaxError, ImportError, AttributeError):
     db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
 print("  Making sure nltk packages are present...")
-import nltk
+import nltk  # noqa: E402
 nltk.download("punkt")
 nltk.download("wordnet")
 
