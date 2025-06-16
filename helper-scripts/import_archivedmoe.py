@@ -6,7 +6,8 @@ Several of these are downloadable here: https://archive.org/details/archivedmoe_
 For /v/, make sure to download this one: https://archive.org/download/archivedmoe_db_201908/v.csv.bz2
 
 """
-
+# flake8: noqa
+# currently broken, kept for historic/future utility purposes
 import argparse
 import json
 import time
