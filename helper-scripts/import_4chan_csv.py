@@ -7,6 +7,7 @@ psql -d fourcat -c "COPY (SELECT id, board, thread_id, timestamp, subject, body,
 """
 
 import argparse
+import psycopg2
 import time
 import csv
 import sys
