@@ -17,21 +17,24 @@ if result.returncode != 0:
     print("stderr:\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
     exit(1)
 
-from flask import Flask
-from flask_login import LoginManager
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug import Request
+# the following are imported *after* the first-run stuff because they may rely
+# on things set up in there
+from flask import Flask  # noqa: E402
+from flask_login import LoginManager  # noqa: E402
+from flask_limiter import Limiter  # noqa: E402
+from flask_limiter.util import get_remote_address  # noqa: E402
+from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
+from werkzeug import Request  # noqa: E402
 
-from common.config_manager import config
-from common.lib.database import Database
-from common.lib.logger import Logger
-from common.lib.queue import JobQueue
-from common.lib.module_loader import ModuleCollector
+from common.config_manager import config  # noqa: E402
+from common.lib.database import Database  # noqa: E402
+from common.lib.logger import Logger  # noqa: E402
+from common.lib.queue import JobQueue  # noqa: E402
+from common.lib.module_loader import ModuleCollector  # noqa: E402
 
-from common.lib.user import User
-from webtool.lib.helpers import generate_css_colours
+from common.lib.user import User  # noqa: E402
+from webtool.lib.helpers import generate_css_colours  # noqa: E402
+from webtool.lib.openapi_collector import OpenAPICollector  # noqa: E402
 
 # initialize global objects for interacting with all the things
 login_manager = LoginManager()
@@ -93,7 +96,6 @@ config.with_db(db)
 queue = JobQueue(logger=log, database=db)
 
 # initialize openapi endpoint collector for later specification generation
-from webtool.lib.openapi_collector import OpenAPICollector
 openapi = OpenAPICollector(app)
 
 # initialize rate limiter
@@ -122,20 +124,21 @@ login_manager.login_view = "show_login"
 Request.max_form_parts = config.get("flask.max_form_parts", 1000)
 
 # import all views
-import webtool.views.views_admin
-import webtool.views.views_extensions
-import webtool.views.views_restart
-import webtool.views.views_user
+# these are also imported late, because they also rely on things set up beforehand
+import webtool.views.views_admin  # noqa: F401, E402
+import webtool.views.views_extensions  # noqa: F401, E402
+import webtool.views.views_restart  # noqa: F401, E402
+import webtool.views.views_user  # noqa: F401, E402
 
-import webtool.views.views_dataset
-import webtool.views.views_misc
-import webtool.views.views_explorer
+import webtool.views.views_dataset  # noqa: F401, E402
+import webtool.views.views_misc  # noqa: F401, E402
+import webtool.views.views_explorer  # noqa: F401, E402
 
-import webtool.views.api_standalone
-import webtool.views.api_tool
+import webtool.views.api_standalone  # noqa: F401, E402
+import webtool.views.api_tool  # noqa: F401, E402
 
 # import custom jinja2 template filters
-import webtool.lib.template_filters
+import webtool.lib.template_filters  # noqa: F401, E402
 
 # ensure that colour definition CSS file is present
 generate_css_colours()
