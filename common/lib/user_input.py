@@ -242,7 +242,7 @@ class UserInput:
 
         elif input_type == UserInput.OPTION_TOGGLE:
             # simple boolean toggle
-            if type(choice) == bool:
+            if type(choice) is bool:
                 return choice
             elif choice in ['false', 'False']:
                 # Sanitized options passed back to Flask can be converted to strings as 'false'
@@ -304,7 +304,7 @@ class UserInput:
         elif input_type == UserInput.OPTION_TEXT_JSON:
             # verify that this is actually json
             try:
-                redumped_value = json.dumps(json.loads(choice))
+                json.dumps(json.loads(choice))
             except json.JSONDecodeError:
                 raise QueryParametersException("Invalid JSON value '%s'" % choice)
 

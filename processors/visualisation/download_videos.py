@@ -462,7 +462,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         self.last_post_process_status = {}
                         self.dataset.update_status("Downloading %i/%i via yt-dlp: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
                         try:
-                            info = ydl.extract_info(url)
+                            ydl.extract_info(url)
                         except MaxVideosDownloaded:
                             self.dataset.log("Max videos for URL reached.")
                             # Raised when already downloaded max number of videos per URL as defined in self.max_videos_per_url
@@ -685,7 +685,7 @@ class VideoDownloaderPlus(BasicProcessor):
         """
         urls = {}
         columns = self.parameters.get("columns")
-        if type(columns) == str:
+        if type(columns) is str:
             columns = [columns]
 
         if not columns:

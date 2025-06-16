@@ -313,7 +313,7 @@ class SearchImportFromFourcat(BasicProcessor):
             # supernumerary datasets - handle on their own
             # these include any children of imported datasets
             try:
-                key_exists = DataSet(key=metadata["key"], db=self.db, modules=self.modules)
+                DataSet(key=metadata["key"], db=self.db, modules=self.modules)
 
                 # if we *haven't* thrown a DatasetException now, then the
                 # key is already in use, so create a "dummy" dataset and
@@ -453,7 +453,7 @@ class SearchImportFromFourcat(BasicProcessor):
             try:
                 self.dataset.update_status(f"Transferring data file for dataset {new_dataset.key}")
                 datapath = new_dataset.get_results_path()
-                data = SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "data", datapath)
+                SearchImportFromFourcat.fetch_from_4cat(self.base, dataset_key, api_key, "data", datapath)
 
                 if not imported:
                     # first dataset - use num rows as 'overall'

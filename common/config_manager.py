@@ -311,7 +311,7 @@ class ConfigManager:
         if type(user) is not str:
             if hasattr(user, "get_id"):
                 user = user.get_id()
-            elif user != None: # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
+            elif user is not None: # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
                 raise TypeError("get() expects None, a User object or a string for argument 'user'")
 
         # user-specific settings are just a special type of tag (which takes
@@ -440,7 +440,6 @@ class ConfigWrapper:
         :return:
         """
         if "tag" not in kwargs and self.tags:
-            tag = self.tags if type(self.tags) is str else self.tags[0]
             kwargs["tag"] = self.tags
 
         return self.config.set(*args, **kwargs)

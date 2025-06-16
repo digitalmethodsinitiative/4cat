@@ -166,7 +166,6 @@ class MakeWordtree(BasicProcessor):
 		"""
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
 
 		# settings
 		column = self.parameters.get("column")
@@ -228,7 +227,7 @@ class MakeWordtree(BasicProcessor):
 				body = punkt_replace.sub("", body)
 
 			body = tokeniser(body, **tokeniser_args)
-			if type(body) != list:
+			if type(body) is not list:
 				# Convert generator to list
 				body = list(body)
 
@@ -317,7 +316,6 @@ class MakeWordtree(BasicProcessor):
 		# next step is to remove all root nodes that are not the main root.
 		# We cannot modify a list in-place, so make a new list with the
 		# relevant nodes
-		level_sizes = {}
 		filtered_tokens_right = []
 		for token in tokens_right:
 			if token.is_root and not token.is_top_root:

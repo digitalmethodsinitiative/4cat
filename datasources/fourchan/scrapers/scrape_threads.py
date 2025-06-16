@@ -112,7 +112,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# disappear from 4chan after 1000 replies, but 4CAT
 		# considers these as organic activity)
 		deleted = set()
-		if thread["is_sticky"] != True:
+		if not thread["is_sticky"]:
 			deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
 			for post_id in deleted:
 				self.db.upsert("posts_%s_deleted" % self.prefix, data={"id_seq": post_id_map[post_id], "timestamp_deleted": self.init_time}, constraints=["id_seq"], commit=False)

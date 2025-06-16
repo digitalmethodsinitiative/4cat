@@ -370,7 +370,7 @@ def _jinja2_filter_string_counter(string, emoji=False):
 	# Also handles emojis.
 
 	# We need to convert multi-character emojis ("graphemes") to one character.
-	if emoji == True:
+	if emoji:
 		string = regex.finditer(r"\X", string) # \X matches graphemes
 		string = [m.group(0) for m in string]
 

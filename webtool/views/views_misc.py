@@ -179,7 +179,6 @@ def data_overview(datasource=None):
 
         # Status labels to display in query form
         labels = []
-        datasource_options = worker_class.get_options()
         is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
         is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
         labels.append(is_local)
@@ -211,7 +210,6 @@ def data_overview(datasource=None):
                 # Get the first and last days for padding
                 all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
                 first_date = datetime.fromtimestamp(min(all_dates))
-                last_date = datetime.fromtimestamp(max(all_dates))
                 
                 # Format the dates in a regular dictionary to be used by Highcharts
                 daily_counts = {"first_date": (first_date.year, first_date.month, first_date.day)}

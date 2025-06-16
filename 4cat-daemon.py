@@ -60,8 +60,8 @@ if not args.no_version_check:
 # we can only import this here, because the version check above needs to be
 # done first, as it may detect that the user needs to migrate first before
 # the config manager can be run properly
-from common.config_manager import config
-from common.lib.helpers import call_api
+from common.config_manager import config  # noqa: E402
+from common.lib.helpers import call_api  # noqa: E402
 # ---------------------------------------------
 #     Check validity of configuration file
 # (could be expanded to check for other values)
@@ -128,7 +128,7 @@ def start():
                 umask=0x002,
                 stderr=open(Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), "4cat.stderr"), "w+"),
                 detach_process=True
-        ) as context:
+        ):
             import backend.bootstrap as bootstrap
             bootstrap.run(as_daemon=True, log_level=args.log_level)
 
@@ -192,7 +192,7 @@ def stop(force=False):
             nowtime = time.time()
             if nowtime - starttime > 60:
                 # give up if it takes too long
-                if force == True and not killed:
+                if force and not killed:
                     os.system("kill -9 %s" % str(pid))
                     print("...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL...")
                     killed = True

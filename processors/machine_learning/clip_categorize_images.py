@@ -266,9 +266,9 @@ class CategorizeImagesCLIP(BasicProcessor):
         # Updates to CLIP output; categories used to be a list of categories, but now is a dict with: {"predictions": [[category_label, precent_float],]}
         categories = item.get("categories")
         error = None
-        if type(categories) == list:
+        if type(categories) is list:
             pass
-        elif type(categories) == dict:
+        elif type(categories) is dict:
             error = categories.get("error", "N/A")
             if "predictions" in categories:
                 categories = categories.get("predictions")

@@ -219,11 +219,11 @@ class VideoTimelines(BasicProcessor):
             # determine appropriate label
             # is this the right place? should it be in the datasource?
             if dataset.type == "tiktok-search":
-                mapper = lambda item: item.get("tiktok_url")
+                mapper = lambda item: item.get("tiktok_url")  # noqa: E731
             elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
-                mapper = lambda item: item.get("youtube_url")
+                mapper = lambda item: item.get("youtube_url")  # noqa: E731
             else:
-                mapper = lambda item: item.get("id")
+                mapper = lambda item: item.get("id")  # noqa: E731
 
             for item in dataset.iterate_items(self):
                 for filename in urls:

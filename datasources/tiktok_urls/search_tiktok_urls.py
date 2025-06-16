@@ -331,7 +331,6 @@ class TikTokScraper:
                 if response.status_code == 404:
                     failed += 1
                     self.processor.dataset.log("Video at %s no longer exists (404), skipping" % response.url)
-                    skip_to_next = True
                     continue
 
                 # haven't seen these in the wild - 403 or 429 might happen?

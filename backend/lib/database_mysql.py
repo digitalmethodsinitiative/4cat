@@ -43,7 +43,8 @@ class MySQLDatabase:
 		:param args: Replacement values
 		:return None:
 		"""
-		if self.log: self.log.debug("Executing query %s" % self.mogrify(query, replacements))
+		if self.log:
+			self.log.debug("Executing query %s" % self.mogrify(query, replacements))
 
 		return self.cursor.execute(query, replacements)
 

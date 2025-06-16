@@ -64,7 +64,7 @@ class CountPosts(BasicProcessor):
 		last_interval = "0000"
 
 		self.dataset.update_status("Processing items")
-		with self.dataset.get_results_path().open("w") as results:
+		with self.dataset.get_results_path().open("w"):
 			counter = 0
 
 			for post in self.source_dataset.iterate_items(self):

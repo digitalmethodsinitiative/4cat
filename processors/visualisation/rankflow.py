@@ -470,7 +470,7 @@ class RankFlowRenderer(BasicProcessor):
 		y = (0.2126 * r1) + (0.7152 * g1) + (0.0722 * b1)
 
 		# calculate perceived lightness
-		l = (y * 903.3) if y <= 0.008856 else (pow(y, 1 / 3) * 116 - 16)
+		l = (y * 903.3) if y <= 0.008856 else (pow(y, 1 / 3) * 116 - 16)  # noqa: E741
 
 		return "black" if l > 50 else "white"
 

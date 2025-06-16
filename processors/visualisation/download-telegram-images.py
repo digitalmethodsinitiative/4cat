@@ -203,8 +203,8 @@ class TelegramImageDownloader(BasicProcessor):
 
                     if not message:
                         # message no longer exists
-                        self.dataset.log(f"Could not download image for message {msg_id} - message is unavailable (it "
-                                         f"may have been deleted)")
+                        self.dataset.log("Could not download image for message - message is unavailable (it "
+                                         "may have been deleted)")
                         self.flawless = False
                         break
 

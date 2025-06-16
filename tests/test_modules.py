@@ -225,7 +225,7 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
             processor_class.get_options(parent_dataset=mock_dataset, user=None)
 
             # Check if the processor can be instantiated
-            processor_instance = processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
+            processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
 
         except Exception as e:
             # Log the failure and add it to the failures list

@@ -101,7 +101,6 @@ class YouTubeMetadata(BasicProcessor):
 		self.dataset.update_status("Extracting YouTube links")
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		www_regex = re.compile(r"^www\.")
 
 		for post in self.source_dataset.iterate_items(self):
 
@@ -425,7 +424,6 @@ class YouTubeMetadata(BasicProcessor):
 		for i, ids_string in enumerate(ids_list):
 
 			retries = 0
-			api_error = ""
 
 			try:
 				# Use YouTubeDL and the YouTube API to request video data
@@ -489,7 +487,7 @@ class YouTubeMetadata(BasicProcessor):
 			# Do nothing with the results if the requests failed after retries
 			if retries >= self.max_retries:
 				self.dataset.update_status("Failed to get metadata from " + str(ids_string) + " after " + str(retries) + " retries.")
-				if self.api_limit_reached == True:
+				if self.api_limit_reached:
 					self.dataset.update_status("Daily YouTube API requests exceeded.")
 
 				return results

@@ -131,7 +131,6 @@ class AudioToText(BasicProcessor):
         """
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text.
         """
-        audio_files_extracted = 0
         if self.source_dataset.num_rows <= 1:
             # 1 because there is always a metadata file
             self.dataset.finish_with_error("No audio files found.")

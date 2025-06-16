@@ -773,7 +773,7 @@ class DataSet(FourcatModule):
 		Check if dataset is finished
 		:return bool:
 		"""
-		return self.data["is_finished"] == True
+		return bool(self.data["is_finished"])
 
 	def is_rankable(self, multiple_items=True):
 		"""
@@ -1627,7 +1627,7 @@ class DataSet(FourcatModule):
 		:todo: If the job column ever gets used, make sure it always contains
 		       a valid value, rather than silently failing this method.
 		"""
-		if type(job) != Job:
+		if type(job) is not Job:
 			raise TypeError("link_job requires a Job object as its argument")
 
 		if "id" not in job.data:

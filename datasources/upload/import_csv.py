@@ -93,7 +93,7 @@ class SearchCustom(BasicProcessor):
             # With validated csvs, save as is but make sure the raw file is sorted
             infile.seek(0)
             dialect = possible_dialects.pop() # Use the last dialect first
-            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect) if type(dialect) == csv.Dialect else dialect}")
+            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect) if type(dialect) is csv.Dialect else dialect}")
             reader = csv.DictReader(infile, dialect=dialect)
 
             if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \

@@ -4,10 +4,9 @@ Calculate word collocations from tokens
 import json
 import pickle
 
-from pathlib import Path
 
 import operator
-from nltk.collocations import *
+from nltk.collocations import TrigramCollocationFinder, BigramCollocationFinder
 
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
@@ -139,7 +138,6 @@ class GetCollocations(BasicProcessor):
 
 		# Get token sets
 		self.dataset.update_status("Processing token sets")
-		dirname = Path(self.dataset.get_results_path().parent, self.dataset.get_results_path().name.replace(".", ""))
 
 		# Dictionary to save queries from
 		results = []
@@ -255,16 +253,16 @@ class GetCollocations(BasicProcessor):
 
 			# Filter out combinations not containing the query string
 			if query_string:
-				word_filter = lambda w1, w2: not any(string in (w1, w2) for string in query_string)
+				word_filter = lambda w1, w2: not any(string in (w1, w2) for string in query_string)  # noqa: E731
 				finder.apply_ngram_filter(word_filter)
 
 				# Filter out two times the occurance of the same query string
-				duplicate_filter = lambda w1, w2: (w1 in query_string and w2 in query_string)
+				duplicate_filter = lambda w1, w2: (w1 in query_string and w2 in query_string)  # noqa: E731
 				finder.apply_ngram_filter(duplicate_filter)
 
 			# Filter out forbidden words
 			if forbidden_words:
-				forbidden_words_filter = lambda w1, w2: any(string in (w1, w2) for string in forbidden_words)
+				forbidden_words_filter = lambda w1, w2: any(string in (w1, w2) for string in forbidden_words)  # noqa: E731
 				finder.apply_ngram_filter(forbidden_words_filter)
 
 		# Three-word collocations (~ trigrams)
@@ -273,7 +271,7 @@ class GetCollocations(BasicProcessor):
 
 			# Filter out combinations not containing the query string
 			if query_string:
-				word_filter = lambda w1, w2, w3: not any(string in (w1, w2, w3) for string in query_string)
+				word_filter = lambda w1, w2, w3: not any(string in (w1, w2, w3) for string in query_string)  # noqa: E731
 				finder.apply_ngram_filter(word_filter)
 
 			# Filter out forbidden words

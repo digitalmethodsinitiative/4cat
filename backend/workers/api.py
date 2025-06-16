@@ -109,7 +109,7 @@ class InternalAPI(BasicWorker):
 
 				# start processing as soon as we have valid json
 				try:
-					test = json.loads(buffer)
+					json.loads(buffer)
 					break
 				except json.JSONDecodeError:
 					pass

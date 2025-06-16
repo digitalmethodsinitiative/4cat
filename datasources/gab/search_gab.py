@@ -44,7 +44,7 @@ class SearchGab(Search):
         timestamp_collected = datetime.datetime.fromtimestamp(metadata.get("timestamp_collected")/1000).strftime("%Y-%m-%d %H:%M:%S") if metadata.get("timestamp_collected") else MissingMappedField("Unknown")
         # reaction_type seems to just be nummeric keys; unsure which reactions they map to
         reactions =  post.get("rc", post.get("reactions_counts"))
-        if type(reactions) != int:
+        if type(reactions) is not int:
             reaction_count = sum([reaction_value for reaction_type, reaction_value in post.get("rc", post.get("reactions_counts")).items()])
         else:
             reaction_count = reactions

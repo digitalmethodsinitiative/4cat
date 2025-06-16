@@ -175,7 +175,7 @@ class ColumnFilter(BaseFilter):
                         self.dataset.finish(0)
                         return
             elif match_style in ["exact", "exact-not", "contains", "contains-not"]:
-                if type(mapped_item.get(column)) == str:
+                if type(mapped_item.get(column)) is str:
                     # Text
                     column_value = mapped_item.get(column).lower() if force_lowercase else mapped_item.get(column)
                 elif mapped_item.get(column) is None:

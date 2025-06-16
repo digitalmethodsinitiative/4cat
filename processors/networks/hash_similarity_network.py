@@ -104,7 +104,7 @@ class HashSimilarityNetworker(BasicProcessor):
             # TODO: process other types of hashes; currently only supporting bit hashes
             original_hash = item.pop(column)
 
-            if type(original_hash) == str:
+            if type(original_hash) is str:
                 item_hash = original_hash
                 # Check if 0b starts string
                 if '0b' == original_hash[:2]:
@@ -146,9 +146,9 @@ class HashSimilarityNetworker(BasicProcessor):
 
                     # Append any metadata associated with hash for Gephi
                     for key, value in item.items():
-                        if type(value) == list:
+                        if type(value) is list:
                             item[key] = ','.join(value)
-                        elif type(value) == str:
+                        elif type(value) is str:
                             try:
                                 float(value)
                                 item[key] = float(value)

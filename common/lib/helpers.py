@@ -102,7 +102,7 @@ def sniff_encoding(file):
     :param file:
     :return:
     """
-    if type(file) == bytearray:
+    if type(file) is bytearray:
         maybe_bom = file[:3]
     elif hasattr(file, "getbuffer"):
         buffer = file.getbuffer()
@@ -691,7 +691,7 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
             timestamp = datetime.datetime.fromtimestamp(timestamp)
         except (ValueError, TypeError):
             raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
-    except:
+    except (TypeError, ValueError):
         try:
             timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
         except (ValueError, TypeError):
@@ -1045,7 +1045,7 @@ def send_email(recipient, message):
             server.login(config.get('mail.username'), config.get('mail.password'))
 
         # Send message
-        if type(message) == str:
+        if type(message) is str:
             server.sendmail(config.get('mail.noreply'), recipient, message)
         else:
             server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
@@ -1086,9 +1086,9 @@ def sets_to_lists(d: MutableMapping):
     :return dict:  A new dictionary with the no nested sets
     """
 
-    def _check_list(l):
+    def _check_list(lst):
         return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (
-        set, list)) else item for item in l]
+        set, list)) else item for item in lst]
 
     def _sets_to_lists_gen(d):
         for k, v in d.items():

@@ -2,7 +2,6 @@
 Search Telegram via API
 """
 import traceback
-import datetime
 import hashlib
 import asyncio
 import json
@@ -384,7 +383,6 @@ class SearchTelegram(Search):
         # we may not always know the 'entity username' for an entity ID, so
         # keep a reference map as we go
         entity_id_map = {}
-        query_id_map= {}
 
         # Collect queries
         # Use while instead of for so we can change queries during iteration
@@ -1042,10 +1040,10 @@ class SearchTelegram(Search):
 
         # maybe we've entered a code already and submitted it with the request
         if "option-security-code" in request.form and request.form.get("option-security-code").strip():
-            code_callback = lambda: request.form.get("option-security-code")
+            code_callback = lambda: request.form.get("option-security-code")  # noqa: E731
             max_attempts = 1
         else:
-            code_callback = lambda: -1
+            code_callback = lambda: -1  # noqa: E731
             # max_attempts = 0 because authing will always fail: we can't wait for
             # the code to be entered interactively, we'll need to do a new request
             # but we can't just immediately return, we still need to call start()

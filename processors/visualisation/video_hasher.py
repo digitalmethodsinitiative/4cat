@@ -534,7 +534,7 @@ class VideoHashSimilarities(BasicProcessor):
 				# matches found! identify group
 				group = [i]
 				for j in range(len(similarity_matrix[i])):
-					if similarity_matrix[i][j] == True and j != i:
+					if similarity_matrix[i][j] and j != i:
 						group.append(j)
 
 				# check if any of the matches are already in a group
