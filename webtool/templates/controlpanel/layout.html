@@ -14,6 +14,8 @@
         <li{% if navigation.sub == "tags" %} class="current"{% endif %}><a href="{{ url_for("manipulate_tags") }}">Configuration Tags</a></li>{% endif %}
     {% if __user_config("privileges.admin.can_manage_notifications") %}
         <li{% if navigation.sub == "notifications" %} class="current"{% endif %}><a href="{{ url_for("manipulate_notifications") }}">Notifications</a></li>{% endif %}
+    {% if __user_config("privileges.admin.can_manage_settings") %}
+        <li{% if navigation.sub == "config" %} class="current"{% endif %}><a href="{{ url_for("list_jobs") }}">Worker Queue</a></li>{% endif %}
     {% if __user_config("privileges.admin.can_restart") %}
         <li{% if navigation.sub == "extensions" %} class="current"{% endif %}><a href="{{ url_for("extensions_panel") }}">Extensions</a></li>{% endif %}
     {% if __user_config("privileges.admin.can_manage_users") %}

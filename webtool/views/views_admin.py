@@ -1,6 +1,7 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
+from backend.lib.worker import BasicWorker
 import markdown2
 import datetime
 import psycopg2
@@ -22,12 +23,13 @@ from email.mime.text import MIMEText
 from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response
 from flask_login import current_user, login_required
 
-from webtool import app, db, config, fourcat_modules
+from webtool import app, db, config, fourcat_modules, queue
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
+from common.lib.job import Job
 from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
-from common.lib.exceptions import QueryParametersException
+from common.lib.exceptions import DataSetException, JobNotFoundException, QueryParametersException
 import common.lib.config_definition as config_definition
 
 from common.config_manager import ConfigWrapper
@@ -162,6 +164,79 @@ def get_queue_status():
     return render_template("controlpanel/queue-status.html", queue=queue, worker_types=fourcat_modules.workers,
                            now=time.time())
 
+
+@app.route("/admin/jobs/", defaults={"page": 1})
+@app.route("/admin/jobs/page/<int:page>/")
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def list_jobs(page):
+    """
+    List jobs
+
+    :param int page:
+    """
+    page_size = 25
+    offset = (page - 1) * page_size
+    filter_jobtype = request.args.get("jobtype", "*")
+
+    order = request.args.get("sort", "jobtype")
+
+    jobs = queue.get_all_jobs(jobtype=filter_jobtype, restrict_claimable=False, limit=page_size, offset=offset)
+    num_users = db.fetchall("SELECT COUNT(*) AS num FROM jobs WHERE jobtype != ''")[0]["num"]
+
+    # these are used for autocompletion in the filter form
+    distinct_jobs = set.union(*[set(u["jobtype"]) for u in db.fetchall("SELECT DISTINCT jobtype FROM jobs")])
+
+    pagination = Pagination(page, page_size, num_users, "list_jobs")
+    return render_template("controlpanel/jobs.html", jobs=jobs,
+                           filter={"jobtype": filter_jobtype, "sort": order}, pagination=pagination,
+                           flashes=get_flashed_messages(), all_jobs=distinct_jobs, now= time.time())
+
+@app.route("/admin/delete-job/", methods=["POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def delete_job():
+    """
+    Delete a job
+    """
+    job_id = request.form.get("job_id")
+    redirect_to_page = request.form.get("redirect_to_page", "false").lower() == "true"
+    if not job_id:
+        return error(400, message="Job ID is required")
+    try:
+        job = Job.get_by_ID(id=job_id, database=db)
+    except JobNotFoundException:
+        return error(404, message="Job not found")
+    
+    # Check for an associated dataset
+    try:
+        dataset = DataSet(db=db, job=job.data["id"], modules=fourcat_modules)
+    except DataSetException:
+        dataset = None
+    
+    if dataset:
+        # Check if the user has permission to manipulate the dataset
+        if not config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
+            return error(403, message="Not allowed to delete this job's dataset")
+        
+        # Delete the dataset
+        dataset.delete()
+
+    # Tell backend to cancel job if running
+    try:
+        call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["type"], "level": BasicWorker.INTERRUPT_CANCEL})
+    except ConnectionRefusedError:
+        return error(500,
+                        message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
+    
+    # Delete the job
+    job.finish(delete=True)
+    message =  f"Job {job.data['id']} {'and associated dataset' if dataset else ''}deleted successfully."
+    if redirect_to_page:
+        flash(message)
+        return redirect(request.referrer or url_for("list_jobs", page=1))
+    else:
+        return jsonify({"status": "success", "job_id": job.data["id"], "dataset_key": dataset.key if dataset else None, "message": message})
 
 @app.route("/admin/add-user/")
 @login_required
