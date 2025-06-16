@@ -3,22 +3,23 @@ Prompt OpenAI GPT LLMs.
 """
 
 import re
-import openai
+
+from httpx import HTTPStatusError
 
 from common.lib.helpers import UserInput
+from common.lib.llm import LLMAdapter
 from backend.lib.processor import BasicProcessor
 from common.config_manager import config
-from openai.types.chat.chat_completion import ChatCompletion
 
-class OpenAI(BasicProcessor):
+class LLMTextGeneration(BasicProcessor):
 	"""
-	Prompt OpenAI's GPT models
+	Prompt LLMs for text generation
 	"""
-	type = "openai-llms"  # job type ID
+	type = "llm-text-generation"  # job type ID
 	category = "Machine learning"  # category
-	title = "OpenAI prompting"  # title displayed in UI
-	description = ("Use OpenAI's LLMs or local models via LM Studio to generate text based on the parent dataset. "
-				   "This can be used for tasks like classification or entity extraction.") # description displayed in UI
+	title = "LLM text generation"  # title displayed in UI
+	description = ("Use a host of API-accessible or local models to generate text based on a prompt and data from the "
+				   "parent dataset. This allow many tasks like classification or entity extraction.")
 	extension = "csv"  # extension of result file, used internally and in UI. In this case it's variable!
 
 	references = [
@@ -52,41 +53,53 @@ class OpenAI(BasicProcessor):
 						"test the prompt on a handful of rows. You can sample your dataset with the filter processors"
 						" on this page."
 			},
-			"model": {
+			"local_or_api": {
+				"type": UserInput.OPTION_CHOICE,
+				"help": "Local or API",
+				"options": {
+					"local": "Local",
+					"api": "API"
+				},
+				"default": "api"
+			},
+			"api_model": {
 				"type": UserInput.OPTION_CHOICE,
 				"help": "Model",
-				"options": {
-					"gpt-4o-mini": "GPT-4o mini",
-					"gpt-4o": "GPT-4o",
-					"gpt-4-turbo": "GPT-4 turbo",
-					"o1-mini": "o1-mini",
-					"custom": "Custom (fine-tuned) model",
-					"local-lmstudio": "Local model via LMStudio"
-				},
-				"default": "gpt-4o-mini"
+				"options": LLMAdapter.get_model_options(),
+				"default": "mistral-small-2503",
+				"requires": "local_or_api==api"
 			},
-			"lmstudio_server": {
+			"api_key": {
 				"type": UserInput.OPTION_TEXT,
-				"requires": "model==local-lmstudio",
-				"default": "http://localhost:1234/v1",
-				"help": "LM Studio endpoint",
-				"tooltip": "[You can run LLMs locally with LM Studio](https://lmstudio.ai/docs/app/api). When the server"
-						   " is running, the endpoint is shown in the Developer tab on the top right "
-						   "(default: http://localhost:1234/v1)."
+				"default": "",
+				"help": "API key",
+				"tooltip": "Create an API key on the LLM provider's website (e.g. "
+						   "https://admin.mistral.ai/organization/api-keys)",
+				"requires": "local_or_api==api",
+				"sensitive": True
 			},
-			"custom_model_info": {
-				"type": UserInput.OPTION_INFO,
-				"requires": "model==custom",
-				"help": "[You can fine-tune a model on the OpenAI portal to improve your prompt results]("
-						"https://platform.openai.com/docs/guides/fine-tuning). With fine-tuned models, examples in the "
-						"prompt ('few-shot learning') may not be necessary anymore."
-			},
-			"custom_model": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "Model ID",
-				"requires": "model==custom",
-				"tooltip": "In the format ft:[modelname]:[org_id]:[custom_suffix]:[id]. See link above"
-			},
+			# "lmstudio_server": {
+			# 	"type": UserInput.OPTION_TEXT,
+			# 	"requires": "model==local-lmstudio",
+			# 	"default": "http://localhost:1234/v1",
+			# 	"help": "LM Studio endpoint",
+			# 	"tooltip": "[You can run LLMs locally with LM Studio](https://lmstudio.ai/docs/app/api). When the server"
+			# 			   " is running, the endpoint is shown in the Developer tab on the top right "
+			# 			   "(default: http://localhost:1234/v1)."
+			# },
+			# "custom_model_info": {
+			# 	"type": UserInput.OPTION_INFO,
+			# 	"requires": "model==custom",
+			# 	"help": "[You can fine-tune a model on the OpenAI portal to improve your prompt results]("
+			# 			"https://platform.openai.com/docs/guides/fine-tuning). With fine-tuned models, examples in the "
+			# 			"prompt ('few-shot learning') may not be necessary anymore."
+			# },
+			# "custom_model": {
+			# 	"type": UserInput.OPTION_TEXT,
+			# 	"help": "Model ID",
+			# 	"requires": "model==custom",
+			# 	"tooltip": "In the format ft:[modelname]:[org_id]:[custom_suffix]:[id]. See link above"
+			# },
 			"prompt": {
 				"type": UserInput.OPTION_TEXT_LARGE,
 				"help": "Prompt",
@@ -107,20 +120,14 @@ class OpenAI(BasicProcessor):
 				"tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
 						   "text for common English text."
 			},
-			"ethics_warning2": {
-				"type": UserInput.OPTION_INFO,
-				"requires": "model!=local-lmstudio",
-				"help": "<strong>Be very sensitive with running this processor on your datasets, as data will be "
-						"sent to OpenAI.</strong>"
-			},
 			"ethics_warning3": {
 				"type": UserInput.OPTION_INFO,
 				"help": "<strong>Always consider anonymising your data and using local, open-source LLMs.</strong>"
 			},
 			"consent": {
 				"type": UserInput.OPTION_TOGGLE,
-				"help": "I understand that my data is sent to OpenAI and that OpenAI may incur costs.",
-				"requires": "model!=local-lmstudio",
+				"help": "I understand that my data is sent to the API provider and that they may incur costs.",
+				"requires": "local_or_api==api",
 				"default": False,
 			},
 			"write_annotations": {
@@ -137,17 +144,6 @@ class OpenAI(BasicProcessor):
 			}
 		}
 
-		api_key = config.get("api.openai.api_key", user=user)
-		if not api_key:
-			options["api_key"] = {
-				"type": UserInput.OPTION_TEXT,
-				"default": "",
-				"help": "OpenAI API key",
-				"tooltip": "Can be created on platform.openapi.com",
-				"requires": "model!=local-lmstudio",
-				"sensitive": True
-			}
-
 		return options
 
 	@classmethod
@@ -163,8 +159,9 @@ class OpenAI(BasicProcessor):
 	def process(self):
 
 		consent = self.parameters.get("consent", False)
-		model = self.parameters.get("model")
-		if not consent and not model == "local-lmstudio":
+		model = self.parameters.get("api_model")
+		is_local = True if self.parameters.get("api_or_local", "api") == "local" else False
+		if not consent and not is_local:
 			self.dataset.finish_with_error("You must consent to your data being sent to OpenAI first")
 			return
 
@@ -224,14 +221,20 @@ class OpenAI(BasicProcessor):
 
 		results = []
 
-		# initiate client
+		provider = LLMAdapter.get_models()[model]["provider"]
+		base_url = None
 		if model == "local-lmstudio":
-			client = openai.OpenAI(api_key="lm-studio", base_url=self.parameters.get("lmstudio_server"))
-		else:
-			client = openai.OpenAI(api_key=api_key)
+			provider = "lmstudio"
+			base_url = self.parameters.get("lmstudio_server")
+
+		# Start LLM
+		try:
+			llm = LLMAdapter(provider=provider, model=model, api_key=api_key, base_url=base_url, temperature=temperature)
+		except Exception as e:
+			self.dataset.finish_with_error(str(e))
+			return
 
 		i = 1
-
 		for item in self.source_dataset.iterate_items():
 
 			# Replace with dataset values
@@ -243,23 +246,28 @@ class OpenAI(BasicProcessor):
 				except KeyError as e:
 					self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
 					return
+
 			try:
-				response = self.prompt_gpt(prompt, client, model=model, temperature=temperature, max_tokens=max_tokens)
-			except openai.NotFoundError as e:
-				self.dataset.finish_with_error(e.message)
+				response = llm.text_generation(prompt)
+			except Exception as e:
+				self.dataset.finish_with_error(str(e))
 				return
-			except openai.BadRequestError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.AuthenticationError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.RateLimitError as e:
-				self.dataset.finish_with_error(e.message)
-				return
-			except openai.APIConnectionError as e:
-				self.dataset.finish_with_error(e.message)
-				return
+
+			# except openai.NotFoundError as e:
+			# 	self.dataset.finish_with_error(e.message)
+			# 	return
+			# except openai.BadRequestError as e:
+			# 	self.dataset.finish_with_error(e.message)
+			# 	return
+			# except openai.AuthenticationError as e:
+			# 	self.dataset.finish_with_error(e.message)
+			# 	return
+			# except openai.RateLimitError as e:
+			# 	self.dataset.finish_with_error(e.message)
+			# 	return
+			# except openai.APIConnectionError as e:
+			# 	self.dataset.finish_with_error(e.message)
+			# 	return
 
 			if "id" in item:
 				item_id = item["id"]
@@ -268,7 +276,6 @@ class OpenAI(BasicProcessor):
 			else:
 				item_id = str(i)
 
-			response = response.choices[0].message.content
 			results.append({
 				"id": item_id,
 				"prompt": prompt,
@@ -293,19 +300,3 @@ class OpenAI(BasicProcessor):
 
 		# Write to csv file
 		self.write_csv_items_and_finish(results)
-
-	@staticmethod
-	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50) -> ChatCompletion:
-
-		# Get response
-		response = client.chat.completions.create(
-			model=model,
-			temperature=temperature,
-			max_tokens=max_tokens,
-			messages=[{
-				"role": "user",
-				"content": prompt
-			}]
-		)
-
-		return response
