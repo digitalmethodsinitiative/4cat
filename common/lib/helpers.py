@@ -30,7 +30,7 @@ from packaging import version
 from PIL import Image
 
 from common.config_manager import config
-
+from common.lib.user_input import UserInput  # noqa: F401
 
 def init_datasource(database, logger, queue, name):
     """
