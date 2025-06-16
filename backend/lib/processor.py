@@ -756,21 +756,21 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			#files = files.glob("*")
 
 		# create zip of archive and delete temporary files and folder
-		self.dataset.update_status("Compressing results into archive")
-		done = 0
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zipf:
-			if is_folder:
-				for root, dirs, files in os.walk(filelist_or_folder):
-					for file in files:
-						zipf.write(os.path.join(root, file),
-								  os.path.relpath(os.path.join(root, file), filelist_or_folder))
-						done += 1
-			else:
-				# list of files
-				for output_path in filelist_or_folder:
-					zipf.write(output_path, output_path.name)
-					output_path.unlink()
-					done += 1
+        self.dataset.update_status("Compressing results into archive")
+        done = 0
+        with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zipf:
+            if is_folder:
+                for root, dirs, files in os.walk(filelist_or_folder):
+                    for file in files:
+                        zipf.write(os.path.join(root, file),
+                                    os.path.relpath(os.path.join(root, file), filelist_or_folder))
+                        done += 1
+            else:
+                # list of files
+                for output_path in filelist_or_folder:
+                    zipf.write(output_path, output_path.name)
+                    output_path.unlink()
+                    done += 1
 
         # delete temporary folder
         if is_folder:

@@ -47,7 +47,7 @@ class ImageDownloader(BasicProcessor):
         "is included in the output archive."
     )  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
-	is_hidden = True # hide in UI; processor is called by ImageDownloaderPreset
+    is_hidden = True # hide in UI; processor is called by ImageDownloaderPreset
     media_type = "image"  # media type of the dataset
 
     followups = [
@@ -142,9 +142,9 @@ class ImageDownloader(BasicProcessor):
 
         return options
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
         Allow processor on top image rankings, collectors, but not specific collectors with their own image
         collection methods
 

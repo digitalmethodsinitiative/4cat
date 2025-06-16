@@ -69,7 +69,6 @@ class TelegramImageDownloader(BasicProcessor):
         max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
 
         options = {
-        options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "No. of images" if max_number_images == 0 else f"No. of images (max {max_number_images})",
