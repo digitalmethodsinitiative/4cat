@@ -2,34 +2,34 @@
     <section class="result-tree">
         <div class="card query{% if not dataset.is_finished() %} unfinished{% endif %}">
             <h2 class="blocktitle{% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %} editable{% endif %}">
-                <span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span>
+                <span><a href="{{ url_for('dataset.show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span>
             </h2>
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
                 <ul>
                     {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
-                    <li><a href="{{ url_for("toggle_favourite", key=dataset.key) }}?redirect"
+                    <li><a href="{{ url_for("toolapi.toggle_favourite", key=dataset.key) }}?redirect"
                            class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star"
                                                         aria-hidden="true"></i> {% if is_favourite %}Delete
                         from{% else %}
                         Add to{% endif %} favourites</a></li>
                     {% endif %}
                     {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
-                        <li><a href="{{ url_for('toggle_private', key=dataset.key) }}?redirect"
+                        <li><a href="{{ url_for('toolapi.toggle_private', key=dataset.key) }}?redirect"
                                class="toggle-private"><i
                                 class="fas fa-lock{% if dataset.is_private %}-open{% endif %}" aria-hidden="true"></i>
                             {% if dataset.is_private %}Make public{% else %}Make private{% endif %}</a></li>
                     {% endif %}
-                    <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link"
+                    <li><a href="{{ url_for('dataset.show_result', key=dataset.key) }}"><i class="fas fa-link"
                                                                                    aria-hidden="true"></i> Permalink</a>
                     </li>
                     {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
-                        <li><a href="{{ url_for('delete_dataset', key=dataset.key) }}?redirect" class="confirm-first"
+                        <li><a href="{{ url_for('toolapi.delete_dataset', key=dataset.key) }}?redirect" class="confirm-first"
                                data-confirm-action="delete this dataset"><i class="fas fa-trash-alt"
                                                                             aria-hidden="true"></i>
                             Delete dataset</a></li>
                     {% endif %}
                     {% if current_user.is_admin and not dataset.is_finished() %}
-                        <li><a href="{{ url_for('nuke_dataset', key=dataset.key) }}?redirect" class="prompt-first"
+                        <li><a href="{{ url_for('toolapi.nuke_dataset', key=dataset.key) }}?redirect" class="prompt-first"
                                data-confirm-method="POST" data-confirm-var="reason"
                                data-confirm-action="cancel this dataset? You can provide a reason that will be displayed to the user"><i
                                 class="fas fa-radiation" aria-hidden="true"></i> Cancel dataset</a></li>
@@ -40,7 +40,7 @@
             {% if dataset.is_expiring() %}
                 <div class="fullwidth notice">
                     <strong>Note:</strong> this dataset will no longer be available
-                    after {{ dataset.is_expiring()|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+                    after {{ dataset.is_expiring()|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You can <a href="{{ url_for("toolapi.keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
 
                 </div>
             {% endif %}
@@ -48,7 +48,7 @@
             {% if "copied_from" in dataset.parameters %}
                 <div class="fullwidth notice">
                     This dataset was generated from <a
-                        href="{{ url_for('show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                        href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
                 </div>
             {% endif %}
 
@@ -69,7 +69,7 @@
                             {{ dataset.parameters.datasource }}{%
                                 if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
                         {% if dataset.parameters.datasource in datasources %}
-                            {{ datasources[dataset.parameters.datasource].name }} (<a href="{{ url_for("data_overview", datasource=dataset.parameters.datasource) }}">details</a>)
+                            {{ datasources[dataset.parameters.datasource].name }} (<a href="{{ url_for("misc.data_overview", datasource=dataset.parameters.datasource) }}">details</a>)
                         {% endif %}
                         </dd>
                     </div>
@@ -107,7 +107,7 @@
                             {% endfor %}
                             </ul>
                             {% if __user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner") %}
-                                <a class="button-like-small" id="add-dataset-owner" href="{{ url_for("add_dataset_owner") }}"><i class="fa fa-user-plus" aria-hidden="true"></i> Share</a>
+                                <a class="button-like-small" id="add-dataset-owner" href="{{ url_for("toolapi.add_dataset_owner") }}"><i class="fa fa-user-plus" aria-hidden="true"></i> Share</a>
                             {% endif %}
                         </dd>
                     </div>
@@ -131,7 +131,7 @@
                                 <li><span class="property-badge">{{ annotation_field[1].label }}</span></li>
                             {% endfor %}
                             </ul>
-                            <a class="button-like-small" id="edit-annotation-fields" href="{{ url_for('explorer_dataset', dataset_key=dataset.key) }}?edit=true"><i class="fas fa-edit" aria-hidden="true"></i> Edit fields</a>
+                            <a class="button-like-small" id="edit-annotation-fields" href="{{ url_for('explorer.explorer_dataset', dataset_key=dataset.key) }}?edit=true"><i class="fas fa-edit" aria-hidden="true"></i> Edit fields</a>
                         </dd>
                     </div>
                     {% endif %}
@@ -141,7 +141,7 @@
                       <dt>API Credentials</dt>
                       <dd>
                         {% for credential in has_credentials %}<span class="property-badge">{{ credential }}</span> {% endfor %}
-                        (<a href="{{ url_for("erase_credentials", key=dataset.key) }}?redirect">erase</a>)
+                        (<a href="{{ url_for("toolapi.erase_credentials", key=dataset.key) }}?redirect">erase</a>)
                       </dd>
                     </div>
                     {% endif %}
@@ -194,13 +194,13 @@
             <h2 class="blocktitle section-subheader">
                 <span>{% if dataset.get_extension == "html" %}View dataset{% else %}Dataset preview{% endif %}</span>
                 <button
-                    data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
+                    data-load-from="{{ url_for('dataset.preview_items', key=dataset.key) }}" class="popup-trigger"
                     aria-controls="popup-preview-{{ dataset.key }}">
                     <i class="fa fa-maximize" aria-hidden="true"></i> <span class="sr-only">Open in popup</span>
                 </button>
             </h2>
             <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
-            <iframe src="{{ url_for('preview_items', key=dataset.key) }}"></iframe>
+            <iframe src="{{ url_for('dataset.preview_items', key=dataset.key) }}"></iframe>
         </section>
     {% endif %}
 

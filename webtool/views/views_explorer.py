@@ -5,25 +5,26 @@ format and lets users annotate the data.
 
 from pathlib import Path
 
-from flask import request, render_template, jsonify
+from flask import Blueprint, current_app, request, render_template, jsonify
 from flask_login import login_required, current_user
-from webtool import app, db, openapi, limiter, config, fourcat_modules
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import hash_to_md5
 from common.lib.exceptions import DataSetException, AnnotationException
 from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user, request=request)
-api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
+component = Blueprint("explorer", __name__)
+config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
+db = current_app.fourcat.db
+api_ratelimit = current_app.limiter.shared_limit("45 per minute", scope="api")
 
 
-@app.route("/results/<string:dataset_key>/explorer/", defaults={"page": 1})
-@app.route("/results/<string:dataset_key>/explorer/page/<int:page>")
+@component.route("/results/<string:dataset_key>/explorer/", defaults={"page": 1})
+@component.route("/results/<string:dataset_key>/explorer/page/<int:page>")
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
+@current_app.fourcat.openapi.endpoint("explorer")
 def explorer_dataset(dataset_key: str, page=1):
 	"""
 	Show items from a dataset
@@ -37,7 +38,7 @@ def explorer_dataset(dataset_key: str, page=1):
 
 	# Get dataset info.
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 	
@@ -153,12 +154,12 @@ def explorer_dataset(dataset_key: str, page=1):
 		warning=warning
 	)
 
-@app.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
+@component.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
+@current_app.fourcat.openapi.endpoint("explorer")
 def explorer_save_annotation_fields(dataset_key: str):
 	"""
 	Save the annotation fields of a dataset to the datasets table.
@@ -199,12 +200,12 @@ def explorer_save_annotation_fields(dataset_key: str):
 	# Else return the amount of fields saved.
 	return str(fields_saved)
 
-@app.route("/explorer/save_annotations/<string:dataset_key>", methods=["POST"])
+@component.route("/explorer/save_annotations/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
+@current_app.fourcat.openapi.endpoint("explorer")
 def explorer_save_annotations(dataset_key: str):
 	"""
 	Save the annotations of a dataset to the annotations table.

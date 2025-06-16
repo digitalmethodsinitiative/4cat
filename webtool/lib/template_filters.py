@@ -10,16 +10,16 @@ import requests
 import regex
 
 from urllib.parse import urlencode, urlparse
-from webtool import app, config
+from webtool import config
 from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify_long, ellipsiate
 from common.config_manager import ConfigWrapper
 
-from flask import request
+from flask import request, current_app
 from flask_login import current_user
 from ural import urls_from_text
 
-@app.template_filter('datetime')
+@current_app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
 	if isinstance(date, str):
 		try:
@@ -42,7 +42,7 @@ def _jinja2_filter_datetime(date, fmt=None, wrap=True):
 		return formatted
 
 
-@app.template_filter('numberify')
+@current_app.template_filter('numberify')
 def _jinja2_filter_numberify(number):
 	try:
 		number = int(number)
@@ -58,7 +58,7 @@ def _jinja2_filter_numberify(number):
 
 	return str(number)
 
-@app.template_filter('commafy')
+@current_app.template_filter('commafy')
 def _jinja2_filter_commafy(number):
 	"""
 	Applies thousands separator to ints.
@@ -70,7 +70,7 @@ def _jinja2_filter_commafy(number):
 
 	return f"{number:,}"
 
-@app.template_filter('timify')
+@current_app.template_filter('timify')
 def _jinja2_filter_timify(number):
 	try:
 		number = int(number)
@@ -94,7 +94,7 @@ def _jinja2_filter_timify(number):
 
 	return time_str.strip()
 
-@app.template_filter('timify_long')
+@current_app.template_filter('timify_long')
 def _jinja2_filter_timify_long(number):
 	"""
 	Make a number look like an indication of time
@@ -105,14 +105,14 @@ def _jinja2_filter_timify_long(number):
 	"""
 	return timify_long(number)
 
-@app.template_filter("fromjson")
+@current_app.template_filter("fromjson")
 def _jinja2_filter_fromjson(data):
 	try:
 		return json.loads(data)
 	except TypeError:
 		return data
 
-@app.template_filter("http_query")
+@current_app.template_filter("http_query")
 def _jinja2_filter_httpquery(data):
 	data = {key: data[key] for key in data if data[key]}
 
@@ -121,7 +121,7 @@ def _jinja2_filter_httpquery(data):
 	except TypeError:
 		return ""
 
-@app.template_filter("add_colour")
+@current_app.template_filter("add_colour")
 def _jinja2_add_colours(data):
 	"""
 	Add colour preview to hexadecimal colour values.
@@ -140,7 +140,7 @@ def _jinja2_add_colours(data):
 
 	return f'<span class="colour-preview"><i style="background:{data}" aria-hidden="true"></i> {data}</span>'
 
-@app.template_filter("add_ahref")
+@current_app.template_filter("add_ahref")
 def _jinja2_filter_add_ahref(content, ellipsiate=0):
 	"""
 	Add HTML links to text
@@ -164,27 +164,27 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
 
 	return content
 
-@app.template_filter('markdown',)
+@current_app.template_filter('markdown',)
 def _jinja2_filter_markdown(text, trim_container=False):
 	return parse_markdown(text, trim_container)
 
-@app.template_filter('isbool')
+@current_app.template_filter('isbool')
 def _jinja2_filter_isbool(value):
 	return isinstance(value, bool)
 
-@app.template_filter('json')
+@current_app.template_filter('json')
 def _jinja2_filter_json(data):
 	return json.dumps(data)
 
 
-@app.template_filter('config_override')
+@current_app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
 	try:
 		return config.get("flask." + property, user=current_user)
 	except AttributeError:
 		return data
 
-@app.template_filter('filesize')
+@current_app.template_filter('filesize')
 def _jinja2_filter_filesize(file, short=False):
 	try:
 		stats = os.stat(file)
@@ -206,11 +206,11 @@ def _jinja2_filter_filesize(file, short=False):
 	else:
 		return "%i bytes" % bytes
 
-@app.template_filter('filesize_short')
+@current_app.template_filter('filesize_short')
 def _jinja2_filter_filesize_short(file):
 	return _jinja2_filter_filesize(file, True)
 
-@app.template_filter('ext2noun')
+@current_app.template_filter('ext2noun')
 def _jinja2_filter_extension_to_noun(ext):
 	if ext == "csv":
 		return "row"
@@ -221,12 +221,12 @@ def _jinja2_filter_extension_to_noun(ext):
 	else:
 		return "item"
 
-@app.template_filter("ellipsiate")
+@current_app.template_filter("ellipsiate")
 def _jinja2_filter_ellipsiate(*args, **kwargs):
 	return ellipsiate(*args, **kwargs)
 
 
-@app.template_filter('4chan_image')
+@current_app.template_filter('4chan_image')
 def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 
 	plebs_boards = ["adv","f","hr","mlpol","mo","o","pol","s4s","sp","tg","trv","tv","x"]
@@ -281,7 +281,7 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 	return "retrieve:https://archived.moe/_/search/image/" + image_md5
 
 
-@app.template_filter('social_mediafy')
+@current_app.template_filter('social_mediafy')
 def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
 	"""
 	Adds links to a text body with hashtags, @-mentions, and URLs.
@@ -364,7 +364,7 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
 	return body
 
 
-@app.template_filter('string_counter')
+@current_app.template_filter('string_counter')
 def _jinja2_filter_string_counter(string, emoji=False):
 	# Returns a dictionary with counts of characters in a string.
 	# Also handles emojis.
@@ -383,7 +383,7 @@ def _jinja2_filter_string_counter(string, emoji=False):
 
 	return counter
 
-@app.template_filter('parameter_str')
+@current_app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):
 	# Returns the current URL parameters as a valid string.
 
@@ -395,11 +395,11 @@ def _jinja2_filter_parameter_str(url):
 
 	return params
 
-@app.template_filter('hasattr')
+@current_app.template_filter('hasattr')
 def _jinja2_filter_hasattr(obj, attribute):
 	return hasattr(obj, attribute)
 
-@app.context_processor
+@current_app.context_processor
 def inject_now():
 	def uniqid():
 		"""
@@ -409,7 +409,7 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	wrapped_config = ConfigWrapper(config, user=current_user, request=request)
+	wrapped_config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
 
 	cv_path = wrapped_config.get("PATH_ROOT").joinpath("config/.current-version")
 	if cv_path.exists():
@@ -429,6 +429,6 @@ def inject_now():
 		"uniqid": uniqid
 	}
 
-@app.template_filter('log')
+@current_app.template_filter('log')
 def _jinja2_filter_log(text):
-	app.logger.info(text)
+	current_app.logger.info(text)

@@ -20,10 +20,9 @@ from dateutil.parser import parse as parse_datetime, ParserError
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response
+from flask import Blueprint, render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response, current_app
 from flask_login import current_user, login_required
 
-from webtool import app, db, config, fourcat_modules, queue
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
@@ -34,12 +33,14 @@ import common.lib.config_definition as config_definition
 
 from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user, request=request)
+component = Blueprint("admin", __name__)
+db = current_app.fourcat.db
+config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
 
 
-@app.route("/admin/")
+@component.route("/admin/")
 @login_required
-def admin_frontpage():
+def frontpage():
     # can be viewed if user has any admin privileges
     admin_privileges = config.get(
         [key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
@@ -81,8 +82,8 @@ def admin_frontpage():
     }, upgrade_available=upgrade_available, tags=tags, current_branch=current_branch)
 
 
-@app.route("/admin/users/", defaults={"page": 1})
-@app.route("/admin/users/page/<int:page>/")
+@component.route("/admin/users/", defaults={"page": 1})
+@component.route("/admin/users/page/<int:page>/")
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def list_users(page):
@@ -129,13 +130,13 @@ def list_users(page):
     distinct_tags = set.union(*[set(u["tags"]) for u in db.fetchall("SELECT DISTINCT tags FROM users")])
     distinct_users = [u["name"] for u in db.fetchall("SELECT DISTINCT name FROM users")]
 
-    pagination = Pagination(page, page_size, num_users, "list_users")
+    pagination = Pagination(page, page_size, num_users, "admin.list_users")
     return render_template("controlpanel/users.html", users=[User(db, user) for user in users],
                            filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
 
-@app.route("/admin/worker-status/")
+@component.route("/admin/worker-status/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_worker_status():
@@ -148,11 +149,11 @@ def get_worker_status():
             "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=db)
         } for worker in api_response["response"]["running"]
     ]
-    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=fourcat_modules.workers,
+    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=current_app.fourcat.modules.workers,
                            now=time.time())
 
 
-@app.route("/admin/queue-status/")
+@component.route("/admin/queue-status/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_queue_status():
@@ -161,12 +162,12 @@ def get_queue_status():
         return """<p class="content-placeholder">Backend unavailable; View logs</p>""", 200, {"Content-Type": "text/html"}
 
     queue = api_response["response"]["queued"]
-    return render_template("controlpanel/queue-status.html", queue=queue, worker_types=fourcat_modules.workers,
+    return render_template("controlpanel/queue-status.html", queue=queue, worker_types=current_app.fourcat.modules.workers,
                            now=time.time())
 
 
-@app.route("/admin/jobs/", defaults={"page": 1})
-@app.route("/admin/jobs/page/<int:page>/")
+@component.route("/admin/jobs/", defaults={"page": 1})
+@component.route("/admin/jobs/page/<int:page>/")
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
 def list_jobs(page):
@@ -181,18 +182,18 @@ def list_jobs(page):
 
     order = request.args.get("sort", "jobtype")
 
-    jobs = queue.get_all_jobs(jobtype=filter_jobtype, restrict_claimable=False, limit=page_size, offset=offset)
+    jobs = current_app.fourcat.queue.get_all_jobs(jobtype=filter_jobtype, restrict_claimable=False, limit=page_size, offset=offset)
     num_users = db.fetchall("SELECT COUNT(*) AS num FROM jobs WHERE jobtype != ''")[0]["num"]
 
     # these are used for autocompletion in the filter form
     distinct_jobs = set.union(*[set(u["jobtype"]) for u in db.fetchall("SELECT DISTINCT jobtype FROM jobs")])
 
-    pagination = Pagination(page, page_size, num_users, "list_jobs")
+    pagination = Pagination(page, page_size, num_users, "admin.list_jobs")
     return render_template("controlpanel/jobs.html", jobs=jobs,
                            filter={"jobtype": filter_jobtype, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), all_jobs=distinct_jobs, now= time.time())
 
-@app.route("/admin/delete-job/", methods=["POST"])
+@component.route("/admin/delete-job/", methods=["POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
 def delete_job():
@@ -210,7 +211,7 @@ def delete_job():
     
     # Check for an associated dataset
     try:
-        dataset = DataSet(db=db, job=job.data["id"], modules=fourcat_modules)
+        dataset = DataSet(db=db, job=job.data["id"], modules=current_app.fourcat.modules)
     except DataSetException:
         dataset = None
     
@@ -234,11 +235,11 @@ def delete_job():
     message =  f"Job {job.data['id']} {'and associated dataset' if dataset else ''}deleted successfully."
     if redirect_to_page:
         flash(message)
-        return redirect(request.referrer or url_for("list_jobs", page=1))
+        return redirect(request.referrer or url_for("admin.list_jobs", page=1))
     else:
         return jsonify({"status": "success", "job_id": job.data["id"], "dataset_key": dataset.key if dataset else None, "message": message})
 
-@app.route("/admin/add-user/")
+@component.route("/admin/add-user/")
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def add_user():
@@ -316,7 +317,7 @@ def add_user():
     if fmt == "html":
         if redirect_to_page:
             flash(response["message"])
-            return redirect(url_for("manipulate_user", mode="edit", name=username))
+            return redirect(url_for("admin.manipulate_user", mode="edit", name=username))
         else:
             return render_template("error.html", message=response["message"],
                                    title=("New account created" if response["success"] else "Error"))
@@ -324,7 +325,7 @@ def add_user():
         return jsonify(response)
 
 
-@app.route("/admin/reject-user/", methods=["GET", "POST"])
+@component.route("/admin/reject-user/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def reject_user():
@@ -381,7 +382,7 @@ def reject_user():
     return render_template("error.html", message="Rejection sent to %s." % email_address, title="Rejection sent")
 
 
-@app.route("/admin/delete-user", methods=["POST"])
+@component.route("/admin/delete-user", methods=["POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def delete_user():
@@ -408,10 +409,10 @@ def delete_user():
     user.delete()
 
     flash(f"User {username} and their datasets have been deleted.")
-    return redirect(url_for("admin_frontpage"))
+    return redirect(url_for("admin.frontpage"))
 
 
-@app.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
+@component.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def manipulate_user(mode):
@@ -469,7 +470,7 @@ def manipulate_user(mode):
                         user.set_password(request.form.get("password"))
                     else:
                         token = user.generate_token(None, regenerate=True)
-                        link = url_for("reset_password", _external=True) + "?token=%s" % token
+                        link = url_for("user.reset_password", _external=True) + "?token=%s" % token
                         flash('User created. %s can set a password via<br><a href="%s">%s</a>.' % (
                             user_data["name"], link, link))
 
@@ -509,7 +510,7 @@ def manipulate_user(mode):
                            mode=mode)
 
 
-@app.route("/admin/user-tags/", methods=["GET", "POST"])
+@component.route("/admin/user-tags/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_tags")
 def manipulate_tags():
@@ -578,7 +579,7 @@ def manipulate_tags():
     return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
-@app.route("/admin/settings", methods=["GET", "POST"])
+@component.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
 def manipulate_settings():
@@ -592,9 +593,9 @@ def manipulate_settings():
 
     modules = {
         **{datasource + "-search": definition["name"] for datasource, definition in
-           fourcat_modules.datasources.items()},
+           current_app.fourcat.modules.datasources.items()},
         **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
-           fourcat_modules.processors.values()}
+           current_app.fourcat.modules.processors.values()}
     }
 
     global_settings = config.get_all(user=None, tags=None)
@@ -672,7 +673,7 @@ def manipulate_settings():
             submenu = "core"
         elif option_owner.endswith("-search"):
             submenu = "datasources"
-        elif option_owner in fourcat_modules.processors:
+        elif option_owner in current_app.fourcat.modules.processors:
             submenu = "processors"
 
         tabname = config_definition.categories.get(option_owner)
@@ -721,7 +722,7 @@ def manipulate_settings():
             "enabled": datasource in config.get("datasources.enabled"),
             "expires": config.get("datasources.expiration").get(datasource, {})
         }
-        for datasource, info in fourcat_modules.datasources.items()}
+        for datasource, info in current_app.fourcat.modules.datasources.items()}
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
@@ -729,7 +730,7 @@ def manipulate_settings():
                            expire_override=expire_override)
 
 
-@app.route("/manage-notifications/", methods=["GET", "POST"])
+@component.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_notifications")
 def manipulate_notifications():
@@ -793,7 +794,7 @@ def manipulate_notifications():
                            notification=notification, notifications=notifications)
 
 
-@app.route("/delete-notification/<int:notification_id>")
+@component.route("/delete-notification/<int:notification_id>")
 @login_required
 @setting_required("privileges.admin.can_manage_notifications")
 def delete_notification(notification_id):
@@ -809,12 +810,12 @@ def delete_notification(notification_id):
 
     redirect_url = request.headers.get("Referer")
     if not redirect_url:
-        redirect_url = url_for("admin_frontpage")
+        redirect_url = url_for("admin.frontpage")
 
     return redirect(redirect_url)
 
 
-@app.route("/logs/")
+@component.route("/logs/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def view_logs():
@@ -827,7 +828,7 @@ def view_logs():
     return render_template("controlpanel/logs.html", headers=headers)
 
 
-@app.route("/logs/<string:logfile>/")
+@component.route("/logs/<string:logfile>/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_log(logfile):
@@ -857,7 +858,7 @@ def get_log(logfile):
         return ""
 
 
-@app.route("/user-bulk", methods=["GET", "POST"])
+@component.route("/user-bulk", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def user_bulk():
@@ -969,7 +970,7 @@ def user_bulk():
                            incomplete=incomplete)
 
 
-@app.route("/dataset-bulk/", methods=["GET", "POST"])
+@component.route("/dataset-bulk/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manipulate_all_datasets")
 def dataset_bulk():
@@ -981,7 +982,7 @@ def dataset_bulk():
     """
     incomplete = []
     forminput = {}
-    datasources = {datasource: meta["name"] for datasource, meta in fourcat_modules.datasources.items()}
+    datasources = {datasource: meta["name"] for datasource, meta in current_app.fourcat.modules.datasources.items()}
 
     if request.method == "POST":
         # action depends on which button was clicked
@@ -1050,7 +1051,7 @@ def dataset_bulk():
             flash(f"{len(bulk_owner):,} new owner(s) were added to the datasets.")
 
         if not incomplete:
-            datasets = [DataSet(data=dataset, db=db, modules=fourcat_modules) for dataset in datasets_meta]
+            datasets = [DataSet(data=dataset, db=db, modules=current_app.fourcat.modules) for dataset in datasets_meta]
             flash(f"{len(datasets):,} dataset(s) updated.")
 
             if action == "export":

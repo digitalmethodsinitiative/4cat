@@ -11,11 +11,10 @@ import os
 
 from pathlib import Path
 
-from flask import jsonify, request, render_template, render_template_string, redirect, url_for, flash, \
+from flask import Blueprint, current_app, jsonify, request, render_template, render_template_string, redirect, url_for, flash, \
 	get_flashed_messages, send_from_directory
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, openapi, limiter, queue, config, fourcat_modules
 from webtool.lib.helpers import error, setting_required, parse_markdown
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
@@ -28,15 +27,18 @@ from common.lib.helpers import UserInput, call_api
 from common.lib.user import User
 from backend.lib.worker import BasicWorker
 
-api_ratelimit = limiter.shared_limit("3 per second", scope="api")
-config = ConfigWrapper(config, user=current_user, request=request)
+component = Blueprint("toolapi", __name__)
+api_ratelimit = current_app.limiter.shared_limit("3 per second", scope="api")
+config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
+
+db = current_app.fourcat.db
 
 API_SUCCESS = 200
 API_FAIL = 404
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
-@app.route("/api/")
+@component.route("/api/")
 @api_ratelimit
 def openapi_overview():
 	return jsonify({
@@ -44,13 +46,13 @@ def openapi_overview():
 		"data": {
 			api_id: "http" + (
 				"s" if config.get("flask.https") else "") + "://" + config.get("flask.server_name") + "/api/spec/" + api_id + "/swagger.json"
-			for api_id in openapi.apis
+			for api_id in current_app.fourcat.openapi.apis
 		}
 	})
 
 
-@app.route('/api/spec/<string:api_id>/')
-@app.route('/api/spec/<string:api_id>/swagger.json')
+@component.route('/api/spec/<string:api_id>/')
+@component.route('/api/spec/<string:api_id>/swagger.json')
 @api_ratelimit
 def openapi_specification(api_id="all"):
 	"""
@@ -58,10 +60,10 @@ def openapi_specification(api_id="all"):
 
 	:return: OpenAPI-formatted API specification
 	"""
-	return jsonify(openapi.generate(api_id))
+	return jsonify(current_app.fourcat.openapi.generate(api_id))
 
 
-@app.route('/api/status.json')
+@component.route('/api/status.json')
 @api_ratelimit
 def api_status():
 	"""
@@ -71,7 +73,7 @@ def api_status():
 	"""
 
 	# get job stats
-	queue = JobQueue(logger=log, database=db)
+	queue = JobQueue(logger=current_app.fourcat.log, database=db)
 	jobs = queue.get_all_jobs()
 	jobs_count = len(jobs)
 	jobs_types = set([job.data["jobtype"] for job in jobs])
@@ -103,7 +105,7 @@ def api_status():
 	return jsonify(response)
 
 
-@app.route("/api/datasource-form/<string:datasource_id>/")
+@component.route("/api/datasource-form/<string:datasource_id>/")
 @login_required
 @setting_required("privileges.can_create_dataset")
 def datasource_form(datasource_id):
@@ -129,14 +131,14 @@ def datasource_form(datasource_id):
 
 	:return-error 404: If the datasource does not exist.
 	"""
-	if datasource_id not in fourcat_modules.datasources:
+	if datasource_id not in current_app.fourcat.modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	if datasource_id not in config.get('datasources.enabled'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	datasource = fourcat_modules.datasources[datasource_id]
-	worker_class = fourcat_modules.workers.get(datasource_id + "-search")
+	datasource = current_app.fourcat.modules.datasources[datasource_id]
+	worker_class = current_app.fourcat.modules.workers.get(datasource_id + "-search")
 
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
@@ -169,10 +171,10 @@ def datasource_form(datasource_id):
 	})
 
 
-@app.route("/api/import-dataset/", methods=["POST"])
+@component.route("/api/import-dataset/", methods=["POST"])
 @login_required
-@limiter.limit("5 per minute")
-@openapi.endpoint("tool")
+@current_app.limiter.limit("5 per minute")
+@current_app.fourcat.openapi.endpoint("tool")
 @setting_required("privileges.can_create_dataset")
 def import_dataset():
 	"""
@@ -209,13 +211,13 @@ def import_dataset():
 		.replace("5", "five").replace("6", "six").replace("7", "seven").replace("8", "eight") \
 		.replace("9", "nine")
 
-	if not platform or platform not in fourcat_modules.datasources or platform not in config.get('datasources.enabled'):
+	if not platform or platform not in current_app.fourcat.modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message=f"Unknown platform or source format '{platform}'")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
 	worker = None
 	for worker_type in worker_types:
-		worker = fourcat_modules.workers.get(worker_type)
+		worker = current_app.fourcat.modules.workers.get(worker_type)
 		if worker:
 			break
 
@@ -228,7 +230,7 @@ def import_dataset():
 		db=db,
 		owner=current_user.get_id(),
 		extension=worker.extension,
-		modules=fourcat_modules
+		modules=current_app.fourcat.modules
 	)
 	dataset.update_status("Importing uploaded file...")
 
@@ -259,21 +261,21 @@ def import_dataset():
 
 			outfile.write(chunk)
 
-	job = queue.add_job(worker_type, {"file": str(temporary_path)}, dataset.key)
+	job = current_app.fourcat.queue.add_job(worker_type, {"file": str(temporary_path)}, dataset.key)
 	dataset.link_job(job)
 
 	return jsonify({
 		"status": "queued",
 		"key": dataset.key,
-		"url": url_for("show_result", key=dataset.key)
+		"url": url_for("dataset.show_result", key=dataset.key)
 	})
 
 
-@app.route("/api/queue-query/", methods=["POST"])
+@component.route("/api/queue-query/", methods=["POST"])
 @login_required
 @setting_required("privileges.can_create_dataset")
-@limiter.limit("5 per minute")
-@openapi.endpoint("tool")
+@current_app.limiter.limit("5 per minute")
+@current_app.fourcat.openapi.endpoint("tool")
 def queue_dataset():
 	"""
 	Queue a 4CAT search query for processing into a dataset
@@ -291,14 +293,14 @@ def queue_dataset():
 	"""
 
 	datasource_id = request.form.get("datasource", "")
-	if datasource_id not in fourcat_modules.datasources:
+	if datasource_id not in current_app.fourcat.modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	search_worker_id = datasource_id + "-search"
-	if search_worker_id not in fourcat_modules.workers:
+	if search_worker_id not in current_app.fourcat.modules.workers:
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
-	search_worker = fourcat_modules.workers[search_worker_id]
+	search_worker = current_app.fourcat.modules.workers[search_worker_id]
 
 	# handle confirmation outside of parameter parsing, since it is not data
 	# source specific
@@ -363,7 +365,7 @@ def queue_dataset():
 		extension=extension,
 		is_private=is_private,
 		owner=current_user.get_id(),
-		modules=fourcat_modules
+		modules=current_app.fourcat.modules
 	)
 
 	# this bit allows search workers to insist on the new dataset having a
@@ -378,16 +380,16 @@ def queue_dataset():
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
-	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=0)
+	current_app.fourcat.queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=0)
 	new_job = Job.get_by_remote_ID(dataset.key, db)
 	dataset.link_job(new_job)
 
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
 
-@app.route('/api/check-query/')
+@component.route('/api/check-query/')
 @setting_required("privileges.can_create_dataset")
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def check_dataset():
 	"""
 	Check dataset status
@@ -420,7 +422,7 @@ def check_dataset():
 	block = request.args.get("block", "status")
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -455,15 +457,15 @@ def check_dataset():
 		"empty": (dataset.data["num_rows"] == 0),
 		"is_favourite": (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
 									 (current_user.get_id(), dataset.key))["num"] > 0),
-		"url": url_for("show_result", key=dataset.key, _external=True)
+		"url": url_for("dataset.show_result", key=dataset.key, _external=True)
 	}
 
 	return jsonify(status)
 
-@app.route("/api/edit-dataset-label/<string:key>/", methods=["POST"])
+@component.route("/api/edit-dataset-label/<string:key>/", methods=["POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def edit_dataset_label(key):
 	"""
 	Change label for a dataset
@@ -490,7 +492,7 @@ def edit_dataset_label(key):
 	label = request.form.get("label", "")
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -500,15 +502,15 @@ def edit_dataset_label(key):
 	dataset.update_label(label)
 	return jsonify({
 		"key": dataset.key,
-		"url": url_for("show_result", key=dataset.key),
+		"url": url_for("dataset.show_result", key=dataset.key),
 		"label": dataset.get_label()
 	})
 
 
-@app.route("/api/convert-dataset/<string:key>/", methods=["POST"])
+@component.route("/api/convert-dataset/<string:key>/", methods=["POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def convert_dataset(key):
 	"""
 	Change the type of custom datasets.
@@ -535,7 +537,7 @@ def convert_dataset(key):
 	datasource = request.form.get("to_datasource", "")
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -545,14 +547,14 @@ def convert_dataset(key):
 	dataset.change_datasource(datasource)
 	return jsonify({
 		"key": dataset.key,
-		"url": url_for("show_result", key=dataset.key),
+		"url": url_for("dataset.show_result", key=dataset.key),
 		"label": dataset.get_label()
 	})
 
-@app.route("/api/nuke-query/<string:key>", methods=["POST"])
+@component.route("/api/nuke-query/<string:key>", methods=["POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def nuke_dataset(key=None, reason=None):
 	"""
 	Use executive override to cancel a query
@@ -583,7 +585,7 @@ def nuke_dataset(key=None, reason=None):
 		reason = "[no reason given]"
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -625,16 +627,16 @@ def nuke_dataset(key=None, reason=None):
 	dataset.finish(0)
 
 	if request.args.get("redirect") is not None:
-		return redirect(url_for("show_result", key=dataset.key))
+		return redirect(url_for("dataset.show_result", key=dataset.key))
 	else:
 		return jsonify({"status": "success", "key": dataset.key})
 
 
-@app.route("/api/delete-dataset/", defaults={"key": None}, methods=["DELETE", "GET", "POST"])
-@app.route("/api/delete-dataset/<string:key>/", methods=["DELETE", "GET", "POST"])
+@component.route("/api/delete-dataset/", defaults={"key": None}, methods=["DELETE", "GET", "POST"])
+@component.route("/api/delete-dataset/<string:key>/", methods=["DELETE", "GET", "POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def delete_dataset(key=None):
 	"""
 	Delete a dataset
@@ -656,7 +658,7 @@ def delete_dataset(key=None):
 	dataset_key = request.form.get("key", "") if not key else key
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -664,24 +666,24 @@ def delete_dataset(key=None):
 		return error(403, message="Not allowed")
 
 	# do we have a parent?
-	parent_dataset = DataSet(key=dataset.key_parent, db=db, modules=fourcat_modules) if dataset.key_parent else None
+	parent_dataset = DataSet(key=dataset.key_parent, db=db, modules=current_app.fourcat.modules) if dataset.key_parent else None
 
 	# and delete the dataset and child datasets
 	dataset.delete()
 
 	if request.args.get("redirect") is not None:
 		if parent_dataset:
-			return redirect(url_for("show_result", key=parent_dataset.key))
+			return redirect(url_for("dataset.show_result", key=parent_dataset.key))
 		else:
-			return redirect(url_for("show_results"))
+			return redirect(url_for("dataset.show_results"))
 	else:
 		return jsonify({"status": "success", "key": dataset.key})
 
 
-@app.route("/api/erase-credentials/", methods=["DELETE"])
+@component.route("/api/erase-credentials/", methods=["DELETE"])
 @api_ratelimit
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def erase_credentials(key=None):
 	"""
 	Erase sensitive parameters from dataset
@@ -703,7 +705,7 @@ def erase_credentials(key=None):
 	dataset_key = request.form.get("key", "") if not key else key
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -716,16 +718,16 @@ def erase_credentials(key=None):
 
 	if request.args.get("redirect") is not None:
 		flash("Credentials erased.")
-		return redirect(url_for("show_result", key=dataset.key))
+		return redirect(url_for("dataset.show_result", key=dataset.key))
 	else:
 		return jsonify({"status": "success", "key": dataset.key})
 
 
-@app.route("/api/remove-tag/", methods=["GET"])
+@component.route("/api/remove-tag/", methods=["GET"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.admin.can_manage_tags")
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def remove_tag():
 	"""
 	Remove tag from all users with that tag
@@ -764,14 +766,14 @@ def remove_tag():
 
 	if request.args.get("redirect") is not None:
 		flash("Tag removed.")
-		return redirect(url_for("manipulate_tags"))
+		return redirect(url_for("admin.manipulate_tags"))
 	else:
 		return jsonify({"status": "success"})
 
-@app.route("/api/add-dataset-owner/", methods=["POST"])
+@component.route("/api/add-dataset-owner/", methods=["POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def add_dataset_owner(key=None, username=None, role=None):
 	"""
 	Add an owner to the dataset
@@ -801,7 +803,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 	usernames = request.form.get("name", "") if not username else username
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -825,7 +827,7 @@ def add_dataset_owner(key=None, username=None, role=None):
 
 	if request.args.get("redirect") is not None:
 		flash("Dataset owner added.")
-		return redirect(url_for("show_result", key=dataset_key))
+		return redirect(url_for("dataset.show_result", key=dataset_key))
 	else:
 		return jsonify({
 			"status": "success",
@@ -834,10 +836,10 @@ def add_dataset_owner(key=None, username=None, role=None):
 		})
 
 
-@app.route("/api/remove-dataset-owner/", methods=["DELETE"])
+@component.route("/api/remove-dataset-owner/", methods=["DELETE"])
 @api_ratelimit
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def remove_dataset_owner(key=None, username=None):
 	"""
 	Add an owner to the dataset
@@ -862,7 +864,7 @@ def remove_dataset_owner(key=None, username=None):
 	username = request.form.get("name", "") if not username else username
 
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -880,14 +882,14 @@ def remove_dataset_owner(key=None, username=None):
 
 	if request.args.get("redirect") is not None:
 		flash("Dataset owner removed.")
-		return redirect(url_for("show_result", key=dataset_key))
+		return redirect(url_for("dataset.show_result", key=dataset_key))
 	else:
 		return jsonify({"status": "success", "key": dataset.key})
 
 
-@app.route("/api/check-search-queue/")
+@component.route("/api/check-search-queue/")
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def check_search_queue():
 	"""
 	Get the amount of search query datasets yet to finish processing.
@@ -899,7 +901,7 @@ def check_search_queue():
 	unfinished_jobs = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
 
 	for i, job in enumerate(unfinished_jobs):
-		processor = fourcat_modules.processors.get(job["jobtype"])
+		processor = current_app.fourcat.modules.processors.get(job["jobtype"])
 		if processor:
 			unfinished_jobs[i]["processor_name"] = processor.title
 		else:
@@ -907,9 +909,9 @@ def check_search_queue():
 
 	return jsonify(unfinished_jobs)
 
-@app.route("/api/toggle-dataset-favourite/<string:key>")
+@component.route("/api/toggle-dataset-favourite/<string:key>")
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def toggle_favourite(key):
 	"""
 	'Like' a dataset
@@ -925,7 +927,7 @@ def toggle_favourite(key):
 	:return-error 404:  If the dataset key was not found
 	"""
 	try:
-		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -941,13 +943,13 @@ def toggle_favourite(key):
 
 	if request.args.get("redirect") is not None:
 		flash("Dataset favourite status updated.")
-		return redirect(url_for("show_result", key=dataset.key))
+		return redirect(url_for("dataset.show_result", key=dataset.key))
 	else:
 		return jsonify({"success": True, "favourite_status": not current_status})
 
-@app.route("/api/toggle-dataset-private/<string:key>")
+@component.route("/api/toggle-dataset-private/<string:key>")
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def toggle_private(key):
 	"""
 	Toggle whether a dataset is private or not
@@ -965,7 +967,7 @@ def toggle_private(key):
 	:return-error 404:  If the dataset key was not found
 	"""
 	try:
-		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset does not exist.")
 
@@ -978,15 +980,15 @@ def toggle_private(key):
 
 	if request.args.get("redirect") is not None:
 		flash("Dataset private status toggled.")
-		return redirect(url_for("show_result", key=dataset.key))
+		return redirect(url_for("dataset.show_result", key=dataset.key))
 	else:
 		return jsonify({"success": True, "is_private": dataset.is_private})
 
-@app.route("/api/queue-processor/", methods=["POST"])
+@component.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def queue_processor(key=None, processor=None):
 	"""
 	Queue a new processor
@@ -1026,7 +1028,7 @@ def queue_processor(key=None, processor=None):
 
 	# cover all bases - can only run processor on "parent" dataset
 	try:
-		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Not a valid dataset key.")
 
@@ -1063,7 +1065,7 @@ def queue_processor(key=None, processor=None):
 					   type=processor,
 					   is_private=dataset.is_private,
 					   owner=current_user.get_id(),
-					   modules=fourcat_modules
+					   modules=current_app.fourcat.modules
 	)
 
 	# give same ownership as parent dataset
@@ -1071,7 +1073,7 @@ def queue_processor(key=None, processor=None):
 
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
-		queue.add_job(jobtype=processor, remote_id=analysis.key)
+		current_app.fourcat.queue.add_job(jobtype=processor, remote_id=analysis.key)
 		job = Job.get_by_remote_ID(analysis.key, database=db)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
@@ -1087,15 +1089,15 @@ def queue_processor(key=None, processor=None):
 		"container": "*[data-dataset-key=" + dataset.key + "]",
 		"key": analysis.key,
 		"html": render_template("components/result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
-                                processors=fourcat_modules.processors) if analysis.is_new else "",
+                                processors=current_app.fourcat.modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
 		"is_filter": available_processors[processor].is_filter()
 	})
 
 
-@app.route('/api/check-processors/')
+@component.route('/api/check-processors/')
 @login_required
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def check_processor():
 	"""
 	Check processor status
@@ -1124,7 +1126,7 @@ def check_processor():
 
 	for key in keys:
 		try:
-			dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+			dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
 		except DataSetException:
 			continue
 
@@ -1141,7 +1143,7 @@ def check_processor():
 			"progress": round(dataset.get_progress() * 100),
 			"html": render_template("components/result-child.html", child=dataset, dataset=parent,
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
-                                    processors=fourcat_modules.processors),
+                                    processors=current_app.fourcat.modules.processors),
 			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
 			"url": "/result/" + dataset.data["result_file"]
 		})
@@ -1149,10 +1151,10 @@ def check_processor():
 	return jsonify(children)
 
 
-@app.route("/api/request-token/")
+@component.route("/api/request-token/")
 @login_required
 @setting_required("privileges.can_create_api_token")
-@openapi.endpoint("tool")
+@current_app.fourcat.openapi.endpoint("tool")
 def request_token():
 	"""
 	Request an access token
@@ -1192,12 +1194,12 @@ def request_token():
 
 	if request.args.get("forward"):
 		# show HTML page
-		return redirect(url_for("show_access_tokens"))
+		return redirect(url_for("user.show_access_tokens"))
 	else:
 		# show JSON response (by default)
 		return jsonify(token)
 
-@app.route("/api/export-packed-dataset/<string:key>/<string:component>/")
+@component.route("/api/export-packed-dataset/<string:key>/<string:component>/")
 @login_required
 @setting_required("privileges.can_export_datasets")
 def export_packed_dataset(key=None, component=None):
@@ -1209,7 +1211,7 @@ def export_packed_dataset(key=None, component=None):
 	:return:
 	"""
 	try:
-		dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 

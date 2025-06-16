@@ -3,6 +3,7 @@ import sys
 import os
 import logging
 
+from collections import namedtuple
 from functools import partial
 from pathlib import Path
 
@@ -36,10 +37,8 @@ from common.lib.user import User  # noqa: E402
 from webtool.lib.helpers import generate_css_colours  # noqa: E402
 from webtool.lib.openapi_collector import OpenAPICollector  # noqa: E402
 
-# initialize global objects for interacting with all the things
-login_manager = LoginManager()
+# make a web app!
 app = Flask(__name__)
-fourcat_modules = ModuleCollector()
 
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy
@@ -47,15 +46,17 @@ fourcat_modules = ModuleCollector()
 proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
 app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
+# set up logger for error logging etc
 if config.get("USING_DOCKER"):
-    # rename 4cat.log to 4cat_frontend.log
-    # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
+    # in Docker it is useful to have two separate files - since 4CAT is also
+    # in two separate containers
     log = Logger(logger_name='4cat-frontend', filename='frontend_4cat.log')
-
 else:
     log = Logger(logger_name='4cat-frontend')
 
-# Set up logging for Gunicorn
+# set up logging for Gunicorn
+# this redirects Gunicorn log messages to the logger instantiated above - more
+# sensible than having yet another separate log file
 if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     # Add Gunicorn error log to main app logger
     gunicorn_logger = logging.getLogger('gunicorn.error')
@@ -89,23 +90,18 @@ else:
     def time_this(func):
         return func
 
+# 4CAT compontents we need access to from within the web app
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
               password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
               port=config.get("DB_PORT"), appname="frontend")
 config.with_db(db)
 queue = JobQueue(logger=log, database=db)
 
-# initialize openapi endpoint collector for later specification generation
-openapi = OpenAPICollector(app)
-
-# initialize rate limiter
-limiter = Limiter(app=app, key_func=get_remote_address)
-
 # make sure a secret key was set in the config file, for secure session cookies
 if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPLACE_THIS":
     raise Exception("You need to set the flask.secret_key setting running the web tool.")
 
-# initialize login manager
+# initialize Flask configuration from config manager
 app.config.from_mapping({
     "FLASK_APP": config.get("flask.flask_app"),
     "SECRET_KEY": config.get("flask.secret_key"),
@@ -116,29 +112,64 @@ app.config.from_mapping({
     "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
     "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http"
 })
-login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
-login_manager.init_app(app)
-login_manager.login_view = "show_login"
 
 # Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
 Request.max_form_parts = config.get("flask.max_form_parts", 1000)
 
-# import all views
-# these are also imported late, because they also rely on things set up beforehand
-import webtool.views.views_admin  # noqa: F401, E402
-import webtool.views.views_extensions  # noqa: F401, E402
-import webtool.views.views_restart  # noqa: F401, E402
-import webtool.views.views_user  # noqa: F401, E402
+# set up login manager
+app.login_manager = LoginManager()
+app.login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
+app.login_manager.init_app(app)
+app.login_manager.login_view = "user.show_login"
 
-import webtool.views.views_dataset  # noqa: F401, E402
-import webtool.views.views_misc  # noqa: F401, E402
-import webtool.views.views_explorer  # noqa: F401, E402
+# initialize rate limiter
+app.limiter = Limiter(app=app, key_func=get_remote_address)
 
-import webtool.views.api_standalone  # noqa: F401, E402
-import webtool.views.api_tool  # noqa: F401, E402
+# initialize OpenAPI schema helper
+openapi = OpenAPICollector(app)
 
-# import custom jinja2 template filters
-import webtool.lib.template_filters  # noqa: F401, E402
+# now create an app context to import Blueprints into
+# the app context allows us to pass some values for use inside the Blueprints
+# which they can access via `current_app` - this eliminates the need for
+# circular imports (importing app from inside the Blueprint)
+with app.app_context():
+
+    # these are app-wide, 4CAT-specific objects that we give their own
+    # namespace to avoid conflicts (e.g. with app.config)
+    app.fourcat = namedtuple("FourcatContext", ("queue", "db", "log", "openapi", "modules"))
+    app.fourcat.config = config
+    app.fourcat.queue = queue
+    app.fourcat.db = db
+    app.fourcat.log = log
+    app.fourcat.openapi = openapi
+    app.fourcat.modules = ModuleCollector()
+
+    # import all views
+    # these can only be imported here because they rely on current_app for
+    # initialisation
+    import webtool.views.views_restart  # noqa: E402
+    import webtool.views.views_admin  # noqa: E402
+    import webtool.views.views_extensions  # noqa: E402
+    import webtool.views.views_user  # noqa: E402
+    import webtool.views.views_dataset  # noqa: E402
+    import webtool.views.views_misc  # noqa: E402
+    import webtool.views.views_explorer  # noqa: E402
+    import webtool.views.api_standalone  # noqa: E402
+    import webtool.views.api_tool  # noqa: E402
+    
+    app.register_blueprint(webtool.views.views_restart.component)
+    app.register_blueprint(webtool.views.views_admin.component)
+    app.register_blueprint(webtool.views.views_extensions.component)
+    app.register_blueprint(webtool.views.views_user.component)
+    app.register_blueprint(webtool.views.views_dataset.component)
+    app.register_blueprint(webtool.views.views_misc.component)
+    app.register_blueprint(webtool.views.views_explorer.component)
+    app.register_blueprint(webtool.views.api_standalone.component)
+    app.register_blueprint(webtool.views.api_tool.component)
+
+    # import custom jinja2 template filters
+    # these also benefit from current_app
+    import webtool.lib.template_filters  # noqa: E402
 
 # ensure that colour definition CSS file is present
 generate_css_colours()

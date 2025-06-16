@@ -8,7 +8,7 @@
 <div class="image-preview-container">
     <input type="checkbox" name="image-zoom" class="image-zoom" id="image-zoom" >
     <label for="image-zoom">
-        <img src="{{ url_for('get_result', query_file=dataset.result_file) }}" alt="">
+        <img src="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}" alt="">
     </label>
 </div>
 </body>

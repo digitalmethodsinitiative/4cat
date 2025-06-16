@@ -22,7 +22,7 @@ class Pagination(object):
 	Provide pagination
 	"""
 
-	def __init__(self, page, per_page, total_count, route="show_results", route_args=None):
+	def __init__(self, page, per_page, total_count, route="dataset.show_results", route_args=None):
 		"""
 		Set up pagination object
 

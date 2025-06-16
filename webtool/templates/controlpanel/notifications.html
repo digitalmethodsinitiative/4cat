@@ -21,7 +21,7 @@
                 if a notification is sent to !everyone or a specific tag and made dismissable, any user can dismiss
                 it and that will delete the notification for all other users (so you probably shouldn't do that).</p>
 
-            <form action="{{ url_for("manipulate_notifications") }}" method="POST" class="wide">
+            <form action="{{ url_for("admin.manipulate_notifications") }}" method="POST" class="wide">
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice|safe }}</p>
                 {% endfor %}

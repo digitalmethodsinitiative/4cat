@@ -7,11 +7,10 @@ import io
 
 import flask
 import json_stream
-from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
+from flask import Blueprint, current_app, render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, config, fourcat_modules, time_this
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
@@ -19,28 +18,29 @@ from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
 from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user, request=request)
+component = Blueprint("dataset", __name__)
+config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
+db = current_app.fourcat.db
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
-@app.route('/create-dataset/')
+@component.route('/create-dataset/')
 @login_required
 @setting_required("privileges.can_create_dataset")
 def create_dataset():
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in current_app.fourcat.modules.datasources.items() if
                    metadata["has_worker"] and metadata["has_options"] and datasource in config.get(
                        "datasources.enabled", {})}
 
     return render_template('create-dataset.html', datasources=datasources)
 
 
-@app.route('/results/', defaults={'page': 1})
-@app.route('/results/page/<int:page>/')
-@time_this
+@component.route('/results/', defaults={'page': 1})
+@component.route('/results/page/<int:page>/')
 @login_required
 def show_results(page):
     """
@@ -141,12 +141,12 @@ def show_results(page):
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = [DataSet(key=dataset["key"], db=db, modules=fourcat_modules) for dataset in datasets]
+    filtered = [DataSet(key=dataset["key"], db=db, modules=current_app.fourcat.modules) for dataset in datasets]
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in current_app.fourcat.modules.datasources.items() if
                    metadata["has_worker"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
@@ -158,7 +158,7 @@ Downloading results
 """
 
 
-@app.route('/result/<path:query_file>')
+@component.route('/result/<path:query_file>')
 def get_result(query_file):
     """
     Get dataset result file
@@ -170,7 +170,7 @@ def get_result(query_file):
     return send_from_directory(directory=config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')), path=query_file)
 
 
-@app.route('/mapped-result/<string:key>/')
+@component.route('/mapped-result/<string:key>/')
 def get_mapped_result(key):
     """
     Get mapped result
@@ -185,7 +185,7 @@ def get_mapped_result(key):
     :param str key:  Dataset key
     """
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -219,15 +219,15 @@ def get_mapped_result(key):
             buffer.seek(0)
 
     disposition = 'attachment; filename="%s"' % dataset.get_results_path().with_suffix(".csv").name
-    return app.response_class(stream_with_context(map_response()), mimetype="text/csv",
+    return current_app.response_class(stream_with_context(map_response()), mimetype="text/csv",
                               headers={"Content-Disposition": disposition})
 
 
-@app.route("/results/<string:key>/log/")
+@component.route("/results/<string:key>/log/")
 @login_required
 def view_log(key):
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -245,8 +245,7 @@ def view_log(key):
     return log
 
 
-@app.route("/preview/<string:key>/")
-@time_this
+@component.route("/preview/<string:key>/")
 def preview_items(key):
     """
     Preview a dataset file
@@ -258,7 +257,7 @@ def preview_items(key):
     :return:  HTML preview
     """
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
@@ -374,9 +373,8 @@ def preview_items(key):
 """
 Individual result pages
 """
-@app.route('/results/<string:key>/processors/')
-@app.route('/results/<string:key>/')
-@time_this
+@component.route('/results/<string:key>/processors/')
+@component.route('/results/<string:key>/')
 def show_result(key):
     """
     Show result page
@@ -388,7 +386,7 @@ def show_result(key):
     :return:  Rendered template
     """
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
     except DataSetException:
         return error(404, error="This dataset cannot be found.")
 
@@ -408,7 +406,7 @@ def show_result(key):
 
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
-    datasources = fourcat_modules.datasources
+    datasources = current_app.fourcat.modules.datasources
     datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
     can_unexpire = ((config.get("expire.allow_optout") and \
@@ -434,14 +432,14 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "result.html" if standalone else "components/result-details.html"
 
-    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=fourcat_modules.processors,
+    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=current_app.fourcat.modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
                            datasources=datasources)
 
 
-@app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
+@component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required
 def queue_processor_interactive(key, processor):
     """
@@ -460,7 +458,7 @@ def queue_processor_interactive(key, processor):
         return redirect("/results/" + key + "/")
 
 
-@app.route("/results/<string:key>/toggle-favourite/")
+@component.route("/results/<string:key>/toggle-favourite/")
 @login_required
 def toggle_favourite_interactive(key):
     """
@@ -488,7 +486,7 @@ def toggle_favourite_interactive(key):
         return render_template("error.html", message="Error while toggling favourite status for dataset %s." % key)
 
 
-@app.route("/results/<string:key>/toggle-private/")
+@component.route("/results/<string:key>/toggle-private/")
 @login_required
 def toggle_private_interactive(key):
     """
@@ -516,11 +514,11 @@ def toggle_private_interactive(key):
         return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
 
 
-@app.route("/results/<string:key>/keep/", methods=["GET"])
+@component.route("/results/<string:key>/keep/", methods=["GET"])
 @login_required
 def keep_dataset(key):
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=db, modules=current_app.fourcat.modules)
     except DataSetException:
         return error(404, message="Dataset not found.")
 
@@ -549,4 +547,4 @@ def keep_dataset(key):
         dataset.keep = True
 
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
-    return redirect(url_for("show_result", key=key))
+    return redirect(url_for("dataset.show_result", key=key))

@@ -15,21 +15,22 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
+from flask import current_app, Blueprint, request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
-from webtool import app, login_manager, db, config
-from webtool.views.api_tool import limiter
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
 from common.lib.helpers import send_email, get_software_commit
+from common.config_manager import ConfigWrapper
 
 from pathlib import Path
 
-from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user, request=request)
+component = Blueprint("user", __name__)
+config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
+db = current_app.fourcat.db
+
 access_request_limit = config.get("4cat.access_request_limit", default="100/day")
 
-@login_manager.user_loader
+@current_app.login_manager.user_loader
 def load_user(user_name):
     """
     Load user object
@@ -44,7 +45,7 @@ def load_user(user_name):
     return user
 
 
-@login_manager.request_loader
+@current_app.login_manager.request_loader
 def load_user_from_request(request):
     """
     Load user object via access token
@@ -78,7 +79,7 @@ def load_user_from_request(request):
         user.authenticate()
         return user
 
-@login_manager.unauthorized_handler
+@current_app.login_manager.unauthorized_handler
 def unauthorized():
     """
     Handle unauthorized requests
@@ -89,10 +90,10 @@ def unauthorized():
     if current_user.is_authenticated:
         return render_template("error.html", message="You cannot view this page."), 403
     else:
-        return redirect(url_for("show_login"))
+        return redirect(url_for("user.show_login"))
 
 
-@app.before_request
+@component.before_request
 def reroute_requests():
     """
     Sometimes the requested route should be overruled
@@ -112,10 +113,10 @@ def reroute_requests():
             request.url_rule and request.url_rule.endpoint not in ("static", "first_run_dialog"):
         wants_phone_home = not config.get("4cat.phone_home_asked", False)
         if wants_phone_home:
-            return redirect(url_for("first_run_dialog"))
+            return redirect(url_for("user.first_run_dialog"))
 
 
-@app.before_request
+@component.before_request
 def autologin_whitelist():
     """
     Checks if host name matches whitelisted hostmask or IP. If so, the user is
@@ -157,7 +158,7 @@ def autologin_whitelist():
         login_user(autologin_user, remember=False)
 
 
-@limiter.request_filter
+@current_app.limiter.request_filter
 def exempt_from_limit():
     """
     Checks if host name matches whitelisted hostmasks for exemption from API
@@ -183,7 +184,7 @@ def exempt_from_limit():
     return False
 
 
-@app.route("/first-run/", methods=["GET", "POST"])
+@component.route("/first-run/", methods=["GET", "POST"])
 def first_run_dialog():
     """
     Special route for creating an initial admin user
@@ -302,11 +303,11 @@ def first_run_dialog():
     # don't ask phone home again until next update
     config.set("4cat.phone_home_asked", True)
 
-    redirect_path = "show_login" if not has_admin_user else "show_frontpage"
+    redirect_path = "user.show_login" if not has_admin_user else "misc.show_frontpage"
     return redirect(url_for(redirect_path))
 
 
-@app.route('/login/', methods=['GET', 'POST'])
+@component.route('/login/', methods=['GET', 'POST'])
 def show_login():
     """
     Handle logging in
@@ -317,11 +318,11 @@ def show_login():
     :return: Redirect to either the URL form, or the index (if logged in)
     """
     if current_user.is_authenticated:
-        return redirect(url_for("show_frontpage"))
+        return redirect(url_for("misc.show_frontpage"))
 
     has_admin_user = db.fetchone("SELECT * FROM users WHERE tags @> '[\"admin\"]'")
     if not has_admin_user:
-        return redirect(url_for("first_run_dialog"))
+        return redirect(url_for("user.first_run_dialog"))
 
     have_email = config.get('mail.admin_email') and config.get('mail.server')
     if request.method == 'GET':
@@ -333,14 +334,14 @@ def show_login():
 
     if registered_user is None:
         flash('Username or Password is invalid.', 'error')
-        return redirect(url_for('show_login'))
+        return redirect(url_for('user.show_login'))
 
     login_user(registered_user, remember=True)
 
-    return redirect(url_for("show_frontpage"))
+    return redirect(url_for("misc.show_frontpage"))
 
 
-@app.route("/logout")
+@component.route("/logout")
 @login_required
 def logout():
     """
@@ -350,12 +351,12 @@ def logout():
     """
     logout_user()
     flash("You have been logged out of 4CAT.")
-    return redirect(url_for("show_login"))
+    return redirect(url_for("user.show_login"))
 
 
-@app.route("/request-access/", methods=["GET", "POST"])
+@component.route("/request-access/", methods=["GET", "POST"])
 @setting_required("4cat.allow_access_request")
-@limiter.limit(access_request_limit, methods=["POST"])
+@current_app.limiter.limit(access_request_limit, methods=["POST"])
 def request_access():
     """
     Request a 4CAT Account
@@ -427,7 +428,7 @@ def request_access():
                            form=request.form, access_policy=access_policy)
 
 
-@app.route("/reset-password/", methods=["GET", "POST"])
+@component.route("/reset-password/", methods=["GET", "POST"])
 def reset_password():
     """
     Reset a password
@@ -465,7 +466,7 @@ def reset_password():
             resetting_user.set_password(password)
             resetting_user.clear_token()
             flash("Your password has been set. You can now log in to 4CAT.")
-            return redirect(url_for("show_login"))
+            return redirect(url_for("user.show_login"))
 
     # show form
     return render_template("account/reset-password.html", username=resetting_user.get_name(), incomplete=incomplete,
@@ -473,8 +474,8 @@ def reset_password():
                            form=request.form)
 
 
-@app.route("/request-password/", methods=["GET", "POST"])
-@limiter.limit("6 per minute")
+@component.route("/request-password/", methods=["GET", "POST"])
+@current_app.limiter.limit("6 per minute")
 def request_password():
     """
     Request a password reset
@@ -527,14 +528,27 @@ def request_password():
                            form=request.form)
 
 
-@app.route("/dismiss-notification/<int:notification_id>")
+
+@component.route("/access-tokens/")
+@login_required
+def show_access_tokens():
+    user = current_user.get_id()
+
+    if user == "autologin":
+        return error(403, message="You cannot view or generate access tokens without a personal acount.")
+
+    tokens = db.fetchall("SELECT * FROM access_tokens WHERE name = %s", (user,))
+
+    return render_template("access-tokens.html", tokens=tokens)
+
+@component.route("/dismiss-notification/<int:notification_id>")
 def dismiss_notification(notification_id):
     current_user.dismiss_notification(notification_id)
 
     if not request.args.get("async"):
         redirect_url = request.headers.get("Referer")
         if not redirect_url:
-            redirect_url = url_for("show_frontpage")
+            redirect_url = url_for("misc.show_frontpage")
 
         return redirect(redirect_url)
     else:

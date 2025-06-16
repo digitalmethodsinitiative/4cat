@@ -17,19 +17,19 @@ import sys
 import os
 
 from pathlib import Path
-from flask import render_template, request, flash, get_flashed_messages, jsonify
+from flask import Blueprint, current_app, render_template, request, flash, get_flashed_messages, jsonify
 
 from flask_login import login_required, current_user
-
-from webtool import app, queue, config
 from webtool.lib.helpers import setting_required, check_restart_request
 
 from common.lib.helpers import get_github_version, get_git_branch
 
 from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user, request=request)
+config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
 
-@app.route("/admin/trigger-restart/", methods=["POST", "GET"])
+component = Blueprint("restart", __name__)
+
+@component.route("/admin/trigger-restart/", methods=["POST", "GET"])
 @login_required
 @setting_required("privileges.admin.can_restart")
 def trigger_restart():
@@ -99,7 +99,7 @@ def trigger_restart():
 
         # from here on, the back-end takes over
         details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
-        queue.add_job("restart-4cat", details, mode)
+        current_app.fourcat.queue.add_job("restart-4cat", details, mode)
         flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
 
     current_branch = get_git_branch()
@@ -108,7 +108,7 @@ def trigger_restart():
                            release_notes=release_notes, current_branch=current_branch)
 
 
-@app.route("/admin/trigger-frontend-upgrade/", methods=["POST"])
+@component.route("/admin/trigger-frontend-upgrade/", methods=["POST"])
 def upgrade_frontend():
     """
     Run migrate.py in the frontend's environment
@@ -128,7 +128,7 @@ def upgrade_frontend():
     """
     # this route only makes sense in a Docker context
     if not config.get("USING_DOCKER") or not check_restart_request():
-        return app.login_manager.unauthorized()
+        return current_app.login_manager.unauthorized()
 
     restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
     frontend_version_file = Path(config.get("PATH_ROOT"), "config/.current-version-frontend")
@@ -147,7 +147,7 @@ def upgrade_frontend():
     # there should be one and only one job of this type, with the parameters of
     # our upgrade. it determines if we update to the latest release or to a
     # branch
-    upgrade_job = queue.get_job("restart-4cat", restrict_claimable=False)
+    upgrade_job = current_app.fourcat.queue.get_job("restart-4cat", restrict_claimable=False)
     command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {oslex.quote(upgrade_job.details['branch'])}"
 
     try:
@@ -169,7 +169,7 @@ def upgrade_frontend():
     return jsonify({"status": "OK" if upgrade_ok else "error", "message": ""})
 
 
-@app.route("/admin/trigger-frontend-restart/", methods=["POST"])
+@component.route("/admin/trigger-frontend-restart/", methods=["POST"])
 def trigger_restart_frontend():
     """
     Trigger a restart of the 4CAT front-end
@@ -200,7 +200,7 @@ def trigger_restart_frontend():
     # alternatively, this can be called directly, but only with the right
     # privileges
     if not check_restart_request() and not config.get("privileges.admin.can_restart"):
-        return app.login_manager.unauthorized()
+        return current_app.login_manager.unauthorized()
 
     # we support restarting with gunicorn and apache/mod_wsgi
     # nginx would usually be a front for gunicorn so that use case is also
@@ -276,7 +276,7 @@ def trigger_restart_frontend():
     return jsonify({"status": status, "message": message})
 
 
-@app.route("/admin/restart-log/")
+@component.route("/admin/restart-log/")
 @setting_required("privileges.admin.can_restart")
 def restart_log():
     """
