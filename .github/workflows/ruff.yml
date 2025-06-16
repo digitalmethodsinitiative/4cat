@@ -9,5 +9,8 @@ on:
     branches: [ "master" ]
 jobs:
   check_ruff_conforming:
-    name: ruff-action
-    uses: astral-sh/ruff-action@v3
+    name: Test conformance to Ruff code formatter
+    runs-on: ubuntu-latest
+    steps:
+      - name: ruff-action
+        uses: astral-sh/ruff-action@v3
