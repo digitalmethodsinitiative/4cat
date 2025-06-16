@@ -1,7 +1,7 @@
+import logging.handlers
 import subprocess
 import sys
 import os
-import logging
 
 from collections import namedtuple
 from functools import partial
@@ -19,7 +19,8 @@ if result.returncode != 0:
     exit(1)
 
 # the following are imported *after* the first-run stuff because they may rely
-# on things set up in there
+# on things set up in there - or should not run unless first-run completes
+# successfully!
 from flask import Flask  # noqa: E402
 from flask_login import LoginManager  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
@@ -74,6 +75,8 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
 
+# helper decorator to facilitate the timing of routes when running in debug
+# mode - if not running in debug mode, nothing happens.
 if app.logger.getEffectiveLevel() == 10:
     # if we're in debug mode, we want to see how long it takes to load datasets
     import time
@@ -89,6 +92,7 @@ if app.logger.getEffectiveLevel() == 10:
 else:
     def time_this(func):
         return func
+app.time_this = time_this
 
 # 4CAT compontents we need access to from within the web app
 db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
@@ -133,7 +137,6 @@ openapi = OpenAPICollector(app)
 # which they can access via `current_app` - this eliminates the need for
 # circular imports (importing app from inside the Blueprint)
 with app.app_context():
-
     # these are app-wide, 4CAT-specific objects that we give their own
     # namespace to avoid conflicts (e.g. with app.config)
     app.fourcat = namedtuple("FourcatContext", ("queue", "db", "log", "openapi", "modules"))
@@ -144,9 +147,8 @@ with app.app_context():
     app.fourcat.openapi = openapi
     app.fourcat.modules = ModuleCollector()
 
-    # import all views
-    # these can only be imported here because they rely on current_app for
-    # initialisation
+    # import all views; these can only be imported here because they rely on
+    # current_app for initialisation
     import webtool.views.views_restart  # noqa: E402
     import webtool.views.views_admin  # noqa: E402
     import webtool.views.views_extensions  # noqa: E402
@@ -171,10 +173,12 @@ with app.app_context():
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402
 
-# ensure that colour definition CSS file is present
+# ensure that colour definition CSS file is present - the CSS colours can be
+# changed by the admin so we need to regenerate the CSS file to make sure it
+# is up to date. Might want to use e.g. SCSS in the future...
 generate_css_colours()
 
-# run it
+# run it (when called directly)
 if __name__ == "__main__":
     print('Starting server...')
     app.run(host='0.0.0.0', debug=True)
