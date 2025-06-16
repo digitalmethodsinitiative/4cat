@@ -8,7 +8,6 @@ import json
 import re
 
 from PIL import Image, UnidentifiedImageError
-from urllib.parse import quote_plus
 from requests.structures import CaseInsensitiveDict
 
 from common.config_manager import config
@@ -116,7 +115,7 @@ class ImageDownloader(BasicProcessor):
             options["amount"]["min"] = 1
         else:
             # 0 can download all images
-            options["amount"]["help"] = f"No. of images"
+            options["amount"]["help"] = "No. of images"
             options["amount"]["min"] = 0
             options["amount"]["tooltip"] = "Set to 0 to download all images"
 

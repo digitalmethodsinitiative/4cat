@@ -368,7 +368,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         self.dataset.log(f"Copying previously downloaded video for url: {url}")
                         num_copied = self.copy_previous_video(previous_vid_metadata, results_path, vid_lib.previous_downloaders)
                         urls[url] = previous_vid_metadata
-                        self.dataset.update_status(f"Copied previously downloaded video to current dataset.")
+                        self.dataset.update_status("Copied previously downloaded video to current dataset.")
                         copied_videos += num_copied
                         continue
                     except FailedToCopy as e:
@@ -488,7 +488,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             # LiveVideoException raised when a video is known to be live
                             if "Requested format is not available" in str(e):
                                 self.dataset.log(f"Format Error: {str(e)}")
-                                message = f"No format available for video (check max size/resolution settings and try again)"
+                                message = "No format available for video (check max size/resolution settings and try again)"
                             elif "Unable to download webpage: The read operation timed out" in str(e):
                                 # Certain sites fail repeatedly (22-12-8 TikTok has this issue)
                                 message = 'DownloadError: %s' % str(e)
@@ -754,10 +754,10 @@ class VideoDownloaderPlus(BasicProcessor):
         elif "filename" in previous_vid_metadata:
             files = [{"filename": previous_vid_metadata.get("filename"), "success": True}]
         else:
-            raise FailedToCopy(f"Unable to read video metadata")
+            raise FailedToCopy("Unable to read video metadata")
 
         if not files:
-            raise FailedToCopy(f"No file found in metadata")
+            raise FailedToCopy("No file found in metadata")
 
         if not dataset:
             raise FailedToCopy(f"Dataset with key {dataset_key} not found")

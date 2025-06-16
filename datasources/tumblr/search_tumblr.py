@@ -240,8 +240,8 @@ class SearchTumblr(Search):
 		try:
 			self.client = self.connect_to_tumblr()
 		except ConfigException:
-			self.log.warning(f"Could not connect to Tumblr API: API keys invalid or not set")
-			self.dataset.finish_with_error(f"Could not connect to Tumblr API: API keys invalid or not set")
+			self.log.warning("Could not connect to Tumblr API: API keys invalid or not set")
+			self.dataset.finish_with_error("Could not connect to Tumblr API: API keys invalid or not set")
 			return
 		except ConnectionRefusedError as e:
 			client_info = self.client.info()
@@ -1251,4 +1251,4 @@ class SearchTumblr(Search):
 		if errors:
 			self.dataset.log(";\n ".join(errors))
 			self.dataset.update_status(
-				f"Dataset completed but failed to capture some notes/reblogs; see log for details")
+				"Dataset completed but failed to capture some notes/reblogs; see log for details")

@@ -17,7 +17,6 @@ from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
-from common.config_manager import config
 
 class SearchTikTokByID(Search):
     """

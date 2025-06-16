@@ -129,8 +129,8 @@ for admin_key in admin_keys:
     print(f"  - privileges.admin.{admin_key} = True")
     config.set(f"privileges.admin.{admin_key}", True, tag="admin")
 
-config.set(f"privileges.can_view_all_datasets", True, tag="admin")
-config.set(f"privileges.can_view_private_datasets", True, tag="admin")
+config.set("privileges.can_view_all_datasets", True, tag="admin")
+config.set("privileges.can_view_private_datasets", True, tag="admin")
 
 # ---------------------------------------------
 #         More consistent setting names

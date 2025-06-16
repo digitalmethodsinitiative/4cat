@@ -292,5 +292,5 @@ class OpenAPICollector:
 		try:
 			schema = json.loads(quote.sub('"\\1"', schema.strip().replace("=", ":")))
 			return schema
-		except json.JSONDecodeError as e:
+		except json.JSONDecodeError:
 			return {"type": schema}

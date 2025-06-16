@@ -11,13 +11,13 @@ from svgwrite.image import Image as ImageElement
 
 from svgwrite.container import SVG
 from svgwrite.shapes import Rect
-from svgwrite.text import Text, TextArea
+from svgwrite.text import Text
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.config_manager import config
 
 __author__ = "Dale Wahl"
@@ -271,7 +271,7 @@ class ImageTextWallGenerator(BasicProcessor):
 			complete_categories.append(category_image)
 
 		# now we know all dimensions we can instantiate the canvas too
-		canvas = get_4cat_canvas(self.dataset.get_results_path(), max(row_widths.values()), row_height * len(row_widths) + fontsize * 4, header=f"Images with captions",
+		canvas = get_4cat_canvas(self.dataset.get_results_path(), max(row_widths.values()), row_height * len(row_widths) + fontsize * 4, header="Images with captions",
 								 fontsize_small=fontsize, fontsize_large=fontsize)
 
 		for category_image in complete_categories:

@@ -5,7 +5,6 @@ import subprocess
 import imagehash
 import hashlib
 import requests
-import hashlib
 import datetime
 import smtplib
 import fnmatch
@@ -30,7 +29,6 @@ from calendar import monthrange
 from packaging import version
 from PIL import Image
 
-from common.lib.user_input import UserInput
 from common.config_manager import config
 
 
@@ -221,7 +219,7 @@ def get_software_commit(worker=None):
         if repository.endswith(".git"):
             repository = repository[:-4]
 
-    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
+    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
         return ("", "")
 
     return (commit, repository)
@@ -691,12 +689,12 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
         timestamp = int(item[item_column])
         try:
             timestamp = datetime.datetime.fromtimestamp(timestamp)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
     except:
         try:
             timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
 
     if interval == "year":

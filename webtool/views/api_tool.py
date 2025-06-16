@@ -11,10 +11,9 @@ import os
 
 from pathlib import Path
 
-from flask import jsonify, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
+from flask import jsonify, request, render_template, render_template_string, redirect, url_for, flash, \
 	get_flashed_messages, send_from_directory
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue, config, fourcat_modules
 from webtool.lib.helpers import error, setting_required, parse_markdown
@@ -25,7 +24,7 @@ from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.config_manager import ConfigWrapper
 from common.lib.dataset import DataSet
-from common.lib.helpers import UserInput, call_api, get_software_version
+from common.lib.helpers import UserInput, call_api
 from common.lib.user import User
 from backend.lib.worker import BasicWorker
 

@@ -103,7 +103,7 @@ class ImageDownloader(BasicProcessor):
 			options['amount']['min'] = 1
 		else:
 			# 0 can download all images
-			options['amount']['help'] = f"No. of images"
+			options['amount']['help'] = "No. of images"
 			options['amount']["min"] = 0
 			options['amount']["tooltip"] = "Set to 0 to download all images"
 
@@ -305,7 +305,7 @@ class ImageDownloader(BasicProcessor):
 					except UnidentifiedImageError:
 						picture = Image.open(image.raw)
 
-			except FileNotFoundError as e:
+			except FileNotFoundError:
 				# get_image raises FileNotFoundError for many reasons
 				failures.append(url)
 				continue
@@ -358,7 +358,7 @@ class ImageDownloader(BasicProcessor):
 		metadata = {
 			url: {
 				"filename": url_file_map.get(url),
-				"success": not url_file_map.get(url) is None and url not in failures,  # skipped and fails are NOT success
+				"success": url_file_map.get(url) is not None and url not in failures,  # skipped and fails are NOT success
 				"from_dataset": self.source_dataset.key,
 				"post_ids": urls[url]
 			} for url in urls
@@ -417,7 +417,7 @@ class ImageDownloader(BasicProcessor):
 
 				try:
 					image = imgur_data["data"]["image"]["album_images"]["images"][0]
-				except KeyError as e:
+				except KeyError:
 					raise FileNotFoundError()
 
 				image_url = "https://imgur.com/" + image["hash"] + image["ext"]

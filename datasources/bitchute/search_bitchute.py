@@ -512,7 +512,7 @@ class SearchBitChute(Search):
         try:
             published = dateparser.parse(
                 soup.find(class_="video-publish-date").text.split("published at")[1].strip()[:-1])
-        except AttributeError as e:
+        except AttributeError:
             # publication date not on page?
             published = None
 
@@ -560,7 +560,7 @@ class SearchBitChute(Search):
                 elif method.lower() == "get":
                     request = session.get(url, headers=headers, params=data)
                 else:
-                    raise NotImplemented()
+                    raise NotImplementedError()
 
                 if request.status_code >= 300:
                     raise ValueError("Response %i from BitChute for URL %s, need to retry" % (request.status_code, url))
@@ -568,7 +568,7 @@ class SearchBitChute(Search):
                 response = request.json()
                 return response
 
-            except (ConnectionResetError, requests.RequestException, ValueError) as e:
+            except (ConnectionResetError, requests.RequestException, ValueError):
                 retries += 1
                 time.sleep(retries * 2)
 

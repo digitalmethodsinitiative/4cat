@@ -16,7 +16,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
-from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.item_mapping import MappedItem
 from common.config_manager import config
 
 from datetime import datetime
@@ -25,7 +25,7 @@ from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, Cha
     FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import User, MessageEntityMention
+from telethon.tl.types import MessageEntityMention
 
 
 
@@ -335,7 +335,7 @@ class SearchTelegram(Search):
             return posts
         except ProcessorInterruptedException as e:
             raise e
-        except Exception as e:
+        except Exception:
             # catch-all so we can disconnect properly
             # ...should we?
             self.dataset.update_status("Error scraping posts from Telegram; halting collection.")
@@ -761,8 +761,7 @@ class SearchTelegram(Search):
         forwarded_name = ""
         forwarded_id = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (
-                type(message["fwd_from"]["from_id"]) is int):
+        if message.get("fwd_from") and "from_id" in message["fwd_from"] and type(message["fwd_from"]["from_id"]) is not int:
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not
@@ -1067,17 +1066,17 @@ class SearchTelegram(Search):
                 # this happens if 2FA is required
                 raise QueryParametersException("Your account requires two-factor authentication. 4CAT at this time "
                                                f"does not support this authentication mode for Telegram. ({e})")
-            except RuntimeError as e:
+            except RuntimeError:
                 # A code was sent to the given phone number
                 needs_code = True
         except FloodWaitError as e:
             # uh oh, we got rate-limited
             raise QueryParametersException("You were rate-limited and should wait a while before trying again. " +
                                            str(e).split("(")[0] + ".")
-        except ApiIdInvalidError as e:
+        except ApiIdInvalidError:
             # wrong credentials
             raise QueryParametersException("Your API credentials are invalid.")
-        except PhoneNumberInvalidError as e:
+        except PhoneNumberInvalidError:
             # wrong phone number
             raise QueryParametersException(
                 "The phone number provided is not a valid phone number for these credentials.")

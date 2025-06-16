@@ -16,7 +16,7 @@ from PIL import Image
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.config_manager import config
 
 __author__ = "Dale Wahl"

@@ -1,6 +1,5 @@
 import datetime
 import json
-import csv
 import re
 
 from dateutil.parser import parse as parse_datetime

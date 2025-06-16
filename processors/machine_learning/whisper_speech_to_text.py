@@ -5,9 +5,8 @@ import os
 import json
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, \
-    DsmConnectionError
-from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
 from common.lib.item_mapping import MappedItem
@@ -78,7 +77,7 @@ class AudioToText(BasicProcessor):
             # TODO: Could limit model availability in conjunction with "amount"
             "model": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": f"Whisper model",
+                "help": "Whisper model",
                 "default": "base",
                 "tooltip": "Larger sizes increase quality at expense of greatly increasing the amount of time to process. Try the Base model and increase as needed.",
                 "options": {
@@ -206,7 +205,7 @@ class AudioToText(BasicProcessor):
         data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in audio_filenames])
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         try:
             dmi_service_manager.send_request_and_wait_for_results(whisper_endpoint, data, wait_period=30)
         except DsmOutOfMemory:

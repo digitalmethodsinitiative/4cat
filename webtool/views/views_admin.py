@@ -28,7 +28,7 @@ from webtool.lib.helpers import error, Pagination, generate_css_colours, setting
 from common.lib.user import User
 from common.lib.dataset import DataSet
 from common.lib.job import Job
-from common.lib.helpers import call_api, send_email, UserInput, folder_size, get_git_branch
+from common.lib.helpers import call_api, send_email, UserInput, get_git_branch
 from common.lib.exceptions import DataSetException, JobNotFoundException, QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -401,7 +401,7 @@ def delete_user():
                                title="User cannot be deleted"), 403
 
     if user.get_id() == current_user.get_id():
-        return render_template("error.html", message=f"You cannot delete your own account.",
+        return render_template("error.html", message="You cannot delete your own account.",
                                title="User cannot be deleted"), 403
 
     # first delete favourites and notifications and api tokens

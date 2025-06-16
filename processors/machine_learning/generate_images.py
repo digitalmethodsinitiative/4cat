@@ -6,12 +6,10 @@ Why? Because we can.
 import shutil
 import json
 import re
-import os
 
 from backend.lib.processor import BasicProcessor
 from processors.visualisation.download_images import ImageDownloader
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config
 
@@ -230,7 +228,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
                 }
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "stable_diffusion"
 
         try:

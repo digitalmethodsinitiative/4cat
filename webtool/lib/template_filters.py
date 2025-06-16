@@ -246,7 +246,7 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 		api_json = None
 		try:
 			api_json = requests.get(api_url, headers=headers)
-		except requests.RequestException as e:
+		except requests.RequestException:
 			pass
 		if api_json.status_code != 200:
 			pass

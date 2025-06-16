@@ -325,7 +325,7 @@ class UserInput:
             if "max" in settings:
                 try:
                     choice = min(settings["max"], value_type(choice))
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     if not silently_correct:
                         raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
 
@@ -334,7 +334,7 @@ class UserInput:
             if "min" in settings:
                 try:
                     choice = max(settings["min"], value_type(choice))
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     if not silently_correct:
                         raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
 

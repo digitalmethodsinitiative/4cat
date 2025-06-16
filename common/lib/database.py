@@ -387,7 +387,7 @@ class Database:
 		# collect results
 		try:
 			result = cursor.fetchall()
-		except AttributeError as e:
+		except AttributeError:
 			result = []
 		except psycopg2.ProgrammingError as e:
 			result = []

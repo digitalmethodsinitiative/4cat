@@ -131,7 +131,7 @@ class SearchImportFromFourcat(BasicProcessor):
         """
         Import 4CAT dataset from a ZIP file
         """
-        self.dataset.update_status(f"Importing datasets and analyses from ZIP file.")
+        self.dataset.update_status("Importing datasets and analyses from ZIP file.")
         temp_file = self.dataset.get_results_path().with_suffix(".importing")
 
         imported = []

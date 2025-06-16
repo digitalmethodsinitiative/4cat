@@ -222,7 +222,7 @@ class TextClassifier(BasicProcessor):
         ]}
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "stormtrooper"
 
         try:

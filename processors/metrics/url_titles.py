@@ -8,7 +8,6 @@ from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
-import requests
 import warnings
 import urllib3
 import ural

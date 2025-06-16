@@ -78,7 +78,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             # TODO: Could limit model availability in conjunction with "amount"
             "model": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": f"[CLIP model](https://arxiv.org/pdf/2103.00020.pdf#page=40&zoom=auto,-457,754)",
+                "help": "[CLIP model](https://arxiv.org/pdf/2103.00020.pdf#page=40&zoom=auto,-457,754)",
                 "default": "ViT-B/32",
                 "tooltip": "More powerful models increase quality at expense of greatly increasing the amount of time to process. Recommend testing small amounts of images first.",
                 "options": {
@@ -195,7 +195,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "clip"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30)
@@ -211,7 +211,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         except DmiServiceManagerException as e:
             self.dataset.log(str(e))
             self.log.warning(f"CLIP Error ({self.dataset.key}): {e}")
-            self.dataset.finish_with_error(f"Error with CLIP model; please contact 4CAT admins.")
+            self.dataset.finish_with_error("Error with CLIP model; please contact 4CAT admins.")
             return
 
         # Load the video metadata if available

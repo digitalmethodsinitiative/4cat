@@ -1,5 +1,4 @@
 import re
-import math
 import json
 import time
 import zipfile
@@ -7,7 +6,6 @@ import mimetypes
 from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
-from common.config_manager import config
 from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
@@ -39,8 +37,8 @@ class SearchMedia(BasicProcessor):
                 "help": "Upload media files to make them be available for further analysis. "
                         "Please include only one type of file per dataset (image, audio, or video) and "
                         "4CAT will be able to run various processors on these media collections. "
-                        f"\n\nFor collections **larger than a few hundred**, please upload a single "
-                        f"ZIP file. More than ~500 files will fail (and a ZIP file will also load much faster)."
+                        "\n\nFor collections **larger than a few hundred**, please upload a single "
+                        "ZIP file. More than ~500 files will fail (and a ZIP file will also load much faster)."
             },
             "data_upload": {
                 "type": UserInput.OPTION_FILE,
@@ -107,7 +105,7 @@ class SearchMedia(BasicProcessor):
                     except (AttributeError, TypeError):
                         bad_files.append(file["filename"])
 
-            except (ValueError, zipfile.BadZipfile) as e:
+            except (ValueError, zipfile.BadZipfile):
                 raise QueryParametersException("Cannot read zip file - it may be encrypted or corrupted and cannot "
                                                "be uploaded to 4CAT.")
 

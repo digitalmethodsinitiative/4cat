@@ -15,13 +15,12 @@ import sys
 import os
 import re
 
-from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.config_manager import config
-from chan_flags import get_country_name, get_troll_names
+from chan_flags import get_country_name
 
 
 def commit(posts, post_fields, db, datasource, fast=False):

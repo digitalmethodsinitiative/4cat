@@ -336,7 +336,7 @@ class ExtractURLs(BasicProcessor):
         try:
             time.sleep(0.1)
             head_request = requests.head(url, timeout=5)
-        except (requests.RequestException, ConnectionError, ValueError, TimeoutError) as e:
+        except (requests.RequestException, ConnectionError, ValueError, TimeoutError):
             return url
 
         # if the returned page's status code is in the 'valid request'

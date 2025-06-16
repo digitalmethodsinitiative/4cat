@@ -2,7 +2,8 @@
 Update vote data for Reddit datasets
 """
 import shutil
-import praw, praw.exceptions
+import praw
+import praw.exceptions
 import csv
 
 from prawcore.exceptions import Forbidden, NotFound, PrawcoreException

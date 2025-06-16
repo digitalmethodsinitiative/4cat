@@ -116,7 +116,7 @@ class HashSimilarityNetworker(BasicProcessor):
 
             try:
                 item_hash = [int(bit) for bit in item_hash]
-            except ValueError as e:
+            except ValueError:
                 self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
                 self.dataset.finish(0)
                 return

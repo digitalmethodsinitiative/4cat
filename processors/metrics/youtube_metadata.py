@@ -11,7 +11,6 @@ from googleapiclient.errors import HttpError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -338,7 +337,7 @@ class YouTubeMetadata(BasicProcessor):
 							ids[channel_id] = [url]
 						else:
 							ids[channel_id].append(url)
-				except Exception as error:
+				except Exception:
 					channel_id = False
 
 		return ids
@@ -367,7 +366,7 @@ class YouTubeMetadata(BasicProcessor):
 				try:
 					query = urllib.parse.urlparse(url)
 				# In large datasets, malformed links occur. Catch these and continue.
-				except ValueError as e:
+				except ValueError:
 					continue
 
 				# youtu.be URLs always reference videos
@@ -438,7 +437,7 @@ class YouTubeMetadata(BasicProcessor):
 					self.invalid_api_key = True
 					return results
 			# Google API's also throws other weird errors that might be resolved by retrying, like SSLEOFError
-			except Exception as e:
+			except Exception:
 				time.sleep(self.sleep_time) # Wait a bit before trying again
 				pass
 
@@ -481,7 +480,7 @@ class YouTubeMetadata(BasicProcessor):
 						pass
 
 				# Google API's also throws other weird errors that might be resolved by retrying, like SSLEOFError
-				except Exception as e:
+				except Exception:
 					retries += 1
 					self.dataset.update_status("Error encoutered, sleeping for " + str(self.sleep_time))
 					time.sleep(self.sleep_time) # Wait a bit before trying again

@@ -7,7 +7,6 @@ psql -d fourcat -c "COPY (SELECT id, board, thread_id, timestamp, subject, body,
 """
 
 import argparse
-import json
 import time
 import csv
 import sys
@@ -16,7 +15,6 @@ import re
 
 from pathlib import Path
 
-from psycopg2.errors import UniqueViolation
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database

@@ -26,7 +26,7 @@ if not input.exists():
 	print("File not found")
 	sys.exit(1)
 
-if not input.suffix in (".csv", ".ndjson"):
+if input.suffix not in (".csv", ".ndjson"):
 	print("File needs to be a CSV or NDJSON file")
 	sys.exit(1)
 

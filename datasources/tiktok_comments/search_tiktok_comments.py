@@ -4,8 +4,7 @@ Import scraped TikTok comment data
 It's prohibitively difficult to scrape data from TikTok within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
-from datetime import datetime, timezone
-from urllib.parse import urlparse, parse_qs
+from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem

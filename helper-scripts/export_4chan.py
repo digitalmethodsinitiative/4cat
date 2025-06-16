@@ -23,14 +23,12 @@ It exports most data as-is, but also makes some changes.
 
 import argparse
 import json
-import time
 import csv
 import sys
 import os
 import re
 
-from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database

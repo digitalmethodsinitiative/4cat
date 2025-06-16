@@ -1,10 +1,8 @@
 """
 General helper functions for Flask templating and 4CAT views
 """
-import datetime
 import markdown
 import colorsys
-import math
 import csv
 import re
 

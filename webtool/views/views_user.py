@@ -419,7 +419,7 @@ def request_access():
                 send_email(config.get('mail.admin_email'), message)
                 return render_template("error.html", title="Thank you",
                                        message="Your request has been submitted; we'll try to answer it as soon as possible.")
-            except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
+            except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout):
                 return render_template("error.html", title="Error",
                                        message="The form could not be submitted; the e-mail server is unreachable.")
 

@@ -212,7 +212,7 @@ class PixPlotGenerator(BasicProcessor):
         data['timeout'] = (86400 * 7)
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "pixplot"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30, check_process=False)

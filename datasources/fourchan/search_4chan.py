@@ -777,7 +777,7 @@ class Search4Chan(SearchWithScope):
 			else:
 				self.dataset.update_status("Error while querying full-text search index", is_final=True)
 				self.log.error("Sphinx warning: %s" % e)
-		except OperationalError as e:
+		except OperationalError:
 			self.dataset.update_status(
 				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.",
 				is_final=True)

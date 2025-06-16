@@ -8,7 +8,6 @@ from common.lib.database import Database
 
 from common.lib.exceptions import ConfigException
 from common.lib.config_definition import config_definition
-from common.lib.user_input import UserInput
 
 import configparser
 import os
@@ -88,7 +87,7 @@ class ConfigManager:
                                            "preventing this. Shame on them!")
 
                     self.config_definition.update(module_config)
-            except (ValueError, TypeError) as e:
+            except (ValueError, TypeError):
                 pass
 
     def load_core_settings(self):

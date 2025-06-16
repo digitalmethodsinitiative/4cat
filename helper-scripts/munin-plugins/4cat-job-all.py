@@ -20,7 +20,7 @@ def get_api(type):
 nodata = False
 try:
         apidata = json.loads(get_api("jobs"))["response"]
-except (json.JSONDecodeError, KeyError) as e:
+except (json.JSONDecodeError, KeyError):
         nodata = True
 
 if len(sys.argv) > 1 and sys.argv[1] == "config":

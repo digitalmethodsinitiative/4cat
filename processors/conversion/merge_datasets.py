@@ -125,7 +125,7 @@ class DatasetMerger(BasicProcessor):
                 source_datasets.append(source_dataset)
 
         if len(source_datasets) <= 1:
-            return self.dataset.finish_with_error(f"You need to provide at least one valid URL for a source dataset.")
+            return self.dataset.finish_with_error("You need to provide at least one valid URL for a source dataset.")
 
         # clean up parameters
         self.dataset.parameters = {**self.dataset.parameters, "source": ", ".join([d.key for d in source_datasets])}

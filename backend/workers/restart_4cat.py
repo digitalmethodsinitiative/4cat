@@ -208,7 +208,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                         continue
                     frontend_ok = True
                     break
-                except requests.RequestException as e:
+                except requests.RequestException:
                     time.sleep(1)
                     continue
 

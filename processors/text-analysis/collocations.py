@@ -101,23 +101,23 @@ class GetCollocations(BasicProcessor):
 		# Validate and process user inputs
 		try:
 			n_size = int(self.parameters.get("n_size", 2))
-		except (ValueError, TypeError) as e:
+		except (ValueError, TypeError):
 			n_size = 2
 
 		try:
 			window_size = int(self.parameters.get("window_size", 2))
-		except (ValueError, TypeError) as e:
+		except (ValueError, TypeError):
 			window_size = 2
 
 		try:
 			max_output = int(self.parameters.get("max_output", 0))
-		except (ValueError, TypeError) as e:
+		except (ValueError, TypeError):
 			max_output = 0
 
 		min_frequency = self.parameters.get("min_frequency")
 		try:
 			min_frequency = int(self.parameters.get("min_frequency", 0))
-		except (ValueError, TypeError) as e:
+		except (ValueError, TypeError):
 			min_frequency = 0
 
 		query_string = self.parameters.get("query_string", "").replace(" ", "")

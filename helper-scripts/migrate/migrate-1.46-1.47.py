@@ -1,5 +1,4 @@
 # Add timestamp_finished column to datasets table
-import json
 import sys
 import os
 import datetime
