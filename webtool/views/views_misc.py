@@ -10,12 +10,11 @@ import traceback
 from pathlib import Path
 from datetime import datetime
 
-from flask import current_app, Blueprint, request, render_template, jsonify, Response
+from flask import current_app, Blueprint, request, render_template, jsonify, Response, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.exceptions import HTTPException, InternalServerError
 
 from webtool.lib.helpers import pad_interval, error
-from webtool.views.views_dataset import create_dataset, show_results
 
 from common.config_manager import ConfigWrapper
 from common.lib.helpers import get_datasource_example_keys
@@ -71,9 +70,9 @@ def show_frontpage():
     """
     page = config.get("ui.homepage")
     if page == "create-dataset":
-        return create_dataset()
+        return redirect(url_for("dataset.create_dataset"))
     elif page == "datasets":
-        return show_results(page=1)
+        return redirect(url_for("dataset.show_results"))
     else:
         return show_about()
 
