@@ -2,15 +2,12 @@
 4CAT extension views - routes to manipulate 4CAT extensions
 """
 
-from flask import Blueprint, current_app, render_template, request, flash, get_flashed_messages
-from flask_login import current_user, login_required
+from flask import Blueprint, render_template, flash, get_flashed_messages
+from flask_login import login_required
 
 from common.lib.helpers import find_extensions
 
-from common.config_manager import ConfigWrapper
-
 component = Blueprint("extensions", __name__)
-config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
 
 @component.route("/admin/extensions/")
 @login_required

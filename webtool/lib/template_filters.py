@@ -13,9 +13,8 @@ from urllib.parse import urlencode, urlparse
 from webtool import config
 from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify_long, ellipsiate
-from common.config_manager import ConfigWrapper
 
-from flask import request, current_app
+from flask import current_app, g
 from flask_login import current_user
 from ural import urls_from_text
 
@@ -409,9 +408,7 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	wrapped_config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
-
-	cv_path = wrapped_config.get("PATH_ROOT").joinpath("config/.current-version")
+	cv_path = g.config.get("PATH_ROOT").joinpath("config/.current-version")
 	if cv_path.exists():
 		with cv_path.open() as infile:
 			version = infile.readline().strip()
@@ -420,11 +417,11 @@ def inject_now():
 
 
 	return {
-		"__has_https": wrapped_config.get("flask.https"),
+		"__has_https": g.config.get("flask.https"),
 		"__datenow": datetime.datetime.utcnow(),
 		"__notifications": current_user.get_notifications(),
-		"__user_config": lambda setting: wrapped_config.get(setting),
-		"__user_cp_access": any([wrapped_config.get(p) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
+		"__user_config": lambda setting: g.config.get(setting),
+		"__user_cp_access": any([g.config.get(p) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
 		"__version": version,
 		"uniqid": uniqid
 	}

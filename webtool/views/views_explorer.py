@@ -5,17 +5,14 @@ format and lets users annotate the data.
 
 from pathlib import Path
 
-from flask import Blueprint, current_app, request, render_template, jsonify
+from flask import Blueprint, current_app, request, render_template, jsonify, g
 from flask_login import login_required, current_user
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import hash_to_md5
 from common.lib.exceptions import DataSetException, AnnotationException
-from common.config_manager import ConfigWrapper
 
 component = Blueprint("explorer", __name__)
-config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
-db = current_app.fourcat.db
 api_ratelimit = current_app.limiter.shared_limit("45 per minute", scope="api")
 
 
@@ -24,7 +21,7 @@ api_ratelimit = current_app.limiter.shared_limit("45 per minute", scope="api")
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
-@current_app.fourcat.openapi.endpoint("explorer")
+@current_app.openapi.endpoint("explorer")
 def explorer_dataset(dataset_key: str, page=1):
 	"""
 	Show items from a dataset
@@ -38,7 +35,7 @@ def explorer_dataset(dataset_key: str, page=1):
 
 	# Get dataset info.
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=current_app.fourcat.modules)
+		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 	
@@ -50,7 +47,7 @@ def explorer_dataset(dataset_key: str, page=1):
 	warning = ""
 
 	# See if we can actually serve this page
-	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
+	if dataset.is_private and not (g.config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:
@@ -61,10 +58,10 @@ def explorer_dataset(dataset_key: str, page=1):
 		return error(404, error="This dataset didn't finish executing.")
 
 	# The amount of posts to show on a page
-	posts_per_page = config.get("explorer.posts_per_page", 50)
+	posts_per_page = g.config.get("explorer.posts_per_page", 50)
 
 	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.get('explorer.max_posts', 500000)
+	max_posts = g.config.get('explorer.max_posts', 500000)
 
 	# The offset for posts depending on the current page
 	offset = ((int(page) - 1) * posts_per_page) if page else 0
@@ -127,9 +124,9 @@ def explorer_dataset(dataset_key: str, page=1):
 	# We can use either a generic or a pre-made, data source-specific template.
 	template = "datasource" if has_datasource_template(datasource) else "generic"
 	if template == "generic":
-		posts_css = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/generic.css")
+		posts_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/generic.css")
 	else:
-		posts_css = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css")
+		posts_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css")
 
 	# Read CSS and pass as a string
 	with open(posts_css, "r", encoding="utf-8") as css:
@@ -159,7 +156,7 @@ def explorer_dataset(dataset_key: str, page=1):
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
-@current_app.fourcat.openapi.endpoint("explorer")
+@current_app.openapi.endpoint("explorer")
 def explorer_save_annotation_fields(dataset_key: str):
 	"""
 	Save the annotation fields of a dataset to the datasets table.
@@ -174,7 +171,7 @@ def explorer_save_annotation_fields(dataset_key: str):
 	if not dataset_key:
 		return error(404, error="No dataset key provided")
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=g.db)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
@@ -205,7 +202,7 @@ def explorer_save_annotation_fields(dataset_key: str):
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
-@current_app.fourcat.openapi.endpoint("explorer")
+@current_app.openapi.endpoint("explorer")
 def explorer_save_annotations(dataset_key: str):
 	"""
 	Save the annotations of a dataset to the annotations table.
@@ -220,7 +217,7 @@ def explorer_save_annotations(dataset_key: str):
 	# Save it!
 	annotations = request.get_json()
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=g.db)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
@@ -247,7 +244,7 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 
 	# Resort to regular iteration if the dataset is larger than the maximum
 	# allowed posts for the Explorer.
-	if dataset.data["num_rows"] > config.get("explorer.max_posts", 500000):
+	if dataset.data["num_rows"] > g.config.get("explorer.max_posts", 500000):
 		yield from dataset.iterate_items(**kwargs)
 		return
 

@@ -10,22 +10,19 @@ import traceback
 from pathlib import Path
 from datetime import datetime
 
-from flask import current_app, Blueprint, request, render_template, jsonify, Response, redirect, url_for
-from flask_login import login_required, current_user
+from flask import Blueprint, request, render_template, jsonify, Response, redirect, url_for, g, current_app
+from flask_login import login_required
 from werkzeug.exceptions import HTTPException, InternalServerError
 
 from webtool.lib.helpers import pad_interval, error
 
-from common.config_manager import ConfigWrapper
 from common.lib.helpers import get_datasource_example_keys
 
 component = Blueprint("misc", __name__)
-config = ConfigWrapper(current_app.fourcat.config, user=current_user, request=request)
-db = current_app.fourcat.db
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
-@component.errorhandler(Exception)
+@component.app_errorhandler(Exception)
 def log_exception(e):
     """
     Log all exceptions
@@ -49,13 +46,13 @@ def log_exception(e):
         # Get the request URL
         request_url = request.url
 
-        current_app.fourcat.log.error(f"{type(cause).__name__}{(' ('+request_url+')') if request_url else ''}: {cause}", frame=tb if tb else None)
+        current_app.log.error(f"{type(cause).__name__}{(' ('+request_url+')') if request_url else ''}: {cause} at {tb}", frame=tb if tb else None)
         return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
     else:
         # Should be just 4xx errors; return and allow Flask to handle them
         return e
 
-@component.errorhandler(413)
+@component.app_errorhandler(413)
 def request_entity_too_large(this_error):
     message = "File too large; try uploading as a ZIP file instead."
     return error(413, message=message, status="error")
@@ -68,7 +65,7 @@ def show_frontpage():
 
     :return:
     """
-    page = config.get("ui.homepage")
+    page = g.config.get("ui.homepage")
     if page == "create-dataset":
         return redirect(url_for("dataset.create_dataset"))
     elif page == "datasets":
@@ -80,7 +77,7 @@ def show_frontpage():
 @login_required
 def show_about():
     # load corpus stats that are generated daily, if available
-    stats_path = Path(config.get('PATH_ROOT'), "stats.json")
+    stats_path = Path(g.config.get('PATH_ROOT'), "stats.json")
     if stats_path.exists():
         with stats_path.open() as stats_file:
             stats = stats_file.read()
@@ -91,7 +88,7 @@ def show_about():
     else:
         stats = None
 
-    news_path = Path(config.get('PATH_ROOT'), "news.json")
+    news_path = Path(g.config.get('PATH_ROOT'), "news.json")
     if news_path.exists():
         with news_path.open() as news_file:
             news = news_file.read()
@@ -105,9 +102,9 @@ def show_about():
     else:
         news = None
 
-    datasources = {k: v for k, v in current_app.fourcat.modules.datasources.items() if
-                   k in config.get("datasources.enabled") and not v["importable"]}
-    importables = {k: v for k, v in current_app.fourcat.modules.datasources.items() if (v["importable"] and k in config.get("datasources.enabled"))}
+    datasources = {k: v for k, v in g.modules.datasources.items() if
+                   k in g.config.get("datasources.enabled") and not v["importable"]}
+    importables = {k: v for k, v in g.modules.datasources.items() if (v["importable"] and k in g.config.get("datasources.enabled"))}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 
@@ -120,7 +117,7 @@ def robots():
     Default to blocking everything, because the tool will (should) usually be
     run as an internal resource.
     """
-    robots = Path(config.get("PATH_ROOT"), "webtool/static/robots.txt")
+    robots = Path(g.config.get("PATH_ROOT"), "webtool/static/robots.txt")
     if not robots.exists():
         return Response("User-agent: *\nDisallow: /", mimetype='text/plain')
 
@@ -135,13 +132,13 @@ def data_overview(datasource=None):
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in current_app.fourcat.modules.datasources.items() if
-                   metadata["has_worker"] and datasource in config.get("datasources.enabled")}
+    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
+                   metadata["has_worker"] and datasource in g.config.get("datasources.enabled")}
 
     if datasource not in datasources:
         datasource = None
 
-    github_url = config.get("4cat.github_url")
+    github_url = g.config.get("4cat.github_url")
 
     # Get information for a specific data source
     datasource_id = None
@@ -155,7 +152,7 @@ def data_overview(datasource=None):
     if datasource:
 
         datasource_id = datasource
-        worker_class = current_app.fourcat.modules.workers.get(datasource_id + "-search")
+        worker_class = g.modules.workers.get(datasource_id + "-search")
         # Database IDs may be different from the Datasource ID (e.g. the datasource "4chan" became "fourchan" but the database ID remained "4chan")
         database_db_id = worker_class.prefix if hasattr(worker_class, "prefix") else datasource_id
 
@@ -179,12 +176,12 @@ def data_overview(datasource=None):
 
         # Get example keys for the datasource
         if datasource_id not in ["upload"]: # ignore upload as keys are variable
-            example_keys = get_datasource_example_keys(db=db, modules=current_app.fourcat.modules, dataset_type=datasource_id + "-search")
+            example_keys = get_datasource_example_keys(db=g.db, modules=g.modules, dataset_type=datasource_id + "-search")
 
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":
 
-            total_counts = db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (database_db_id,))
+            total_counts = g.db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (database_db_id,))
 
             if total_counts:
                 
@@ -193,7 +190,7 @@ def data_overview(datasource=None):
                 boards = set(total_counts.keys())
                 
                 # Fetch date counts per board from the database
-                db_counts = db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (database_db_id,))
+                db_counts = g.db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (database_db_id,))
 
                 # Get the first and last days for padding
                 all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
@@ -214,10 +211,10 @@ def data_overview(datasource=None):
 @component.route('/get-boards/<string:datasource>/')
 @login_required
 def getboards(datasource):
-    if datasource not in config.get("datasources.enabled"):
+    if datasource not in g.config.get("datasources.enabled"):
         result = False
     else:
-        result = config.get(datasource + "-search.boards", False)
+        result = g.config.get(datasource + "-search.boards", False)
 
     return jsonify(result)
 
@@ -236,7 +233,7 @@ def show_page(page):
     """
     page = re.sub(r"[^a-zA-Z0-9-_]*", "", page)
     page_class = "page-" + page
-    page_folder = Path(config.get('PATH_ROOT'), "webtool", "pages")
+    page_folder = Path(g.config.get('PATH_ROOT'), "webtool", "pages")
     page_path = page_folder.joinpath(page + ".md")
 
     if not page_path.exists():
@@ -247,10 +244,10 @@ def show_page(page):
         page_parsed = markdown.markdown(page_raw)
         page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
 
-        if config.get("mail.admin_email"):
+        if g.config.get("mail.admin_email"):
             # replace this one explicitly instead of doing a generic config
             # filter, to avoid accidentally exposing config values
-            admin_email = config.get("mail.admin_email", "4cat-admin@example.com")
+            admin_email = g.config.get("mail.admin_email", "4cat-admin@example.com")
             page_parsed = page_parsed.replace("%%ADMIN_EMAIL%%", admin_email)
 
     return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)

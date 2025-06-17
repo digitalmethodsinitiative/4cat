@@ -3,7 +3,6 @@ import subprocess
 import sys
 import os
 
-from collections import namedtuple
 from functools import partial
 from pathlib import Path
 
@@ -21,14 +20,14 @@ if result.returncode != 0:
 # the following are imported *after* the first-run stuff because they may rely
 # on things set up in there - or should not run unless first-run completes
 # successfully!
-from flask import Flask  # noqa: E402
-from flask_login import LoginManager  # noqa: E402
+from flask import Flask, g, request, current_app  # noqa: E402
+from flask_login import LoginManager, current_user  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
 from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
 from werkzeug import Request  # noqa: E402
 
-from common.config_manager import config  # noqa: E402
+from common.config_manager import config, ConfigWrapper  # noqa: E402
 from common.lib.database import Database  # noqa: E402
 from common.lib.logger import Logger  # noqa: E402
 from common.lib.queue import JobQueue  # noqa: E402
@@ -129,23 +128,27 @@ app.login_manager.login_view = "user.show_login"
 # initialize rate limiter
 app.limiter = Limiter(app=app, key_func=get_remote_address)
 
-# initialize OpenAPI schema helper
-openapi = OpenAPICollector(app)
 
 # now create an app context to import Blueprints into
 # the app context allows us to pass some values for use inside the Blueprints
 # which they can access via `current_app` - this eliminates the need for
 # circular imports (importing app from inside the Blueprint)
 with app.app_context():
+    # prepare some values in the global context that we can write 4CAT and user-
+    # specific values to
+
     # these are app-wide, 4CAT-specific objects that we give their own
     # namespace to avoid conflicts (e.g. with app.config)
-    app.fourcat = namedtuple("FourcatContext", ("queue", "db", "log", "openapi", "modules"))
-    app.fourcat.config = config
-    app.fourcat.queue = queue
-    app.fourcat.db = db
-    app.fourcat.log = log
-    app.fourcat.openapi = openapi
-    app.fourcat.modules = ModuleCollector()
+
+    # run this *after* Blueprints have been loaded because it needs to know
+    # what routes are available
+    # it allows us to mark that routes should be documented in the 4CAT web
+    # API specs for use by others
+    app.openapi = OpenAPICollector(app)
+
+    app.log = log
+    app.db = db
+    app.fourcat_config = config
 
     # import all views; these can only be imported here because they rely on
     # current_app for initialisation
@@ -168,6 +171,22 @@ with app.app_context():
     app.register_blueprint(webtool.views.views_explorer.component)
     app.register_blueprint(webtool.views.api_standalone.component)
     app.register_blueprint(webtool.views.api_tool.component)
+
+    @app.before_request
+    def before_request():
+        """
+        Register context-aware 4CAT objects per request
+
+        Particularly the config reader should be wrapped to account for the
+        request's active user, so these are registered in the global `g`
+        contextual namespace.
+        """
+        g.base_config = config
+        g.queue = queue
+        g.db = db
+        g.log = log
+        g.modules = ModuleCollector()
+        g.config = ConfigWrapper(g.base_config, user=current_user, request=request)
 
     # import custom jinja2 template filters
     # these also benefit from current_app

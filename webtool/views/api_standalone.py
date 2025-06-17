@@ -8,7 +8,7 @@ import json
 import time
 import csv
 
-from flask import Blueprint, current_app, jsonify, request, send_file, after_this_request
+from flask import Blueprint, current_app, jsonify, request, send_file, after_this_request, g
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import error, setting_required
@@ -28,7 +28,7 @@ api_ratelimit = current_app.limiter.shared_limit("45 per minute", scope="api")
 
 @component.route("/api/get-standalone-processors/")
 @api_ratelimit
-@current_app.fourcat.openapi.endpoint("standalone")
+@current_app.openapi.endpoint("standalone")
 def get_standalone_processors():
 	"""
 	Get processors available for standalone API requests
@@ -130,7 +130,7 @@ def get_standalone_processors():
 
 	available_processors = {}
 
-	for processor_type, processor in current_app.fourcat.modules.processors.items():
+	for processor_type, processor in g.modules.processors.items():
 		# Skip datasources as they do not conform to /api/process/<processor>/ API
 		if issubclass(processor, Search) or processor_type.endswith("-search"):
 			# ALMOST all datasources are subclasses of Search, almost.
@@ -153,7 +153,7 @@ def get_standalone_processors():
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
-@current_app.fourcat.openapi.endpoint("standalone")
+@current_app.openapi.endpoint("standalone")
 def process_standalone(processor):
 	"""
 	Run a standalone processor
@@ -228,10 +228,10 @@ def process_standalone(processor):
 		extension="csv",
 		type="standalone",
 		parameters={"next": [processor]},
-		db=current_app.fourcat.db,
+		db=g.db,
 		owner=current_user.get_id(),
 		is_private=True,
-		modules=current_app.fourcat.modules
+		modules=g.modules
 	)
 	temp_dataset.finish(len(input))
 
@@ -253,10 +253,10 @@ def process_standalone(processor):
 
 	# queue the postprocessor
 	metadata = processors[processor]
-	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=current_app.fourcat.db, modules=current_app.fourcat.modules)
+	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=g.db, modules=g.modules)
 
-	job = current_app.fourcat.queue.add_job(processor, {}, processed.key)
-	place_in_queue = current_app.fourcat.queue.get_place_in_queue(job)
+	job = g.queue.add_job(processor, {}, processed.key)
+	place_in_queue = g.queue.get_place_in_queue(job)
 	if place_in_queue > 5:
 		job.finish()
 		return error(code=503, error="Your request could not be handled as there are currently %i other jobs of this type in the queue. Please try again later." % place_in_queue)
@@ -270,7 +270,7 @@ def process_standalone(processor):
 			job.finish()
 			return error(code=503, error="The server is currently too busy to handle your request. Please try again later.")
 
-		if current_app.fourcat.queue.get_place_in_queue(job) != 0:
+		if g.queue.get_place_in_queue(job) != 0:
 			time.sleep(2)
 			continue
 		else:
@@ -279,7 +279,7 @@ def process_standalone(processor):
 	# job currently being processed, wait for it to finish
 	while True:
 		try:
-			job = Job.get_by_remote_ID(job.data["remote_id"], current_app.fourcat.db, processor)
+			job = Job.get_by_remote_ID(job.data["remote_id"], g.db, processor)
 		except JobNotFoundException:
 			break
 
