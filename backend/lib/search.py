@@ -91,32 +91,6 @@ class Search(BasicProcessor, ABC):
 		elif items is not None:
 			self.dataset.update_status("Query finished, no results found.")
 
-		# queue predefined processors
-		if num_items > 0 and query_parameters.get("next", []):
-			for next in query_parameters.get("next"):
-				next_parameters = next.get("parameters", {})
-				next_type = next.get("type", "")
-				available_processors = self.dataset.get_available_processors(user=self.dataset.creator, exclude_hidden=False)
-
-				# run it only if the processor is actually available for this query
-				if next_type in available_processors:
-					next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db,
-											parent=self.dataset.key,
-											extension=available_processors[next_type]["extension"])
-					self.queue.add_job(next_type, remote_id=next_analysis.key)
-
-		# see if we need to register the result somewhere
-		if query_parameters.get("copy_to", None):
-			# copy the results to an arbitrary place that was passed
-			if self.dataset.get_results_path().exists():
-				# but only if we actually have something to copy
-				shutil.copyfile(str(self.dataset.get_results_path()), query_parameters.get("copy_to"))
-			else:
-				# if copy_to was passed, that means it's important that this
-				# file exists somewhere, so we create it as an empty file
-				with open(query_parameters.get("copy_to"), "w") as empty_file:
-					empty_file.write("")
-
 		if self.import_warning_count == 0 and self.import_error_count == 0:
 			self.dataset.finish(num_rows=num_items)
 		else:

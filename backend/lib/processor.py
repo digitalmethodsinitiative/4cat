@@ -753,8 +753,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             if not filelist_or_folder.exists() or not filelist_or_folder.is_dir():
                 raise RuntimeError("Folder %s is not a folder that can be archived" % filelist_or_folder)
 
-			#files = files.glob("*")
-
 		# create zip of archive and delete temporary files and folder
         self.dataset.update_status("Compressing results into archive")
         done = 0
