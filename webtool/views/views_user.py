@@ -8,13 +8,10 @@ import fnmatch
 import socket
 import random
 import time
-import sys
-import os
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-sys.path.insert(0, os.path.dirname(__file__) + '/../..')
 from flask import current_app, Blueprint, request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify, g
 from flask_login import login_user, login_required, logout_user, current_user
 from common.lib.user import User
