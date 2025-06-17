@@ -20,7 +20,7 @@ if result.returncode != 0:
 # the following are imported *after* the first-run stuff because they may rely
 # on things set up in there - or should not run unless first-run completes
 # successfully!
-from flask import Flask, g, request, current_app  # noqa: E402
+from flask import Flask, g, request  # noqa: E402
 from flask_login import LoginManager, current_user  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
@@ -134,18 +134,11 @@ app.limiter = Limiter(app=app, key_func=get_remote_address)
 # which they can access via `current_app` - this eliminates the need for
 # circular imports (importing app from inside the Blueprint)
 with app.app_context():
-    # prepare some values in the global context that we can write 4CAT and user-
-    # specific values to
-
-    # these are app-wide, 4CAT-specific objects that we give their own
-    # namespace to avoid conflicts (e.g. with app.config)
-
-    # run this *after* Blueprints have been loaded because it needs to know
-    # what routes are available
-    # it allows us to mark that routes should be documented in the 4CAT web
-    # API specs for use by others
+    # these are needed in contexts where we cannot read from `g` (because that
+    # gets populated before `before_request`), but can read from current_app
+    # instead. Note that where possible g.config should always be preferred
+    # over app.fourcat_config because the former is not user-aware!
     app.openapi = OpenAPICollector(app)
-
     app.log = log
     app.db = db
     app.fourcat_config = config

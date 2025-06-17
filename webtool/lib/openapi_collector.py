@@ -212,9 +212,6 @@ class OpenAPICollector:
 
 		var_regex = re.compile(r"<([^>]+)>")
 
-		# backward compatibility thing...
-		match_api_id = ("toolapi" if api_id == "tool" else api_id)
-
 		# loop through available routes in Flask app
 		for rule in self.flask_app.url_map.iter_rules():
 			# check if this route is marked as an API endpoint

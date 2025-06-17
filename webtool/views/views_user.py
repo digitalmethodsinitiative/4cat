@@ -443,7 +443,7 @@ def reset_password():
         # we need *a* token
         return render_template("error.html", message="You need a valid reset token to set a password.")
 
-    resetting_user = User.get_by_token(db, token)
+    resetting_user = User.get_by_token(g.db, token)
     if not resetting_user or resetting_user.is_special:
         # this doesn't mean the token is unknown, but it could be older than 3 days
         return render_template("error.html",

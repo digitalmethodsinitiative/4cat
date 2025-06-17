@@ -292,7 +292,7 @@ def add_user():
                 # if a user does not use their token in time, maybe you want to
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
-                user = User.get_by_name(db, username)
+                user = User.get_by_name(g.db, username)
                 g.db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
