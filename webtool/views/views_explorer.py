@@ -267,35 +267,9 @@ def has_datasource_template(datasource: str) -> bool:
 
 	:returns: bool, Whether the required files are present.
 	"""
-	css_exists = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css").exists()
-	html_exists = Path(config.get('PATH_ROOT'), "webtool/templates/explorer/datasource-templates/" + datasource + ".html").exists()
+	css_exists = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css").exists()
+	html_exists = Path(g.config.get('PATH_ROOT'), "webtool/templates/explorer/datasource-templates/" + datasource + ".html").exists()
 
 	if css_exists and html_exists:
 		return True
 	return False
-
-def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
-	"""
-	todo: Integrate later
-	Retrieve posts by ID from a database-accessible data source.
-	"""
-
-	raise NotImplementedError
-
-	if not ids:
-		return None
-
-	if board:
-		board = " AND board = '" + board + "' "
-
-	id_field = "id" if not threads else "thread_id"
-	order_by = " ORDER BY " + ", ".join(order_by)
-	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	offset = " OFFSET %i" % int(offset)
-
-	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + board + order_by + " ASC" + limit + offset,
-						(ids,))
-	if not posts:
-		return False
-
-	return posts
