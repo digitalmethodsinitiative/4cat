@@ -22,6 +22,7 @@ from pathlib import Path
 
 component = Blueprint("user", __name__)
 
+# ok to use the app's config reader here since this is a global-only setting
 access_request_limit = current_app.fourcat_config.get("4cat.allow_access_request_limiter", default="100/day")
 
 @current_app.login_manager.user_loader
@@ -116,6 +117,7 @@ def autologin_whitelist():
     Checks if host name matches whitelisted hostmask or IP. If so, the user is
     logged in as the special "autologin" user.
     """
+    # ok to use the app's config reader here since this is a global-only setting
     if not current_app.fourcat_config.get("flask.autologin.hostnames"):
         # if there's no whitelist, there's no point in checking it
         return
@@ -160,6 +162,7 @@ def exempt_from_limit():
 
     :return bool:  Whether the request's hostname is exempt
     """
+    # ok to use the app's config reader here since this is a global-only setting
     if not current_app.fourcat_config.get("flask.autologin.api"):
         return False
 
