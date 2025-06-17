@@ -25,7 +25,6 @@ from flask_login import LoginManager, current_user  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
 from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
-from werkzeug import Request  # noqa: E402
 
 from common.config_manager import config, ConfigWrapper  # noqa: E402
 from common.lib.database import Database  # noqa: E402
@@ -117,7 +116,7 @@ app.config.from_mapping({
 })
 
 # Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
-Request.max_form_parts = config.get("flask.max_form_parts", 1000)
+app.request_class.max_form_parts = config.get("flask.max_form_parts", 1000)
 
 # set up login manager
 app.login_manager = LoginManager()
