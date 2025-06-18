@@ -861,7 +861,7 @@ class DatasetVideoLibrary:
                 pass
 
         # Instantiate the downloader datasets so we can use their methods
-        return [downloader.instatiate(db=self.current_dataset.db) for downloader in previous_downloaders]
+        return previous_downloaders
 
     def collect_metadata_file(self, dataset, staging_area):
         source_file = dataset.get_results_path()
