@@ -172,26 +172,6 @@ class TikTokImageDownloader(BasicProcessor):
 
     followups = ImageDownloader.followups
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of items (max 1000)",
-            "default": 100,
-            "min": 0,
-            "max": 1000
-        },
-        "thumb_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Media type",
-            "options": {
-                "thumbnail": "Video Thumbnail",
-                "music": "Music Thumbnail",
-                "author_avatar": "User avatar"
-            },
-            "default": "thumbnail"
-        }
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -225,6 +205,7 @@ class TikTokImageDownloader(BasicProcessor):
                 "options": {
                     "thumbnail": "Video Thumbnail",
                     "music": "Music Thumbnail",
+                    "author_avatar": "User avatar"
                 },
                 "default": "thumbnail"
             }
