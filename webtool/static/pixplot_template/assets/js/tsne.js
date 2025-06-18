@@ -3510,6 +3510,9 @@ function Webgl() {
 **/
 
 Webgl.prototype.getGl = function() {
+  // Add this to console to check what failed:
+  console.log(navigator.userAgent);
+  console.log('WebGL support:', !!window.WebGLRenderingContext);
   var gl = getElem('canvas').getContext('webgl');
   if (!gl) document.querySelector('#webgl-not-available').style.display = 'block';
   return gl;

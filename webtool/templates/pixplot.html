@@ -503,15 +503,33 @@
     </div>
     <!-- Image Picker: single image selection -->
     <script type='text/html' id='selected-image-template'>
-      <div class='modal-row-content'>
+      <div class='modal-content'>
         <div class='modal-x'>✕</div>
-        <div class='modal-left' id='selected-image-meta'>
-          <div class='modal-left-content'>
+        <div class='modal-left'>
+          <div id='selected-image-container'>
+            <div id='selected-image-target'></div>
+            <div class='icons' id='selected-image-icons'>
+              <a target='_blank' id='eye-icon' href='<%- meta.permalink || meta.src %>'>
+                <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons/eye-icon.png") }}' alt='eye icon' />
+              </a>
+              <a id='download-icon' href='<%- meta.src || "#" %>' download>
+                <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons//download-icon.png") }}' alt='download icon' />
+              </a>
+            </div>
+            <% if (multiImage) { %>
+              <img id='caret-left' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons//chevron.png") }}' onclick='modal.showPreviousCell()'>
+              <img id='caret-right' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/chevron.png") }}' onclick='modal.showNextCell()'>
+            <% } %>
+          </div>
+        </div>
+        <div class='modal-right' id='selected-image-meta'>
+          <div class='modal-right-content'>
             <div class='modal-text-left'>
               <div id='image-title'><%- meta.filename ? decodeURIComponent(meta.filename) : decodeURIComponent(meta.src) %></div>
               <div class='modal-text-right'>
                 <% if (meta.category || meta.tags) { %>
                   <div id='meta-category-container'>
+                    <h2>Image tags</h2>
                     <% if (meta.category) { %>
                       <div class='meta-category'><%- meta.category %></div>
                     <% }; %>
@@ -528,24 +546,6 @@
               <span id='image-text'><%= meta.description ? decodeURIComponent(meta.description) : '' %></span>
               <span id='image-date'><%- meta.date ? '(' + meta.date + ')' : '' %></span>
             </div>
-
-          </div>
-        </div>
-        <div class='modal-right'>
-          <div id='selected-image-container'>
-            <div id='selected-image-target'></div>
-            <div class='icons'>
-              <a target='_blank' id='eye-icon' href='<%- meta.permalink || meta.src %>'>
-                <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons/eye-icon.png") }}' alt='eye icon' />
-              </a>
-              <a id='download-icon' href='<%- meta.src || "#" %>' download>
-                <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons//download-icon.png") }}' alt='download icon' />
-              </a>
-            </div>
-            <% if (multiImage) { %>
-              <img id='caret-left' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons//chevron.png") }}' onclick='modal.showPreviousCell()'>
-              <img id='caret-right' class='image-caret' src='{{ url_for("static", filename="pixplot_template/assets/images/icons/chevron.png") }}' onclick='modal.showNextCell()'>
-            <% } %>
           </div>
         </div>
       </div>

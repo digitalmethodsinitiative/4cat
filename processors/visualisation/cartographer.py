@@ -6,8 +6,9 @@ import os
 import uuid
 import zipfile
 from dateutil.parser import parse as parse_date
-
 import numpy as np
+import ural
+
 
 from collections import defaultdict
 from PIL import Image, UnidentifiedImageError
@@ -18,6 +19,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
+from common.lib.helpers import ellipsiate
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -34,7 +36,7 @@ class ImagePlotGenerator(BasicProcessor):
     """
     type = "custom-image-plot"  # job type ID
     category = "Visual"  # category
-    title = "Create Image visualisation"  # title displayed in UI
+    title = "Create PixPlot visualisation"  # title displayed in UI
     description = "Create an explorable map of images using different algorithms to identify similarities."
     extension = "zip"  # extension of result file, used internally and in UI
     is_plot = True  # can ZIP use pixplot template?
@@ -646,7 +648,7 @@ class ImagePlotGenerator(BasicProcessor):
                     '': successful_image_count,
                     'filename': data.get('filename'),
                     'permalink': url,
-                    'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(data.get('post_ids'))),
+                    'description': '<br><b>Number of post with this image:</b> ' + str(len(data.get('post_ids'))),
                     'tags': [],
                     'number_of_posts': 0,
                     }
@@ -667,12 +669,12 @@ class ImagePlotGenerator(BasicProcessor):
 
                     # Update description
                     image['number_of_posts'] += 1
-                    image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
+                    image['description'] += '<br><br><b>Post ' + str(image['number_of_posts']) + '</b><br><br>'
                     # Order of Description elements
                     ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
                     for detail in ordered_descriptions:
                         if post.get(detail):
-                            image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
+                            image['description'] += '<p><span class="fieldname">' + detail + '</span>' + self.make_nice_link(post.get(detail)) + '</p>'
 
                         # Add timestamps to image_dates
                         if detail == 'timestamp':
@@ -686,15 +688,15 @@ class ImagePlotGenerator(BasicProcessor):
 
                     for key, value in post.items():
                         if key not in ordered_descriptions:
-                            image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
+                            image['description'] += '<p><span class="fieldname">' + key + '</span> ' + self.make_nice_link(value) + '</p>'
 
                     # Add tags or hashtags
-                    if 'tags' in post.keys():
+                    if 'tags' in post.keys() and post["tags"]:
                         if type(post['tags']) == list:
                             image['tags'] += post['tags']
                         else:
                             image['tags'] += post['tags'].split(',')
-                    elif 'hashtags' in post.keys():
+                    elif 'hashtags' in post.keys() and post["hashtags"]:
                         if type(post['hashtags']) == list:
                             image['tags'] += post['hashtags']
                         else:
@@ -705,8 +707,8 @@ class ImagePlotGenerator(BasicProcessor):
                     if 'timestamp' in post.keys():
                         image['year'] = datetime.datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
 
-                    if category:
-                        image['category'] += [post.get(category, "None")]
+                    if category:      
+                        image['category'] += [str(post.get(category, "None"))]
 
         self.dataset.log(f"Image metadata added to {posts_with_images} posts")
 
@@ -869,6 +871,25 @@ class ImagePlotGenerator(BasicProcessor):
         }
       }
 
+    def make_nice_link(self, content):
+        """
+        Add HTML links to text
+
+        Replaces URLs with a clickable link
+        :param str content:  Text to parse
+        :return str:  Parsed text
+        """
+        try:
+            content = str(content)
+        except ValueError:
+            return content
+
+        for link in set(ural.urls_from_text(str(content))):
+            link_text = ellipsiate(link, 50, True, "[&hellip;]")
+            content = content.replace(link,
+                                      f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
+
+        return content
 
     def get_categorical_boxes(self, group_counts, margin=2):
         """
