@@ -98,6 +98,7 @@ class ImageWallGenerator(BasicProcessor):
 			options["amount"].pop("max")
 			options['amount']['tooltip'] = "'0' will use all available images"
 		return options
+	
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

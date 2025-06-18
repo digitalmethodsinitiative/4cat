@@ -306,11 +306,7 @@ def preview_items(key):
     has_mapper = hasattr(processor, "map_item")
     use_mapper = has_mapper and config.get("ui.prefer_mapped_preview")
 
-    if dataset.get_extension() == "html":
-        # html files
-        return get_result(dataset.get_results_path().name)
-
-    elif dataset.get_extension() == "zip":
+    if dataset.get_extension() == "zip":
         # Check if zip can use pixplot template
         if hasattr(processor, "is_plot") and processor.is_plot:
             return view_image_plot(dataset.key)
@@ -329,14 +325,13 @@ def preview_items(key):
                         return view_image_plot(grandkid.key)
 
         # List files in zip w/ links
-        rows = [["Files"]]
+        rows = [{"Files": "Files"}]
         with zipfile.ZipFile(dataset.get_results_path(), "r") as archive:
             archive_contents = sorted(archive.namelist())
-            [rows.append([markupsafe.Markup(f"<a href='{url_for('get_result', query_file=dataset.get_results_path().name + '/' + file)}'>{file}</a>")]) for file in archive_contents]
+            [rows.append({"file": markupsafe.Markup(f"<a href='{url_for('get_result', query_file=dataset.get_results_path().name + '/' + file)}'>{file}</a>")}) for file in archive_contents]
 
         return render_template("preview/csv.html", rows=rows, max_items=preview_size,
                                dataset=dataset)
-
 
     elif dataset.get_extension() == "gexf":
         # network files
