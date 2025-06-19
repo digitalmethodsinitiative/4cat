@@ -141,7 +141,7 @@ with app.app_context():
     app.log = log
     app.db = db
     app.fourcat_config = config
-    app.fourcat_modules = ModuleCollector(g.base_config)
+    app.fourcat_modules = ModuleCollector(app.fourcat_config)
 
     # import all views; these can only be imported here because they rely on
     # current_app for initialisation
