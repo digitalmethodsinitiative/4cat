@@ -38,11 +38,12 @@ class CountPosts(BasicProcessor):
 	}
 
 	@staticmethod
-	def is_compatible_with(module=None, user=None):
+	def is_compatible_with(module=None, config=None):
 		"""
         Determine compatibility
 
         :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
@@ -177,7 +178,7 @@ class CountPosts(BasicProcessor):
 		self.write_csv_items_and_finish(rows)
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		
 		options = cls.options
 

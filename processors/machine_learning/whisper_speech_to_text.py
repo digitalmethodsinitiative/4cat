@@ -8,7 +8,6 @@ from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from common.config_manager import config
 from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
@@ -56,18 +55,19 @@ class AudioToText(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on audio archives if enabled in Control Panel
         """
-        return config.get("dmi-service-manager.bc_whisper_enabled", False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.bc_whisper_enabled", False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == 'audio' or module.type.startswith("audio-extractor"))
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Collect maximum number of audio files from configuration and update options accordingly
+        :param config:
         """
         options = {
             "amount": {
@@ -113,7 +113,7 @@ class AudioToText(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100, user=user))
+        max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100))
         if max_number_audio_files == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of audio files"
             options["amount"]["default"] = 100

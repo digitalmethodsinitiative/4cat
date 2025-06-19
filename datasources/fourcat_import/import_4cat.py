@@ -585,7 +585,7 @@ class SearchImportFromFourcat(BasicProcessor):
         return response
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate custom data input
 
@@ -594,7 +594,7 @@ class SearchImportFromFourcat(BasicProcessor):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         if query.get("method") == "zip":

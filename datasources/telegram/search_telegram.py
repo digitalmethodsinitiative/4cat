@@ -16,7 +16,6 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient
@@ -80,7 +79,7 @@ class SearchTelegram(Search):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -89,11 +88,10 @@ class SearchTelegram(Search):
 
         :param DataSet parent_dataset:  An object representing the dataset that
           the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-          case they are requested for display in the 4CAT web interface. This can
-          be used to show some options only to privileges users.
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+
+        max_entities = config.get("telegram-search.max_entities", 25)
         options = {
             "intro": {
                 "type": UserInput.OPTION_INFO,
@@ -177,7 +175,7 @@ class SearchTelegram(Search):
             options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
                                               f"(channels or groups) at a time. Separate with line breaks or commas.")
 
-        all_messages = config.get("telegram-search.can_query_all_messages", False, user=user)
+        all_messages = config.get("telegram-search.can_query_all_messages", False)
         if all_messages:
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
@@ -185,7 +183,7 @@ class SearchTelegram(Search):
             options["max_posts"]["help"] = (f"Messages to collect per entity. You can query up to "
                                              f"{options['max_posts']['max']:,} messages per entity.")
 
-        if config.get("telegram-search.max_crawl_depth", 0, user=user) > 0:
+        if config.get("telegram-search.max_crawl_depth", 0) > 0:
             options["crawl_intro"] = {
                 "type": UserInput.OPTION_INFO,
                 "help": "Optionally, 4CAT can 'discover' new entities via forwarded messages; for example, if a "
@@ -274,7 +272,7 @@ class SearchTelegram(Search):
                                                       query["api_id"].strip(),
                                                       query["api_hash"].strip())
         self.dataset.log(f'Telegram session id: {session_id}')
-        session_path = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_SESSIONS"), session_id + ".session")
+        session_path = Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_SESSIONS"), session_id + ".session")
 
         client = None
 
@@ -978,13 +976,15 @@ class SearchTelegram(Search):
         return mapped_obj
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate Telegram query
 
+        :param config:
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
         :param User user:  User object of user who has submitted the query
+        :param ConfigManager config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # no query 4 u
@@ -994,10 +994,11 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        all_posts = config.get("telegram-search.can_query_all_messages", False, user=user)
-        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+        all_posts = config.get("telegram-search.can_query_all_messages", False)
+        max_entities = config.get("telegram-search.max_entities", 25)
 
-        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options()["max_posts"]["max"])
+        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options(
+            config=config)["max_posts"]["max"])
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
@@ -1020,14 +1021,14 @@ class SearchTelegram(Search):
         min_date, max_date = query.get("daterange")
 
         # now check if there is an active API session
-        if not user or not user.is_authenticated or user.is_anonymous:
+        if not hasattr(config, "user") or not config.user.is_authenticated or config.user.is_anonymous:
             raise QueryParametersException("Telegram scraping is only available to logged-in users with personal "
                                            "accounts.")
 
         # check for the information we need
         session_id = SearchTelegram.create_session_id(query.get("api_phone"), query.get("api_id"),
                                                       query.get("api_hash"))
-        user.set_value("telegram.session", session_id)
+        config.user.set_value("telegram.session", session_id)
         session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
 
         client = None

@@ -57,11 +57,12 @@ class TwitterAggregatedStats(BasicProcessor):
 
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
@@ -242,7 +243,7 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
     ]
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         options = cls.options.copy()
 
         options["show_outliers"] = {

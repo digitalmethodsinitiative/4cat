@@ -17,6 +17,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
 from common.lib.helpers import send_email, get_software_commit
+from common.config_manager import ConfigWrapper
 
 from pathlib import Path
 
@@ -37,6 +38,8 @@ def load_user(user_name):
     user = User.get_by_name(current_app.db, user_name)
     if user:
         user.authenticate()
+        user.with_config(ConfigWrapper(current_app.fourcat_config, user=user, request=request))
+
     return user
 
 
@@ -71,6 +74,7 @@ def load_user_from_request(request):
     else:
         current_app.db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
         user = User.get_by_name(g.db, user["user"])
+        user.with_config(g.config)
         user.authenticate()
         return user
 
@@ -147,6 +151,7 @@ def autologin_whitelist():
     # request only if the hostname or IP matches the whitelist
     if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.hostnames", [])]):
         autologin_user = User.get_by_name(g.db, "autologin")
+        autologin_user.with_config(g.config)
         if not autologin_user:
             # this user should exist by default
             abort(500)
@@ -258,6 +263,7 @@ def first_run_dialog():
         g.db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
         g.db.commit()
         user = User.get_by_name(db=g.db, name=username)
+        user.with_config(g.config)
         user.set_password(password)
         user.add_tag("admin")  # first user is always admin
 
@@ -333,6 +339,7 @@ def show_login():
         flash('Username or Password is invalid.', 'error')
         return redirect(url_for('user.show_login'))
 
+    registered_user.with_config(g.config)
     login_user(registered_user, remember=True)
 
     return redirect(url_for("misc.show_frontpage"))
@@ -450,6 +457,7 @@ def reset_password():
                                message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
 
     # check form
+    resetting_user.with_config(g.config)
     incomplete = []
     if request.method == "POST":
         # check password validity
@@ -498,6 +506,8 @@ def request_password():
 
         # is it also a valid username? that is not a 'special' user (like autologin)?
         resetting_user = User.get_by_name(g.db, username)
+        resetting_user.with_config(g.config)
+
         if resetting_user is None or resetting_user.is_special:
             incomplete.append("username")
             flash("That user is not known here. Note that your username is typically your e-mail address.")

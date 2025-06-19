@@ -3,7 +3,6 @@ Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
 from processors.metrics.count_posts import CountPosts
-import copy
 
 
 class MonthlyHistogramCreator(ProcessorPreset):
@@ -17,21 +16,22 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	extension = "svg"
 
 	@staticmethod
-	def is_compatible_with(module=None, user=None):
+	def is_compatible_with(module=None, config=None):
 		"""
         Determine compatibility
 
         This preset is compatible with any module that has countable items (via count-posts)
 
         :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 	
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		count_options = copy.deepcopy(CountPosts.get_options(parent_dataset=parent_dataset, user=user))
-		if "all" in count_options["timeframe"].get("options", {}):
+	def get_options(cls, parent_dataset=None, config=None):
+		count_options = CountPosts.get_options(parent_dataset=parent_dataset, config=config)
+		if "all" in count_options["timeframe"]:
 			# Cannot graph overall counts (or rather it would be a single bar)
 			count_options["timeframe"]["options"].pop("all")
 		return count_options

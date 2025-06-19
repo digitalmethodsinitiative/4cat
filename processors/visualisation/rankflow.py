@@ -93,11 +93,12 @@ class RankFlowRenderer(BasicProcessor):
 			   [0.179, 1.0, 0.475], [0.108, 0.502, 0.914], [0.096, 1.0, 0.502], [0.123, 1.0, 0.69]]
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.is_rankable()
 

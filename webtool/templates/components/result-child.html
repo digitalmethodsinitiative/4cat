@@ -1,5 +1,5 @@
 {% set item = child %}
-{% set can_process = (current_user.is_authenticated and item.get_available_processors(user=current_user)) %}
+{% set can_process = (current_user.is_authenticated and item.get_available_processors(config=__config)) %}
 {% set deprecated = (item.type not in processors) %}
 {% set is_filtered = (not deprecated and processors[item.type].is_filter()) %}
 
@@ -116,7 +116,7 @@
                     <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished() %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
                 </li>
                 {% endif %}
-            {% if item.type in processors %}{% set processor_options = processors[item.type].get_options() %}{% endif %}
+            {% if item.type in processors %}{% set processor_options = processors[item.type].get_options(config=__config) %}{% endif %}
             {% for option in item.parameters %}
                 {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
                 {% if processor_options[option].type == "toggle" %}
@@ -140,7 +140,7 @@
 
     {# 'More' button to show further analysis and preview #}
     <div class="processor-expand button-wrap">
-        {% if item.is_finished() and (item.get_children() or (item.num_rows > 0 and current_user.is_authenticated and item.get_available_processors(exclude_hidden=True))) %}
+        {% if item.is_finished() and (item.get_children() or (item.num_rows > 0 and current_user.is_authenticated and item.get_available_processors(config=__config, exclude_hidden=True))) %}
         <button aria-controls="child-{{ item.key }}-details" class="toggle-button">
             <span class="headline">
             <i class="fa fa-sitemap" aria-hidden="true"></i> <span class="sr-only">More info</span>
@@ -165,7 +165,7 @@
         {# Possible further analyses #}
         {% if __user_config("privileges.can_run_processors") and (__user_config("privileges.admin.can_manipulate_all_datasets") or item.is_accessible_by(current_user, role="owner")) %}
         <ol class="children-processors">
-            {% for processor in item.get_available_processors(exclude_hidden=True).values() %}
+            {% for processor in item.get_available_processors(exclude_hidden=True, config=__config).values() %}
 
                 {% set git_url = item.get_version_url("backend/processors/" + processor.filepath)%}
                 {% set dataset = item %}

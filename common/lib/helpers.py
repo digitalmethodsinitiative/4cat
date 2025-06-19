@@ -385,6 +385,7 @@ def convert_to_float(value, default=0) -> float:
     except (ValueError, TypeError):
         return default
 
+
 def timify_long(number):
     """
     Make a number look like an indication of time

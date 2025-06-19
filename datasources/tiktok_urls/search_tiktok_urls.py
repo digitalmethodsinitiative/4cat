@@ -76,13 +76,13 @@ class SearchTikTokByID(Search):
         return loop.run_until_complete(tiktok_scraper.request_metadata(query["urls"].split(",")))
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate TikTok query
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         if not query.get("urls"):

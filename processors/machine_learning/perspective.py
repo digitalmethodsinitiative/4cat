@@ -39,7 +39,7 @@ class Perspective(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		options = {
 			"attributes": {
 				"type": UserInput.OPTION_MULTI,
@@ -61,7 +61,7 @@ class Perspective(BasicProcessor):
 			}
 		}
 
-		api_key = config.get("api.google.api_key", user=user)
+		api_key = config.get("api.google.api_key")
 		if not api_key:
 			options["api_key"] = {
 				"type": UserInput.OPTION_TEXT,

@@ -35,11 +35,12 @@ class TwitterUserVisibility(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type in ["twitterv2-search", "dmi-tcat-search"]
 

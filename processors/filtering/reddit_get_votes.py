@@ -11,7 +11,6 @@ from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -47,13 +46,14 @@ class RedditVoteChecker(BasicProcessor):
 		}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor if dataset is a Reddit dataset
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
-		if config.get('api.reddit.client_id', False, user=user) and config.get('api.reddit.secret', False, user=user):
+		if config.get('api.reddit.client_id', False) and config.get('api.reddit.secret', False):
 			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
 		return False
 

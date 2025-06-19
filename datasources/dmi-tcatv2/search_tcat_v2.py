@@ -12,7 +12,6 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from backend.lib.database_mysql import MySQLDatabase
-from common.config_manager import config
 
 
 class SearchWithinTCATBinsV2(Search):
@@ -73,23 +72,23 @@ class SearchWithinTCATBinsV2(Search):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get data source options
 
         This method takes the pre-defined options, but fills the 'bins' options
         with bins currently available from the configured TCAT instances.
 
+        :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
         the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
+can
         be used to show some options only to privileges users.
         """
         options = cls.options
 
         # Collect Metadata from TCAT instances
-        all_bins = cls.collect_tcat_metadata()
+        all_bins = cls.collect_tcat_metadata(config)
 
         options["bin"] = {
             "type": UserInput.OPTION_CHOICE,
@@ -116,7 +115,7 @@ class SearchWithinTCATBinsV2(Search):
         bin_name = bin.split("@")[0]
         tcat_name = bin.split("@").pop()
 
-        available_instances = config.get("dmi-tcatv2-search.database_instances", [])
+        available_instances = self.config.get("dmi-tcatv2-search.database_instances", [])
         instance = [instance for instance in available_instances if instance.get('tcat_name') == tcat_name][0]
 
         db = MySQLDatabase(logger=self.log,
@@ -320,7 +319,7 @@ class SearchWithinTCATBinsV2(Search):
 
 
     @classmethod
-    def collect_tcat_metadata(cls):
+    def collect_tcat_metadata(cls, config):
         """
         Collect specific metadata from TCAT instances listed in the configuration and return a dictionary containing
         this data. To be used to infor the user of available TCAT bins and create the options from which a user will
@@ -381,13 +380,13 @@ class SearchWithinTCATBinsV2(Search):
         return all_bins
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate DMI-TCAT query input
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # no query 4 u

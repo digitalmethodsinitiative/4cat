@@ -7,8 +7,6 @@ import openai
 
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
-from common.config_manager import config
-from openai.types.chat.chat_completion import ChatCompletion
 
 class OpenAI(BasicProcessor):
 	"""
@@ -38,7 +36,7 @@ class OpenAI(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None) -> dict:
+	def get_options(cls, parent_dataset=None, config=None):
 		options = {
 			"per_item": {
 				"type": UserInput.OPTION_INFO,
@@ -137,7 +135,7 @@ class OpenAI(BasicProcessor):
 			}
 		}
 
-		api_key = config.get("api.openai.api_key", user=user)
+		api_key = config.get("api.openai.api_key")
 		if not api_key:
 			options["api_key"] = {
 				"type": UserInput.OPTION_TEXT,
@@ -151,7 +149,7 @@ class OpenAI(BasicProcessor):
 		return options
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None) -> bool:
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Determine if processor is compatible with a dataset or processor
 
@@ -181,8 +179,8 @@ class OpenAI(BasicProcessor):
 
 		api_key = self.parameters.get("api_key")
 		if not api_key:
-			api_key = config.get("api.openai.api_key", user=self.owner)
-		if not api_key and not model == "local-lmstudio":
+			api_key = self.config.get("api.openai.api_key")
+		if not api_key:
 			self.dataset.finish_with_error("You need to provide a valid API key")
 			return
 
@@ -295,7 +293,7 @@ class OpenAI(BasicProcessor):
 		self.write_csv_items_and_finish(results)
 
 	@staticmethod
-	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50) -> ChatCompletion:
+	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50):
 
 		# Get response
 		response = client.chat.completions.create(
