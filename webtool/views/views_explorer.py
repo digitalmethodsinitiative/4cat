@@ -66,10 +66,6 @@ def explorer_dataset(dataset_key: str, page=1):
 	# The offset for posts depending on the current page
 	offset = ((int(page) - 1) * posts_per_page) if page else 0
 
-	# If the dataset is generated from an API-accessible database, we can add 
-	# extra features like the ability to navigate across posts.
-	has_database = False # todo: integrate
-
 	# Check if we have to sort the data.
 	sort = request.args.get("sort")
 
@@ -137,7 +133,6 @@ def explorer_dataset(dataset_key: str, page=1):
 		"explorer/explorer.html",
 		dataset=dataset,
 		datasource=datasource,
-		has_database=has_database,
 		posts=posts,
 		annotation_fields=annotation_fields,
 		annotations=post_annotations,
