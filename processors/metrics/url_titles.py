@@ -1,6 +1,7 @@
 """
 Retrieve HTML title (and other metadata) for URLs
 """
+
 import csv
 
 from backend.lib.processor import BasicProcessor
@@ -24,11 +25,14 @@ class URLFetcher(BasicProcessor):
     """
     Retrieve HTML title (and other metadata) for URLs
     """
+
     type = "url-metadata"  # job type ID
     category = "Post metrics"  # category
     title = "Fetch URL metadata"  # title displayed in UI
-    description = ("Fetches the page title and other metadata for URLs referenced in the dataset. Makes a request to "
-                   "each URL, optionally following HTTP redirects.")  # description displayed in UI
+    description = (
+        "Fetches the page title and other metadata for URLs referenced in the dataset. Makes a request to "
+        "each URL, optionally following HTTP redirects."
+    )  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     followups = []
@@ -37,23 +41,23 @@ class URLFetcher(BasicProcessor):
         "columns": {
             "type": UserInput.OPTION_TEXT,
             "help": "Column(s) to get URLs from",
-            "default": "body"
+            "default": "body",
         },
         "follow-redirects": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Follow redirects?",
             "default": True,
             "tooltip": "Follow HTTP redirects (status 301 or 302) and report on the URL redirected to instead of the "
-                       "original URL"
+            "original URL",
         },
         "ignore-duplicates": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Ignore duplicates?",
             "default": True,
             "tooltip": "If enabled, only include the first occurrence of a URL. Otherwise, a row will be included in "
-                       "the output CSV file for each separate occurrence of the URL. Note that each URL is only "
-                       "requested once regardless."
-        }
+            "the output CSV file for each separate occurrence of the URL. Note that each URL is only "
+            "requested once regardless.",
+        },
     }
 
     config = {
@@ -62,7 +66,7 @@ class URLFetcher(BasicProcessor):
             "coerce_type": float,
             "default": 60.0,
             "help": "Timeout",
-            "tooltip": "Time to wait before cancelling a request and potentially trying again"
+            "tooltip": "Time to wait before cancelling a request and potentially trying again",
         }
     }
 
@@ -133,11 +137,7 @@ class URLFetcher(BasicProcessor):
 
             for url in urls:
                 if url not in all_urls:
-                    all_urls[url] = {
-                        "items": [],
-                        "retries": 0,
-                        "retry_after": 0
-                    }
+                    all_urls[url] = {"items": [], "retries": 0, "retry_after": 0}
                 elif ignore_dupes:
                     continue
 
@@ -145,14 +145,30 @@ class URLFetcher(BasicProcessor):
                 # used in multiple items. so save references to all items per
                 # URL; save item ID and timestamp, which we will include in the
                 # output later
-                all_urls[url]["items"].append({k: v for k, v in item.items() if k in ("id", "thread_id", "timestamp")})
+                all_urls[url]["items"].append(
+                    {
+                        k: v
+                        for k, v in item.items()
+                        if k in ("id", "thread_id", "timestamp")
+                    }
+                )
 
         self.dataset.log(f"Found {len(all_urls):,} in dataset.")
 
         # now start fetching things
         with self.dataset.get_results_path().open("w", newline="") as outfile:
-            fieldnames = ("item_id", "thread_id", "item_timestamp", "url", "final_url", "domain_name", "status",
-                          "status_code", "reason", "title")
+            fieldnames = (
+                "item_id",
+                "thread_id",
+                "item_timestamp",
+                "url",
+                "final_url",
+                "domain_name",
+                "status",
+                "status_code",
+                "reason",
+                "title",
+            )
 
             self.writer = csv.DictWriter(outfile, fieldnames=fieldnames)
             self.writer.writeheader()
@@ -162,16 +178,17 @@ class URLFetcher(BasicProcessor):
             ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0"
 
             for url, response in self.iterate_proxied_requests(
-                    all_urls,
-                    preserve_order=False,
-                    headers={"User-Agent": ua}, hooks={
-                        # use hooks to download the content (stream=True) in parallel
-                        "response": URLFetcher.stream_url
-                    },
-                    verify=False,
-                    timeout=self.config.get("url-metadata.timeout", 70),
-                    allow_redirects=follow_redirects,
-                    stream=True
+                all_urls,
+                preserve_order=False,
+                headers={"User-Agent": ua},
+                hooks={
+                    # use hooks to download the content (stream=True) in parallel
+                    "response": URLFetcher.stream_url
+                },
+                verify=False,
+                timeout=self.config.get("url-metadata.timeout", 70),
+                allow_redirects=follow_redirects,
+                stream=True,
             ):
                 if self.interrupted:
                     self.flush_proxied_requests()
@@ -179,31 +196,41 @@ class URLFetcher(BasicProcessor):
 
                 if type(response) is FailedProxiedRequest:
                     self.dataset.log(
-                        f"Error getting URL {url} ({response.context}), skipping")
+                        f"Error getting URL {url} ({response.context}), skipping"
+                    )
                     urls_failed += 1
                 else:
                     urls_success += 1
                     for item in all_urls[url]["items"]:
-                        self.writer.writerow({
-                            "item_id": item["id"],
-                            "thread_id": item["thread_id"],
-                            "item_timestamp": item["timestamp"],
-                            "url": url,
-                            "final_url": response.url,
-                            "domain_name": ural.get_domain_name(response.url),
-                            "status": "success",
-                            "status_code": response.status_code,
-                            "reason": response.reason,
-                            "title": response.page_title
-                        })
+                        self.writer.writerow(
+                            {
+                                "item_id": item["id"],
+                                "thread_id": item["thread_id"],
+                                "item_timestamp": item["timestamp"],
+                                "url": url,
+                                "final_url": response.url,
+                                "domain_name": ural.get_domain_name(response.url),
+                                "status": "success",
+                                "status_code": response.status_code,
+                                "reason": response.reason,
+                                "title": response.page_title,
+                            }
+                        )
 
-                self.dataset.update_status(f"Processed {(urls_failed + urls_success):,} of {len(all_urls):,} URLs")
-                self.dataset.update_progress((urls_failed + urls_success) / len(all_urls))
+                self.dataset.update_status(
+                    f"Processed {(urls_failed + urls_success):,} of {len(all_urls):,} URLs"
+                )
+                self.dataset.update_progress(
+                    (urls_failed + urls_success) / len(all_urls)
+                )
 
         # log warning if not everything succeeded
         if urls_failed:
-            self.dataset.update_status(f"URLs fetched, but {urls_failed:,} URL(s) could not be retrieved. See dataset "
-                                       f"log for details.", is_final=True)
+            self.dataset.update_status(
+                f"URLs fetched, but {urls_failed:,} URL(s) could not be retrieved. See dataset "
+                f"log for details.",
+                is_final=True,
+            )
 
         # and write everything to a CSV
         self.dataset.finish(urls_failed + urls_success)

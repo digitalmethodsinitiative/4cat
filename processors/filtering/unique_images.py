@@ -1,6 +1,7 @@
 """
 Filter by unique images
 """
+
 import shutil
 import json
 
@@ -18,6 +19,7 @@ class UniqueImageFilter(BasicProcessor):
     """
     Retain only unique images, by a user-defined metric
     """
+
     type = "image-downloader-unique"  # job type ID
     category = "Visualisation"  # category
     title = "Filter for unique images"  # title displayed in UI
@@ -29,7 +31,6 @@ class UniqueImageFilter(BasicProcessor):
         "Explainer: [Average hash](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
         "Explainer: [Perceptual hashing](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
         "Explainer: [Difference hash](https://www.hackerfactor.com/blog/index.php?/archives/529-Kind-of-Like-That.html)",
-
     ]
 
     options = {
@@ -42,8 +43,8 @@ class UniqueImageFilter(BasicProcessor):
                 "colorhash": "Colour hash (good at colours, worse at shapes)",
                 "phash": "Perceptual hash (decent at colours and shapes)",
                 "average_hash": "Average hash (good at crops, less tolerant of differences than perceptual hashing)",
-                "dhash": "Difference hash (similar to average hash, better at photos and art)"
-            }
+                "dhash": "Difference hash (similar to average hash, better at photos and art)",
+            },
         }
     }
 
@@ -54,8 +55,11 @@ class UniqueImageFilter(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.get_media_type() == "image" or module.type.startswith(
-            "image-downloader") or module.type == "video-frames"
+        return (
+            module.get_media_type() == "image"
+            or module.type.startswith("image-downloader")
+            or module.type == "video-frames"
+        )
 
     def process(self):
         """
@@ -73,12 +77,16 @@ class UniqueImageFilter(BasicProcessor):
         self.dataset.update_status("Processing images and looking for duplicates")
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while filtering for unique images")
+                raise ProcessorInterruptedException(
+                    "Interrupted while filtering for unique images"
+                )
 
             self.dataset.update_progress(processed / self.source_dataset.num_rows)
             if processed % 100 == 0:
-                self.dataset.update_status(f"Processed {processed:,} of {self.source_dataset.num_rows:,} images, "
-                                             f"found {dupes:,} duplicate(s)")
+                self.dataset.update_status(
+                    f"Processed {processed:,} of {self.source_dataset.num_rows:,} images, "
+                    f"found {dupes:,} duplicate(s)"
+                )
             processed += 1
 
             if image_file.name == ".metadata.json":
@@ -93,7 +101,9 @@ class UniqueImageFilter(BasicProcessor):
                 shutil.copy2(image_file, staging_area)
                 hash_map[image_hash] = image_file.name
             else:
-                self.dataset.log(f"{image_file.name} is a duplicate of {hash_map[image_hash]} - skipping")
+                self.dataset.log(
+                    f"{image_file.name} is a duplicate of {hash_map[image_hash]} - skipping"
+                )
                 dupes += 1
 
         new_metadata = {}
@@ -104,13 +114,22 @@ class UniqueImageFilter(BasicProcessor):
                     new_metadata[inverse_hashmap[item["filename"]]] = {
                         **item,
                         "hash": inverse_hashmap[item["filename"]],
-                        "hash_type": self.parameters.get("hash-type")
+                        "hash_type": self.parameters.get("hash-type"),
                     }
         else:
-            new_metadata = {hash_map[k]: {"filename": hash_map[k], "hash": k, "hash_type": self.parameters.get("hash-type")} for k in hash_map}
+            new_metadata = {
+                hash_map[k]: {
+                    "filename": hash_map[k],
+                    "hash": k,
+                    "hash_type": self.parameters.get("hash-type"),
+                }
+                for k in hash_map
+            }
 
         with staging_area.joinpath(".metadata.json").open("w") as outfile:
             json.dump(new_metadata, outfile)
 
-        self.dataset.update_status(f"Image archive filtered, found {dupes:,} duplicate(s)", is_final=True)
+        self.dataset.update_status(
+            f"Image archive filtered, found {dupes:,} duplicate(s)", is_final=True
+        )
         self.write_archive_and_finish(staging_area, len(hash_map), finish=True)

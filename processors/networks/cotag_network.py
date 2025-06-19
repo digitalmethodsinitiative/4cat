@@ -15,12 +15,15 @@ class CoTaggerPreset(ProcessorPreset):
     """
     Generate co-tag network of co-occurring (hash)tags in items
     """
+
     type = "preset-cotag-network"  # job type ID
     category = "Networks"  # category
     title = "Co-tag network"  # title displayed in UI
-    description = "Create a GEXF network file of tags co-occurring in a posts. " \
-                  "Edges are weighted by the amount of tag co-occurrences; nodes " \
-                  "are weighted by how often the tag appears in the dataset."  # description displayed in UI
+    description = (
+        "Create a GEXF network file of tags co-occurring in a posts. "
+        "Edges are weighted by the amount of tag co-occurrences; nodes "
+        "are weighted by how often the tag appears in the dataset."
+    )  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
 
     options = {
@@ -28,15 +31,15 @@ class CoTaggerPreset(ProcessorPreset):
             "type": UserInput.OPTION_TOGGLE,
             "default": True,
             "help": "Convert tags to lowercase",
-            "tooltip": "Merges tags with varying cases"
+            "tooltip": "Merges tags with varying cases",
         },
         "ignore-tags": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
             "help": "Tags to ignore",
             "tooltip": "Separate with commas if you want to ignore multiple tags. Do not include the '#' "
-                       "character."
-        }
+            "character.",
+        },
     }
 
     possible_tag_columns = {"tags", "hashtags", "groups"}
@@ -69,7 +72,9 @@ class CoTaggerPreset(ProcessorPreset):
             tag_column = "tags"
         else:
             columns = self.source_dataset.get_columns()
-            tag_column = next((col for col in columns if col in self.possible_tag_columns), None)
+            tag_column = next(
+                (col for col in columns if col in self.possible_tag_columns), None
+            )
 
         pipeline = [
             {
@@ -82,8 +87,8 @@ class CoTaggerPreset(ProcessorPreset):
                     "categorise": True,
                     "allow-loops": False,
                     "ignore-nodes": self.parameters.get("ignore-tags", ""),
-                    "to-lowercase": self.parameters.get("to-lowercase", True)
-                }
+                    "to-lowercase": self.parameters.get("to-lowercase", True),
+                },
             }
         ]
 

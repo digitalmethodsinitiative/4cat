@@ -5,11 +5,17 @@ The DMI OCR Server can be downloaded seperately here:
 https://github.com/digitalmethodsinitiative/ocr_server#readme
 and is run using the DMI Service Manager
 """
+
 import json
 import os
 
 from common.config_manager import config
-from common.lib.dmi_service_manager import DmiServiceManager, DsmConnectionError, DsmOutOfMemory, DmiServiceManagerException
+from common.lib.dmi_service_manager import (
+    DmiServiceManager,
+    DsmConnectionError,
+    DsmOutOfMemory,
+    DmiServiceManagerException,
+)
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
@@ -20,10 +26,12 @@ __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
+
 class ImageTextDetector(BasicProcessor):
     """
     Send images to DMI OCR server for OCR analysis
     """
+
     type = "text-from-images"  # job type ID
     category = "Conversion"  # category
     title = "Extract Text from Images"  # title displayed in UI
@@ -43,10 +51,10 @@ class ImageTextDetector(BasicProcessor):
 
     references = [
         "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
-        "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)"
-        #"[Keras OCR model]( https://keras-ocr.readthedocs.io/en/latest/)",
-        #"[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
-        #"[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
+        "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)",
+        # "[Keras OCR model]( https://keras-ocr.readthedocs.io/en/latest/)",
+        # "[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
+        # "[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
     ]
 
     config = {
@@ -81,8 +89,8 @@ class ImageTextDetector(BasicProcessor):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Update original dataset with detected text",
             "default": False,
-            "tooltip": "If enabled, the original dataset will be modified to include a 'detected_text' column otherwise a seperate dataset will be created"
-        }
+            "tooltip": "If enabled, the original dataset will be modified to include a 'detected_text' column otherwise a seperate dataset will be created",
+        },
     }
 
     @classmethod
@@ -92,9 +100,14 @@ class ImageTextDetector(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return config.get('dmi-service-manager.eb_ocr_enabled', False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
+        return (
+            config.get("dmi-service-manager.eb_ocr_enabled", False, user=user)
+            and config.get("dmi-service-manager.ab_server_address", False, user=user)
+            and (
+                module.get_media_type() == "image"
+                or module.type.startswith("image-downloader")
+            )
+        )
 
     def process(self):
         """
@@ -120,16 +133,20 @@ class ImageTextDetector(BasicProcessor):
         image_filenames = []
         skipped_images = 0
         metadata_file = None
-        for image in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+        for image in self.iterate_archive_contents(
+            self.source_file, staging_area=staging_area, immediately_delete=False
+        ):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while unzipping images")
+                raise ProcessorInterruptedException(
+                    "Interrupted while unzipping images"
+                )
 
             if image.name == ".metadata.json":
                 metadata_file = image.name
                 continue
-            elif image.name.split('.')[-1]  in ["json", "log"]:
+            elif image.name.split(".")[-1] in ["json", "log"]:
                 continue
-            elif image.name.split('.')[-1] == "svg":
+            elif image.name.split(".")[-1] == "svg":
                 self.dataset.log(f"SVG files are not supported, skipping {image.name}")
                 skipped_images += 1
                 continue
@@ -154,38 +171,55 @@ class ImageTextDetector(BasicProcessor):
 
         # Process the image files (upload to server if needed)
         try:
-            path_to_files, path_to_results = dmi_service_manager.process_files(input_file_dir=staging_area,
-                                                                           filenames=image_filenames,
-                                                                           output_file_dir=output_dir,
-                                                                           server_file_collection_name=file_collection_name,
-                                                                           server_results_folder_name=server_results_folder_name)
+            path_to_files, path_to_results = dmi_service_manager.process_files(
+                input_file_dir=staging_area,
+                filenames=image_filenames,
+                output_file_dir=output_dir,
+                server_file_collection_name=file_collection_name,
+                server_results_folder_name=server_results_folder_name,
+            )
         except DsmConnectionError as e:
-            self.dataset.finish_with_error(f"Unable to connect to DMI Service Manager: {e}")
+            self.dataset.finish_with_error(
+                f"Unable to connect to DMI Service Manager: {e}"
+            )
             return
 
         # Arguments for the OCR server
         data = {
-                'args': ['--model', model_type,
-                         '--output_dir', f"data/{path_to_results}",
-                         '--images'],
-                'timeout': max(2 * total_image_files, 600), # 2 seconds per image
-                }
-        data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
+            "args": [
+                "--model",
+                model_type,
+                "--output_dir",
+                f"data/{path_to_results}",
+                "--images",
+            ],
+            "timeout": max(2 * total_image_files, 600),  # 2 seconds per image
+        }
+        data["args"].extend(
+            [
+                f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}"
+                for filename in image_filenames
+            ]
+        )
 
         # Send request to DMI Service Manager
         self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "ocr"
         try:
-            dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30,
-                                                                  check_process=True)
+            dmi_service_manager.send_request_and_wait_for_results(
+                api_endpoint, data, wait_period=30, check_process=True
+            )
         except DsmOutOfMemory:
             self.dataset.finish_with_error(
-                "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
+                "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later."
+            )
             return
         except DmiServiceManagerException as e:
             self.dataset.log(str(e))
             self.log.warning(f"text_from_image Error ({self.dataset.key}): {e}")
-            self.dataset.finish_with_error(f"Error with {model_type} model; please contact 4CAT admins.")
+            self.dataset.finish_with_error(
+                f"Error with {model_type} model; please contact 4CAT admins."
+            )
             return
 
         self.dataset.update_status("Processing OCR results...")
@@ -196,7 +230,9 @@ class ImageTextDetector(BasicProcessor):
         image_metadata = {}
         if metadata_file is None:
             try:
-                self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+                self.extract_archived_file_by_name(
+                    ".metadata.json", self.source_file, staging_area
+                )
                 metadata_exists = True
             except FileNotFoundError:
                 self.dataset.update_status("No metadata file found")
@@ -206,43 +242,52 @@ class ImageTextDetector(BasicProcessor):
             metadata_exists = True
 
         if metadata_exists:
-            with open(os.path.join(staging_area, '.metadata.json')) as file:
+            with open(os.path.join(staging_area, ".metadata.json")) as file:
                 image_data = json.load(file)
                 for url, data in image_data.items():
-                    if data.get('success'):
+                    if data.get("success"):
                         data.update({"url": url})
-                        image_metadata[data['filename']] = data
+                        image_metadata[data["filename"]] = data
 
         # Check if we need to collect data for updating the original dataset
         update_original = self.parameters.get("update_original", False)
         if update_original:
             if not metadata_exists:
-                self.dataset.update_status("No metadata file found, cannot update original dataset")
+                self.dataset.update_status(
+                    "No metadata file found, cannot update original dataset"
+                )
                 update_original = False
             else:
                 # Create filename to post id mapping
                 filename_to_post_id = {}
                 for url, data in image_data.items():
-                    if data.get('success'):
-                        filename_to_post_id[data.get('filename')] = data.get('post_ids')
+                    if data.get("success"):
+                        filename_to_post_id[data.get("filename")] = data.get("post_ids")
                 post_id_to_results = {}
 
         # Save files as NDJSON, then use map_item for 4CAT to interact
         processed = 0
-        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+        with self.dataset.get_results_path().open(
+            "w", encoding="utf-8", newline=""
+        ) as outfile:
             for result_filename in os.listdir(output_dir):
                 if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while writing results to file")
+                    raise ProcessorInterruptedException(
+                        "Interrupted while writing results to file"
+                    )
 
                 self.dataset.log(f"Writing {result_filename}...")
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
-                    result_data = json.loads(''.join(result_file))
+                    result_data = json.loads("".join(result_file))
                     image_name = result_data.get("filename")
 
                     # Collect annotations for updating the original dataset
                     if update_original:
                         # Need to include filename as there may be many images to a single post
-                        detected_text = '%s:"""%s"""' % (image_name, result_data.get('simplified_text', {}).get('raw_text', ''))
+                        detected_text = '%s:"""%s"""' % (
+                            image_name,
+                            result_data.get("simplified_text", {}).get("raw_text", ""),
+                        )
 
                         post_ids = filename_to_post_id[image_name]
                         for post_id in post_ids:
@@ -255,7 +300,9 @@ class ImageTextDetector(BasicProcessor):
                     data = {
                         "id": image_name,
                         **result_data,
-                        "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
+                        "image_metadata": image_metadata.get(image_name, {})
+                        if image_metadata
+                        else {},
                     }
                     outfile.write(json.dumps(data) + "\n")
 
@@ -269,18 +316,25 @@ class ImageTextDetector(BasicProcessor):
             # We need an entry for each row/item in the original dataset necitating we loop through it
             detected_text_column = []
             for post in self.dataset.top_parent().iterate_items(self):
-                detected_text_column.append('\n'.join(post_id_to_results.get(post.get('id'), [])))
+                detected_text_column.append(
+                    "\n".join(post_id_to_results.get(post.get("id"), []))
+                )
 
             try:
-                self.add_field_to_parent(field_name='4CAT_detexted_text',
-                                         new_data=detected_text_column,
-                                         which_parent=self.dataset.top_parent())
+                self.add_field_to_parent(
+                    field_name="4CAT_detexted_text",
+                    new_data=detected_text_column,
+                    which_parent=self.dataset.top_parent(),
+                )
             except ProcessorException as e:
                 self.dataset.update_status("Error updating parent dataset: %s" % e)
 
         detected_message = f"Detected text in {processed} of {total_image_files} images.{(' Skipped ' + str(skipped_images) + ' images; see log for details.') if skipped_images else ''}"
         if self.parameters.get("update_original", False) and not update_original:
-            self.dataset.update_status(f"{detected_message} No metadata file found, unable to update original dataset.", is_final=True)
+            self.dataset.update_status(
+                f"{detected_message} No metadata file found, unable to update original dataset.",
+                is_final=True,
+            )
         else:
             self.dataset.update_status(detected_message)
         self.dataset.finish(processed)
@@ -290,10 +344,19 @@ class ImageTextDetector(BasicProcessor):
         """
         For preview frontend
         """
-        return MappedItem({
-            "image_filename": item.get("filename"),
-            "model_type": item.get("model_type"),
-            "text": item.get("simplified_text", {}).get("raw_text"),
-            "post_ids": ", ".join([str(post_id) for post_id in item.get("image_metadata", {}).get("post_ids", [])]),
-            "image_url": item.get("image_metadata", {}).get("url")
-        })
+        return MappedItem(
+            {
+                "image_filename": item.get("filename"),
+                "model_type": item.get("model_type"),
+                "text": item.get("simplified_text", {}).get("raw_text"),
+                "post_ids": ", ".join(
+                    [
+                        str(post_id)
+                        for post_id in item.get("image_metadata", {}).get(
+                            "post_ids", []
+                        )
+                    ]
+                ),
+                "image_url": item.get("image_metadata", {}).get("url"),
+            }
+        )

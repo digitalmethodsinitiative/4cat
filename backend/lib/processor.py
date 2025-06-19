@@ -1,6 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+
 import re
 import traceback
 import zipfile
@@ -18,8 +19,13 @@ from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email
-from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
-                                   DataSetException, MapItemException)
+from common.lib.exceptions import (
+    WorkerInterruptedException,
+    ProcessorInterruptedException,
+    ProcessorException,
+    DataSetException,
+    MapItemException,
+)
 from common.config_manager import config, ConfigWrapper
 from common.lib.user import User
 
@@ -101,7 +107,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         try:
             # a dataset can have multiple owners, but the creator is the user
             # that actually queued the processor, so their config is relevant
-            self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db, modules=self.modules)
+            self.dataset = DataSet(
+                key=self.job.data["remote_id"], db=self.db, modules=self.modules
+            )
             self.owner = self.dataset.creator
         except DataSetException:
             # query has been deleted in the meantime. finish without error,
@@ -113,7 +121,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # creator. This ensures that if a value has been overriden for the owner,
         # the overridden value is used instead.
         config.with_db(self.db)
-        self.config = ConfigWrapper(config=config, user=User.get_by_name(self.db, self.owner))
+        self.config = ConfigWrapper(
+            config=config, user=User.get_by_name(self.db, self.owner)
+        )
 
         if self.dataset.data.get("key_parent", None):
             # search workers never have parents (for now), so we don't need to
@@ -126,23 +136,30 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 # their data from. However, this should only be done as long as the
                 # preset is not finished yet, because after that there may be processors
                 # that run on the final preset result
-                while self.source_dataset.type.startswith("preset-") and not self.source_dataset.is_finished():
+                while (
+                    self.source_dataset.type.startswith("preset-")
+                    and not self.source_dataset.is_finished()
+                ):
                     self.is_running_in_preset = True
                     self.source_dataset = self.source_dataset.get_parent()
                     if self.source_dataset is None:
                         # this means there is no dataset that is *not* a preset anywhere
                         # above this dataset. This should never occur, but if it does, we
                         # cannot continue
-                        self.log.error("Processor preset %s for dataset %s cannot find non-preset parent dataset",
-                                       (self.type, self.dataset.key))
+                        self.log.error(
+                            "Processor preset %s for dataset %s cannot find non-preset parent dataset",
+                            (self.type, self.dataset.key),
+                        )
                         self.job.finish()
                         return
 
             except DataSetException:
                 # we need to know what the source_dataset dataset was to properly handle the
                 # analysis
-                self.log.warning("Processor %s queued for orphan dataset %s: cannot run, cancelling job" % (
-                    self.type, self.dataset.key))
+                self.log.warning(
+                    "Processor %s queued for orphan dataset %s: cannot run, cancelling job"
+                    % (self.type, self.dataset.key)
+                )
                 self.job.finish()
                 return
 
@@ -157,11 +174,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             if not self.source_file.exists():
                 self.dataset.update_status("Finished, no input data found.")
 
-        self.log.info("Running processor %s on dataset %s" % (self.type, self.job.data["remote_id"]))
+        self.log.info(
+            "Running processor %s on dataset %s"
+            % (self.type, self.job.data["remote_id"])
+        )
 
         processor_name = self.title if hasattr(self, "title") else self.type
         self.dataset.clear_log()
-        self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
+        self.dataset.log(
+            "Processing '%s' started for dataset %s"
+            % (processor_name, self.dataset.key)
+        )
 
         # start log file
         self.dataset.update_status("Processing data")
@@ -172,7 +195,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         given_parameters = self.dataset.parameters.copy()
         all_parameters = self.get_options(self.dataset)
         self.parameters = {
-            param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
+            param: given_parameters.get(
+                param, all_parameters.get(param, {}).get("default")
+            )
             for param in [*all_parameters.keys(), *given_parameters.keys()]
         }
 
@@ -193,12 +218,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 self.process()
                 self.after_process()
             except WorkerInterruptedException as e:
-                self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
+                self.dataset.log(
+                    "Processing interrupted (%s), trying again later" % str(e)
+                )
                 self.abort()
             except Exception as e:
                 self.dataset.log("Processor crashed (%s), trying again later" % str(e))
                 stack = traceback.extract_tb(e.__traceback__)
-                frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack[1:]]
+                frames = [
+                    frame.filename.split("/").pop() + ":" + str(frame.lineno)
+                    for frame in stack[1:]
+                ]
                 location = "->".join(frames)
 
                 # Not all datasets have source_dataset keys
@@ -207,17 +237,38 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 else:
                     parent_key = ""
 
-                print("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
-                    self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
+                print(
+                    "Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n"
+                    % (
+                        self.type,
+                        e.__class__.__name__,
+                        self.dataset.key,
+                        parent_key,
+                        location,
+                        str(e),
+                    )
+                )
                 # remove any result files that have been created so far
                 self.remove_files()
 
-                raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
-                    self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
+                raise ProcessorException(
+                    "Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n"
+                    % (
+                        self.type,
+                        e.__class__.__name__,
+                        self.dataset.key,
+                        parent_key,
+                        location,
+                        str(e),
+                    ),
+                    frame=stack,
+                )
         else:
             # dataset already finished, job shouldn't be open anymore
-            self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (
-            self.job.data["jobtype"], self.job.data["remote_id"]))
+            self.log.warning(
+                "Job %s/%s was queued for a dataset already marked as finished, deleting..."
+                % (self.job.data["jobtype"], self.job.data["remote_id"])
+            )
             self.job.finish()
 
     def after_process(self):
@@ -242,17 +293,22 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             next_parameters = next.get("parameters", {})
             next_type = next.get("type", "")
             try:
-                available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
+                available_processors = self.dataset.get_available_processors(
+                    user=self.dataset.creator
+                )
             except ValueError:
-                self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
+                self.log.info(
+                    "Trying to queue next processor, but parent dataset no longer exists, halting"
+                )
                 break
 
             # run it only if the post-processor is actually available for this query
             if self.dataset.data["num_rows"] <= 0:
                 can_run_next = False
                 self.log.info(
-                    "Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (
-                    next_type, self.dataset.key))
+                    "Not running follow-up processor of type %s for dataset %s, no input data for follow-up"
+                    % (next_type, self.dataset.key)
+                )
 
             elif next_type in available_processors:
                 next_analysis = DataSet(
@@ -263,7 +319,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     extension=available_processors[next_type].extension,
                     is_private=self.dataset.is_private,
                     owner=self.dataset.creator,
-                    modules=self.modules
+                    modules=self.modules,
                 )
                 # copy ownership from parent dataset
                 next_analysis.copy_ownership_from(self.dataset)
@@ -271,8 +327,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 self.queue.add_job(next_type, remote_id=next_analysis.key)
             else:
                 can_run_next = False
-                self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (
-                self.dataset.key, self.type, next_type))
+                self.log.warning(
+                    "Dataset %s (of type %s) wants to run processor %s next, but it is incompatible"
+                    % (self.dataset.key, self.type, next_type)
+                )
 
             if not can_run_next:
                 # We are unable to continue the chain of processors, so we check to see if we are attaching to a parent
@@ -289,19 +347,25 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                             break
                         else:
                             if "next" in next_parameters:
-                                next_parameters = next_parameters["next"][0]["parameters"]
+                                next_parameters = next_parameters["next"][0][
+                                    "parameters"
+                                ]
                             else:
                                 # No more descendents
                                 # Should not happen; we cannot find the source dataset
                                 self.log.warning(
-                                    "Cannot find preset's source dataset for dataset %s" % self.dataset.key)
+                                    "Cannot find preset's source dataset for dataset %s"
+                                    % self.dataset.key
+                                )
                                 break
 
         # see if we need to register the result somewhere
         if "copy_to" in self.parameters:
             # copy the results to an arbitrary place that was passed
             if self.dataset.get_results_path().exists():
-                shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
+                shutil.copyfile(
+                    str(self.dataset.get_results_path()), self.parameters["copy_to"]
+                )
             else:
                 # if copy_to was passed, that means it's important that this
                 # file exists somewhere, so we create it as an empty file
@@ -319,9 +383,15 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
                 if self.dataset.get_results_path().exists():
                     # Update the surrogate's results file suffix to match this dataset's suffix
-                    surrogate.data["result_file"] = surrogate.get_results_path().with_suffix(
-                        self.dataset.get_results_path().suffix)
-                    shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
+                    surrogate.data["result_file"] = (
+                        surrogate.get_results_path().with_suffix(
+                            self.dataset.get_results_path().suffix
+                        )
+                    )
+                    shutil.copyfile(
+                        str(self.dataset.get_results_path()),
+                        str(surrogate.get_results_path()),
+                    )
 
                 try:
                     surrogate.finish(self.dataset.data["num_rows"])
@@ -333,12 +403,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
             except ValueError:
                 # dataset with key to attach to doesn't exist...
-                self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (
-                    self.dataset.key, self.parameters["attach_to"]))
+                self.log.warning(
+                    "Cannot attach dataset chain containing %s to %s (dataset does not exist)"
+                    % (self.dataset.key, self.parameters["attach_to"])
+                )
 
         self.job.finish()
 
-        if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+        if config.get("mail.server") and self.dataset.get_parameters().get(
+            "email-complete", False
+        ):
             owner = self.dataset.get_parameters().get("email-complete", False)
             # Check that username is email address
             if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
@@ -349,13 +423,20 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 import html2text
 
                 self.log.debug("Sending email to %s" % owner)
-                dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get(
-                    'flask.server_name') + '/results/' + self.dataset.key
-                sender = config.get('mail.noreply')
+                dataset_url = (
+                    ("https://" if config.get("flask.https") else "http://")
+                    + config.get("flask.server_name")
+                    + "/results/"
+                    + self.dataset.key
+                )
+                sender = config.get("mail.noreply")
                 message = MIMEMultipart("alternative")
                 message["From"] = sender
                 message["To"] = owner
-                message["Subject"] = "4CAT dataset completed: %s - %s" % (self.dataset.type, self.dataset.get_label())
+                message["Subject"] = "4CAT dataset completed: %s - %s" % (
+                    self.dataset.type,
+                    self.dataset.get_label(),
+                )
                 mail = """
 					<p>Hello %s,</p>
 					<p>4CAT has finished collecting your %s dataset labeled: %s</p>
@@ -363,7 +444,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					<p><a href="%s">%s</a></p> 
 					<p>Sincerely,</p>
 					<p>Your friendly neighborhood 4CAT admin</p>
-					""" % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
+					""" % (
+                    owner,
+                    self.dataset.type,
+                    self.dataset.get_label(),
+                    dataset_url,
+                    dataset_url,
+                )
                 html_parser = html2text.HTML2Text()
                 message.attach(MIMEText(html_parser.handle(mail), "plain"))
                 message.attach(MIMEText(mail, "html"))
@@ -404,7 +491,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # cancel job
             self.job.finish()
 
-    def add_field_to_parent(self, field_name, new_data, which_parent=source_dataset, update_existing=False):
+    def add_field_to_parent(
+        self, field_name, new_data, which_parent=source_dataset, update_existing=False
+    ):
         """
         This function adds a new field to the parent dataset. Expects a list of data points, one for each item
         in the parent dataset. Processes csv and ndjson. If update_existing is set to True, this can be used
@@ -420,21 +509,24 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         if len(new_data) < 1:
             # no data
-            raise ProcessorException('No data provided')
+            raise ProcessorException("No data provided")
 
         if not hasattr(self, "source_dataset") and which_parent is not None:
             # no source to update
-            raise ProcessorException('No source dataset to update')
+            raise ProcessorException("No source dataset to update")
 
         # Get the source file data path
         parent_path = which_parent.get_results_path()
 
         if len(new_data) != which_parent.num_rows:
             raise ProcessorException(
-                'Must have new data point for each record: parent dataset: %i, new data points: %i' % (
-                which_parent.num_rows, len(new_data)))
+                "Must have new data point for each record: parent dataset: %i, new data points: %i"
+                % (which_parent.num_rows, len(new_data))
+            )
 
-        self.dataset.update_status("Adding new field %s to the source file" % field_name)
+        self.dataset.update_status(
+            "Adding new field %s to the source file" % field_name
+        )
 
         # Get a temporary path where we can store the data
         tmp_path = self.dataset.get_staging_area()
@@ -445,7 +537,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # Get field names
             fieldnames = which_parent.get_columns()
             if not update_existing and field_name in fieldnames:
-                raise ProcessorException('field_name %s already exists!' % field_name)
+                raise ProcessorException("field_name %s already exists!" % field_name)
             fieldnames.append(field_name)
 
             # Iterate through the original dataset and add values to a new column
@@ -457,7 +549,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 for count, post in enumerate(which_parent.iterate_items(self)):
                     # stop processing if worker has been asked to stop
                     if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while writing CSV file")
+                        raise ProcessorInterruptedException(
+                            "Interrupted while writing CSV file"
+                        )
 
                     post.original[field_name] = new_data[count]
                     writer.writerow(post.original)
@@ -472,17 +566,23 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 for count, post in enumerate(which_parent.iterate_items(self)):
                     # stop processing if worker has been asked to stop
                     if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
+                        raise ProcessorInterruptedException(
+                            "Interrupted while writing NDJSON file"
+                        )
 
                     if not update_existing and field_name in post.original.keys():
-                        raise ProcessorException('field_name %s already exists!' % field_name)
+                        raise ProcessorException(
+                            "field_name %s already exists!" % field_name
+                        )
 
                     # Update data
                     post.original[field_name] = new_data[count]
 
                     output.write(json.dumps(post.original) + "\n")
         else:
-            raise NotImplementedError("Cannot iterate through %s file" % parent_path.suffix)
+            raise NotImplementedError(
+                "Cannot iterate through %s file" % parent_path.suffix
+            )
 
         # Replace the source file path with the new file
         shutil.copy(str(tmp_file_path), str(parent_path))
@@ -536,7 +636,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 delegator.add_urls(batch, queue_name, **kwargs)
 
             time.sleep(0.05)  # arbitrary...
-            for url, result in delegator.get_results(queue_name, preserve_order=preserve_order):
+            for url, result in delegator.get_results(
+                queue_name, preserve_order=preserve_order
+            ):
                 # result may also be a FailedProxiedRequest!
                 # up to the processor to decide how to deal with it
                 yield url, result
@@ -550,7 +652,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         requests, adds to end of queue by default
         :param kwargs:
         """
-        self.manager.proxy_delegator.add_urls([url], self._proxy_queue_name(), position=position, **kwargs)
+        self.manager.proxy_delegator.add_urls(
+            [url], self._proxy_queue_name(), position=position, **kwargs
+        )
 
     def flush_proxied_requests(self):
         """
@@ -563,7 +667,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         self.manager.proxy_delegator.halt_and_wait(self._proxy_queue_name())
 
-
     def _proxy_queue_name(self):
         """
         Get proxy queue name
@@ -574,8 +677,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         return f"{self.type}-{self.dataset.key}"
 
-
-    def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
+    def iterate_archive_contents(
+        self, path, staging_area=None, immediately_delete=True, filename_filter=[]
+    ):
         """
         A generator that iterates through files in an archive
 
@@ -618,7 +722,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     continue
 
                 if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
+                    raise ProcessorInterruptedException(
+                        "Interrupted while iterating zip file contents"
+                    )
 
                 temp_file = staging_area.joinpath(archived_file)
                 archive_file.extract(archived_file, staging_area)
@@ -661,7 +767,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
             for archived_file in archive_contents:
                 if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
+                    raise ProcessorInterruptedException(
+                        "Interrupted while iterating zip file contents"
+                    )
 
                 file_name = archived_file.split("/")[-1]
                 temp_file = staging_area.joinpath(file_name)
@@ -691,7 +799,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         with zipfile.ZipFile(archive_path, "r") as archive_file:
             if filename not in archive_file.namelist():
-                raise FileNotFoundError("File %s not found in archive %s" % (filename, archive_path))
+                raise FileNotFoundError(
+                    "File %s not found in archive %s" % (filename, archive_path)
+                )
             else:
                 archive_file.extract(filename, staging_area)
                 return staging_area.joinpath(filename)
@@ -707,20 +817,31 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         :param data: A list or tuple of dictionaries, all with the same keys
         """
-        if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data,
-                                                                                                                 str):
+        if not (
+            isinstance(data, typing.List)
+            or isinstance(data, typing.Tuple)
+            or callable(data)
+        ) or isinstance(data, str):
             raise TypeError(
-                "write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
+                "write_csv_items requires a list or tuple of dictionaries as argument (%s given)"
+                % type(data)
+            )
 
         if not data:
-            raise ValueError("write_csv_items requires a dictionary with at least one item")
+            raise ValueError(
+                "write_csv_items requires a dictionary with at least one item"
+            )
 
         self.dataset.update_status("Writing results file")
         writer = False
-        with self.dataset.get_results_path().open("w", encoding="utf-8", newline='') as results:
+        with self.dataset.get_results_path().open(
+            "w", encoding="utf-8", newline=""
+        ) as results:
             for row in data:
                 if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while writing results file")
+                    raise ProcessorInterruptedException(
+                        "Interrupted while writing results file"
+                    )
 
                 row = remove_nuls(row)
                 if not writer:
@@ -732,7 +853,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         self.dataset.update_status("Finished")
         self.dataset.finish(len(data))
 
-    def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
+    def write_archive_and_finish(
+        self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True
+    ):
         """
         Archive a bunch of files into a zip archive and finish processing
 
@@ -749,14 +872,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if issubclass(type(files), PurePath):
             is_folder = files
             if not files.exists() or not files.is_dir():
-                raise RuntimeError("Folder %s is not a folder that can be archived" % files)
+                raise RuntimeError(
+                    "Folder %s is not a folder that can be archived" % files
+                )
 
             files = files.glob("*")
 
         # create zip of archive and delete temporary files and folder
         self.dataset.update_status("Compressing results into archive")
         done = 0
-        with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zip:
+        with zipfile.ZipFile(
+            self.dataset.get_results_path(), "w", compression=compression
+        ) as zip:
             for output_path in files:
                 zip.write(output_path, output_path.name)
                 output_path.unlink()
@@ -785,7 +912,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         top_parent = self.source_dataset
 
         finished = self.dataset.check_dataset_finished()
-        if finished == 'empty':
+        if finished == "empty":
             # No data to process, so we can't create a standalone dataset
             return
         elif finished is None:
@@ -818,7 +945,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         return standalone
 
-    def save_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
+    def save_annotations(
+        self, annotations: list, source_dataset=None, overwrite=False
+    ) -> int:
         """
         Saves annotations made by this processor on the basis of another dataset.
         Also adds some data regarding this processor: set `author` and `label` to processor name,
@@ -848,7 +977,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         # Set some values
         for annotation in annotations:
-
             if not annotation.get("label"):
                 # If there's no label, set the default label to this processor's name
                 label = self.name
@@ -864,7 +992,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # add a number suffix to differentiate
             if not overwrite and label in existing_labels:
                 label += "-" + str(
-                    len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
+                    len(
+                        [
+                            existing_label
+                            for existing_label in existing_labels
+                            if existing_label.startswith(label)
+                        ]
+                    )
+                )
             # Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
             annotation["label"] = label
 
@@ -876,7 +1011,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
             annotation["by_processor"] = True
 
-        annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+        annotations_saved = source_dataset.save_annotations(
+            annotations, overwrite=overwrite
+        )
         return annotations_saved
 
     @classmethod
@@ -938,7 +1075,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :todo: Make this a bit more robust than sniffing the processor category
         :return bool:
         """
-        return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
+        return (
+            hasattr(cls, "category")
+            and cls.category
+            and "filter" in cls.category.lower()
+        )
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

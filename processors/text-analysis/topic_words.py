@@ -18,6 +18,7 @@ class TopicModelWordExtractor(BasicProcessor):
     """
     Extracts topics per model and top associated words
     """
+
     type = "topic-model-words"  # job type ID
     category = "Text analysis"  # category
     title = "Top words per topic"  # title displayed in UI
@@ -33,7 +34,7 @@ class TopicModelWordExtractor(BasicProcessor):
             "max": 100,
             "default": 10,
             "help": "Tokens per topic",
-            "tooltip": "This many of the most relevant tokens will be retained per topic"
+            "tooltip": "This many of the most relevant tokens will be retained per topic",
         }
     }
 
@@ -57,9 +58,13 @@ class TopicModelWordExtractor(BasicProcessor):
 
         for model_file in staging_area.glob("*.model"):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while extracting topic model tokens")
+                raise ProcessorInterruptedException(
+                    "Interrupted while extracting topic model tokens"
+                )
 
-            self.dataset.update_status("Extracting topics from model '%s'" % model_file.stem)
+            self.dataset.update_status(
+                "Extracting topics from model '%s'" % model_file.stem
+            )
             self.dataset.update_progress(processed / self.source_dataset.num_rows)
             processed += 1
 
@@ -73,12 +78,13 @@ class TopicModelWordExtractor(BasicProcessor):
             for topic in model.components_:
                 topic_index += 1
                 top_features = {features[i]: weight for i, weight in enumerate(topic)}
-                top_features = {f: top_features[f] for f in
-                                sorted(top_features, key=lambda k: top_features[k], reverse=True)[:self.parameters.get("topic_size")]}
-                result = {
-                    "date": model_file.stem,
-                    "topic_number": topic_index
+                top_features = {
+                    f: top_features[f]
+                    for f in sorted(
+                        top_features, key=lambda k: top_features[k], reverse=True
+                    )[: self.parameters.get("topic_size")]
                 }
+                result = {"date": model_file.stem, "topic_number": topic_index}
 
                 for index, word in enumerate(top_features):
                     index += 1

@@ -1,6 +1,7 @@
 """
 Classify text content with large language models
 """
+
 import shutil
 import json
 import csv
@@ -8,7 +9,11 @@ import re
 import io
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
+from common.lib.dmi_service_manager import (
+    DmiServiceManager,
+    DmiServiceManagerException,
+    DsmOutOfMemory,
+)
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding, sniff_csv_dialect
@@ -24,18 +29,21 @@ class TextClassifier(BasicProcessor):
     """
     Classify text using a large language model of choice
     """
+
     type = "text-classification-llm"  # job type ID
     category = "Text analysis"  # category
     title = "Classify text using large language models"  # title displayed in UI
-    description = ("Given a list of categories, use a large language model to classify text content into one of the "
-                   "provided categories.")  # description displayed in UI
+    description = (
+        "Given a list of categories, use a large language model to classify text content into one of the "
+        "provided categories."
+    )  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     references = [
         "Annotations are made using the [Stormtrooper](https://centre-for-humanities-computing.github.io/stormtrooper/) library",
         "Model card: [google/flan-t5-large](https://huggingface.co/google/flan-t5-large)",
         "Model card: [tiiuae/falcon-7b-instruct](https://huggingface.co/tiiuae/falcon-7b-instruct)",
-        "Model card: [meta-llama/Meta-Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct)"
+        "Model card: [meta-llama/Meta-Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct)",
     ]
 
     config = {
@@ -51,47 +59,46 @@ class TextClassifier(BasicProcessor):
         "dmi-service-manager.stormtrooper_models": {
             "type": UserInput.OPTION_TEXT,
             "default": "google/flan-t5-large,tiiaue/falcon-7b-instruct",
-            "help": "Comma-separated list of models that can be selected"
-        }
+            "help": "Comma-separated list of models that can be selected",
+        },
     }
 
     options = {
         "text-column": {
             "type": UserInput.OPTION_TEXT,
             "default": False,
-            "help": "Data field to classify"
+            "help": "Data field to classify",
         },
         "model": {
             "type": UserInput.OPTION_CHOICE,
             "default": "google/flan-t5-large",
-            "options": {
-            },
-            "help": "Large Language Model to use"
+            "options": {},
+            "help": "Large Language Model to use",
         },
         "shotstyle": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Classification style",
             "options": {
                 "zeroshot": "Zero-shot classification (just categories, no examples)",
-                "fewshot": "Few-shot classification (provide a few examples per category)"
+                "fewshot": "Few-shot classification (provide a few examples per category)",
             },
-            "default": "zeroshot"
+            "default": "zeroshot",
         },
         "categories": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
             "help": "Categories",
             "tooltip": "Categories to choose from. Separate with commas.",
-            "requires": "shotstyle==zeroshot"
+            "requires": "shotstyle==zeroshot",
         },
         "category-file": {
             "type": UserInput.OPTION_FILE,
             "help": "Labels (CSV file)",
             "tooltip": "CSV file containing two columns; one with the label, and a second one with an example for the "
-                       "label. There can be multiple rows per label, with different examples each.",
+            "label. There can be multiple rows per label, with different examples each.",
             "requires": "shotstyle==fewshot",
-            "accept": ".csv,text/csv"
-        }
+            "accept": ".csv,text/csv",
+        },
     }
 
     @classmethod
@@ -108,7 +115,9 @@ class TextClassifier(BasicProcessor):
         """
         options = cls.options
 
-        models = config.get("dmi-service-manager.stormtrooper_models", user=user).split(",")
+        models = config.get("dmi-service-manager.stormtrooper_models", user=user).split(
+            ","
+        )
         options["model"]["options"] = {m: m for m in models}
 
         if parent_dataset is None:
@@ -118,10 +127,12 @@ class TextClassifier(BasicProcessor):
 
         if parent_columns:
             parent_columns = {c: c for c in sorted(parent_columns)}
-            options["text-column"].update({
-                "type": UserInput.OPTION_CHOICE,
-                "options": parent_columns,
-            })
+            options["text-column"].update(
+                {
+                    "type": UserInput.OPTION_CHOICE,
+                    "options": parent_columns,
+                }
+            )
 
         return options
 
@@ -130,9 +141,11 @@ class TextClassifier(BasicProcessor):
         """
         Allow on datasets with columns (from which a prompt can be retrieved)
         """
-        return config.get("dmi-service-manager.stormtrooper_enabled", False, user=user) and \
-            config.get("dmi-service-manager.ab_server_address", False, user=user) and \
-            module.get_columns()
+        return (
+            config.get("dmi-service-manager.stormtrooper_enabled", False, user=user)
+            and config.get("dmi-service-manager.ab_server_address", False, user=user)
+            and module.get_columns()
+        )
 
     def process(self):
         """
@@ -151,25 +164,38 @@ class TextClassifier(BasicProcessor):
 
         # Check GPU memory available
         try:
-            gpu_memory, info = dmi_service_manager.check_gpu_memory_available("stable_diffusion")
+            gpu_memory, info = dmi_service_manager.check_gpu_memory_available(
+                "stable_diffusion"
+            )
         except DmiServiceManagerException as e:
             return self.dataset.finish_with_error(str(e))
             staging_area.unlink()
             output_dir.unlink()
 
         if not gpu_memory:
-            if info and info.get("reason") == "GPU not enabled on this instance of DMI Service Manager":
-                self.dataset.update_status("DMI Service Manager GPU not enabled; using CPU")
+            if (
+                info
+                and info.get("reason")
+                == "GPU not enabled on this instance of DMI Service Manager"
+            ):
+                self.dataset.update_status(
+                    "DMI Service Manager GPU not enabled; using CPU"
+                )
             else:
                 shutil.rmtree(staging_area)
                 shutil.rmtree(output_dir)
 
-                if info and int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
+                if (
+                    info
+                    and int(info.get("memory", {}).get("gpu_free_mem", 0)) < 1000000
+                ):
                     return self.dataset.finish_with_error(
-                        "DMI Service Manager currently too busy; no GPU memory available. Please try again later.")
+                        "DMI Service Manager currently too busy; no GPU memory available. Please try again later."
+                    )
                 else:
                     return self.dataset.finish_with_error(
-                        "Cannot connect to DMI Service Manager. Verify that this 4CAT server has access to it.")
+                        "Cannot connect to DMI Service Manager. Verify that this 4CAT server has access to it."
+                    )
 
         if self.parameters["shotstyle"] == "fewshot":
             # do we have examples?
@@ -190,8 +216,11 @@ class TextClassifier(BasicProcessor):
 
         else:
             # if we have no examples, just include an empty list
-            labels = {i.strip(): [] for i in self.parameters.get("categories").split(",") if i.strip()}
-
+            labels = {
+                i.strip(): []
+                for i in self.parameters.get("categories").split(",")
+                if i.strip()
+            }
 
         # store labels in a file (since we don't know how much data this is)
         labels_path = staging_area.joinpath("labels.temp.json")
@@ -206,32 +235,47 @@ class TextClassifier(BasicProcessor):
         data_path = staging_area.joinpath("data.temp.ndjson")
         with data_path.open("w", newline="") as outfile:
             for i, item in enumerate(self.source_dataset.iterate_items()):
-                outfile.write(json.dumps({item.get("id", str(i)): item.get(textfield)}) + "\n")
+                outfile.write(
+                    json.dumps({item.get("id", str(i)): item.get(textfield)}) + "\n"
+                )
 
-        path_to_files, path_to_results = dmi_service_manager.process_files(staging_area,
-                                                                           [data_path.name, labels_path.name],
-                                                                           output_dir, file_collection_name,
-                                                                           results_folder_name)
+        path_to_files, path_to_results = dmi_service_manager.process_files(
+            staging_area,
+            [data_path.name, labels_path.name],
+            output_dir,
+            file_collection_name,
+            results_folder_name,
+        )
 
         # interface.py args
-        data = {"timeout": (86400 * 7), "args": [
-            "--model", model,
-            "--output-dir", f"data/{path_to_results}",
-            "--inputfile", f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(data_path.name))}",
-            "--labelfile", f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(labels_path.name))}"
-        ]}
+        data = {
+            "timeout": (86400 * 7),
+            "args": [
+                "--model",
+                model,
+                "--output-dir",
+                f"data/{path_to_results}",
+                "--inputfile",
+                f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(data_path.name))}",
+                "--labelfile",
+                f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(labels_path.name))}",
+            ],
+        }
 
         # Send request to DMI Service Manager
         self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "stormtrooper"
 
         try:
-            dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=5)
+            dmi_service_manager.send_request_and_wait_for_results(
+                api_endpoint, data, wait_period=5
+            )
         except DsmOutOfMemory:
             shutil.rmtree(staging_area)
             shutil.rmtree(output_dir)
             return self.dataset.finish_with_error(
-                "DMI Service Manager ran out of memory; Try decreasing the number of prompts or try again or try again later.")
+                "DMI Service Manager ran out of memory; Try decreasing the number of prompts or try again or try again later."
+            )
         except DmiServiceManagerException as e:
             shutil.rmtree(staging_area)
             shutil.rmtree(output_dir)
@@ -253,7 +297,9 @@ class TextClassifier(BasicProcessor):
             :param str prompt:  Text prompt, will be sanitised, e.g. `Rasta Bill Gates`
             :return str:  For example, `54-rasta-bill-gates.jpeg`
             """
-            safe_prompt = re.sub(r"[^a-zA-Z0-9 _-]", "", prompt).replace(" ", "-").lower()[:90]
+            safe_prompt = (
+                re.sub(r"[^a-zA-Z0-9 _-]", "", prompt).replace(" ", "-").lower()[:90]
+            )
             return f"{id}-{safe_prompt}.jpeg"
 
         self.dataset.update_status("Loading annotated data")
@@ -266,7 +312,9 @@ class TextClassifier(BasicProcessor):
                 row = {
                     "id": item.get("id", i),
                     textfield: item.get(textfield),
-                    "category": annotations.get(item.get("id", str(i))) # str(i) because it is not recorded as an int in the annotations
+                    "category": annotations.get(
+                        item.get("id", str(i))
+                    ),  # str(i) because it is not recorded as an int in the annotations
                 }
                 if not writer:
                     writer = csv.DictWriter(outfile, fieldnames=row.keys())
@@ -300,12 +348,15 @@ class TextClassifier(BasicProcessor):
         if shotstyle == "zeroshot":
             labels = query.get("categories")
             if not labels or len([i for i in labels if i.strip()]) < 2:
-                raise QueryParametersException("At least two labels should be provided for text classification.")
+                raise QueryParametersException(
+                    "At least two labels should be provided for text classification."
+                )
         else:
             file = request.files["option-category-file"]
             if not file:
                 raise QueryParametersException(
-                    "No label file provided. A label file is required when using few-shot classification.")
+                    "No label file provided. A label file is required when using few-shot classification."
+                )
 
             # we want a very specific type of CSV file!
             encoding = sniff_encoding(file)
@@ -313,16 +364,26 @@ class TextClassifier(BasicProcessor):
             try:
                 wrapped_file.seek(0)
                 dialect, has_header = sniff_csv_dialect(wrapped_file)
-                reader = csv.reader(wrapped_file, dialect=dialect) if not has_header else csv.DictReader(wrapped_file)
+                reader = (
+                    csv.reader(wrapped_file, dialect=dialect)
+                    if not has_header
+                    else csv.DictReader(wrapped_file)
+                )
                 row = next(reader)
                 if len(list(row)) != 2:
-                    raise QueryParametersException("The label file must have exactly two columns.")
+                    raise QueryParametersException(
+                        "The label file must have exactly two columns."
+                    )
 
             except UnicodeDecodeError:
-                raise QueryParametersException("The label file does not seem to be a CSV file encoded with UTF-8. "
-                                               "Save the file in the proper format and try again.")
+                raise QueryParametersException(
+                    "The label file does not seem to be a CSV file encoded with UTF-8. "
+                    "Save the file in the proper format and try again."
+                )
             except csv.Error:
-                raise QueryParametersException("Label file is not a well-formed CSV file.")
+                raise QueryParametersException(
+                    "Label file is not a well-formed CSV file."
+                )
             finally:
                 # we're done with the file
                 wrapped_file.detach()

@@ -1,6 +1,7 @@
 """
 Rank top vernacular in tokens
 """
+
 import pickle
 import csv
 import json
@@ -13,127 +14,147 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+
 class VectorRanker(BasicProcessor):
-	"""
-	Rank vectors over time
-	"""
-	type = "vector-ranker"  # job type ID
-	category = "Post metrics" # category
-	title = "Extract top words"  # title displayed in UI
-	description = "Ranks most used tokens per tokenset (overall or per timeframe). " \
-				  "Limited to 100 most-used tokens."  # description displayed in UI
-	extension = "csv"  # extension of result file, used internally and in UI
+    """
+    Rank vectors over time
+    """
 
-	followups = ["wordcloud"]
+    type = "vector-ranker"  # job type ID
+    category = "Post metrics"  # category
+    title = "Extract top words"  # title displayed in UI
+    description = (
+        "Ranks most used tokens per tokenset (overall or per timeframe). "
+        "Limited to 100 most-used tokens."
+    )  # description displayed in UI
+    extension = "csv"  # extension of result file, used internally and in UI
 
-	options = {
-		"top": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 25,
-			"help": "Cut-off for top list"
-		},
-		"top-style": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "per-item",
-			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (only include overall top items in the timeframe)"},
-			"help": "Determine top items",
-			"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
-		},
-	}
+    followups = ["wordcloud"]
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-		Allow processor on token vectors
+    options = {
+        "top": {
+            "type": UserInput.OPTION_TEXT,
+            "default": 25,
+            "help": "Cut-off for top list",
+        },
+        "top-style": {
+            "type": UserInput.OPTION_CHOICE,
+            "default": "per-item",
+            "options": {
+                "per-item": "per interval (separate ranking per interval)",
+                "overall": "overall (only include overall top items in the timeframe)",
+            },
+            "help": "Determine top items",
+            "tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe.",
+        },
+    }
 
-		:param module: Module to determine compatibility with
-		"""
-		return module.type == "vectorise-tokens"
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
+        Allow processor on token vectors
 
-	def process(self):
-		"""
-		Reads vector set and creates a CSV with ranked vectors
-		"""
-		self.dataset.update_status("Processing token sets")
+        :param module: Module to determine compatibility with
+        """
+        return module.type == "vectorise-tokens"
 
-		def file_to_timestamp(file):
-			"""
-			Get comparable datestamp value for token file
+    def process(self):
+        """
+        Reads vector set and creates a CSV with ranked vectors
+        """
+        self.dataset.update_status("Processing token sets")
 
-			Token files are named YYYY-m.pb. This function converts that to a
-			YYYYmm string, then that string to an int, so that it may be
-			compared for sorting chronologically.
+        def file_to_timestamp(file):
+            """
+            Get comparable datestamp value for token file
 
-			:param str file:  File name
-			:return int:  Comparable datestamp
-			"""
-			stem = file.split("/")[-1].split(".")[0].split("-")
-			try:
-				return int(stem[0] + stem[1].zfill(2))
-			except (ValueError, IndexError):
-				return 0
+            Token files are named YYYY-m.pb. This function converts that to a
+            YYYYmm string, then that string to an int, so that it may be
+            compared for sorting chronologically.
 
-		results = []
+            :param str file:  File name
+            :return int:  Comparable datestamp
+            """
+            stem = file.split("/")[-1].split(".")[0].split("-")
+            try:
+                return int(stem[0] + stem[1].zfill(2))
+            except (ValueError, IndexError):
+                return 0
 
-		# truncate results as needed
-		rank_style = self.parameters.get("top-style")
-		cutoff = convert_to_int(self.parameters.get("top"))
+        results = []
 
-		# now rank the vectors by most prevalent per "file" (i.e. interval)
-		overall_top = {}
-		index = 0
-		for vector_file in self.iterate_archive_contents(self.source_file):
-			# we support both pickle and json dumps of vectors
-			vector_unpacker = pickle if vector_file.suffix == "pb" else json
+        # truncate results as needed
+        rank_style = self.parameters.get("top-style")
+        cutoff = convert_to_int(self.parameters.get("top"))
 
-			index += 1
-			vector_set_name = vector_file.stem  # we don't need the full path
-			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
-			self.dataset.update_progress(index / self.source_dataset.num_rows)
+        # now rank the vectors by most prevalent per "file" (i.e. interval)
+        overall_top = {}
+        index = 0
+        for vector_file in self.iterate_archive_contents(self.source_file):
+            # we support both pickle and json dumps of vectors
+            vector_unpacker = pickle if vector_file.suffix == "pb" else json
 
-			with vector_file.open("rb") as binary_tokens:
-				# these were saved as pickle dumps so we need the binary mode
-				vectors = vector_unpacker.load(binary_tokens)
+            index += 1
+            vector_set_name = vector_file.stem  # we don't need the full path
+            self.dataset.update_status(
+                "Processing token set %i (%s)" % (index, vector_set_name)
+            )
+            self.dataset.update_progress(index / self.source_dataset.num_rows)
 
-			vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
-				
-			# for overall ranking we need the full vector space per interval
-			# because maybe an overall top-ranking vector is at the bottom
-			# in this particular interval - we'll truncate the top list at
-			# a later point in that case. Else, truncate it here
-			if rank_style == "per-item":
-				vectors = vectors[0:cutoff]
+            with vector_file.open("rb") as binary_tokens:
+                # these were saved as pickle dumps so we need the binary mode
+                vectors = vector_unpacker.load(binary_tokens)
 
-			for vector in vectors:
-				if not vector[0].strip():
-					continue
+            vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
 
-				results.append({"date": vector_set_name.split(".")[0], "item": vector[0], "value": vector[1]})
+            # for overall ranking we need the full vector space per interval
+            # because maybe an overall top-ranking vector is at the bottom
+            # in this particular interval - we'll truncate the top list at
+            # a later point in that case. Else, truncate it here
+            if rank_style == "per-item":
+                vectors = vectors[0:cutoff]
 
-				if vector[0] not in overall_top:
-					overall_top[vector[0]] = 0
+            for vector in vectors:
+                if not vector[0].strip():
+                    continue
 
-				overall_top[vector[0]] += int(vector[1])
+                results.append(
+                    {
+                        "date": vector_set_name.split(".")[0],
+                        "item": vector[0],
+                        "value": vector[1],
+                    }
+                )
 
-		# this eliminates all items from the results that were not in the
-		# *overall* top-occuring items. This only has an effect when vectors
-		# were generated for multiple intervals
-		if rank_style == "overall":
-			overall_top = {item: overall_top[item] for item in sorted(overall_top, key=lambda x: overall_top[x], reverse=True)[0:cutoff]}
-			filtered_results = []
-			for item in results:
-				if item["item"] in overall_top:
-					filtered_results.append(item)
+                if vector[0] not in overall_top:
+                    overall_top[vector[0]] = 0
 
-			results = filtered_results
+                overall_top[vector[0]] += int(vector[1])
 
-		# done!
-		self.dataset.update_status("Writing results file")
-		with open(self.dataset.get_results_path(), "w", encoding="utf-8") as output:
-			writer = csv.DictWriter(output, fieldnames = ("date", "item", "value"))
-			writer.writeheader()
-			for row in results:
-				writer.writerow(row)
+        # this eliminates all items from the results that were not in the
+        # *overall* top-occuring items. This only has an effect when vectors
+        # were generated for multiple intervals
+        if rank_style == "overall":
+            overall_top = {
+                item: overall_top[item]
+                for item in sorted(
+                    overall_top, key=lambda x: overall_top[x], reverse=True
+                )[0:cutoff]
+            }
+            filtered_results = []
+            for item in results:
+                if item["item"] in overall_top:
+                    filtered_results.append(item)
 
-		self.dataset.update_status("Finished")
-		self.dataset.finish(len(results))
+            results = filtered_results
+
+        # done!
+        self.dataset.update_status("Writing results file")
+        with open(self.dataset.get_results_path(), "w", encoding="utf-8") as output:
+            writer = csv.DictWriter(output, fieldnames=("date", "item", "value"))
+            writer.writeheader()
+            for row in results:
+                writer.writerow(row)
+
+        self.dataset.update_status("Finished")
+        self.dataset.finish(len(results))

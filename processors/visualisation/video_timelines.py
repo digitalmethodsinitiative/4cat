@@ -1,6 +1,7 @@
 """
 Create timelines from collections of video frames
 """
+
 import base64
 import json
 import io
@@ -31,11 +32,14 @@ class VideoTimelines(BasicProcessor):
 
     Takes a set of folders containing video frames and renders them as a horizontal collage per video
     """
+
     type = "video-timelines"  # job type ID
     category = "Visual"  # category
     title = "Create video timelines"  # title displayed in UI
-    description = "For each video for which frames were extracted, create a video timeline (i.e. a horizontal " \
-                  "collage of sequential frames). Timelines are then vertically stacked."  # description displayed in UI
+    description = (
+        "For each video for which frames were extracted, create a video timeline (i.e. a horizontal "
+        "collage of sequential frames). Timelines are then vertically stacked."
+    )  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
     options = {
@@ -43,11 +47,11 @@ class VideoTimelines(BasicProcessor):
             "type": UserInput.OPTION_TEXT,
             "help": "Timeline height",
             "tooltip": "In pixels. Each timeline will be this height; frames are resized proportionally to fit it. "
-                       "Must be between 25 and 200.",
+            "Must be between 25 and 200.",
             "coerce_type": int,
             "default": 100,
             "min": 25,
-            "max": 200
+            "max": 200,
         }
     }
 
@@ -87,7 +91,9 @@ class VideoTimelines(BasicProcessor):
         # ends and can finish up within it for all timelines including the last
         while looping:
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while looping through video frames")
+                raise ProcessorInterruptedException(
+                    "Interrupted while looping through video frames"
+                )
 
             # get next file in archive from iterator
             try:
@@ -121,11 +127,24 @@ class VideoTimelines(BasicProcessor):
                         # This likely means no frames were found for the video and this processor should not have run
                         continue
                     video_label = labels.get(previous_video, previous_video)
-                    footersize = (fontsize * (len(video_label) + 2) * 0.5925, fontsize * 2)
-                    footer_shape = SVG(insert=(0, base_height - footersize[1]), size=footersize)
-                    footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-                    label_element = Text(insert=("50%", "50%"), text=video_label, dominant_baseline="middle",
-                             text_anchor="middle", fill="#FFF", style="font-size:%ipx" % fontsize)
+                    footersize = (
+                        fontsize * (len(video_label) + 2) * 0.5925,
+                        fontsize * 2,
+                    )
+                    footer_shape = SVG(
+                        insert=(0, base_height - footersize[1]), size=footersize
+                    )
+                    footer_shape.add(
+                        Rect(insert=(0, 0), size=("100%", "100%"), fill="#000")
+                    )
+                    label_element = Text(
+                        insert=("50%", "50%"),
+                        text=video_label,
+                        dominant_baseline="middle",
+                        text_anchor="middle",
+                        fill="#FFF",
+                        style="font-size:%ipx" % fontsize,
+                    )
 
                     # if the label is a URL, make it clickable
                     if is_url(video_label):
@@ -136,7 +155,9 @@ class VideoTimelines(BasicProcessor):
                         footer_shape.add(label_element)
 
                     # sometimes the label is larger than the rendered frames!
-                    timeline["width"] = max(timeline_widths[previous_video], footersize[0])
+                    timeline["width"] = max(
+                        timeline_widths[previous_video], footersize[0]
+                    )
 
                     # add to canvas
                     timeline.add(footer_shape)
@@ -144,8 +165,12 @@ class VideoTimelines(BasicProcessor):
 
                 if looping:
                     # Only prep for new timeline if still looping
-                    self.dataset.update_status(f"Rendering video timeline for collection {video} ({len(timeline_widths)}/{self.source_dataset.num_rows})")
-                    self.dataset.update_progress(len(timeline_widths) / self.source_dataset.num_rows)
+                    self.dataset.update_status(
+                        f"Rendering video timeline for collection {video} ({len(timeline_widths)}/{self.source_dataset.num_rows})"
+                    )
+                    self.dataset.update_progress(
+                        len(timeline_widths) / self.source_dataset.num_rows
+                    )
                     # reset and ready for the next timeline
                     offset_y += base_height
                     previous_video = video
@@ -160,11 +185,19 @@ class VideoTimelines(BasicProcessor):
 
                 # add to SVG as data URI (so it is a self-contained file)
                 frame_data = io.BytesIO()
-                frame.save(frame_data, format="JPEG")  # JPEG probably optimal for video frames
-                frame_data = "data:image/jpeg;base64," + base64.b64encode(frame_data.getvalue()).decode("utf-8")
+                frame.save(
+                    frame_data, format="JPEG"
+                )  # JPEG probably optimal for video frames
+                frame_data = "data:image/jpeg;base64," + base64.b64encode(
+                    frame_data.getvalue()
+                ).decode("utf-8")
 
                 # add to timeline element
-                frame_element = ImageElement(href=frame_data, insert=(timeline_widths[video], 0), size=(frame_width, base_height))
+                frame_element = ImageElement(
+                    href=frame_data,
+                    insert=(timeline_widths[video], 0),
+                    size=(frame_width, base_height),
+                )
                 timeline.add(frame_element)
                 timeline_widths[video] += frame_width
 
@@ -175,8 +208,12 @@ class VideoTimelines(BasicProcessor):
         # now we know all dimensions we can instantiate the canvas too
         canvas_width = max(timeline_widths.values())
         fontsize = 12
-        canvas = get_4cat_canvas(self.dataset.get_results_path(), canvas_width, base_height * len(timeline_widths),
-                                 fontsize_small=fontsize)
+        canvas = get_4cat_canvas(
+            self.dataset.get_results_path(),
+            canvas_width,
+            base_height * len(timeline_widths),
+            fontsize_small=fontsize,
+        )
         for timeline in timelines:
             canvas.add(timeline)
 
@@ -204,23 +241,35 @@ class VideoTimelines(BasicProcessor):
             return {}
 
         for url, data in metadata.items():
-            if data.get('success'):
+            if data.get("success"):
                 for filename in [f["filename"] for f in data.get("files", [])]:
                     filename = ".".join(filename.split(".")[:-1])
                     mapping_ids[filename] = data["post_ids"]
-                    if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:
-                        mapping_dataset[data.get("from_dataset", data.get("source_dataset"))] = []
-                    mapping_dataset[data.get("from_dataset", data.get("source_dataset"))].append(filename)
+                    if (
+                        data.get("from_dataset", data.get("source_dataset"))
+                        not in mapping_dataset
+                    ):
+                        mapping_dataset[
+                            data.get("from_dataset", data.get("source_dataset"))
+                        ] = []
+                    mapping_dataset[
+                        data.get("from_dataset", data.get("source_dataset"))
+                    ].append(filename)
                     labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():
-            dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest("*-search")
+            dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest(
+                "*-search"
+            )
 
             # determine appropriate label
             # is this the right place? should it be in the datasource?
             if dataset.type == "tiktok-search":
                 mapper = lambda item: item.get("tiktok_url")  # noqa: E731
-            elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
+            elif (
+                dataset.type == "upload-search"
+                and dataset.parameters.get("board") == "youtube-video-list"
+            ):
                 mapper = lambda item: item.get("youtube_url")  # noqa: E731
             else:
                 mapper = lambda item: item.get("id")  # noqa: E731

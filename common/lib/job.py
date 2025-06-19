@@ -10,208 +10,251 @@ from common.lib.helpers import timify_long
 
 
 class Job:
-	"""
-	Job in queue
-	"""
-	data = {}
-	db = None
+    """
+    Job in queue
+    """
 
-	is_finished = False
-	is_claimed = False
+    data = {}
+    db = None
 
-	def __init__(self, data, database=None):
-		"""
-		Instantiate Job object
+    is_finished = False
+    is_claimed = False
 
-		:param dict data:  Job data, should correspond to a database record
-		:param database:  Database handler
-		"""
-		self.data = data
-		self.db = database
+    def __init__(self, data, database=None):
+        """
+        Instantiate Job object
 
-		self.data["remote_id"] = str(self.data["remote_id"])
+        :param dict data:  Job data, should correspond to a database record
+        :param database:  Database handler
+        """
+        self.data = data
+        self.db = database
 
-		try:
-			self.is_finished = "is_finished" in self.data and self.data["is_finished"]
-			self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
-		except KeyError:
-			raise Exception
+        self.data["remote_id"] = str(self.data["remote_id"])
 
-	def get_by_ID(id, database):
-		"""
-		Instantiate job object by ID
+        try:
+            self.is_finished = "is_finished" in self.data and self.data["is_finished"]
+            self.is_claimed = (
+                self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
+            )
+        except KeyError:
+            raise Exception
 
-		:param int id: Job ID
-		:param database:  Database handler
-		:return Job: Job object
-		"""
-		data = database.fetchone("SELECT * FROM jobs WHERE id = %s", (id,))
-		if not data:
-			raise JobNotFoundException
+    def get_by_ID(id, database):
+        """
+        Instantiate job object by ID
 
-		return Job.get_by_data(data, database)
+        :param int id: Job ID
+        :param database:  Database handler
+        :return Job: Job object
+        """
+        data = database.fetchone("SELECT * FROM jobs WHERE id = %s", (id,))
+        if not data:
+            raise JobNotFoundException
 
-	def get_by_data(data, database):
-		"""
-		Instantiate job object with given data
+        return Job.get_by_data(data, database)
 
-		:param dict data:  Job data, should correspond to a database row
-		:param database: Database handler
-		:return Job: Job object
-		"""
-		return Job(data, database)
+    def get_by_data(data, database):
+        """
+        Instantiate job object with given data
 
-	def get_by_remote_ID(remote_id, database, jobtype="*"):
-		"""
-		Instantiate job object by combination of remote ID and job type
+        :param dict data:  Job data, should correspond to a database row
+        :param database: Database handler
+        :return Job: Job object
+        """
+        return Job(data, database)
 
-		This combination is guaranteed to be unique.
+    def get_by_remote_ID(remote_id, database, jobtype="*"):
+        """
+        Instantiate job object by combination of remote ID and job type
 
-		:param database: Database handler
-		:param str jobtype: Job type
-		:param str remote_id: Job remote ID
-		:return Job: Job object
-		"""
-		if jobtype != "*":
-			data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s", (jobtype, remote_id))
-		else:
-			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id,))
+        This combination is guaranteed to be unique.
 
-		if not data:
-			raise JobNotFoundException
+        :param database: Database handler
+        :param str jobtype: Job type
+        :param str remote_id: Job remote ID
+        :return Job: Job object
+        """
+        if jobtype != "*":
+            data = database.fetchone(
+                "SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s",
+                (jobtype, remote_id),
+            )
+        else:
+            data = database.fetchone(
+                "SELECT * FROM jobs WHERE remote_id = %s", (remote_id,)
+            )
 
-		return Job.get_by_data(data, database=database)
+        if not data:
+            raise JobNotFoundException
 
-	def claim(self):
-		"""
-		Claim a job
+        return Job.get_by_data(data, database=database)
 
-		This marks it in the database so it cannot be claimed again.
-		"""
-		if self.data["interval"] == 0:
-			claim_time = int(time.time())
-		else:
-			# the claim time should be a multiple of the interval to prevent
-			# drift of the interval over time. this ensures that on average,
-			# the interval remains as set
-			claim_time = math.floor(int(time.time()) / self.data["interval"]) * self.data["interval"]
+    def claim(self):
+        """
+        Claim a job
 
-		updated = self.db.update("jobs", data={"timestamp_claimed": claim_time, "timestamp_lastclaimed": claim_time},
-								 where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"],
-										"timestamp_claimed": 0})
+        This marks it in the database so it cannot be claimed again.
+        """
+        if self.data["interval"] == 0:
+            claim_time = int(time.time())
+        else:
+            # the claim time should be a multiple of the interval to prevent
+            # drift of the interval over time. this ensures that on average,
+            # the interval remains as set
+            claim_time = (
+                math.floor(int(time.time()) / self.data["interval"])
+                * self.data["interval"]
+            )
 
-		if updated == 0:
-			raise JobClaimedException
+        updated = self.db.update(
+            "jobs",
+            data={"timestamp_claimed": claim_time, "timestamp_lastclaimed": claim_time},
+            where={
+                "jobtype": self.data["jobtype"],
+                "remote_id": self.data["remote_id"],
+                "timestamp_claimed": 0,
+            },
+        )
 
-		self.data["timestamp_claimed"] = claim_time
-		self.data["timestamp_lastclaimed"] = claim_time
+        if updated == 0:
+            raise JobClaimedException
 
-		self.is_claimed = True
+        self.data["timestamp_claimed"] = claim_time
+        self.data["timestamp_lastclaimed"] = claim_time
 
-	def finish(self, delete=False):
-		"""
-		Finish job
+        self.is_claimed = True
 
-		This deletes it from the database, or in the case of recurring jobs,
-		resets the claim flags.
+    def finish(self, delete=False):
+        """
+        Finish job
 
-		:param bool delete: Whether to force deleting the job even if it is a
-							job with an interval.
-		"""
-		if self.data["interval"] == 0 or delete:
-			self.db.delete("jobs", where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
-		else:
-			self.db.update("jobs", data={"timestamp_claimed": 0, "attempts": 0},
-						   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+        This deletes it from the database, or in the case of recurring jobs,
+        resets the claim flags.
 
-		self.is_finished = True
+        :param bool delete: Whether to force deleting the job even if it is a
+                                                job with an interval.
+        """
+        if self.data["interval"] == 0 or delete:
+            self.db.delete(
+                "jobs",
+                where={
+                    "jobtype": self.data["jobtype"],
+                    "remote_id": self.data["remote_id"],
+                },
+            )
+        else:
+            self.db.update(
+                "jobs",
+                data={"timestamp_claimed": 0, "attempts": 0},
+                where={
+                    "jobtype": self.data["jobtype"],
+                    "remote_id": self.data["remote_id"],
+                },
+            )
 
-	def release(self, delay=0, claim_after=0):
-		"""
-		Release a job so it may be claimed again
+        self.is_finished = True
 
-		:param int delay: Delay in seconds after which job may be reclaimed.
-		:param int claim_after:  Timestamp after which job may be claimed. This
-		is overridden by `delay`.
-		"""
-		update = {"timestamp_claimed": 0, "attempts": self.data["attempts"] + 1}
-		if delay > 0:
-			update["timestamp_after"] = int(time.time()) + delay
-		elif claim_after is not None:
-			update["timestamp_after"] = claim_after
+    def release(self, delay=0, claim_after=0):
+        """
+        Release a job so it may be claimed again
 
-		self.db.update("jobs", data=update,
-					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
-		self.is_claimed = False
+        :param int delay: Delay in seconds after which job may be reclaimed.
+        :param int claim_after:  Timestamp after which job may be claimed. This
+        is overridden by `delay`.
+        """
+        update = {"timestamp_claimed": 0, "attempts": self.data["attempts"] + 1}
+        if delay > 0:
+            update["timestamp_after"] = int(time.time()) + delay
+        elif claim_after is not None:
+            update["timestamp_after"] = claim_after
 
-	def is_claimable(self):
-		"""
-		Can this job be claimed?
+        self.db.update(
+            "jobs",
+            data=update,
+            where={
+                "jobtype": self.data["jobtype"],
+                "remote_id": self.data["remote_id"],
+            },
+        )
+        self.is_claimed = False
 
-		:return bool: If the job is not claimed yet and also isn't finished.
-		"""
-		return not self.is_claimed and not self.is_finished
-	
-	def get_status(self, with_details=False):
-		"""
-		Get the status of this job
+    def is_claimable(self):
+        """
+        Can this job be claimed?
 
-		:return str: Status of the job
-		"""
-		# TODO: add error/crash status
-		if self.is_finished:
-			return "Finished"
-		elif self.is_claimed:
-			if with_details:
-				elapsed = int(time.time()) - self.data["timestamp_claimed"]
-				return f"Running ({timify_long(elapsed)})"
-			return "Running"
-		elif self.data["timestamp_after"] > 0 and self.data["timestamp_after"] > int(time.time()):
-			if with_details:
-				wait_time = self.data["timestamp_after"] - int(time.time())
-				return f"Scheduled (in {timify_long(wait_time)})"
-			return "Scheduled"
-		elif self.data["interval"] > 0 and (self.data["timestamp_lastclaimed"] + self.data["interval"]) > int(time.time()):
-			if with_details:
-				interval_time = (self.data["timestamp_lastclaimed"] + self.data["interval"]) - int(time.time())
-				return f"Scheduled (interval) (in {timify_long(interval_time)})"
-			return "Scheduled (interval)"
-		else:
-			return "Queued"
+        :return bool: If the job is not claimed yet and also isn't finished.
+        """
+        return not self.is_claimed and not self.is_finished
 
-	def get_place_in_queue(self):
-		"""
-		Get the place of this job in the queue
+    def get_status(self, with_details=False):
+        """
+        Get the status of this job
 
-		:return int: Place in queue
-		"""
-		query = "SELECT COUNT(*) as queue_ahead FROM jobs WHERE jobtype = %s"
-		replacements = [self.data["jobtype"]]
-		if self.data["timestamp_after"] == 0:
-			# Job can be claimed immediately
-			query += (
-				" AND (timestamp_after = 0 AND timestamp < %s OR "  # Other jobs that can be claimed immediately and were queued prior to this job being queued
-				" timestamp_after > 0 AND timestamp_after < %s) ")  # Other jobs that are waiting for a specific time, but prior to this job being queued
-			replacements += [self.data["timestamp"], self.data["timestamp"]]
-		else:
-			# Job must wait until timestamp_after
-			query += (
-				" AND (timestamp_after = 0 AND timestamp < %s OR "  # Other jobs that can be claimed immediately and were queued prior to this job
-				" timestamp_after > 0 AND timestamp_after < %s) ")  # Other jobs that are waiting, but prior to this job's start time
-			replacements += [self.data["timestamp_after"], self.data["timestamp_after"]]
-		queue_result = self.db.fetchone(query, replacements)
-		if queue_result["queue_ahead"] is None:
-			raise Exception(f"what? {queue_result}")
+        :return str: Status of the job
+        """
+        # TODO: add error/crash status
+        if self.is_finished:
+            return "Finished"
+        elif self.is_claimed:
+            if with_details:
+                elapsed = int(time.time()) - self.data["timestamp_claimed"]
+                return f"Running ({timify_long(elapsed)})"
+            return "Running"
+        elif self.data["timestamp_after"] > 0 and self.data["timestamp_after"] > int(
+            time.time()
+        ):
+            if with_details:
+                wait_time = self.data["timestamp_after"] - int(time.time())
+                return f"Scheduled (in {timify_long(wait_time)})"
+            return "Scheduled"
+        elif self.data["interval"] > 0 and (
+            self.data["timestamp_lastclaimed"] + self.data["interval"]
+        ) > int(time.time()):
+            if with_details:
+                interval_time = (
+                    self.data["timestamp_lastclaimed"] + self.data["interval"]
+                ) - int(time.time())
+                return f"Scheduled (interval) (in {timify_long(interval_time)})"
+            return "Scheduled (interval)"
+        else:
+            return "Queued"
 
-		return queue_result["queue_ahead"]
+    def get_place_in_queue(self):
+        """
+        Get the place of this job in the queue
 
-	@property
-	def details(self):
-		try:
-			details = json.loads(self.data["details"])
-			if details:
-				return details
-			else:
-				return {}
-		except (TypeError, json.JSONDecodeError):
-			return {}
+        :return int: Place in queue
+        """
+        query = "SELECT COUNT(*) as queue_ahead FROM jobs WHERE jobtype = %s"
+        replacements = [self.data["jobtype"]]
+        if self.data["timestamp_after"] == 0:
+            # Job can be claimed immediately
+            query += (
+                " AND (timestamp_after = 0 AND timestamp < %s OR "  # Other jobs that can be claimed immediately and were queued prior to this job being queued
+                " timestamp_after > 0 AND timestamp_after < %s) "
+            )  # Other jobs that are waiting for a specific time, but prior to this job being queued
+            replacements += [self.data["timestamp"], self.data["timestamp"]]
+        else:
+            # Job must wait until timestamp_after
+            query += (
+                " AND (timestamp_after = 0 AND timestamp < %s OR "  # Other jobs that can be claimed immediately and were queued prior to this job
+                " timestamp_after > 0 AND timestamp_after < %s) "
+            )  # Other jobs that are waiting, but prior to this job's start time
+            replacements += [self.data["timestamp_after"], self.data["timestamp_after"]]
+        queue_result = self.db.fetchone(query, replacements)
+        if queue_result["queue_ahead"] is None:
+            raise Exception(f"what? {queue_result}")
+
+        return queue_result["queue_ahead"]
+
+    @property
+    def details(self):
+        try:
+            details = json.loads(self.data["details"])
+            if details:
+                return details
+            else:
+                return {}
+        except (TypeError, json.JSONDecodeError):
+            return {}

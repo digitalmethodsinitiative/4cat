@@ -3,6 +3,7 @@ Calculate similarity of hashes and create a GEXF network file.
 
 Only supports bit based hashes currently (e.g., 101010101110110011)
 """
+
 import networkx as nx
 import numpy as np
 
@@ -21,6 +22,7 @@ class HashSimilarityNetworker(BasicProcessor):
     """
     Compare hashes and generate a network based on similarity
     """
+
     type = "hash-similarity-network"
     category = "Networks"
     title = "Hash Similarity network to identify near duplicate hashes"
@@ -35,7 +37,7 @@ class HashSimilarityNetworker(BasicProcessor):
         "choice_column": {
             "help": "Column containing hashes",
             "inline": True,
-            "tooltip": "Expects all hashes to be of the same length"
+            "tooltip": "Expects all hashes to be of the same length",
         },
         "percent_similar": {
             "type": UserInput.OPTION_TEXT,
@@ -60,11 +62,19 @@ class HashSimilarityNetworker(BasicProcessor):
             columns = parent_dataset.get_columns()
             options["choice_column"]["type"] = UserInput.OPTION_CHOICE
             options["choice_column"]["options"] = {v: v for v in columns}
-            options["choice_column"]["default"] = "video_hash" if "video_hash" in columns else sorted(columns, key=lambda k: "hash" in k).pop()
+            options["choice_column"]["default"] = (
+                "video_hash"
+                if "video_hash" in columns
+                else sorted(columns, key=lambda k: "hash" in k).pop()
+            )
 
             options["descriptor_column"]["type"] = UserInput.OPTION_CHOICE
             options["descriptor_column"]["options"] = {v: v for v in columns}
-            options["descriptor_column"]["default"] = "id" if "id" in columns else sorted(columns, key=lambda k: "id" in k).pop()
+            options["descriptor_column"]["default"] = (
+                "id"
+                if "id" in columns
+                else sorted(columns, key=lambda k: "id" in k).pop()
+            )
 
         return options
 
@@ -82,10 +92,12 @@ class HashSimilarityNetworker(BasicProcessor):
         """
         id_column = self.parameters.get("descriptor_column")
         column = self.parameters.get("choice_column")
-        percent_similar = self.parameters.get("percent_similar")/100
+        percent_similar = self.parameters.get("percent_similar") / 100
 
-        network_parameters = {"generated_by": "4CAT Capture & Analysis Toolkit",
-                              "source_dataset_id": self.source_dataset.key}
+        network_parameters = {
+            "generated_by": "4CAT Capture & Analysis Toolkit",
+            "source_dataset_id": self.source_dataset.key,
+        }
         network = nx.Graph(**network_parameters)
 
         self.dataset.update_status("Collecting identifiers and hashes from dataset")
@@ -96,7 +108,9 @@ class HashSimilarityNetworker(BasicProcessor):
         bit_length = None
         for item in self.source_dataset.iterate_items(self):
             if column not in item:
-                self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
+                self.dataset.update_status(
+                    "Column %s not found in dataset" % column, is_final=True
+                )
                 self.dataset.finish(0)
                 return
 
@@ -107,30 +121,40 @@ class HashSimilarityNetworker(BasicProcessor):
             if type(original_hash) is str:
                 item_hash = original_hash
                 # Check if 0b starts string
-                if '0b' == original_hash[:2]:
+                if "0b" == original_hash[:2]:
                     item_hash = original_hash[2:]
             else:
-                self.dataset.update_status("Hash type %s currently not supported" % type(original_hash), is_final=True)
+                self.dataset.update_status(
+                    "Hash type %s currently not supported" % type(original_hash),
+                    is_final=True,
+                )
                 self.dataset.finish(0)
                 return
 
             try:
                 item_hash = [int(bit) for bit in item_hash]
             except ValueError:
-                self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
+                self.dataset.update_status(
+                    "Column %s not found in dataset" % column, is_final=True
+                )
                 self.dataset.finish(0)
                 return
 
             if not all([bit == 1 or bit == 0 for bit in item_hash]):
                 # Note: this technically allows [True, False, 0, 1] "hashes"
-                self.dataset.update_status("Incorrect type of hash found in dataset (not a bit hash)", is_final=True)
+                self.dataset.update_status(
+                    "Incorrect type of hash found in dataset (not a bit hash)",
+                    is_final=True,
+                )
                 self.dataset.finish(0)
                 return
 
             item_id = item.pop(id_column)
 
             if item_id is None or item_id in identifiers:
-                self.dataset.update_status("ID Column is not unique for each hash", is_final=True)
+                self.dataset.update_status(
+                    "ID Column is not unique for each hash", is_final=True
+                )
                 self.dataset.finish(0)
                 return
 
@@ -147,7 +171,7 @@ class HashSimilarityNetworker(BasicProcessor):
                     # Append any metadata associated with hash for Gephi
                     for key, value in item.items():
                         if type(value) is list:
-                            item[key] = ','.join(value)
+                            item[key] = ",".join(value)
                         elif type(value) is str:
                             try:
                                 float(value)
@@ -155,17 +179,22 @@ class HashSimilarityNetworker(BasicProcessor):
                             except ValueError:
                                 pass
 
-                    if 'post_ids' in item:
-                        item.pop('post_ids')
+                    if "post_ids" in item:
+                        item.pop("post_ids")
                     hash_metadata[item_id] = item
 
                 else:
-                    self.dataset.update_status("Hashes are not compatible for comparison", is_final=True)
+                    self.dataset.update_status(
+                        "Hashes are not compatible for comparison", is_final=True
+                    )
                     self.dataset.finish(0)
 
             collected += 1
             if collected % 500 == 0:
-                self.dataset.update_status("Collected %i of %i data points" % (collected, self.source_dataset.num_rows))
+                self.dataset.update_status(
+                    "Collected %i of %i data points"
+                    % (collected, self.source_dataset.num_rows)
+                )
                 self.dataset.update_progress(collected / self.source_dataset.num_rows)
 
         if len(identifiers) != len(hashes):
@@ -193,12 +222,12 @@ class HashSimilarityNetworker(BasicProcessor):
                 id1 = identifiers[i]
                 # Node 2 is this iteration plus comparison number PLUS one as the first hash of this set has been
                 # removed (e.g., very first ID2 is 0+0+1)
-                id2 = identifiers[i+j+1]
+                id2 = identifiers[i + j + 1]
 
                 # Check if edge exists (it shouldn't!)
                 edge = (id1, id2)
                 if edge in network.edges():
-                    raise ProcessorException('Error in processing hash similarities')
+                    raise ProcessorException("Error in processing hash similarities")
 
                 # Check if xor_comparison is less than requested similarity
                 # xor compares each bit and returns 0 if a bit is the same and 1 if different
@@ -209,11 +238,15 @@ class HashSimilarityNetworker(BasicProcessor):
                 comparisons += 1
                 if comparisons % 500 == 0:
                     self.dataset.update_status(
-                        "Calculated %i of %i hash similarities" % (comparisons, expected_comparisons))
+                        "Calculated %i of %i hash similarities"
+                        % (comparisons, expected_comparisons)
+                    )
                     self.dataset.update_progress(comparisons / expected_comparisons)
 
         if not network.edges():
-            self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
+            self.dataset.update_status(
+                "No edges could be created for the given parameters", is_final=True
+            )
             self.dataset.finish(0)
             return
 

@@ -3,6 +3,7 @@
 Script to set all the flags in the correct manner for a /pol/ dataset.
 
 """
+
 # flake8: noqa
 # currently broken, kept for historic/future utility purposes
 import sys
@@ -18,73 +19,103 @@ import json
 PATH_TO_4PLEBS_DUMP = None
 
 if not PATH_TO_4PLEBS_DUMP:
-	print("You must provide a path to a json file with post ID: troll_code key/value pairs.")
-	quit()
+    print(
+        "You must provide a path to a json file with post ID: troll_code key/value pairs."
+    )
+    quit()
 
 print("Extracting posts with a troll flag from the 4plebs dump.")
 troll_flags = {}
 troll_names = {
-	"AC": "Anarcho-Capitalist",
-	"AN": "Anarchist",
-	"BL": "Black Nationalist",
-	"CF": "Confederate",
-	"CT": "Catalonia",
-	"CM": "Communist",
-	"DM": "Democrat",
-	"EU": "European",
-	"FC": "Fascist",
-	"GN": "Gadsden",
-	"GY": "Gay",
-	"JH": "Jihadi",
-	"KP": "North Korea",
-	"KN": "Kekistani",
-	"MF": "Muslim",
-	"MZ": "Task Force Z",
-	"NB": "National Bolshevik",
-	"NT": "NATO",
-	"NZ": "Nazi",
-	"OB": "Obama",
-	"PC": "Hippie",
-	"PR": "Pirate",
-	"RB": "Rebel",
-	"RE": "Republican",
-	"RP": "Libertarian",
-	"TM": "Templar",
-	"TP": "Tea Partier",
-	"TR": "Tree Hugger",
-	"TX": "Texan",
-	"UN": "United Nations",
-	"WP": "White Supremacist",
+    "AC": "Anarcho-Capitalist",
+    "AN": "Anarchist",
+    "BL": "Black Nationalist",
+    "CF": "Confederate",
+    "CT": "Catalonia",
+    "CM": "Communist",
+    "DM": "Democrat",
+    "EU": "European",
+    "FC": "Fascist",
+    "GN": "Gadsden",
+    "GY": "Gay",
+    "JH": "Jihadi",
+    "KP": "North Korea",
+    "KN": "Kekistani",
+    "MF": "Muslim",
+    "MZ": "Task Force Z",
+    "NB": "National Bolshevik",
+    "NT": "NATO",
+    "NZ": "Nazi",
+    "OB": "Obama",
+    "PC": "Hippie",
+    "PR": "Pirate",
+    "RB": "Rebel",
+    "RE": "Republican",
+    "RP": "Libertarian",
+    "TM": "Templar",
+    "TP": "Tea Partier",
+    "TR": "Tree Hugger",
+    "TX": "Texan",
+    "UN": "United Nations",
+    "WP": "White Supremacist",
 }
 
 with open(PATH_TO_4PLEBS_DUMP, encoding="utf-8") as in_csv:
+    fieldnames = (
+        "num",
+        "subnum",
+        "thread_num",
+        "op",
+        "timestamp",
+        "timestamp_expired",
+        "preview_orig",
+        "preview_w",
+        "preview_h",
+        "media_filename",
+        "media_w",
+        "media_h",
+        "media_size",
+        "media_hash",
+        "media_orig",
+        "spoiler",
+        "deleted",
+        "capcode",
+        "email",
+        "name",
+        "trip",
+        "title",
+        "comment",
+        "sticky",
+        "locked",
+        "poster_hash",
+        "poster_country",
+        "exif",
+    )
 
-	fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
+    reader = csv.DictReader(
+        in_csv, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True
+    )
+    count = 0
 
-	reader = csv.DictReader(in_csv, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
-	count = 0
+    for post in reader:
+        count += 1
+        if "exif" in post:
+            if "troll_country" in post["exif"]:
+                troll_json = json.loads(post["exif"])
+                troll_code = troll_json["troll_country"]
+                troll_name = troll_conversion[troll_code]
 
-	for post in reader:
-		count += 1
-		if "exif" in post:
+                if troll_name not in troll_flags:
+                    troll_flags[troll_name] = []
 
-			if "troll_country" in post["exif"]:
+                troll_flags[troll_name].append(int(post["num"]))
 
-				troll_json = json.loads(post["exif"])
-				troll_code = troll_json["troll_country"]
-				troll_name = troll_conversion[troll_code]
-
-				if troll_name not in troll_flags:
-					troll_flags[troll_name] = []
-
-				troll_flags[troll_name].append(int(post["num"]))
-
-		if count % 100000 == 0:
-			for k, v in troll_flags.items():
-				print(k, str(len(v)))
+        if count % 100000 == 0:
+            for k, v in troll_flags.items():
+                print(k, str(len(v)))
 
 with open("troll_flags.json", "w", encoding="utf-8") as out_json:
-	json.dump(troll_flags, out_json)
+    json.dump(troll_flags, out_json)
 
 
 logger = Logger()
@@ -93,20 +124,18 @@ db = Database(logger=logger, appname="queue-dump")
 # Loop through the troll country data from the 4plebs dump
 print("Updating ambiguous troll flags using the 4plebs dump.")
 for k, v in troll_flags.items():
-	
-	for troll_code, troll_name in troll_names.items():
+    for troll_code, troll_name in troll_names.items():
+        troll_ids = tuple([int(k) for k, v in troll_flags.items() if v == troll_code])
 
-		troll_ids = tuple([int(k) for k, v in troll_flags.items() if v == troll_code])
-
-		query_update_ambiguous_troll_flag = ("""
+        query_update_ambiguous_troll_flag = """
 			UPDATE posts_4chan
 			SET country_name = '%s', country_code = '%s'
 			WHERE id IN %s
 			AND board = 'pol'
 			AND ((country_name IS NULL OR country_name = '') AND (country_code IS NULL OR country_code = ''));
-		""" % (troll_name, 't_' + troll_code, troll_ids))
-		db.execute(query_update_ambiguous_troll_flag)
-		db.commit()
+		""" % (troll_name, "t_" + troll_code, troll_ids)
+        db.execute(query_update_ambiguous_troll_flag)
+        db.commit()
 
 # First we have to fill in the empty troll country data.
 # These are stored in the `unsorted_data` columns, with
@@ -128,7 +157,9 @@ db.execute(query_move_troll_flags)
 # For the pre 15 December 2014 posts, only static country flags were available.
 # These included both troll flags and actual flags.
 # So here we can simply set the country names according to those static codes.
-print("Adding `country_name` values for posts before 15 December 2014, when only geoflags were available.")
+print(
+    "Adding `country_name` values for posts before 15 December 2014, when only geoflags were available."
+)
 
 query_update_old_flags = """
 		UPDATE posts_4chan
@@ -173,7 +204,9 @@ db.execute(query_update_old_flags)
 db.commit()
 
 # After 15 December 2014 and before 13 June 2017, only geoflags were available, so no troll flags, no conflicts.
-print("Adding `country_name` values for posts after 15 December 2014 and before 14 July 2017.")
+print(
+    "Adding `country_name` values for posts after 15 December 2014 and before 14 July 2017."
+)
 
 query_update_country_flags = """
 		UPDATE posts_4chan
@@ -742,56 +775,54 @@ We use the 4plebs /pol/ dump to first fill in all the posts with troll country n
 # Loop through the troll country data from the 4plebs dump
 print("Updating ambiguous troll flags using the 4plebs dump.")
 with open(PATH_TO_TROLL_FLAG_IDS, "r", encoding="utf-8") as in_json:
+    troll_flags = json.load(in_json)
 
-	troll_flags = json.load(in_json)
+    # We don't want to intrepret country_names beyond the dump's latest post
+    max_id = int(max(list(troll_flags.keys())))
+    min_id = int(min(list(troll_flags.keys())))
 
-	# We don't want to intrepret country_names beyond the dump's latest post 
-	max_id = int(max(list(troll_flags.keys())))
-	min_id = int(min(list(troll_flags.keys())))
+    troll_names = {
+        "AC": "Anarcho-Capitalist",
+        "AN": "Anarchist",
+        "BL": "Black Nationalist",
+        "CF": "Confederate",
+        "CM": "Communist",
+        "CT": "Catalonia",
+        "DM": "Democrat",
+        "GN": "Gadsden",
+        "GY": "Gay",
+        "JH": "Jihadi",
+        "KN": "Kekistani",
+        "MF": "Muslim",
+        "MZ": "Task Force Z",
+        "NB": "National Bolshevik",
+        "NT": "NATO",
+        "NZ": "Nazi",
+        "PC": "Hippie",
+        "PR": "Pirate",
+        "RE": "Republican",
+        "TM": "Templar",
+        "TR": "Tree Hugger",
+        "UN": "United Nations",
+        "WP": "White Supremacist",
+    }
 
-	troll_names = {
-		"AC": "Anarcho-Capitalist",
-		"AN": "Anarchist",
-		"BL": "Black Nationalist",
-		"CF": "Confederate",
-		"CM": "Communist",
-		"CT": "Catalonia",
-		"DM": "Democrat",
-		"GN": "Gadsden",
-		"GY": "Gay",
-		"JH": "Jihadi",
-		"KN": "Kekistani",
-		"MF": "Muslim",
-		"MZ": "Task Force Z",
-		"NB": "National Bolshevik",
-		"NT": "NATO",
-		"NZ": "Nazi",
-		"PC": "Hippie",
-		"PR": "Pirate",
-		"RE": "Republican",
-		"TM": "Templar",
-		"TR": "Tree Hugger",
-		"UN": "United Nations",
-		"WP": "White Supremacist",
-	}
+    for troll_code, troll_name in troll_names.items():
+        troll_ids = tuple([int(k) for k, v in troll_flags.items() if v == troll_code])
 
-	for troll_code, troll_name in troll_names.items():
-
-		troll_ids = tuple([int(k) for k, v in troll_flags.items() if v == troll_code])
-
-		query_update_ambiguous_troll_flag = ("""
+        query_update_ambiguous_troll_flag = """
 			UPDATE posts_4chan
 			SET country_name = '%s'
 			WHERE id IN %s
 			AND board = 'pol'
 			AND (country_name = '') IS NOT FALSE;
-		""" % (troll_name, troll_ids))
+		""" % (troll_name, troll_ids)
 
-		db.execute(query_update_ambiguous_troll_flag)
-		db.commit()
+        db.execute(query_update_ambiguous_troll_flag)
+        db.commit()
 
 # For all the empty country_names in the timeframe of the dataset, we can assume they're an actual country
-query_update_leftovers = ("""
+query_update_leftovers = """
 		UPDATE posts_4chan
 		SET country_name =
 		CASE
@@ -817,7 +848,7 @@ query_update_leftovers = ("""
 		AND id < %s
 		AND id > %s
 		AND (country_name = '') IS NOT FALSE;
-		""" % (max_id, min_id))
+		""" % (max_id, min_id)
 
 db.execute(query_update_leftovers)
 db.commit()

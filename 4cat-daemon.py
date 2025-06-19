@@ -8,11 +8,26 @@ import re
 from pathlib import Path
 
 cli = argparse.ArgumentParser()
-cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
-                 action="store_true")
-cli.add_argument("--log-level", "-l", default="INFO", help="Set log level (\"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
-cli.add_argument("--no-version-check", "-n", default=False,
-                 help="Skip version check that may prompt the user to migrate first.", action="store_true")
+cli.add_argument(
+    "--interactive",
+    "-i",
+    default=False,
+    help="Run 4CAT in interactive mode (not in the background).",
+    action="store_true",
+)
+cli.add_argument(
+    "--log-level",
+    "-l",
+    default="INFO",
+    help='Set log level ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL").',
+)
+cli.add_argument(
+    "--no-version-check",
+    "-n",
+    default=False,
+    help="Skip version check that may prompt the user to migrate first.",
+    action="store_true",
+)
 cli.add_argument("command")
 args = cli.parse_args()
 
@@ -21,13 +36,20 @@ args = cli.parse_args()
 #  right when running 4CAT for the first time
 # ---------------------------------------------
 first_run = Path(__file__).parent.joinpath("helper-scripts", "first-run.py")
-result = subprocess.run([sys.executable, str(first_run)], stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE)
+result = subprocess.run(
+    [sys.executable, str(first_run)], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+)
 
 if result.returncode != 0:
     print("Unexpected error while preparing 4CAT. You may need to re-install 4CAT.")
-    print("stdout:\n" + "\n".join(["  " + line for line in result.stdout.decode("utf-8").split("\n")]))
-    print("stderr:\n" + "\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
+    print(
+        "stdout:\n"
+        + "\n".join(["  " + line for line in result.stdout.decode("utf-8").split("\n")])
+    )
+    print(
+        "stderr:\n"
+        + "\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")])
+    )
     exit(1)
 
 # ---------------------------------------------
@@ -53,7 +75,9 @@ if not args.no_version_check:
     if current_version != target_version:
         print("Migrated version: %s" % current_version)
         print("Code version: %s" % target_version)
-        print("Upgrade detected. You should run the following command to update 4CAT before (re)starting:")
+        print(
+            "Upgrade detected. You should run the following command to update 4CAT before (re)starting:"
+        )
         print("  %s helper-scripts/migrate.py" % sys.executable)
         exit(1)
 
@@ -62,13 +86,18 @@ if not args.no_version_check:
 # the config manager can be run properly
 from common.config_manager import config  # noqa: E402
 from common.lib.helpers import call_api  # noqa: E402
+
 # ---------------------------------------------
 #     Check validity of configuration file
 # (could be expanded to check for other values)
 # ---------------------------------------------
-if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "REPLACE_THIS":
+if (
+    not config.get("ANONYMISATION_SALT")
+    or config.get("ANONYMISATION_SALT") == "REPLACE_THIS"
+):
     print(
-        "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
+        "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option."
+    )
     sys.exit(1)
 
 # ---------------------------------------------
@@ -78,7 +107,10 @@ if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "
 # ---------------------------------------------
 if os.name not in ("posix",):
     # if not, run the backend directly and quit
-    print("Using '%s' to run the 4CAT backend is only supported on UNIX-like systems." % __file__)
+    print(
+        "Using '%s' to run the 4CAT backend is only supported on UNIX-like systems."
+        % __file__
+    )
     print("Running backend in interactive mode instead.")
     import backend.bootstrap as bootstrap
 
@@ -97,7 +129,10 @@ else:
     import daemon
 
 # determine PID file
-pidfile = config.get('PATH_ROOT').joinpath(config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
+pidfile = config.get("PATH_ROOT").joinpath(
+    config.get("PATH_LOCKFILE"), "4cat.pid"
+)  # pid file location
+
 
 # ---------------------------------------------
 #   These functions start and stop the daemon
@@ -124,12 +159,16 @@ def start():
     if new_pid == 0:
         # create new daemon context and run bootstrapper inside it
         with daemon.DaemonContext(
-                working_directory=os.path.abspath(os.path.dirname(__file__)),
-                umask=0x002,
-                stderr=open(Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), "4cat.stderr"), "w+"),
-                detach_process=True
+            working_directory=os.path.abspath(os.path.dirname(__file__)),
+            umask=0x002,
+            stderr=open(
+                Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "4cat.stderr"),
+                "w+",
+            ),
+            detach_process=True,
         ):
             import backend.bootstrap as bootstrap
+
             bootstrap.run(as_daemon=True, log_level=args.log_level)
 
         sys.exit(0)
@@ -179,7 +218,9 @@ def stop(force=False):
             pid = int(infile.read().strip())
 
         if pid not in psutil.pids():
-            print("...error: 4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?")
+            print(
+                "...error: 4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?"
+            )
             return False
 
         # tell the backend to stop
@@ -194,12 +235,15 @@ def stop(force=False):
                 # give up if it takes too long
                 if force and not killed:
                     os.system("kill -9 %s" % str(pid))
-                    print("...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL...")
+                    print(
+                        "...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL..."
+                    )
                     killed = True
                     starttime = time.time()
                 else:
                     print(
-                        "...error: the 4CAT backend daemon did not quit within 60 seconds. A worker may not have quit (yet).")
+                        "...error: the 4CAT backend daemon did not quit within 60 seconds. A worker may not have quit (yet)."
+                    )
                     return False
             time.sleep(1)
 
@@ -222,7 +266,14 @@ manual = """Usage: python(3) backend.py <start|stop|restart|force-restart|force-
 
 Starts, stops or restarts the 4CAT backend daemon.
 """
-if args.command not in ("start", "stop", "restart", "status", "force-restart", "force-stop"):
+if args.command not in (
+    "start",
+    "stop",
+    "restart",
+    "status",
+    "force-restart",
+    "force-stop",
+):
     print(manual)
     sys.exit(1)
 
@@ -260,16 +311,20 @@ elif command == "status":
         print("4CAT Backend Daemon is currently up and running.")
 
         # fetch more detailed status via internal API
-        if not config.get('API_PORT'):
+        if not config.get("API_PORT"):
             sys.exit(0)
 
         print("\n     Active workers:\n-------------------------")
         api_response = call_api("workers")
         if api_response["status"] == "success":
             active_workers = api_response["response"]
-            active_workers = {worker: active_workers[worker] for worker in
-                            sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if
-                            active_workers[worker] > 0}
+            active_workers = {
+                worker: active_workers[worker]
+                for worker in sorted(
+                    active_workers, key=lambda id: active_workers[id], reverse=True
+                )
+                if active_workers[worker] > 0
+            }
             for worker in active_workers:
                 print("%s: %i" % (worker, active_workers[worker]))
 
@@ -279,6 +334,7 @@ elif command == "status":
             print(api_response["error"])
             print("4CAT Backend Daemon may have crashed.")
 
-
     else:
-        print("4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?")
+        print(
+            "4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?"
+        )

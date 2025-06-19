@@ -6,6 +6,7 @@ Similar to 'Extract frames', but different enough that it gets its own file.
 This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
+
 import shutil
 import subprocess
 import oslex
@@ -29,6 +30,7 @@ class VideoSceneFrames(BasicProcessor):
 
     Uses ffmpeg to extract a certain number of frames per second at different sizes and saves them in an archive.
     """
+
     type = "video-scene-frames"  # job type ID
     category = "Visual"  # category
     title = "Extract first frames from each scene"  # title displayed in UI
@@ -47,7 +49,7 @@ class VideoSceneFrames(BasicProcessor):
                 "432x432": "Medium (432x432)",
                 "1026x1026": "Large (1026x1026)",
             },
-            "help": "Size of extracted frames"
+            "help": "Size of extracted frames",
         },
     }
 
@@ -61,9 +63,11 @@ class VideoSceneFrames(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type in ["video-scene-detector"] and \
-               config.get("video-downloader.ffmpeg_path") and \
-               shutil.which(config.get("video-downloader.ffmpeg_path"))
+        return (
+            module.type in ["video-scene-detector"]
+            and config.get("video-downloader.ffmpeg_path")
+            and shutil.which(config.get("video-downloader.ffmpeg_path"))
+        )
 
     def process(self):
         """
@@ -72,7 +76,9 @@ class VideoSceneFrames(BasicProcessor):
         """
         # Check processor able to run
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No videos from which to extract frames.", is_final=True)
+            self.dataset.update_status(
+                "No videos from which to extract frames.", is_final=True
+            )
             self.dataset.finish(0)
             return
 
@@ -86,8 +92,11 @@ class VideoSceneFrames(BasicProcessor):
                 video_dataset = self.source_dataset.nearest(video_dataset_type)
         if not video_dataset:
             self.log.error(
-                f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
-            return self.dataset.finish_with_error("Video data missing for scene metadata. Cannot extract frames.")
+                f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')"
+            )
+            return self.dataset.finish_with_error(
+                "Video data missing for scene metadata. Cannot extract frames."
+            )
 
         # map scenes to filenames
         scenes = {}
@@ -106,9 +115,11 @@ class VideoSceneFrames(BasicProcessor):
         errors = 0
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
-        for video in self.iterate_archive_contents(video_dataset.get_results_path(), staging_area=video_staging_area):
+        for video in self.iterate_archive_contents(
+            video_dataset.get_results_path(), staging_area=video_staging_area
+        ):
             # Check for 4CAT's metadata JSON and copy it
-            if video.name == '.metadata.json':
+            if video.name == ".metadata.json":
                 shutil.copy(video, staging_area)
 
             if video.name not in scenes:
@@ -118,7 +129,11 @@ class VideoSceneFrames(BasicProcessor):
             video_folder.mkdir(exist_ok=True)
 
             ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
-            fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
+            fps_command = (
+                "-fps_mode"
+                if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1")
+                else "-vsync"
+            )
 
             # we use a single command per video and get all frames in one go
             # previously we had a separate command per frame, which is slower
@@ -127,45 +142,63 @@ class VideoSceneFrames(BasicProcessor):
 
             command = [
                 ffmpeg_path,
-                "-i", oslex.quote(str(video)),
-                "-vf", f"select='{vf_param}'",
-                fps_command, "passthrough",
-                oslex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
+                "-i",
+                oslex.quote(str(video)),
+                "-vf",
+                f"select='{vf_param}'",
+                fps_command,
+                "passthrough",
+                oslex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg"))),
             ]
 
             if frame_size != "no_modify":
                 command += ["-s", oslex.quote(frame_size)]
 
-            result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+            result = subprocess.run(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
 
             # some ffmpeg error - log but continue
             if result.returncode != 0:
                 self.dataset.log(
-                    f"Error extracting frames for video file {video.name}, skipping.")
+                    f"Error extracting frames for video file {video.name}, skipping."
+                )
 
                 errors += 1
 
             # the default filenames can be improved - use scene ID instead of frame #
             for i in range(0, len(scenes[video.name])):
-                frame_file = video_folder.joinpath(f"{video.stem}_frame_{i+1}.jpeg")
+                frame_file = video_folder.joinpath(f"{video.stem}_frame_{i + 1}.jpeg")
                 scene_id = scenes[video.name][i]["id"].split("_").pop()
-                frame_file.rename(frame_file.with_stem(f"{video.stem}_scene_{scene_id}"))
+                frame_file.rename(
+                    frame_file.with_stem(f"{video.stem}_scene_{scene_id}")
+                )
 
             processed_frames += len(scenes[video.name])
 
-            self.dataset.update_status(f"Captured frames for {processed_frames:,} of {num_scenes:,} scenes")
+            self.dataset.update_status(
+                f"Captured frames for {processed_frames:,} of {num_scenes:,} scenes"
+            )
             self.dataset.update_progress(processed_frames / num_scenes)
 
         # Finish up
         # We've created a directory and folder structure here as opposed to a single folder with single files as
         # expected by self.write_archive_and_finish() so we use make_archive instead
         from shutil import make_archive
-        make_archive(self.dataset.get_results_path().with_suffix(''), "zip", staging_area)
+
+        make_archive(
+            self.dataset.get_results_path().with_suffix(""), "zip", staging_area
+        )
 
         if errors:
-            self.dataset.update_status("Finished, but not all scenes could be captured. See dataset log for "
-                                       "details.", is_final=True)
+            self.dataset.update_status(
+                "Finished, but not all scenes could be captured. See dataset log for "
+                "details.",
+                is_final=True,
+            )
 
         # Remove staging areas
         shutil.rmtree(staging_area)

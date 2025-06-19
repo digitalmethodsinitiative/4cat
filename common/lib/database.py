@@ -1,6 +1,7 @@
 """
 Database wrapper
 """
+
 import itertools
 import psycopg2.extras
 import psycopg2
@@ -12,430 +13,492 @@ from psycopg2.extras import execute_values
 
 from common.lib.exceptions import DatabaseQueryInterruptedException
 
+
 class Database:
-	"""
-	Simple database handler
+    """
+    Simple database handler
 
-	Offers a number of abstraction methods that limit how much SQL one is
-	required to write. Also makes the database connection mostly multithreading
-	proof by instantiating a new cursor for each query (and closing it afterwards)
-	"""
-	cursor = None
-	log = None
-	appname=""
+    Offers a number of abstraction methods that limit how much SQL one is
+    required to write. Also makes the database connection mostly multithreading
+    proof by instantiating a new cursor for each query (and closing it afterwards)
+    """
 
-	interrupted = False
-	interruptable_timeout = 86400  # if a query takes this long, it should be cancelled. see also fetchall_interruptable()
-	interruptable_job = None
+    cursor = None
+    log = None
+    appname = ""
 
-	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None, appname=None):
-		"""
-		Set up database connection
+    interrupted = False
+    interruptable_timeout = 86400  # if a query takes this long, it should be cancelled. see also fetchall_interruptable()
+    interruptable_job = None
 
-		:param logger:  Logger instance
-		:param dbname:  Database name
-		:param user:  Database username
-		:param password:  Database password
-		:param host:  Database server address
-		:param port:  Database port
-		:param appname:  App name, mostly useful to trace connections in pg_stat_activity
-		"""
-		self.appname = "4CAT" if not appname else "4CAT-%s" % appname
+    def __init__(
+        self,
+        logger,
+        dbname=None,
+        user=None,
+        password=None,
+        host=None,
+        port=None,
+        appname=None,
+    ):
+        """
+        Set up database connection
 
-		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=self.appname)
-		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-		self.log = logger
+        :param logger:  Logger instance
+        :param dbname:  Database name
+        :param user:  Database username
+        :param password:  Database password
+        :param host:  Database server address
+        :param port:  Database port
+        :param appname:  App name, mostly useful to trace connections in pg_stat_activity
+        """
+        self.appname = "4CAT" if not appname else "4CAT-%s" % appname
 
-		if self.log is None:
-			self.log = logging
+        self.connection = psycopg2.connect(
+            dbname=dbname,
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+            application_name=self.appname,
+        )
+        self.cursor = self.connection.cursor(
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
+        self.log = logger
 
-	def reconnect(self, tries=3, wait=10):
-		"""
-		Reconnect to the database
+        if self.log is None:
+            self.log = logging
 
-		:param int tries: Number of tries to reconnect
+    def reconnect(self, tries=3, wait=10):
+        """
+                Reconnect to the database
+
+                :param int tries: Number of tries to reconnect
         :param int wait: Time to wait between tries (first try is immediate)
-		"""
-		for i in range(tries):
-			try:
-				self.connection = psycopg2.connect(dbname=self.connection.info.dbname,
-												   user=self.connection.info.user,
-												   password=self.connection.info.password,
-												   host=self.connection.info.host,
-												   port=self.connection.info.port,
-												   application_name=self.appname)
-				self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-				return
-			except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-				self.log.warning(f"Database connection closed. Reconnecting...\n{e}")
-				time.sleep(wait)
-		self.log.error("Failed to reconnect to database after %d tries" % tries)
-
-	def _execute_query(self, query, replacements=None, cursor=None):
-		"""
-		Execute a query
-
-		Simple wrapper to get a cursor to execute a query with. Do not call
-		from outside this class - use `execute()` instead.
-
-		:param string query: Query
-		:param args: Replacement values
-		:param cursor: Cursor to use. Default - use common cursor
-		:return None:
-		"""
-		if not cursor:
-			cursor = self.get_cursor()
-
-		self.log.debug("Executing query %s" % cursor.mogrify(query, replacements))
-		try:
-			cursor.execute(query, replacements)
-		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-			self.log.warning(f"Database Exception: {e}\nReconnecting and retrying query...")
-			self.reconnect()
-			cursor = self.get_cursor()
-			cursor.execute(query, replacements)
-		return cursor
-
-	def execute(self, query, replacements=None, commit=True, cursor=None, close_cursor=True):
-		"""
-		Execute a query, and commit afterwards
-
-		This is required for UPDATE/INSERT/DELETE/etc to stick!
-
-		:param string query:  Query
-		:param cursor: Cursor to use. By default, use the result of
-		`get_cursor()`.
-		:param replacements: Replacement values
-		:param bool commit:  Commit transaction after query?
-		:param bool close_cursor:  Close cursor after query?
-		"""
-		cursor = self._execute_query(query, replacements, cursor)
-
-		if commit:
-			self.commit()
-
-		rowcount = cursor.rowcount
-
-		if close_cursor:
-			cursor.close()
-
-		return rowcount
-
-	def execute_many(self, query, commit=True, replacements=None):
-		"""
-		Execute a query multiple times, each time with different values
-
-		This makes it particularly suitable for INSERT queries, but other types
-		of query using VALUES are possible too.
-
-		:param string query:  Query
-		:param replacements: A list of replacement values
-		:param commit:  Commit transaction after query?
-		"""
-		cursor = self.get_cursor()
-		try:
-			execute_values(cursor, query, replacements)
-		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-			self.log.warning(f"Database Exception: {e}\nReconnecting and retrying query...")
-			self.reconnect()
-			cursor = self.get_cursor()
-			execute_values(cursor, query, replacements)
-
-		cursor.close()
-		if commit:
-			self.commit()
-
-	def update(self, table, data, where=None, commit=True):
-		"""
-		Update a database record
-
-		:param string table:  Table to update
-		:param dict data:  Data to set, Column => Value
-		:param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
-		:param bool commit:  Whether to commit after executing the query
-
-		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
-		"""
-		if where is None:
-			where = {}
-
-		# build query
-		identifiers = [sql.Identifier(column) for column in data.keys()]
-		identifiers.insert(0, sql.Identifier(table))
-		replacements = list(data.values())
-
-		query = "UPDATE {} SET " + ", ".join(["{} = %s" for column in data])
-		if where:
-			query += " WHERE " + " AND ".join(["{} = %s" for column in where])
-			for column in where.keys():
-				identifiers.append(sql.Identifier(column))
-				replacements.append(where[column])
-
-		query = sql.SQL(query).format(*identifiers)
-
-		rowcount = self.execute(query, replacements=replacements, commit=commit)
-		return rowcount
-
-	def delete(self, table, where, commit=True):
-		"""
-		Delete a database record
-
-		:param string table:  Table to delete from
-		:param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
-		:param bool commit:  Whether to commit after executing the query
-
-		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
-		"""
-		where_sql = []
-		replacements = []
-		for column in where.keys():
-			if type(where[column]) in (set, tuple, list):
-				where_sql.append("{} IN %s")
-				replacements.append(tuple(where[column]))
-			else:
-				where_sql.append("{} = %s")
-				replacements.append(where[column])
-
-		# build query
-		identifiers = [sql.Identifier(column) for column in where.keys()]
-		identifiers.insert(0, sql.Identifier(table))
-		query = sql.SQL("DELETE FROM {} WHERE " + " AND ".join(where_sql)).format(*identifiers)
-
-		rowcount = self.execute(query, replacements=replacements, commit=commit)
-		return rowcount
-
-	def insert(self, table, data, commit=True, safe=False, constraints=None, return_field=""):
-		"""
-		Create database record
-
-		:param string table:  Table to insert record into
-		:param dict data:   Data to insert
-		:param bool commit: Whether to commit after executing the query
-		:param bool safe: If set to `True`, "ON CONFLICT DO NOTHING" is added to the insert query, so it does not
-						  insert the row and no error is thrown when the insert violates a unique index or other constraint
-		:param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a
-								  constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
-		:param str return_field: If not empty or None, this makes the method
-		return this field of the inserted row, instead of the number of
-		affected rows, with `RETURNING`.
-		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
-		"""
-		if constraints is None:
-			constraints = []
-
-		# escape identifiers
-		identifiers = [sql.Identifier(column) for column in data.keys()]
-		identifiers.insert(0, sql.Identifier(table))
-
-		# construct ON NOTHING bit of query
-		if safe:
-			safe_bit = " ON CONFLICT "
-			if constraints:
-				safe_bit += "(" + ", ".join(["{}" for each in constraints]) + ")"
-				identifiers.extend([sql.Identifier(column) for column in constraints])
-			safe_bit += " DO NOTHING"
-		else:
-			safe_bit = ""
-
-		# prepare parameter replacements
-		protoquery = "INSERT INTO {} (%s) VALUES %%s" % ", ".join(["{}" for column in data.keys()]) + safe_bit
-
-		if return_field:
-			protoquery += " RETURNING {}"
-			identifiers.append(sql.Identifier(return_field))
-
-		query = sql.SQL(protoquery).format(*identifiers)
-		replacements = (tuple(data.values()),)
-
-		cursor = self.get_cursor()
-		rowcount = self.execute(query, replacements=replacements, cursor=cursor, commit=commit, close_cursor=False)
-
-		result = rowcount if not return_field else cursor.fetchone()[return_field]
-		cursor.close()
-		return result
-
-	def upsert(self, table, data, commit=True, constraints=None):
-		"""
-		Create or update database record
-
-		If the record could not be inserted because of a constraint, the
-		constraining record is updated instead.
-
-		:param string table:  Table to upsert record into
-		:param dict data:   Data to upsert
-		:param bool commit: Whether to commit after executing the query
-		:param tuple constraints: This tuple may contain the columns that should be used as a
-								  constraint, e.g. ON CONFLICT (name, lastname) DO UPDATE
-		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
-		"""
-		if constraints is None:
-			constraints = []
-
-		# escape identifiers
-		identifiers = [sql.Identifier(column) for column in data.keys()]
-		identifiers.insert(0, sql.Identifier(table))
-
-		# prepare parameter replacements
-		protoquery = "INSERT INTO {} (%s) VALUES %%s" % ", ".join(["{}" for column in data.keys()])
-		protoquery += " ON CONFLICT"
-
-		if constraints:
-			protoquery += " (" + ", ".join(["{}" for each in constraints]) + ")"
-			identifiers.extend([sql.Identifier(column) for column in constraints])
-
-		protoquery += " DO UPDATE SET "
-		protoquery += ", ".join(["%s = EXCLUDED.%s" % (column, column) for column in data.keys()])
-		identifiers.extend(list(itertools.chain.from_iterable([[column, column] for column in data.keys()])))
-
-		query = sql.SQL(protoquery).format(*identifiers)
-		replacements = (tuple(data.values()),)
-
-		rowcount = self.execute(query, replacements=replacements, commit=commit)
-		return rowcount
-
-	def fetchall(self, query, *args):
-		"""
-		Fetch all rows for a query
-
-		:param string query:  Query
-		:param args: Replacement values
-		:param commit:  Commit transaction after query?
-		:return list: The result rows, as a list
-		"""
-		cursor = self._execute_query(query, *args)
-
-		try:
-			result = cursor.fetchall()
-		except AttributeError:
-			result = []
-		except psycopg2.ProgrammingError as e:
-			# there seems to be a bug with psycopg2 where it sometimes raises
-			# this for empty query results even though it shouldn't. this
-			# doesn't seem to indicate an actual problem so we catch the
-			# exception and return an empty list
-			self.rollback()
-			result = []
-			self.log.warning("Caught ProgrammingError: %s" % e)
-
-		cursor.close()
-		self.commit()
-
-		return result
-
-	def fetchone(self, query, *args):
-		"""
-		Fetch one result row
-
-		:param string query: Query
-		:param args: Replacement values
-		:param commit:  Commit transaction after query?
-		:return: The row, as a dictionary, or None if there were no rows
-		"""
-		cursor = self._execute_query(query, *args)
-
-		try:
-			result = cursor.fetchone()
-		except psycopg2.ProgrammingError as e:
-			# no results to fetch
-			self.rollback()
-			result = None
-			self.log.warning("Caught ProgrammingError: %s" % e)
-
-		cursor.close()
-		self.commit()
-
-		return result
-
-	def fetchall_interruptable(self, queue, query, *args):
-		"""
-		Fetch all rows for a query, allowing for interruption
-
-		Before running the query, a job is queued to cancel the query after a
-		set amount of time. The query is expected to complete before this
-		timeout. If the backend is interrupted, however, that job will be
-		executed immediately, to cancel the database query. If this happens, a
-		DatabaseQueryInterruptedException will be raised, but the database
-		object will otherwise remain useable.
-
-		Note that in the event that the cancellation job is run, all queries
-		for this instance of the database object will be cancelled. However,
-		there should never be more than one active query per connection within
-		4CAT.
-
-		:param JobQueue queue:  A job queue object, required to schedule the
-		query cancellation job
-		:param str query:  SQL query
-		:param list args:  Replacement variables
-		:param commit:  Commit transaction after query?
-		:return list:  A list of rows, as dictionaries
-		"""
-		# schedule a job that will cancel the query we're about to make
-		self.interruptable_job = queue.add_job("cancel-pg-query", details={}, remote_id=self.appname, claim_after=time.time() + self.interruptable_timeout)
-
-		# run the query
-		cursor = self.get_cursor()
-		try:
-			cursor = self._execute_query(query, cursor=cursor, *args)
-		except psycopg2.extensions.QueryCanceledError:
-			# interrupted with cancellation worker (or manually)
-			self.log.debug("Query in connection %s was interrupted..." % self.appname)
-			self.rollback()
-			cursor.close()
-			raise DatabaseQueryInterruptedException("Interrupted while querying database")
-
-		# collect results
-		try:
-			result = cursor.fetchall()
-		except AttributeError:
-			result = []
-		except psycopg2.ProgrammingError as e:
-			result = []
-			self.log.warning("Caught ProgrammingError: %s" % e)
-
-		# clean up cancelling job when we have the data
-		self.interruptable_job.finish()
-		self.interruptable_job = None
-
-		cursor.close()
-		self.commit()
-
-		return result
-
-
-	def commit(self):
-		"""
-		Commit the current transaction
-
-		This is required for UPDATE etc to stick.
-		"""
-		self.connection.commit()
-
-	def rollback(self):
-		"""
-		Roll back the current transaction
-		"""
-		self.connection.rollback()
-
-	def close(self):
-		"""
-		Close connection
-
-		Running queries after this is probably a bad idea!
-		"""
-		self.connection.close()
-
-	def get_cursor(self):
-		"""
-		Get a new cursor
-
-		Re-using cursors seems to give issues when using per-thread
-		connections, so simply instantiate a new one each time
-
-		:return: Cursor
-		"""
-		try:
-			return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-			self.log.warning(f"Database Exception: {e}\nReconnecting and retrying query...")
-			self.reconnect()
-			return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        """
+        for i in range(tries):
+            try:
+                self.connection = psycopg2.connect(
+                    dbname=self.connection.info.dbname,
+                    user=self.connection.info.user,
+                    password=self.connection.info.password,
+                    host=self.connection.info.host,
+                    port=self.connection.info.port,
+                    application_name=self.appname,
+                )
+                self.cursor = self.connection.cursor(
+                    cursor_factory=psycopg2.extras.RealDictCursor
+                )
+                return
+            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+                self.log.warning(f"Database connection closed. Reconnecting...\n{e}")
+                time.sleep(wait)
+        self.log.error("Failed to reconnect to database after %d tries" % tries)
+
+    def _execute_query(self, query, replacements=None, cursor=None):
+        """
+        Execute a query
+
+        Simple wrapper to get a cursor to execute a query with. Do not call
+        from outside this class - use `execute()` instead.
+
+        :param string query: Query
+        :param args: Replacement values
+        :param cursor: Cursor to use. Default - use common cursor
+        :return None:
+        """
+        if not cursor:
+            cursor = self.get_cursor()
+
+        self.log.debug("Executing query %s" % cursor.mogrify(query, replacements))
+        try:
+            cursor.execute(query, replacements)
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            self.log.warning(
+                f"Database Exception: {e}\nReconnecting and retrying query..."
+            )
+            self.reconnect()
+            cursor = self.get_cursor()
+            cursor.execute(query, replacements)
+        return cursor
+
+    def execute(
+        self, query, replacements=None, commit=True, cursor=None, close_cursor=True
+    ):
+        """
+        Execute a query, and commit afterwards
+
+        This is required for UPDATE/INSERT/DELETE/etc to stick!
+
+        :param string query:  Query
+        :param cursor: Cursor to use. By default, use the result of
+        `get_cursor()`.
+        :param replacements: Replacement values
+        :param bool commit:  Commit transaction after query?
+        :param bool close_cursor:  Close cursor after query?
+        """
+        cursor = self._execute_query(query, replacements, cursor)
+
+        if commit:
+            self.commit()
+
+        rowcount = cursor.rowcount
+
+        if close_cursor:
+            cursor.close()
+
+        return rowcount
+
+    def execute_many(self, query, commit=True, replacements=None):
+        """
+        Execute a query multiple times, each time with different values
+
+        This makes it particularly suitable for INSERT queries, but other types
+        of query using VALUES are possible too.
+
+        :param string query:  Query
+        :param replacements: A list of replacement values
+        :param commit:  Commit transaction after query?
+        """
+        cursor = self.get_cursor()
+        try:
+            execute_values(cursor, query, replacements)
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            self.log.warning(
+                f"Database Exception: {e}\nReconnecting and retrying query..."
+            )
+            self.reconnect()
+            cursor = self.get_cursor()
+            execute_values(cursor, query, replacements)
+
+        cursor.close()
+        if commit:
+            self.commit()
+
+    def update(self, table, data, where=None, commit=True):
+        """
+        Update a database record
+
+        :param string table:  Table to update
+        :param dict data:  Data to set, Column => Value
+        :param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
+        :param bool commit:  Whether to commit after executing the query
+
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        if where is None:
+            where = {}
+
+        # build query
+        identifiers = [sql.Identifier(column) for column in data.keys()]
+        identifiers.insert(0, sql.Identifier(table))
+        replacements = list(data.values())
+
+        query = "UPDATE {} SET " + ", ".join(["{} = %s" for column in data])
+        if where:
+            query += " WHERE " + " AND ".join(["{} = %s" for column in where])
+            for column in where.keys():
+                identifiers.append(sql.Identifier(column))
+                replacements.append(where[column])
+
+        query = sql.SQL(query).format(*identifiers)
+
+        rowcount = self.execute(query, replacements=replacements, commit=commit)
+        return rowcount
+
+    def delete(self, table, where, commit=True):
+        """
+        Delete a database record
+
+        :param string table:  Table to delete from
+        :param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
+        :param bool commit:  Whether to commit after executing the query
+
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        where_sql = []
+        replacements = []
+        for column in where.keys():
+            if type(where[column]) in (set, tuple, list):
+                where_sql.append("{} IN %s")
+                replacements.append(tuple(where[column]))
+            else:
+                where_sql.append("{} = %s")
+                replacements.append(where[column])
+
+        # build query
+        identifiers = [sql.Identifier(column) for column in where.keys()]
+        identifiers.insert(0, sql.Identifier(table))
+        query = sql.SQL("DELETE FROM {} WHERE " + " AND ".join(where_sql)).format(
+            *identifiers
+        )
+
+        rowcount = self.execute(query, replacements=replacements, commit=commit)
+        return rowcount
+
+    def insert(
+        self, table, data, commit=True, safe=False, constraints=None, return_field=""
+    ):
+        """
+        Create database record
+
+        :param string table:  Table to insert record into
+        :param dict data:   Data to insert
+        :param bool commit: Whether to commit after executing the query
+        :param bool safe: If set to `True`, "ON CONFLICT DO NOTHING" is added to the insert query, so it does not
+                                          insert the row and no error is thrown when the insert violates a unique index or other constraint
+        :param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a
+                                                          constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
+        :param str return_field: If not empty or None, this makes the method
+        return this field of the inserted row, instead of the number of
+        affected rows, with `RETURNING`.
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        if constraints is None:
+            constraints = []
+
+        # escape identifiers
+        identifiers = [sql.Identifier(column) for column in data.keys()]
+        identifiers.insert(0, sql.Identifier(table))
+
+        # construct ON NOTHING bit of query
+        if safe:
+            safe_bit = " ON CONFLICT "
+            if constraints:
+                safe_bit += "(" + ", ".join(["{}" for each in constraints]) + ")"
+                identifiers.extend([sql.Identifier(column) for column in constraints])
+            safe_bit += " DO NOTHING"
+        else:
+            safe_bit = ""
+
+        # prepare parameter replacements
+        protoquery = (
+            "INSERT INTO {} (%s) VALUES %%s"
+            % ", ".join(["{}" for column in data.keys()])
+            + safe_bit
+        )
+
+        if return_field:
+            protoquery += " RETURNING {}"
+            identifiers.append(sql.Identifier(return_field))
+
+        query = sql.SQL(protoquery).format(*identifiers)
+        replacements = (tuple(data.values()),)
+
+        cursor = self.get_cursor()
+        rowcount = self.execute(
+            query,
+            replacements=replacements,
+            cursor=cursor,
+            commit=commit,
+            close_cursor=False,
+        )
+
+        result = rowcount if not return_field else cursor.fetchone()[return_field]
+        cursor.close()
+        return result
+
+    def upsert(self, table, data, commit=True, constraints=None):
+        """
+        Create or update database record
+
+        If the record could not be inserted because of a constraint, the
+        constraining record is updated instead.
+
+        :param string table:  Table to upsert record into
+        :param dict data:   Data to upsert
+        :param bool commit: Whether to commit after executing the query
+        :param tuple constraints: This tuple may contain the columns that should be used as a
+                                                          constraint, e.g. ON CONFLICT (name, lastname) DO UPDATE
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        if constraints is None:
+            constraints = []
+
+        # escape identifiers
+        identifiers = [sql.Identifier(column) for column in data.keys()]
+        identifiers.insert(0, sql.Identifier(table))
+
+        # prepare parameter replacements
+        protoquery = "INSERT INTO {} (%s) VALUES %%s" % ", ".join(
+            ["{}" for column in data.keys()]
+        )
+        protoquery += " ON CONFLICT"
+
+        if constraints:
+            protoquery += " (" + ", ".join(["{}" for each in constraints]) + ")"
+            identifiers.extend([sql.Identifier(column) for column in constraints])
+
+        protoquery += " DO UPDATE SET "
+        protoquery += ", ".join(
+            ["%s = EXCLUDED.%s" % (column, column) for column in data.keys()]
+        )
+        identifiers.extend(
+            list(
+                itertools.chain.from_iterable(
+                    [[column, column] for column in data.keys()]
+                )
+            )
+        )
+
+        query = sql.SQL(protoquery).format(*identifiers)
+        replacements = (tuple(data.values()),)
+
+        rowcount = self.execute(query, replacements=replacements, commit=commit)
+        return rowcount
+
+    def fetchall(self, query, *args):
+        """
+        Fetch all rows for a query
+
+        :param string query:  Query
+        :param args: Replacement values
+        :param commit:  Commit transaction after query?
+        :return list: The result rows, as a list
+        """
+        cursor = self._execute_query(query, *args)
+
+        try:
+            result = cursor.fetchall()
+        except AttributeError:
+            result = []
+        except psycopg2.ProgrammingError as e:
+            # there seems to be a bug with psycopg2 where it sometimes raises
+            # this for empty query results even though it shouldn't. this
+            # doesn't seem to indicate an actual problem so we catch the
+            # exception and return an empty list
+            self.rollback()
+            result = []
+            self.log.warning("Caught ProgrammingError: %s" % e)
+
+        cursor.close()
+        self.commit()
+
+        return result
+
+    def fetchone(self, query, *args):
+        """
+        Fetch one result row
+
+        :param string query: Query
+        :param args: Replacement values
+        :param commit:  Commit transaction after query?
+        :return: The row, as a dictionary, or None if there were no rows
+        """
+        cursor = self._execute_query(query, *args)
+
+        try:
+            result = cursor.fetchone()
+        except psycopg2.ProgrammingError as e:
+            # no results to fetch
+            self.rollback()
+            result = None
+            self.log.warning("Caught ProgrammingError: %s" % e)
+
+        cursor.close()
+        self.commit()
+
+        return result
+
+    def fetchall_interruptable(self, queue, query, *args):
+        """
+        Fetch all rows for a query, allowing for interruption
+
+        Before running the query, a job is queued to cancel the query after a
+        set amount of time. The query is expected to complete before this
+        timeout. If the backend is interrupted, however, that job will be
+        executed immediately, to cancel the database query. If this happens, a
+        DatabaseQueryInterruptedException will be raised, but the database
+        object will otherwise remain useable.
+
+        Note that in the event that the cancellation job is run, all queries
+        for this instance of the database object will be cancelled. However,
+        there should never be more than one active query per connection within
+        4CAT.
+
+        :param JobQueue queue:  A job queue object, required to schedule the
+        query cancellation job
+        :param str query:  SQL query
+        :param list args:  Replacement variables
+        :param commit:  Commit transaction after query?
+        :return list:  A list of rows, as dictionaries
+        """
+        # schedule a job that will cancel the query we're about to make
+        self.interruptable_job = queue.add_job(
+            "cancel-pg-query",
+            details={},
+            remote_id=self.appname,
+            claim_after=time.time() + self.interruptable_timeout,
+        )
+
+        # run the query
+        cursor = self.get_cursor()
+        try:
+            cursor = self._execute_query(query, cursor=cursor, *args)
+        except psycopg2.extensions.QueryCanceledError:
+            # interrupted with cancellation worker (or manually)
+            self.log.debug("Query in connection %s was interrupted..." % self.appname)
+            self.rollback()
+            cursor.close()
+            raise DatabaseQueryInterruptedException(
+                "Interrupted while querying database"
+            )
+
+        # collect results
+        try:
+            result = cursor.fetchall()
+        except AttributeError:
+            result = []
+        except psycopg2.ProgrammingError as e:
+            result = []
+            self.log.warning("Caught ProgrammingError: %s" % e)
+
+        # clean up cancelling job when we have the data
+        self.interruptable_job.finish()
+        self.interruptable_job = None
+
+        cursor.close()
+        self.commit()
+
+        return result
+
+    def commit(self):
+        """
+        Commit the current transaction
+
+        This is required for UPDATE etc to stick.
+        """
+        self.connection.commit()
+
+    def rollback(self):
+        """
+        Roll back the current transaction
+        """
+        self.connection.rollback()
+
+    def close(self):
+        """
+        Close connection
+
+        Running queries after this is probably a bad idea!
+        """
+        self.connection.close()
+
+    def get_cursor(self):
+        """
+        Get a new cursor
+
+        Re-using cursors seems to give issues when using per-thread
+        connections, so simply instantiate a new one each time
+
+        :return: Cursor
+        """
+        try:
+            return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            self.log.warning(
+                f"Database Exception: {e}\nReconnecting and retrying query..."
+            )
+            self.reconnect()
+            return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)

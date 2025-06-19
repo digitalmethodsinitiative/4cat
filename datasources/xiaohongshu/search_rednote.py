@@ -4,6 +4,7 @@ Import scraped RedNote data
 It's prohibitively difficult to scrape data from RedNote within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+
 from datetime import datetime
 
 from backend.lib.search import Search
@@ -14,6 +15,7 @@ class SearchRedNote(Search):
     """
     Import scraped RedNote/Xiaohongshu/XSH data
     """
+
     type = "xiaohongshu-search"  # job ID
     category = "Search"  # category
     title = "Import scraped RedNote data"  # title displayed in UI
@@ -25,7 +27,7 @@ class SearchRedNote(Search):
     accepts = [None]
     references = [
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
-        "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)"
+        "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)",
     ]
 
     def get_items(self, query):
@@ -34,8 +36,9 @@ class SearchRedNote(Search):
 
         Not available for RedNote
         """
-        raise NotImplementedError("RedNote/Xiaohongshu datasets can only be created by importing data from elsewhere")
-
+        raise NotImplementedError(
+            "RedNote/Xiaohongshu datasets can only be created by importing data from elsewhere"
+        )
 
     @staticmethod
     def map_item(post):
@@ -70,7 +73,6 @@ class SearchRedNote(Search):
         item = post["note_card"] if post.get("type") != "video" else post
         item_id = post.get("id", post.get("note_id"))
 
-
         # Images
         images = []
         if item.get("image_list"):
@@ -90,7 +92,7 @@ class SearchRedNote(Search):
             images.append(item["cover"]["url_default"])
         else:
             # no image found;
-            images = MissingMappedField("")       
+            images = MissingMappedField("")
 
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={post['xsec_token']}" if post.get("xsec_token") else ""
@@ -100,25 +102,35 @@ class SearchRedNote(Search):
             video_url = MissingMappedField("")
 
         timestamp = item.get("time", None)
-        return MappedItem({
-            "id": item_id,
-            "thread_id": item_id,
-            "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
-            "title": item.get("display_title", ""),
-            "body": item.get("desc", "") if "desc" in item else MissingMappedField(""),
-            "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
-            "author": item["user"]["nickname"],
-            "author_avatar_url": item["user"]["avatar"],
-            "image_urls": ",".join(images) if type(images) is list else images,
-            "video_url": video_url,
-            # only available when loading an individual post page, so skip
-            # "tags": ",".join(t["name"] for t in item["tag_list"]),
-            "likes": item["interact_info"]["liked_count"],
-            # "collects": item["interact_info"]["collected_count"],
-            # "comments": item["interact_info"]["comment_count"],
-            # "shares": item["interact_info"]["share_count"],
-            "unix_timestamp": int(timestamp / 1000) if timestamp else MissingMappedField(""),
-        })
+        return MappedItem(
+            {
+                "id": item_id,
+                "thread_id": item_id,
+                "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
+                "title": item.get("display_title", ""),
+                "body": item.get("desc", "")
+                if "desc" in item
+                else MissingMappedField(""),
+                "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+                if timestamp
+                else MissingMappedField(""),
+                "author": item["user"]["nickname"],
+                "author_avatar_url": item["user"]["avatar"],
+                "image_urls": ",".join(images) if type(images) is list else images,
+                "video_url": video_url,
+                # only available when loading an individual post page, so skip
+                # "tags": ",".join(t["name"] for t in item["tag_list"]),
+                "likes": item["interact_info"]["liked_count"],
+                # "collects": item["interact_info"]["collected_count"],
+                # "comments": item["interact_info"]["comment_count"],
+                # "shares": item["interact_info"]["share_count"],
+                "unix_timestamp": int(timestamp / 1000)
+                if timestamp
+                else MissingMappedField(""),
+            }
+        )
 
     @staticmethod
     def map_item_from_json_embedded(item):
@@ -138,25 +150,35 @@ class SearchRedNote(Search):
         xsec_bit = f"?xsec_token={note['xsecToken']}"
         timestamp = item.get("time", None)
 
-        return MappedItem({
-            "id": item["id"],
-            "thread_id": item["id"],
-            "url": f"https://www.xiaohongshu.com/explore/{item['id']}{xsec_bit}",
-            "title": note.get("title", ""),
-            "body": note.get("desc", "") if "desc" in note else MissingMappedField(""),
-            "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
-            "author": note["user"]["nickname"],
-            "author_avatar_url": note["user"]["avatar"],
-            "image_url": image,
-            "video_url": MissingMappedField(""),
-            # only available when loading an individual post page, so skip
-            # "tags": ",".join(t["name"] for t in item["tag_list"]),
-            "likes": item["interactInfo"]["likedCount"],
-            # "collects": item["interact_info"]["collected_count"],
-            # "comments": item["interact_info"]["comment_count"],
-            # "shares": item["interact_info"]["share_count"],
-            "unix_timestamp": int(timestamp / 1000) if timestamp else MissingMappedField(""),
-        })
+        return MappedItem(
+            {
+                "id": item["id"],
+                "thread_id": item["id"],
+                "url": f"https://www.xiaohongshu.com/explore/{item['id']}{xsec_bit}",
+                "title": note.get("title", ""),
+                "body": note.get("desc", "")
+                if "desc" in note
+                else MissingMappedField(""),
+                "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+                if timestamp
+                else MissingMappedField(""),
+                "author": note["user"]["nickname"],
+                "author_avatar_url": note["user"]["avatar"],
+                "image_url": image,
+                "video_url": MissingMappedField(""),
+                # only available when loading an individual post page, so skip
+                # "tags": ",".join(t["name"] for t in item["tag_list"]),
+                "likes": item["interactInfo"]["likedCount"],
+                # "collects": item["interact_info"]["collected_count"],
+                # "comments": item["interact_info"]["comment_count"],
+                # "shares": item["interact_info"]["share_count"],
+                "unix_timestamp": int(timestamp / 1000)
+                if timestamp
+                else MissingMappedField(""),
+            }
+        )
 
     def map_item_from_html(item):
         """
@@ -168,21 +190,23 @@ class SearchRedNote(Search):
         :param dict item:
         :return MappedItem:
         """
-        return MappedItem({
-            "id": item["id"],
-            "thread_id": item["id"],
-            "url": f"https://www.xiaohongshu.com{item['url']}",
-            "title": item["title"],
-            "body": MissingMappedField(""),
-            "timestamp": MissingMappedField(""),
-            "author": item["author_name"],
-            "author_avatar_url": item["author_avatar_url"],
-            "image_url": item["thumbnail_url"],
-            "video_url": MissingMappedField(""),
-            # "tags": MissingMappedField(""),
-            "likes": item["likes"],
-            # "collects": MissingMappedField(""),
-            # "comments": MissingMappedField(""),
-            # "shares": MissingMappedField(""),
-            "unix_timestamp": MissingMappedField(""),
-        })
+        return MappedItem(
+            {
+                "id": item["id"],
+                "thread_id": item["id"],
+                "url": f"https://www.xiaohongshu.com{item['url']}",
+                "title": item["title"],
+                "body": MissingMappedField(""),
+                "timestamp": MissingMappedField(""),
+                "author": item["author_name"],
+                "author_avatar_url": item["author_avatar_url"],
+                "image_url": item["thumbnail_url"],
+                "video_url": MissingMappedField(""),
+                # "tags": MissingMappedField(""),
+                "likes": item["likes"],
+                # "collects": MissingMappedField(""),
+                # "comments": MissingMappedField(""),
+                # "shares": MissingMappedField(""),
+                "unix_timestamp": MissingMappedField(""),
+            }
+        )

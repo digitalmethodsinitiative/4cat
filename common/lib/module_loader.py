@@ -1,6 +1,7 @@
 """
 Load modules and datasources dynamically
 """
+
 from pathlib import Path
 import importlib
 import inspect
@@ -25,6 +26,7 @@ class ModuleCollector:
     "backend/workers" folder. All these folders are scanned for both
     processors and workers (processors being a specific kind of worker).
     """
+
     ignore = []
     missing_modules = {}
     log_buffer = None
@@ -60,7 +62,11 @@ class ModuleCollector:
                 if hasattr(worker, "config") and type(worker.config) is dict:
                     module_config.update(worker.config)
 
-            with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+            with (
+                config.get("PATH_ROOT")
+                .joinpath("config/module_config.bin")
+                .open("wb") as outfile
+            ):
                 pickle.dump(module_config, outfile)
 
         # load from cache
@@ -72,7 +78,10 @@ class ModuleCollector:
         Determine if a module member is a worker class we can use
         """
         if inspect.isclass(object):
-            if object.__name__ in("BasicProcessor", "BasicWorker") or inspect.isabstract(object):
+            if object.__name__ in (
+                "BasicProcessor",
+                "BasicWorker",
+            ) or inspect.isabstract(object):
                 # ignore abstract and base classes
                 return False
 
@@ -98,15 +107,17 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        extension_path = Path(config.get('PATH_ROOT'), "extensions")
+        extension_path = Path(config.get("PATH_ROOT"), "extensions")
 
-        paths = [Path(config.get('PATH_ROOT'), "processors"),
-                 Path(config.get('PATH_ROOT'), "backend", "workers"),
-                 extension_path,
-                 *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
+        paths = [
+            Path(config.get("PATH_ROOT"), "processors"),
+            Path(config.get("PATH_ROOT"), "backend", "workers"),
+            extension_path,
+            *[self.datasources[datasource]["path"] for datasource in self.datasources],
+        ]  # extension datasources will be here and the above line...
 
-        root_match = re.compile(r"^%s" % re.escape(str(config.get('PATH_ROOT'))))
-        root_path = Path(config.get('PATH_ROOT'))
+        root_match = re.compile(r"^%s" % re.escape(str(config.get("PATH_ROOT"))))
+        root_path = Path(config.get("PATH_ROOT"))
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
@@ -114,7 +125,9 @@ class ModuleCollector:
             for file in folder.rglob("*.py"):
                 # determine module name for file
                 # reduce path to be relative to 4CAT root
-                module_name = ".".join(file.parts[len(root_path.parts):-1] + (file.stem,))
+                module_name = ".".join(
+                    file.parts[len(root_path.parts) : -1] + (file.stem,)
+                )
 
                 # check if we've already loaded this module
                 if module_name in self.ignore:
@@ -157,22 +170,33 @@ class ModuleCollector:
                     # to import BasicProcessor, which would lead to a circular
                     # import
                     if self.is_4cat_class(component[1], only_processors=True):
-                        self.processors[component[1].type] = self.workers[component[1].type]
+                        self.processors[component[1].type] = self.workers[
+                            component[1].type
+                        ]
 
         # sort by category for more convenient display in interfaces
-        sorted_processors = {id: self.processors[id] for id in
-                             sorted(self.processors)}
-        categorised_processors = {id: sorted_processors[id] for id in
-                                  sorted(sorted_processors,
-                                         key=lambda item: "0" if sorted_processors[item].category == "Presets" else
-                                         sorted_processors[item].category)}
+        sorted_processors = {id: self.processors[id] for id in sorted(self.processors)}
+        categorised_processors = {
+            id: sorted_processors[id]
+            for id in sorted(
+                sorted_processors,
+                key=lambda item: "0"
+                if sorted_processors[item].category == "Presets"
+                else sorted_processors[item].category,
+            )
+        }
 
         # Give a heads-up if not all modules were installed properly
         if self.missing_modules:
-            warning = "Warning: Not all modules could be found, which might cause data sources and modules to not " \
-                      "function.\nMissing modules:\n"
+            warning = (
+                "Warning: Not all modules could be found, which might cause data sources and modules to not "
+                "function.\nMissing modules:\n"
+            )
             for missing_module, processor_list in self.missing_modules.items():
-                warning += "\t%s (for %s)\n" % (missing_module, ", ".join(processor_list))
+                warning += "\t%s (for %s)\n" % (
+                    missing_module,
+                    ", ".join(processor_list),
+                )
 
             self.log_buffer += warning
 
@@ -187,48 +211,68 @@ class ModuleCollector:
         `DATASOURCE` constant. The latter is taken as the ID for this
         datasource.
         """
+
         def _load_datasource(subdirectory):
             """
             Load a single datasource
             """
             # determine module name (path relative to 4CAT root w/ periods)
-            module_name = ".".join(subdirectory.relative_to(Path(config.get("PATH_ROOT"))).parts)
+            module_name = ".".join(
+                subdirectory.relative_to(Path(config.get("PATH_ROOT"))).parts
+            )
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
                 self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
                 return
 
-            if not hasattr(datasource, "init_datasource") or not hasattr(datasource, "DATASOURCE"):
-                self.log_buffer += "Could not load datasource %s: missing init_datasource or DATASOURCE\n" % subdirectory
+            if not hasattr(datasource, "init_datasource") or not hasattr(
+                datasource, "DATASOURCE"
+            ):
+                self.log_buffer += (
+                    "Could not load datasource %s: missing init_datasource or DATASOURCE\n"
+                    % subdirectory
+                )
                 return
 
             datasource_id = datasource.DATASOURCE
 
             self.datasources[datasource_id] = {
-                "expire-datasets": config.get("datasources.expiration", {}).get(datasource_id, None),
+                "expire-datasets": config.get("datasources.expiration", {}).get(
+                    datasource_id, None
+                ),
                 "path": subdirectory,
-                "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
+                "name": datasource.NAME
+                if hasattr(datasource, "NAME")
+                else datasource_id,
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
-                "config": {} if not hasattr(datasource, "config") else datasource.config
+                "config": {}
+                if not hasattr(datasource, "config")
+                else datasource.config,
             }
 
         # Load 4CAT core datasources
-        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
+        for subdirectory in Path(config.get("PATH_ROOT"), "datasources").iterdir():
             if subdirectory.is_dir():
                 _load_datasource(subdirectory)
 
         # Load extension datasources
         # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
-        for root, dirs, files in os.walk(Path(config.get('PATH_ROOT'), "extensions"), followlinks=True):
+        for root, dirs, files in os.walk(
+            Path(config.get("PATH_ROOT"), "extensions"), followlinks=True
+        ):
             if "datasources" in dirs:
                 for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():
                         _load_datasource(subdirectory)
 
-        sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in
-                              sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}
+        sorted_datasources = {
+            datasource_id: self.datasources[datasource_id]
+            for datasource_id in sorted(
+                self.datasources, key=lambda id: self.datasources[id]["name"]
+            )
+        }
         self.datasources = sorted_datasources
 
     def expand_datasources(self):
@@ -242,9 +286,16 @@ class ModuleCollector:
         for datasource_id in self.datasources:
             worker = self.workers.get("%s-search" % datasource_id)
             self.datasources[datasource_id]["has_worker"] = bool(worker)
-            self.datasources[datasource_id]["has_options"] = self.datasources[datasource_id]["has_worker"] and \
-                                                             bool(self.workers["%s-search" % datasource_id].get_options())
-            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
+            self.datasources[datasource_id]["has_options"] = self.datasources[
+                datasource_id
+            ]["has_worker"] and bool(
+                self.workers["%s-search" % datasource_id].get_options()
+            )
+            self.datasources[datasource_id]["importable"] = (
+                worker
+                and hasattr(worker, "is_from_zeeschuimer")
+                and worker.is_from_zeeschuimer
+            )
 
     def load_worker_class(self, worker):
         """

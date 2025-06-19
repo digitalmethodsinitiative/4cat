@@ -17,6 +17,7 @@ the same job as this script (and a lot more, which is why this lightweight
 version also exists, since we don't need that extra code to also run when
 running 4CAT from the command line manually).
 """
+
 import shutil
 import sys
 from pathlib import Path
@@ -27,7 +28,10 @@ if not version_file.exists():
     # this file should ALWAYS exist, because it is part of the repository, and
     # required by other parts of 4CAT. If it's absent, something has gone
     # wrong, and the preferred course of action is restarting from scratch
-    print("VERSION file not found. You should re-install 4CAT before continuing.", file=sys.stderr)
+    print(
+        "VERSION file not found. You should re-install 4CAT before continuing.",
+        file=sys.stderr,
+    )
     exit(1)
 
 current_version_file = version_file.parent.joinpath("config/.current-version")
@@ -40,10 +44,11 @@ shutil.copy(version_file, current_version_file)
 
 # Now check for presence of required NLTK packages
 import nltk  # noqa: E402
+
 nltk_downloads = ("wordnet", "punkt_tab", "omw-1.4")
 for package in nltk_downloads:
     # if it already exists, .download() will just NOP
     try:
         nltk.download(package)
     except FileExistsError:
-        pass 
+        pass

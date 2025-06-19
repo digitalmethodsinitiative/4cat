@@ -1,6 +1,7 @@
 """
 Import scraped Truth Social data
 """
+
 import datetime
 
 from backend.lib.search import Search
@@ -11,6 +12,7 @@ class SearchGab(Search):
     """
     Import scraped truth social data
     """
+
     type = "truthsocial-search"  # job ID
     category = "Search"  # category
     title = "Import scraped Truth Social data"  # title displayed in UI
@@ -28,7 +30,9 @@ class SearchGab(Search):
 
         Not available for Truth Social
         """
-        raise NotImplementedError("Truth Social datasets can only be created by importing data from elsewhere")
+        raise NotImplementedError(
+            "Truth Social datasets can only be created by importing data from elsewhere"
+        )
 
     @staticmethod
     def map_item(post):
@@ -39,7 +43,9 @@ class SearchGab(Search):
         :return dict:  Mapped item
         """
         errors = []
-        post_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        post_time = datetime.datetime.strptime(
+            post["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
+        )
         images = []
         videos = []
         video_thumbs = []
@@ -61,7 +67,7 @@ class SearchGab(Search):
                     errors.append(f"New media type: {mtype}")
 
         group = post.get("group") if post.get("group") else {}
-        
+
         if post.get("quote_id", None):
             thread_id = post.get("quote_id")
         elif post.get("in_reply_to", None):
@@ -74,10 +80,15 @@ class SearchGab(Search):
                     break
         else:
             thread_id = post.get("id")
-        
-        mentions = [mention.get("username") for mention in (post.get("mentions") if post.get("mentions") else [])]
-        hashtags = [tag.get("name") for tag in (post.get("tags") if post.get("tags") else [])]
-    
+
+        mentions = [
+            mention.get("username")
+            for mention in (post.get("mentions") if post.get("mentions") else [])
+        ]
+        hashtags = [
+            tag.get("name") for tag in (post.get("tags") if post.get("tags") else [])
+        ]
+
         mapped_item = {
             "id": post["id"],
             "created_at": post["created_at"],
@@ -85,7 +96,6 @@ class SearchGab(Search):
             "url": post.get("url", None),
             "reblogs_count": post.get("reblogs_count", 0),
             "replies_count": post.get("replies_count", 0),
-
             "account_id": post["account"]["id"],
             "account_username": post["account"]["username"],
             "account_display_name": post["account"]["display_name"],
@@ -93,24 +103,20 @@ class SearchGab(Search):
             "account_verified": post["account"]["verified"],
             "account_followers": post["account"]["followers_count"],
             "account_following": post["account"]["following_count"],
-            
             "mentions": ",".join(mentions),
             "hashtags": ",".join(hashtags),
-
             # media
             "images": ",".join(images),
             "video_thumbs": ",".join(video_thumbs),
             "video_urls": ",".join(videos),
-            
             # group
             "group_id": group.get("id", None),
             "group_display_name": group.get("display_name", None),
             "group_avatar": group.get("avatar", None),
             "group_note": group.get("note", None),
             "group_members_count": group.get("members_count", 0),
-
             "thread_id": thread_id,
-            "timestamp": post_time.strftime("%Y-%m-%d %H:%M:%S")
-        }        
+            "timestamp": post_time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
 
         return MappedItem(mapped_item, message="; ".join(errors))

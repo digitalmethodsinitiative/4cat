@@ -1,6 +1,7 @@
 """
 Download images linked in dataset
 """
+
 import requests
 import urllib3
 import shutil
@@ -235,7 +236,9 @@ class ImageDownloader(BasicProcessor):
                     item_map[item_url] = []
 
                 item_map[item_url].extend(
-                    item.get("ids").split(",") if "ids" in item else [item.get("id", "")]
+                    item.get("ids").split(",")
+                    if "ids" in item
+                    else [item.get("id", "")]
                 )
                 urls.append(item_url)
 

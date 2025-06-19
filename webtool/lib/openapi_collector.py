@@ -18,282 +18,352 @@ Usage:
   specification tree:
       return json.dumps(openapi.generate(api_id))
 """
+
 import inspect
 import json
 import re
 
 from common.config_manager import config
 
+
 class OpenAPICollector:
-	"""
-	Flask-compatible OpenAPI generator
-	"""
-	endpoints = {}
-	apis = set()
-	flask_app = None
-	type_map = {"int": "integer", "str": "string"}  # openapi is picky about type names
+    """
+    Flask-compatible OpenAPI generator
+    """
 
-	def __init__(self, app):
-		"""
-		Store a reference to the used Flask app
+    endpoints = {}
+    apis = set()
+    flask_app = None
+    type_map = {"int": "integer", "str": "string"}  # openapi is picky about type names
 
-		This is used to later inspect the available routes and extract endpoint
-		metadata from them.
+    def __init__(self, app):
+        """
+        Store a reference to the used Flask app
 
-		:param app:  Flask app
-		"""
-		self.flask_app = app
+        This is used to later inspect the available routes and extract endpoint
+        metadata from them.
 
-	def endpoint(self, api_id="all"):
-		"""
-		Factory for OpenAPI mark decorator
-		:param api_id:  Optional, API ID, for subsetting specific APIs
-		:return:  Decorator
-		"""
-		self.apis.add(api_id)
+        :param app:  Flask app
+        """
+        self.flask_app = app
 
-		def openapi_decorator(callback):
-			"""
-			Mark as OpenAPI endpoint
+    def endpoint(self, api_id="all"):
+        """
+        Factory for OpenAPI mark decorator
+        :param api_id:  Optional, API ID, for subsetting specific APIs
+        :return:  Decorator
+        """
+        self.apis.add(api_id)
 
-			Decorator that marks a route as an endpoint that should be documented
-			in the OpenAPI specification.
+        def openapi_decorator(callback):
+            """
+            Mark as OpenAPI endpoint
 
-			:param callback:  Route view function
-			:return:  The same function, but meanwhile the function metadata has
-		          been stored to be integrated in the OpenAPI spec later.
-			"""
-			collapse_whitespace = re.compile(r"\s+")
-			if callback.__doc__:
-				# if there is a docstring, we can get most metadata about the
-				# endpoint from there
+            Decorator that marks a route as an endpoint that should be documented
+            in the OpenAPI specification.
 
-				# extract first paragraph of docstring as endpoint title
-				docstring = inspect.cleandoc(callback.__doc__).strip()
-				elements = re.split(r"(\n\s*\n)", docstring)
-				title = elements[0].strip()
+            :param callback:  Route view function
+            :return:  The same function, but meanwhile the function metadata has
+              been stored to be integrated in the OpenAPI spec later.
+            """
+            collapse_whitespace = re.compile(r"\s+")
+            if callback.__doc__:
+                # if there is a docstring, we can get most metadata about the
+                # endpoint from there
 
-				# split remaining docstring in description and structured metadata
-				docbits = re.split(r"(\n\s*:)", "".join(elements[1:]))
-				description = docbits[0].strip()
-				metadata = "".join(docbits[1:])
+                # extract first paragraph of docstring as endpoint title
+                docstring = inspect.cleandoc(callback.__doc__).strip()
+                elements = re.split(r"(\n\s*\n)", docstring)
+                title = elements[0].strip()
 
-				# extract definitions of http request parameters
-				request_vars = {var[1].split(" ").pop(): {"context": var[0].strip(), "name": var[1].strip(), "description": var[2].strip()} for var
-								in
-								re.findall(r":request-(param|body) ([^:]+):([^:]+)", metadata)}
+                # split remaining docstring in description and structured metadata
+                docbits = re.split(r"(\n\s*:)", "".join(elements[1:]))
+                description = docbits[0].strip()
+                metadata = "".join(docbits[1:])
 
-				request_schemas = {var[0].strip(): self.schema_to_schema(var[1].strip()) for var in
-								   re.findall(r":request-schema ([^:]+):([^:]+)", metadata)}
+                # extract definitions of http request parameters
+                request_vars = {
+                    var[1].split(" ").pop(): {
+                        "context": var[0].strip(),
+                        "name": var[1].strip(),
+                        "description": var[2].strip(),
+                    }
+                    for var in re.findall(
+                        r":request-(param|body) ([^:]+):([^:]+)", metadata
+                    )
+                }
 
-				# clean http request metadata
-				for name in request_vars:
-					var_definition = request_vars[name]["name"].split(" ")
-					request_vars[name]["type"] = var_definition[0] if len(var_definition) > 1 else "string"
-					request_vars[name]["type"] = self.type_map.get(request_vars[name]["type"],
-																   request_vars[name]["type"])
-					request_vars[name]["name"] = var_definition.pop()
-					request_vars[name]["in"] = "query" if request_vars[name]["context"] == "param" else "body"
-					request_vars[name]["description"] = collapse_whitespace.sub(" ", request_vars[name]["description"])
+                request_schemas = {
+                    var[0].strip(): self.schema_to_schema(var[1].strip())
+                    for var in re.findall(r":request-schema ([^:]+):([^:]+)", metadata)
+                }
 
-					# optional parameters are marked by a ? before the parameter name
-					if request_vars[name]["name"][0] == "?":
-						request_vars[name]["required"] = False
-						request_vars[name]["name"] = request_vars[name]["name"][1:].strip()
-					else:
-						request_vars[name]["required"] = True
+                # clean http request metadata
+                for name in request_vars:
+                    var_definition = request_vars[name]["name"].split(" ")
+                    request_vars[name]["type"] = (
+                        var_definition[0] if len(var_definition) > 1 else "string"
+                    )
+                    request_vars[name]["type"] = self.type_map.get(
+                        request_vars[name]["type"], request_vars[name]["type"]
+                    )
+                    request_vars[name]["name"] = var_definition.pop()
+                    request_vars[name]["in"] = (
+                        "query" if request_vars[name]["context"] == "param" else "body"
+                    )
+                    request_vars[name]["description"] = collapse_whitespace.sub(
+                        " ", request_vars[name]["description"]
+                    )
 
-					if name in request_schemas:
-						request_vars[name]["schema"] = request_schemas[name]
+                    # optional parameters are marked by a ? before the parameter name
+                    if request_vars[name]["name"][0] == "?":
+                        request_vars[name]["required"] = False
+                        request_vars[name]["name"] = request_vars[name]["name"][
+                            1:
+                        ].strip()
+                    else:
+                        request_vars[name]["required"] = True
 
-				# extract definitions of function parameters
-				rest_keywords = "param|parameter|arg|argument|key|keyword"
-				vars = {var[1].strip().split(" ").pop(): {"name": var[1].strip(), "description": var[2].strip()} for var
-						in
-						re.findall(r":(" + rest_keywords + ") ([^:]+):([^:]+)", metadata)}
+                    if name in request_schemas:
+                        request_vars[name]["schema"] = request_schemas[name]
 
-				# clean var metadata
-				for name in vars:
-					var_definition = vars[name]["name"].split(" ")
-					vars[name]["type"] = var_definition[0].strip() if len(var_definition) > 1 else "string"
-					vars[name]["type"] = self.type_map.get(vars[name]["type"], vars[name]["type"])
-					vars[name]["name"] = var_definition.pop()
-					vars[name]["description"] = collapse_whitespace.sub(" ", vars[name]["description"])
+                # extract definitions of function parameters
+                rest_keywords = "param|parameter|arg|argument|key|keyword"
+                vars = {
+                    var[1].strip().split(" ").pop(): {
+                        "name": var[1].strip(),
+                        "description": var[2].strip(),
+                    }
+                    for var in re.findall(
+                        r":(" + rest_keywords + ") ([^:]+):([^:]+)", metadata
+                    )
+                }
 
-					if name in request_schemas:
-						vars[name]["schema"] = request_schemas[name]
+                # clean var metadata
+                for name in vars:
+                    var_definition = vars[name]["name"].split(" ")
+                    vars[name]["type"] = (
+                        var_definition[0].strip()
+                        if len(var_definition) > 1
+                        else "string"
+                    )
+                    vars[name]["type"] = self.type_map.get(
+                        vars[name]["type"], vars[name]["type"]
+                    )
+                    vars[name]["name"] = var_definition.pop()
+                    vars[name]["description"] = collapse_whitespace.sub(
+                        " ", vars[name]["description"]
+                    )
 
-				# see if the mime type of the outcome has been defined
-				mime = re.search(r":rmime:([^:]+)", metadata)
-				mime = mime[1].strip() if mime else "application/json"
+                    if name in request_schemas:
+                        vars[name]["schema"] = request_schemas[name]
 
-				# determine error codes
-				error_codes = {str(var[0]): {"description": re.sub(r"[\s]+", " ", var[1].strip())} for var in
-							   re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)}
+                # see if the mime type of the outcome has been defined
+                mime = re.search(r":rmime:([^:]+)", metadata)
+                mime = mime[1].strip() if mime else "application/json"
 
-			else:
-				# if there is no docstring (shame!) assume defaults
-				docstring = ""
-				vars = request_vars = {}
-				title = description = ""
-				mime = "application/json"
-				error_codes = {}
+                # determine error codes
+                error_codes = {
+                    str(var[0]): {"description": re.sub(r"[\s]+", " ", var[1].strip())}
+                    for var in re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)
+                }
 
-			# Use return description as endpoint data summary
-			result = re.search(r":(return|returns)[^:]*:([^:]+)", docstring)
-			if result and result[2].strip():
-				result = collapse_whitespace.sub(" ", result[2].strip())
-			else:
-				# captain obvious to the rescue
-				result = "Query result"
+            else:
+                # if there is no docstring (shame!) assume defaults
+                docstring = ""
+                vars = request_vars = {}
+                title = description = ""
+                mime = "application/json"
+                error_codes = {}
 
-			# There may be a schema for the return value
-			result_schema = re.search(r":return-schema:([^:]+)", docstring)
-			if result_schema and result_schema[1].strip():
-				result_schema = self.schema_to_schema(result_schema[1].strip())
-			else:
-				result_schema = None
+            # Use return description as endpoint data summary
+            result = re.search(r":(return|returns)[^:]*:([^:]+)", docstring)
+            if result and result[2].strip():
+                result = collapse_whitespace.sub(" ", result[2].strip())
+            else:
+                # captain obvious to the rescue
+                result = "Query result"
 
-			# store endpoint metadata for later use
-			self.endpoints[api_id + "." + callback.__name__] = {
-				"method": "get",
-				"title": title,
-				"description": collapse_whitespace.sub(" ", description),
-				"mime": mime,
-				"return": result,
-				"return-error": error_codes,
-				"return-schema": result_schema,
-				"vars": vars,
-				"request-vars": request_vars,
-				"api_id": api_id
-			}
+            # There may be a schema for the return value
+            result_schema = re.search(r":return-schema:([^:]+)", docstring)
+            if result_schema and result_schema[1].strip():
+                result_schema = self.schema_to_schema(result_schema[1].strip())
+            else:
+                result_schema = None
 
-			# return the original function, unchanged
-			return callback
+            # store endpoint metadata for later use
+            self.endpoints[api_id + "." + callback.__name__] = {
+                "method": "get",
+                "title": title,
+                "description": collapse_whitespace.sub(" ", description),
+                "mime": mime,
+                "return": result,
+                "return-error": error_codes,
+                "return-schema": result_schema,
+                "vars": vars,
+                "request-vars": request_vars,
+                "api_id": api_id,
+            }
 
-		return openapi_decorator
+            # return the original function, unchanged
+            return callback
 
-	def generate(self, api_id="all"):
-		"""
-		Generate OpenAPI API specification
+        return openapi_decorator
 
-		Loops through all Flask endpoints that are registered and for all of
-		those that are marked as being an endpoint, adds them to the OpenAPI
-		output, which is then written to a file.
+    def generate(self, api_id="all"):
+        """
+        Generate OpenAPI API specification
 
-		This method should be called once Flask has finished initialisation; a
-		good way to do this is calling it via the `before_first_request`
-		decorator.
+        Loops through all Flask endpoints that are registered and for all of
+        those that are marked as being an endpoint, adds them to the OpenAPI
+        output, which is then written to a file.
 
-		The OpenAPI description and definition of the decorated functions is
-		built from their docstring. The parser assumes a reST-formatted
-		docstring.
+        This method should be called once Flask has finished initialisation; a
+        good way to do this is calling it via the `before_first_request`
+        decorator.
 
-		:return dict: The OpenAPI-formatted specification, as a dictionary
-		              that can be (f.ex.) dumped as JSON for a usable spec.
-		"""
+        The OpenAPI description and definition of the decorated functions is
+        built from their docstring. The parser assumes a reST-formatted
+        docstring.
 
-		spec = {
-			"swagger": "2.0",
-			"host": config.get("flask.server_name"),
-			"info": {
-				"title": config.get("4cat.name_long") + " RESTful API",
-				"description": "This API allows interfacing with the " + config.get("4cat.name") + " Capture and Analysis"
-							   "Toolkit, offering endpoints through which one may query our corpora via "
-							   "keyword-based search, and run further analysis on the results.",
-				"version": "1.0.0",
-				"contact": {
-					"email": config.get("mail.admin_email", "")
-				}
-			},
-			"paths": {
-			}
-		}
+        :return dict: The OpenAPI-formatted specification, as a dictionary
+                      that can be (f.ex.) dumped as JSON for a usable spec.
+        """
 
-		var_regex = re.compile(r"<([^>]+)>")
+        spec = {
+            "swagger": "2.0",
+            "host": config.get("flask.server_name"),
+            "info": {
+                "title": config.get("4cat.name_long") + " RESTful API",
+                "description": "This API allows interfacing with the "
+                + config.get("4cat.name")
+                + " Capture and Analysis"
+                "Toolkit, offering endpoints through which one may query our corpora via "
+                "keyword-based search, and run further analysis on the results.",
+                "version": "1.0.0",
+                "contact": {"email": config.get("mail.admin_email", "")},
+            },
+            "paths": {},
+        }
 
-		# loop through available routes in Flask app
-		for rule in self.flask_app.url_map.iter_rules():
-			# check if this route is marked as an API endpoint
-			endpoint = rule.endpoint
-			rule_func = self.flask_app.view_functions[endpoint].__name__
-			endpoint_id = api_id + "." + rule_func
-			if endpoint_id not in self.endpoints:
-				continue
+        var_regex = re.compile(r"<([^>]+)>")
 
-			if not api_id or api_id == "all" or self.endpoints[endpoint_id]["api_id"] == api_id:
-				pointspec = self.endpoints[endpoint_id]
-			else:
-				print(self.endpoints[endpoint_id])
-				continue
+        # loop through available routes in Flask app
+        for rule in self.flask_app.url_map.iter_rules():
+            # check if this route is marked as an API endpoint
+            endpoint = rule.endpoint
+            rule_func = self.flask_app.view_functions[endpoint].__name__
+            endpoint_id = api_id + "." + rule_func
+            if endpoint_id not in self.endpoints:
+                continue
 
-			# find parameters in endpoint path
-			vars = {}
-			for var in var_regex.findall(rule.rule):
-				var = var.split(":")
-				if len(var) == 1:
-					# by default, take docstring typehint or assume string
-					if var[0] in pointspec["vars"]:
-						vars[var[0]] = pointspec["vars"][var[0]]["type"]
-					vars[var[0]] = "string"
-				else:
-					# if given, take type from path (overrides docstring)
-					vars[var[1]] = self.type_map.get(var[0], var[0])
+            if (
+                not api_id
+                or api_id == "all"
+                or self.endpoints[endpoint_id]["api_id"] == api_id
+            ):
+                pointspec = self.endpoints[endpoint_id]
+            else:
+                print(self.endpoints[endpoint_id])
+                continue
 
-			# OpenAPI spec mandates { instead of < but otherwise identical to WZ routes
-			path = re.sub(r"<[^:>]+:([^>]+)>", r"<\1>", rule.rule).replace("<", "{").replace(">", "}")
-			pointspec = self.endpoints[endpoint_id]
+            # find parameters in endpoint path
+            vars = {}
+            for var in var_regex.findall(rule.rule):
+                var = var.split(":")
+                if len(var) == 1:
+                    # by default, take docstring typehint or assume string
+                    if var[0] in pointspec["vars"]:
+                        vars[var[0]] = pointspec["vars"][var[0]]["type"]
+                    vars[var[0]] = "string"
+                else:
+                    # if given, take type from path (overrides docstring)
+                    vars[var[1]] = self.type_map.get(var[0], var[0])
 
-			# add paths to spec
-			spec["paths"][path] = {
-				method.lower(): {
-					"operationId": rule_func + ("-" + method.lower() if len(rule.methods) > 1 else ""),  # use function name as endpoint ID
-					"description": pointspec["title"],
-					"summary": pointspec["description"],
-					"produces": [
-						pointspec["mime"]
-					],
-					# we cannot cope with other response codes, unfortunately
-					"responses": {
-						"200": {**{
-							"description": pointspec["return"]
-						}, **({"schema": pointspec["return-schema"]} if pointspec.get("return-schema", None) else {})},
-						"429": {
-							"description": "If your request has been rate-limited."
-						},
-						**pointspec["return-error"]
-					},
-					# combine path parameters and any request parameters found in docstring
-					"parameters": [{
-						"name": var,
-						"in": "path",
-						"required": True,
-						"description": pointspec["vars"][var]["description"] if var in pointspec["vars"] else var,
-						"type": vars[var]
-					} for var in vars] + [({**{
-						"name": request_var["name"],
-						"in": request_var.get("in", "request"),
-						"required": request_var["required"],
-						"description": request_var["description"]
-					}, **({"schema": request_var["schema"]} if "schema" in request_var else {"type": request_var["type"]})}) for
-										  request_var in pointspec["request-vars"].values()]
-				} for method in rule.methods if method in ("GET", "POST", "PUT", "DELETE")}  # RESTful methods only
+            # OpenAPI spec mandates { instead of < but otherwise identical to WZ routes
+            path = (
+                re.sub(r"<[^:>]+:([^>]+)>", r"<\1>", rule.rule)
+                .replace("<", "{")
+                .replace(">", "}")
+            )
+            pointspec = self.endpoints[endpoint_id]
 
-		# return a dictionary that can (should) be json'ed or yaml'ed
-		return spec
+            # add paths to spec
+            spec["paths"][path] = {
+                method.lower(): {
+                    "operationId": rule_func
+                    + (
+                        "-" + method.lower() if len(rule.methods) > 1 else ""
+                    ),  # use function name as endpoint ID
+                    "description": pointspec["title"],
+                    "summary": pointspec["description"],
+                    "produces": [pointspec["mime"]],
+                    # we cannot cope with other response codes, unfortunately
+                    "responses": {
+                        "200": {
+                            **{"description": pointspec["return"]},
+                            **(
+                                {"schema": pointspec["return-schema"]}
+                                if pointspec.get("return-schema", None)
+                                else {}
+                            ),
+                        },
+                        "429": {
+                            "description": "If your request has been rate-limited."
+                        },
+                        **pointspec["return-error"],
+                    },
+                    # combine path parameters and any request parameters found in docstring
+                    "parameters": [
+                        {
+                            "name": var,
+                            "in": "path",
+                            "required": True,
+                            "description": pointspec["vars"][var]["description"]
+                            if var in pointspec["vars"]
+                            else var,
+                            "type": vars[var],
+                        }
+                        for var in vars
+                    ]
+                    + [
+                        (
+                            {
+                                **{
+                                    "name": request_var["name"],
+                                    "in": request_var.get("in", "request"),
+                                    "required": request_var["required"],
+                                    "description": request_var["description"],
+                                },
+                                **(
+                                    {"schema": request_var["schema"]}
+                                    if "schema" in request_var
+                                    else {"type": request_var["type"]}
+                                ),
+                            }
+                        )
+                        for request_var in pointspec["request-vars"].values()
+                    ],
+                }
+                for method in rule.methods
+                if method in ("GET", "POST", "PUT", "DELETE")
+            }  # RESTful methods only
 
-	def schema_to_schema(self, schema):
-		"""
-		Convert the schema definition in method comments to OpenAPI format
+        # return a dictionary that can (should) be json'ed or yaml'ed
+        return spec
 
-		:param str schema:  Schema definition
-		:return list: Definition, formatted
-		"""
+    def schema_to_schema(self, schema):
+        """
+        Convert the schema definition in method comments to OpenAPI format
 
-		quote = re.compile(r"([a-zA-Z0-9_]+)")
+        :param str schema:  Schema definition
+        :return list: Definition, formatted
+        """
 
-		try:
-			schema = json.loads(quote.sub('"\\1"', schema.strip().replace("=", ":")))
-			return schema
-		except json.JSONDecodeError:
-			return {"type": schema}
+        quote = re.compile(r"([a-zA-Z0-9_]+)")
+
+        try:
+            schema = json.loads(quote.sub('"\\1"', schema.strip().replace("=", ":")))
+            return schema
+        except json.JSONDecodeError:
+            return {"type": schema}

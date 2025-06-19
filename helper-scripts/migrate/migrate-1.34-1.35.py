@@ -12,26 +12,40 @@ from common.lib.logger import Logger
 log = Logger(output=True)
 
 import configparser  # noqa: E402
+
 ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
 db_config = ini["DATABASE"]
 
-db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
-              host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
+db = Database(
+    logger=log,
+    dbname=db_config["db_name"],
+    user=db_config["db_user"],
+    password=db_config["db_password"],
+    host=db_config["db_host"],
+    port=db_config["db_port"],
+    appname="4cat-migrate",
+)
 
 # Hot fix for missing database initialization column in 1.34
 creator_column_check = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'creator'")
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'creator'"
+)
 if creator_column_check["num"] == 0:
     print("  Adding missing 'creator' column to 'datasets' table...")
     db.execute("ALTER TABLE datasets ADD COLUMN creator VARCHAR DEFAULT 'anonymous'")
     db.commit()
 
 print("  Adding default privileges for the 'admin' tag...")
-privileges = ("privileges.admin.can_manipulate_all_datasets", "privileges.admin.can_manage_notifications")
+privileges = (
+    "privileges.admin.can_manipulate_all_datasets",
+    "privileges.admin.can_manage_notifications",
+)
 for privilege in privileges:
     print(f"  ...{privilege}")
-    db.insert("settings", data={"name": privilege, "value": "true", "tag": "admin"}, safe=True)
+    db.insert(
+        "settings", data={"name": privilege, "value": "true", "tag": "admin"}, safe=True
+    )
 
 # expiration was a mistake
 # or at least the initial implementation was
@@ -50,7 +64,11 @@ if datasets:
         parameters = json.loads(dataset["parameters"])
         if "expires-after" in parameters:
             del parameters["expires-after"]
-            db.update("datasets", where={"key": dataset["key"]}, data={"parameters": json.dumps(parameters)})
+            db.update(
+                "datasets",
+                where={"key": dataset["key"]},
+                data={"parameters": json.dumps(parameters)},
+            )
 
 expires = db.fetchone("SELECT * FROM settings WHERE name = 'expires.timeout'")
 if expires:
@@ -85,19 +103,31 @@ if any([warning_expires, warning_datasets]):
 
     # reset timeouts for all current expiration settings, for all tags
     db.delete("settings", where={"name": "datasources.expiration"})
-    datasources = db.fetchall("SELECT * FROM settings WHERE name = 'datasources.enabled'")
+    datasources = db.fetchall(
+        "SELECT * FROM settings WHERE name = 'datasources.enabled'"
+    )
     for setting in datasources:
         db.delete("settings", where=setting)
         try:
             # reset timeouts
             enabled = json.loads(setting["value"])
-            db.insert("settings", data={"name": "datasources.expiration", "value": json.dumps({
-                datasource: {
-                    "enabled": True,
-                    "timeout": 0,
-                    "allow_optout": False
-                } for datasource in enabled
-            }), "tag": setting["tag"]})
+            db.insert(
+                "settings",
+                data={
+                    "name": "datasources.expiration",
+                    "value": json.dumps(
+                        {
+                            datasource: {
+                                "enabled": True,
+                                "timeout": 0,
+                                "allow_optout": False,
+                            }
+                            for datasource in enabled
+                        }
+                    ),
+                    "tag": setting["tag"],
+                },
+            )
         except json.JSONDecodeError:
             # invalid setting, deleting is enough
             pass

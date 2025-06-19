@@ -12,15 +12,23 @@ from common.lib.logger import Logger
 log = Logger(output=True)
 from common.config_manager import config  # noqa: E402
 
-db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'),
-              host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
+db = Database(
+    logger=log,
+    dbname=config.get("DB_NAME"),
+    user=config.get("DB_USER"),
+    password=config.get("DB_PASSWORD"),
+    host=config.get("DB_HOST"),
+    port=config.get("DB_PORT"),
+    appname="4cat-migrate",
+)
 
 # -----------------------------------------------
 #  Add tag colums to keep track of per-tag config
 # -----------------------------------------------
 print("  Checking if users table has a column 'tags'...")
 has_column = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'tags'")
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'tags'"
+)
 if has_column["num"] == 0:
     print("  ...No, adding.")
     db.execute("ALTER TABLE users ADD COLUMN tags JSONB DEFAULT '[]'")
@@ -30,7 +38,8 @@ else:
 
 print("  Checking if users table has a column 'timestamp_created'...")
 has_column = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'timestamp_created'")
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'timestamp_created'"
+)
 if has_column["num"] == 0:
     print("  ...No, adding.")
     db.execute("ALTER TABLE users ADD COLUMN timestamp_created INTEGER DEFAULT 0")
@@ -40,7 +49,8 @@ else:
 
 print("  Checking if settings table has a column 'tag'...")
 has_column = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'settings' AND column_name = 'tag'")
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'settings' AND column_name = 'tag'"
+)
 if has_column["num"] == 0:
     print("  ...No, adding.")
     db.execute("ALTER TABLE settings ADD COLUMN tag TEXT DEFAULT ''")
@@ -49,7 +59,9 @@ else:
     print("  ...Yes, nothing to update.")
 
 print("  Ensuring uniqueness of settings...")
-index_name = db.fetchone("SELECT constraint_name FROM information_schema.table_constraints WHERE table_schema = 'public' AND table_name = 'settings' AND constraint_type = 'PRIMARY KEY'")
+index_name = db.fetchone(
+    "SELECT constraint_name FROM information_schema.table_constraints WHERE table_schema = 'public' AND table_name = 'settings' AND constraint_type = 'PRIMARY KEY'"
+)
 if index_name:
     db.execute(f"ALTER TABLE settings DROP CONSTRAINT {index_name['constraint_name']}")
 
@@ -60,7 +72,8 @@ db.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_setting ON settings (name, 
 # ---------------------------------------------
 print("  Checking if users table has a column 'is_admin'...")
 has_column = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_admin'")
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_admin'"
+)
 if has_column["num"] != 0:
     print("  ...yes, giving all admins the 'admin' user tag...")
     for admin in db.fetchall("SELECT * FROM users WHERE is_admin = True"):
@@ -73,7 +86,9 @@ if has_column["num"] != 0:
             tags.insert(0, "admin")
 
         print(f"  ...admin user {admin['name']}")
-        db.update("users", where={"name": admin["name"]}, data={"tags": json.dumps(tags)})
+        db.update(
+            "users", where={"name": admin["name"]}, data={"tags": json.dumps(tags)}
+        )
 
     print("  Dropping 'is_admin' column from users table...")
     try:
@@ -104,7 +119,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS dataset_owners_user_key_idx ON datasets_owners
 # ---------------------------------------------
 print("  Checking if datasets table has a column 'owner'...")
 has_column = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'owner'")
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'owner'"
+)
 if has_column["num"] != 0:
     print("  ...column exists")
     print("  Migrating dataset ownership to datasets_owners table...")
@@ -123,8 +139,15 @@ else:
 #       Ensure admin tag already exists
 # ---------------------------------------------
 print("  Creating privilege settings for 'admin' user tag")
-admin_keys = ("can_view_status", "can_manage_users", "can_manage_settings", "can_manage_datasources",
-              "can_manage_notification", "can_manage_tags", "can_restart")
+admin_keys = (
+    "can_view_status",
+    "can_manage_users",
+    "can_manage_settings",
+    "can_manage_datasources",
+    "can_manage_notification",
+    "can_manage_tags",
+    "can_restart",
+)
 for admin_key in admin_keys:
     print(f"  - privileges.admin.{admin_key} = True")
     config.set(f"privileges.admin.{admin_key}", True, tag="admin")
@@ -167,7 +190,7 @@ changes = {
     "tcat-auto-upload.TCAT_USERNAME": "tcat-auto-upload.username",
     "tcat-auto-upload.TCAT_PASSWORD": "tcat-auto-upload.password",
     "4cat.datasources": "datasources.enabled",
-    "expire.datasources": "datasources.expiration"
+    "expire.datasources": "datasources.expiration",
 }
 for from_name, to_name in changes.items():
     db.execute("UPDATE settings SET name = %s WHERE name = %s", (to_name, from_name))
@@ -179,16 +202,23 @@ for from_name, to_name in changes.items():
 changes = {
     "reddit.can_query_without_keyword": "reddit-search.can_query_without_keyword",
     "4chan.can_query_without_keyword": "fourchan-search.can_query_without_keyword",
-    "telegram.can_query_all_messages": "telegram-search.can_query_all_messages"
+    "telegram.can_query_all_messages": "telegram-search.can_query_all_messages",
 }
 for from_name, to_name in changes.items():
     print(f"  - {from_name} -> {to_name}")
-    users = db.fetchall(f"SELECT * FROM users WHERE userdata::json->>'{from_name}' IS NOT NULL")
+    users = db.fetchall(
+        f"SELECT * FROM users WHERE userdata::json->>'{from_name}' IS NOT NULL"
+    )
     for user in users:
         userdata = json.loads(user["userdata"])
         config.set(to_name, userdata[from_name], tag=f"user:{user['name']}")
         del userdata[from_name]
-        db.update("users", where={"name": user["name"]}, data={"userdata": json.dumps(userdata)}, commit=False)
+        db.update(
+            "users",
+            where={"name": user["name"]},
+            data={"userdata": json.dumps(userdata)},
+            commit=False,
+        )
 
 # ---------------------------------------------
 # New dataset identifiers - these were changed
@@ -202,14 +232,20 @@ changes = {
 }
 for from_name, to_name in changes.items():
     print("  ...updating jobs")
-    db.execute(f"UPDATE jobs SET jobtype = REPLACE(jobtype, '{from_name}', '{to_name}') WHERE jobtype LIKE '{from_name}-%'")
+    db.execute(
+        f"UPDATE jobs SET jobtype = REPLACE(jobtype, '{from_name}', '{to_name}') WHERE jobtype LIKE '{from_name}-%'"
+    )
 
     print("  ...updating dataset types")
-    db.execute(f"UPDATE datasets SET type = REPLACE(type, '{from_name}', '{to_name}') WHERE type LIKE '{from_name}-%'")
+    db.execute(
+        f"UPDATE datasets SET type = REPLACE(type, '{from_name}', '{to_name}') WHERE type LIKE '{from_name}-%'"
+    )
 
     # ugh
     print("  ...updating dataset parameters")
-    for dataset in db.fetchall(f"SELECT * FROM datasets WHERE parameters::json->>'datasource' = '{from_name}' OR parameters::json->>'type' LIKE '{from_name}-%'"):
+    for dataset in db.fetchall(
+        f"SELECT * FROM datasets WHERE parameters::json->>'datasource' = '{from_name}' OR parameters::json->>'type' LIKE '{from_name}-%'"
+    ):
         parameters = json.loads(dataset["parameters"])
         if "datasource" in parameters:
             parameters["datasource"] = to_name
@@ -217,7 +253,12 @@ for from_name, to_name in changes.items():
         if parameters.get("type", "").startswith(from_name + "-"):
             parameters["type"] = parameters["type"].replace(from_name, to_name)
 
-        db.update("datasets", where={"key": dataset["key"]}, data={"parameters": json.dumps(parameters)}, commit=False)
+        db.update(
+            "datasets",
+            where={"key": dataset["key"]},
+            data={"parameters": json.dumps(parameters)},
+            commit=False,
+        )
 
 db.commit()
 print("  Done!")

@@ -1,6 +1,7 @@
 """
 DMI Service Manager
 """
+
 import datetime
 import os
 import json
@@ -24,12 +25,15 @@ class DmiServiceManagerException(Exception):
     """
     Raised when there is a problem with the configuration settings.
     """
+
     pass
+
 
 class DsmOutOfMemory(DmiServiceManagerException):
     """
     Raised when there is a problem with the configuration settings.
     """
+
     pass
 
 
@@ -37,7 +41,9 @@ class DsmConnectionError(DmiServiceManagerException):
     """
     Raised when there is a problem with the configuration settings.
     """
+
     pass
+
 
 class DmiServiceManager:
     """
@@ -46,12 +52,17 @@ class DmiServiceManager:
     Found here:
     https://github.com/digitalmethodsinitiative/dmi_service_manager
     """
+
     def __init__(self, processor):
-        """
-        """
+        """ """
         self.processor = processor
-        self.local_or_remote = processor.config.get("dmi-service-manager.ac_local_or_remote")
-        self.server_address = processor.config.get("dmi-service-manager.ab_server_address").rstrip("/") + "/api/"
+        self.local_or_remote = processor.config.get(
+            "dmi-service-manager.ac_local_or_remote"
+        )
+        self.server_address = (
+            processor.config.get("dmi-service-manager.ab_server_address").rstrip("/")
+            + "/api/"
+        )
 
         self.processed_files = 0
 
@@ -76,12 +87,19 @@ class DmiServiceManager:
             raise DsmOutOfMemory("DMI Service Manager server out of GPU memory.")
         else:
             try:
-                reason = resp.json()['reason']
+                reason = resp.json()["reason"]
             except JSONDecodeError:
                 reason = strip_tags(resp.text)
             raise DsmConnectionError(f"Connection Error {resp.status_code}: {reason}")
 
-    def process_files(self, input_file_dir, filenames, output_file_dir, server_file_collection_name, server_results_folder_name):
+    def process_files(
+        self,
+        input_file_dir,
+        filenames,
+        output_file_dir,
+        server_file_collection_name,
+        server_results_folder_name,
+    ):
         """
         Process files according to DMI Service Manager local or remote settings
         """
@@ -91,18 +109,28 @@ class DmiServiceManager:
         if self.local_or_remote == "local":
             # Relative to PATH_DATA which should be where Docker mounts the container volume
             # TODO: path is just the staging_area name, but what if we move staging areas? DMI Service manager needs to know...
-            path_to_files = input_file_dir.absolute().relative_to(self.processor.config.get("PATH_DATA").absolute())
-            path_to_results = output_file_dir.absolute().relative_to(self.processor.config.get("PATH_DATA").absolute())
+            path_to_files = input_file_dir.absolute().relative_to(
+                self.processor.config.get("PATH_DATA").absolute()
+            )
+            path_to_results = output_file_dir.absolute().relative_to(
+                self.processor.config.get("PATH_DATA").absolute()
+            )
 
         elif self.local_or_remote == "remote":
-
             # Upload files
             self.server_file_collection_name = server_file_collection_name
             self.server_results_folder_name = server_results_folder_name
-            path_to_files, path_to_results = self.send_files(server_file_collection_name, server_results_folder_name, filenames, input_file_dir)
+            path_to_files, path_to_results = self.send_files(
+                server_file_collection_name,
+                server_results_folder_name,
+                filenames,
+                input_file_dir,
+            )
 
         else:
-            raise DmiServiceManagerException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+            raise DmiServiceManagerException(
+                "dmi_service_manager.local_or_remote setting must be 'local' or 'remote'"
+            )
 
         self.path_to_files = path_to_files
         self.path_to_results = path_to_results
@@ -110,27 +138,43 @@ class DmiServiceManager:
 
     def check_progress(self):
         if self.local_or_remote == "local":
-            current_completed = self.count_local_files(self.processor.config.get("PATH_DATA").joinpath(self.path_to_results))
+            current_completed = self.count_local_files(
+                self.processor.config.get("PATH_DATA").joinpath(self.path_to_results)
+            )
         elif self.local_or_remote == "remote":
             existing_files = self.request_folder_files(self.server_file_collection_name)
-            current_completed = len(existing_files.get(self.server_results_folder_name, []))
+            current_completed = len(
+                existing_files.get(self.server_results_folder_name, [])
+            )
         else:
-            raise DmiServiceManagerException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+            raise DmiServiceManagerException(
+                "dmi_service_manager.local_or_remote setting must be 'local' or 'remote'"
+            )
 
         if current_completed != self.processed_files:
             self.processor.dataset.update_status(
-                f"Processed {current_completed} of {self.num_files_to_process} files")
-            self.processor.dataset.update_progress(current_completed / self.num_files_to_process)
+                f"Processed {current_completed} of {self.num_files_to_process} files"
+            )
+            self.processor.dataset.update_progress(
+                current_completed / self.num_files_to_process
+            )
             self.processed_files = current_completed
 
     def check_service_exists(self):
-        """"
+        """ "
         Check for services created with the current dataset key.
 
         Returns None, if none found else the related service jobs and their details
         """
         # Check to see if service already created
-        resp = requests.get(self.server_address + "jobs/details_query/", json={"details_key": "$.request_json.4CAT_dataset_key", "details_value": self.processor.dataset.key}, timeout=30)
+        resp = requests.get(
+            self.server_address + "jobs/details_query/",
+            json={
+                "details_key": "$.request_json.4CAT_dataset_key",
+                "details_value": self.processor.dataset.key,
+            },
+            timeout=30,
+        )
         if resp.status_code == 200:
             # Check if service is already running
             if len(resp.json()["jobs"]) > 0:
@@ -138,7 +182,9 @@ class DmiServiceManager:
             else:
                 return None
 
-    def send_request_and_wait_for_results(self, service_endpoint, data, wait_period=60, check_process=True, callback=None):
+    def send_request_and_wait_for_results(
+        self, service_endpoint, data, wait_period=60, check_process=True, callback=None
+    ):
         """
         Send request and wait for results to be ready.
 
@@ -150,24 +196,34 @@ class DmiServiceManager:
         elif self.local_or_remote == "remote":
             service_endpoint += "_remote"
         else:
-            raise DmiServiceManagerException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+            raise DmiServiceManagerException(
+                "dmi_service_manager.local_or_remote setting must be 'local' or 'remote'"
+            )
 
         existing_service = self.check_service_exists()
         if existing_service:
             if len(existing_service) > 1:
-                raise DmiServiceManagerException("Multiple services found with the same dataset key.")
+                raise DmiServiceManagerException(
+                    "Multiple services found with the same dataset key."
+                )
             else:
                 existing_service = existing_service[0]
-                if existing_service['status'] == 'complete':
+                if existing_service["status"] == "complete":
                     # Service already completed
                     return True
-                elif existing_service['status'] == 'error':
-                    results = json.loads(existing_service['results'])
-                    raise DmiServiceManagerException(f"DMI Service Manager Error: {results['error']}")
+                elif existing_service["status"] == "error":
+                    results = json.loads(existing_service["results"])
+                    raise DmiServiceManagerException(
+                        f"DMI Service Manager Error: {results['error']}"
+                    )
                 else:
                     # Service already running
-                    results_url = self.server_address + f"jobs/{existing_service.get('id')}"
-                    self.processor.dataset.update_status(f"Waiting for results from {service_endpoint}...")
+                    results_url = (
+                        self.server_address + f"jobs/{existing_service.get('id')}"
+                    )
+                    self.processor.dataset.update_status(
+                        f"Waiting for results from {service_endpoint}..."
+                    )
         else:
             # Create a new service
             # Append dataset key to data
@@ -175,29 +231,47 @@ class DmiServiceManager:
             api_endpoint = self.server_address + service_endpoint
             try:
                 resp = requests.post(api_endpoint, json=data, timeout=30)
-            except requests.exceptions.ConnectionError as e :
-                raise DsmConnectionError(f"Unable to connect to DMI Service Manager server: {str(e)}")
+            except requests.exceptions.ConnectionError as e:
+                raise DsmConnectionError(
+                    f"Unable to connect to DMI Service Manager server: {str(e)}"
+                )
 
             if resp.status_code == 202:
                 # New request successful
-                results_url = resp.json()['result_url']
+                results_url = resp.json()["result_url"]
             else:
                 try:
                     resp_json = resp.json()
-                    if resp.status_code == 400 and 'key' in resp_json and 'error' in resp_json and resp_json['error'] == f"future_key {resp_json['key']} already exists":
+                    if (
+                        resp.status_code == 400
+                        and "key" in resp_json
+                        and "error" in resp_json
+                        and resp_json["error"]
+                        == f"future_key {resp_json['key']} already exists"
+                    ):
                         # Request already exists; get DMI SM database key
-                        raise DmiServiceManagerException("Request already exists; check that DMI SM is up to date")
+                        raise DmiServiceManagerException(
+                            "Request already exists; check that DMI SM is up to date"
+                        )
                     elif resp.status_code == 404:
                         # Could be local vs remote not set correctly
-                        raise DsmConnectionError(f"404: {resp.url} not found; DMI Service Manager may not be set up for this service")
+                        raise DsmConnectionError(
+                            f"404: {resp.url} not found; DMI Service Manager may not be set up for this service"
+                        )
                     else:
-                        raise DmiServiceManagerException(f"DMI Service Manager error: {str(resp.status_code)}: {str(resp_json)}")
+                        raise DmiServiceManagerException(
+                            f"DMI Service Manager error: {str(resp.status_code)}: {str(resp_json)}"
+                        )
                 except JSONDecodeError:
                     # Unexpected Error
-                    raise DmiServiceManagerException(f"DMI Service Manager error: {str(resp.status_code)}: {str(resp.text)}")
+                    raise DmiServiceManagerException(
+                        f"DMI Service Manager error: {str(resp.status_code)}: {str(resp.text)}"
+                    )
 
             # Wait for results to be ready
-            self.processor.dataset.update_status(f"Generating results for {service_endpoint}...")
+            self.processor.dataset.update_status(
+                f"Generating results for {service_endpoint}..."
+            )
 
         check_time = 0
         success = False
@@ -206,7 +280,10 @@ class DmiServiceManager:
         while True:
             # If interrupted is called, attempt to finish dataset while server still running
             if self.processor.interrupted:
-                self.processor.dataset.update_status(f"4CAT interrupted; Processing successful {service_endpoint} results...", is_final=True)
+                self.processor.dataset.update_status(
+                    f"4CAT interrupted; Processing successful {service_endpoint} results...",
+                    is_final=True,
+                )
                 break
 
             # Send request to check status every wait_period seconds
@@ -221,59 +298,79 @@ class DmiServiceManager:
                     # Have seen the Service Manager fail particularly when another processor is uploading many consecutive files
                     connection_error += 1
                     if connection_error > 3:
-                        raise DsmConnectionError(f"Unable to connect to DMI Service Manager server: {str(e)}")
+                        raise DsmConnectionError(
+                            f"Unable to connect to DMI Service Manager server: {str(e)}"
+                        )
                     continue
 
-                if result.status_code != 200 or (result.json and result.json().get('status') != "success"):
+                if result.status_code != 200 or (
+                    result.json and result.json().get("status") != "success"
+                ):
                     # Unexpected response from DMI SM
                     connection_error += 1
                     if connection_error > 3:
-                        raise DsmConnectionError(f"Unable to connect to DMI Service Manager server: {str(result.status_code)}: {str(result.json()) if 'json' in result.headers.get('Content-Type', '') else str(result.text)}")
+                        raise DsmConnectionError(
+                            f"Unable to connect to DMI Service Manager server: {str(result.status_code)}: {str(result.json()) if 'json' in result.headers.get('Content-Type', '') else str(result.text)}"
+                        )
                     continue
                 service_status = result.json()["job"]
 
                 # Update progress
                 if check_process:
                     # Check for message
-                    status_message = service_status.get('message', '')
-                    current_completed = service_status.get('processed_records', False)
+                    status_message = service_status.get("message", "")
+                    current_completed = service_status.get("processed_records", False)
                     if status_message:
                         # Update status message if changed
                         if last_status != status_message:
-                            last_status = service_status.get('message', '')
+                            last_status = service_status.get("message", "")
                             self.processor.dataset.update_status(last_status)
-                        if current_completed and self.processed_files != int(current_completed):
-                            self.processor.dataset.update_progress(int(current_completed) / self.num_files_to_process)
+                        if current_completed and self.processed_files != int(
+                            current_completed
+                        ):
+                            self.processor.dataset.update_progress(
+                                int(current_completed) / self.num_files_to_process
+                            )
                             self.processed_files = int(current_completed)
                     else:
                         # This service does not provide status message; check progress via file count
                         self.check_progress()
 
-                if service_status['status'] in ["created", "running", "pending"]:
+                if service_status["status"] in ["created", "running", "pending"]:
                     # Still running
                     continue
-                elif service_status['status'] in ["complete", "error"]:
-                    results = json.loads(service_status['results'])
+                elif service_status["status"] in ["complete", "error"]:
+                    results = json.loads(service_status["results"])
                     if not results:
                         # This should not be the case if the service was written well (unless the DMI SM crashed?)
-                        #TODO test if timing issue?
+                        # TODO test if timing issue?
                         connection_error += 1
                         if connection_error > 3:
-                            raise DmiServiceManagerException(f"Unable to read DMI SM results: {service_status}")
-                    if int(results['returncode']) == 0:
+                            raise DmiServiceManagerException(
+                                f"Unable to read DMI SM results: {service_status}"
+                            )
+                    if int(results["returncode"]) == 0:
                         # Complete without error
-                        self.processor.dataset.update_status(f"Completed {service_endpoint}!")
+                        self.processor.dataset.update_status(
+                            f"Completed {service_endpoint}!"
+                        )
                         success = True
                         break
                     else:
-                        error = results['error']
+                        error = results["error"]
                         if "CUDA error: out of memory" in error:
-                            raise DsmOutOfMemory("DMI Service Manager server ran out of memory; try reducing the number of files processed at once or waiting until the server is less busy.")
+                            raise DsmOutOfMemory(
+                                "DMI Service Manager server ran out of memory; try reducing the number of files processed at once or waiting until the server is less busy."
+                            )
                         else:
-                            raise DmiServiceManagerException(f"Error {service_endpoint}: " + error)
+                            raise DmiServiceManagerException(
+                                f"Error {service_endpoint}: " + error
+                            )
                 else:
                     # Something botched
-                    raise DmiServiceManagerException(f"Error {service_endpoint}: " + str(result.json()))
+                    raise DmiServiceManagerException(
+                        f"Error {service_endpoint}: " + str(result.json())
+                    )
             else:
                 time.sleep(1)
 
@@ -284,16 +381,24 @@ class DmiServiceManager:
             # Output files are already in local directory
             pass
         elif self.local_or_remote == "remote":
-            results_path = os.path.join(self.server_file_collection_name, self.server_results_folder_name)
+            results_path = os.path.join(
+                self.server_file_collection_name, self.server_results_folder_name
+            )
             self.processor.dataset.log(f"Downloading results from {results_path}...")
             # Collect result filenames from server
             result_files = self.request_folder_files(results_path)
             for path, files in result_files.items():
-                if path == '.':
+                if path == ".":
                     self.download_results(files, results_path, local_output_dir)
                 else:
-                    Path(os.path.join(local_output_dir, path)).mkdir(exist_ok=True, parents=True)
-                    self.download_results(files, os.path.join(results_path, path), local_output_dir.joinpath(path))
+                    Path(os.path.join(local_output_dir, path)).mkdir(
+                        exist_ok=True, parents=True
+                    )
+                    self.download_results(
+                        files,
+                        os.path.join(results_path, path),
+                        local_output_dir.joinpath(path),
+                    )
 
     def request_folder_files(self, folder_name):
         """
@@ -308,22 +413,32 @@ class DmiServiceManager:
             except requests.exceptions.ConnectionError as e:
                 retries += 1
                 if retries > 3:
-                    raise DsmConnectionError(f"Connection Error {e} (retries {retries}) while downloading files from: {folder_name}")
+                    raise DsmConnectionError(
+                        f"Connection Error {e} (retries {retries}) while downloading files from: {folder_name}"
+                    )
                 continue
 
         # Check if 4CAT has access to this server
         if filename_response.status_code == 403:
-            raise DsmConnectionError("403: 4CAT does not have permission to use the DMI Service Manager server")
+            raise DsmConnectionError(
+                "403: 4CAT does not have permission to use the DMI Service Manager server"
+            )
         elif filename_response.status_code in [400, 405]:
-            raise DsmConnectionError(f"400: DMI Service Manager server {filename_response.json()['reason']}")
+            raise DsmConnectionError(
+                f"400: DMI Service Manager server {filename_response.json()['reason']}"
+            )
         elif filename_response.status_code == 404:
             # Folder not found; no files
             return {}
         elif filename_response.status_code != 200:
-            raise DmiServiceManagerException(f"Unknown response from DMI Service Manager: {filename_response.status_code} - {filename_response.reason}")
+            raise DmiServiceManagerException(
+                f"Unknown response from DMI Service Manager: {filename_response.status_code} - {filename_response.reason}"
+            )
         return filename_response.json()
 
-    def send_files(self, file_collection_name, results_name, files_to_upload, dir_with_files):
+    def send_files(
+        self, file_collection_name, results_name, files_to_upload, dir_with_files
+    ):
         """
         Send files to the DMI Service Manager server. This is only relevant for remote mode based on file management.
         The path on the server to both the files and results will be returned.
@@ -339,17 +454,21 @@ class DmiServiceManager:
         :param Dataset dataset:             Dataset object for status updates and unique key
         :return Path, Path:                 Server's Path to files, Server's Path to results
         """
-        data = {'folder_name': file_collection_name}
+        data = {"folder_name": file_collection_name}
 
         # Check if files have already been sent
         self.processor.dataset.update_status("Connecting to DMI Service Manager...")
         existing_files = self.request_folder_files(file_collection_name)
-        uploaded_files = existing_files.get('4cat_uploads', [])
+        uploaded_files = existing_files.get("4cat_uploads", [])
         if len(uploaded_files) > 0:
-            self.processor.dataset.update_status("Found %i files previously uploaded" % (len(uploaded_files)))
+            self.processor.dataset.update_status(
+                "Found %i files previously uploaded" % (len(uploaded_files))
+            )
 
         # Compare files with previously uploaded
-        to_upload_filenames = [filename for filename in files_to_upload if filename not in uploaded_files]
+        to_upload_filenames = [
+            filename for filename in files_to_upload if filename not in uploaded_files
+        ]
         total_files_to_upload = len(to_upload_filenames)
 
         # Check if results folder exists
@@ -358,14 +477,16 @@ class DmiServiceManager:
             total_files_to_upload += 1
             # Create a blank file to upload into results folder
             empty_placeholder = f"4CAT_{results_name}_blank.txt"
-            with open(dir_with_files.joinpath(empty_placeholder), 'w') as file:
-                file.write('')
+            with open(dir_with_files.joinpath(empty_placeholder), "w") as file:
+                file.write("")
             to_upload_filenames = [empty_placeholder] + to_upload_filenames
 
         if total_files_to_upload > 0:
             api_upload_endpoint = f"{self.server_address}send_files"
 
-            self.processor.dataset.update_status(f"Uploading {total_files_to_upload} files")
+            self.processor.dataset.update_status(
+                f"Uploading {total_files_to_upload} files"
+            )
             files_uploaded = 0
             while to_upload_filenames:
                 upload_file = to_upload_filenames.pop()
@@ -373,26 +494,52 @@ class DmiServiceManager:
                 # Upload files
                 if upload_file == empty_placeholder:
                     # Upload a blank results file to results folder
-                    response = requests.post(api_upload_endpoint,
-                                             files=[(results_name, open(dir_with_files.joinpath(upload_file), 'rb'))],
-                                             data=data, timeout=120)
+                    response = requests.post(
+                        api_upload_endpoint,
+                        files=[
+                            (
+                                results_name,
+                                open(dir_with_files.joinpath(upload_file), "rb"),
+                            )
+                        ],
+                        data=data,
+                        timeout=120,
+                    )
                 else:
                     # All other files uploading to general upload folder belonging to parent dataset collection
-                    response = requests.post(api_upload_endpoint,
-                                             files=[('4cat_uploads', open(dir_with_files.joinpath(upload_file), 'rb'))],
-                                             data=data, timeout=120)
+                    response = requests.post(
+                        api_upload_endpoint,
+                        files=[
+                            (
+                                "4cat_uploads",
+                                open(dir_with_files.joinpath(upload_file), "rb"),
+                            )
+                        ],
+                        data=data,
+                        timeout=120,
+                    )
 
                 if response.status_code == 200:
                     files_uploaded += 1
                     if files_uploaded % 1000 == 0:
-                        self.processor.dataset.update_status(f"Uploaded {files_uploaded} of {total_files_to_upload} files!")
-                    self.processor.dataset.update_progress(files_uploaded / total_files_to_upload)
+                        self.processor.dataset.update_status(
+                            f"Uploaded {files_uploaded} of {total_files_to_upload} files!"
+                        )
+                    self.processor.dataset.update_progress(
+                        files_uploaded / total_files_to_upload
+                    )
                 elif response.status_code == 403:
-                    raise DsmConnectionError("403: 4CAT does not have permission to use the DMI Service Manager server")
+                    raise DsmConnectionError(
+                        "403: 4CAT does not have permission to use the DMI Service Manager server"
+                    )
                 elif response.status_code == 405:
-                    raise DsmConnectionError("405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)")
+                    raise DsmConnectionError(
+                        "405: Method not allowed; check DMI Service Manager server address (perhaps http is being used instead of https)"
+                    )
                 else:
-                    self.processor.dataset.log(f"Unable to upload file ({response.status_code} - {response.reason}): {upload_file}")
+                    self.processor.dataset.log(
+                        f"Unable to upload file ({response.status_code} - {response.reason}): {upload_file}"
+                    )
 
                 try:
                     response_json = response.json()
@@ -400,7 +547,8 @@ class DmiServiceManager:
                     response_json = None
                 if response_json and "errors" in response.json():
                     self.processor.dataset.log(
-                        f"Unable to upload file ({response.status_code} - {response.reason}): {upload_file} - {response.json()['errors']}")
+                        f"Unable to upload file ({response.status_code} - {response.reason}): {upload_file} - {response.json()['errors']}"
+                    )
 
             self.processor.dataset.update_status(f"Uploaded {files_uploaded} files!")
 
@@ -409,7 +557,9 @@ class DmiServiceManager:
 
         return server_path_to_files, server_path_to_results
 
-    def download_results(self, filenames_to_download, folder_name, local_output_dir, timeout=30):
+    def download_results(
+        self, filenames_to_download, folder_name, local_output_dir, timeout=30
+    ):
         """
         Download results from the DMI Service Manager server.
 
@@ -422,24 +572,35 @@ class DmiServiceManager:
         api_upload_endpoint = f"{self.server_address}download/"
         total_files_to_download = len(filenames_to_download)
         files_downloaded = 0
-        self.processor.dataset.update_status(f"Downloading {total_files_to_download} files from {folder_name}...")
+        self.processor.dataset.update_status(
+            f"Downloading {total_files_to_download} files from {folder_name}..."
+        )
         for filename in filenames_to_download:
             retries = 0
             while True:
                 try:
-                    file_response = requests.get(api_upload_endpoint + f"{folder_name}/{filename}", timeout=timeout)
+                    file_response = requests.get(
+                        api_upload_endpoint + f"{folder_name}/{filename}",
+                        timeout=timeout,
+                    )
                     break
                 except requests.exceptions.ConnectionError as e:
                     retries += 1
                     if retries > 3:
-                        raise DsmConnectionError(f"Connection Error {e} (retries {retries}) while downloading file: {folder_name}/{filename}")
+                        raise DsmConnectionError(
+                            f"Connection Error {e} (retries {retries}) while downloading file: {folder_name}/{filename}"
+                        )
                     continue
             files_downloaded += 1
             if files_downloaded % 1000 == 0:
-                self.processor.dataset.update_status(f"Downloaded {files_downloaded} of {total_files_to_download} files")
-            self.processor.dataset.update_progress(files_downloaded / total_files_to_download)
+                self.processor.dataset.update_status(
+                    f"Downloaded {files_downloaded} of {total_files_to_download} files"
+                )
+            self.processor.dataset.update_progress(
+                files_downloaded / total_files_to_download
+            )
 
-            with open(local_output_dir.joinpath(filename), 'wb') as file:
+            with open(local_output_dir.joinpath(filename), "wb") as file:
                 file.write(file_response.content)
 
     def sanitize_filenames(self, filename):
@@ -452,7 +613,9 @@ class DmiServiceManager:
         elif self.local_or_remote == "remote":
             return secure_filename(filename)
         else:
-            raise DmiServiceManagerException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+            raise DmiServiceManagerException(
+                "dmi_service_manager.local_or_remote setting must be 'local' or 'remote'"
+            )
 
     @staticmethod
     def get_folder_name(dataset):
@@ -462,9 +625,15 @@ class DmiServiceManager:
 
         This is only relevant for remote mode based on file management.
         """
-        return datetime.datetime.fromtimestamp(dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + \
-            ''.join(e if e.isalnum() else '_' for e in dataset.get_label()) + '-' + \
-            str(dataset.key)
+        return (
+            datetime.datetime.fromtimestamp(dataset.timestamp).strftime(
+                "%Y-%m-%d-%H%M%S"
+            )
+            + "-"
+            + "".join(e if e.isalnum() else "_" for e in dataset.get_label())
+            + "-"
+            + str(dataset.key)
+        )
 
     @staticmethod
     def count_local_files(directory):

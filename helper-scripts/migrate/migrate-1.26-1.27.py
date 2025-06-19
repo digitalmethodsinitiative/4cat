@@ -15,11 +15,20 @@ ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
 db_config = ini["DATABASE"]
 
-db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
-              host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
+db = Database(
+    logger=log,
+    dbname=db_config["db_name"],
+    user=db_config["db_user"],
+    password=db_config["db_password"],
+    host=db_config["db_host"],
+    port=db_config["db_port"],
+    appname="4cat-migrate",
+)
 
 print("  Checking if datasets table has a column 'progress'...")
-has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'progress'")
+has_column = db.fetchone(
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'progress'"
+)
 if has_column["num"] == 0:
     print("  ...No, adding.")
     db.execute("ALTER TABLE datasets ADD COLUMN progress FLOAT DEFAULT 0.0")

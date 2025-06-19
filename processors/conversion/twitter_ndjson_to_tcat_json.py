@@ -1,6 +1,7 @@
 """
 Convert a Twitter NDJSON file to be importable by TCAT's import-jsondump.php
 """
+
 import json
 
 from backend.lib.processor import BasicProcessor
@@ -10,10 +11,12 @@ __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "d.l.wahl@uva.nl"
 
+
 class ConvertNDJSONToJSON(BasicProcessor):
     """
     Convert a Twitter NDJSON file to be importable by TCAT's import-jsondump.php
     """
+
     type = "convert-ndjson-for-tcat"  # job type ID
     category = "Conversion"  # category
     title = "Convert to TCAT JSON"  # title displayed in UI
@@ -47,14 +50,16 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
                 # TCAT has a check on line 62 of /import/import-jsondump.php
                 # that rejects strings large than 40960
-                #https://github.com/digitalmethodsinitiative/dmi-tcat/blob/9654fe3ff489fd3b0efc6ddcf7c19adf8ed7726d/import/import-jsondump.php#L62
+                # https://github.com/digitalmethodsinitiative/dmi-tcat/blob/9654fe3ff489fd3b0efc6ddcf7c19adf8ed7726d/import/import-jsondump.php#L62
                 # We are obviously dropping some tweets because of this
                 if len(json.dumps(post)) < 40960:
                     output.write(json.dumps(post, ensure_ascii=False))
                     # NDJSON file is expected by TCAT
-                    output.write('\n')
+                    output.write("\n")
                 else:
-                    self.dataset.log(f"Tweet {post['id_str']} is too large to be imported by TCAT. It has been dropped.")
+                    self.dataset.log(
+                        f"Tweet {post['id_str']} is too large to be imported by TCAT. It has been dropped."
+                    )
 
         self.dataset.update_status("Finished.")
         self.dataset.finish(num_rows=posts)
@@ -86,66 +91,96 @@ class ConvertNDJSONToJSON(BasicProcessor):
         :return dict:  Dictionary/JSON in the format expected by TCAT's import-jsondump.php
         """
         new_tweet = {
-                    'id_str' : tweet['id'],
-                    'created_at' : tweet['created_at'],
-                    'user' : self.author_conversion(tweet.get('author_user')),
-                    'source' : tweet.get('source'),
-                    'lang' : tweet.get('lang'),
-                    'possibly_sensitive' : tweet.get('possibly_sensitive'),
-                    'withheld_copyright' : tweet.get('withheld', {}).get('copyright') if tweet.get('withheld') else None,
-                    'withheld_in_countries' : tweet.get('withheld', {}).get('country_codes') if tweet.get('withheld') else None,
-                    'retweet_count' : tweet.get('public_metrics').get('retweet_count'),
-                    'favorite_count' : tweet.get('public_metrics').get('like_count'),
-
-                    'text': tweet['text'],
-
-                    'entities' : {
-                                  'user_mentions' : self.user_mentions_item(tweet.get('entities', {}).get('mentions')) if tweet.get('entities', {}).get('mentions') else [],
-                                  'hashtags' : self.hashtag_item(tweet.get('entities', {}).get('hashtags')) if tweet.get('entities', {}).get('hashtags') else [],
-                                  'urls' : tweet.get('entities', {}).get('urls', []),
-
-                                  # Not used by TCAT
-                                  'cashtags' : tweet.get('entities', {}).get('cashtags'),
-                                  'annotations' : tweet.get('entities', {}).get('annotations'),
-
-                                  # Media is stored in attachements with APIv2 but TCAT expect in entities
-                                  'media' : self.media_item(tweet.get('attachments', {}).get('media_keys')) if tweet.get('attachments', {}).get('media_keys') else None,
-                                 },
-
-                    # Geo data currently has option of place_id and place_id's can have coordinates
-                    'place' : {'id' : tweet.get('geo', {}).get('place_id')},
-                    'geo' : tweet.get('geo', {}).get('coordinates'),
-                    # Reply
-                    'in_reply_to_user_id_str' : tweet.get('in_reply_to_user_id'),
-                    'in_reply_to_screen_name' : tweet.get('in_reply_to_user', {}).get('username'),
-                    # Relies on fact that there will only ever be one reply_to tweet in reference_tweets
-                    'in_reply_to_status_id_str' : next((reply.get('id') for reply in tweet.get('referenced_tweets', []) if reply.get('type') == 'replied_to'), None),
-
-                    # Quote (also relies on only one quote tweet in reference_tweets)
-                    'quoted_status_id_str' : next((quote.get('id') for quote in tweet.get('referenced_tweets', []) if quote.get('type') == 'quoted'), None),
-
-                    # Not used by TCAT
-                    'reply_count' : tweet.get('public_metrics').get('reply_count'),
-                    'quote_count' : tweet.get('public_metrics').get('quote_count'),
-                    'attachements' : {'poll_ids' : tweet.get('attachments', {}).get('poll_ids') if tweet.get('attachments') else None},
-                    'context_annotations' : tweet.get('context_annotations'),
-                    'conversation_id' : tweet.get('conversation_id'),
-                    'reply_settings' : tweet.get('reply_settings'),
-                    # Remaining in_reply_to_user information
-                    'in_reply_to_user' : tweet.get('in_reply_to_user'),
-                    # Storing the full referenced tweets (retweets, quotes, and replies)
-                    'referenced_tweets' : tweet.get('referenced_tweets'),
-                    # Storing full place object
-                    'geo_full' : tweet.get('geo'),
-                    }
-
+            "id_str": tweet["id"],
+            "created_at": tweet["created_at"],
+            "user": self.author_conversion(tweet.get("author_user")),
+            "source": tweet.get("source"),
+            "lang": tweet.get("lang"),
+            "possibly_sensitive": tweet.get("possibly_sensitive"),
+            "withheld_copyright": tweet.get("withheld", {}).get("copyright")
+            if tweet.get("withheld")
+            else None,
+            "withheld_in_countries": tweet.get("withheld", {}).get("country_codes")
+            if tweet.get("withheld")
+            else None,
+            "retweet_count": tweet.get("public_metrics").get("retweet_count"),
+            "favorite_count": tweet.get("public_metrics").get("like_count"),
+            "text": tweet["text"],
+            "entities": {
+                "user_mentions": self.user_mentions_item(
+                    tweet.get("entities", {}).get("mentions")
+                )
+                if tweet.get("entities", {}).get("mentions")
+                else [],
+                "hashtags": self.hashtag_item(tweet.get("entities", {}).get("hashtags"))
+                if tweet.get("entities", {}).get("hashtags")
+                else [],
+                "urls": tweet.get("entities", {}).get("urls", []),
+                # Not used by TCAT
+                "cashtags": tweet.get("entities", {}).get("cashtags"),
+                "annotations": tweet.get("entities", {}).get("annotations"),
+                # Media is stored in attachements with APIv2 but TCAT expect in entities
+                "media": self.media_item(tweet.get("attachments", {}).get("media_keys"))
+                if tweet.get("attachments", {}).get("media_keys")
+                else None,
+            },
+            # Geo data currently has option of place_id and place_id's can have coordinates
+            "place": {"id": tweet.get("geo", {}).get("place_id")},
+            "geo": tweet.get("geo", {}).get("coordinates"),
+            # Reply
+            "in_reply_to_user_id_str": tweet.get("in_reply_to_user_id"),
+            "in_reply_to_screen_name": tweet.get("in_reply_to_user", {}).get(
+                "username"
+            ),
+            # Relies on fact that there will only ever be one reply_to tweet in reference_tweets
+            "in_reply_to_status_id_str": next(
+                (
+                    reply.get("id")
+                    for reply in tweet.get("referenced_tweets", [])
+                    if reply.get("type") == "replied_to"
+                ),
+                None,
+            ),
+            # Quote (also relies on only one quote tweet in reference_tweets)
+            "quoted_status_id_str": next(
+                (
+                    quote.get("id")
+                    for quote in tweet.get("referenced_tweets", [])
+                    if quote.get("type") == "quoted"
+                ),
+                None,
+            ),
+            # Not used by TCAT
+            "reply_count": tweet.get("public_metrics").get("reply_count"),
+            "quote_count": tweet.get("public_metrics").get("quote_count"),
+            "attachements": {
+                "poll_ids": tweet.get("attachments", {}).get("poll_ids")
+                if tweet.get("attachments")
+                else None
+            },
+            "context_annotations": tweet.get("context_annotations"),
+            "conversation_id": tweet.get("conversation_id"),
+            "reply_settings": tweet.get("reply_settings"),
+            # Remaining in_reply_to_user information
+            "in_reply_to_user": tweet.get("in_reply_to_user"),
+            # Storing the full referenced tweets (retweets, quotes, and replies)
+            "referenced_tweets": tweet.get("referenced_tweets"),
+            # Storing full place object
+            "geo_full": tweet.get("geo"),
+        }
 
         # Retweet - TCAT checks existance of 'retweeted_status' as key to determine if tweet is a retweet
         # We instead search for a referenced_tweets with type 'retweeted'
         # This assumes only one retweet in reference tweets (which has proven true in testing)
-        if any([ref["type"] == "retweeted" for ref in tweet.get("referenced_tweets", [])]):
-            retweet = next(retweet for retweet in tweet.get('referenced_tweets') if retweet.get('type') == 'retweeted')
-            new_tweet['retweeted_status'] = self.reformat_retweet(retweet)
+        if any(
+            [ref["type"] == "retweeted" for ref in tweet.get("referenced_tweets", [])]
+        ):
+            retweet = next(
+                retweet
+                for retweet in tweet.get("referenced_tweets")
+                if retweet.get("type") == "retweeted"
+            )
+            new_tweet["retweeted_status"] = self.reformat_retweet(retweet)
 
         return new_tweet
 
@@ -154,33 +189,35 @@ class ConvertNDJSONToJSON(BasicProcessor):
         Handle the author object and conver to TCAT
         """
         return {
-                  'screen_name' : author_user.get('username'),
-                  # if author_user id has been pseudonymised, change to integer
-                  'id_str' : self.hash_if_not_int(author_user.get('id')),
-                  'statuses_count' : author_user.get('public_metrics').get('tweet_count'),
-                  'followers_count' : author_user.get('public_metrics').get('followers_count'),
-                  'listed_count' : author_user.get('public_metrics').get('listed_count'),
-                  'friends_count' : author_user.get('public_metrics').get('following_count'),
-                  'name' : author_user.get('name'),
-                  'description' : author_user.get('description'),
-                  'url' : author_user.get('url'),
-                  'verified' : author_user.get('verified'),
-                  'profile_image_url' : author_user.get('profile_image_url'),
-                  'created_at' : author_user.get('created_at'),
-                  'location' : author_user.get('location'),
-                  'withheld_in_countries' : author_user.get('withheld', {}).get('country_codes') if author_user.get('withheld') else None,
-
-                  # Not used by TCAT
-                  'protected' : author_user.get('protected'),
-                  'pinned_tweet_id' : author_user.get('pinned_tweet_id'),
-                  'entities' : author_user.get('entities'),
-
-                  # Required by TCAT, but not in APIv2
-                  'lang' : None,
-                  'utc_offset': None,
-                  'time_zone' : None,
-                  'favourites_count' : None,
-                 }
+            "screen_name": author_user.get("username"),
+            # if author_user id has been pseudonymised, change to integer
+            "id_str": self.hash_if_not_int(author_user.get("id")),
+            "statuses_count": author_user.get("public_metrics").get("tweet_count"),
+            "followers_count": author_user.get("public_metrics").get("followers_count"),
+            "listed_count": author_user.get("public_metrics").get("listed_count"),
+            "friends_count": author_user.get("public_metrics").get("following_count"),
+            "name": author_user.get("name"),
+            "description": author_user.get("description"),
+            "url": author_user.get("url"),
+            "verified": author_user.get("verified"),
+            "profile_image_url": author_user.get("profile_image_url"),
+            "created_at": author_user.get("created_at"),
+            "location": author_user.get("location"),
+            "withheld_in_countries": author_user.get("withheld", {}).get(
+                "country_codes"
+            )
+            if author_user.get("withheld")
+            else None,
+            # Not used by TCAT
+            "protected": author_user.get("protected"),
+            "pinned_tweet_id": author_user.get("pinned_tweet_id"),
+            "entities": author_user.get("entities"),
+            # Required by TCAT, but not in APIv2
+            "lang": None,
+            "utc_offset": None,
+            "time_zone": None,
+            "favourites_count": None,
+        }
 
     def reformat_retweet(self, retweet):
         """
@@ -188,22 +225,33 @@ class ConvertNDJSONToJSON(BasicProcessor):
         query that import-jsondump.php expect. Full retweet is stored in referenced_tweets.
         """
         return {
-                'full_text' : retweet.get('text'),
-                'id_str' : retweet.get('id'),
-                'user' : self.author_conversion(retweet.get('author_user')),
-                'entities' : {
-                              'user_mentions' : self.user_mentions_item(retweet.get('entities', {}).get('mentions')) if retweet.get('entities', {}).get('mentions') else [],
-                              'hashtags' : self.hashtag_item(retweet.get('entities', {}).get('hashtags')) if retweet.get('entities', {}).get('hashtags') else [],
-                              'urls' : retweet.get('entities', {}).get('urls', []),
+            "full_text": retweet.get("text"),
+            "id_str": retweet.get("id"),
+            "user": self.author_conversion(retweet.get("author_user")),
+            "entities": {
+                "user_mentions": self.user_mentions_item(
+                    retweet.get("entities", {}).get("mentions")
+                )
+                if retweet.get("entities", {}).get("mentions")
+                else [],
+                "hashtags": self.hashtag_item(
+                    retweet.get("entities", {}).get("hashtags")
+                )
+                if retweet.get("entities", {}).get("hashtags")
+                else [],
+                "urls": retweet.get("entities", {}).get("urls", []),
+                # Media is stored in attachements with APIv2
+                "media": self.media_item(
+                    retweet.get("attachments", {}).get("media_keys")
+                )
+                if retweet.get("attachments", {}).get("media_keys")
+                else None,
+                # Not used by TCAT
+                "cashtags": retweet.get("entities", {}).get("cashtags"),
+                "annotations": retweet.get("entities", {}).get("annotations"),
+            },
+        }
 
-                              # Media is stored in attachements with APIv2
-                              'media' : self.media_item(retweet.get('attachments', {}).get('media_keys')) if retweet.get('attachments', {}).get('media_keys') else None,
-
-                              # Not used by TCAT
-                              'cashtags' : retweet.get('entities', {}).get('cashtags'),
-                              'annotations' : retweet.get('entities', {}).get('annotations'),
-                             }
-                }
     def media_item(self, tweet_media):
         """
         Some media items return only a string while others return more robust objects.
@@ -218,21 +266,36 @@ class ConvertNDJSONToJSON(BasicProcessor):
         new_list = []
         for media in tweet_media:
             if type(media) is dict:
-                new_list.append({
-                    'id_str' : media.get('media_key'),
-                    'url' : media.get('url') if media.get('url') else media.get('preview_image_url'),
-                    'type' : media.get('type'),
-                    'sizes' : {'large' : {'w' : media.get('width'),
-                                          'h' : media.get('height'),
-                    #TCAT Requires
-                                          'resize' : None}
-                               },
-                    'expanded_url' : None,
-                    'media_url_https' : None,
-                    })
+                new_list.append(
+                    {
+                        "id_str": media.get("media_key"),
+                        "url": media.get("url")
+                        if media.get("url")
+                        else media.get("preview_image_url"),
+                        "type": media.get("type"),
+                        "sizes": {
+                            "large": {
+                                "w": media.get("width"),
+                                "h": media.get("height"),
+                                # TCAT Requires
+                                "resize": None,
+                            }
+                        },
+                        "expanded_url": None,
+                        "media_url_https": None,
+                    }
+                )
             else:
                 # Media Key only
-                new_list.append({'id_str' : media, 'url' : None, 'expanded_url' : None, 'media_url_https' : None, 'type' : None})
+                new_list.append(
+                    {
+                        "id_str": media,
+                        "url": None,
+                        "expanded_url": None,
+                        "media_url_https": None,
+                        "type": None,
+                    }
+                )
         return new_list
 
     def user_mentions_item(self, mentions):
@@ -245,12 +308,12 @@ class ConvertNDJSONToJSON(BasicProcessor):
         """
         modified_mentions = []
         for mention in mentions:
-            mention['screen_name'] = mention.get('username')
+            mention["screen_name"] = mention.get("username")
             # Check to see if id was included
-            if mention.get('id', None):
-                mention['id_str'] = mention.get('id')
+            if mention.get("id", None):
+                mention["id_str"] = mention.get("id")
             else:
-                mention['id_str'] = None
+                mention["id_str"] = None
             modified_mentions.append(mention)
         return modified_mentions
 
@@ -260,7 +323,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         """
         modified_hashtags = []
         for hashtag in hashtags:
-            hashtag['text'] = hashtag.get('tag')
+            hashtag["text"] = hashtag.get("tag")
             modified_hashtags.append(hashtag)
         return modified_hashtags
 

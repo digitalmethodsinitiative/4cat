@@ -13,16 +13,20 @@ we import within the test functions and utilize pytest.fixtures to mock the nece
 
 PATH_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve()
 
+
 @pytest.fixture
 def mock_database():
     """
     Mock the database connection.
     """
-    with patch("common.config_manager.Database") as mock_database, \
-         patch("backend.lib.worker.Database") as mock_database:
+    with (
+        patch("common.config_manager.Database") as mock_database,
+        patch("backend.lib.worker.Database") as mock_database,
+    ):
         mock_database_instance = MagicMock()
         mock_database.return_value = mock_database_instance
         yield mock_database_instance
+
 
 @pytest.fixture
 def mock_logger_config(tmp_path, mock_database):
@@ -30,14 +34,17 @@ def mock_logger_config(tmp_path, mock_database):
     Mock the config manager in logger to return a temporary path for logs
     """
     with patch("common.lib.logger.config") as mock_logger_config:
-        mock_logger_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
-            "PATH_ROOT": tmp_path,
-            "PATH_LOGS": tmp_path / "logs",
-        }.get(key, default))
+        mock_logger_config.get = MagicMock(
+            side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
+                "PATH_ROOT": tmp_path,
+                "PATH_LOGS": tmp_path / "logs",
+            }.get(key, default)
+        )
         # Create necessary directories
         (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
         yield mock_logger_config
-       
+
+
 @pytest.fixture
 def logger(mock_logger_config):
     """
@@ -46,7 +53,11 @@ def logger(mock_logger_config):
     This also allows us to use our Logger for testing.
     """
     from common.lib.logger import Logger
-    return Logger(logger_name="pytest", output=True, filename='test.log', log_level='DEBUG')
+
+    return Logger(
+        logger_name="pytest", output=True, filename="test.log", log_level="DEBUG"
+    )
+
 
 def test_logger(logger, mock_logger_config):
     # Initialize the logger
@@ -54,7 +65,7 @@ def test_logger(logger, mock_logger_config):
 
     # Verify that mock_config.get was called
     mock_logger_config.get.assert_any_call("PATH_LOGS")
-    
+
     # Check if the logger is initialized correctly
     assert log is not None
     assert log.logger is not None
@@ -62,12 +73,13 @@ def test_logger(logger, mock_logger_config):
 
     # Test logging a message
     log.info("This is a test log message.")
-    
+
     # Check if the message was logged (you would need to check the log file in a real test)
-    log_file_path = mock_logger_config.get("PATH_LOGS") / 'test.log'
-    with open(log_file_path, 'r') as f:
+    log_file_path = mock_logger_config.get("PATH_LOGS") / "test.log"
+    with open(log_file_path, "r") as f:
         logs = f.read()
         assert "This is a test log message." in logs
+
 
 @pytest.fixture
 def mock_module_config(mock_database):
@@ -75,15 +87,20 @@ def mock_module_config(mock_database):
     Mock the module loader config; needs real PATH_ROOT to find modules
     """
     with patch("common.lib.module_loader.config") as mock_config:
-        mock_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
-            "PATH_ROOT": PATH_ROOT,
-        }.get(key, default))
+        mock_config.get = MagicMock(
+            side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
+                "PATH_ROOT": PATH_ROOT,
+            }.get(key, default)
+        )
+
 
 @pytest.fixture
 def fourcat_modules(mock_module_config):
     from common.lib.module_loader import ModuleCollector
+
     # Initialize the ModuleCollector and return it
     return ModuleCollector()
+
 
 @pytest.mark.dependency()
 def test_module_collector(logger, fourcat_modules):
@@ -107,7 +124,9 @@ def test_module_collector(logger, fourcat_modules):
 
     # Check if any modules could not be loaded
     if fourcat_modules.missing_modules:
-        logger.error(f"Unable to import modules: {', '.join(fourcat_modules.missing_modules.keys())}")
+        logger.error(
+            f"Unable to import modules: {', '.join(fourcat_modules.missing_modules.keys())}"
+        )
     else:
         logger.info("No missing modules")
     assert len(fourcat_modules.missing_modules) == 0
@@ -123,6 +142,7 @@ def mock_job():
         mock_job.return_value = mock_job_instance
         yield mock_job_instance
 
+
 @pytest.fixture
 def mock_job_queue():
     # Mock the job queue
@@ -130,6 +150,7 @@ def mock_job_queue():
         mock_job_queue_instance = MagicMock()
         mock_job_queue.return_value = mock_job_queue_instance
         yield mock_job_queue_instance
+
 
 def test_worker_initialization(mock_database, mock_job, mock_job_queue):
     # Mostly to ensure testing and mocks are working as appropriate, but also check BasicWorker inits
@@ -145,7 +166,7 @@ def test_worker_initialization(mock_database, mock_job, mock_job_queue):
         job=mock_job,
         queue=mock_job_queue,
         manager=MagicMock(),
-        modules=MagicMock()
+        modules=MagicMock(),
     )
 
     # Assert that the worker uses the mocked database
@@ -153,6 +174,7 @@ def test_worker_initialization(mock_database, mock_job, mock_job_queue):
 
     # Assert that the worker uses the mocked job queue
     assert worker.queue == mock_job_queue
+
 
 @pytest.fixture
 def mock_dataset_database():
@@ -176,24 +198,32 @@ def mock_dataset_database():
             "software_file": "",
             "num_rows": 0,
             "progress": 0.0,
-            "key_parent": ""
+            "key_parent": "",
         }
         mock_database.return_value = mock_database_instance
         yield mock_database_instance
 
+
 @pytest.fixture
 def mock_dataset(mock_dataset_database, fourcat_modules):
     from common.lib.dataset import DataSet
+
     # Patch the refresh_owners method to prevent it from running
     # Patch get_parent to return a mock object; some get_options methods expect it (usually would not run due to is_compatible_with)
-    with patch.object(DataSet, "refresh_owners", return_value=None), \
-         patch.object(DataSet, "get_parent", return_value=MagicMock(type="test_parent")):
-        dataset = DataSet(key="test_dataset", db=mock_dataset_database, modules=fourcat_modules)
+    with (
+        patch.object(DataSet, "refresh_owners", return_value=None),
+        patch.object(DataSet, "get_parent", return_value=MagicMock(type="test_parent")),
+    ):
+        dataset = DataSet(
+            key="test_dataset", db=mock_dataset_database, modules=fourcat_modules
+        )
         yield dataset
 
 
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
+def test_processors(
+    logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database
+):
     """
     Test all processors separately ensuring they are valid and can be instantiated and report all failures at the end.
     """
@@ -207,25 +237,47 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
 
         try:
             # Check if the processor is a subclass of BasicProcessor
-            assert issubclass(processor_class, BasicProcessor), f"{processor_name} is not a subclass of BasicProcessor"
+            assert issubclass(processor_class, BasicProcessor), (
+                f"{processor_name} is not a subclass of BasicProcessor"
+            )
 
             # Check if required attributes are implemented
-            required_attributes = ["type", "category", "title", "description", "extension"]
+            required_attributes = [
+                "type",
+                "category",
+                "title",
+                "description",
+                "extension",
+            ]
             for attr in required_attributes:
-                assert hasattr(processor_class, attr), f"{processor_name} is missing required attribute: {attr}"
-                assert getattr(processor_class, attr), f"{processor_name} has an empty value for attribute: {attr}"
+                assert hasattr(processor_class, attr), (
+                    f"{processor_name} is missing required attribute: {attr}"
+                )
+                assert getattr(processor_class, attr), (
+                    f"{processor_name} has an empty value for attribute: {attr}"
+                )
 
             # Check if required methods are implemented
             required_methods = ["get_options", "process"]
             for method in required_methods:
-                assert hasattr(processor_class, method), f"{processor_name} is missing required method: {method}"
-                assert callable(getattr(processor_class, method)), f"{processor_name} has a non-callable method: {method}"
+                assert hasattr(processor_class, method), (
+                    f"{processor_name} is missing required method: {method}"
+                )
+                assert callable(getattr(processor_class, method)), (
+                    f"{processor_name} has a non-callable method: {method}"
+                )
 
             # Test get_options with mock_dataset
             processor_class.get_options(parent_dataset=mock_dataset, user=None)
 
             # Check if the processor can be instantiated
-            processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
+            processor_class(
+                logger,
+                job=mock_job,
+                queue=mock_job_queue,
+                manager=None,
+                modules=fourcat_modules,
+            )
 
         except Exception as e:
             # Log the failure and add it to the failures list
@@ -240,8 +292,11 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
     else:
         logger.info("All processors passed successfully.")
 
+
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
+def test_datasources(
+    logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database
+):
     from backend.lib.search import Search
 
     failures = []  # Collect failures for reporting
@@ -251,7 +306,13 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
         try:
             # Identify Search processors and ensure they were named correctly
             if issubclass(processor_class, Search):
-                assert (processor_name.replace("-search", "") in fourcat_modules.datasources or processor_name.replace("-import", "") in fourcat_modules.datasources), f"Search worker type {processor_name} is does not appear to be paired with a datasource; please check the naming convention (e.g., {processor_name}-search or {processor_name}-import)."
+                assert (
+                    processor_name.replace("-search", "") in fourcat_modules.datasources
+                    or processor_name.replace("-import", "")
+                    in fourcat_modules.datasources
+                ), (
+                    f"Search worker type {processor_name} is does not appear to be paired with a datasource; please check the naming convention (e.g., {processor_name}-search or {processor_name}-import)."
+                )
 
         except Exception as e:
             # Log the failure and add it to the failures list
@@ -265,13 +326,15 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
             # this includes bug https://github.com/digitalmethodsinitiative/4cat/issues/493 which likely needs migrate script fix
             continue
         try:
-            assert datasource_data.get("has_worker", False), f"Datasource {datasource_name} does not have a worker"
-          
+            assert datasource_data.get("has_worker", False), (
+                f"Datasource {datasource_name} does not have a worker"
+            )
+
         except Exception as e:
             # Log the failure and add it to the failures list
             logger.error(f"Datasource {datasource_name} failed: {e}")
             failures.append((datasource_name, str(e)))
-    
+
     # Report all failures at the end
     if failures:
         names = [name for name, _ in failures]

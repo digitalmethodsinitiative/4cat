@@ -1,6 +1,7 @@
 """
 Twitter APIv2 general tweet statistics
 """
+
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
 
@@ -14,6 +15,7 @@ class TwitterStats(TwitterStatsBase):
     """
     Collect Twitter statistics. Built to emulate TCAT statistic.
     """
+
     type = "twitter-0-stats"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Twitter Statistics"  # title displayed in UI
@@ -24,16 +26,23 @@ class TwitterStats(TwitterStatsBase):
         "timeframe": {
             "type": UserInput.OPTION_CHOICE,
             "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
+            "options": {
+                "all": "Overall",
+                "year": "Year",
+                "month": "Month",
+                "week": "Week",
+                "day": "Day",
+                "hour": "Hour",
+                "minute": "Minute",
+            },
+            "help": "Produce counts per",
         },
         "pad": {
             "type": UserInput.OPTION_TOGGLE,
             "default": True,
             "help": "Include dates where the count is zero",
-            "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
-        }
+            "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts.",
+        },
     }
 
     @classmethod
@@ -61,18 +70,38 @@ class TwitterStats(TwitterStatsBase):
         group_by_keys = None
 
         # Use set as hashtag/mention is either in tweet or not AND adding it from the reference tweet should not duplicate
-        hashtags = set([tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
-        mentions = set([tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
-        num_urls = len([tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
+        hashtags = set(
+            [tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])]
+        )
+        mentions = set(
+            [tag["username"] for tag in post.get("entities", {}).get("mentions", [])]
+        )
+        num_urls = len(
+            [tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])]
+        )
         num_images = len(
-            [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
-             type(item) is dict and item.get("type") == "photo"])
+            [
+                item["url"]
+                for item in post.get("attachments", {}).get("media_keys", [])
+                if type(item) is dict and item.get("type") == "photo"
+            ]
+        )
 
         # Update hashtags and mentions
-        for ref_tweet in post.get('referenced_tweets', []):
-            if ref_tweet.get('type') in ['retweeted', 'quoted']:
-                hashtags.update([tag['tag'] for tag in ref_tweet.get('entities', {}).get('hashtags', [])])
-                mentions.update([tag['username'] for tag in ref_tweet.get('entities', {}).get('mentions', [])])
+        for ref_tweet in post.get("referenced_tweets", []):
+            if ref_tweet.get("type") in ["retweeted", "quoted"]:
+                hashtags.update(
+                    [
+                        tag["tag"]
+                        for tag in ref_tweet.get("entities", {}).get("hashtags", [])
+                    ]
+                )
+                mentions.update(
+                    [
+                        tag["username"]
+                        for tag in ref_tweet.get("entities", {}).get("mentions", [])
+                    ]
+                )
 
         # Map the data in the post to either be summed (by grouping and interval)
         sum_map = {
@@ -81,9 +110,30 @@ class TwitterStats(TwitterStatsBase):
             "Number of Tweets with hashtags": 1 if len(hashtags) > 0 else 0,
             "Number of Tweets with mentions": 1 if len(mentions) > 0 else 0,
             "Number of Tweets with images": 1 if num_images > 0 else 0,
-            "Number of Retweets": 1 if any([ref.get("type") == "retweeted" for ref in post.get("referenced_tweets", [])]) else 0,
-            "Number of Replies": 1 if any([ref.get("type") == "replied_to" for ref in post.get("referenced_tweets", [])]) else 0,
-            "Number of Quotes": 1 if any([ref.get("type") == "quoted" for ref in post.get("referenced_tweets", [])]) else 0,
+            "Number of Retweets": 1
+            if any(
+                [
+                    ref.get("type") == "retweeted"
+                    for ref in post.get("referenced_tweets", [])
+                ]
+            )
+            else 0,
+            "Number of Replies": 1
+            if any(
+                [
+                    ref.get("type") == "replied_to"
+                    for ref in post.get("referenced_tweets", [])
+                ]
+            )
+            else 0,
+            "Number of Quotes": 1
+            if any(
+                [
+                    ref.get("type") == "quoted"
+                    for ref in post.get("referenced_tweets", [])
+                ]
+            )
+            else 0,
         }
         # These are user-specific metrics and not per tweet/post like above
         static_map = {}
@@ -121,41 +171,53 @@ class TwitterStats(TwitterStatsBase):
         lists or sets of items that were collected.
         """
         # Count the number of unique authors
-        data['Number of unique Authors'] = len(set(data['Authors']))
+        data["Number of unique Authors"] = len(set(data["Authors"]))
 
         # Tally authors, hashtags, and mentions
         top_authors = {}
-        for author in data['Authors']:
+        for author in data["Authors"]:
             if author in top_authors:
                 top_authors[author] += 1
             else:
                 top_authors[author] = 1
-        sorted_authors = ["%s: %s" % (k, v) for k, v in
-                          sorted(top_authors.items(), key=lambda item: item[1], reverse=True)]
-        data["Top 10 authors"] = ', '.join(sorted_authors[:10])
+        sorted_authors = [
+            "%s: %s" % (k, v)
+            for k, v in sorted(
+                top_authors.items(), key=lambda item: item[1], reverse=True
+            )
+        ]
+        data["Top 10 authors"] = ", ".join(sorted_authors[:10])
 
         top_hashtags = {}
-        for tag in data['Hashtags']:
+        for tag in data["Hashtags"]:
             if tag in top_hashtags:
                 top_hashtags[tag] += 1
             else:
                 top_hashtags[tag] = 1
-        sorted_tags = ["%s: %s" % (k, v) for k, v in
-                       sorted(top_hashtags.items(), key=lambda item: item[1], reverse=True)]
-        data["Top 10 hashtags"] = ', '.join(sorted_tags[:10])
+        sorted_tags = [
+            "%s: %s" % (k, v)
+            for k, v in sorted(
+                top_hashtags.items(), key=lambda item: item[1], reverse=True
+            )
+        ]
+        data["Top 10 hashtags"] = ", ".join(sorted_tags[:10])
 
         top_mentions = {}
-        for mention in data['Mentions']:
+        for mention in data["Mentions"]:
             if mention in top_mentions:
                 top_mentions[mention] += 1
             else:
                 top_mentions[mention] = 1
-        sorted_mentions = ["%s: %s" % (k, v) for k, v in
-                           sorted(top_mentions.items(), key=lambda item: item[1], reverse=True)]
-        data["Top 10 mentions"] = ', '.join(sorted_mentions[:10])
+        sorted_mentions = [
+            "%s: %s" % (k, v)
+            for k, v in sorted(
+                top_mentions.items(), key=lambda item: item[1], reverse=True
+            )
+        ]
+        data["Top 10 mentions"] = ", ".join(sorted_mentions[:10])
 
         # Remove unnecessary keys
-        data.pop('Created at Timestamp')
+        data.pop("Created at Timestamp")
         data.pop("Authors")
         data.pop("Hashtags")
         data.pop("Mentions")

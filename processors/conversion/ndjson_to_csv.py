@@ -1,6 +1,7 @@
 """
 Convert a NDJSON file to CSV
 """
+
 import csv
 import json
 
@@ -15,76 +16,85 @@ __email__ = "4cat@oilab.eu"
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+
 class ConvertNDJSONtoCSV(BasicProcessor):
-	"""
-	Convert a NDJSON file to CSV
-	"""
-	type = "convert-ndjson-csv"  # job type ID
-	category = "Conversion"  # category
-	title = "Convert NDJSON file to CSV"  # title displayed in UI
-	description = "Create a CSV file from an NDJSON file. Note that some data may be lost as CSV files cannot " \
-				  "contain nested data."  # description displayed in UI
-	extension = "csv"  # extension of result file, used internally and in UI
+    """
+    Convert a NDJSON file to CSV
+    """
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-		Determine if processor is compatible with dataset
+    type = "convert-ndjson-csv"  # job type ID
+    category = "Conversion"  # category
+    title = "Convert NDJSON file to CSV"  # title displayed in UI
+    description = (
+        "Create a CSV file from an NDJSON file. Note that some data may be lost as CSV files cannot "
+        "contain nested data."
+    )  # description displayed in UI
+    extension = "csv"  # extension of result file, used internally and in UI
 
-		:param module: Module to determine compatibility with
-		"""
-		return module.get_extension() == "ndjson"
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
+        Determine if processor is compatible with dataset
 
-	def process(self):
-		"""
-		This takes a NDJSON file as input, flattens the dictionaries, and writes the same data as a CSV file
-		"""
-		total_items = self.source_dataset.num_rows
+        :param module: Module to determine compatibility with
+        """
+        return module.get_extension() == "ndjson"
 
-		# We first collect all possible columns for the csv file, then
-		# for each item make sure there is a value for all the columns (in the
-		# second step)
-		all_keys = self.source_dataset.get_columns()
+    def process(self):
+        """
+        This takes a NDJSON file as input, flattens the dictionaries, and writes the same data as a CSV file
+        """
+        total_items = self.source_dataset.num_rows
 
-		self.dataset.update_status("Converting file")
-		staging_area = self.dataset.get_staging_area()
-		with staging_area.joinpath('temp.ndjson').open("w") as output:
-			for mapped_item in self.source_dataset.iterate_items(self):
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
-				# Flatten the dict
-				item = flatten_dict(mapped_item.original)
-				# Add any new keys to all_keys
-				for field in item.keys():
-					if field not in all_keys:
-						all_keys.append(field)
+        # We first collect all possible columns for the csv file, then
+        # for each item make sure there is a value for all the columns (in the
+        # second step)
+        all_keys = self.source_dataset.get_columns()
 
-				# Add mapped keys to flattened original item
-				item.update(mapped_item)
+        self.dataset.update_status("Converting file")
+        staging_area = self.dataset.get_staging_area()
+        with staging_area.joinpath("temp.ndjson").open("w") as output:
+            for mapped_item in self.source_dataset.iterate_items(self):
+                if self.interrupted:
+                    raise ProcessorInterruptedException(
+                        "Interrupted while writing temporary results to file"
+                    )
+                # Flatten the dict
+                item = flatten_dict(mapped_item.original)
+                # Add any new keys to all_keys
+                for field in item.keys():
+                    if field not in all_keys:
+                        all_keys.append(field)
 
-				# Write this new json to our temp file
-				output.write(json.dumps(item) + "\n")
+                # Add mapped keys to flattened original item
+                item.update(mapped_item)
 
-		processed = 0
-		# Create new CSV file
-		with self.dataset.get_results_path().open("w", newline="") as output:
-			writer = csv.DictWriter(output, fieldnames=all_keys)
-			writer.writeheader()
+                # Write this new json to our temp file
+                output.write(json.dumps(item) + "\n")
 
-			with staging_area.joinpath('temp.ndjson').open("r") as infile:
-				for line in infile:
-					if self.interrupted:
-						raise ProcessorInterruptedException("Interrupted while writing results to file")
+        processed = 0
+        # Create new CSV file
+        with self.dataset.get_results_path().open("w", newline="") as output:
+            writer = csv.DictWriter(output, fieldnames=all_keys)
+            writer.writeheader()
 
-					item = json.loads(line)
-					writer.writerow({key: item.get(key, "") for key in all_keys})
-					processed += 1
+            with staging_area.joinpath("temp.ndjson").open("r") as infile:
+                for line in infile:
+                    if self.interrupted:
+                        raise ProcessorInterruptedException(
+                            "Interrupted while writing results to file"
+                        )
 
-				if processed % 100 == 0:
-					self.dataset.update_status(
-						f"Processed {processed}/{total_items} items")
-					self.dataset.update_progress(processed / total_items)
+                    item = json.loads(line)
+                    writer.writerow({key: item.get(key, "") for key in all_keys})
+                    processed += 1
 
-		# done!
-		self.dataset.update_status("Finished.")
-		self.dataset.finish(num_rows=processed)
+                if processed % 100 == 0:
+                    self.dataset.update_status(
+                        f"Processed {processed}/{total_items} items"
+                    )
+                    self.dataset.update_progress(processed / total_items)
+
+        # done!
+        self.dataset.update_status("Finished.")
+        self.dataset.finish(num_rows=processed)

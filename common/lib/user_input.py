@@ -5,12 +5,15 @@ import json
 
 import re
 
+
 class RequirementsNotMetException(Exception):
     """
     If this is raised while parsing, that option is not included in the parsed
     output. Used with the "requires" option setting.
     """
+
     pass
+
 
 class UserInput:
     """
@@ -21,11 +24,14 @@ class UserInput:
     behaviour. This class offers a set of pre-defined value types that can be
     consistently rendered as form elements in an interface and parsed.
     """
+
     OPTION_TOGGLE = "toggle"  # boolean toggle (checkbox)
     OPTION_CHOICE = "choice"  # one choice out of a list (select)
     OPTION_TEXT = "string"  # simple string or integer (input text)
     OPTION_MULTI = "multi"  # multiple values out of a list (select multiple)
-    OPTION_MULTI_SELECT = "multi_select"  # multiple values out of a dropdown list (select multiple)
+    OPTION_MULTI_SELECT = (
+        "multi_select"  # multiple values out of a dropdown list (select multiple)
+    )
     OPTION_INFO = "info"  # just a bit of text, not actual input
     OPTION_TEXT_LARGE = "textarea"  # longer text
     OPTION_TEXT_JSON = "json"  # text, but should be valid JSON
@@ -35,7 +41,9 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
-    OPTION_DATASOURCES_TABLE = "datasources_table" # a table with settings per data source
+    OPTION_DATASOURCES_TABLE = (
+        "datasources_table"  # a table with settings per data source
+    )
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
@@ -61,6 +69,7 @@ class UserInput:
         :return dict:  Sanitised form input
         """
         from common.lib.helpers import convert_to_int
+
         parsed_input = {}
 
         if type(input) is not dict and type(input) is not ImmutableMultiDict:
@@ -73,14 +82,19 @@ class UserInput:
                 if type(value) is list and len(value) == 1:
                     input[key] = value[0]
 
-        # all parameters are submitted as option-[parameter ID], this is an 
+        # all parameters are submitted as option-[parameter ID], this is an
         # artifact of how the web interface works and we can simply remove the
         # prefix
         input = {re.sub(r"^option-", "", field): input[field] for field in input}
 
         # re-order input so that the fields relying on the value of other
         # fields are parsed last
-        options = {k: options[k] for k in sorted(options, key=lambda k: options[k].get("requires") is not None)}
+        options = {
+            k: options[k]
+            for k in sorted(
+                options, key=lambda k: options[k].get("requires") is not None
+            )
+        }
 
         for option, settings in options.items():
             if settings.get("indirect"):
@@ -107,11 +121,26 @@ class UserInput:
 
                 # save as a tuple of unix timestamps (or None)
                 try:
-                    after, before = (UserInput.parse_value(settings, input.get(option_min), parsed_input, silently_correct), UserInput.parse_value(settings, input.get(option_max), parsed_input, silently_correct))
+                    after, before = (
+                        UserInput.parse_value(
+                            settings,
+                            input.get(option_min),
+                            parsed_input,
+                            silently_correct,
+                        ),
+                        UserInput.parse_value(
+                            settings,
+                            input.get(option_max),
+                            parsed_input,
+                            silently_correct,
+                        ),
+                    )
 
                     if before and after and after > before:
                         if not silently_correct:
-                            raise QueryParametersException("End of date range must be after beginning of date range.")
+                            raise QueryParametersException(
+                                "End of date range must be after beginning of date range."
+                            )
                         else:
                             before = after
 
@@ -125,7 +154,9 @@ class UserInput:
                 try:
                     if option in input:
                         # Toggle needs to be parsed
-                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
+                        parsed_input[option] = UserInput.parse_value(
+                            settings, input[option], parsed_input, silently_correct
+                        )
                     else:
                         # Toggle was left blank
                         parsed_input[option] = False
@@ -135,13 +166,20 @@ class UserInput:
             elif settings.get("type") == UserInput.OPTION_DATASOURCES:
                 # special case, because this combines multiple inputs to
                 # configure data source availability and expiration
-                datasources = {datasource: {
-                    "enabled": f"{option}-enable-{datasource}" in input,
-                    "allow_optout": f"{option}-optout-{datasource}" in input,
-                    "timeout": convert_to_int(input[f"{option}-timeout-{datasource}"], 0)
-                } for datasource in input[option].split(",")}
+                datasources = {
+                    datasource: {
+                        "enabled": f"{option}-enable-{datasource}" in input,
+                        "allow_optout": f"{option}-optout-{datasource}" in input,
+                        "timeout": convert_to_int(
+                            input[f"{option}-timeout-{datasource}"], 0
+                        ),
+                    }
+                    for datasource in input[option].split(",")
+                }
 
-                parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
+                parsed_input[option] = [
+                    datasource for datasource, v in datasources.items() if v["enabled"]
+                ]
                 parsed_input[option.split(".")[0] + ".expiration"] = datasources
 
             elif settings.get("type") == UserInput.OPTION_DATASOURCES_TABLE:
@@ -152,10 +190,15 @@ class UserInput:
                 for datasource in list(settings["default"].keys()):
                     table_input[datasource] = {}
                     for column in columns:
-
-                        choice = input.get(option + "-" + datasource + "-" + column, False)
-                        column_settings = settings["columns"][column] # sub-settings per column
-                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
+                        choice = input.get(
+                            option + "-" + datasource + "-" + column, False
+                        )
+                        column_settings = settings["columns"][
+                            column
+                        ]  # sub-settings per column
+                        table_input[datasource][column] = UserInput.parse_value(
+                            column_settings, choice, table_input, silently_correct=True
+                        )
 
                 parsed_input[option] = table_input
 
@@ -166,7 +209,9 @@ class UserInput:
             else:
                 # normal parsing and sanitisation
                 try:
-                    parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
+                    parsed_input[option] = UserInput.parse_value(
+                        settings, input[option], parsed_input, silently_correct
+                    )
                 except RequirementsNotMetException:
                     pass
 
@@ -193,7 +238,9 @@ class UserInput:
         # and the requirement isn't met
         if settings.get("requires"):
             try:
-                field, operator, value = re.findall(r"([a-zA-Z0-9_-]+)([!=$~^]+)(.*)", settings.get("requires"))[0]
+                field, operator, value = re.findall(
+                    r"([a-zA-Z0-9_-]+)([!=$~^]+)(.*)", settings.get("requires")
+                )[0]
             except IndexError:
                 # invalid condition, interpret as 'does the field with this name have a value'
                 field, operator, value = (choice, "!=", "")
@@ -205,15 +252,19 @@ class UserInput:
             if type(other_value) is bool:
                 # evalues to a boolean, i.e. checkboxes etc
                 if operator == "!=":
-                    if (other_value and value in ("", "false")) or (not other_value and value in ("true", "checked")):
+                    if (other_value and value in ("", "false")) or (
+                        not other_value and value in ("true", "checked")
+                    ):
                         raise RequirementsNotMetException()
                 else:
-                    if (other_value and value not in ("true", "checked")) or (not other_value and value not in ("", "false")):
+                    if (other_value and value not in ("true", "checked")) or (
+                        not other_value and value not in ("", "false")
+                    ):
                         raise RequirementsNotMetException()
 
             else:
                 if type(other_value) in (tuple, list):
-                # iterables are a bit special
+                    # iterables are a bit special
                     if len(other_value) == 1:
                         # treat one-item lists as "normal" values
                         other_value = other_value[0]
@@ -244,10 +295,10 @@ class UserInput:
             # simple boolean toggle
             if type(choice) is bool:
                 return choice
-            elif choice in ['false', 'False']:
+            elif choice in ["false", "False"]:
                 # Sanitized options passed back to Flask can be converted to strings as 'false'
                 return False
-            elif choice in ['true', 'True', 'on']:
+            elif choice in ["true", "True", "on"]:
                 # Toggle will have value 'on', but may also becomes a string 'true'
                 return True
             else:
@@ -295,7 +346,9 @@ class UserInput:
             # return option if valid, or default
             if choice not in settings.get("options"):
                 if not silently_correct:
-                    raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(settings.get('options', {}).keys())}. {settings}")
+                    raise QueryParametersException(
+                        f"Invalid value selected; must be one of {', '.join(settings.get('options', {}).keys())}. {settings}"
+                    )
                 else:
                     return settings.get("default", "")
             else:
@@ -310,7 +363,11 @@ class UserInput:
 
             return json.loads(choice)
 
-        elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
+        elif input_type in (
+            UserInput.OPTION_TEXT,
+            UserInput.OPTION_TEXT_LARGE,
+            UserInput.OPTION_HUE,
+        ):
             # text string
             # optionally clamp it as an integer; return default if not a valid
             # integer (or float; inferred from default or made explicit via the
@@ -327,7 +384,9 @@ class UserInput:
                     choice = min(settings["max"], value_type(choice))
                 except (ValueError, TypeError):
                     if not silently_correct:
-                        raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
+                        raise QueryParametersException(
+                            "Provide a value of %s or lower." % str(settings["max"])
+                        )
 
                     choice = settings.get("default")
 
@@ -336,7 +395,9 @@ class UserInput:
                     choice = max(settings["min"], value_type(choice))
                 except (ValueError, TypeError):
                     if not silently_correct:
-                        raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
+                        raise QueryParametersException(
+                            "Provide a value of %s or more." % str(settings["min"])
+                        )
 
                     choice = settings.get("default")
 

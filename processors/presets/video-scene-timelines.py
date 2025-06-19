@@ -1,6 +1,7 @@
 """
 Create scene-by-scene timelines
 """
+
 import shutil
 
 from common.config_manager import config
@@ -11,12 +12,17 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     """
     Run processor pipeline to create video scene timelines
     """
+
     type = "preset-scene-timelines"  # job type ID
-    category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
+    category = (
+        "Visual"  # category. 'Combined processors' are always listed first in the UI.
+    )
     title = "Create scene-by-scene timelines"  # title displayed in UI
-    description = "Creates a 'timeline' for each video, a horizontal collage of sequential frames. Each 'scene' in " \
-                  "the video is visualised as a single frame. Scenes are detected algorithmically. The timelines " \
-                  "for all videos are then stacked vertically and rendered as a single SVG file."
+    description = (
+        "Creates a 'timeline' for each video, a horizontal collage of sequential frames. Each 'scene' in "
+        "the video is visualised as a single frame. Scenes are detected algorithmically. The timelines "
+        "for all videos are then stacked vertically and rendered as a single SVG file."
+    )
     extension = "svg"
 
     @classmethod
@@ -30,9 +36,14 @@ class VideoSceneTimelineCreator(ProcessorPreset):
         :param DataSet module:  Module ID to determine compatibility with
         :return bool:
         """
-        return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-               config.get("video-downloader.ffmpeg_path", user=user) and \
-               shutil.which(config.get("video-downloader.ffmpeg_path"))
+        return (
+            (
+                module.get_media_type() == "video"
+                or module.type.startswith("video-downloader")
+            )
+            and config.get("video-downloader.ffmpeg_path", user=user)
+            and shutil.which(config.get("video-downloader.ffmpeg_path"))
+        )
 
     def get_processor_pipeline(self):
         """
@@ -41,17 +52,11 @@ class VideoSceneTimelineCreator(ProcessorPreset):
 
         pipeline = [
             # first, detect scenes (with the default settings)
-            {
-                "type": "video-scene-detector"
-            },
+            {"type": "video-scene-detector"},
             # then, extract frames per scene
-            {
-                "type": "video-scene-frames"
-            },
+            {"type": "video-scene-frames"},
             # and finally, render to a combined collage
-            {
-                "type": "video-timelines"
-            }
+            {"type": "video-timelines"},
         ]
 
         return pipeline

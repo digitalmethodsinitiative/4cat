@@ -1,6 +1,7 @@
 """
 Restart 4CAT and optionally upgrade it to the latest release
 """
+
 import subprocess
 import requests
 import hashlib
@@ -37,6 +38,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
     outcome of the worker probably needs to implement some timeout after which
     it is assumed that the restart/upgrade process failed catastrophically.
     """
+
     type = "restart-4cat"
     max_workers = 1
 
@@ -54,7 +56,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
         # this file has the log of the restart worker itself and is checked by
         # the frontend to see how far we are
-        log_file_restart = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_LOGS")).joinpath("restart.log")
+        log_file_restart = (
+            Path(config.get("PATH_ROOT"))
+            .joinpath(config.get("PATH_LOGS"))
+            .joinpath("restart.log")
+        )
         log_stream_restart = log_file_restart.open("a")
 
         if not is_resuming:
@@ -73,8 +79,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # being the process output
 
             if self.job.data["remote_id"].startswith("upgrade"):
-                command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart" % \
-                          (oslex.quote(config.get("4cat.github_url")))
+                command = (
+                    sys.executable
+                    + " helper-scripts/migrate.py --repository %s --yes --restart"
+                    % (oslex.quote(config.get("4cat.github_url")))
+                )
                 if self.job.details and self.job.details.get("branch"):
                     # migrate to code in specific branch
                     command += f" --branch {oslex.quote(self.job.details['branch'])}"
@@ -83,7 +92,9 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     command += " --release"
 
             else:
-                command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
+                command = (
+                    sys.executable + " 4cat-daemon.py --no-version-check force-restart"
+                )
 
             try:
                 # flush any writes before the other process starts writing to
@@ -100,9 +111,13 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # restarts and we re-attempt to make a daemon, it will fail
                 # when trying to close the stdin file descriptor of the
                 # subprocess (man, that was a fun bug to hunt down)
-                process = subprocess.Popen(oslex.split(command), cwd=str(config.get("PATH_ROOT")),
-                                           stdout=log_stream_restart, stderr=log_stream_restart,
-                                           stdin=subprocess.DEVNULL)
+                process = subprocess.Popen(
+                    oslex.split(command),
+                    cwd=str(config.get("PATH_ROOT")),
+                    stdout=log_stream_restart,
+                    stderr=log_stream_restart,
+                    stdin=subprocess.DEVNULL,
+                )
 
                 while not self.interrupted:
                     # basically wait for either the process to quit or 4CAT to
@@ -118,7 +133,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 if process.returncode is not None:
                     # if we reach this, 4CAT was never restarted, and so the job failed
                     log_stream_restart.write(
-                        f"\nUnexpected outcome of restart call ({process.returncode})\n")
+                        f"\nUnexpected outcome of restart call ({process.returncode})\n"
+                    )
 
                     raise RuntimeError()
                 else:
@@ -130,8 +146,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_restart.write(str(e))
                 log_stream_restart.write(
                     "[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
-                    "(see above). You may need to restart 4CAT manually.\n")
-                self.log.error(f"Error restarting 4CAT. See {log_stream_restart.name} for details.")
+                    "(see above). You may need to restart 4CAT manually.\n"
+                )
+                self.log.error(
+                    f"Error restarting 4CAT. See {log_stream_restart.name} for details."
+                )
                 lock_file.unlink()
                 self.job.finish()
 
@@ -141,31 +160,48 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         else:
             # 4CAT back-end was restarted - now check the results and make the
             # front-end restart or upgrade too
-            self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
+            self.log.info(
+                "Restart worker resumed after restarting 4CAT, restart successful."
+            )
             log_stream_restart.write("4CAT restarted.\n")
-            with Path(config.get("PATH_ROOT")).joinpath("config/.current-version").open() as infile:
-                log_stream_restart.write(f"4CAT is now running version {infile.readline().strip()}.\n")
+            with (
+                Path(config.get("PATH_ROOT"))
+                .joinpath("config/.current-version")
+                .open() as infile
+            ):
+                log_stream_restart.write(
+                    f"4CAT is now running version {infile.readline().strip()}.\n"
+                )
 
             # we're gonna use some specific Flask routes to trigger this, i.e.
             # we're interacting with the front-end through HTTP
             api_host = "https://" if config.get("flask.https") else "http://"
             if config.get("USING_DOCKER"):
                 import os
-                docker_exposed_port = os.environ['PUBLIC_PORT']
+
+                docker_exposed_port = os.environ["PUBLIC_PORT"]
                 api_host += f"host.docker.internal{':' + docker_exposed_port if docker_exposed_port != '80' else ''}"
             else:
                 api_host += config.get("flask.server_name")
 
-            if self.job.data["remote_id"].startswith("upgrade") and config.get("USING_DOCKER"):
+            if self.job.data["remote_id"].startswith("upgrade") and config.get(
+                "USING_DOCKER"
+            ):
                 # when using Docker, the front-end needs to update separately
-                log_stream_restart.write("Telling front-end Docker container to upgrade...\n")
+                log_stream_restart.write(
+                    "Telling front-end Docker container to upgrade...\n"
+                )
                 log_stream_restart.close()  # close, because front-end will be writing to it
                 upgrade_ok = False
                 upgrade_timeout = False
                 try:
                     upgrade_url = api_host + "/admin/trigger-frontend-upgrade/"
                     with lock_file.open() as infile:
-                        frontend_upgrade = requests.post(upgrade_url, data={"token": infile.read()}, timeout=(10 * 60))
+                        frontend_upgrade = requests.post(
+                            upgrade_url,
+                            data={"token": infile.read()},
+                            timeout=(10 * 60),
+                        )
                     upgrade_ok = frontend_upgrade.json()["status"] == "OK"
                 except requests.RequestException:
                     pass
@@ -176,8 +212,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 if not upgrade_ok:
                     if upgrade_timeout:
                         log_stream_restart.write("Upgrade timed out.")
-                    log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart"
-                                             "containers manually.\n")
+                    log_stream_restart.write(
+                        "Error upgrading front-end container. You may need to upgrade and restart"
+                        "containers manually.\n"
+                    )
                     lock_file.unlink()
                     return self.job.finish()
 
@@ -187,7 +225,9 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             try:
                 restart_url = api_host + "/admin/trigger-frontend-restart/"
                 with lock_file.open() as infile:
-                    response = requests.post(restart_url, data={"token": infile.read()}, timeout=5).json()
+                    response = requests.post(
+                        restart_url, data={"token": infile.read()}, timeout=5
+                    ).json()
 
                 if response.get("message"):
                     log_stream_restart.write(response.get("message") + "\n")
@@ -214,8 +254,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             # too bad
             if not frontend_ok:
-                log_stream_restart.write("Timed out waiting for front-end to restart. You may need to restart it "
-                                         "manually.\n")
+                log_stream_restart.write(
+                    "Timed out waiting for front-end to restart. You may need to restart it "
+                    "manually.\n"
+                )
                 self.log.error("Front-end did not come back online after restart")
             else:
                 log_stream_restart.write("Front-end is available. Restart complete.")

@@ -1,6 +1,7 @@
 """
 Generate network of values from two columns
 """
+
 from dateutil.relativedelta import relativedelta
 
 from backend.lib.processor import BasicProcessor
@@ -19,22 +20,19 @@ class ColumnNetworker(BasicProcessor):
     """
     Generate network of values from two columns
     """
+
     type = "column-network"
     category = "Networks"
     title = "Custom network"
-    description = "Create a GEXF network file comprised of linked values between a custom set of columns " \
-                  "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
+    description = (
+        "Create a GEXF network file comprised of linked values between a custom set of columns "
+        "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
+    )
     extension = "gexf"
 
     options = {
-        "column-a": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Attribute A"
-        },
-        "column-b": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Attribute B"
-        },
+        "column-a": {"type": UserInput.OPTION_TEXT, "help": "Attribute A"},
+        "column-b": {"type": UserInput.OPTION_TEXT, "help": "Attribute B"},
         "interval": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Make network dynamic by",
@@ -44,53 +42,53 @@ class ColumnNetworker(BasicProcessor):
                 "year": "Year",
                 "month": "Month",
                 "week": "Week",
-                "day": "Day"
+                "day": "Day",
             },
             "tooltip": "Dynamic networks will record in which interval(s) nodes and edges were present. "
-                       "Weights will also be calculated per interval. Dynamic graphs can be opened in e.g. Gephi to "
-                       "visually analyse the evolution of the network over time."
+            "Weights will also be calculated per interval. Dynamic graphs can be opened in e.g. Gephi to "
+            "visually analyse the evolution of the network over time.",
         },
         "directed": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Directed edges?",
             "default": True,
             "tooltip": "If enabled, e.g. an edge from 'hello' in column 1 to 'world' in column 2 creates a different edge "
-                       "than from 'world' in column 1 to 'hello' in column 2. If disabled, these would be considered "
-                       "the same edge."
+            "than from 'world' in column 1 to 'hello' in column 2. If disabled, these would be considered "
+            "the same edge.",
         },
         "allow-loops": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Allow loops?",
             "default": False,
-            "tooltip": "If enabled, a looping edge (from a node to itself) is created if the two columns contain the same value."
+            "tooltip": "If enabled, a looping edge (from a node to itself) is created if the two columns contain the same value.",
         },
         "split-comma": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Split column values by comma?",
             "default": False,
             "tooltip": "If enabled, values separated by commas are considered separate nodes, and create separate "
-                       "edges. Useful if columns contain e.g. lists of hashtags."
+            "edges. Useful if columns contain e.g. lists of hashtags.",
         },
         "categorise": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Categorize nodes by column?",
             "default": True,
             "tooltip": "If enabled, the same values from different columns are treated as separate nodes. For "
-                       "example, the value 'hello' from the column 'user' is treated as a different node than the "
-                       "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
+            "example, the value 'hello' from the column 'user' is treated as a different node than the "
+            "value 'hello' from the column 'subject'. If disabled, they would be considered a single node.",
         },
         "to-lowercase": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Convert values to lowercase",
-            "tooltip": "Merges values with varying cases"
+            "tooltip": "Merges values with varying cases",
         },
         "ignore-nodes": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
             "help": "Nodes to ignore",
-            "tooltip": "Separate with commas if you want to ignore multiple nodes"
-        }
+            "tooltip": "Separate with commas if you want to ignore multiple nodes",
+        },
     }
 
     @classmethod
@@ -117,13 +115,13 @@ class ColumnNetworker(BasicProcessor):
                 "type": UserInput.OPTION_CHOICE,
                 "options": parent_columns,
                 "help": "'From' column name",
-                "tooltip": "Name of the column of values from which edges originate"
+                "tooltip": "Name of the column of values from which edges originate",
             }
             options["column-b"] = {
                 "type": UserInput.OPTION_CHOICE,
                 "options": parent_columns,
                 "help": "'To' column name",
-                "tooltip": "Name of the column of values at which edges terminate"
+                "tooltip": "Name of the column of values at which edges terminate",
             }
 
         return options
@@ -151,23 +149,42 @@ class ColumnNetworker(BasicProcessor):
         allow_loops = self.parameters.get("allow-loops")
         interval_type = self.parameters.get("interval")
         to_lower = self.parameters.get("to-lowercase", False)
-        ignoreable = [n.strip() for n in self.parameters.get("ignore-nodes", "").split(",") if n.strip()]
+        ignoreable = [
+            n.strip()
+            for n in self.parameters.get("ignore-nodes", "").split(",")
+            if n.strip()
+        ]
 
         processed = 0
 
-        network_parameters = {"generated_by": "4CAT Capture & Analysis Toolkit", "source_dataset_id": self.source_dataset.key}
-        network = nx.DiGraph(**network_parameters) if directed else nx.Graph(**network_parameters)
+        network_parameters = {
+            "generated_by": "4CAT Capture & Analysis Toolkit",
+            "source_dataset_id": self.source_dataset.key,
+        }
+        network = (
+            nx.DiGraph(**network_parameters)
+            if directed
+            else nx.Graph(**network_parameters)
+        )
 
         for item in self.source_dataset.iterate_items(self):
             if column_a not in item or column_b not in item:
-                missing = "'" + "' and '".join([c for c in (column_a, column_b) if c not in item]) + "'"
-                self.dataset.update_status(f"Column(s) {missing} not found in dataset", is_final=True)
+                missing = (
+                    "'"
+                    + "' and '".join([c for c in (column_a, column_b) if c not in item])
+                    + "'"
+                )
+                self.dataset.update_status(
+                    f"Column(s) {missing} not found in dataset", is_final=True
+                )
                 self.dataset.finish(0)
                 return
 
             processed += 1
             if processed % 500 == 0:
-                self.dataset.update_status(f"Processed {processed:,} items ({len(network.nodes):,} nodes found)")
+                self.dataset.update_status(
+                    f"Processed {processed:,} items ({len(network.nodes):,} nodes found)"
+                )
                 self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
             # both columns need to have a value for an edge to be possible
@@ -197,8 +214,16 @@ class ColumnNetworker(BasicProcessor):
             values_b = [values_b]
 
             if split_comma:
-                values_a = [value.strip() for value_groups in values_a for value in value_groups.split(",")]
-                values_b = [value.strip() for value_groups in values_b for value in value_groups.split(",")]
+                values_a = [
+                    value.strip()
+                    for value_groups in values_a
+                    for value in value_groups.split(",")
+                ]
+                values_b = [
+                    value.strip()
+                    for value_groups in values_b
+                    for value in value_groups.split(",")
+                ]
 
             if ignoreable:
                 values_a = [v for v in values_a if v not in ignoreable]
@@ -211,10 +236,12 @@ class ColumnNetworker(BasicProcessor):
             try:
                 interval = get_interval_descriptor(item, interval_type)
             except ValueError as e:
-                self.dataset.update_status(f"{e}, cannot count posts per {interval_type}", is_final=True)
+                self.dataset.update_status(
+                    f"{e}, cannot count posts per {interval_type}", is_final=True
+                )
                 self.dataset.update_status(0)
                 return
-            
+
             # Track nodes per item (categoise option adjusts node name to include column if True)
             processed_nodes = set()
 
@@ -224,8 +251,12 @@ class ColumnNetworker(BasicProcessor):
             for value_a in values_a:
                 for value_b in values_b:
                     # node 'ID', which we use to differentiate by column (or not)
-                    node_a = column_a + "-" + value_a if categorise else "node-" + value_a
-                    node_b = column_b + "-" + value_b if categorise else "node-" + value_b
+                    node_a = (
+                        column_a + "-" + value_a if categorise else "node-" + value_a
+                    )
+                    node_b = (
+                        column_b + "-" + value_b if categorise else "node-" + value_b
+                    )
 
                     if not allow_loops and node_a == node_b:
                         continue
@@ -235,7 +266,13 @@ class ColumnNetworker(BasicProcessor):
                     # frequency
                     if node_a not in processed_nodes:
                         if node_a not in network.nodes():
-                            network.add_node(node_a, intervals={}, frequency=1, label=value_a, **({"category": column_a} if categorise else {}))
+                            network.add_node(
+                                node_a,
+                                intervals={},
+                                frequency=1,
+                                label=value_a,
+                                **({"category": column_a} if categorise else {}),
+                            )
                         else:
                             network.nodes[node_a]["frequency"] += 1
 
@@ -244,13 +281,19 @@ class ColumnNetworker(BasicProcessor):
                         network.nodes[node_a]["intervals"][interval] += 1
 
                         processed_nodes.add(node_a)
-                    
+
                     if node_b not in processed_nodes:
                         if node_b not in network.nodes():
-                            network.add_node(node_b, intervals={}, frequency=1, label=value_b, **({"category": column_b} if categorise else {}))
+                            network.add_node(
+                                node_b,
+                                intervals={},
+                                frequency=1,
+                                label=value_b,
+                                **({"category": column_b} if categorise else {}),
+                            )
                         else:
                             network.nodes[node_b]["frequency"] += 1
-                       
+
                         if interval not in network.nodes[node_b]["intervals"]:
                             network.nodes[node_b]["intervals"][interval] = 0
                         network.nodes[node_b]["intervals"][interval] += 1
@@ -263,10 +306,12 @@ class ColumnNetworker(BasicProcessor):
                         edge = tuple(sorted((node_a, node_b)))
                     else:
                         edge = (node_a, node_b)
-                    
+
                     if edge not in processed_edges:
                         if edge not in network.edges():
-                            network.add_edge(node_a, node_b, intervals={}, frequency=1, weight=1)
+                            network.add_edge(
+                                node_a, node_b, intervals={}, frequency=1, weight=1
+                            )
                         else:
                             network.edges[edge]["frequency"] += 1
                             network.edges[edge]["weight"] += 1
@@ -279,7 +324,9 @@ class ColumnNetworker(BasicProcessor):
                         processed_edges.add(edge)
 
         if not network.edges():
-            self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
+            self.dataset.update_status(
+                "No edges could be created for the given parameters", is_final=True
+            )
             self.dataset.finish(0)
             return
 
@@ -296,15 +343,24 @@ class ColumnNetworker(BasicProcessor):
             for component in (network.nodes, network.edges):
                 for item in component:
                     if transformed % 500 == 0:
-                        self.dataset.update_status(f"Transforming dynamic nodes and edges ({transformed:,} of {num_items:,} done)")
+                        self.dataset.update_status(
+                            f"Transforming dynamic nodes and edges ({transformed:,} of {num_items:,} done)"
+                        )
                         self.dataset.update_progress(transformed / num_items)
 
                     transformed += 1
                     for interval, weight in component[item]["intervals"].copy().items():
                         del component[item]["intervals"][interval]
-                        component[item]["intervals"].update(self.extrapolate_weights(interval, weight, interval_type))
+                        component[item]["intervals"].update(
+                            self.extrapolate_weights(interval, weight, interval_type)
+                        )
 
-                    component[item]["intervals"] = dict(sorted(component[item]["intervals"].items(), key=lambda item: item[0]))
+                    component[item]["intervals"] = dict(
+                        sorted(
+                            component[item]["intervals"].items(),
+                            key=lambda item: item[0],
+                        )
+                    )
 
                     # now figure out the continuous periods of node existence
                     # as well as the period in which each weight was accurate
@@ -324,10 +380,16 @@ class ColumnNetworker(BasicProcessor):
 
                         # see if there is a gap of more than one day between
                         # this occurrence and the previous one
-                        interval_datetime = datetime.datetime.strptime(interval, "%Y-%m-%d")
-                        previous_datetime = datetime.datetime.strptime(previous, "%Y-%m-%d")
+                        interval_datetime = datetime.datetime.strptime(
+                            interval, "%Y-%m-%d"
+                        )
+                        previous_datetime = datetime.datetime.strptime(
+                            previous, "%Y-%m-%d"
+                        )
 
-                        if interval_datetime > previous_datetime + datetime.timedelta(days=1):
+                        if interval_datetime > previous_datetime + datetime.timedelta(
+                            days=1
+                        ):
                             # if so, create a new spell
                             spells.append((start, previous))
                             weights.append([weight, weight_start, previous])
@@ -343,7 +405,13 @@ class ColumnNetworker(BasicProcessor):
 
                     # add final spells
                     spells.append((start, [*component[item]["intervals"].keys()][-1]))
-                    weights.append([previous_weight, weight_start, [*component[item]["intervals"].keys()][-1]])
+                    weights.append(
+                        [
+                            previous_weight,
+                            weight_start,
+                            [*component[item]["intervals"].keys()][-1],
+                        ]
+                    )
 
                     component[item]["spells"] = spells
                     component[item]["frequency"] = weights
@@ -379,14 +447,20 @@ class ColumnNetworker(BasicProcessor):
             moment = datetime.datetime(int(interval), 1, 1)
             interval_end = moment + relativedelta(years=+1)
         elif interval_type == "month":
-            moment = datetime.datetime(int(interval.split("-")[0]), int(interval.split("-")[1]), 1)
+            moment = datetime.datetime(
+                int(interval.split("-")[0]), int(interval.split("-")[1]), 1
+            )
             interval_end = moment + relativedelta(months=+1)
         elif interval_type == "week":
             # a little bit more complicated
-            moment = datetime.datetime.strptime("%s-%s-1" % tuple(interval.split("-")), "%Y-%W-%w").date()
+            moment = datetime.datetime.strptime(
+                "%s-%s-1" % tuple(interval.split("-")), "%Y-%W-%w"
+            ).date()
             interval_end = moment + relativedelta(weeks=+1)
         else:
-            raise ValueError("extrapolate_weights() expects interval to be one of year, month, week")
+            raise ValueError(
+                "extrapolate_weights() expects interval to be one of year, month, week"
+            )
 
         result = {}
         while moment < interval_end:

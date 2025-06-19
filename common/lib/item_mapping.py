@@ -39,7 +39,9 @@ class MappedItem:
         """
         self.data = data
         self.message = message
-        self.missing = [k for k in self.data if type(self.data[k]) is MissingMappedField]
+        self.missing = [
+            k for k in self.data if type(self.data[k]) is MissingMappedField
+        ]
 
     def get_item_data(self, safe=False):
         """
@@ -85,6 +87,7 @@ class DatasetItem(dict):
     :todo: consider just-in-time mapping by only storing the original and
     calling the mapper only when the object is accessed as a dict
     """
+
     def __init__(self, mapper, original, mapped_object, *args, **kwargs):
         """
         DatasetItem init
