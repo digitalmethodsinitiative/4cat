@@ -170,10 +170,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # this trips Flake8 for some reason, can ignore
         common_vocab.sort(
             key=lambda w: sum(
-                [model.get_vecattr(w, "count") for model in models.values()]
+                [model.get_vecattr(w, "count") for model in models.values()]  # noqa: F821
             ),
             reverse=True,
-        )  # noqa: F821
+        )
 
         # initial boundaries of 2D space (to be adjusted later based on t-sne
         # outcome)

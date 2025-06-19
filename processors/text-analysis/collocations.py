@@ -273,22 +273,22 @@ class GetCollocations(BasicProcessor):
 
             # Filter out combinations not containing the query string
             if query_string:
-                word_filter = lambda w1, w2: not any(
+                word_filter = lambda w1, w2: not any(  # noqa: E731
                     string in (w1, w2) for string in query_string
-                )  # noqa: E731
+                )
                 finder.apply_ngram_filter(word_filter)
 
                 # Filter out two times the occurance of the same query string
-                duplicate_filter = lambda w1, w2: (
+                duplicate_filter = lambda w1, w2: (  # noqa: E731
                     w1 in query_string and w2 in query_string
-                )  # noqa: E731
+                )
                 finder.apply_ngram_filter(duplicate_filter)
 
             # Filter out forbidden words
             if forbidden_words:
-                forbidden_words_filter = lambda w1, w2: any(
+                forbidden_words_filter = lambda w1, w2: any(  # noqa: E731
                     string in (w1, w2) for string in forbidden_words
-                )  # noqa: E731
+                )
                 finder.apply_ngram_filter(forbidden_words_filter)
 
         # Three-word collocations (~ trigrams)
@@ -299,9 +299,9 @@ class GetCollocations(BasicProcessor):
 
             # Filter out combinations not containing the query string
             if query_string:
-                word_filter = lambda w1, w2, w3: not any(
+                word_filter = lambda w1, w2, w3: not any(  # noqa: E731
                     string in (w1, w2, w3) for string in query_string
-                )  # noqa: E731
+                )
                 finder.apply_ngram_filter(word_filter)
 
             # Filter out forbidden words
