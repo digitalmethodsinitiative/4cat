@@ -13,5 +13,7 @@ jobs:
     steps:
       - name: checkout-repo
         uses: actions/checkout@v4
-      - name: ruff-action
+      - name: ruff-check
         uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check --diff"
