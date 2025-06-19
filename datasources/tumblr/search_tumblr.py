@@ -148,7 +148,7 @@ class SearchTumblr(Search):
 		}
 
 		try:
-			SearchTumblr.get_tumblr_keys(user)
+			SearchTumblr.get_tumblr_keys(config)
 		except ConfigException:
 			# No 4CAT set keys for user; let user input their own
 			options["key-info"] = {
@@ -303,7 +303,7 @@ class SearchTumblr(Search):
 				# Used for getting tagged posts, which uses requests instead.
 				api_key = self.parameters.get("consumer_key")
 				if not api_key:
-					api_key = SearchTumblr.get_tumblr_keys(self.owner)[0]
+					api_key = SearchTumblr.get_tumblr_keys(self.config)[0]
 
 				new_results = self.get_posts_by_tag(query, max_date=max_date, min_date=min_date, api_key=api_key)
 
@@ -893,7 +893,7 @@ class SearchTumblr(Search):
 		return post_notes
 
 	@staticmethod
-	def get_tumblr_keys(user):
+	def get_tumblr_keys(config):
 		config_keys = [
 			config.get("api.tumblr.consumer_key"),
 			config.get("api.tumblr.consumer_secret"),
@@ -915,7 +915,7 @@ class SearchTumblr(Search):
 					   self.parameters.get("secret_key")]
 		if not all(config_keys):
 			# No user input keys; attempt to use 4CAT config keys
-			config_keys = self.get_tumblr_keys(self.owner)
+			config_keys = self.get_tumblr_keys(self.config)
 
 		self.client = pytumblr.TumblrRestClient(*config_keys)
 

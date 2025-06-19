@@ -139,7 +139,7 @@ def datasource_form(datasource_id):
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
-	worker_options = worker_class.get_options(None, config)
+	worker_options = worker_class.get_options(None, g.config)
 	if not worker_options:
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
@@ -307,11 +307,11 @@ def queue_dataset():
 		# just in case
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(None, config), request.form, silently_correct=False)
+			sanitised_query = UserInput.parse_all(search_worker.get_options(None, g.config), request.form, silently_correct=False)
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
-			sanitised_query = search_worker.validate_query(sanitised_query, request, config)
+			sanitised_query = search_worker.validate_query(sanitised_query, request, g.config)
 
 		except QueryNeedsFurtherInputException as e:
 			# ask the user for more input by returning a HTML snippet
@@ -1032,18 +1032,18 @@ def queue_processor(key=None, processor=None):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
-	available_processors = dataset.get_available_processors(config=config, exclude_hidden=True)
+	available_processors = dataset.get_available_processors(config=g.config, exclude_hidden=True)
 	if processor not in available_processors:
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 
 	processor_worker = available_processors[processor]
 	try:
-		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, config), request.form,
+		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, g.config), request.form,
                                               silently_correct=False)
 
 		if hasattr(processor_worker, "validate_query"):
 			# validate_query is optional for processors
-			sanitised_query = processor_worker.validate_query(sanitised_query, request, config)
+			sanitised_query = processor_worker.validate_query(sanitised_query, request, g.config)
 
 	except QueryParametersException as e:
 		# parameters need amending

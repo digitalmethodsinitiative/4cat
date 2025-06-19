@@ -97,9 +97,9 @@ class AudioExtractor(BasicProcessor):
             # ffmpeg -i video.mkv -map 0:a -acodec libmp3lame audio.mp4
             command = [
                 shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-                "-i", shlex.quote(str(path)),
+                "-i", oslex.quote(str(path)),
                 "-ar", str(16000),
-                shlex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
+                oslex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
             ]
 
             result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

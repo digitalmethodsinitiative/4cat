@@ -293,7 +293,7 @@ def add_user():
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
                 user = User.get_by_name(g.db, username)
-		user.with_config(g.config)
+                user.with_config(g.config)
                 g.db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
@@ -429,7 +429,7 @@ def manipulate_user(mode):
     if user is None:
         return error(404, message="User not found")
 
-    user.with_config(config)
+    user.with_config(g.config)
     incomplete = []
     if request.method == "POST":
         if not request.form.get("name", request.args.get("name")):
@@ -482,7 +482,7 @@ def manipulate_user(mode):
                     incomplete.append("name")
                     g.db.rollback()
 
-            user.with_config(config)
+            user.with_config(g.config)
             if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
                 if not autodelete:

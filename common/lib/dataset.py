@@ -12,8 +12,8 @@ import re
 from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
-from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api
+
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api, hash_to_md5, convert_to_float
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,

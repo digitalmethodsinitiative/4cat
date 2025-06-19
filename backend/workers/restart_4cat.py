@@ -73,7 +73,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             if self.job.data["remote_id"].startswith("upgrade"):
                 command = sys.executable + " helper-scripts/migrate.py --repository %s --yes --restart" % \
-                          (oslex.quote(config.get("4cat.github_url")))
+                          (oslex.quote(self.config.get("4cat.github_url")))
                 if self.job.details and self.job.details.get("branch"):
                     # migrate to code in specific branch
                     command += f" --branch {oslex.quote(self.job.details['branch'])}"
@@ -99,7 +99,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # restarts and we re-attempt to make a daemon, it will fail
                 # when trying to close the stdin file descriptor of the
                 # subprocess (man, that was a fun bug to hunt down)
-                process = subprocess.Popen(oslex.split(command), cwd=str(config.get("PATH_ROOT")),
+                process = subprocess.Popen(oslex.split(command), cwd=str(self.config.get("PATH_ROOT")),
                                            stdout=log_stream_restart, stderr=log_stream_restart,
                                            stdin=subprocess.DEVNULL)
 

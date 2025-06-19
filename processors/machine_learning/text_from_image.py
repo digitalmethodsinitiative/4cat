@@ -8,7 +8,7 @@ and is run using the DMI Service Manager
 import json
 import os
 
-from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
+from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException, DsmConnectionError
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException

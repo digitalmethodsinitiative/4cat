@@ -76,7 +76,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
         :return bool:
         """
         return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-               config.get("video-downloader.ffmpeg_path", user=user) and \
+               config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
         
     def get_processor_advanced_pipeline(self, attach_to=None):
@@ -525,20 +525,20 @@ class VideoHashSimilarities(BasicProcessor):
             xor_result = np.bitwise_xor(vid_hash, hashes)
             similarity_matrix.append([xor_comparison.sum() <= bits_threshhold for xor_comparison in xor_result])
 
-		self.dataset.update_status(f"Create groups video hash similarities above {self.parameters.get('percent', 90)}% similar")
-		# These groups can merge and get rather large as similarities can "chain"
-		# (e.g., A is similar to B, B is similar C, thus A & B & C are similar)
-		groups = {"no_matches": []}
-		video_group_key = {}
-		group_index = 1
-		for i, vid in enumerate(all_video_hashes):
-			create_new_group = False
-			if sum(similarity_matrix[i]) > 1:
-				# matches found! identify group
-				group = [i]
-				for j in range(len(similarity_matrix[i])):
-					if similarity_matrix[i][j] and j != i:
-						group.append(j)
+        self.dataset.update_status(f"Create groups video hash similarities above {self.parameters.get('percent', 90)}% similar")
+        # These groups can merge and get rather large as similarities can "chain"
+        # (e.g., A is similar to B, B is similar C, thus A & B & C are similar)
+        groups = {"no_matches": []}
+        video_group_key = {}
+        group_index = 1
+        for i, vid in enumerate(all_video_hashes):
+            create_new_group = False
+            if sum(similarity_matrix[i]) > 1:
+                # matches found! identify group
+                group = [i]
+                for j in range(len(similarity_matrix[i])):
+                    if similarity_matrix[i][j] and j != i:
+                        group.append(j)
 
                 # check if any of the matches are already in a group
                 group_key_match = set(video_group_key.get(match) for match in group if video_group_key.get(match))

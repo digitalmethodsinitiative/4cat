@@ -89,7 +89,7 @@ class ImageDownloader(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -107,7 +107,7 @@ class ImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
+        max_number_images = int(config.get("image-downloader.max", 1000))
         if max_number_images != 0:
             options["amount"]["help"] = f"No. of images (max {max_number_images})"
             options["amount"]["max"] = max_number_images

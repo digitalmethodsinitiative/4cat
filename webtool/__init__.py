@@ -20,7 +20,7 @@ if result.returncode != 0:
 # the following are imported *after* the first-run stuff because they may rely
 # on things set up in there - or should not run unless first-run completes
 # successfully!
-from flask import Flask, g, request  # noqa: E402
+from flask import Flask, g, request, current_app  # noqa: E402
 from flask_login import LoginManager, current_user  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
@@ -141,6 +141,7 @@ with app.app_context():
     app.log = log
     app.db = db
     app.fourcat_config = config
+    app.fourcat_modules = ModuleCollector(g.base_config)
 
     # import all views; these can only be imported here because they rely on
     # current_app for initialisation
@@ -178,7 +179,7 @@ with app.app_context():
         g.db = db
         g.log = log
         g.config = ConfigWrapper(g.base_config, user=current_user, request=request)
-	g.modules = ModuleCollector(g.base_config)
+        g.modules = current_app.fourcat_modules
 
     # import custom jinja2 template filters
     # these also benefit from current_app

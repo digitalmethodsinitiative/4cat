@@ -281,7 +281,7 @@ class ImageTextWallGenerator(BasicProcessor):
 
         # now we know all dimensions we can instantiate the canvas too
         canvas = get_4cat_canvas(self.dataset.get_results_path(), max(row_widths.values()),
-                                 row_height * len(row_widths) + fontsize * 4, header=f"Images with captions",
+                                 row_height * len(row_widths) + fontsize * 4, header="Images with captions",
                                  fontsize_small=fontsize, fontsize_large=fontsize)
 
         for category_image in complete_categories:

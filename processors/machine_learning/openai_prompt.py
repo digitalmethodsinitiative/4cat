@@ -135,7 +135,7 @@ class OpenAI(BasicProcessor):
 			}
 		}
 
-		api_key = config.get("api.openai.api_key", user=user)
+		api_key = config.get("api.openai.api_key")
 		if not api_key:
 			options["api_key"] = {
 				"type": UserInput.OPTION_TEXT,
@@ -293,7 +293,7 @@ class OpenAI(BasicProcessor):
 		self.write_csv_items_and_finish(results)
 
 	@staticmethod
-	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50) -> ChatCompletion:
+	def prompt_gpt(prompt: str, client: openai.Client, model="gpt-4-turbo", temperature=0.2, max_tokens=50):
 
 		# Get response
 		response = client.chat.completions.create(

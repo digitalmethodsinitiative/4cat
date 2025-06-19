@@ -114,23 +114,24 @@ class OvertimeHatefulAnalysis(BasicProcessor):
             self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
             self.dataset.finish(0)
             return
-		# now for the real deal
-		self.dataset.update_status("Reading source file")
-		activity = {}
-		hateful = {}
-		views = {}
-		intervals = set()
-		unknown_dates = 0
+            
+        # now for the real deal
+        self.dataset.update_status("Reading source file")
+        activity = {}
+        hateful = {}
+        views = {}
+        intervals = set()
+        unknown_dates = 0
 
-		fieldnames = self.source_dataset.get_columns()
-		if "views" in fieldnames:
-			engagement_field = "views"
-		elif "score" in fieldnames:
-			engagement_field = "score"
-		elif "likes" in fieldnames:
-			engagement_field = "likes"
-		else:
-			engagement_field = None
+        fieldnames = self.source_dataset.get_columns()
+        if "views" in fieldnames:
+            engagement_field = "views"
+        elif "score" in fieldnames:
+            engagement_field = "score"
+        elif "likes" in fieldnames:
+            engagement_field = "likes"
+        else:
+            engagement_field = None
 
         with self.config.get('PATH_ROOT').joinpath(
                 f"common/assets/hatebase/hatebase-{language}.json").open() as hatebasedata:
@@ -141,18 +142,18 @@ class OvertimeHatefulAnalysis(BasicProcessor):
                     hatebase[term]["average_offensiveness"] and hatebase[term][
                 "average_offensiveness"] > min_offensive)]) + r")\b")
 
-		for post in self.source_dataset.iterate_items(self):
-			# Ensure the post has a date
-			if timeframe != "all" and not post.get("timestamp"):
-				time_unit = "unknown_date"
-				unknown_dates += 1
-			else:
-				try:
-					time_unit = get_interval_descriptor(post, timeframe)
-				except ValueError as e:
-					self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
-					self.dataset.update_status(0)
-					return
+        for post in self.source_dataset.iterate_items(self):
+            # Ensure the post has a date
+            if timeframe != "all" and not post.get("timestamp"):
+                time_unit = "unknown_date"
+                unknown_dates += 1
+            else:
+                try:
+                    time_unit = get_interval_descriptor(post, timeframe)
+                except ValueError as e:
+                    self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
+                    self.dataset.update_status(0)
+                    return
 
             # determine where to put this data
             if time_unit not in activity:
@@ -166,12 +167,12 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 
             intervals.add(time_unit)
 
-			activity[time_unit] += 1
-			if engagement_field:
-				try:
-					views[time_unit] += int(post[engagement_field])
-				except (ValueError, TypeError):
-					pass
+            activity[time_unit] += 1
+            if engagement_field:
+                try:
+                    views[time_unit] += int(post[engagement_field])
+                except (ValueError, TypeError):
+                    pass
 
             terms = []
             for term in hatebase_regex.findall(post["body"].lower()):
@@ -192,24 +193,24 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 
             hateful[time_unit] += len(terms)
 
-		rows = []
-		for interval in sorted(intervals):
-			rows.append({
-				"date": interval,
-				"item": "offensive language",
-				"value": hateful[interval]
-			})
-			rows.append({
-				"date": interval,
-				"item": "messages",
-				"value": activity[interval]
-			})
-			if engagement_field:
-				rows.append({
-					"date": interval,
-					"item": engagement_field,
-					"value": views[interval]
-				})
+        rows = []
+        for interval in sorted(intervals):
+            rows.append({
+                "date": interval,
+                "item": "offensive language",
+                "value": hateful[interval]
+            })
+            rows.append({
+                "date": interval,
+                "item": "messages",
+                "value": activity[interval]
+            })
+            if engagement_field:
+                rows.append({
+                    "date": interval,
+                    "item": engagement_field,
+                    "value": views[interval]
+                })
 
         # write as csv
         if rows:

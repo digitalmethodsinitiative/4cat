@@ -149,9 +149,9 @@ class AttributeRanker(BasicProcessor):
             self.dataset.finish(0)
             return
 
-		# we need to be able to order the values later, chronologically, so use
-		# and OrderedDict; all frequencies go into this variable
-		items = OrderedDict()
+        # we need to be able to order the values later, chronologically, so use
+        # and OrderedDict; all frequencies go into this variable
+        items = OrderedDict()
 
         # this is a placeholder function to map missing values to a placeholder
         def missing_value_placeholder(data, field_name):

@@ -4,7 +4,6 @@ Collect Bluesky posts
 import hashlib
 import time
 from datetime import datetime
-from pathlib import Path
 
 from dateutil import parser
 
@@ -17,7 +16,7 @@ from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitCo
     ProcessorInterruptedException
 from common.lib.helpers import timify_long
 from common.lib.user_input import UserInput
-from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.item_mapping import MappedItem
 
 class SearchBluesky(Search):
     """
@@ -140,7 +139,7 @@ class SearchBluesky(Search):
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
         try:
             SearchBluesky.bsky_login(username=query["username"], password=query["password"], session_id=session_id, session_directory=config.get("PATH_ROOT").joinpath(config.get("PATH_SESSIONS")))
-        except UnauthorizedError as e:
+        except UnauthorizedError:
             raise QueryParametersException("Invalid Bluesky login credentials.")
         except RequestException as e:
             if e.response.content.message == 'Rate Limit Exceeded':

@@ -35,7 +35,7 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.get('tcat-auto-upload.server_url', user=user)
+                            url: url for url in config.get('tcat-auto-upload.server_url')
                         }
                     },
                     "default": "random",
