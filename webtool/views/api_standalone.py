@@ -8,27 +8,27 @@ import json
 import time
 import csv
 
-from flask import jsonify, request, send_file, after_this_request
+from flask import Blueprint, current_app, jsonify, request, send_file, after_this_request, g
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, openapi, limiter, fourcat_modules
 from webtool.lib.helpers import error, setting_required
 
 from common.lib.exceptions import JobNotFoundException
-from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
-
-api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
+from backend.lib.search import Search
 
 API_SUCCESS = 200
 API_FAIL = 404
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
-@app.route("/api/get-standalone-processors/")
+component = Blueprint("standalone", __name__)
+api_ratelimit = current_app.limiter.shared_limit("45 per minute", scope="api")
+
+@component.route("/api/get-standalone-processors/")
 @api_ratelimit
-@openapi.endpoint("standalone")
+@current_app.openapi.endpoint("standalone")
 def get_standalone_processors():
 	"""
 	Get processors available for standalone API requests
@@ -49,24 +49,111 @@ def get_standalone_processors():
 		}
 	}
 	"""
+	class FakeDataset():
+		"""
+		Fake dataset class to allow processor introspection without having
+		to create a real dataset.
+
+		This is meant to represent a dataset compatible with /api/process/<processor>/
+		
+		TODO: this could be modified for a base dataset class for more advanced tests
+		"""
+		type = "fake_dataset"
+		parameters = {"datasource": "fake"} # TODO: refactor how processors check module.parameters.get("datasource") to function call we can override here
+		
+		def get_extension(self):
+			"""
+			Return CSV which is expected by /api/process/<processor>/
+
+			NDJSON processors work on CSV and NDJSON
+			"""
+			return "csv"
+		
+		def get_media_type(self):
+			"""
+			Return media type expected by /api/process/<processor>/
+			"""
+			return "text"
+		
+		def get_columns(self):
+			"""
+			Return columns expected by /api/process/<processor>/
+			"""
+			return ["id", "thread_id", "body", "author"]
+		
+		def is_top_dataset(self):
+			"""
+			Return True to indicate that this is a top-level dataset
+			"""
+			return True
+		
+		def is_accessible_by(self, user, role="owner"):
+			"""
+			Return True to indicate that this dataset is accessible by the
+			current user
+			"""
+			# Could check to see if the processors are avaiable to the user,
+			# but this is not necessary for the fake dataset
+			return True
+		
+		def is_from_collector(self):
+			"""
+			Return True to indicate that it is a "datasource"
+
+			This is a lie, but so is the cake
+			"""
+			return True
+			
+		def is_dataset(self):
+			"""
+			Return True to indicate that this is a dataset
+			"""
+			# TODO: I think all is_compatible_with methods ONLY receive DataSet objects; verify and perhaps modify the functions to specify
+			return True
+		
+		def has_annotations(self):
+			"""
+			Return False to indicate that this dataset does not have
+			annotations
+			"""
+			return False
+		
+		def is_rankable(self, multiple_items=False):
+			"""
+			Return True...
+
+			TODO: Unsure if this makes sense here, but trying no to be exclusive here
+			"""
+			return True
+		
+	fake_dataset = FakeDataset()
+
 	available_processors = {}
 
-	for processor in fourcat_modules.processors:
-		if not fourcat_modules.processors[processor].hasattr("datasources") and not hasattr(fourcat_modules.processors[processor], "accepts"):
-			available_processors[processor] = fourcat_modules.processors[processor]
+	for processor_type, processor in g.modules.processors.items():
+		# Skip datasources as they do not conform to /api/process/<processor>/ API
+		if issubclass(processor, Search) or processor_type.endswith("-search"):
+			# ALMOST all datasources are subclasses of Search, almost.
+			continue
+
+		# Check if the processor is compatible with the fake dataset
+		if hasattr(processor, "is_compatible_with") and not processor.is_compatible_with(fake_dataset):
+			continue
+
+		available_processors[processor_type] = processor
 
 	return jsonify({processor: {
-		"name": available_processors[processor].name,
+		"type": available_processors[processor].type,
 		"category": available_processors[processor].category,
 		"description": available_processors[processor].description,
 		"extension": available_processors[processor].extension
 	} for processor in available_processors})
 
-@app.route("/api/process/<processor>/", methods=["POST"])
+@component.route("/api/process/<processor>/", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
-@openapi.endpoint("standalone")
+@current_app.openapi.endpoint("standalone")
 def process_standalone(processor):
 	"""
 	Run a standalone processor
@@ -141,10 +228,10 @@ def process_standalone(processor):
 		extension="csv",
 		type="standalone",
 		parameters={"next": [processor]},
-		db=db,
+		db=g.db,
 		owner=current_user.get_id(),
 		is_private=True,
-		modules=fourcat_modules
+		modules=g.modules
 	)
 	temp_dataset.finish(len(input))
 
@@ -166,11 +253,10 @@ def process_standalone(processor):
 
 	# queue the postprocessor
 	metadata = processors[processor]
-	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=db, modules=fourcat_modules)
+	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=g.db, modules=g.modules)
 
-	queue = JobQueue(database=db, logger=log)
-	job = queue.add_job(processor, {}, processed.key)
-	place_in_queue = queue.get_place_in_queue(job)
+	job = g.queue.add_job(processor, {}, processed.key)
+	place_in_queue = g.queue.get_place_in_queue(job)
 	if place_in_queue > 5:
 		job.finish()
 		return error(code=503, error="Your request could not be handled as there are currently %i other jobs of this type in the queue. Please try again later." % place_in_queue)
@@ -184,7 +270,7 @@ def process_standalone(processor):
 			job.finish()
 			return error(code=503, error="The server is currently too busy to handle your request. Please try again later.")
 
-		if queue.get_place_in_queue(job) != 0:
+		if g.queue.get_place_in_queue(job) != 0:
 			time.sleep(2)
 			continue
 		else:
@@ -193,7 +279,7 @@ def process_standalone(processor):
 	# job currently being processed, wait for it to finish
 	while True:
 		try:
-			job = Job.get_by_remote_ID(job.data["remote_id"], db, processor)
+			job = Job.get_by_remote_ID(job.data["remote_id"], g.db, processor)
 		except JobNotFoundException:
 			break
 

@@ -8,28 +8,24 @@ import fnmatch
 import socket
 import random
 import time
-import sys
-import os
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
+from flask import current_app, Blueprint, request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify, g
 from flask_login import login_user, login_required, logout_user, current_user
-from webtool import app, login_manager, db, config
-from webtool.views.api_tool import limiter
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
 from common.lib.helpers import send_email, get_software_commit
 
 from pathlib import Path
 
-from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user, request=request)
-access_request_limit = config.get("4cat.access_request_limit", default="100/day")
+component = Blueprint("user", __name__)
 
-@login_manager.user_loader
+# ok to use the app's config reader here since this is a global-only setting
+access_request_limit = current_app.fourcat_config.get("4cat.allow_access_request_limiter", default="100/day")
+
+@current_app.login_manager.user_loader
 def load_user(user_name):
     """
     Load user object
@@ -38,7 +34,7 @@ def load_user(user_name):
     :param user_name:  ID of user
     :return:  User object
     """
-    user = User.get_by_name(db, user_name)
+    user = User.get_by_name(current_app.db, user_name)
     if user:
         user.authenticate()
         user.with_config(ConfigWrapper(config, user=user, request=request))
@@ -46,7 +42,7 @@ def load_user(user_name):
     return user
 
 
-@login_manager.request_loader
+@current_app.login_manager.request_loader
 def load_user_from_request(request):
     """
     Load user object via access token
@@ -70,18 +66,18 @@ def load_user_from_request(request):
     if not token:
         return None
 
-    user = db.fetchone("SELECT name AS user FROM access_tokens WHERE token = %s AND (expires = 0 OR expires > %s)",
+    user = current_app.db.fetchone("SELECT name AS user FROM access_tokens WHERE token = %s AND (expires = 0 OR expires > %s)",
                        (token, int(time.time())))
     if not user:
         return None
     else:
-        db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
-        user = User.get_by_name(db, user["user"])
-        user.with_config(config)
+        current_app.db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
+        user = User.get_by_name(g.db, user["user"])
+		user.with_config(g.config)
         user.authenticate()
         return user
 
-@login_manager.unauthorized_handler
+@current_app.login_manager.unauthorized_handler
 def unauthorized():
     """
     Handle unauthorized requests
@@ -92,10 +88,10 @@ def unauthorized():
     if current_user.is_authenticated:
         return render_template("error.html", message="You cannot view this page."), 403
     else:
-        return redirect(url_for("show_login"))
+        return redirect(url_for("user.show_login"))
 
 
-@app.before_request
+@component.before_request
 def reroute_requests():
     """
     Sometimes the requested route should be overruled
@@ -113,18 +109,19 @@ def reroute_requests():
     # ensures admins get to see the phone home screen at least once
     elif current_user and current_user.is_authenticated and current_user.is_admin and \
             request.url_rule and request.url_rule.endpoint not in ("static", "first_run_dialog"):
-        wants_phone_home = not config.get("4cat.phone_home_asked", False)
+        wants_phone_home = not g.config.get("4cat.phone_home_asked", False)
         if wants_phone_home:
-            return redirect(url_for("first_run_dialog"))
+            return redirect(url_for("user.first_run_dialog"))
 
 
-@app.before_request
+@component.before_app_request
 def autologin_whitelist():
     """
     Checks if host name matches whitelisted hostmask or IP. If so, the user is
     logged in as the special "autologin" user.
     """
-    if not config.get("flask.autologin.hostnames"):
+    # ok to use the app's config reader here since this is a global-only setting
+    if not current_app.fourcat_config.get("flask.autologin.hostnames"):
         # if there's no whitelist, there's no point in checking it
         return
 
@@ -151,9 +148,9 @@ def autologin_whitelist():
 
     # autologin is a special user that is automatically logged in for this
     # request only if the hostname or IP matches the whitelist
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in config.get("flask.autologin.hostnames", [])]):
-        autologin_user = User.get_by_name(db, "autologin")
-        autologin_user.with_config(config)
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.hostnames", [])]):
+        autologin_user = User.get_by_name(g.db, "autologin")
+		autologin_user.with_config(g.config)
         if not autologin_user:
             # this user should exist by default
             abort(500)
@@ -161,7 +158,7 @@ def autologin_whitelist():
         login_user(autologin_user, remember=False)
 
 
-@limiter.request_filter
+@current_app.limiter.request_filter
 def exempt_from_limit():
     """
     Checks if host name matches whitelisted hostmasks for exemption from API
@@ -169,7 +166,8 @@ def exempt_from_limit():
 
     :return bool:  Whether the request's hostname is exempt
     """
-    if not config.get("flask.autologin.api"):
+    # ok to use the app's config reader here since this is a global-only setting
+    if not current_app.fourcat_config.get("flask.autologin.api"):
         return False
 
     # filter by IP address and hostname, if the latter is available
@@ -181,13 +179,13 @@ def exempt_from_limit():
     except (socket.herror, socket.timeout):
         pass  # no hostname for this address
 
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in config.get("flask.autologin.api", [])]):
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.api", [])]):
         return True
 
     return False
 
 
-@app.route("/first-run/", methods=["GET", "POST"])
+@component.route("/first-run/", methods=["GET", "POST"])
 def first_run_dialog():
     """
     Special route for creating an initial admin user
@@ -197,13 +195,13 @@ def first_run_dialog():
 
     :return:
     """
-    has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'")["amount"]
-    wants_phone_home = not config.get("4cat.phone_home_asked", False)
+    has_admin_user = g.db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'")["amount"]
+    wants_phone_home = not g.config.get("4cat.phone_home_asked", False)
 
     if has_admin_user and not wants_phone_home:
         return error(403, message="The 'first run' page is not available")
 
-    version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version")
     if version_file.exists():
         with version_file.open() as infile:
             version = infile.readline().strip()
@@ -213,7 +211,7 @@ def first_run_dialog():
     missing = []
     # choose a random adjective to differentiate this 4CAT instance (this can
     # be edited by the user)
-    adjective_file = Path(config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
+    adjective_file = Path(g.config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
     if not adjective_file.exists():
         adjectives = ["Awesome"]
     else:
@@ -224,7 +222,7 @@ def first_run_dialog():
     # choose a random accent colour (this can also be edited)
     interface_hue = random.random()
 
-    phone_home_url = config.get("4cat.phone_home_url")
+    phone_home_url = g.config.get("4cat.phone_home_url")
     if request.method == 'GET':
         template = "account/first-run.html" if not has_admin_user else "account/first-run-after-update.html"
         return render_template(template, incomplete=missing, form=request.form, phone_home_url=phone_home_url,
@@ -240,7 +238,7 @@ def first_run_dialog():
         if not username:
             missing.append("username")
         else:
-            user_exists = db.fetchone("SELECT name FROM users WHERE name = %s", (username,))
+            user_exists = g.db.fetchone("SELECT name FROM users WHERE name = %s", (username,))
             if user_exists:
                 flash("The username '%s' already exists and is reserved." % username)
                 missing.append("username")
@@ -261,14 +259,14 @@ def first_run_dialog():
                                    flashes=get_flashed_messages(), phone_home_url=phone_home_url,
                                    adjective=adjective, interface_hue=interface_hue)
 
-        db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
-        db.commit()
-        user = User.get_by_name(db=db, name=username)
-        user.with_config(config)
+        g.db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
+        g.db.commit()
+        user = User.get_by_name(db=g.db, name=username)
+		user.with_config(g.config)
         user.set_password(password)
         user.add_tag("admin")  # first user is always admin
 
-        config.set("4cat.name_long", instance_name)
+        g.config.set("4cat.name_long", instance_name)
 
         # handle hue colour
         try:
@@ -277,17 +275,17 @@ def first_run_dialog():
         except (ValueError, TypeError):
             interface_hue = random.randrange(0, 360)
 
-        config.set("4cat.layout_hue", interface_hue)
+        g.config.set("4cat.layout_hue", interface_hue)
         generate_css_colours(force=True)
 
         # make user an admin
-        db.update("users", where={"name": username}, data={"is_deactivated": False})
-        db.commit()
+        g.db.update("users", where={"name": username}, data={"is_deactivated": False})
+        g.db.commit()
 
         flash("The admin user '%s' was created, you can now use it to log in." % username)
 
     if phone_home_url and request.form.get("phonehome"):
-        with Path(config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
+        with Path(g.config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {
@@ -305,13 +303,13 @@ def first_run_dialog():
             flash("Could not send install ping to 4CAT developers")
 
     # don't ask phone home again until next update
-    config.set("4cat.phone_home_asked", True)
+    g.config.set("4cat.phone_home_asked", True)
 
-    redirect_path = "show_login" if not has_admin_user else "show_frontpage"
+    redirect_path = "user.show_login" if not has_admin_user else "misc.show_frontpage"
     return redirect(url_for(redirect_path))
 
 
-@app.route('/login/', methods=['GET', 'POST'])
+@component.route('/login/', methods=['GET', 'POST'])
 def show_login():
     """
     Handle logging in
@@ -322,31 +320,31 @@ def show_login():
     :return: Redirect to either the URL form, or the index (if logged in)
     """
     if current_user.is_authenticated:
-        return redirect(url_for("show_frontpage"))
+        return redirect(url_for("misc.show_frontpage"))
 
-    has_admin_user = db.fetchone("SELECT * FROM users WHERE tags @> '[\"admin\"]'")
+    has_admin_user = g.db.fetchone("SELECT * FROM users WHERE tags @> '[\"admin\"]'")
     if not has_admin_user:
-        return redirect(url_for("first_run_dialog"))
+        return redirect(url_for("user.first_run_dialog"))
 
-    have_email = config.get('mail.admin_email') and config.get('mail.server')
+    have_email = g.config.get('mail.admin_email') and g.config.get('mail.server')
     if request.method == 'GET':
         return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email), 401
 
     username = request.form['username']
     password = request.form['password']
-    registered_user = User.get_by_login(db, username, password)
+    registered_user = User.get_by_login(g.db, username, password)
 
     if registered_user is None:
         flash('Username or Password is invalid.', 'error')
-        return redirect(url_for('show_login'))
+        return redirect(url_for('user.show_login'))
 
     registered_user.with_config(config)
     login_user(registered_user, remember=True)
 
-    return redirect(url_for("show_frontpage"))
+    return redirect(url_for("misc.show_frontpage"))
 
 
-@app.route("/logout")
+@component.route("/logout")
 @login_required
 def logout():
     """
@@ -356,12 +354,12 @@ def logout():
     """
     logout_user()
     flash("You have been logged out of 4CAT.")
-    return redirect(url_for("show_login"))
+    return redirect(url_for("user.show_login"))
 
 
-@app.route("/request-access/", methods=["GET", "POST"])
+@component.route("/request-access/", methods=["GET", "POST"])
 @setting_required("4cat.allow_access_request")
-@limiter.limit(access_request_limit, methods=["POST"])
+@current_app.limiter.limit(access_request_limit, methods=["POST"])
 def request_access():
     """
     Request a 4CAT Account
@@ -370,11 +368,11 @@ def request_access():
     sent to the 4CAT admin via e-mail so they can create an account (if
     approved)
     """
-    if not config.get('mail.admin_email'):
+    if not g.config.get('mail.admin_email'):
         return render_template("error.html",
                                message="No administrator e-mail is configured; the request form cannot be displayed.")
 
-    if not config.get('mail.server'):
+    if not g.config.get('mail.server'):
         return render_template("error.html",
                                message="No e-mail server configured; the request form cannot be displayed.")
 
@@ -383,7 +381,7 @@ def request_access():
 
     incomplete = []
 
-    policy_template = Path(config.get('PATH_ROOT'), "webtool/pages/access-policy.md")
+    policy_template = Path(g.config.get('PATH_ROOT'), "webtool/pages/access-policy.md")
     access_policy = ""
     if policy_template.exists():
         access_policy = policy_template.read_text(encoding="utf-8")
@@ -399,18 +397,18 @@ def request_access():
         else:
             html_parser = html2text.HTML2Text()
 
-            sender = config.get('mail.noreply')
+            sender = g.config.get('mail.noreply')
             message = MIMEMultipart("alternative")
             message["Subject"] = "Account request"
             message["From"] = sender
-            message["To"] = config.get('mail.admin_email', "")
+            message["To"] = g.config.get('mail.admin_email', "")
 
             mail = "<p>Hello! Someone requests a 4CAT Account:</p>\n"
             for field in required:
                 mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
 
-            root_url = "https" if config.get("flask.https") else "http"
-            root_url += "://%s/admin/" % config.get("flask.server_name")
+            root_url = "https" if g.config.get("flask.https") else "http"
+            root_url += "://%s/admin/" % g.config.get("flask.server_name")
             approve_url = root_url + "add-user/?format=html&email=%s" % request.form.get("email", "")
             reject_url = root_url + "reject-user/?name=%s&email=%s" % (
             request.form.get("name", ""), request.form.get("email", ""))
@@ -422,10 +420,10 @@ def request_access():
             message.attach(MIMEText(mail, "html"))
 
             try:
-                send_email(config.get('mail.admin_email'), message)
+                send_email(g.config.get('mail.admin_email'), message)
                 return render_template("error.html", title="Thank you",
                                        message="Your request has been submitted; we'll try to answer it as soon as possible.")
-            except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
+            except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout):
                 return render_template("error.html", title="Error",
                                        message="The form could not be submitted; the e-mail server is unreachable.")
 
@@ -433,7 +431,7 @@ def request_access():
                            form=request.form, access_policy=access_policy)
 
 
-@app.route("/reset-password/", methods=["GET", "POST"])
+@component.route("/reset-password/", methods=["GET", "POST"])
 def reset_password():
     """
     Reset a password
@@ -451,7 +449,7 @@ def reset_password():
         # we need *a* token
         return render_template("error.html", message="You need a valid reset token to set a password.")
 
-    resetting_user = User.get_by_token(db, token)
+    resetting_user = User.get_by_token(g.db, token)
     if not resetting_user or resetting_user.is_special:
         # this doesn't mean the token is unknown, but it could be older than 3 days
         return render_template("error.html",
@@ -472,7 +470,7 @@ def reset_password():
             resetting_user.set_password(password)
             resetting_user.clear_token()
             flash("Your password has been set. You can now log in to 4CAT.")
-            return redirect(url_for("show_login"))
+            return redirect(url_for("user.show_login"))
 
     # show form
     return render_template("account/reset-password.html", username=resetting_user.get_name(), incomplete=incomplete,
@@ -480,8 +478,8 @@ def reset_password():
                            form=request.form)
 
 
-@app.route("/request-password/", methods=["GET", "POST"])
-@limiter.limit("6 per minute")
+@component.route("/request-password/", methods=["GET", "POST"])
+@current_app.limiter.limit("6 per minute")
 def request_password():
     """
     Request a password reset
@@ -506,8 +504,9 @@ def request_password():
             flash("Please provide a username.")
 
         # is it also a valid username? that is not a 'special' user (like autologin)?
-        resetting_user = User.get_by_name(db, username)
-        resetting_user.with_config(config)
+        resetting_user = User.get_by_name(g.db, username)
+		resetting_user.with_config(g.config)
+
         if resetting_user is None or resetting_user.is_special:
             incomplete.append("username")
             flash("That user is not known here. Note that your username is typically your e-mail address.")
@@ -535,14 +534,27 @@ def request_password():
                            form=request.form)
 
 
-@app.route("/dismiss-notification/<int:notification_id>")
+
+@component.route("/access-tokens/")
+@login_required
+def show_access_tokens():
+    user = current_user.get_id()
+
+    if user == "autologin":
+        return error(403, message="You cannot view or generate access tokens without a personal acount.")
+
+    tokens = g.db.fetchall("SELECT * FROM access_tokens WHERE name = %s", (user,))
+
+    return render_template("access-tokens.html", tokens=tokens)
+
+@component.route("/dismiss-notification/<int:notification_id>")
 def dismiss_notification(notification_id):
     current_user.dismiss_notification(notification_id)
 
     if not request.args.get("async"):
         redirect_url = request.headers.get("Referer")
         if not redirect_url:
-            redirect_url = url_for("show_frontpage")
+            redirect_url = url_for("misc.show_frontpage")
 
         return redirect(redirect_url)
     else:

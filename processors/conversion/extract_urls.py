@@ -226,7 +226,7 @@ class ExtractURLs(BasicProcessor):
 
         # Get match column parameters
         columns = self.parameters.get("columns", [])
-        if type(columns) == str:
+        if type(columns) is str:
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
         return_matches_only = self.parameters.get("return_matches_only", True)
@@ -258,7 +258,7 @@ class ExtractURLs(BasicProcessor):
                     value = item.get(column)
                     if not value:
                         continue
-                    if type(value) != str:
+                    if type(value) is not str:
                         self.dataset.update_status(f"Column \"{column}\" is not text and will be ignored.")
                         # Remove from future
                         columns.remove(column)
@@ -339,7 +339,7 @@ class ExtractURLs(BasicProcessor):
         try:
             time.sleep(0.1)
             head_request = requests.head(url, timeout=5)
-        except (requests.RequestException, ConnectionError, ValueError, TimeoutError) as e:
+        except (requests.RequestException, ConnectionError, ValueError, TimeoutError):
             return url
 
         # if the returned page's status code is in the 'valid request'

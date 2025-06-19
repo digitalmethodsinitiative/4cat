@@ -6,7 +6,7 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException

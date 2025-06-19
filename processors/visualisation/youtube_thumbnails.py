@@ -88,7 +88,6 @@ class YouTubeThumbnails(BasicProcessor):
 				except Exception as error:
 					self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
 					retries += 1
-					api_error = error
 					time.sleep(self.sleep_time)  # Wait a bit before trying again
 
 			# Do nothing with the results if the requests failed -
@@ -111,8 +110,4 @@ class YouTubeThumbnails(BasicProcessor):
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")
-
-		# Save the count of images for `finish` function
-		image_count = 0
-
 		self.write_archive_and_finish(results_path)

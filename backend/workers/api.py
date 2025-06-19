@@ -70,7 +70,7 @@ class InternalAPI(BasicWorker):
 		while not self.interrupted:
 			try:
 				client, address = server.accept()
-			except (socket.timeout, TimeoutError) as e:
+			except (socket.timeout, TimeoutError):
 				if self.interrupted:
 					break
 				# no problemo, just listen again - this only times out so it won't hang the entire app when
@@ -111,7 +111,7 @@ class InternalAPI(BasicWorker):
 
 				# start processing as soon as we have valid json
 				try:
-					test = json.loads(buffer)
+					json.loads(buffer)
 					break
 				except json.JSONDecodeError:
 					pass

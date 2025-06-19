@@ -1,0 +1,17 @@
+# This will verify if the code committed has been formatted in accordance with what Ruff would do
+
+name: Test conformance to Ruff code formatter
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "master" branch
+  push
+jobs:
+  check_ruff_conforming:
+    name: Test conformance to Ruff code formatter
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout-repo
+        uses: actions/checkout@v4
+      - name: ruff-action
+        uses: astral-sh/ruff-action@v3

@@ -30,8 +30,9 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     category = "Post metrics"  # category
     title = "Google Vision API Analysis"  # title displayed in UI
     description = "Use the Google Vision API to annotate images with tags and labels identified via machine learning. " \
-                  "One request will be made per image per annotation type. Note that this is NOT a free service and " \
-                  "requests will be credited by Google to the owner of the API token you provide!"# description displayed in UI
+                  "One request will be made per image per annotation type. Note that this is not a free service and " \
+                  "requests will be credited by Google to the owner of the API token you provide. Requires billing " \
+                  "and Google Vision API enabled (this may take a few minutes)."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     followups = ["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"]
@@ -61,7 +62,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             "type": UserInput.OPTION_TEXT,
             "help": "API Key",
             "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
-                       "key on the API dashboard."
+                       "key on console.cloud.google.com. You also need to enable billing and Vision API."
         },
         "features": {
             "type": UserInput.OPTION_MULTI,
@@ -109,6 +110,10 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         processed = 0
         done = 0
 
+        # Get the .metadata.json file if we're writing annotations so we can add them to specific rows.
+        img_metadata = []
+
+        # Loop through images
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
@@ -117,6 +122,13 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             self.dataset.update_progress(done / total)
 
             if image_file.name.startswith(".") or image_file.suffix in (".json", ".log"):
+
+                # Get the .metadata.json file so we can also save post IDs.
+                if image_file.name == ".metadata.json":
+                    img_metadata = json.load(image_file.open())
+                    if img_metadata:
+                        img_metadata = [v for v in img_metadata.values()]
+
                 self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
                 continue
 
@@ -130,7 +142,10 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             if not annotations:
                 continue
 
-            annotations = {"file_name": image_file.name, **annotations}
+            annotations = {
+                "file_name": image_file.name,
+                "post_ids": img_metadata[processed - 1].get("post_ids", []),
+                **annotations}
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:
                 outfile.write(json.dumps(annotations) + "\n")
@@ -142,7 +157,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         self.dataset.update_status("Annotations retrieved for %i images (%i processed in total)" % (done, processed), is_final=True)
         self.dataset.finish(done)
 
-    def annotate_image(self, image_file, api_key, features):
+    def annotate_image(self, image_file: Path, api_key: str, features: list):
         """
         Get annotations from the Google Vision API
 

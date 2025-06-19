@@ -7,11 +7,12 @@ import zipfile
 import typing
 import shutil
 import json
+import time
 import abc
 import csv
 import os
 
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
@@ -22,149 +23,148 @@ from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterrup
 from common.config_manager import ConfigWrapper
 from common.lib.user import User
 
-
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
 class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
-	"""
-	Abstract processor class
+    """
+    Abstract processor class
 
-	A processor takes a finished dataset as input and processes its result in
-	some way, with another dataset set as output. The input thus is a file, and
-	the output (usually) as well. In other words, the result of a processor can
-	be used as input for another processor (though whether and when this is
-	useful is another question).
+    A processor takes a finished dataset as input and processes its result in
+    some way, with another dataset set as output. The input thus is a file, and
+    the output (usually) as well. In other words, the result of a processor can
+    be used as input for another processor (though whether and when this is
+    useful is another question).
 
 	To determine whether a processor can process a given dataset, you can
 	define a `is_compatible_with(FourcatModule module=None, config=None):) -> bool` class
 	method which takes a dataset as argument and returns a bool that determines
 	if this processor is considered compatible with that dataset. For example:
 
-	.. code-block:: python
+    .. code-block:: python
 
         @classmethod
         def is_compatible_with(cls, module=None, config=None):
             return module.type == "linguistic-features"
 
 
-	"""
+    """
 
-	#: Database handler to interface with the 4CAT database
-	db = None
+    #: Database handler to interface with the 4CAT database
+    db = None
 
-	#: Job object that requests the execution of this processor
-	job = None
+    #: Job object that requests the execution of this processor
+    job = None
 
-	#: The dataset object that the processor is *creating*.
-	dataset = None
+    #: The dataset object that the processor is *creating*.
+    dataset = None
 
-	#: Owner (username) of the dataset
-	owner = None
+    #: Owner (username) of the dataset
+    owner = None
 
-	#: The dataset object that the processor is *processing*.
-	source_dataset = None
+    #: The dataset object that the processor is *processing*.
+    source_dataset = None
 
-	#: The file that is being processed
-	source_file = None
+    #: The file that is being processed
+    source_file = None
 
-	#: Processor description, which will be displayed in the web interface
-	description = "No description available"
+    #: Processor description, which will be displayed in the web interface
+    description = "No description available"
 
-	#: Category identifier, used to group processors in the web interface
-	category = "Other"
+    #: Category identifier, used to group processors in the web interface
+    category = "Other"
 
-	#: Extension of the file created by the processor
-	extension = "csv"
+    #: Extension of the file created by the processor
+    extension = "csv"
 
-	#: 4CAT settings from the perspective of the dataset's owner
-	config = None
+    #: 4CAT settings from the perspective of the dataset's owner
+    config = None
 
-	#: Is this processor running 'within' a preset processor?
-	is_running_in_preset = False
+    #: Is this processor running 'within' a preset processor?
+    is_running_in_preset = False
 
-	#: Is this processor hidden in the front-end, and only used internally/in presets?
-	is_hidden = False
+    #: Is this processor hidden in the front-end, and only used internally/in presets?
+    is_hidden = False
 
-	#: This will be defined automatically upon loading the processor. There is
-	#: no need to override manually
-	filepath = None
+    #: This will be defined automatically upon loading the processor. There is
+    #: no need to override manually
+    filepath = None
 
-	def work(self):
-		"""
-		Process a dataset
+    def work(self):
+        """
+        Process a dataset
 
-		Loads dataset metadata, sets up the scaffolding for performing some kind
-		of processing on that dataset, and then processes it. Afterwards, clean
-		up.
-		"""
-		try:
-			# a dataset can have multiple owners, but the creator is the user
-			# that actually queued the processor, so their config is relevant
-			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db, modules=self.modules)
-			self.owner = self.dataset.creator
-		except DataSetException as e:
-			# query has been deleted in the meantime. finish without error,
-			# as deleting it will have been a conscious choice by a user
-			self.job.finish()
-			return
+        Loads dataset metadata, sets up the scaffolding for performing some kind
+        of processing on that dataset, and then processes it. Afterwards, clean
+        up.
+        """
+        try:
+            # a dataset can have multiple owners, but the creator is the user
+            # that actually queued the processor, so their config is relevant
+            self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db, modules=self.modules)
+            self.owner = self.dataset.creator
+        except DataSetException:
+            # query has been deleted in the meantime. finish without error,
+            # as deleting it will have been a conscious choice by a user
+            self.job.finish()
+            return
 
 		# set up config reader wrapping the worker's config manager, which is
 		# in turn the one passed to it by the WorkerManager, which is the one
 		# originally loaded in bootstrap
 		self.config = ConfigWrapper(config=self.config, user=User.get_by_name(self.db, self.owner))
 
-		if self.dataset.data.get("key_parent", None):
-			# search workers never have parents (for now), so we don't need to
-			# find out what the source_dataset dataset is if it's a search worker
-			try:
-				self.source_dataset = self.dataset.get_parent()
+        if self.dataset.data.get("key_parent", None):
+            # search workers never have parents (for now), so we don't need to
+            # find out what the source_dataset dataset is if it's a search worker
+            try:
+                self.source_dataset = self.dataset.get_parent()
 
-				# for presets, transparently use the *top* dataset as a source_dataset
-				# since that is where any underlying processors should get
-				# their data from. However, this should only be done as long as the
-				# preset is not finished yet, because after that there may be processors
-				# that run on the final preset result
-				while self.source_dataset.type.startswith("preset-") and not self.source_dataset.is_finished():
-					self.is_running_in_preset = True
-					self.source_dataset = self.source_dataset.get_parent()
-					if self.source_dataset is None:
-						# this means there is no dataset that is *not* a preset anywhere
-						# above this dataset. This should never occur, but if it does, we
-						# cannot continue
-						self.log.error("Processor preset %s for dataset %s cannot find non-preset parent dataset",
-									   (self.type, self.dataset.key))
-						self.job.finish()
-						return
+                # for presets, transparently use the *top* dataset as a source_dataset
+                # since that is where any underlying processors should get
+                # their data from. However, this should only be done as long as the
+                # preset is not finished yet, because after that there may be processors
+                # that run on the final preset result
+                while self.source_dataset.type.startswith("preset-") and not self.source_dataset.is_finished():
+                    self.is_running_in_preset = True
+                    self.source_dataset = self.source_dataset.get_parent()
+                    if self.source_dataset is None:
+                        # this means there is no dataset that is *not* a preset anywhere
+                        # above this dataset. This should never occur, but if it does, we
+                        # cannot continue
+                        self.log.error("Processor preset %s for dataset %s cannot find non-preset parent dataset",
+                                       (self.type, self.dataset.key))
+                        self.job.finish()
+                        return
 
-			except DataSetException:
-				# we need to know what the source_dataset dataset was to properly handle the
-				# analysis
-				self.log.warning("Processor %s queued for orphan dataset %s: cannot run, cancelling job" % (
-					self.type, self.dataset.key))
-				self.job.finish()
-				return
+            except DataSetException:
+                # we need to know what the source_dataset dataset was to properly handle the
+                # analysis
+                self.log.warning("Processor %s queued for orphan dataset %s: cannot run, cancelling job" % (
+                    self.type, self.dataset.key))
+                self.job.finish()
+                return
 
-			if not self.source_dataset.is_finished() and not self.is_running_in_preset:
-				# not finished yet - retry after a while
-				# exception for presets, since these *should* be unfinished
-				# until underlying processors are done
-				self.job.release(delay=30)
-				return
+            if not self.source_dataset.is_finished() and not self.is_running_in_preset:
+                # not finished yet - retry after a while
+                # exception for presets, since these *should* be unfinished
+                # until underlying processors are done
+                self.job.release(delay=30)
+                return
 
-			self.source_file = self.source_dataset.get_results_path()
-			if not self.source_file.exists():
-				self.dataset.update_status("Finished, no input data found.")
+            self.source_file = self.source_dataset.get_results_path()
+            if not self.source_file.exists():
+                self.dataset.update_status("Finished, no input data found.")
 
-		self.log.info("Running processor %s on dataset %s" % (self.type, self.job.data["remote_id"]))
+        self.log.info("Running processor %s on dataset %s" % (self.type, self.job.data["remote_id"]))
 
-		processor_name = self.title if hasattr(self, "title") else self.type
-		self.dataset.clear_log()
-		self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
+        processor_name = self.title if hasattr(self, "title") else self.type
+        self.dataset.clear_log()
+        self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
 
-		# start log file
-		self.dataset.update_status("Processing data")
-		self.dataset.update_version(get_software_commit(self))
+        # start log file
+        self.dataset.update_status("Processing data")
+        self.dataset.update_version(get_software_commit(self))
 
 		# get parameters
 		# if possible, fill defaults where parameters are not provided
@@ -183,55 +183,68 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			if option_settings.get("sensitive"):
 				self.dataset.delete_parameter(option)
 
-		if self.interrupted:
-			self.dataset.log("Processing interrupted, trying again later")
-			return self.abort()
+        if self.interrupted:
+            self.dataset.log("Processing interrupted, trying again later")
+            return self.abort()
 
-		if not self.dataset.is_finished():
-			try:
-				self.process()
-				self.after_process()
-			except WorkerInterruptedException as e:
-				self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
-				self.abort()
-			except Exception as e:
-				self.dataset.log("Processor crashed (%s), trying again later" % str(e))
-				stack = traceback.extract_tb(e.__traceback__)
-				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack[1:]]
-				location = "->".join(frames)
+        if not self.dataset.is_finished():
+            try:
+                self.process()
+                self.after_process()
+            except WorkerInterruptedException as e:
+                self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
+                self.abort()
+            except Exception as e:
+                self.dataset.log("Processor crashed (%s), trying again later" % str(e))
+                stack = traceback.extract_tb(e.__traceback__)
+                frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack[1:]]
+                location = "->".join(frames)
 
-				# Not all datasets have source_dataset keys
-				if len(self.dataset.get_genealogy()) > 1:
-					parent_key = " (via " + self.dataset.get_genealogy()[0].key + ")"
-				else:
-					parent_key = ""
+                # Not all datasets have source_dataset keys
+                if len(self.dataset.get_genealogy()) > 1:
+                    parent_key = " (via " + self.dataset.get_genealogy()[0].key + ")"
+                else:
+                    parent_key = ""
 
-				# remove any result files that have been created so far
-				self.remove_files()
+                print("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
+                    self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
+                # remove any result files that have been created so far
+                self.remove_files()
 
-				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
-				self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
-		else:
-			# dataset already finished, job shouldn't be open anymore
-			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))
-			self.job.finish()
+                raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
+                    self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
+        else:
+            # dataset already finished, job shouldn't be open anymore
+            self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (
+            self.job.data["jobtype"], self.job.data["remote_id"]))
+            self.job.finish()
 
+    def after_process(self):
+        """
+        Run after processing the dataset
 
-	def after_process(self):
-		"""
-		Run after processing the dataset
+        This method cleans up temporary files, and if needed, handles logistics
+        concerning the result file, e.g. running a pre-defined processor on the
+        result, copying it to another dataset, and so on.
+        """
+        if self.dataset.data["num_rows"] > 0:
+            self.dataset.update_status("Dataset completed.")
 
-		This method cleans up temporary files, and if needed, handles logistics
-		concerning the result file, e.g. running a pre-defined processor on the
-		result, copying it to another dataset, and so on.
-		"""
-		if self.dataset.data["num_rows"] > 0:
-			self.dataset.update_status("Dataset completed.")
+        if not self.dataset.is_finished():
+            self.dataset.finish()
 
-		if not self.dataset.is_finished():
-			self.dataset.finish()
+        self.dataset.remove_staging_areas()
 
-		self.dataset.remove_staging_areas()
+        # see if we have anything else lined up to run next
+        for next in self.parameters.get("next", []):
+            can_run_next = True
+            next_parameters = next.get("parameters", {})
+            next_type = next.get("type", "")
+            try:
+                available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
+            except ValueError:
+                self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
+                break
 
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
@@ -244,91 +257,99 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
 				break
 
-			# run it only if the post-processor is actually available for this query
-			if self.dataset.data["num_rows"] <= 0:
-				can_run_next = False
-				self.log.info("Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (next_type, self.dataset.key))
+            elif next_type in available_processors:
+                next_analysis = DataSet(
+                    parameters=next_parameters,
+                    type=next_type,
+                    db=self.db,
+                    parent=self.dataset.key,
+                    extension=available_processors[next_type].extension,
+                    is_private=self.dataset.is_private,
+                    owner=self.dataset.creator,
+                    modules=self.modules
+                )
+                # copy ownership from parent dataset
+                next_analysis.copy_ownership_from(self.dataset)
+                # add to queue
+                self.queue.add_job(next_type, remote_id=next_analysis.key)
+            else:
+                can_run_next = False
+                self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (
+                self.dataset.key, self.type, next_type))
 
-			elif next_type in available_processors:
-				next_analysis = DataSet(
-					parameters=next_parameters,
-					type=next_type,
-					db=self.db,
-					parent=self.dataset.key,
-					extension=available_processors[next_type].extension,
-					is_private=self.dataset.is_private,
-					owner=self.dataset.creator,
-					modules=self.modules
-				)
-				# copy ownership from parent dataset
-				next_analysis.copy_ownership_from(self.dataset)
-				# add to queue
-				self.queue.add_job(next_type, remote_id=next_analysis.key)
-			else:
-				can_run_next = False
-				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
+            if not can_run_next:
+                # We are unable to continue the chain of processors, so we check to see if we are attaching to a parent
+                # preset; this allows the parent (for example a preset) to be finished and any successful processors displayed
+                if "attach_to" in self.parameters:
+                    # Probably should not happen, but for some reason a mid processor has been designated as the processor
+                    # the parent should attach to
+                    pass
+                else:
+                    # Check for "attach_to" parameter in descendents
+                    while True:
+                        if "attach_to" in next_parameters:
+                            self.parameters["attach_to"] = next_parameters["attach_to"]
+                            break
+                        else:
+                            if "next" in next_parameters:
+                                next_parameters = next_parameters["next"][0]["parameters"]
+                            else:
+                                # No more descendents
+                                # Should not happen; we cannot find the source dataset
+                                self.log.warning(
+                                    "Cannot find preset's source dataset for dataset %s" % self.dataset.key)
+                                break
 
-			if not can_run_next:
-				# We are unable to continue the chain of processors, so we check to see if we are attaching to a parent
-				# preset; this allows the parent (for example a preset) to be finished and any successful processors displayed
-				if "attach_to" in self.parameters:
-					# Probably should not happen, but for some reason a mid processor has been designated as the processor
-					# the parent should attach to
-					pass
-				else:
-					# Check for "attach_to" parameter in descendents
-					while True:
-						if "attach_to" in next_parameters:
-							self.parameters["attach_to"] = next_parameters["attach_to"]
-							break
-						else:
-							if "next" in next_parameters:
-								next_parameters = next_parameters["next"][0]["parameters"]
-							else:
-								# No more descendents
-								# Should not happen; we cannot find the source dataset
-								self.log.warning("Cannot find preset's source dataset for dataset %s" % self.dataset.key)
-								break
+        # see if we need to register the result somewhere
+        if "copy_to" in self.parameters:
+            # copy the results to an arbitrary place that was passed
+            if self.dataset.get_results_path().exists():
+                shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
+            else:
+                # if copy_to was passed, that means it's important that this
+                # file exists somewhere, so we create it as an empty file
+                with open(self.parameters["copy_to"], "w") as empty_file:
+                    empty_file.write("")
 
-		# see if we need to register the result somewhere
-		if "copy_to" in self.parameters:
-			# copy the results to an arbitrary place that was passed
-			if self.dataset.get_results_path().exists():
-				shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
-			else:
-				# if copy_to was passed, that means it's important that this
-				# file exists somewhere, so we create it as an empty file
-				with open(self.parameters["copy_to"], "w") as empty_file:
-					empty_file.write("")
+        # see if this query chain is to be attached to another query
+        # if so, the full genealogy of this query (minus the original dataset)
+        # is attached to the given query - this is mostly useful for presets,
+        # where a chain of processors can be marked as 'underlying' a preset
+        if "attach_to" in self.parameters:
+            try:
+                # copy metadata and results to the surrogate
+                surrogate = DataSet(key=self.parameters["attach_to"], db=self.db)
 
-		# see if this query chain is to be attached to another query
-		# if so, the full genealogy of this query (minus the original dataset)
-		# is attached to the given query - this is mostly useful for presets,
-		# where a chain of processors can be marked as 'underlying' a preset
-		if "attach_to" in self.parameters:
-			try:
-				# copy metadata and results to the surrogate
-				surrogate = DataSet(key=self.parameters["attach_to"], db=self.db)
+                if self.dataset.get_results_path().exists():
+                    # Update the surrogate's results file suffix to match this dataset's suffix
+                    surrogate.data["result_file"] = surrogate.get_results_path().with_suffix(
+                        self.dataset.get_results_path().suffix)
+                    shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
 
-				if self.dataset.get_results_path().exists():
-					# Update the surrogate's results file suffix to match this dataset's suffix
-					surrogate.data["result_file"] = surrogate.get_results_path().with_suffix(self.dataset.get_results_path().suffix)
-					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
+                try:
+                    surrogate.finish(self.dataset.data["num_rows"])
+                except RuntimeError:
+                    # already finished, could happen (though it shouldn't)
+                    pass
 
-				try:
-					surrogate.finish(self.dataset.data["num_rows"])
-				except RuntimeError:
-					# already finished, could happen (though it shouldn't)
-					pass
+                surrogate.update_status(self.dataset.get_status())
 
-				surrogate.update_status(self.dataset.get_status())
+            except ValueError:
+                # dataset with key to attach to doesn't exist...
+                self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (
+                    self.dataset.key, self.parameters["attach_to"]))
 
-			except ValueError:
-				# dataset with key to attach to doesn't exist...
-				self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (
-				self.dataset.key, self.parameters["attach_to"]))
+        self.job.finish()
 
-		self.job.finish()
+        if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+            owner = self.dataset.get_parameters().get("email-complete", False)
+            # Check that username is email address
+            if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+                from smtplib import SMTPException
+                import socket
+                import html2text
 
 		if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
 			owner = self.dataset.get_parameters().get("email-complete", False)
@@ -875,34 +896,32 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         e.g.:
 
         def exclude_followup_processors(cls, processor_type):
-			if processor_type in ["undesirable-followup-processor"]:
-				return True
-			return False
+            if processor_type in ["undesirable-followup-processor"]:
+                return True
+            return False
 
         :param str processor_type:  Processor type to exclude
         :return bool:  True if processor should be excluded, False otherwise
         """
-		return False
+        return False
 
-	@abc.abstractmethod
-	def process(self):
-		"""
-		Process data
+    @abc.abstractmethod
+    def process(self):
+        """
+        Process data
 
-		To be defined by the child processor.
-		"""
-		pass
+        To be defined by the child processor.
+        """
+        pass
 
-	@staticmethod
-	def is_4cat_processor():
-		"""
-		Is this a 4CAT processor?
+    @staticmethod
+    def is_4cat_processor():
+        """
+        Is this a 4CAT processor?
 
-		This is used to determine whether a class is a 4CAT
-		processor.
-		
-		:return:  True
-		"""
-		return True
+        This is used to determine whether a class is a 4CAT
+        processor.
 
-
+        :return:  True
+        """
+        return True

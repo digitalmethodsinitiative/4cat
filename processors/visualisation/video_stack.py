@@ -8,7 +8,7 @@ assumes that ffprobe is also present in the same location.
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from packaging import version
 
@@ -40,7 +40,7 @@ class VideoStack(BasicProcessor):
     options = {
         "amount": {
             "type": UserInput.OPTION_TEXT,
-            "help": f"Number of videos to stack.",
+            "help": "Number of videos to stack.",
             "default": 10,
             "max": 50,
             "min": 2,
@@ -166,7 +166,7 @@ class VideoStack(BasicProcessor):
             if len(videos) >= max_videos:
                 break
 
-            video_path = shlex.quote(str(video))
+            video_path = oslex.quote(str(video))
 
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
@@ -193,7 +193,7 @@ class VideoStack(BasicProcessor):
         # loop again, this time to construct the ffmpeg command
         last_index = num_videos - 1
         for video in videos:
-            video_path = shlex.quote(str(video))
+            video_path = oslex.quote(str(video))
             # video to stack
             command += ["-i", video_path]
             if index > 0:
@@ -222,19 +222,19 @@ class VideoStack(BasicProcessor):
             self.dataset.update_status(f"Unpacked {index:,} of {num_videos:,} videos")
 
         # create final complex filter chain
-        ffmpeg_filter = shlex.quote(";".join(transparency_filter) + ";" + ";".join(merge_filter))[1:-1]
+        ffmpeg_filter = oslex.quote(";".join(transparency_filter) + ";" + ";".join(merge_filter))[1:-1]
         command += ["-filter_complex", ffmpeg_filter]
 
         # ensure mixed audio
         if sound == "none":
             command += ["-an"]
         elif sound == "longest":
-            command += ["-map", f"0:a"]
+            command += ["-map", "0:a"]
 
         command += ["-map", "[final]", *fps_params]
 
         # output file
-        command.append(shlex.quote(str(self.dataset.get_results_path())))
+        command.append(oslex.quote(str(self.dataset.get_results_path())))
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
 
         if self.interrupted:

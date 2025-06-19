@@ -122,6 +122,10 @@ class RankFlowRenderer(BasicProcessor):
 			all_periods = set()
 			known_periods = {}
 			for row in self.source_dataset.iterate_items(self):
+				if row["date"] == "unknown_date":
+					# skip unknown dates, they are not useful for this
+					continue
+
 				all_periods.add(row["date"])
 
 				label = self.get_label(row)
@@ -135,6 +139,7 @@ class RankFlowRenderer(BasicProcessor):
 		# now first create a map with the ranks for each period
 		weighted = False
 		processed = 0
+		unknown_dates = 0
 		for row in self.source_dataset.iterate_items(self):
 			processed += 1
 			if processed % 250 == 0:
@@ -142,7 +147,12 @@ class RankFlowRenderer(BasicProcessor):
 
 			# figure out label and apply completeness filter
 			label = self.get_label(row)
-			if label in ignore:
+			if row["date"] == "unknown_date":
+				# skip unknown dates, they are not useful for this
+				unknown_dates += 1
+				self.dataset.log("Skipping item with unknown date: %s" % label)
+				continue
+			elif label in ignore:
 				continue
 
 			# always treat weight (value) as float - can be converted to lower
@@ -432,6 +442,9 @@ class RankFlowRenderer(BasicProcessor):
 			self.dataset.log("Pretty-printing failed, retrying...")
 			canvas.saveas(filename=str(self.dataset.get_results_path()))
 
+		if unknown_dates > 0:
+			self.dataset.update_status(f"Dataset completed. Skipped {unknown_dates} items with unknown dates.", is_final=True)
+
 		self.dataset.finish(len(items) * len(list(items.items()).pop()))
 
 	def black_or_white(self, hsv):
@@ -458,7 +471,7 @@ class RankFlowRenderer(BasicProcessor):
 		y = (0.2126 * r1) + (0.7152 * g1) + (0.0722 * b1)
 
 		# calculate perceived lightness
-		l = (y * 903.3) if y <= 0.008856 else (pow(y, 1 / 3) * 116 - 16)
+		l = (y * 903.3) if y <= 0.008856 else (pow(y, 1 / 3) * 116 - 16)  # noqa: E741
 
 		return "black" if l > 50 else "white"
 

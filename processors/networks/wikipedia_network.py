@@ -46,7 +46,7 @@ class WikiURLCoLinker(BasicProcessor):
 
 		# we use these to extract URLs and host names if needed
 		link_regex = re.compile(r"https?://en.wikipedia\.org/wiki/[^\s.]+")
-		wiki_page = re.compile(r"[\[\[[^\]]+\]\]")
+		# wiki_page = re.compile(r"[\[\[[^\]]+\]\]")
 		category_regex = re.compile(r"\[\[Category:[^\]]+\]\]")
 		trailing_comma = re.compile(r",$")
 
@@ -54,8 +54,6 @@ class WikiURLCoLinker(BasicProcessor):
 		all_categories = {}
 		errors = 0
 		page_categories = {}
-		page_links = {}
-		deep_pages = {}
 		processed = 0
 		network = nx.Graph()
 

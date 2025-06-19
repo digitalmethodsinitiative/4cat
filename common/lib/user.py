@@ -249,7 +249,7 @@ class User:
         """
         try:
             return "admin" in self.data["tags"]
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             # invalid JSON?
             return False
 

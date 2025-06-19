@@ -8,7 +8,6 @@ from common.lib.database import Database
 
 from common.lib.exceptions import ConfigException
 from common.lib.config_definition import config_definition
-from common.lib.user_input import UserInput
 
 import configparser
 import os
@@ -88,7 +87,7 @@ class ConfigManager:
                                            "preventing this. Shame on them!")
 
                     self.config_definition.update(module_config)
-            except (ValueError, TypeError) as e:
+            except (ValueError, TypeError):
                 pass
 
     def load_core_settings(self):
@@ -316,8 +315,9 @@ class ConfigManager:
 
             if hasattr(user, "get_id"):
                 user = user.get_id()
-            elif user != None: # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
-                raise TypeError("get() expects None, a User object or a string for argument 'user'")
+            elif user != None:  # noqa: E711
+                # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
+                raise TypeError(f"get() expects None, a User object or a string for argument 'user', {type(user).__name__} given")
 
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups
@@ -453,7 +453,6 @@ class ConfigWrapper:
         :return:
         """
         if "tag" not in kwargs and self.tags:
-            tag = self.tags if type(self.tags) is str else self.tags[0]
             kwargs["tag"] = self.tags
 
         return self.config.set(*args, **kwargs)

@@ -49,10 +49,6 @@ class DebateMetrics(BasicProcessor):
 		"""
 
 		threads = {}
-		reply_lengths = []
-		
-		datasource = self.source_dataset.parameters["datasource"]
-		board = self.source_dataset.parameters["board"]
 
 		self.dataset.update_status("Reading source file")
 		for post in self.source_dataset.iterate_items(self):

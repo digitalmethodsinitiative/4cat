@@ -2,7 +2,6 @@
 Search Telegram via API
 """
 import traceback
-import datetime
 import hashlib
 import asyncio
 import json
@@ -24,7 +23,7 @@ from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, Cha
     FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import User, MessageEntityMention
+from telethon.tl.types import MessageEntityMention
 
 
 
@@ -269,7 +268,9 @@ class SearchTelegram(Search):
         # order to avoid having to re-enter the security code
         query = self.parameters
 
-        session_id = SearchTelegram.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
+        session_id = SearchTelegram.create_session_id(query["api_phone"].strip(),
+                                                      query["api_id"].strip(),
+                                                      query["api_hash"].strip())
         self.dataset.log(f'Telegram session id: {session_id}')
         session_path = Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_SESSIONS"), session_id + ".session")
 
@@ -331,7 +332,7 @@ class SearchTelegram(Search):
             return posts
         except ProcessorInterruptedException as e:
             raise e
-        except Exception as e:
+        except Exception:
             # catch-all so we can disconnect properly
             # ...should we?
             self.dataset.update_status("Error scraping posts from Telegram; halting collection.")
@@ -380,7 +381,6 @@ class SearchTelegram(Search):
         # we may not always know the 'entity username' for an entity ID, so
         # keep a reference map as we go
         entity_id_map = {}
-        query_id_map= {}
 
         # Collect queries
         # Use while instead of for so we can change queries during iteration
@@ -757,8 +757,7 @@ class SearchTelegram(Search):
         forwarded_name = ""
         forwarded_id = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (
-                type(message["fwd_from"]["from_id"]) is int):
+        if message.get("fwd_from") and "from_id" in message["fwd_from"] and type(message["fwd_from"]["from_id"]) is not int:
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not
@@ -825,6 +824,12 @@ class SearchTelegram(Search):
                     # Failsafe; can be updated to support formatting of new datastructures in the future
                     reactions += f"{reaction}, "
 
+        is_reply = False
+        reply_to = ""
+        if message.get("reply_to"):
+            is_reply = True
+            reply_to = message["reply_to"].get("reply_to_msg_id", "")
+
         # t.me links
         linked_entities = set()
         all_links = ural.urls_from_text(message["message"])
@@ -866,7 +871,9 @@ class SearchTelegram(Search):
             "author_name": fullname,
             "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
-            "reply_to": message.get("reply_to_msg_id", ""),
+            "body_markdown": message["message_markdown"],
+            "is_reply": is_reply,
+            "reply_to": reply_to,
             "views": message["views"] if message["views"] else "",
             # "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
@@ -961,6 +968,11 @@ class SearchTelegram(Search):
         # Add the _type if the original object was a telethon type
         if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
             mapped_obj["_type"] = type(input_obj).__name__
+
+        # Store the markdown-formatted text
+        if type(input_obj).__name__ == "Message":
+            mapped_obj["message_markdown"] = input_obj.text
+
         return mapped_obj
 
     @staticmethod
@@ -1029,10 +1041,10 @@ class SearchTelegram(Search):
 
         # maybe we've entered a code already and submitted it with the request
         if "option-security-code" in request.form and request.form.get("option-security-code").strip():
-            code_callback = lambda: request.form.get("option-security-code")
+            code_callback = lambda: request.form.get("option-security-code")  # noqa: E731
             max_attempts = 1
         else:
-            code_callback = lambda: -1
+            code_callback = lambda: -1  # noqa: E731
             # max_attempts = 0 because authing will always fail: we can't wait for
             # the code to be entered interactively, we'll need to do a new request
             # but we can't just immediately return, we still need to call start()
@@ -1053,17 +1065,17 @@ class SearchTelegram(Search):
                 # this happens if 2FA is required
                 raise QueryParametersException("Your account requires two-factor authentication. 4CAT at this time "
                                                f"does not support this authentication mode for Telegram. ({e})")
-            except RuntimeError as e:
+            except RuntimeError:
                 # A code was sent to the given phone number
                 needs_code = True
         except FloodWaitError as e:
             # uh oh, we got rate-limited
             raise QueryParametersException("You were rate-limited and should wait a while before trying again. " +
                                            str(e).split("(")[0] + ".")
-        except ApiIdInvalidError as e:
+        except ApiIdInvalidError:
             # wrong credentials
             raise QueryParametersException("Your API credentials are invalid.")
-        except PhoneNumberInvalidError as e:
+        except PhoneNumberInvalidError:
             # wrong phone number
             raise QueryParametersException(
                 "The phone number provided is not a valid phone number for these credentials.")

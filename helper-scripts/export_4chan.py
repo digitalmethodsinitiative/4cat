@@ -23,14 +23,12 @@ It exports most data as-is, but also makes some changes.
 
 import argparse
 import json
-import time
 import csv
 import sys
 import os
 import re
 
-from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
@@ -158,11 +156,11 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 
 				# Set required OP data
 				post = {
-					"sub": row["subject"] if row["subject"] != None else "", 
+					"sub": row["subject"] if row["subject"] is not None else "",
 					"replies": 0,
 					"images": 0,
 					"op": True,
-					"semantic_url": row["semantic_url"] if row["semantic_url"] != None else ""
+					"semantic_url": row["semantic_url"] if row["semantic_url"] is not None else ""
 				}
 
 				# Set optional OP data
@@ -211,7 +209,7 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 			post["num"] = row["id"]
 			post["resto"] = row["thread_id"]
 			post["board"] = row["board"]
-			post["com"] = row["body"] if row["body"] != None else ""
+			post["com"] = row["body"] if row["body"] is not None else ""
 			post["time"] = row["timestamp"]
 			post["time_utc"] = datetime.strftime(datetime.utcfromtimestamp(row["timestamp"]), "%Y-%m-%d %H:%M:%S")
 			post["name"] = row.get("author", "")

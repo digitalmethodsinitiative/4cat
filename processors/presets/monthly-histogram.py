@@ -3,6 +3,7 @@ Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
 from processors.metrics.count_posts import CountPosts
+import copy
 
 
 class MonthlyHistogramCreator(ProcessorPreset):

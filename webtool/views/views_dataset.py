@@ -5,39 +5,38 @@ import json
 import csv
 import io
 
-import flask
 import json_stream
-from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
-    url_for, stream_with_context
+from flask import Blueprint, current_app, render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
+    url_for, stream_with_context, g
 from flask_login import login_required, current_user
 
-from webtool import app, db, config, fourcat_modules, time_this
 from webtool.lib.helpers import Pagination, error, setting_required
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
 
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
 
+component = Blueprint("dataset", __name__)
+
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
-@app.route('/create-dataset/')
+@component.route('/create-dataset/')
 @login_required
 @setting_required("privileges.can_create_dataset")
 def create_dataset():
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get(
+    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
+                   metadata["has_worker"] and metadata["has_options"] and datasource in g.config.get(
                        "datasources.enabled", {})}
 
     return render_template('create-dataset.html', datasources=datasources)
 
 
-@app.route('/results/', defaults={'page': 1})
-@app.route('/results/page/<int:page>/')
-@time_this
+@component.route('/results/', defaults={'page': 1})
+@component.route('/results/page/<int:page>/')
 @login_required
 def show_results(page):
     """
@@ -74,7 +73,7 @@ def show_results(page):
     # 'all' is limited to admins
     depth = request.args.get("depth", "own")
     available_depths = ["own", "favourites"]
-    if config.get("privileges.can_view_all_datasets"):
+    if g.config.get("privileges.can_view_all_datasets"):
         available_depths.append("all")
 
     if depth not in available_depths:
@@ -84,7 +83,7 @@ def show_results(page):
 
     # the user filter is only exposed to admins
     if filters["user"]:
-        if config.get("privileges.can_view_all_datasets"):
+        if g.config.get("privileges.can_view_all_datasets"):
             where.append("key IN ( SELECT key FROM datasets_owners WHERE name LIKE %s AND key = datasets.key)")
             replacements.append(filters["user"].replace("*", "%"))
         else:
@@ -105,7 +104,7 @@ def show_results(page):
         replacements.append("%" + filters["filter"] + "%")
 
     # hide private datasets for non-owners and non-admins
-    if not config.get("privileges.can_view_private_datasets"):
+    if not g.config.get("privileges.can_view_private_datasets"):
         where.append(
             "(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key))")
         replacements.append(owner_match)
@@ -124,26 +123,26 @@ def show_results(page):
     where = " AND ".join(where)
 
     # first figure out how many datasets this matches
-    num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE " + where, tuple(replacements))["num"]
+    num_datasets = g.db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE " + where, tuple(replacements))["num"]
 
     # then get the current page of results
     replacements.append(page_size)
     replacements.append(offset)
     query = "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s"
 
-    datasets = db.fetchall(query, tuple(replacements))
+    datasets = g.db.fetchall(query, tuple(replacements))
 
     if not datasets and page != 1:
         return error(404)
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = [DataSet(key=dataset["key"], db=db, modules=fourcat_modules) for dataset in datasets]
+    filtered = [DataSet(key=dataset["key"], db=g.db, modules=g.modules) for dataset in datasets]
 
     favourites = [row["key"] for row in
-                  db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
+                  g.db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in fourcat_modules.datasources.items() if
+    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
                    metadata["has_worker"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
@@ -155,7 +154,7 @@ Downloading results
 """
 
 
-@app.route('/result/<path:query_file>')
+@component.route('/result/<path:query_file>')
 def get_result(query_file):
     """
     Get dataset result file
@@ -164,10 +163,10 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    return send_from_directory(directory=config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')), path=query_file)
+    return send_from_directory(directory=g.config.get('PATH_ROOT').joinpath(g.config.get('PATH_DATA')), path=query_file)
 
 
-@app.route('/mapped-result/<string:key>/')
+@component.route('/mapped-result/<string:key>/')
 def get_mapped_result(key):
     """
     Get mapped result
@@ -177,32 +176,18 @@ def get_mapped_result(key):
     processor of the dataset has a method for mapping its data to CSV, then this
     route uses that to convert the data to CSV on the fly and serve it as such.
 
+    We also use this if there's annotation data saved.
+
     :param str key:  Dataset key
     """
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
-            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+            g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
-
-    if dataset.get_extension() == ".csv":
-        # if it's already a csv, just return the existing file
-        return url_for("get_result", query_file=dataset.get_results_path().name)
-
-    if not hasattr(dataset.get_own_processor(), "map_item"):
-        # cannot map without a mapping method
-        return error(404, error="File not found.")
-
-    # Also add possibly added annotation items.
-    # These cannot be added to the static `map_item` function.
-    annotation_labels = None
-    annotation_fields = dataset.get_annotation_fields()
-    if annotation_fields:
-        annotation_labels = ["annotation_" + v["label"] for v in annotation_fields.values()]
-        annotations = dataset.get_annotations()
 
     def map_response():
         """
@@ -217,10 +202,6 @@ def get_mapped_result(key):
         for item in dataset.iterate_items(processor=dataset.get_own_processor(), warn_unmappable=False):
             if not writer:
                 fieldnames = list(item.keys())
-                if annotation_labels:
-                    for label in annotation_labels:
-                        if label not in fieldnames:
-                            fieldnames.append(label)
 
                 writer = csv.DictWriter(buffer, fieldnames=fieldnames)
                 writer.writeheader()
@@ -228,44 +209,39 @@ def get_mapped_result(key):
                 buffer.truncate(0)
                 buffer.seek(0)
 
-            if annotation_fields:
-                for label in annotation_labels:
-                    item[label] = annotations.get(item.get("id"), {}).get(label, "")
-
             writer.writerow(item)
             yield buffer.getvalue()
             buffer.truncate(0)
             buffer.seek(0)
 
     disposition = 'attachment; filename="%s"' % dataset.get_results_path().with_suffix(".csv").name
-    return app.response_class(stream_with_context(map_response()), mimetype="text/csv",
+    return current_app.response_class(stream_with_context(map_response()), mimetype="text/csv",
                               headers={"Content-Disposition": disposition})
 
 
-@app.route("/results/<string:key>/log/")
+@component.route("/results/<string:key>/log/")
 @login_required
 def view_log(key):
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
-            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+            g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     logfile = dataset.get_log_path()
     if not logfile.exists():
         return error(404)
 
-    log = flask.Response(dataset.get_log_path().read_text("utf-8"))
+    log = current_app.response_class(dataset.get_log_path().read_text("utf-8"))
     log.headers["Content-type"] = "text/plain"
 
     return log
 
 
-@app.route("/preview/<string:key>/")
-@time_this
+@component.route("/preview/<string:key>/")
 def preview_items(key):
     """
     Preview a dataset file
@@ -277,12 +253,12 @@ def preview_items(key):
     :return:  HTML preview
     """
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
-            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+            g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     preview_size = 1000
@@ -296,12 +272,12 @@ def preview_items(key):
     # json and ndjson can use mapped data for the preview or the raw json;
     # this depends on 4CAT settings
     has_mapper = hasattr(processor, "map_item")
-    use_mapper = has_mapper and config.get("ui.prefer_mapped_preview")
+    use_mapper = has_mapper and g.config.get("ui.prefer_mapped_preview")
 
     if dataset.get_extension() == "gexf":
         # network files
         # use GEXF preview panel which loads full data file client-side
-        hostname = config.get("flask.server_name").split(":")[0]
+        hostname = g.config.get("flask.server_name").split(":")[0]
         in_localhost = hostname in ("localhost", "127.0.0.1") or hostname.endswith(".local") or \
                        hostname.endswith(".localhost")
         return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
@@ -393,9 +369,8 @@ def preview_items(key):
 """
 Individual result pages
 """
-@app.route('/results/<string:key>/processors/')
-@app.route('/results/<string:key>/')
-@time_this
+@component.route('/results/<string:key>/processors/')
+@component.route('/results/<string:key>/')
 def show_result(key):
     """
     Show result page
@@ -407,7 +382,7 @@ def show_result(key):
     :return:  Rendered template
     """
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
     except DataSetException:
         return error(404, error="This dataset cannot be found.")
 
@@ -422,15 +397,15 @@ def show_result(key):
         return redirect(url)
 
     is_processor_running = False
-    is_favourite = (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
+    is_favourite = (g.db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
                                 (current_user.get_id(), dataset.key))["num"] > 0)
 
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
-    datasources = fourcat_modules.datasources
-    datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
+    datasources = g.modules.datasources
+    datasource_expiration = g.config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
-    can_unexpire = ((config.get('expire.allow_optout') and \
+    can_unexpire = ((g.config.get("expire.allow_optout") and \
                      datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout",
                                                                                                    False)) \
                    and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
@@ -453,13 +428,14 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "result.html" if standalone else "components/result-details.html"
 
-    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=fourcat_modules.processors,
+    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
+                           datasources=datasources)
 
 
-@app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
+@component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required
 def queue_processor_interactive(key, processor):
     """
@@ -478,7 +454,7 @@ def queue_processor_interactive(key, processor):
         return redirect("/results/" + key + "/")
 
 
-@app.route("/results/<string:key>/toggle-favourite/")
+@component.route("/results/<string:key>/toggle-favourite/")
 @login_required
 def toggle_favourite_interactive(key):
     """
@@ -506,7 +482,7 @@ def toggle_favourite_interactive(key):
         return render_template("error.html", message="Error while toggling favourite status for dataset %s." % key)
 
 
-@app.route("/results/<string:key>/toggle-private/")
+@component.route("/results/<string:key>/toggle-private/")
 @login_required
 def toggle_private_interactive(key):
     """
@@ -534,15 +510,15 @@ def toggle_private_interactive(key):
         return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
 
 
-@app.route("/results/<string:key>/keep/", methods=["GET"])
+@component.route("/results/<string:key>/keep/", methods=["GET"])
 @login_required
 def keep_dataset(key):
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
     except DataSetException:
         return error(404, message="Dataset not found.")
 
-    if not config.get("expire.allow_optout"):
+    if not g.config.get("expire.allow_optout"):
         return render_template("error.html", title="Dataset cannot be kept",
                                message="All datasets are scheduled for automatic deletion. This cannot be "
                                        "overridden."), 403
@@ -555,8 +531,8 @@ def keep_dataset(key):
         # check if data source forces expiration - in that case, the user
         # cannot reset this
         datasource = dataset.parameters.get("datasource")
-        datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
-        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get(
+        datasource_expiration = g.config.get("datasources.expiration", {}).get(datasource, {})
+        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not g.config.get(
                 "expire.allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
                                    message="All datasets of this data source (%s) are scheduled for automatic "
@@ -567,4 +543,4 @@ def keep_dataset(key):
         dataset.keep = True
 
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
-    return redirect(url_for("show_result", key=key))
+    return redirect(url_for("dataset.show_result", key=key))

@@ -9,7 +9,7 @@ try:
 	import config
 	import logging
 	db = Database(logger=logging, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
-except (SyntaxError, ImportError, AttributeError) as e:
+except (SyntaxError, ImportError, AttributeError):
 	from common.config_manager import config
 	from common.lib.logger import Logger
 	log = Logger(output=True)

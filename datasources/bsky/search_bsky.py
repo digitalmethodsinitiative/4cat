@@ -70,6 +70,7 @@ class SearchBluesky(Search):
                 "help": "Bluesky Username",
                 "cache": True,
                 "sensitive": True,
+                "tooltip": "If no server is specified, .bsky.social is used."
             },
             "password": {
                 "type": UserInput.OPTION_TEXT,
@@ -128,6 +129,13 @@ class SearchBluesky(Search):
         if not query.get("username", None) or not query.get("password", None) :
             raise QueryParametersException("You need to provide valid Bluesky login credentials first.")
 
+        # If no server is specified, default to .bsky.social
+        if "." not in query.get("username"):
+            query["username"] += ".bsky.social"
+        # Remove @ at the start
+        if query.get("username").startswith("@"):
+            query["username"] = query["username"][1:]
+
         # Test login credentials
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
         try:
@@ -160,9 +168,9 @@ class SearchBluesky(Search):
                 expected_time = timify_long(expected_tweets / posts_per_second)
                 raise QueryNeedsExplicitConfirmationException(f"This query matches approximately {expected_tweets} tweets and may take {expected_time} to complete. Do you want to continue?")
             elif max_posts == 0 and not min_date:
-                raise QueryNeedsExplicitConfirmationException(f"No maximum number of posts set! This query has no minimum date and thus may take a very, very long time to complete. Do you want to continue?")
+                raise QueryNeedsExplicitConfirmationException("No maximum number of posts set! This query has no minimum date and thus may take a very, very long time to complete. Do you want to continue?")
             elif max_posts == 0:
-                raise QueryNeedsExplicitConfirmationException(f"No maximum number of posts set! This query may take a long time to complete. Do you want to continue?")
+                raise QueryNeedsExplicitConfirmationException("No maximum number of posts set! This query may take a long time to complete. Do you want to continue?")
 
         return {
             "max_posts": query.get("max_posts"),
@@ -291,7 +299,7 @@ class SearchBluesky(Search):
                     # Expected from NetworkError, but the query will have been added back to the queue
                     # If not, then there was a problem with the query
                     if len(queries) == 0:
-                        self.dataset.update_status(f"Error collecting posts from Bluesky; see log for details", is_final=True)
+                        self.dataset.update_status("Error collecting posts from Bluesky; see log for details", is_final=True)
                     if query not in queries:
                         # Query was not added back; there was an unexpected issue with the query itself
                         self.dataset.update_status(f"Error continuing {query} from Bluesky (see log for details); continuing to next query")
@@ -304,7 +312,7 @@ class SearchBluesky(Search):
                     invalid_post_counter += 1
                     if invalid_post_counter >= 100:
                         #  Max limit is 100; this should not occur, but we do not want to continue searching post by post indefinitely
-                        self.dataset.log(f"Unable to identify invalid post; discontinuing search")
+                        self.dataset.log("Unable to identify invalid post; discontinuing search")
                         query_parameters["limit"] = limit
                         search_for_invalid_post = False
                         invalid_post_counter = 0
@@ -652,7 +660,7 @@ class SearchBluesky(Search):
                     return user_profile.handle
                 else:
                     return None
-            except (NetworkError, InvokeTimeoutError) as e:
+            except (NetworkError, InvokeTimeoutError):
                 # Network error; try again
                 tries += 1
                 time.sleep(1)
@@ -699,7 +707,15 @@ class SearchBluesky(Search):
         if session_path.exists():
             with session_path.open() as session_file:
                 session_string = session_file.read()
-                client.login(session_string=session_string)
+                try:
+                    client.login(session_string=session_string)
+                except BadRequestError as e:
+                    if e.response.content.message == 'Token has expired':
+                        # Token has expired; try to refresh
+                        if username and password:
+                            client.login(login=username, password=password)
+                        else:
+                            raise ValueError("Session token has expired; please re-login with username and password.")
         else:
             # Were not able to log in via session string; login with username and password
             client.login(login=username, password=password)

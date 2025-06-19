@@ -29,7 +29,7 @@ class SearchVK(Search):
         "[VK API documentation](https://vk.com/dev/first_guide)",
         "[Python API wrapper](https://github.com/python273/vk_api)"
     ]
-
+    
     expanded_profile_fields = "id,screen_name,first_name,last_name,name,deactivated,is_closed,is_admin,sex,city,country,photo_200,photo_100,photo_50,followers_count,members_count"  # https://vk.com/dev/objects/user & https://vk.com/dev/objects/group
 
     @classmethod
@@ -125,7 +125,7 @@ class SearchVK(Search):
                 is_final=True)
             return []
 
-        self.dataset.update_status(f"Logging in to VK")
+        self.dataset.update_status("Logging in to VK")
         try:
             vk_session = self.login(self.parameters.get("username"), self.parameters.get("password"))
         except vk_api.exceptions.AuthError as e:
@@ -151,7 +151,7 @@ class SearchVK(Search):
 
             # Collect Newsfeed results
             num_results = 0
-            self.dataset.update_status(f"Submitting query...")
+            self.dataset.update_status("Submitting query...")
             for i, result_batch in enumerate(self.search_newsfeed(vk_helper, **query_parameters)):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while fetching newsfeed data from the VK API")

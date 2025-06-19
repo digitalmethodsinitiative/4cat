@@ -21,7 +21,7 @@
                 if a notification is sent to !everyone or a specific tag and made dismissable, any user can dismiss
                 it and that will delete the notification for all other users (so you probably shouldn't do that).</p>
 
-            <form action="{{ url_for("manipulate_notifications") }}" method="POST" class="wide">
+            <form action="{{ url_for("admin.manipulate_notifications") }}" method="POST" class="wide">
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice|safe }}</p>
                 {% endfor %}
@@ -37,9 +37,14 @@
                     <label for="notification-allow_dismiss">Dismissable?</label>
                     <input type="checkbox" id="notification-allow_dismiss" name="allow_dismiss"{% if notification.allow_dismiss %} checked{% endif %}>
                 </div>
-                <div class="form-element{% if "expires" in incomplete %} missing{% endif %}">
-                    <label for="notification-expires">Expire after</label>
-                    <input type="text" name="expires" id="notification-expires" value="{{ notification.expires }}">
+                <div class="form-element{% if "expires-seconds" in incomplete %} missing{% endif %}">
+                    <label for="notification-expires-seconds">Expire after (seconds)</label>
+                    <input type="text" name="expires-seconds" id="notification-expires-seconds" value="{{ notification.expires }}">
+                </div>
+                <div class="form-element"><label> or </label></div>
+                <div class="form-element{% if "expires-date" in incomplete %} missing{% endif %}">
+                    <label for="notification-expires-date">Expire after (date)</label>
+                    <input type="datetime-local" name="expires-date" id="notification-expires-date" value="{{ notification.expires }}">
                 </div>
                 <div class="submit-container">
                     <button>

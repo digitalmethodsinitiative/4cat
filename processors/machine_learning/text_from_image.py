@@ -152,20 +152,27 @@ class ImageTextDetector(BasicProcessor):
         file_collection_name = dmi_service_manager.get_folder_name(self.source_dataset)
 
         # Process the image files (upload to server if needed)
-        path_to_files, path_to_results = dmi_service_manager.process_files(input_file_dir=staging_area,
+        try:
+            path_to_files, path_to_results = dmi_service_manager.process_files(input_file_dir=staging_area,
                                                                            filenames=image_filenames,
                                                                            output_file_dir=output_dir,
                                                                            server_file_collection_name=file_collection_name,
                                                                            server_results_folder_name=server_results_folder_name)
+        except DsmConnectionError as e:
+            self.dataset.finish_with_error(f"Unable to connect to DMI Service Manager: {e}")
+            return
 
         # Arguments for the OCR server
-        data = {'args': ['--model', model_type,
+        data = {
+                'args': ['--model', model_type,
                          '--output_dir', f"data/{path_to_results}",
-                         '--images']}
+                         '--images'],
+                'timeout': max(2 * total_image_files, 600), # 2 seconds per image
+                }
         data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "ocr"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30,

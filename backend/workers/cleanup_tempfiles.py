@@ -98,9 +98,12 @@ class TempFileCleaner(BasicWorker):
                 # if the dataset is finished, the staging area should have been
                 # compressed into a zip file, or deleted, so this is also safe
                 # to clean up
-                self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
-                dataset.key, str(file)))
-                shutil.rmtree(file)
+                if file.name not in tracked_files:
+                    self.log.info("Dataset %s is finished, but staging area remains at %s, marking for deletion" % (dataset.key, str(file)))
+                    tracked_files[file.name] = datetime.now().timestamp() + (self.days_to_keep * 86400)
+                elif tracked_files[file.name] < datetime.now().timestamp():
+                    self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (dataset.key, str(file)))
+                    shutil.rmtree(file)
 
         # Update tracked files
         tracking_file.write_text(json.dumps(tracked_files))

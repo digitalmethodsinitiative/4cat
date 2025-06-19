@@ -70,7 +70,6 @@ class SearchRedNote(Search):
         item = post["note_card"] if post.get("type") != "video" else post
         item_id = post.get("id", post.get("note_id"))
 
-        import json
 
         # Images
         images = []

@@ -211,7 +211,7 @@ class PixPlotGenerator(BasicProcessor):
         data['timeout'] = (86400 * 7)
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "pixplot"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30, check_process=False)
@@ -268,11 +268,17 @@ class PixPlotGenerator(BasicProcessor):
             # No metadata
             return False
 
+
+        top_dataset = self.dataset.top_parent()
         # Check that this is not already a top dataset
-        if self.dataset.top_parent().key == self.source_dataset.key:
-            # i.e. the source image dataset is not a top dataset that happens to have a metadata file from some export
+        if top_dataset.key == self.source_dataset.key:
+            # This is a top dataset; there is no additional metadata to be added from a source dataset
+            # i.e. there is a metadata file uploaded from some export, but we do not have the original source dataset
             # This can happen with the Upload Media datasource if the user uploads a 4CAT results zip with images and .metadata.json
-            # But there is not a top dataset with post data in this instance unfortunately
+            return False
+        elif top_dataset.get_media_type() != "text":
+            # Top dataset is not a text dataset; no additional metadata to be added
+            # e.g., image dataset uploaded as zip and later filtered via unique_images
             return False
 
         with open(os.path.join(temp_path, '.metadata.json')) as file:
@@ -335,12 +341,12 @@ class PixPlotGenerator(BasicProcessor):
                     if image['tags']:
                         image['tags'] += '|'
                     if 'tags' in post.keys():
-                        if type(post['tags']) == list:
+                        if type(post['tags']) is list:
                             image['tags'] += '|'.join(post['tags'])
                         else:
                             image['tags'] += '|'.join(post['tags'].split(','))
                     elif 'hashtags' in post.keys():
-                        if type(post['hashtags']) == list:
+                        if type(post['hashtags']) is list:
                             image['tags'] += '|'.join(post['hashtags'])
                         else:
                             image['tags'] += '|'.join(post['hashtags'].split(','))
@@ -354,7 +360,7 @@ class PixPlotGenerator(BasicProcessor):
                             pass 
                         elif type(post['timestamp']) in [int, float]:
                             image['year'] = datetime.fromtimestamp(post['timestamp']).year
-                        elif type(post['timestamp']) == str:
+                        elif type(post['timestamp']) is str:
                             try:
                                 image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
                             except ValueError:
@@ -395,7 +401,8 @@ class PixPlotGenerator(BasicProcessor):
         """
         s = unquote(os.path.basename(s))
         invalid_chars = '<>:;,"/\\|?*[]'
-        for i in invalid_chars: s = s.replace(i, '')
+        for i in invalid_chars:
+            s = s.replace(i, '')
         return s
 
     def make_nice_link(self, content):

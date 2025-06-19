@@ -83,7 +83,7 @@ class MakeWordCloud(BasicProcessor):
 		to_lower = self.parameters.get("to_lower")
 		try:
 			max_words = int(self.parameters.get("max_words"))
-		except (ValueError, TypeError) as e:
+		except (ValueError, TypeError):
 			max_words = self.parameters["max_words"]["default"]
 
 		self.dataset.update_status("Extracting words and counts.")

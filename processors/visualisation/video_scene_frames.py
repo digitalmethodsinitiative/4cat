@@ -8,7 +8,7 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from packaging import version
 
@@ -126,14 +126,14 @@ class VideoSceneFrames(BasicProcessor):
 
             command = [
                 ffmpeg_path,
-                "-i", shlex.quote(str(video)),
+                "-i", oslex.quote(str(video)),
                 "-vf", f"select='{vf_param}'",
                 fps_command, "passthrough",
-                shlex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
+                oslex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
             ]
 
             if frame_size != "no_modify":
-                command += ["-s", shlex.quote(frame_size)]
+                command += ["-s", oslex.quote(frame_size)]
 
             result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)

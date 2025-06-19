@@ -174,7 +174,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             data["args"].extend(["--prompt", self.parameters.get("prompt")])
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "blip2"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30)
@@ -190,7 +190,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         except DmiServiceManagerException as e:
             self.dataset.log(str(e))
             self.log.warning(f"BLIP2 Error ({self.dataset.key}): {e}")
-            self.dataset.finish_with_error(f"Error with BLIP2 model; please contact 4CAT admins.")
+            self.dataset.finish_with_error("Error with BLIP2 model; please contact 4CAT admins.")
             return
 
         # Load the video metadata if available

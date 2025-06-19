@@ -40,7 +40,7 @@ class SearchNineGag(Search):
     def map_item(post):
         post_timestamp = datetime.fromtimestamp(post["creationTs"])
 
-        image = sorted([v for v in post["images"].values() if not "hasAudio" in v], key=lambda image: image["width"] * image["height"], reverse=True)[0]
+        image = sorted([v for v in post["images"].values() if "hasAudio" not in v], key=lambda image: image["width"] * image["height"], reverse=True)[0]
         video = sorted([v for v in post["images"].values() if "hasAudio" in v], key=lambda image: image["width"] * image["height"], reverse=True)
 
         video_url = ""

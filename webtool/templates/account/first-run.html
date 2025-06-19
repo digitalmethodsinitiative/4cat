@@ -12,7 +12,7 @@
         <p>This will only set up your initial account. To add more accounts, after logging in, use the Control Panel or
             configure e-mail server details to enable users to request their own accounts.</p>
 
-        <form action="{{ url_for('first_run_dialog') }}" method="POST" class="wide">
+        <form action="{{ url_for('user.first_run_dialog') }}" method="POST" class="wide">
             {% for notice in flashes %}
                 <p class="form-notice">{{ notice }}</p>
             {% endfor %}

@@ -76,7 +76,7 @@ class ViewMetadata(BasicProcessor):
 		include_failed = self.parameters.get("include_failed", False)
 		rows = []
 		num_posts = 0
-		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+		with self.dataset.get_results_path().open("w", encoding="utf-8", newline=""):
 			for key, value in metadata_file.items():
 				if not include_failed and not value.get("success", True):
 					continue
