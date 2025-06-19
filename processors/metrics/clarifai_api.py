@@ -219,6 +219,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
         # Get original post IDs for annotations
         fourcat_annotations = []
+        annotated = 0
         if save_annotations:
             filename_and_post_ids = {v["filename"]: v["post_ids"] for v in image_metadata.values()}
 
@@ -242,16 +243,22 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     for label, confidence in all_annotations.items():
                         if confidence > annotation_threshold:
                             for item_id in filename_and_post_ids[image]:
-                                fourcat_annotation = {
+                                fourcat_annotations.append({
                                     "label": "clarifai_" + label,
                                     "value": confidence,
                                     "item_id": item_id
-                                }
-                                fourcat_annotations.append(fourcat_annotation)
+                                })
 
+                                # Save in batches so we don't memory hog
+                                annotated += 1
+                                if annotated % 1000 == 0:
+                                    self.save_annotations(fourcat_annotations, overwrite=True)
+                                    fourcat_annotations = []
+
+        # Write leftover annotations
         if save_annotations and fourcat_annotations:
             self.save_annotations(fourcat_annotations, overwrite=True)
-            self.dataset.update_status(f"Saved {len(fourcat_annotations)} labels as annotations")
+            self.dataset.update_status(f"Saved {annotated + len(fourcat_annotations)} labels as annotations")
 
         if errors:
             self.dataset.update_status(f"Collected {annotated} annotations, {errors} skipped - see dataset log for details",

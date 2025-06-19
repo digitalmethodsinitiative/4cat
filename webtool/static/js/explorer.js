@@ -201,7 +201,7 @@ function init() {
 			$(".annotation-field").each(function(){
 
 				let ann_field = $(this);
-
+				console.log(ann_field)
 				let label_field = ann_field.find(".annotation-field-label");
 				let type = ann_field.find(".annotation-field-type").val();
 				let option_fields = ann_field.find(".option-fields");
@@ -211,7 +211,7 @@ function init() {
 				// Get the ID of the field, so we
 				// can later check if it already exists.
 				let field_id = ann_field.attr("id").split("-")[1];
-
+				console.log(field_id, field_id)
 				// Make sure the inputs have a label
 				if (!label.length > 0) {
 					label_field.addClass("invalid");
@@ -231,6 +231,9 @@ function init() {
 
 				// Keep track of the labels we've added
 				labels_added.push(label);
+				if (type === undefined) {
+					type = "text";
+				}
 				if (type === "text" || type === "textarea") {
 					annotation_fields[field_id] = {"type": type, "label": label};
 				}
@@ -410,7 +413,6 @@ function init() {
 		},
 
 		checkFieldChanges(new_fields, old_fields) {
-
 			let deleted_fields = [];
 			let changed_type_fields = [];
 

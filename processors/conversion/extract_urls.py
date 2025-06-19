@@ -14,7 +14,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
-__credits__ = ["Stijn Peeters", "Dale Wahl"]
+__credits__ = ["Stijn Peeters", "Dale Wahl", "Sal Hagen"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
@@ -320,6 +320,10 @@ class ExtractURLs(BasicProcessor):
                 if processed_items % progress_interval_size == 0:
                     self.dataset.update_status(f"Processed {processed_items}/{total_items} items; {url_matches_found} items with url(s)")
                     self.dataset.update_progress(processed_items / total_items)
+                if annotations and processed_items % 1000 == 0:
+                    self.save_annotations(annotations, overwrite=False)
+                    annotations = []
+
         if cache:
             self.dataset.log(f"Expanded {len(cache)} URLs in dataset")
 

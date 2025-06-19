@@ -8,6 +8,7 @@ import jieba
 import json
 import re
 import os
+import time
 
 import nltk
 from nltk.stem.snowball import SnowballStemmer
@@ -479,7 +480,7 @@ class Tokenise(BasicProcessor):
                         # However, why someone would want to predict topics for different parts of a post seems unclear
                         metadata[post_id][document_descriptor]['multiple_docs'] = True
 
-					# Possibly save tokens as annotations, in batches of 1000
+					# Possibly save tokens as annotations, in batches of 1000 to prevent memory hog
 					if save_annotations:
 						annotations.append({
 							"label": "tokens",
@@ -487,14 +488,14 @@ class Tokenise(BasicProcessor):
 							"value": ",".join(post_tokens)
 						})
 						if processed % 1000 == 0:
-							self.save_annotations(annotations, overwrite=True)
+							self.save_annotations(annotations, overwrite=False)
 							annotations = []
 
                     output_files[output_path] += 1
 
 		# Safe leftover annotations
 		if annotations:
-			self.save_annotations(annotations, overwrite=True)
+			self.save_annotations(annotations, overwrite=False)
 
 		if output_file_handle:
 			output_file_handle.close()
