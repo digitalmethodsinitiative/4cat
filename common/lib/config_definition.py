@@ -9,7 +9,6 @@ The order of th dictionary below determines the order of the settings in the int
 
 """
 from common.lib.user_input import UserInput
-import json
 
 config_definition = {
     "datasources.intro": {

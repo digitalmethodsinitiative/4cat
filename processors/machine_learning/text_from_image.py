@@ -5,7 +5,6 @@ The DMI OCR Server can be downloaded seperately here:
 https://github.com/digitalmethodsinitiative/ocr_server#readme
 and is run using the DMI Service Manager
 """
-import requests
 import json
 import os
 
@@ -174,7 +173,7 @@ class ImageTextDetector(BasicProcessor):
         data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "ocr"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30,

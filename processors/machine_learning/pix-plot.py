@@ -212,7 +212,7 @@ class PixPlotGenerator(BasicProcessor):
         data['timeout'] = (86400 * 7)
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "pixplot"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30, check_process=False)
@@ -342,12 +342,12 @@ class PixPlotGenerator(BasicProcessor):
                     if image['tags']:
                         image['tags'] += '|'
                     if 'tags' in post.keys():
-                        if type(post['tags']) == list:
+                        if type(post['tags']) is list:
                             image['tags'] += '|'.join(post['tags'])
                         else:
                             image['tags'] += '|'.join(post['tags'].split(','))
                     elif 'hashtags' in post.keys():
-                        if type(post['hashtags']) == list:
+                        if type(post['hashtags']) is list:
                             image['tags'] += '|'.join(post['hashtags'])
                         else:
                             image['tags'] += '|'.join(post['hashtags'].split(','))
@@ -361,7 +361,7 @@ class PixPlotGenerator(BasicProcessor):
                             pass 
                         elif type(post['timestamp']) in [int, float]:
                             image['year'] = datetime.fromtimestamp(post['timestamp']).year
-                        elif type(post['timestamp']) == str:
+                        elif type(post['timestamp']) is str:
                             try:
                                 image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
                             except ValueError:
@@ -402,7 +402,8 @@ class PixPlotGenerator(BasicProcessor):
         """
         s = unquote(os.path.basename(s))
         invalid_chars = '<>:;,"/\\|?*[]'
-        for i in invalid_chars: s = s.replace(i, '')
+        for i in invalid_chars:
+            s = s.replace(i, '')
         return s
 
     def make_nice_link(self, content):

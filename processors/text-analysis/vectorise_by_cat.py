@@ -4,7 +4,6 @@ Transform tokeniser output into vectors by category w/ filter
 import csv
 import json
 import pickle
-import itertools
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput

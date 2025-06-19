@@ -7,7 +7,6 @@ import json
 
 from gensim.models import Word2Vec, FastText
 from gensim.models.phrases import Phrases, Phraser
-from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor

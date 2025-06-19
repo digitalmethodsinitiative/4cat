@@ -2,7 +2,6 @@
 Filter posts by lexicon
 """
 import re
-from pathlib import Path
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput

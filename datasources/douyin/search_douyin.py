@@ -7,7 +7,6 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
-from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 class SearchDouyin(Search):
@@ -104,7 +103,7 @@ class SearchDouyin(Search):
             forward_count = stats.get("forwardCount", MissingMappedField("Unknown"))
             play_count = stats.get("playCount", MissingMappedField("Unknown"))
             share_count = stats.get("shareCount", MissingMappedField("Unknown"))
-            live_watch_count = stats.get("liveWatchCount", MissingMappedField("Unknown"))
+            # live_watch_count = stats.get("liveWatchCount", MissingMappedField("Unknown"))
 
             # This is a guess, I have not encountered it
             video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if "tagName" in tag])
@@ -171,7 +170,7 @@ class SearchDouyin(Search):
             forward_count = stats.get("forward_count") if stats else MissingMappedField("Unknown")
             play_count = stats.get("play_count") if stats else MissingMappedField("Unknown")
             share_count = stats.get("share_count") if stats else MissingMappedField("Unknown")
-            live_watch_count = stats.get("live_watch_count") if stats else MissingMappedField("Unknown")
+            # live_watch_count = stats.get("live_watch_count") if stats else MissingMappedField("Unknown")
 
             video_tags = ",".join(
                 [tag["tag_name"] for tag in (item["video_tag"] if item["video_tag"] is not None else []) if

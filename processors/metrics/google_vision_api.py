@@ -111,7 +111,6 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
         # Get the .metadata.json file if we're writing annotations so we can add them to specific rows.
         img_metadata = []
-        parent_annotations = []
 
         # Loop through images
         for image_file in self.iterate_archive_contents(self.source_file):

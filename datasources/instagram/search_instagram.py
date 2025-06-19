@@ -9,7 +9,7 @@ import re
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.lib.exceptions import WorkerInterruptedException, MapItemException
+from common.lib.exceptions import MapItemException
 
 
 class SearchInstagram(Search):
@@ -191,7 +191,7 @@ class SearchInstagram(Search):
         :return dict:  Mapped item
         """
         num_media = 1 if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
-        caption = MissingMappedField("") if not "caption" in node else "" if not node.get("caption") else node["caption"]["text"]
+        caption = MissingMappedField("") if "caption" not in node else "" if not node.get("caption") else node["caption"]["text"]
 
         # get media urls
         display_urls = []

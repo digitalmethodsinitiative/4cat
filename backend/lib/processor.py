@@ -11,16 +11,15 @@ import time
 import abc
 import csv
 import os
-import random
 
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
-                                   DataSetException, MapItemException, AnnotationException)
+                                   DataSetException, MapItemException)
 from common.config_manager import config, ConfigWrapper
 from common.lib.user import User
 
@@ -104,7 +103,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # that actually queued the processor, so their config is relevant
             self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db, modules=self.modules)
             self.owner = self.dataset.creator
-        except DataSetException as e:
+        except DataSetException:
             # query has been deleted in the meantime. finish without error,
             # as deleting it will have been a conscious choice by a user
             self.job.finish()
@@ -370,7 +369,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 message.attach(MIMEText(mail, "html"))
                 try:
                     send_email([owner], message)
-                except (SMTPException, ConnectionRefusedError, socket.timeout) as e:
+                except (SMTPException, ConnectionRefusedError, socket.timeout):
                     self.log.error("Error sending email to %s" % owner)
 
     def remove_files(self):

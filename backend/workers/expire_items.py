@@ -3,7 +3,6 @@ Delete old items
 """
 import datetime
 import time
-import json
 import re
 
 from backend.lib.worker import BasicWorker

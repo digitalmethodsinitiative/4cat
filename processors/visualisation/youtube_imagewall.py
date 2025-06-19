@@ -61,9 +61,6 @@ class YouTubeImageWall(BasicProcessor):
 		turns it into an image wall. 
 
 		"""
-		results_path = self.dataset.get_results_path()
-		dirname = Path(results_path.parent, results_path.name.replace(".", ""))
-
 		# Get the required parameters
 		# path to the YouTube csv data that was the source of the thumbnails
 		root_csv = self.dataset.get_genealogy()[-3].get_results_path()
@@ -142,7 +139,6 @@ class YouTubeImageWall(BasicProcessor):
 
 		wall = Image.new("RGBA", (wall_width, wall_height))
 		counter = 0
-		category_amount = 1
 		categories_legend = []
 
 		# Get a list of filenames of succesfully downloaded images

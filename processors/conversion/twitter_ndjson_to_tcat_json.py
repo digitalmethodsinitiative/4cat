@@ -217,7 +217,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         """
         new_list = []
         for media in tweet_media:
-            if type(media) == dict:
+            if type(media) is dict:
                 new_list.append({
                     'id_str' : media.get('media_key'),
                     'url' : media.get('url') if media.get('url') else media.get('preview_image_url'),

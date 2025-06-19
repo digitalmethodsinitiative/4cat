@@ -18,7 +18,7 @@ from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitCo
 from common.lib.helpers import timify_long
 from common.lib.user_input import UserInput
 from common.config_manager import config
-from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.item_mapping import MappedItem
 
 class SearchBluesky(Search):
     """
@@ -141,7 +141,7 @@ class SearchBluesky(Search):
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
         try:
             SearchBluesky.bsky_login(username=query["username"], password=query["password"], session_id=session_id)
-        except UnauthorizedError as e:
+        except UnauthorizedError:
             raise QueryParametersException("Invalid Bluesky login credentials.")
         except RequestException as e:
             if e.response.content.message == 'Rate Limit Exceeded':
@@ -169,9 +169,9 @@ class SearchBluesky(Search):
                 expected_time = timify_long(expected_tweets / posts_per_second)
                 raise QueryNeedsExplicitConfirmationException(f"This query matches approximately {expected_tweets} tweets and may take {expected_time} to complete. Do you want to continue?")
             elif max_posts == 0 and not min_date:
-                raise QueryNeedsExplicitConfirmationException(f"No maximum number of posts set! This query has no minimum date and thus may take a very, very long time to complete. Do you want to continue?")
+                raise QueryNeedsExplicitConfirmationException("No maximum number of posts set! This query has no minimum date and thus may take a very, very long time to complete. Do you want to continue?")
             elif max_posts == 0:
-                raise QueryNeedsExplicitConfirmationException(f"No maximum number of posts set! This query may take a long time to complete. Do you want to continue?")
+                raise QueryNeedsExplicitConfirmationException("No maximum number of posts set! This query may take a long time to complete. Do you want to continue?")
 
         return {
             "max_posts": query.get("max_posts"),
@@ -300,7 +300,7 @@ class SearchBluesky(Search):
                     # Expected from NetworkError, but the query will have been added back to the queue
                     # If not, then there was a problem with the query
                     if len(queries) == 0:
-                        self.dataset.update_status(f"Error collecting posts from Bluesky; see log for details", is_final=True)
+                        self.dataset.update_status("Error collecting posts from Bluesky; see log for details", is_final=True)
                     if query not in queries:
                         # Query was not added back; there was an unexpected issue with the query itself
                         self.dataset.update_status(f"Error continuing {query} from Bluesky (see log for details); continuing to next query")
@@ -313,7 +313,7 @@ class SearchBluesky(Search):
                     invalid_post_counter += 1
                     if invalid_post_counter >= 100:
                         #  Max limit is 100; this should not occur, but we do not want to continue searching post by post indefinitely
-                        self.dataset.log(f"Unable to identify invalid post; discontinuing search")
+                        self.dataset.log("Unable to identify invalid post; discontinuing search")
                         query_parameters["limit"] = limit
                         search_for_invalid_post = False
                         invalid_post_counter = 0
@@ -667,7 +667,7 @@ class SearchBluesky(Search):
                     return user_profile.handle
                 else:
                     return None
-            except (NetworkError, InvokeTimeoutError) as e:
+            except (NetworkError, InvokeTimeoutError):
                 # Network error; try again
                 tries += 1
                 time.sleep(1)

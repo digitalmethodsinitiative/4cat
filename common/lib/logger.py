@@ -45,7 +45,7 @@ class WebHookLogHandler(HTTPHandler):
         :param logging.LogRecord record:  Log record to send
         """
         try:
-            import http.client, urllib.parse
+            import http.client
             host = self.host
             if self.secure:
                 h = http.client.HTTPSConnection(host, context=self.context)

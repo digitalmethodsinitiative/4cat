@@ -5,7 +5,6 @@ import time
 import json
 
 from common.lib.job import Job
-import psycopg2
 
 
 class JobQueue:

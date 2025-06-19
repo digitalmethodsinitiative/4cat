@@ -17,7 +17,6 @@ from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
-from common.config_manager import config
 
 class SearchTikTokByID(Search):
     """
@@ -332,7 +331,6 @@ class TikTokScraper:
                 if response.status_code == 404:
                     failed += 1
                     self.processor.dataset.log("Video at %s no longer exists (404), skipping" % response.url)
-                    skip_to_next = True
                     continue
 
                 # haven't seen these in the wild - 403 or 429 might happen?

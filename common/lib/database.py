@@ -370,7 +370,6 @@ class Database:
 		:return list:  A list of rows, as dictionaries
 		"""
 		# schedule a job that will cancel the query we're about to make
-		pid = self.connection.get_backend_pid()
 		self.interruptable_job = queue.add_job("cancel-pg-query", details={}, remote_id=self.appname, claim_after=time.time() + self.interruptable_timeout)
 
 		# run the query
@@ -387,7 +386,7 @@ class Database:
 		# collect results
 		try:
 			result = cursor.fetchall()
-		except AttributeError as e:
+		except AttributeError:
 			result = []
 		except psycopg2.ProgrammingError as e:
 			result = []

@@ -40,8 +40,6 @@ class ThreadSplitter(BasicProcessor):
 		with one column with unique usernames and in the other one the amount
 		of posts for that user name
 		"""
-		users = {}
-
 		# prepare staging area
 		results_path = self.dataset.get_staging_area()
 

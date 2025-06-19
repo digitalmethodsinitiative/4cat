@@ -70,7 +70,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
 
             # special case format
             if "webDetection" in annotations and annotations["webDetection"]:
-                file_result["labelGuess"] = [l["label"] for l in annotations["webDetection"].get("bestGuessLabels", [])]
+                file_result["labelGuess"] = [i["label"] for i in annotations["webDetection"].get("bestGuessLabels", [])]
                 file_result["webEntities"] = [e["description"] for e in annotations["webDetection"].get("webEntities", []) if "description" in e]
                 file_result["urlsPagesWithMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("pagesWithMatchingImages", [])]
                 file_result["urlsMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("fullMatchingImages", [])]

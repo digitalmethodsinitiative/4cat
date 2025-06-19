@@ -325,7 +325,7 @@ class Annotation:
             # If the annotation type has changed, also delete existing annotations,
             # except between text and textarea, where we can just change the type and keep the text.
             if old_field["type"] != new_field["type"]:
-                if not old_field["type"] in text_fields and not new_field["type"] in text_fields:
+                if old_field["type"] not in text_fields and new_field["type"] not in text_fields:
                     fields_to_delete.add(field_id)
                     continue
 

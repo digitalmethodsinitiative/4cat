@@ -121,7 +121,7 @@
                 <h2 id="datasource-header"><span>Data sources</span></h2>
                 <ol id="datasource-list">
                     {% for datasource in datasources %}
-                        <li>{% if datasource_id != datasource %}<a href="{{ url_for('data_overview') }}{{ datasource }}">{% endif %}<h4>{{ datasources[datasource].name }}</h4>{% if datasource_id != datasource %}</a>{% endif %}</li>
+                        <li>{% if datasource_id != datasource %}<a href="{{ url_for('misc.data_overview') }}{{ datasource }}">{% endif %}<h4>{{ datasources[datasource].name }}</h4>{% if datasource_id != datasource %}</a>{% endif %}</li>
                     {% endfor %}
                 </ol>
             </div>

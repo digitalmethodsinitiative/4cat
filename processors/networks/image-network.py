@@ -140,7 +140,7 @@ class ImageGrapher(BasicProcessor):
                     if file_hash not in hash_file_map:
                         hash_file_map[file_hash] = file.name
 
-                except (FileNotFoundError, ValueError) as e:
+                except (FileNotFoundError, ValueError):
                     continue
 
         if not metadata:

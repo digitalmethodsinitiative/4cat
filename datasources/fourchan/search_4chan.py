@@ -270,7 +270,6 @@ class Search4Chan(SearchWithScope):
 				"Samoa": "<span class='flag flag-ws' title='Samoa'></span> Samoa",
 				"San Marino": "<span class='flag flag-sm' title='San Marino'></span> San Marino",
 				"Sao Tome and Principe": "<span class='flag flag-st' title='Sao Tome and Principe'></span> Sao Tome and Principe",
-				"Satellite Provider":  "<span class='flag flag-a2' title='Satellite Provider'></span> Satellite Provider",
 				"Satellite Provider": "<span class='flag flag-a2' title='Satellite Provider'></span> Satellite Provider",
 				"Saudi Arabia": "<span class='flag flag-sa' title='Saudi Arabia'></span> Saudi Arabia",
 				"Senegal": "<span class='flag flag-sn' title='Senegal'></span> Senegal",
@@ -583,7 +582,6 @@ class Search4Chan(SearchWithScope):
 				pass
 
 		# Limit to posts of a certain board
-		board = None
 		if query.get("board", None) and query["board"] != "*":
 			where.append("board = %s")
 			replacements.append(query["board"])
@@ -777,7 +775,7 @@ class Search4Chan(SearchWithScope):
 			else:
 				self.dataset.update_status("Error while querying full-text search index", is_final=True)
 				self.log.error("Sphinx warning: %s" % e)
-		except OperationalError as e:
+		except OperationalError:
 			self.dataset.update_status(
 				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.",
 				is_final=True)

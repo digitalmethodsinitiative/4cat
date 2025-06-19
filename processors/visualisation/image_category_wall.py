@@ -16,7 +16,7 @@ from PIL import Image
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.config_manager import config
 
 __author__ = "Dale Wahl"
@@ -252,7 +252,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
 							except ValueError:
 								category_type = str
 
-						if category_type == str:
+						if category_type is str:
 							post_category = post.get(category_column)
 							if post_category == "" or post_category is None:
 								post_category = "None"
@@ -260,7 +260,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
 								categories[post_category] = [{"id": post.get("id")}]
 							else:
 								categories[post_category].append({"id": post.get("id")})
-						elif category_type == float:
+						elif category_type is float:
 							if post.get(category_column) is None:
 								self.dataset.log(f"Post {post.get('id')} has no data; skipping")
 								continue
@@ -284,7 +284,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
 			# Sort categories by score
 			for cat in categories:
 				categories[cat] = sorted(categories[cat], key=lambda x: x.get("value"), reverse=True)
-		elif category_type == float:
+		elif category_type is float:
 			if all([x[0].is_integer() for x in post_values]):
 				self.dataset.log("Detected integer categories")
 				post_values = [(int(x[0]), x[1]) for x in post_values]
@@ -295,21 +295,21 @@ class ImageCategoryWallGenerator(BasicProcessor):
 			max_value = max(all_values)
 			min_value = min(all_values)
 			range_size = (max_value - min_value) / self.number_of_ranges
-			if category_type == int:
+			if category_type is int:
 				ranges = [(math.floor(min_value + range_size * i), math.ceil(min_value + range_size * (i + 1))) for i in range(self.number_of_ranges)]
 			else:
 				ranges = [(min_value + range_size * i, min_value + range_size * (i + 1)) for i in range(self.number_of_ranges)]
 			ranges.reverse()
 
 			# Sort posts into ranges
-			if category_type == int:
+			if category_type is int:
 				categories = {f"{x[0]} - {x[1]}": [] for x in ranges}
 			else:
 				categories = {f"{x[0]:.2f} - {x[1]:.2f}": [] for x in ranges}
 			for value, post_id in post_values:
 				for min_value, max_value in ranges:
 					if min_value <= value <= max_value:  # inclusive as an image is the exact min and exact max; we break so images are stored in only first matching range
-						if category_type == int:
+						if category_type is int:
 							categories[f"{min_value} - {max_value}"].append({"id": post_id, "value": value})
 						else:
 							categories[f"{min_value:.2f} - {max_value:.2f}"].append({"id": post_id, "value": value})
@@ -388,7 +388,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
 
 					# add score label
 					if category_type in [float, int]:
-						if category_type == int:
+						if category_type is int:
 							image_score = str(image.get("value"))
 						else:
 							image_score = f"{image.get('value'):.2f}" + ("%" if special_case and (category_column == "top_categories") else "")

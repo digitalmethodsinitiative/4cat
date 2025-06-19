@@ -190,7 +190,7 @@ class TextClassifier(BasicProcessor):
 
         else:
             # if we have no examples, just include an empty list
-            labels = {l.strip(): [] for l in self.parameters.get("categories").split(",") if l.strip()}
+            labels = {i.strip(): [] for i in self.parameters.get("categories").split(",") if i.strip()}
 
 
         # store labels in a file (since we don't know how much data this is)
@@ -222,7 +222,7 @@ class TextClassifier(BasicProcessor):
         ]}
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "stormtrooper"
 
         try:
@@ -299,7 +299,7 @@ class TextClassifier(BasicProcessor):
         shotstyle = query.get("shotstyle")
         if shotstyle == "zeroshot":
             labels = query.get("categories")
-            if not labels or len([l for l in labels if l.strip()]) < 2:
+            if not labels or len([i for i in labels if i.strip()]) < 2:
                 raise QueryParametersException("At least two labels should be provided for text classification.")
         else:
             file = request.files["option-category-file"]

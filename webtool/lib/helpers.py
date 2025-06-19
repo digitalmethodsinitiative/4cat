@@ -1,10 +1,8 @@
 """
 General helper functions for Flask templating and 4CAT views
 """
-import datetime
 import markdown
 import colorsys
-import math
 import csv
 import re
 
@@ -24,7 +22,7 @@ class Pagination(object):
 	Provide pagination
 	"""
 
-	def __init__(self, page, per_page, total_count, route="show_results", route_args=None):
+	def __init__(self, page, per_page, total_count, route="dataset.show_results", route_args=None):
 		"""
 		Set up pagination object
 
@@ -210,7 +208,7 @@ def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="f
 	:param str output_filepath :     String path to save new image
 	"""
 	possible_colors = [k for k, v in ImageColor.colormap.items()]
-	if (type(color) != tuple or len(color) != 3) and (color not in possible_colors):
+	if (type(color) is not tuple or len(color) != 3) and (color not in possible_colors):
 		raise Exception("Color not available")
 
 	img = Image.open(input_filepath)

@@ -52,6 +52,7 @@ packages = set([
 	"razdel~=0.5",
 	"requests~=2.27",
 	"requests_futures",
+	"ruff",
 	"scenedetect[opencv]",
 	"scikit-learn",
 	"scipy~=1.13",

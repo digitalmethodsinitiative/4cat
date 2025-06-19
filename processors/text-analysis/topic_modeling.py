@@ -6,7 +6,8 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
-import json, pickle
+import json
+import pickle
 import shutil
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer

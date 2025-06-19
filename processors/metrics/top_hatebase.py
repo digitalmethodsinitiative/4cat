@@ -83,9 +83,6 @@ class HatebaseRanker(BasicProcessor):
 		rank_style = self.parameters.get("top-style")
 		cutoff = convert_to_int(self.parameters.get("top"), 15)
 
-		# This is needed to check for URLs in the "domain" and "url" columns for Reddit submissions
-		datasource = self.source_dataset.parameters.get("datasource")
-
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
 		overall_top = {}

@@ -9,7 +9,6 @@ assumes that ffprobe is also present in the same location.
 import shutil
 import subprocess
 import oslex
-import re
 
 from packaging import version
 
@@ -42,7 +41,7 @@ class VideoStack(BasicProcessor):
     options = {
         "amount": {
             "type": UserInput.OPTION_TEXT,
-            "help": f"Number of videos to stack.",
+            "help": "Number of videos to stack.",
             "default": 10,
             "max": 50,
             "min": 2,
@@ -230,7 +229,7 @@ class VideoStack(BasicProcessor):
         if sound == "none":
             command += ["-an"]
         elif sound == "longest":
-            command += ["-map", f"0:a"]
+            command += ["-map", "0:a"]
 
         command += ["-map", "[final]", *fps_params]
 
