@@ -57,6 +57,17 @@ def explorer_dataset(dataset_key: str, page=1):
 	if not results_path:
 		return error(404, error="This dataset didn't finish executing.")
 
+	# Get the datasets that generated annotations
+	from_datasets = {}
+	for annotation_field in annotation_fields.values():
+		if annotation_field["from_dataset"]:
+			key = annotation_field["from_dataset"]
+			try:
+				from_dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+				from_datasets[key] = from_dataset
+			except DataSetException:
+				return error(404, error="Dataset not found.")
+
 	# The amount of posts to show on a page
 	posts_per_page = g.config.get("explorer.posts_per_page", 50)
 
@@ -136,6 +147,7 @@ def explorer_dataset(dataset_key: str, page=1):
 		posts=posts,
 		annotation_fields=annotation_fields,
 		annotations=post_annotations,
+		from_datasets=from_datasets,
 		template=template,
 		posts_css=posts_css,
 		page=page,

@@ -739,8 +739,23 @@ class DataSet(FourcatModule):
 		except JobNotFoundException:
 			pass
 
-		# delete from database
-		self.delete_annotations()
+		# delete this dataset's own annotations
+		self.db.delete("annotations", where={"dataset": self.key}, commit=commit)
+		# delete annotations that have been generated as part of this dataset
+		self.db.delete("annotations", where={"from_dataset": self.key}, commit=commit)
+		# delete annotation fields from other datasets that were created as part of this dataset
+		for parent_dataset in self.get_genealogy():
+			field_deleted = False
+			annotation_fields = parent_dataset.get_annotation_fields()
+			if annotation_fields:
+				for field_id in list(annotation_fields.keys()):
+					if annotation_fields[field_id].get("from_dataset", "") == self.key:
+						del annotation_fields[field_id]
+						field_deleted = True
+			if field_deleted:
+				parent_dataset.save_annotation_fields(annotation_fields)
+
+		# delete dataset from database
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
@@ -1909,7 +1924,7 @@ class DataSet(FourcatModule):
 		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
 										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
 		:param bool overwrite:			Whether to overwrite the annotation if it is already present.
-		:param str from_dataset:		The dataset key that this annotation has been generated from. Only relevant
+		:param str from_dataset:		Dataset key from where this annotation has been generated from. Only relevant
 										for processor-generated annotations.
 		:param bool editable:			Whether the annotation can be edited in the Explorer.
 		:param bool hide_in_explorer:	Whether to hide this annotation in the Explorer (still shows through
@@ -1925,10 +1940,6 @@ class DataSet(FourcatModule):
 		count = 0
 		annotation_fields = self.annotation_fields
 		annotation_labels = self.get_annotation_field_labels()
-
-		field_id = "" if not from_dataset else from_dataset
-		print("FI", field_id)
-		salt = str(random.randrange(0, 1000000))
 
 		# Add some dataset data to annotations, if not present
 		for annotation_data in annotations:
@@ -1954,32 +1965,20 @@ class DataSet(FourcatModule):
 				annotation_data["author"] = self.get_owners()[0]
 
 			# The field ID can already exist for the same dataset/key combo if a previous label has been renamed.
-			# In this case create a new key with some salt.
-			if not overwrite and not field_id:
-				field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] + salt)
+			# In this case create a new key with `from_dataset`.
+			if not annotation_data.get("field_id"):
+				if not overwrite:
+					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] +
+										   annotation_data.get("from_dataset", ""))
+				else:
+					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"])
 
-			annotation_data["field_id"] = field_id
+				annotation_data["field_id"] = field_id
 
 			# Create Annotation object, which also saves it to the database
 			# If this dataset/item ID/label combination already exists, this retrieves the
 			# existing data and updates it with new values.
-			annotation = Annotation(data=annotation_data, db=self.db)
-
-			# Add data on the type of annotation field, if it is not saved to the datasets table yet.
-			# For now this is just a simple dict with a field ID, type, label, job ID (for processors),
-			# and possible options.
-			if not annotation_fields or annotation.field_id not in annotation_fields:
-				annotation_fields[annotation.field_id] = {
-					"label": annotation.label,
-					"type": annotation.type,  # Defaults to `text`
-					"editable": editable,
-					"hide_in_explorer": hide_in_explorer
-				}
-				if from_dataset:
-					annotation_fields[annotation.field_id]["from_dataset"] = from_dataset
-				if annotation.options:
-					annotation_fields[annotation.options] = annotation.options
-
+			Annotation(data=annotation_data, db=self.db)
 			count += 1
 
 		# Save annotation fields if things changed
@@ -1989,26 +1988,6 @@ class DataSet(FourcatModule):
 		# columns may have changed if there are new annotations
 		self._cached_columns = None
 		return count
-
-	def delete_annotations(self, id=None, field_id=None):
-		"""
-		Deletes all annotations for an entire dataset.
-		If `id` or `field_id` are also given, it only deletes those annotations for this dataset.
-
-		:param li id:			A list or string of unique annotation IDs.
-		:param li field_id:		A list or string of IDs for annotation fields.
-
-		:return int: The number of removed records.
-		"""
-
-		where = {"dataset": self.key}
-
-		if id:
-			where["id"] = id
-		if field_id:
-			where["field_id"] = field_id
-
-		return self.db.delete("annotations", where)
 
 	def save_annotation_fields(self, new_fields: dict, add=False) -> int:
 		"""
@@ -2029,6 +2008,7 @@ class DataSet(FourcatModule):
 		# Get existing annotation fields to see if stuff changed.
 		old_fields = self.annotation_fields
 		changes = False
+
 		# Do some validation
 		# Annotation field must be valid JSON.
 		try:
@@ -2041,7 +2021,6 @@ class DataSet(FourcatModule):
 			raise AnnotationException("Can't save annotation fields: field IDs must be unique")
 
 		# Annotation fields must at minimum have `type` and `label` keys.
-		seen_labels = []
 		for field_id, annotation_field in new_fields.items():
 			if not isinstance(field_id, str):
 				raise AnnotationException("Can't save annotation fields: field ID %s is not a valid string" % field_id)
@@ -2049,9 +2028,6 @@ class DataSet(FourcatModule):
 				raise AnnotationException("Can't save annotation fields: all fields must have a label" % field_id)
 			if "type" not in annotation_field:
 				raise AnnotationException("Can't save annotation fields: all fields must have a type" % field_id)
-			if annotation_field["label"] in seen_labels:
-				raise AnnotationException("Can't save annotation fields: labels must be unique (%s)" % annotation_field["label"])
-			seen_labels.append(annotation_field["label"])
 
 			# Keep track of whether existing fields have changed; if so, we're going to
 			# update the annotations table.

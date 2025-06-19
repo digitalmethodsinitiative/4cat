@@ -38,6 +38,7 @@ class Annotation:
     author = None             # Who last edited the annotation
     author_original = None    # Who originally made the annotation
     by_processor = None       # Whether the annotation was made by a processor
+    from_dataset = None       # Processor-made dataset key this annotation was generated as part of
     metadata = None           # Misc metadata
 
     def __init__(self, data=None, annotation_id=None, db=None):
@@ -120,6 +121,7 @@ class Annotation:
                 "author": data.get("author", ""),
                 "author_original": data.get("author", ""),
                 "by_processor": data.get("by_processor", False),
+                "from_dataset": data.get("from_dataset", ""),
                 "metadata": data.get("metadata", {}),
             }
 
@@ -354,16 +356,6 @@ class Annotation:
                         options_to_update = {}
                         if old_options[old_field_id] and old_options != new_options:
                             options_to_update = new_options
-
-                        # # Options are saved in a dict with IDs as keys and labels as values.
-                        # for old_option_id, old_option in old_options.items():
-                        #
-                        #     # Renamed option label
-                        #     if old_option_id in new_options and old_option != new_options[old_option_id]:
-                        #         options_to_update[old_option] = new_options[old_option_id]  # Old label -> new label
-                        #     # Deleted option
-                        #     elif old_option_id not in new_options:
-                        #         options_to_update[old_option] = None  # Remove None labels later
 
                         if options_to_update:
                             update_data[field_key] = {"options": options_to_update}

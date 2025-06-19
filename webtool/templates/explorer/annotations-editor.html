@@ -39,7 +39,11 @@
                         {% endif %}
                     {% endif %}
                     {% if annotation_field.from_dataset %}
-                        <a href="{{ url_for('show_result', key=annotation_field.from_dataset)}}" class="from-dataset-link">
+                        {% set from_dataset = from_datasets[annotation_field.from_dataset] %}
+                        {{ from_dataset.type }}
+                        {% set item = from_dataset %}
+                        {% include 'components/result-parameters.html' %}
+                        <a href="{{ url_for('show_result', key=from_dataset.key)}}" class="from-dataset-link">
                             <span>Go to dataset</span>
                         </a>
                     {% endif %}

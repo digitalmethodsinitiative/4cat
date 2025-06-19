@@ -17,7 +17,7 @@ from pathlib import PurePath
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_commit, remove_nuls, send_email
+from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
                                    DataSetException, MapItemException)
 from common.config_manager import ConfigWrapper
@@ -729,8 +729,21 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
             annotation["by_processor"] = True
 
-        annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
-        return annotations_saved
+			# Store annotation field data for every unique dataset->label combo!
+			if (annotation["from_dataset"], annotation["label"]) not in unique_fields:
+				unique_fields.add((annotation["from_dataset"], annotation["label"]))
+				field_id = hash_to_md5(self.source_dataset.key + annotation["label"] + annotation["from_dataset"])
+				annotation_fields[field_id] = {
+					"label": annotation["label"],
+					"type": annotation["type"] if annotation.get("type") else "textarea",
+					"editable": editable,
+					"from_dataset": annotation["from_dataset"]
+				}
+
+		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+		source_dataset.save_annotation_fields(annotation_fields)
+
+		return annotations_saved
 
     @classmethod
     def map_item_method_available(cls, dataset):
