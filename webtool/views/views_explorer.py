@@ -68,10 +68,6 @@ def explorer_dataset(dataset_key: str, page=1):
 	# The offset for posts depending on the current page
 	offset = ((int(page) - 1) * posts_per_page) if page else 0
 
-	# If the dataset is generated from an API-accessible database, we can add 
-	# extra features like the ability to navigate across posts.
-	has_database = False # todo: integrate
-
 	# Check if we have to sort the data.
 	sort = request.args.get("sort")
 
@@ -139,7 +135,6 @@ def explorer_dataset(dataset_key: str, page=1):
 		"explorer/explorer.html",
 		dataset=dataset,
 		datasource=datasource,
-		has_database=has_database,
 		posts=posts,
 		annotation_fields=annotation_fields,
 		annotations=post_annotations,
@@ -272,104 +267,3 @@ def has_datasource_template(datasource: str) -> bool:
 	if css_exists and html_exists:
 		return True
 	return False
-
-def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
-	"""
-	todo: Integrate later
-	Retrieve posts by ID from a database-accessible data source.
-	"""
-
-	raise NotImplementedError
-
-	if not ids:
-		return None
-
-	if board:
-		board = " AND board = '" + board + "' "
-
-	id_field = "id" if not threads else "thread_id"
-	order_by = " ORDER BY " + ", ".join(order_by)
-	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	offset = " OFFSET %i" % int(offset)
-
-	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + board + order_by + " ASC" + limit + offset,
-						(ids,))
-	if not posts:
-		return False
-
-	return posts
-
-@app.route('/results/<datasource>/<string:thread_id>/explorer')
-@api_ratelimit
-@login_required
-@setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
-def explorer_api_thread(datasource, thread_id):
-	"""
-	todo: INTEGRATE LATER!
-
-	Show a thread from an API-accessible database.
-
-	:param str datasource:  Data source ID
-	:param str board:  Board name
-	:param int thread_id:  Thread ID
-
-	:return-error 404:  If the thread ID does not exist for the given data source.
-	"""
-	raise NotImplementedError
-
-	if not datasource:
-		return error(404, error="No datasource provided")
-	if datasource not in config.get('datasources.enabled'):
-		return error(404, error="Invalid data source")
-	if not thread_id:
-		return error(404, error="No thread ID provided")
-
-	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.get('explorer.max_posts', 500000)
-
-	# Get the posts with this thread ID.
-	#todo: define function get_api_posts
-	posts = get_api_posts(db, datasource, ids=tuple([thread_id]), threads=True, order_by=["id"])
-
-	if not posts:
-		return error(404, error="No posts available for this thread")
-
-	posts = [strip_html(post) for post in posts]
-	posts = [format(post, datasource=datasource) for post in posts]
-
-	return render_template("explorer/explorer.html", datasource=datasource, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
-
-@app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
-@api_ratelimit
-@login_required
-@setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
-def explorer_api_posts(datasource, post_ids):
-	"""
-	todo: INTEGRATE LATER
-
-	Show posts from an API-accessible database.
-
-	:param str datasource:  Data source ID
-	:param str board:  Board name
-	:param int post_ids:  Post IDs
-
-	:return-error 404:  If the thread ID does not exist for the given data source.
-	"""
-	raise NotImplementedError
-
-	if not datasource:
-		return error(404, error="No datasource provided")
-	if datasource not in config.get('datasources.enabled'):
-		return error(404, error="Invalid data source")
-	if not post_ids:
-		return error(404, error="No thread ID provided")
-
-	# Get the posts with this thread ID.
-	posts = get_database_posts(db, datasource, board=board, ids=tuple([post_ids]), threads=True, order_by=["id"])
-
-	posts = [strip_html(post) for post in posts]
-	posts = [format(post) for post in posts]
-
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts))
