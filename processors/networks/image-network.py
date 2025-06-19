@@ -1,6 +1,7 @@
 """
 Make a bipartite Image-Item network
 """
+
 import json
 
 from backend.lib.processor import BasicProcessor
@@ -24,13 +25,16 @@ class ImageGrapher(BasicProcessor):
     Creates a bipartite network of images and some attribute of the dataset the
     images were sourced from
     """
+
     type = "image-bipartite-network"  # job type ID
     category = "Networks"
     title = "Bipartite image-item network"  # title displayed in UI
-    description = ("Create a GEXF network file with a bipartite network of "
-                   "images and some data field (e.g. author) of the dataset "
-                   "the images were sourced from. Suitable for use with Gephi's "
-                   "'Image Preview' plugin.")
+    description = (
+        "Create a GEXF network file with a bipartite network of "
+        "images and some data field (e.g. author) of the dataset "
+        "the images were sourced from. Suitable for use with Gephi's "
+        "'Image Preview' plugin."
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
 
     options = {}
@@ -44,41 +48,40 @@ class ImageGrapher(BasicProcessor):
             "column": {
                 "help": "Dataset field",
                 "type": UserInput.OPTION_TEXT,
-                "default": "id"
+                "default": "id",
             },
             "image-value": {
                 "help": "Image node label",
                 "type": UserInput.OPTION_CHOICE,
-                "options": {
-                    "filename": "Image file name",
-                    "url": "Image URL"
-                },
+                "options": {"filename": "Image file name", "url": "Image URL"},
                 "tooltip": "The image node label will have this value. Depending on the network visualisation software "
-                           "you use, one or the other is required to display the images as nodes."
+                "you use, one or the other is required to display the images as nodes.",
             },
             "deduplicate": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Merge images",
                 "tooltip": "Similar images can be merged into a single node, represented by the first image of the set "
-                           "that was encountered.",
+                "that was encountered.",
                 "options": {
                     "none": "Do not merge",
                     "file-hash": "File hash (files need to be byte-by-byte duplicates)",
                     "colorhash": "Colour hash (good at colours, worse at shapes)",
                     "phash": "Perceptual hash (decent at colours and shapes)",
                     "average_hash": "Average hash (good at crops, less tolerant of differences than perceptual hashing)",
-                    "dhash": "Difference hash (similar to average hash, better at photos and art)"
-                }
+                    "dhash": "Difference hash (similar to average hash, better at photos and art)",
+                },
             },
-            **({
-                   "column": {
-                       "help": "Dataset field",
-                       "type": UserInput.OPTION_CHOICE,
-                       "options": {
-                           column: column
-                           for column in columns}
-                   }
-               } if columns else {})
+            **(
+                {
+                    "column": {
+                        "help": "Dataset field",
+                        "type": UserInput.OPTION_CHOICE,
+                        "options": {column: column for column in columns},
+                    }
+                }
+                if columns
+                else {}
+            ),
         }
 
     @classmethod
@@ -105,7 +108,9 @@ class ImageGrapher(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader") and cls.get_root_dataset(module)
+        return module.type.startswith("image-downloader") and cls.get_root_dataset(
+            module
+        )
 
     def process(self):
         column = self.parameters.get("column")
@@ -121,20 +126,32 @@ class ImageGrapher(BasicProcessor):
         seen_hashes = set()
         id_file_map = {}
 
-        for file in self.iterate_archive_contents(self.source_file, filename_filter=filename_filter):
+        for file in self.iterate_archive_contents(
+            self.source_file, filename_filter=filename_filter
+        ):
             if file.name == ".metadata.json":
                 with file.open() as infile:
                     try:
                         metadata = json.load(infile)
-                        file_hash_map = {i: v["filename"] for i, v in metadata.items()} if self.parameters.get("image-value") == "url" else {i["filename"]: i["filename"] for i in metadata.values()}
+                        file_hash_map = (
+                            {i: v["filename"] for i, v in metadata.items()}
+                            if self.parameters.get("image-value") == "url"
+                            else {
+                                i["filename"]: i["filename"] for i in metadata.values()
+                            }
+                        )
                     except json.JSONDecodeError:
                         pass
             else:
                 try:
                     hashed += 1
                     if hashed % 100 == 0:
-                        self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows-1:,} item(s)")
-                    self.dataset.update_progress(hashed / (self.source_dataset.num_rows-1) * 0.5)
+                        self.dataset.update_status(
+                            f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows - 1:,} item(s)"
+                        )
+                    self.dataset.update_progress(
+                        hashed / (self.source_dataset.num_rows - 1) * 0.5
+                    )
                     file_hash = hash_file(file, hash_type)
                     file_hash_map[file.name] = file_hash
                     if file_hash not in hash_file_map:
@@ -144,21 +161,29 @@ class ImageGrapher(BasicProcessor):
                     continue
 
         if not metadata:
-            return self.dataset.finish_with_error("No valid metadata found in image archive - this processor can only "
-                                                  "be run on sets of images sourced from another 4CAT dataset.")
+            return self.dataset.finish_with_error(
+                "No valid metadata found in image archive - this processor can only "
+                "be run on sets of images sourced from another 4CAT dataset."
+            )
 
         file_url_map = {v["filename"]: u for u, v in metadata.items()}
         for url, details in metadata.items():
             for item_id in details.get("post_ids", []):
                 if self.source_dataset.type.endswith("-telegram"):
                     # telegram has weird IDs
-                    item_id = "-".join(details["filename"].split("-")[:-1]) + "-" + str(item_id)
+                    item_id = (
+                        "-".join(details["filename"].split("-")[:-1])
+                        + "-"
+                        + str(item_id)
+                    )
                 id_file_map[item_id] = details["filename"]
 
         root_dataset = self.get_root_dataset(self.dataset)
         if not root_dataset:
-            return self.dataset.finish_with_error("No suitable parent dataset found - this processor can only "
-                                                  "be run on sets of images sourced from another 4CAT dataset.")
+            return self.dataset.finish_with_error(
+                "No suitable parent dataset found - this processor can only "
+                "be run on sets of images sourced from another 4CAT dataset."
+            )
 
         network = nx.DiGraph()
         processed = 0
@@ -171,7 +196,9 @@ class ImageGrapher(BasicProcessor):
             self.dataset.update_progress(progress)
             processed += 1
             if processed % 100 == 0:
-                self.dataset.update_status(f"Processed {processed:,} of {root_dataset.num_rows:,} item(s)")
+                self.dataset.update_status(
+                    f"Processed {processed:,} of {root_dataset.num_rows:,} item(s)"
+                )
 
             if self.interrupted:
                 raise ProcessorInterruptedException()
@@ -191,8 +218,10 @@ class ImageGrapher(BasicProcessor):
                 # merge the nodes (use the original node as the 'to node')
                 to_node = hash_file_map.get(image_hash)
                 if to_node and image_file != to_node:
-                    self.dataset.update_status(f"Image {image_file} identified as a duplicate of {to_node} - "
-                                               f"merging.")
+                    self.dataset.update_status(
+                        f"Image {image_file} identified as a duplicate of {to_node} - "
+                        f"merging."
+                    )
 
             else:
                 seen_hashes.add(image_hash)
@@ -210,7 +239,9 @@ class ImageGrapher(BasicProcessor):
                 network.add_node(from_node_id, label=from_node, category=column)
 
             if to_node_id not in network.nodes:
-                network.add_node(to_node_id, label=to_node, category="image", image=to_node)
+                network.add_node(
+                    to_node_id, label=to_node, category="image", image=to_node
+                )
 
             edge = (from_node_id, to_node_id)
             if edge not in network.edges():

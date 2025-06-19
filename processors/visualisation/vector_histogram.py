@@ -1,6 +1,7 @@
 """
 Generate histogram of activity
 """
+
 import math
 
 from calendar import month_abbr
@@ -18,258 +19,309 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+
 class SVGHistogramRenderer(BasicProcessor):
-	"""
-	Generate activity histogram
-	"""
-	type = "histogram"  # job type ID
-	category = "Visual"  # category
-	title = "Histogram"  # title displayed in UI
-	description = "Generates a histogram (bar graph) from time frequencies."  # description displayed in UI
-	extension = "svg"
+    """
+    Generate activity histogram
+    """
 
-	options = {
-		"header": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Graph header",
-			"tooltip": "The header may be truncated if it is too large to fit"
-		}
-	}
+    type = "histogram"  # job type ID
+    category = "Visual"  # category
+    title = "Histogram"  # title displayed in UI
+    description = "Generates a histogram (bar graph) from time frequencies."  # description displayed in UI
+    extension = "svg"
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-		Allow processor on rankable items
+    options = {
+        "header": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "",
+            "help": "Graph header",
+            "tooltip": "The header may be truncated if it is too large to fit",
+        }
+    }
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
-		return module.is_rankable(multiple_items=False)
-		
-	def process(self):
-		"""
-		Render an SVG histogram/bar chart using a previous frequency analysis
-		as input.
-		"""
-		self.dataset.update_status("Reading source file")
-		header = self.parameters.get("header")
-		max_posts = 0
-		removed_non_date_intervals = False
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
+        Allow processor on rankable items
 
-		# collect post numbers per month
-		intervals = {}
-		have_float = False
-		for post in self.source_dataset.iterate_items(self):
-			value = float(post["value"])
-			if value != int(value):
-				have_float = True
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.is_rankable(multiple_items=False)
 
-			intervals[post["date"]] = value
-			max_posts = max(max_posts, value)
+    def process(self):
+        """
+        Render an SVG histogram/bar chart using a previous frequency analysis
+        as input.
+        """
+        self.dataset.update_status("Reading source file")
+        header = self.parameters.get("header")
+        max_posts = 0
+        removed_non_date_intervals = False
 
-		# Remove non-date intervals
-		for non_date in ["unknown_date", "all"]:
-			if non_date in intervals:
-				del intervals[non_date]
-				removed_non_date_intervals = True
-				self.dataset.log("Removed non-date interval: %s" % non_date)
+        # collect post numbers per month
+        intervals = {}
+        have_float = False
+        for post in self.source_dataset.iterate_items(self):
+            value = float(post["value"])
+            if value != int(value):
+                have_float = True
 
-		if len(intervals) <= 1:
-			self.dataset.update_status("Not enough data available for a histogram; need more than one time series.")
-			self.dataset.finish(0)
-			return
+            intervals[post["date"]] = value
+            max_posts = max(max_posts, value)
 
-		self.dataset.update_status("Cleaning up data")
-		try:
-			(missing, intervals) = pad_interval(intervals)
-		except ValueError:
-			self.dataset.update_status("Some of the items in the dataset contain invalid dates; cannot count frequencies per interval.", is_final=True)
-			self.dataset.finish(0)
-			return
+        # Remove non-date intervals
+        for non_date in ["unknown_date", "all"]:
+            if non_date in intervals:
+                del intervals[non_date]
+                removed_non_date_intervals = True
+                self.dataset.log("Removed non-date interval: %s" % non_date)
 
-		# create histogram
-		self.dataset.update_status("Drawing histogram")
+        if len(intervals) <= 1:
+            self.dataset.update_status(
+                "Not enough data available for a histogram; need more than one time series."
+            )
+            self.dataset.finish(0)
+            return
 
-		# you may change the following four variables to adjust the graph dimensions
-		width = 1024
-		height = 786
-		y_margin = 75
-		x_margin = 50
-		x_margin_left = x_margin * 2
-		tick_width = 5
+        self.dataset.update_status("Cleaning up data")
+        try:
+            (missing, intervals) = pad_interval(intervals)
+        except ValueError:
+            self.dataset.update_status(
+                "Some of the items in the dataset contain invalid dates; cannot count frequencies per interval.",
+                is_final=True,
+            )
+            self.dataset.finish(0)
+            return
 
-		fontsize_small = width / 100
-		fontsize_normal = width / 75
-		fontsize_large = width / 50
+        # create histogram
+        self.dataset.update_status("Drawing histogram")
 
-		# better don't touch the following
-		line_width = round(width / 512)
-		y_margin_top = 50
-		if header:
-			y_margin_top += (2 * fontsize_large)
-		y_height = height - (y_margin + y_margin_top)
-		x_width = width - (x_margin + x_margin_left)
+        # you may change the following four variables to adjust the graph dimensions
+        width = 1024
+        height = 786
+        y_margin = 75
+        x_margin = 50
+        x_margin_left = x_margin * 2
+        tick_width = 5
 
-		# normalize the Y axis to a multiple of a power of 10
-		magnitude = pow(10, len(str(int(max_posts))) - 1)  # ew
-		max_neat = math.ceil(max_posts / magnitude) * magnitude
-		self.dataset.update_status("Max (normalized): %i (%i) (magnitude: %i)" % (max_posts, max_neat, magnitude))
+        fontsize_small = width / 100
+        fontsize_normal = width / 75
+        fontsize_large = width / 50
 
-		canvas = get_4cat_canvas(self.dataset.get_results_path(), width, height,
-								 header=(header[:37] + "..." if len(header) > 40 else header),
-								 fontsize_small=fontsize_small,
-								 fontsize_large=fontsize_large,
-								 fontsize_normal=fontsize_normal)
+        # better don't touch the following
+        line_width = round(width / 512)
+        y_margin_top = 50
+        if header:
+            y_margin_top += 2 * fontsize_large
+        y_height = height - (y_margin + y_margin_top)
+        x_width = width - (x_margin + x_margin_left)
 
-		# horizontal grid lines
-		for i in range(0, 10):
-			offset = (y_height / 10) * i
-			canvas.add(Line(
-				start=(x_margin_left, y_margin_top + offset),
-				end=(width - x_margin, y_margin_top + offset),
-				stroke="#EEE",
-				stroke_width=line_width
-			))
+        # normalize the Y axis to a multiple of a power of 10
+        magnitude = pow(10, len(str(int(max_posts))) - 1)  # ew
+        max_neat = math.ceil(max_posts / magnitude) * magnitude
+        self.dataset.update_status(
+            "Max (normalized): %i (%i) (magnitude: %i)"
+            % (max_posts, max_neat, magnitude)
+        )
 
-		# draw bars
-		item_width = (width - (x_margin + x_margin_left)) / len(intervals)
-		item_height = (height - y_margin - y_margin_top)
-		bar_width = item_width * 0.9
-		x = x_margin_left + (item_width / 2) - (bar_width / 2)
+        canvas = get_4cat_canvas(
+            self.dataset.get_results_path(),
+            width,
+            height,
+            header=(header[:37] + "..." if len(header) > 40 else header),
+            fontsize_small=fontsize_small,
+            fontsize_large=fontsize_large,
+            fontsize_normal=fontsize_normal,
+        )
 
-		if bar_width >= 8:
-			arc_adjust = max(8, int(item_width / 5)) / 2
-		else:
-			arc_adjust = 0
+        # horizontal grid lines
+        for i in range(0, 10):
+            offset = (y_height / 10) * i
+            canvas.add(
+                Line(
+                    start=(x_margin_left, y_margin_top + offset),
+                    end=(width - x_margin, y_margin_top + offset),
+                    stroke="#EEE",
+                    stroke_width=line_width,
+                )
+            )
 
-		for interval in intervals:
-			posts = intervals[interval]
-			bar_height = ((posts / max_neat) * item_height)
-			self.dataset.update_status("%s: %i posts" % (interval, posts))
-			bar_top = height - y_margin - bar_height
-			bar_bottom = height - y_margin
+        # draw bars
+        item_width = (width - (x_margin + x_margin_left)) / len(intervals)
+        item_height = height - y_margin - y_margin_top
+        bar_width = item_width * 0.9
+        x = x_margin_left + (item_width / 2) - (bar_width / 2)
 
-			if bar_height == 0:
-				x += item_width
-				continue
+        if bar_width >= 8:
+            arc_adjust = max(8, int(item_width / 5)) / 2
+        else:
+            arc_adjust = 0
 
-			bar = SVGPath(fill="#000")
-			bar.push("M %f %f" % (x, bar_bottom))
-			bar.push("L %f %f" % (x, bar_top + (arc_adjust if bar_height > arc_adjust else 0)))
-			if bar_height > arc_adjust > 0:
-				control = (x, bar_top)
-				bar.push("C %f %f %f %f %f %f" % (*control, *control, x + arc_adjust, bar_top))
-			bar.push("L %f %f" % (x + bar_width - arc_adjust, height - y_margin - bar_height))
-			if bar_height > arc_adjust > 0:
-				control = (x + bar_width, bar_top)
-				bar.push("C %f %f %f %f %f %f" % (*control, *control, x + bar_width, bar_top + arc_adjust))
-			bar.push("L %f %f" % (x + bar_width, height - y_margin))
-			bar.push("Z")
-			canvas.add(bar)
+        for interval in intervals:
+            posts = intervals[interval]
+            bar_height = (posts / max_neat) * item_height
+            self.dataset.update_status("%s: %i posts" % (interval, posts))
+            bar_top = height - y_margin - bar_height
+            bar_bottom = height - y_margin
 
-			x += item_width
+            if bar_height == 0:
+                x += item_width
+                continue
 
-		# draw X and Y axis
-		canvas.add(Line(
-			start=(x_margin_left, height - y_margin),
-			end=(width - x_margin, height - y_margin),
-			stroke="#000",
-			stroke_width=2
-		))
-		canvas.add(Line(
-			start=(x_margin_left, y_margin_top),
-			end=(x_margin_left, height - y_margin),
-			stroke="#000",
-			stroke_width=2
-		))
+            bar = SVGPath(fill="#000")
+            bar.push("M %f %f" % (x, bar_bottom))
+            bar.push(
+                "L %f %f"
+                % (x, bar_top + (arc_adjust if bar_height > arc_adjust else 0))
+            )
+            if bar_height > arc_adjust > 0:
+                control = (x, bar_top)
+                bar.push(
+                    "C %f %f %f %f %f %f"
+                    % (*control, *control, x + arc_adjust, bar_top)
+                )
+            bar.push(
+                "L %f %f" % (x + bar_width - arc_adjust, height - y_margin - bar_height)
+            )
+            if bar_height > arc_adjust > 0:
+                control = (x + bar_width, bar_top)
+                bar.push(
+                    "C %f %f %f %f %f %f"
+                    % (*control, *control, x + bar_width, bar_top + arc_adjust)
+                )
+            bar.push("L %f %f" % (x + bar_width, height - y_margin))
+            bar.push("Z")
+            canvas.add(bar)
 
-		# draw ticks on Y axis
-		for i in range(0, 10):
-			offset = (y_height / 10) * i
-			canvas.add(Line(
-				start=(x_margin_left - tick_width, y_margin_top + offset),
-				end=(x_margin_left, y_margin_top + offset),
-				stroke="#000",
-				stroke_width=line_width
-			))
+            x += item_width
 
-		# draw ticks on X axis
-		for i in range(0, len(intervals)):
-			offset = (x_width / len(intervals)) * (i + 0.5)
-			canvas.add(Line(
-				start=(x_margin_left + offset, height - y_margin),
-				end=(x_margin_left + offset, height - y_margin + tick_width),
-				stroke="#000",
-				stroke_width=line_width
-			))
+        # draw X and Y axis
+        canvas.add(
+            Line(
+                start=(x_margin_left, height - y_margin),
+                end=(width - x_margin, height - y_margin),
+                stroke="#000",
+                stroke_width=2,
+            )
+        )
+        canvas.add(
+            Line(
+                start=(x_margin_left, y_margin_top),
+                end=(x_margin_left, height - y_margin),
+                stroke="#000",
+                stroke_width=2,
+            )
+        )
 
-		# prettify
+        # draw ticks on Y axis
+        for i in range(0, 10):
+            offset = (y_height / 10) * i
+            canvas.add(
+                Line(
+                    start=(x_margin_left - tick_width, y_margin_top + offset),
+                    end=(x_margin_left, y_margin_top + offset),
+                    stroke="#000",
+                    stroke_width=line_width,
+                )
+            )
 
-		# y labels
-		origin = (x_margin_left / 2)
-		step = y_height / 10
-		for i in range(0, 11):
-			label_value = (max_neat / 10) * i
-			if not have_float:
-				label_value = int(label_value)
-			label = str(label_value)
+        # draw ticks on X axis
+        for i in range(0, len(intervals)):
+            offset = (x_width / len(intervals)) * (i + 0.5)
+            canvas.add(
+                Line(
+                    start=(x_margin_left + offset, height - y_margin),
+                    end=(x_margin_left + offset, height - y_margin + tick_width),
+                    stroke="#000",
+                    stroke_width=line_width,
+                )
+            )
 
-			labelsize = (len(label) * fontsize_normal * 1.25, fontsize_normal)
-			label_x = origin - (tick_width * 2)
-			label_y = height - y_margin - (i * step) - (labelsize[1] / 2)
-			label_container = SVG(
-				insert=(label_x, label_y),
-				size=(x_margin_left / 2, x_margin_left / 5)
-			)
-			label_container.add(Text(
-				insert=("100%", "50%"),
-				text=label,
-				dominant_baseline="middle",
-				text_anchor="end"
-			))
-			canvas.add(label_container)
+        # prettify
 
-		# x labels
-		label_width = max(fontsize_small * 6, item_width)
-		label_x = x_margin_left
-		label_y = height - y_margin + (tick_width * 2)
-		next = 0
+        # y labels
+        origin = x_margin_left / 2
+        step = y_height / 10
+        for i in range(0, 11):
+            label_value = (max_neat / 10) * i
+            if not have_float:
+                label_value = int(label_value)
+            label = str(label_value)
 
-		interval_type = self.source_dataset.parameters.get("timeframe", "overall")
-		for interval in intervals:
-			if len(interval) == 7:
-				if interval_type == "month":
-					label = month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
-				else:
-					label = interval[0:4] + "\nW" + interval[5:7]
+            labelsize = (len(label) * fontsize_normal * 1.25, fontsize_normal)
+            label_x = origin - (tick_width * 2)
+            label_y = height - y_margin - (i * step) - (labelsize[1] / 2)
+            label_container = SVG(
+                insert=(label_x, label_y), size=(x_margin_left / 2, x_margin_left / 5)
+            )
+            label_container.add(
+                Text(
+                    insert=("100%", "50%"),
+                    text=label,
+                    dominant_baseline="middle",
+                    text_anchor="end",
+                )
+            )
+            canvas.add(label_container)
 
-			elif len(interval) == 10:
-				label = str(int(interval[8:10])) + " " + month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
-			else:
-				label = interval.replace("-", "\n")
+        # x labels
+        label_width = max(fontsize_small * 6, item_width)
+        label_x = x_margin_left
+        label_y = height - y_margin + (tick_width * 2)
+        next = 0
 
-			if label_x > next:
-				shift = 0
-				for line in label.split("\n"):
-					label_container = SVG(
-						insert=(label_x + (item_width / 2) - (label_width / 2), label_y + (tick_width * 2)),
-						size=(label_width, y_margin), overflow="visible")
-					label_container.add(Text(
-						insert=("50%", "0%"),
-						text=line,
-						dominant_baseline="middle",
-						text_anchor="middle",
-						dy=[shift]
-					))
-					shift += fontsize_small * 1.5
-					canvas.add(label_container)
-					next = label_x + (label_width * 0.9)
-			label_x += item_width
+        interval_type = self.source_dataset.parameters.get("timeframe", "overall")
+        for interval in intervals:
+            if len(interval) == 7:
+                if interval_type == "month":
+                    label = month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
+                else:
+                    label = interval[0:4] + "\nW" + interval[5:7]
 
+            elif len(interval) == 10:
+                label = (
+                    str(int(interval[8:10]))
+                    + " "
+                    + month_abbr[int(interval[5:7])]
+                    + "\n"
+                    + interval[0:4]
+                )
+            else:
+                label = interval.replace("-", "\n")
 
-		canvas.save(pretty=True)
+            if label_x > next:
+                shift = 0
+                for line in label.split("\n"):
+                    label_container = SVG(
+                        insert=(
+                            label_x + (item_width / 2) - (label_width / 2),
+                            label_y + (tick_width * 2),
+                        ),
+                        size=(label_width, y_margin),
+                        overflow="visible",
+                    )
+                    label_container.add(
+                        Text(
+                            insert=("50%", "0%"),
+                            text=line,
+                            dominant_baseline="middle",
+                            text_anchor="middle",
+                            dy=[shift],
+                        )
+                    )
+                    shift += fontsize_small * 1.5
+                    canvas.add(label_container)
+                    next = label_x + (label_width * 0.9)
+            label_x += item_width
 
-		if removed_non_date_intervals:
-			self.dataset.update_status("Finished; Removed non date intervals (e.g., \"unknown_date\").", is_final=True)
-		self.dataset.update_status("Finished")
-		self.dataset.finish(len(intervals))
+        canvas.save(pretty=True)
+
+        if removed_non_date_intervals:
+            self.dataset.update_status(
+                'Finished; Removed non date intervals (e.g., "unknown_date").',
+                is_final=True,
+            )
+        self.dataset.update_status("Finished")
+        self.dataset.finish(len(intervals))

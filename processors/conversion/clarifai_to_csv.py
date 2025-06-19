@@ -1,6 +1,7 @@
 """
 Convert Clarifai annotations to CSV
 """
+
 import csv
 
 from backend.lib.processor import BasicProcessor
@@ -21,6 +22,7 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
     NDJSON, but it can be more useful to have a CSV file. This discards some
     information to allow 'flattening' the output to a simple CSV file.
     """
+
     type = "convert-clarifai-vision-to-csv"  # job type ID
     category = "Conversion"  # category
     title = "Convert Clarifai results to CSV"  # title displayed in UI
@@ -44,7 +46,10 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
         done = 0
 
         if not self.source_file.exists():
-            self.dataset.update_status("No data was returned by the Clarifai API, so none can be converted.", is_final=True)
+            self.dataset.update_status(
+                "No data was returned by the Clarifai API, so none can be converted.",
+                is_final=True,
+            )
             self.dataset.finish(0)
             return
 
@@ -58,14 +63,18 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
                     {
                         "image": annotations["image"],
                         "concepts": ", ".join(model_annotations.keys()),
-                        "confidences": ", ".join([str(c) for c in model_annotations.values()]),
-                        "model": model
+                        "confidences": ", ".join(
+                            [str(c) for c in model_annotations.values()]
+                        ),
+                        "model": model,
                     }
                 )
 
             done += 1
             if done % 25 == 0:
-                self.dataset.update_status("Processed %i/%i image files" % (done, self.source_dataset.num_rows))
+                self.dataset.update_status(
+                    "Processed %i/%i image files" % (done, self.source_dataset.num_rows)
+                )
                 self.dataset.update_progress(done / self.source_dataset.num_rows)
 
         self.write_csv_items_and_finish(result)

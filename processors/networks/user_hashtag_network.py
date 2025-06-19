@@ -1,6 +1,7 @@
 """
 Generate bipartite user-hashtag graph of posts
 """
+
 from backend.lib.preset import ProcessorPreset
 from common.lib.user_input import UserInput
 
@@ -15,6 +16,7 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     """
     Generate bipartite user-hashtag graph of posts
     """
+
     type = "preset-bipartite-user-tag-network"  # job type ID
     category = "Networks"  # category
     title = "Bipartite Author-tag Network"  # title displayed in UI
@@ -28,8 +30,8 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
                 "type": UserInput.OPTION_TOGGLE,
                 "default": False,
                 "help": "Convert values to lowercase",
-                "tooltip": "Merges values with varying cases"
-                }
+                "tooltip": "Merges values with varying cases",
+            }
         }
 
     @classmethod
@@ -73,7 +75,7 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
                     "categorise": True,
                     "allow-loops": False,
                     "to-lowercase": self.parameters.get("to-lowercase", False),
-                }
+                },
             }
         ]
 

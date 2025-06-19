@@ -1,6 +1,7 @@
 """
 Base filter class to handle filetypes
 """
+
 import abc
 import csv
 import json
@@ -19,6 +20,7 @@ class BaseFilter(BasicProcessor):
     """
     Retain only posts where a given column matches a given value
     """
+
     type = "column-filter"  # job type ID
     category = "Filtering"  # category
     title = "Base Filter"  # title displayed in UI
@@ -56,19 +58,24 @@ class BaseFilter(BasicProcessor):
                     writer.writerow(post)
                     num_posts += 1
         elif parent_extension == "ndjson":
-            with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+            with self.dataset.get_results_path().open(
+                "w", encoding="utf-8", newline=""
+            ) as outfile:
                 for post in matching_posts:
-
                     outfile.write(json.dumps(post) + "\n")
                     num_posts += 1
         else:
-            raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
+            raise NotImplementedError(
+                "Parent datasource of type %s cannot be filtered" % parent_extension
+            )
 
         if num_posts == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
 
         if self.dataset.is_finished():
-            self.dataset.log("Processor already marked dataset as finished prior to saving file!")
+            self.dataset.log(
+                "Processor already marked dataset as finished prior to saving file!"
+            )
             return
 
         self.dataset.update_label(f"({self.title}) {self.source_dataset.get_label()}")

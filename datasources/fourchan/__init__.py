@@ -8,6 +8,7 @@ Initialize 4chan data source
 from common.lib.helpers import init_datasource as base_init_datasource
 
 from common.config_manager import config
+
 # Internal identifier for this data source
 #
 # This name is to be used whenever referring to the data source or a property
@@ -19,25 +20,28 @@ from common.config_manager import config
 DATASOURCE = "fourchan"
 NAME = "4chan"
 
+
 def init_datasource(database, logger, queue, name):
-	"""
-	Initialise datasource
+    """
+    Initialise datasource
 
-	Compounds the base initialisation method by queueing jobs for the board
-	scrapers, if those don't exist already.
+    Compounds the base initialisation method by queueing jobs for the board
+    scrapers, if those don't exist already.
 
-	:param Database database:  Database connection instance
-	:param Logger logger:  Log handler
-	:param JobQueue queue:  Job Queue instance
-	:param string name:  ID of datasource that is being initialised
-	"""
-	interval = config.get(name + "-search.interval", 0)
+    :param Database database:  Database connection instance
+    :param Logger logger:  Log handler
+    :param JobQueue queue:  Job Queue instance
+    :param string name:  ID of datasource that is being initialised
+    """
+    interval = config.get(name + "-search.interval", 0)
 
-	if config.get(name + "-search.autoscrape", False):
-		for board in config.get(name + "-search.boards", []):
-			if config.get(name + "-search.no_scrape") and board in config.get(name + "-search.no_scrape"):
-				continue
-			else:
-				queue.add_job(name + "-board", {}, board, 0, interval)
+    if config.get(name + "-search.autoscrape", False):
+        for board in config.get(name + "-search.boards", []):
+            if config.get(name + "-search.no_scrape") and board in config.get(
+                name + "-search.no_scrape"
+            ):
+                continue
+            else:
+                queue.add_job(name + "-board", {}, board, 0, interval)
 
-	base_init_datasource(database, logger, queue, name)
+    base_init_datasource(database, logger, queue, name)

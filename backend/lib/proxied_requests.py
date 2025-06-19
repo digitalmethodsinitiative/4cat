@@ -382,7 +382,7 @@ class DelegatedRequestHandler:
                             "url": url,
                             "timeout": 30,
                             "proxies": proxy_definition,
-                            **url_metadata.kwargs
+                            **url_metadata.kwargs,
                         }
                     )
 

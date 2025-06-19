@@ -15,113 +15,132 @@ __email__ = "4cat@oilab.eu"
 
 
 class MakeWordCloud(BasicProcessor):
-	"""
-	Generate activity histogram
-	"""
-	type = "wordcloud"  # job type ID
-	category = "Visual"  # category
-	title = "Word cloud"  # title displayed in UI
-	description = "Generates a word cloud with words sized on occurrence."  # description displayed in UI
-	extension = "svg"
+    """
+    Generate activity histogram
+    """
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-		Allow processor on rankable items
+    type = "wordcloud"  # job type ID
+    category = "Visual"  # category
+    title = "Word cloud"  # title displayed in UI
+    description = "Generates a word cloud with words sized on occurrence."  # description displayed in UI
+    extension = "svg"
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
-		return module.type in ("tfidf", "collocations", "vector-ranker", "vectorise-tokens-by-category", "similar-word2vec", "extract-nouns", "get-entities")
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
+        Allow processor on rankable items
 
-	@classmethod
-	def get_options(self, parent_dataset=None, user=None):
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.type in (
+            "tfidf",
+            "collocations",
+            "vector-ranker",
+            "vectorise-tokens-by-category",
+            "similar-word2vec",
+            "extract-nouns",
+            "get-entities",
+        )
 
-		options = {}
-		if not parent_dataset:
-			return options
-		parent_columns = parent_dataset.get_columns()
+    @classmethod
+    def get_options(self, parent_dataset=None, user=None):
+        options = {}
+        if not parent_dataset:
+            return options
+        parent_columns = parent_dataset.get_columns()
 
-		if parent_columns:
-			parent_columns = {c: c for c in sorted(parent_columns)}
-			options = {
-				"word_column": {
-					"type": UserInput.OPTION_CHOICE,
-					"options": parent_columns,
-					"help": "Word column",
-					"default": "item" if "item" in parent_columns else "",
-				},
-				"count_column": {
-					"type": UserInput.OPTION_CHOICE,
-					"options": parent_columns,
-					"help": "Count column",
-					"default": "value" if "value" in parent_columns else "",
-				},
-				"to_lower": {
-					"type": UserInput.OPTION_TOGGLE,
-					"default": True,
-					"help": "Convert to lowercase?"
-				},
-				"max_words": {
-					"type": UserInput.OPTION_TEXT,
-					"default": 200,
-					"help": "Max words to show"
-				}
-			}
-		return options
+        if parent_columns:
+            parent_columns = {c: c for c in sorted(parent_columns)}
+            options = {
+                "word_column": {
+                    "type": UserInput.OPTION_CHOICE,
+                    "options": parent_columns,
+                    "help": "Word column",
+                    "default": "item" if "item" in parent_columns else "",
+                },
+                "count_column": {
+                    "type": UserInput.OPTION_CHOICE,
+                    "options": parent_columns,
+                    "help": "Count column",
+                    "default": "value" if "value" in parent_columns else "",
+                },
+                "to_lower": {
+                    "type": UserInput.OPTION_TOGGLE,
+                    "default": True,
+                    "help": "Convert to lowercase?",
+                },
+                "max_words": {
+                    "type": UserInput.OPTION_TEXT,
+                    "default": 200,
+                    "help": "Max words to show",
+                },
+            }
+        return options
 
-	def process(self):
-		"""
-		Render an SVG histogram/bar chart using a previous frequency analysis
-		as input.
-		"""
+    def process(self):
+        """
+        Render an SVG histogram/bar chart using a previous frequency analysis
+        as input.
+        """
 
-		words = {}
+        words = {}
 
-		word_column = self.parameters.get("word_column")
-		count_column = self.parameters.get("count_column")
-		to_lower = self.parameters.get("to_lower")
-		try:
-			max_words = int(self.parameters.get("max_words"))
-		except (ValueError, TypeError):
-			max_words = self.parameters["max_words"]["default"]
+        word_column = self.parameters.get("word_column")
+        count_column = self.parameters.get("count_column")
+        to_lower = self.parameters.get("to_lower")
+        try:
+            max_words = int(self.parameters.get("max_words"))
+        except (ValueError, TypeError):
+            max_words = self.parameters["max_words"]["default"]
 
-		self.dataset.update_status("Extracting words and counts.")
+        self.dataset.update_status("Extracting words and counts.")
 
-		if not word_column:
-			self.dataset.update_status("Please set a valid word column.")
-			self.finish(0)
+        if not word_column:
+            self.dataset.update_status("Please set a valid word column.")
+            self.finish(0)
 
-		if not count_column:
-			self.dataset.update_status("Please set a valid count column.")
-			self.finish(0)
-			return
+        if not count_column:
+            self.dataset.update_status("Please set a valid count column.")
+            self.finish(0)
+            return
 
-		for post in self.source_dataset.iterate_items(self):
+        for post in self.source_dataset.iterate_items(self):
+            word = post[word_column]
+            if to_lower:
+                word = word.lower()
+            if len(word) > 50:
+                word = word[:47] + "..."
 
-			word = post[word_column]
-			if to_lower:
-				word = word.lower()
-			if len(word) > 50:
-				word = word[:47] + "..."
+            try:
+                count = int(post[count_column])
+            except ValueError:
+                self.dataset.update_status(
+                    "Couldn't convert value '%s' to an integer. Please set a valid count column."
+                    % post[count_column]
+                )
+                self.dataset.finish(0)
+                return
 
-			try:
-				count = int(post[count_column])
-			except ValueError:
-				self.dataset.update_status("Couldn't convert value '%s' to an integer. Please set a valid count column." % post[count_column])
-				self.dataset.finish(0)
-				return
+            # Add to general dict
+            if word in words:
+                words[word] += count
+            else:
+                words[word] = count
 
-			# Add to general dict
-			if word in words:
-				words[word] += count
-			else:
-				words[word] = count
+        self.dataset.update_status("Making word cloud.")
+        cloud = WordCloud(
+            prefer_horizontal=1,
+            background_color="rgba(255, 255, 255, 0)",
+            mode="RGBA",
+            color_func=lambda *args, **kwargs: (0, 0, 0),
+            width=1600,
+            height=1000,
+            collocations=False,
+            max_words=max_words,
+        ).generate_from_frequencies(words)
 
-		self.dataset.update_status("Making word cloud.")
-		cloud = WordCloud(prefer_horizontal=1, background_color="rgba(255, 255, 255, 0)", mode="RGBA", color_func=lambda *args, **kwargs: (0,0,0), width=1600, height=1000, collocations=False, max_words=max_words).generate_from_frequencies(words)
-
-		# Write to svg
-		cloud = cloud.to_svg()
-		file = open(self.dataset.get_results_path(), "w")
-		file.write(cloud)
-		self.dataset.finish(1)
+        # Write to svg
+        cloud = cloud.to_svg()
+        file = open(self.dataset.get_results_path(), "w")
+        file.write(cloud)
+        self.dataset.finish(1)

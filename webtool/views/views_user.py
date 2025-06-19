@@ -1,6 +1,7 @@
 """
 Control access to web tool - views and functions used in handling user access
 """
+
 import html2text
 import requests
 import smtplib
@@ -12,7 +13,19 @@ import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import current_app, Blueprint, request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify, g
+from flask import (
+    current_app,
+    Blueprint,
+    request,
+    abort,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    get_flashed_messages,
+    jsonify,
+    g,
+)
 from flask_login import login_user, login_required, logout_user, current_user
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
@@ -23,7 +36,10 @@ from pathlib import Path
 component = Blueprint("user", __name__)
 
 # ok to use the app's config reader here since this is a global-only setting
-access_request_limit = current_app.fourcat_config.get("4cat.allow_access_request_limiter", default="100/day")
+access_request_limit = current_app.fourcat_config.get(
+    "4cat.allow_access_request_limiter", default="100/day"
+)
+
 
 @current_app.login_manager.user_loader
 def load_user(user_name):
@@ -64,15 +80,21 @@ def load_user_from_request(request):
     if not token:
         return None
 
-    user = current_app.db.fetchone("SELECT name AS user FROM access_tokens WHERE token = %s AND (expires = 0 OR expires > %s)",
-                       (token, int(time.time())))
+    user = current_app.db.fetchone(
+        "SELECT name AS user FROM access_tokens WHERE token = %s AND (expires = 0 OR expires > %s)",
+        (token, int(time.time())),
+    )
     if not user:
         return None
     else:
-        current_app.db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
+        current_app.db.execute(
+            "UPDATE access_tokens SET calls = calls + 1 WHERE name = %s",
+            (user["user"],),
+        )
         user = User.get_by_name(g.db, user["user"])
         user.authenticate()
         return user
+
 
 @current_app.login_manager.unauthorized_handler
 def unauthorized():
@@ -101,11 +123,18 @@ def reroute_requests():
             message += "\n\nThe following reason was recorded for your account's deactivation: *"
             message += current_user.get_value("deactivated.reason") + "*"
 
-        return render_template("error.html", title="Your account has been deactivated", message=message), 403
+        return render_template(
+            "error.html", title="Your account has been deactivated", message=message
+        ), 403
 
     # ensures admins get to see the phone home screen at least once
-    elif current_user and current_user.is_authenticated and current_user.is_admin and \
-            request.url_rule and request.url_rule.endpoint not in ("static", "first_run_dialog"):
+    elif (
+        current_user
+        and current_user.is_authenticated
+        and current_user.is_admin
+        and request.url_rule
+        and request.url_rule.endpoint not in ("static", "first_run_dialog")
+    ):
         wants_phone_home = not g.config.get("4cat.phone_home_asked", False)
         if wants_phone_home:
             return redirect(url_for("user.first_run_dialog"))
@@ -145,7 +174,12 @@ def autologin_whitelist():
 
     # autologin is a special user that is automatically logged in for this
     # request only if the hostname or IP matches the whitelist
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.hostnames", [])]):
+    if any(
+        [
+            fnmatch.filter(filterables, hostmask)
+            for hostmask in g.config.get("flask.autologin.hostnames", [])
+        ]
+    ):
         autologin_user = User.get_by_name(g.db, "autologin")
         if not autologin_user:
             # this user should exist by default
@@ -175,7 +209,12 @@ def exempt_from_limit():
     except (socket.herror, socket.timeout):
         pass  # no hostname for this address
 
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.api", [])]):
+    if any(
+        [
+            fnmatch.filter(filterables, hostmask)
+            for hostmask in g.config.get("flask.autologin.api", [])
+        ]
+    ):
         return True
 
     return False
@@ -191,7 +230,9 @@ def first_run_dialog():
 
     :return:
     """
-    has_admin_user = g.db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'")["amount"]
+    has_admin_user = g.db.fetchone(
+        "SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'"
+    )["amount"]
     wants_phone_home = not g.config.get("4cat.phone_home_asked", False)
 
     if has_admin_user and not wants_phone_home:
@@ -207,7 +248,9 @@ def first_run_dialog():
     missing = []
     # choose a random adjective to differentiate this 4CAT instance (this can
     # be edited by the user)
-    adjective_file = Path(g.config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
+    adjective_file = Path(
+        g.config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt"
+    )
     if not adjective_file.exists():
         adjectives = ["Awesome"]
     else:
@@ -219,10 +262,21 @@ def first_run_dialog():
     interface_hue = random.random()
 
     phone_home_url = g.config.get("4cat.phone_home_url")
-    if request.method == 'GET':
-        template = "account/first-run.html" if not has_admin_user else "account/first-run-after-update.html"
-        return render_template(template, incomplete=missing, form=request.form, phone_home_url=phone_home_url,
-                               version=version, adjective=adjective, interface_hue=interface_hue)
+    if request.method == "GET":
+        template = (
+            "account/first-run.html"
+            if not has_admin_user
+            else "account/first-run-after-update.html"
+        )
+        return render_template(
+            template,
+            incomplete=missing,
+            form=request.form,
+            phone_home_url=phone_home_url,
+            version=version,
+            adjective=adjective,
+            interface_hue=interface_hue,
+        )
 
     if not has_admin_user:
         username = request.form.get("username").strip()
@@ -234,7 +288,9 @@ def first_run_dialog():
         if not username:
             missing.append("username")
         else:
-            user_exists = g.db.fetchone("SELECT name FROM users WHERE name = %s", (username,))
+            user_exists = g.db.fetchone(
+                "SELECT name FROM users WHERE name = %s", (username,)
+            )
             if user_exists:
                 flash("The username '%s' already exists and is reserved." % username)
                 missing.append("username")
@@ -251,11 +307,19 @@ def first_run_dialog():
 
         if missing:
             flash("Please make sure all fields are complete")
-            return render_template("account/first-run.html", form=request.form, incomplete=missing,
-                                   flashes=get_flashed_messages(), phone_home_url=phone_home_url,
-                                   adjective=adjective, interface_hue=interface_hue)
+            return render_template(
+                "account/first-run.html",
+                form=request.form,
+                incomplete=missing,
+                flashes=get_flashed_messages(),
+                phone_home_url=phone_home_url,
+                adjective=adjective,
+                interface_hue=interface_hue,
+            )
 
-        g.db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
+        g.db.insert(
+            "users", data={"name": username, "timestamp_created": int(time.time())}
+        )
         g.db.commit()
         user = User.get_by_name(db=g.db, name=username)
         user.set_password(password)
@@ -266,7 +330,9 @@ def first_run_dialog():
         # handle hue colour
         try:
             interface_hue = int(interface_hue)
-            interface_hue = interface_hue if 0 <= interface_hue <= 360 else random.randrange(0, 360)
+            interface_hue = (
+                interface_hue if 0 <= interface_hue <= 360 else random.randrange(0, 360)
+            )
         except (ValueError, TypeError):
             interface_hue = random.randrange(0, 360)
 
@@ -277,10 +343,14 @@ def first_run_dialog():
         g.db.update("users", where={"name": username}, data={"is_deactivated": False})
         g.db.commit()
 
-        flash("The admin user '%s' was created, you can now use it to log in." % username)
+        flash(
+            "The admin user '%s' was created, you can now use it to log in." % username
+        )
 
     if phone_home_url and request.form.get("phonehome"):
-        with Path(g.config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
+        with Path(
+            g.config.get("PATH_ROOT"), "config/.current-version"
+        ).open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {
@@ -288,7 +358,7 @@ def first_run_dialog():
             "commit": get_software_commit(),
             "role": request.form.get("role", ""),
             "affiliation": request.form.get("affiliation", ""),
-            "email": request.form.get("email", "")
+            "email": request.form.get("email", ""),
         }
 
         try:
@@ -304,7 +374,7 @@ def first_run_dialog():
     return redirect(url_for(redirect_path))
 
 
-@component.route('/login/', methods=['GET', 'POST'])
+@component.route("/login/", methods=["GET", "POST"])
 def show_login():
     """
     Handle logging in
@@ -321,17 +391,19 @@ def show_login():
     if not has_admin_user:
         return redirect(url_for("user.first_run_dialog"))
 
-    have_email = g.config.get('mail.admin_email') and g.config.get('mail.server')
-    if request.method == 'GET':
-        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email), 401
+    have_email = g.config.get("mail.admin_email") and g.config.get("mail.server")
+    if request.method == "GET":
+        return render_template(
+            "account/login.html", flashes=get_flashed_messages(), have_email=have_email
+        ), 401
 
-    username = request.form['username']
-    password = request.form['password']
+    username = request.form["username"]
+    password = request.form["password"]
     registered_user = User.get_by_login(g.db, username, password)
 
     if registered_user is None:
-        flash('Username or Password is invalid.', 'error')
-        return redirect(url_for('user.show_login'))
+        flash("Username or Password is invalid.", "error")
+        return redirect(url_for("user.show_login"))
 
     login_user(registered_user, remember=True)
 
@@ -362,20 +434,27 @@ def request_access():
     sent to the 4CAT admin via e-mail so they can create an account (if
     approved)
     """
-    if not g.config.get('mail.admin_email'):
-        return render_template("error.html",
-                               message="No administrator e-mail is configured; the request form cannot be displayed.")
+    if not g.config.get("mail.admin_email"):
+        return render_template(
+            "error.html",
+            message="No administrator e-mail is configured; the request form cannot be displayed.",
+        )
 
-    if not g.config.get('mail.server'):
-        return render_template("error.html",
-                               message="No e-mail server configured; the request form cannot be displayed.")
+    if not g.config.get("mail.server"):
+        return render_template(
+            "error.html",
+            message="No e-mail server configured; the request form cannot be displayed.",
+        )
 
     if current_user.is_authenticated:
-        return render_template("error.html", message="You are already logged in and cannot request another account.")
+        return render_template(
+            "error.html",
+            message="You are already logged in and cannot request another account.",
+        )
 
     incomplete = []
 
-    policy_template = Path(g.config.get('PATH_ROOT'), "webtool/pages/access-policy.md")
+    policy_template = Path(g.config.get("PATH_ROOT"), "webtool/pages/access-policy.md")
     access_policy = ""
     if policy_template.exists():
         access_policy = policy_template.read_text(encoding="utf-8")
@@ -391,38 +470,65 @@ def request_access():
         else:
             html_parser = html2text.HTML2Text()
 
-            sender = g.config.get('mail.noreply')
+            sender = g.config.get("mail.noreply")
             message = MIMEMultipart("alternative")
             message["Subject"] = "Account request"
             message["From"] = sender
-            message["To"] = g.config.get('mail.admin_email', "")
+            message["To"] = g.config.get("mail.admin_email", "")
 
             mail = "<p>Hello! Someone requests a 4CAT Account:</p>\n"
             for field in required:
-                mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
+                mail += (
+                    "<p><b>"
+                    + field
+                    + "</b>: "
+                    + request.form.get(field, "")
+                    + " </p>\n"
+                )
 
             root_url = "https" if g.config.get("flask.https") else "http"
             root_url += "://%s/admin/" % g.config.get("flask.server_name")
-            approve_url = root_url + "add-user/?format=html&email=%s" % request.form.get("email", "")
+            approve_url = (
+                root_url
+                + "add-user/?format=html&email=%s" % request.form.get("email", "")
+            )
             reject_url = root_url + "reject-user/?name=%s&email=%s" % (
-            request.form.get("name", ""), request.form.get("email", ""))
-            mail += "<p>Use <a href=\"%s\">this link</a> to approve this request and send a password reset e-mail.</p>" % approve_url
-            mail += "<p>Use <a href=\"%s\">this link</a> to send a message to this person about why their request was " \
-                    "rejected.</p>" % reject_url
+                request.form.get("name", ""),
+                request.form.get("email", ""),
+            )
+            mail += (
+                '<p>Use <a href="%s">this link</a> to approve this request and send a password reset e-mail.</p>'
+                % approve_url
+            )
+            mail += (
+                '<p>Use <a href="%s">this link</a> to send a message to this person about why their request was '
+                "rejected.</p>" % reject_url
+            )
 
             message.attach(MIMEText(html_parser.handle(mail), "plain"))
             message.attach(MIMEText(mail, "html"))
 
             try:
-                send_email(g.config.get('mail.admin_email'), message)
-                return render_template("error.html", title="Thank you",
-                                       message="Your request has been submitted; we'll try to answer it as soon as possible.")
+                send_email(g.config.get("mail.admin_email"), message)
+                return render_template(
+                    "error.html",
+                    title="Thank you",
+                    message="Your request has been submitted; we'll try to answer it as soon as possible.",
+                )
             except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout):
-                return render_template("error.html", title="Error",
-                                       message="The form could not be submitted; the e-mail server is unreachable.")
+                return render_template(
+                    "error.html",
+                    title="Error",
+                    message="The form could not be submitted; the e-mail server is unreachable.",
+                )
 
-    return render_template("account/request.html", incomplete=incomplete, flashes=get_flashed_messages(),
-                           form=request.form, access_policy=access_policy)
+    return render_template(
+        "account/request.html",
+        incomplete=incomplete,
+        flashes=get_flashed_messages(),
+        form=request.form,
+        access_policy=access_policy,
+    )
 
 
 @component.route("/reset-password/", methods=["GET", "POST"])
@@ -436,18 +542,25 @@ def reset_password():
     """
     if current_user.is_authenticated:
         # this makes no sense if you're already logged in
-        return render_template("error.html", message="You are already logged in and cannot request another account.")
+        return render_template(
+            "error.html",
+            message="You are already logged in and cannot request another account.",
+        )
 
     token = request.args.get("token", None) or request.form.get("token", None)
     if token is None:
         # we need *a* token
-        return render_template("error.html", message="You need a valid reset token to set a password.")
+        return render_template(
+            "error.html", message="You need a valid reset token to set a password."
+        )
 
     resetting_user = User.get_by_token(g.db, token)
     if not resetting_user or resetting_user.is_special:
         # this doesn't mean the token is unknown, but it could be older than 3 days
-        return render_template("error.html",
-                               message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
+        return render_template(
+            "error.html",
+            message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.",
+        )
 
     # check form
     incomplete = []
@@ -466,9 +579,14 @@ def reset_password():
             return redirect(url_for("user.show_login"))
 
     # show form
-    return render_template("account/reset-password.html", username=resetting_user.get_name(), incomplete=incomplete,
-                           flashes=get_flashed_messages(), token=token,
-                           form=request.form)
+    return render_template(
+        "account/reset-password.html",
+        username=resetting_user.get_name(),
+        incomplete=incomplete,
+        flashes=get_flashed_messages(),
+        token=token,
+        form=request.form,
+    )
 
 
 @component.route("/request-password/", methods=["GET", "POST"])
@@ -485,7 +603,10 @@ def request_password():
     """
     if current_user.is_authenticated:
         # using this while logged in makes no sense
-        return render_template("error.html", message="You are already logged in and cannot request a password reset.")
+        return render_template(
+            "error.html",
+            message="You are already logged in and cannot request a password reset.",
+        )
 
     # check form submission
     incomplete = []
@@ -500,30 +621,44 @@ def request_password():
         resetting_user = User.get_by_name(g.db, username)
         if resetting_user is None or resetting_user.is_special:
             incomplete.append("username")
-            flash("That user is not known here. Note that your username is typically your e-mail address.")
+            flash(
+                "That user is not known here. Note that your username is typically your e-mail address."
+            )
 
-        elif resetting_user.get_token() and resetting_user.data["timestamp_token"] > 0 and resetting_user.data[
-            "timestamp_token"] > time.time() - (3 * 86400):
+        elif (
+            resetting_user.get_token()
+            and resetting_user.data["timestamp_token"] > 0
+            and resetting_user.data["timestamp_token"] > time.time() - (3 * 86400)
+        ):
             # and have they not already requested a reset?
             incomplete.append("")
             flash(
-                "You have recently requested a password reset and an e-mail has been sent to you containing a reset link. It could take a while to arrive; also, don't forget to check your spam folder.")
+                "You have recently requested a password reset and an e-mail has been sent to you containing a reset link. It could take a while to arrive; also, don't forget to check your spam folder."
+            )
         else:
             # okay, send an e-mail
             try:
                 resetting_user.email_token(new=False)
-                return render_template("error.html", title="Success",
-                                       message="An e-mail has been sent to you containing instructions on how to reset your password.")
+                return render_template(
+                    "error.html",
+                    title="Success",
+                    message="An e-mail has been sent to you containing instructions on how to reset your password.",
+                )
             except RuntimeError:
                 # no e-mail could be sent - clear the token so the user can try again later
                 resetting_user.clear_token()
                 incomplete.append(username)
-                flash("The username was recognised but no reset e-mail could be sent. Please try again later.")
+                flash(
+                    "The username was recognised but no reset e-mail could be sent. Please try again later."
+                )
 
     # show page
-    return render_template("account/request-password.html", incomplete=incomplete, flashes=get_flashed_messages(),
-                           form=request.form)
-
+    return render_template(
+        "account/request-password.html",
+        incomplete=incomplete,
+        flashes=get_flashed_messages(),
+        form=request.form,
+    )
 
 
 @component.route("/access-tokens/")
@@ -532,11 +667,15 @@ def show_access_tokens():
     user = current_user.get_id()
 
     if user == "autologin":
-        return error(403, message="You cannot view or generate access tokens without a personal acount.")
+        return error(
+            403,
+            message="You cannot view or generate access tokens without a personal acount.",
+        )
 
     tokens = g.db.fetchall("SELECT * FROM access_tokens WHERE name = %s", (user,))
 
     return render_template("access-tokens.html", tokens=tokens)
+
 
 @component.route("/dismiss-notification/<int:notification_id>")
 def dismiss_notification(notification_id):

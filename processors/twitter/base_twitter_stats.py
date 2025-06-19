@@ -1,6 +1,7 @@
 """
 Twitter APIv2 base stats class
 """
+
 import abc
 import datetime
 
@@ -18,14 +19,16 @@ class TwitterStatsBase(BasicProcessor):
     """
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
+
     type = "twitter-stats-base"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Twitter Base Statistics"  # title displayed in UI
-    description = "This is a class to help other twitter classes"  # description displayed in UI
+    description = (
+        "This is a class to help other twitter classes"  # description displayed in UI
+    )
     extension = "csv"  # extension of result file, used internally and in UI
 
     sorted = False
-
 
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
@@ -56,20 +59,28 @@ class TwitterStatsBase(BasicProcessor):
             post = post.original
 
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while processing Tweets")
+                raise ProcessorInterruptedException(
+                    "Interrupted while processing Tweets"
+                )
 
             try:
-                tweet_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
+                tweet_time = datetime.datetime.strptime(
+                    post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z"
+                )
                 post["timestamp"] = tweet_time.strftime("%Y-%m-%d %H:%M:%S")
                 date = get_interval_descriptor(post, timeframe)
             except ValueError as e:
-                self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+                self.dataset.update_status(
+                    "%s, cannot count posts per %s" % (str(e), timeframe), is_final=True
+                )
                 self.dataset.update_status(0)
                 return
 
             # Map the data in the post to either be summed (by grouping and interval) or updated (keeping most recent)
             try:
-                group_by_keys_category, group_by_keys, sum_map, static_map, list_map = self.map_data(post)
+                group_by_keys_category, group_by_keys, sum_map, static_map, list_map = (
+                    self.map_data(post)
+                )
             except ProcessorException as e:
                 self.dataset.update_status(str(e), is_final=True)
                 self.dataset.update_status(0)
@@ -88,7 +99,9 @@ class TwitterStatsBase(BasicProcessor):
                 if type(group_by_keys) is str:
                     group_by_keys = [group_by_keys]
                 elif type(group_by_keys) is not set:
-                    raise ProcessorException("group_by_keys must be a string, list, or set")
+                    raise ProcessorException(
+                        "group_by_keys must be a string, list, or set"
+                    )
 
                 # Add a counts for the respective timeframe
                 if date not in intervals:
@@ -97,7 +110,12 @@ class TwitterStatsBase(BasicProcessor):
                 for group_by_key in group_by_keys:
                     if group_by_key not in intervals[date]:
                         # Add new record for this grouping
-                        intervals[date][group_by_key] = {**static_map, **sum_map, **list_map, **{"Created at Timestamp": int(tweet_time.timestamp())}}
+                        intervals[date][group_by_key] = {
+                            **static_map,
+                            **sum_map,
+                            **list_map,
+                            **{"Created at Timestamp": int(tweet_time.timestamp())},
+                        }
 
                         # Convenience for easy adding to above
                         if not data_types:
@@ -113,14 +131,22 @@ class TwitterStatsBase(BasicProcessor):
 
                         # Methodology question: which stat is best to use? Most recent? Largest? Smallest? Likely they will be identical or minimally different.
                         # Using most recent for now.
-                        if int(tweet_time.timestamp()) > intervals[date][group_by_key]["Created at Timestamp"]:
+                        if (
+                            int(tweet_time.timestamp())
+                            > intervals[date][group_by_key]["Created at Timestamp"]
+                        ):
                             for key, value in static_map.items():
                                 intervals[date][group_by_key][key] = value
 
             # Aggregate by intervals only
             else:
                 if date not in intervals:
-                    intervals[date] = {**static_map, **sum_map, **list_map, **{"Created at Timestamp": int(tweet_time.timestamp())}}
+                    intervals[date] = {
+                        **static_map,
+                        **sum_map,
+                        **list_map,
+                        **{"Created at Timestamp": int(tweet_time.timestamp())},
+                    }
 
                     # Convenience for easy adding to above
                     if not data_types:
@@ -135,7 +161,10 @@ class TwitterStatsBase(BasicProcessor):
 
                     # Methodology question: which stat is best to use? Most recent? Largest? Smallest? Likely they will be identical or minimally different.
                     # Using most recent for now.
-                    if int(tweet_time.timestamp()) > intervals[date]["Created at Timestamp"]:
+                    if (
+                        int(tweet_time.timestamp())
+                        > intervals[date]["Created at Timestamp"]
+                    ):
                         for key, value in static_map.items():
                             intervals[date][key] = value
 
@@ -145,7 +174,9 @@ class TwitterStatsBase(BasicProcessor):
             counter += 1
 
             if counter % 2500 == 0:
-                self.dataset.update_status("Processed through " + str(counter) + " posts.")
+                self.dataset.update_status(
+                    "Processed through " + str(counter) + " posts."
+                )
 
         # pad interval if needed, this is useful if the result is to be
         # visualised as a histogram, for example
@@ -161,19 +192,28 @@ class TwitterStatsBase(BasicProcessor):
         rows = []
         for interval, data in intervals.items():
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while processing Tweets")
+                raise ProcessorInterruptedException(
+                    "Interrupted while processing Tweets"
+                )
 
             interval_rows = []
             if group_by_keys_category:
                 for group_key, group_data in data.items():
                     group_data = self.modify_intervals(group_key, group_data)
-                    interval_rows.append({**{"date": interval, group_by_keys_category: group_key}, **group_data})
+                    interval_rows.append(
+                        {
+                            **{"date": interval, group_by_keys_category: group_key},
+                            **group_data,
+                        }
+                    )
             else:
                 data = self.modify_intervals(interval, data)
                 interval_rows.append({**{"date": interval}, **data})
 
             if self.sorted:
-                interval_rows = sorted(interval_rows, key=lambda d: d[self.sorted], reverse=True)
+                interval_rows = sorted(
+                    interval_rows, key=lambda d: d[self.sorted], reverse=True
+                )
 
             rows += interval_rows
 

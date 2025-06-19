@@ -41,9 +41,19 @@ class ConfigManager:
         """
         if db or not self.db:
             # Replace w/ db if provided else only initialise if not already
-            self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
-                                         password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
-                                         port=self.get("DB_PORT"), appname="config-reader")
+            self.db = (
+                db
+                if db
+                else Database(
+                    logger=None,
+                    dbname=self.get("DB_NAME"),
+                    user=self.get("DB_USER"),
+                    password=self.get("DB_PASSWORD"),
+                    host=self.get("DB_HOST"),
+                    port=self.get("DB_PORT"),
+                    appname="config-reader",
+                )
+            )
         else:
             # self.db already initialized and no db provided
             pass
@@ -83,8 +93,10 @@ class ConfigManager:
                     if module_config is None:
                         # not really a way to gracefully recover from this, but
                         # we can at least describe the error
-                        raise RuntimeError("Could not read module_config.bin. The 4CAT developers did a bad job of "
-                                           "preventing this. Shame on them!")
+                        raise RuntimeError(
+                            "Could not read module_config.bin. The 4CAT developers did a bad job of "
+                            "preventing this. Shame on them!"
+                        )
 
                     self.config_definition.update(module_config)
             except (ValueError, TypeError):
@@ -110,31 +122,35 @@ class ConfigManager:
                 in_docker = True
         else:
             # config should be created!
-            raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
+            raise ConfigException(
+                "No config/config.ini file exists! Update and rename the config.ini-example file."
+            )
 
-        self.core_settings.update({
-            "CONFIG_FILE": config_file.resolve(),
-            "USING_DOCKER": in_docker,
-            "DB_HOST": config_reader["DATABASE"].get("db_host"),
-            "DB_PORT": config_reader["DATABASE"].get("db_port"),
-            "DB_USER": config_reader["DATABASE"].get("db_user"),
-            "DB_NAME": config_reader["DATABASE"].get("db_name"),
-            "DB_PASSWORD": config_reader["DATABASE"].get("db_password"),
-
-            "API_HOST": config_reader["API"].get("api_host"),
-            "API_PORT": config_reader["API"].getint("api_port"),
-
-            "PATH_ROOT": Path(os.path.abspath(os.path.dirname(__file__))).joinpath(
-                "..").resolve(),  # better don"t change this
-            "PATH_LOGS": Path(config_reader["PATHS"].get("path_logs", "")),
-            "PATH_IMAGES": Path(config_reader["PATHS"].get("path_images", "")),
-            "PATH_DATA": Path(config_reader["PATHS"].get("path_data", "")),
-            "PATH_LOCKFILE": Path(config_reader["PATHS"].get("path_lockfile", "")),
-            "PATH_SESSIONS": Path(config_reader["PATHS"].get("path_sessions", "")),
-
-            "ANONYMISATION_SALT": config_reader["GENERATE"].get("anonymisation_salt"),
-            "SECRET_KEY": config_reader["GENERATE"].get("secret_key")
-        })
+        self.core_settings.update(
+            {
+                "CONFIG_FILE": config_file.resolve(),
+                "USING_DOCKER": in_docker,
+                "DB_HOST": config_reader["DATABASE"].get("db_host"),
+                "DB_PORT": config_reader["DATABASE"].get("db_port"),
+                "DB_USER": config_reader["DATABASE"].get("db_user"),
+                "DB_NAME": config_reader["DATABASE"].get("db_name"),
+                "DB_PASSWORD": config_reader["DATABASE"].get("db_password"),
+                "API_HOST": config_reader["API"].get("api_host"),
+                "API_PORT": config_reader["API"].getint("api_port"),
+                "PATH_ROOT": Path(os.path.abspath(os.path.dirname(__file__)))
+                .joinpath("..")
+                .resolve(),  # better don"t change this
+                "PATH_LOGS": Path(config_reader["PATHS"].get("path_logs", "")),
+                "PATH_IMAGES": Path(config_reader["PATHS"].get("path_images", "")),
+                "PATH_DATA": Path(config_reader["PATHS"].get("path_data", "")),
+                "PATH_LOCKFILE": Path(config_reader["PATHS"].get("path_lockfile", "")),
+                "PATH_SESSIONS": Path(config_reader["PATHS"].get("path_sessions", "")),
+                "ANONYMISATION_SALT": config_reader["GENERATE"].get(
+                    "anonymisation_salt"
+                ),
+                "SECRET_KEY": config_reader["GENERATE"].get("secret_key"),
+            }
+        )
 
     def ensure_database(self):
         """
@@ -151,12 +167,25 @@ class ConfigManager:
             if setting in known_settings:
                 continue
 
-            self.db.log.debug(f"Creating setting: {setting} with default value {parameters.get('default', '')}")
+            self.db.log.debug(
+                f"Creating setting: {setting} with default value {parameters.get('default', '')}"
+            )
             self.set(setting, parameters.get("default", ""))
 
         # make sure settings and user table are in sync
-        user_tags = list(set(itertools.chain(*[u["tags"] for u in self.db.fetchall("SELECT DISTINCT tags FROM users")])))
-        known_tags = [t["tag"] for t in self.db.fetchall("SELECT DISTINCT tag FROM settings")]
+        user_tags = list(
+            set(
+                itertools.chain(
+                    *[
+                        u["tags"]
+                        for u in self.db.fetchall("SELECT DISTINCT tags FROM users")
+                    ]
+                )
+            )
+        )
+        known_tags = [
+            t["tag"] for t in self.db.fetchall("SELECT DISTINCT tag FROM settings")
+        ]
         tag_order = self.get("flask.tag_order")
 
         for tag in known_tags:
@@ -194,7 +223,9 @@ class ConfigManager:
         :return dict: Setting value, as a dictionary with setting names as keys
         and setting values as values.
         """
-        return self.get(attribute_name=None, default=None, is_json=is_json, user=user, tags=tags)
+        return self.get(
+            attribute_name=None, default=None, is_json=is_json, user=user, tags=tags
+        )
 
     def get(self, attribute_name, default=None, is_json=False, user=None, tags=None):
         """
@@ -241,7 +272,7 @@ class ConfigManager:
             replacements = (tuple(attribute_name), tuple(tags))
         else:
             query = "SELECT * FROM settings WHERE tag IN %s"
-            replacements = (tuple(tags), )
+            replacements = (tuple(tags),)
 
         settings = {setting: {} for setting in attribute_name} if attribute_name else {}
 
@@ -269,7 +300,11 @@ class ConfigManager:
             if not is_json and value is not None:
                 value = json.loads(value)
             # TODO: Which default should have priority? The provided default feels like it should be the highest priority, but I think that is an old implementation and perhaps should be removed. - Dale
-            elif value is None and setting_name in self.config_definition and "default" in self.config_definition[setting_name]:
+            elif (
+                value is None
+                and setting_name in self.config_definition
+                and "default" in self.config_definition[setting_name]
+            ):
                 value = self.config_definition[setting_name]["default"]
             elif value is None and default is not None:
                 value = default
@@ -313,12 +348,16 @@ class ConfigManager:
                 user = user.get_id()
             elif user != None:  # noqa: E711
                 # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
-                raise TypeError(f"get() expects None, a User object or a string for argument 'user', {type(user).__name__} given")
+                raise TypeError(
+                    f"get() expects None, a User object or a string for argument 'user', {type(user).__name__} given"
+                )
 
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups
         if user:
-            user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
+            user_tags = self.db.fetchone(
+                "SELECT tags FROM users WHERE name = %s", (user,)
+            )
             if user_tags:
                 try:
                     tags.extend(user_tags["tags"])
@@ -330,7 +369,9 @@ class ConfigManager:
 
         return tags
 
-    def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True):
+    def set(
+        self, attribute_name, value, is_json=False, tag="", overwrite_existing=True
+    ):
         """
         Insert OR set value for a setting
 
@@ -358,7 +399,9 @@ class ConfigManager:
             except json.JSONDecodeError:
                 return None
 
-        if attribute_name in self.config_definition and self.config_definition.get(attribute_name).get("global"):
+        if attribute_name in self.config_definition and self.config_definition.get(
+            attribute_name
+        ).get("global"):
             tag = ""
 
         if overwrite_existing:
@@ -410,6 +453,7 @@ class ConfigWrapper:
     to `get()` are done for those tags or that user. Can also adjust tags based
     on the HTTP request, if used in a Flask context.
     """
+
     def __init__(self, config, user=None, tags=None, request=None):
         """
         Initialise config wrapper
@@ -430,7 +474,6 @@ class ConfigWrapper:
         # this ensures the user object in turn reads from the wrapper
         if self.user:
             self.user.with_config(self)
-
 
     def set(self, *args, **kwargs):
         """
@@ -523,9 +566,13 @@ class ConfigWrapper:
         if type(tags) is str:
             tags = [tags]
 
-        if self.request and self.request.headers.get("X-4Cat-Config-Tag") and \
-            self.config.get("flask.proxy_secret") and \
-            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
+        if (
+            self.request
+            and self.request.headers.get("X-4Cat-Config-Tag")
+            and self.config.get("flask.proxy_secret")
+            and self.request.headers.get("X-4Cat-Config-Via-Proxy")
+            == self.config.get("flask.proxy_secret")
+        ):
             # need to ensure not just anyone can add this header to their
             # request!
             # to this end, the second header must be set to the secret value;
@@ -536,7 +583,11 @@ class ConfigWrapper:
 
             # can never set admin tag via headers (should always be user-based)
             forbidden_overrides = ("admin",)
-            tags += [tag for tag in self.request.headers.get("X-4Cat-Config-Tag").split(",") if tag not in forbidden_overrides]
+            tags += [
+                tag
+                for tag in self.request.headers.get("X-4Cat-Config-Tag").split(",")
+                if tag not in forbidden_overrides
+            ]
 
         return tags
 
@@ -556,6 +607,7 @@ class ConfigWrapper:
         else:
             raise AttributeError(f"'{self.__name__}' object has no attribute '{item}'")
 
+
 class ConfigDummy:
     """
     Dummy class to use as initial value for class-based configs
@@ -565,6 +617,7 @@ class ConfigDummy:
     been inititated, so until then use this dummy wrapper that throws an error
     when used to access config variables
     """
+
     def __getattribute__(self, item):
         """
         Access class attribute
@@ -572,8 +625,10 @@ class ConfigDummy:
         :param item:
         :raises NotImplementedError:
         """
-        raise NotImplementedError("Cannot call processor config object in a class or static method - call global "
-                                  "configuration manager instead.")
+        raise NotImplementedError(
+            "Cannot call processor config object in a class or static method - call global "
+            "configuration manager instead."
+        )
 
 
 config = ConfigManager()

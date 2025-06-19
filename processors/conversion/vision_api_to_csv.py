@@ -1,6 +1,7 @@
 """
 Convert Google Vision API annotations to CSV
 """
+
 import csv
 
 from backend.lib.processor import BasicProcessor
@@ -22,18 +23,21 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     NDJSON, but it can be more useful to have a CSV file. This discards some
     information to allow 'flattening' the output to a simple CSV file.
     """
+
     type = "convert-google-vision-to-csv"  # job type ID
     category = "Conversion"  # category
     title = "Convert Vision results to CSV"  # title displayed in UI
-    description = ("Convert the Vision API output to a simplified CSV file. Also allows writing results as annotations "
-                   "to the original dataset.")  # description displayed in UI
+    description = (
+        "Convert the Vision API output to a simplified CSV file. Also allows writing results as annotations "
+        "to the original dataset."
+    )  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
         "write_annotations": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Add features as annotations to the original dataset.",
-            "default": False
+            "default": False,
         }
     }
 
@@ -56,7 +60,10 @@ class ConvertVisionOutputToCSV(BasicProcessor):
         self.dataset.update_status("Converting posts")
 
         if not self.source_file.exists():
-            self.dataset.update_status("No data was returned by the Google Vision API, so none can be converted.", is_final=True)
+            self.dataset.update_status(
+                "No data was returned by the Google Vision API, so none can be converted.",
+                is_final=True,
+            )
             self.dataset.finish(0)
             return
 
@@ -70,16 +77,41 @@ class ConvertVisionOutputToCSV(BasicProcessor):
 
             # special case format
             if "webDetection" in annotations and annotations["webDetection"]:
-                file_result["labelGuess"] = [i["label"] for i in annotations["webDetection"].get("bestGuessLabels", [])]
-                file_result["webEntities"] = [e["description"] for e in annotations["webDetection"].get("webEntities", []) if "description" in e]
-                file_result["urlsPagesWithMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("pagesWithMatchingImages", [])]
-                file_result["urlsMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("fullMatchingImages", [])]
-                file_result["urlsPartialMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("partialMatchingImages", [])]
+                file_result["labelGuess"] = [
+                    i["label"]
+                    for i in annotations["webDetection"].get("bestGuessLabels", [])
+                ]
+                file_result["webEntities"] = [
+                    e["description"]
+                    for e in annotations["webDetection"].get("webEntities", [])
+                    if "description" in e
+                ]
+                file_result["urlsPagesWithMatchingImages"] = [
+                    u["url"]
+                    for u in annotations["webDetection"].get(
+                        "pagesWithMatchingImages", []
+                    )
+                ]
+                file_result["urlsMatchingImages"] = [
+                    u["url"]
+                    for u in annotations["webDetection"].get("fullMatchingImages", [])
+                ]
+                file_result["urlsPartialMatchingImages"] = [
+                    u["url"]
+                    for u in annotations["webDetection"].get(
+                        "partialMatchingImages", []
+                    )
+                ]
 
             # shared format
             for annotation_type, tags in annotations.items():
-                if annotation_type not in ("landmarkAnnotations", "logoAnnotations", "labelAnnotations",
-                                           "fullTextAnnotation", "localizedObjectAnnotations"):
+                if annotation_type not in (
+                    "landmarkAnnotations",
+                    "logoAnnotations",
+                    "labelAnnotations",
+                    "fullTextAnnotation",
+                    "localizedObjectAnnotations",
+                ):
                     # annotations that don't make sense to include
                     continue
 
@@ -92,7 +124,11 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                 else:
                     # create a list of detected labels - can be imploded later
                     file_result[annotation_type] = set()
-                    label_field = "name" if annotation_type == "localizedObjectAnnotations" else "description"
+                    label_field = (
+                        "name"
+                        if annotation_type == "localizedObjectAnnotations"
+                        else "description"
+                    )
 
                     for tag in tags:
                         if annotation_type != "fullTextAnnotation":
@@ -108,26 +144,36 @@ class ConvertVisionOutputToCSV(BasicProcessor):
 
             done += 1
             if done % 25 == 0:
-                self.dataset.update_status("Processed %i/%i image files" % (done, self.source_dataset.num_rows))
+                self.dataset.update_status(
+                    "Processed %i/%i image files" % (done, self.source_dataset.num_rows)
+                )
                 self.dataset.update_progress(done / self.source_dataset.num_rows)
 
             # Get annotation data for source dataset
             if write_annotations:
                 for item_id in annotations.get("post_ids", []):
                     for label, value in file_result.items():
-                        parent_annotations.append({
-                            "item_id": item_id,
-                            "label": label,
-                            "value": value,
-                            "type": "textarea"
-                        })
+                        parent_annotations.append(
+                            {
+                                "item_id": item_id,
+                                "label": label,
+                                "value": value,
+                                "type": "textarea",
+                            }
+                        )
 
         # Write Vision annotations to source dataset
         if write_annotations:
-            self.save_annotations(parent_annotations, source_dataset=self.source_dataset.top_parent(),
-                                  overwrite=False)
+            self.save_annotations(
+                parent_annotations,
+                source_dataset=self.source_dataset.top_parent(),
+                overwrite=False,
+            )
 
         for index, value in enumerate(result):
-            result[index] = {**{annotation_type: "" for annotation_type in annotation_types}, **value}
+            result[index] = {
+                **{annotation_type: "" for annotation_type in annotation_types},
+                **value,
+            }
 
         self.write_csv_items_and_finish(result)

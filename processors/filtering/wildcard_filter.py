@@ -1,6 +1,7 @@
 """
 Filter posts by lexicon
 """
+
 import re
 
 from processors.filtering.base_filter import BaseFilter
@@ -16,6 +17,7 @@ class WildcardFilter(BaseFilter):
     """
     Retain only posts matching a given list of keywords
     """
+
     type = "wildcard-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by wildcard"  # title displayed in UI
@@ -27,7 +29,7 @@ class WildcardFilter(BaseFilter):
             "type": UserInput.OPTION_TEXT,
             "default": "",
             "help": "Words or phrases to match. You can use * as a wildcard.",
-            "tooltip": "Separate with commas."
+            "tooltip": "Separate with commas.",
         }
     }
 
@@ -49,7 +51,10 @@ class WildcardFilter(BaseFilter):
         :return generator:
         """
 
-        matches = [match.strip().replace("*", r"[^\s]*") for match in self.parameters.get("match").split(",")]
+        matches = [
+            match.strip().replace("*", r"[^\s]*")
+            for match in self.parameters.get("match").split(",")
+        ]
 
         # load lexicons from word lists
 
@@ -69,7 +74,9 @@ class WildcardFilter(BaseFilter):
                 continue
 
             if processed % 2500 == 0:
-                self.dataset.update_status("Processed %i posts (%i matching)" % (processed, matching_items))
+                self.dataset.update_status(
+                    "Processed %i posts (%i matching)" % (processed, matching_items)
+                )
                 self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
             if not matcher.findall(mapped_item.get("body")):

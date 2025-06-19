@@ -1,6 +1,7 @@
 """
 Get YouTube metadata from video links posted
 """
+
 import time
 import urllib.request
 
@@ -15,98 +16,112 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
+
 class YouTubeThumbnails(BasicProcessor):
-	"""
-	
-	Downloads YouTube thumbnails.
+    """
 
-	"""
+    Downloads YouTube thumbnails.
 
-	type = "youtube-thumbnails"  # job type ID
-	category = "Cross-platform" # category
-	title = "Download YouTube thumbnails"  # title displayed in UI
-	description = "Downloads the thumbnails of YouTube videos and stores it in a zip archive."  # description displayed in UI
-	extension = "zip"  # extension of result file, used internally and in UI
-	media_type = "image"  # media type of the result
+    """
 
-	followups = ["youtube-imagewall"]
-	
-	max_retries = 3
-	sleep_time = 10
+    type = "youtube-thumbnails"  # job type ID
+    category = "Cross-platform"  # category
+    title = "Download YouTube thumbnails"  # title displayed in UI
+    description = "Downloads the thumbnails of YouTube videos and stores it in a zip archive."  # description displayed in UI
+    extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image"  # media type of the result
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-		Allow processor on YouTube metadata sets
+    followups = ["youtube-imagewall"]
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
-		return module.type == "youtube-metadata"
+    max_retries = 3
+    sleep_time = 10
 
-	def process(self):
-		"""
-		Downloads thumbnails from YouTube videos. 
+    @classmethod
+    def is_compatible_with(cls, module=None, user=None):
+        """
+        Allow processor on YouTube metadata sets
 
-		"""
-		self.dataset.update_status("Extracting YouTube links")
-		video_ids = set()
-		for youtube_video in self.source_dataset.iterate_items(self):
-			video_ids.add(youtube_video["id"])
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.type == "youtube-metadata"
 
-		self.dataset.update_status("Downloading thumbnails")
-		self.download_thumbnails(list(video_ids))
+    def process(self):
+        """
+        Downloads thumbnails from YouTube videos.
 
-	def download_thumbnails(self, video_ids):
-		"""
-		Download video thumbnails
-		:param video_ids list, list of YouTube video IDs
-		"""
+        """
+        self.dataset.update_status("Extracting YouTube links")
+        video_ids = set()
+        for youtube_video in self.source_dataset.iterate_items(self):
+            video_ids.add(youtube_video["id"])
 
-		# prepare staging area
-		results_path = self.dataset.get_staging_area()
+        self.dataset.update_status("Downloading thumbnails")
+        self.download_thumbnails(list(video_ids))
 
-		# Use YouTubeDL and the YouTube API to request video data
-		youtube = build(self.config.get('api.youtube.name'), self.config.get('api.youtube.version'),
-											developerKey=self.config.get('api.youtube.key'))
-		
-		ids_list = get_yt_compatible_ids(video_ids)
-		retries = 0
+    def download_thumbnails(self, video_ids):
+        """
+        Download video thumbnails
+        :param video_ids list, list of YouTube video IDs
+        """
 
-		for i, ids_string in enumerate(ids_list):
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while downloading thumbnails from YouTube")
+        # prepare staging area
+        results_path = self.dataset.get_staging_area()
 
-			while retries < self.max_retries:
-				try:
-					response = youtube.videos().list(
-						part = "snippet",
-						id = ids_string,
-						maxResults = 50
-						).execute()
-					break
-				except Exception as error:
-					self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
-					retries += 1
-					time.sleep(self.sleep_time)  # Wait a bit before trying again
+        # Use YouTubeDL and the YouTube API to request video data
+        youtube = build(
+            self.config.get("api.youtube.name"),
+            self.config.get("api.youtube.version"),
+            developerKey=self.config.get("api.youtube.key"),
+        )
 
-			# Do nothing with the results if the requests failed -
-			# be in the final results file
-			if retries >= self.max_retries:
-				self.dataset.update_status("Error during YouTube API request")
-			else:
-				# Get and return results for each video
-				for metadata in response["items"]:
+        ids_list = get_yt_compatible_ids(video_ids)
+        retries = 0
 
-					# Get the URL of the thumbnail
-					thumb_url = metadata["snippet"]["thumbnails"]["high"]["url"]
-					# Format the path to save the thumbnail to
-					save_path = results_path.joinpath(metadata["id"] + "." + str(thumb_url.split('.')[-1]))
-					# Download the image
-					urllib.request.urlretrieve(thumb_url, save_path)
+        for i, ids_string in enumerate(ids_list):
+            if self.interrupted:
+                raise ProcessorInterruptedException(
+                    "Interrupted while downloading thumbnails from YouTube"
+                )
 
-			self.dataset.update_status("Downloaded thumbnails for " + str(i * 50) + "/" + str(len(video_ids)))
-			self.dataset.update_progress(i / len(ids_list))
+            while retries < self.max_retries:
+                try:
+                    response = (
+                        youtube.videos()
+                        .list(part="snippet", id=ids_string, maxResults=50)
+                        .execute()
+                    )
+                    break
+                except Exception as error:
+                    self.dataset.update_status(
+                        "Encountered exception "
+                        + str(error)
+                        + ".\nSleeping for "
+                        + str(self.sleep_time)
+                    )
+                    retries += 1
+                    time.sleep(self.sleep_time)  # Wait a bit before trying again
 
-		# create zip of archive and delete temporary files and folder
-		self.dataset.update_status("Compressing results into archive")
-		self.write_archive_and_finish(results_path)
+            # Do nothing with the results if the requests failed -
+            # be in the final results file
+            if retries >= self.max_retries:
+                self.dataset.update_status("Error during YouTube API request")
+            else:
+                # Get and return results for each video
+                for metadata in response["items"]:
+                    # Get the URL of the thumbnail
+                    thumb_url = metadata["snippet"]["thumbnails"]["high"]["url"]
+                    # Format the path to save the thumbnail to
+                    save_path = results_path.joinpath(
+                        metadata["id"] + "." + str(thumb_url.split(".")[-1])
+                    )
+                    # Download the image
+                    urllib.request.urlretrieve(thumb_url, save_path)
+
+            self.dataset.update_status(
+                "Downloaded thumbnails for " + str(i * 50) + "/" + str(len(video_ids))
+            )
+            self.dataset.update_progress(i / len(ids_list))
+
+        # create zip of archive and delete temporary files and folder
+        self.dataset.update_status("Compressing results into archive")
+        self.write_archive_and_finish(results_path)

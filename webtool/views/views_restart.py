@@ -3,6 +3,7 @@ Routes for restarting 4CAT
 
 This is a relatively complex set of routes so they get their own file!
 """
+
 import packaging.version
 import subprocess
 import threading
@@ -17,13 +18,24 @@ import sys
 import os
 
 from pathlib import Path
-from flask import Blueprint, current_app, render_template, request, flash, get_flashed_messages, jsonify, g
+from flask import (
+    Blueprint,
+    current_app,
+    render_template,
+    request,
+    flash,
+    get_flashed_messages,
+    jsonify,
+    g,
+)
 
 from flask_login import login_required
 from webtool.lib.helpers import setting_required, check_restart_request
 
 from common.lib.helpers import get_github_version, get_git_branch
+
 component = Blueprint("restart", __name__)
+
 
 @component.route("/admin/trigger-restart/", methods=["POST", "GET"])
 @login_required
@@ -59,12 +71,18 @@ def trigger_restart():
 
     # upgrade is available if we have all info and the release is newer than
     # the currently checked out code
-    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
-        current_version) >= packaging.version.parse(github_version))
+    can_upgrade = not (
+        github_version == "unknown"
+        or code_version == "unknown"
+        or packaging.version.parse(current_version)
+        >= packaging.version.parse(github_version)
+    )
 
     lock_file = Path(g.config.get("PATH_ROOT"), "config/restart.lock")
     if request.method == "POST" and lock_file.exists():
-        flash("A restart is already in progress. Wait for it to complete. Check the process log for more details.")
+        flash(
+            "A restart is already in progress. Wait for it to complete. Check the process log for more details."
+        )
 
     elif request.method == "POST":
         # run upgrade or restart via shell commands
@@ -81,27 +99,45 @@ def trigger_restart():
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
-        restart_log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
+        restart_log_file = Path(
+            g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log"
+        )
         with restart_log_file.open("w") as outfile:
             outfile.write(
-                f"{mode.capitalize().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
-            outfile.write(f"Telling 4CAT to {mode.replace('-', ' ')} via job queue...\n")
+                f"{mode.capitalize().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n"
+            )
+            outfile.write(
+                f"Telling 4CAT to {mode.replace('-', ' ')} via job queue...\n"
+            )
         # this file will be updated when the upgrade runs
         # and it is shared between containers, but we will need to upgrade the
         # front-end separately - so keep a local copy for the latter step
         if g.config.get("USING_DOCKER") and mode.startswith("upgrade"):
-            frontend_version_file = current_version_file.with_name(".current-version-frontend")
+            frontend_version_file = current_version_file.with_name(
+                ".current-version-frontend"
+            )
             shutil.copy(current_version_file, frontend_version_file)
 
         # from here on, the back-end takes over
-        details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
+        details = (
+            {} if not request.form.get("branch") else {"branch": request.form["branch"]}
+        )
         g.queue.add_job("restart-4cat", details, mode)
-        flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
+        flash(
+            f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress."
+        )
 
     current_branch = get_git_branch()
-    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
-                           can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
-                           release_notes=release_notes, current_branch=current_branch)
+    return render_template(
+        "controlpanel/restart.html",
+        flashes=get_flashed_messages(),
+        in_progress=lock_file.exists(),
+        can_upgrade=can_upgrade,
+        current_version=current_version,
+        tagged_version=github_version,
+        release_notes=release_notes,
+        current_branch=current_branch,
+    )
 
 
 @component.route("/admin/trigger-frontend-upgrade/", methods=["POST"])
@@ -126,8 +162,12 @@ def upgrade_frontend():
     if not g.config.get("USING_DOCKER") or not check_restart_request():
         return current_app.login_manager.unauthorized()
 
-    restart_log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
-    frontend_version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version-frontend")
+    restart_log_file = Path(
+        g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log"
+    )
+    frontend_version_file = Path(
+        g.config.get("PATH_ROOT"), "config/.current-version-frontend"
+    )
     if not frontend_version_file.exists():
         return jsonify({"status": "error", "message": "No version file found"})
 
@@ -137,18 +177,35 @@ def upgrade_frontend():
     log_stream.flush()
     upgrade_ok = False
 
-    command = sys.executable + " -m helper-scripts.migrate.py --component frontend --repository %s --yes --current-version %s" % (
-        oslex.quote(g.config.get("4cat.github_url")), oslex.quote(str(frontend_version_file)))
+    command = (
+        sys.executable
+        + " -m helper-scripts.migrate.py --component frontend --repository %s --yes --current-version %s"
+        % (
+            oslex.quote(g.config.get("4cat.github_url")),
+            oslex.quote(str(frontend_version_file)),
+        )
+    )
 
     # there should be one and only one job of this type, with the parameters of
     # our upgrade. it determines if we update to the latest release or to a
     # branch
     upgrade_job = g.queue.get_job("restart-4cat", restrict_claimable=False)
-    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {oslex.quote(upgrade_job.details['branch'])}"
+    command += (
+        " --release"
+        if not upgrade_job or not upgrade_job.details.get("branch")
+        else f" --branch {oslex.quote(upgrade_job.details['branch'])}"
+    )
 
     try:
-        response = subprocess.run(oslex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
-                                  check=True, cwd=str(g.config.get("PATH_ROOT")), stdin=subprocess.DEVNULL)
+        response = subprocess.run(
+            oslex.split(command),
+            stdout=log_stream,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=True,
+            cwd=str(g.config.get("PATH_ROOT")),
+            stdin=subprocess.DEVNULL,
+        )
         if response.returncode != 0:
             raise RuntimeError(f"Unexpected return code {response.returncode}")
         upgrade_ok = True
@@ -183,6 +240,7 @@ def trigger_restart_frontend():
         Helper function. Gives Flask time to complete the request before
         sending the signal.
         """
+
         def kill_function():
             if touch_path:
                 touch_path.touch()
@@ -210,13 +268,16 @@ def trigger_restart_frontend():
     in_uwsgi = False
     try:
         import uwsgi
+
         in_uwsgi = True
     except (ModuleNotFoundError, ImportError):
         pass
 
     if in_uwsgi:
         message = "Detected Flask running in uWSGI, sending SIGHUP"
-        kill_thread = threading.Thread(target=server_killer(uwsgi.masterpid(), signal.SIGHUP))
+        kill_thread = threading.Thread(
+            target=server_killer(uwsgi.masterpid(), signal.SIGHUP)
+        )
         kill_thread.start()
 
     elif "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
@@ -225,6 +286,7 @@ def trigger_restart_frontend():
         # so traverse up the process tree, from the current process, to the
         # uppermost process running a "gunicorn" command
         import psutil
+
         process = psutil.Process(os.getpid()).parent()
         gunicorn_pid = None
         while process:
@@ -240,12 +302,16 @@ def trigger_restart_frontend():
             process = process.parent()
 
         if not gunicorn_pid:
-            message = ("4CAT is running with Gunicorn, but could not find Gunicorn PID. You will need to restart the "
-                       "front-end manually.")
+            message = (
+                "4CAT is running with Gunicorn, but could not find Gunicorn PID. You will need to restart the "
+                "front-end manually."
+            )
 
         else:
             message = "Detected Flask running in Gunicorn, sending SIGHUP."
-            kill_thread = threading.Thread(target=server_killer(gunicorn_pid, signal.SIGHUP))
+            kill_thread = threading.Thread(
+                target=server_killer(gunicorn_pid, signal.SIGHUP)
+            )
             kill_thread.start()
             status = "OK"
 
@@ -258,15 +324,22 @@ def trigger_restart_frontend():
         # send a signal to apache to reload if running in daemon mode
         if os.environ.get("mod_wsgi.process_group") not in (None, ""):
             message = "Detected Flask running in mod_wsgi as daemon, sending SIGINT."
-            kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT, touch_path=wsgi_file))
+            kill_thread = threading.Thread(
+                target=server_killer(os.getpid(), signal.SIGINT, touch_path=wsgi_file)
+            )
             kill_thread.start()
             status = "OK"
         else:
             wsgi_file.touch()
 
     else:
-        return jsonify({"status": "error", "message": "4CAT is not hosted with gunicorn, uwsgi or mod_wsgi. Cannot "
-                                                      "restart 4CAT's front-end remotely; you have to do so manually."})
+        return jsonify(
+            {
+                "status": "error",
+                "message": "4CAT is not hosted with gunicorn, uwsgi or mod_wsgi. Cannot "
+                "restart 4CAT's front-end remotely; you have to do so manually.",
+            }
+        )
 
     # up to whatever called this to monitor for restarting
     return jsonify({"status": status, "message": message})

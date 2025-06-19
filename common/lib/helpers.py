@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+
 import subprocess
 import imagehash
 import hashlib
@@ -31,7 +32,9 @@ from PIL import Image
 
 from common.config_manager import config
 from common.lib.user_input import UserInput
+
 __all__ = ("UserInput",)
+
 
 def init_datasource(database, logger, queue, name):
     """
@@ -47,16 +50,24 @@ def init_datasource(database, logger, queue, name):
     """
     pass
 
+
 def get_datasource_example_keys(db, modules, dataset_type):
     """
     Get example keys for a datasource
     """
     from common.lib.dataset import DataSet
-    example_dataset_key = db.fetchone("SELECT key from datasets WHERE type = %s and is_finished = True and num_rows > 0 ORDER BY timestamp_finished DESC LIMIT 1", (dataset_type,))
+
+    example_dataset_key = db.fetchone(
+        "SELECT key from datasets WHERE type = %s and is_finished = True and num_rows > 0 ORDER BY timestamp_finished DESC LIMIT 1",
+        (dataset_type,),
+    )
     if example_dataset_key:
-        example_dataset = DataSet(db=db, key=example_dataset_key["key"], modules=modules)
+        example_dataset = DataSet(
+            db=db, key=example_dataset_key["key"], modules=modules
+        )
         return example_dataset.get_columns()
     return []
+
 
 def strip_tags(html, convert_newlines=True):
     """
@@ -116,6 +127,7 @@ def sniff_encoding(file):
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
+
 def sniff_csv_dialect(csv_input):
     """
     Determine CSV dialect for an input stream
@@ -147,19 +159,35 @@ def get_git_branch():
     repository or git is not installed an empty string is returned.
     """
     try:
-        root_dir = str(config.get('PATH_ROOT').resolve())
-        branch = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
+        root_dir = str(config.get("PATH_ROOT").resolve())
+        branch = subprocess.run(
+            oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"),
+            stdout=subprocess.PIPE,
+        )
         if branch.returncode != 0:
             raise ValueError()
         branch_name = branch.stdout.decode("utf-8").strip()
         if not branch_name:
             # Check for detached HEAD state
             # Most likely occuring because of checking out release tags (which are not branches) or commits
-            head_status = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} status"), stdout=subprocess.PIPE)
+            head_status = subprocess.run(
+                oslex.split(f"git -C {oslex.quote(root_dir)} status"),
+                stdout=subprocess.PIPE,
+            )
             if head_status.returncode == 0:
                 for line in head_status.stdout.decode("utf-8").split("\n"):
-                    if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
-                        branch_name = line.split("/")[-1] if "/" in line else line.split(" ")[-1]
+                    if any(
+                        [
+                            detached_message in line
+                            for detached_message in (
+                                "HEAD detached from",
+                                "HEAD detached at",
+                            )
+                        ]
+                    ):
+                        branch_name = (
+                            line.split("/")[-1] if "/" in line else line.split(" ")[-1]
+                        )
                         return branch_name.strip()
     except (subprocess.SubprocessError, ValueError, FileNotFoundError):
         return ""
@@ -196,10 +224,14 @@ def get_software_commit(worker=None):
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
             relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
-            working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
+            working_dir = str(
+                config.get("PATH_ROOT").joinpath(relative_filepath).resolve()
+            )
             # check if we are in the extensions' own repo or 4CAT's
             git_cmd = f"git -C {oslex.quote(working_dir)} rev-parse --show-toplevel"
-            repo_level = subprocess.run(oslex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            repo_level = subprocess.run(
+                oslex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE
+            )
             if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
                 # not its own repository
                 return ("", "")
@@ -207,23 +239,40 @@ def get_software_commit(worker=None):
         else:
             working_dir = str(config.get("PATH_ROOT").resolve())
 
-        show = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        show = subprocess.run(
+            oslex.split(f"git -C {oslex.quote(working_dir)} show"),
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
         if show.returncode != 0:
             raise ValueError()
         commit = show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
 
         # now get the repository the commit belongs to, if we can
-        origin = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} config --get remote.origin.url"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        origin = subprocess.run(
+            oslex.split(
+                f"git -C {oslex.quote(working_dir)} config --get remote.origin.url"
+            ),
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
         if origin.returncode != 0 or not origin.stdout:
             raise ValueError()
         repository = origin.stdout.decode("utf-8").strip()
         if repository.endswith(".git"):
             repository = repository[:-4]
 
-    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
+    except (
+        subprocess.SubprocessError,
+        IndexError,
+        TypeError,
+        ValueError,
+        FileNotFoundError,
+    ):
         return ("", "")
 
     return (commit, repository)
+
 
 def get_software_version():
     """
@@ -243,6 +292,7 @@ def get_software_version():
     with current_version_file.open() as infile:
         return infile.readline().strip()
 
+
 def get_github_version(timeout=5):
     """
     Get latest release tag version from GitHub
@@ -257,7 +307,9 @@ def get_github_version(timeout=5):
     if not repo_url.endswith("/"):
         repo_url += "/"
 
-    repo_id = re.sub(r"(\.git)?/?$", "", re.sub(r"^https?://(www\.)?github\.com/", "", repo_url))
+    repo_id = re.sub(
+        r"(\.git)?/?$", "", re.sub(r"^https?://(www\.)?github\.com/", "", repo_url)
+    )
 
     api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
     response = requests.get(api_url, timeout=timeout)
@@ -271,6 +323,7 @@ def get_github_version(timeout=5):
 
     return (latest_tag, response.get("html_url"))
 
+
 def get_ffmpeg_version(ffmpeg_path):
     """
     Determine ffmpeg version
@@ -281,10 +334,19 @@ def get_ffmpeg_version(ffmpeg_path):
     :return packaging.version:  Comparable ersion
     """
     command = [ffmpeg_path, "-version"]
-    ffmpeg_version = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+    ffmpeg_version = subprocess.run(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
-    ffmpeg_version = ffmpeg_version.stdout.decode("utf-8").split("\n")[0].strip().split(" version ")[1]
+    ffmpeg_version = (
+        ffmpeg_version.stdout.decode("utf-8")
+        .split("\n")[0]
+        .strip()
+        .split(" version ")[1]
+    )
     ffmpeg_version = re.split(r"[^0-9.]", ffmpeg_version)[0]
 
     return version.parse(ffmpeg_version)
@@ -312,8 +374,10 @@ def find_extensions():
             "version": "",
             "url": "",
             "git_url": "",
-            "is_git": False
-        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
+            "is_git": False,
+        }
+        for extension in sorted(os.scandir(extension_path), key=lambda x: x.name)
+        if extension.is_dir()
     }
 
     # collect metadata for extensions
@@ -325,18 +389,29 @@ def find_extensions():
             with metadata_file.open() as infile:
                 try:
                     metadata = json.load(infile)
-                    extensions[extension].update({k: metadata[k] for k in metadata if k in allowed_metadata_keys})
+                    extensions[extension].update(
+                        {k: metadata[k] for k in metadata if k in allowed_metadata_keys}
+                    )
                 except (TypeError, ValueError) as e:
-                    errors.append(f"Error reading metadata file for extension '{extension}' ({e})")
+                    errors.append(
+                        f"Error reading metadata file for extension '{extension}' ({e})"
+                    )
                     continue
 
-        extensions[extension]["is_git"] = extension_folder.joinpath(".git/HEAD").exists()
+        extensions[extension]["is_git"] = extension_folder.joinpath(
+            ".git/HEAD"
+        ).exists()
         if extensions[extension]["is_git"]:
             # try to get remote URL
             try:
                 extension_root = str(extension_folder.resolve())
-                origin = subprocess.run(oslex.split(f"git -C {oslex.quote(extension_root)} config --get remote.origin.url"), stderr=subprocess.PIPE,
-                                        stdout=subprocess.PIPE)
+                origin = subprocess.run(
+                    oslex.split(
+                        f"git -C {oslex.quote(extension_root)} config --get remote.origin.url"
+                    ),
+                    stderr=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                )
                 if origin.returncode != 0 or not origin.stdout:
                     raise ValueError()
                 repository = origin.stdout.decode("utf-8").strip()
@@ -344,7 +419,13 @@ def find_extensions():
                     # use repo URL
                     repository = repository[:-4]
                 extensions[extension]["git_url"] = repository
-            except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
+            except (
+                subprocess.SubprocessError,
+                IndexError,
+                TypeError,
+                ValueError,
+                FileNotFoundError,
+            ) as e:
                 print(e)
                 pass
 
@@ -368,6 +449,7 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
+
 def convert_to_float(value, default=0) -> float:
     """
     Convert a value to a floating point, with a fallback
@@ -384,6 +466,7 @@ def convert_to_float(value, default=0) -> float:
         return float(value)
     except (ValueError, TypeError):
         return default
+
 
 def timify_long(number):
     """
@@ -403,25 +486,25 @@ def timify_long(number):
     months = math.floor(number / month_length)
     if months:
         components.append("%i month%s" % (months, "s" if months != 1 else ""))
-        number -= (months * month_length)
+        number -= months * month_length
 
     week_length = 7 * 86400
     weeks = math.floor(number / week_length)
     if weeks:
         components.append("%i week%s" % (weeks, "s" if weeks != 1 else ""))
-        number -= (weeks * week_length)
+        number -= weeks * week_length
 
     day_length = 86400
     days = math.floor(number / day_length)
     if days:
         components.append("%i day%s" % (days, "s" if days != 1 else ""))
-        number -= (days * day_length)
+        number -= days * day_length
 
     hour_length = 3600
     hours = math.floor(number / hour_length)
     if hours:
         components.append("%i hour%s" % (hours, "s" if hours != 1 else ""))
-        number -= (hours * hour_length)
+        number -= hours * hour_length
 
     minute_length = 60
     minutes = math.floor(number / minute_length)
@@ -439,6 +522,7 @@ def timify_long(number):
 
     return time_str + last_str
 
+
 def andify(items):
     """
     Format a list of items for use in text
@@ -455,6 +539,7 @@ def andify(items):
 
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
+
 
 def ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
     if len(text) <= length:
@@ -478,6 +563,7 @@ def ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
 
         after = len(text) - before
         return text[:before] + ellipsis_str + text[after:]
+
 
 def hash_file(image_file, hash_type="file-hash"):
     """
@@ -510,6 +596,7 @@ def hash_file(image_file, hash_type="file-hash"):
     else:
         raise NotImplementedError(f"Unknown hash type '{hash_type}'")
 
+
 def get_yt_compatible_ids(yt_ids):
     """
     :param yt_ids list, a list of strings
@@ -528,7 +615,6 @@ def get_yt_compatible_ids(yt_ids):
     ids = []
     last_i = 0
     for i, yt_id in enumerate(yt_ids):
-
         # Add a joined string per fifty videos
         if i % 50 == 0 and i != 0:
             ids_string = ",".join(yt_ids[last_i:i])
@@ -543,8 +629,16 @@ def get_yt_compatible_ids(yt_ids):
     return ids
 
 
-def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", fontsize_normal=None,
-                    fontsize_small=None, fontsize_large=None):
+def get_4cat_canvas(
+    path,
+    width,
+    height,
+    header=None,
+    footer="made with 4CAT",
+    fontsize_normal=None,
+    fontsize_small=None,
+    fontsize_large=None,
+):
     """
     Get a standard SVG canvas to draw 4CAT graphs to
 
@@ -576,27 +670,55 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
         fontsize_large = width / 50
 
     # instantiate with border and white background
-    canvas = Drawing(str(path), size=(width, height), style="font-family:monospace;font-size:%ipx" % fontsize_normal)
-    canvas.add(Rect(insert=(0, 0), size=(width, height), stroke="#000", stroke_width=2, fill="#FFF"))
+    canvas = Drawing(
+        str(path),
+        size=(width, height),
+        style="font-family:monospace;font-size:%ipx" % fontsize_normal,
+    )
+    canvas.add(
+        Rect(
+            insert=(0, 0),
+            size=(width, height),
+            stroke="#000",
+            stroke_width=2,
+            fill="#FFF",
+        )
+    )
 
     # header
     if header:
         header_shape = SVG(insert=(0, 0), size=("100%", fontsize_large * 2))
         header_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
         header_shape.add(
-            Text(insert=("50%", "50%"), text=header, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
-                 style="font-size:%ipx" % fontsize_large))
+            Text(
+                insert=("50%", "50%"),
+                text=header,
+                dominant_baseline="middle",
+                text_anchor="middle",
+                fill="#FFF",
+                style="font-size:%ipx" % fontsize_large,
+            )
+        )
         canvas.add(header_shape)
 
     # footer (i.e. 4cat banner)
     if footer:
         footersize = (fontsize_small * len(footer) * 0.7, fontsize_small * 2)
-        footer_shape = SVG(insert=(width - footersize[0], height - footersize[1]), size=footersize)
+        footer_shape = SVG(
+            insert=(width - footersize[0], height - footersize[1]), size=footersize
+        )
         footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
         link = Hyperlink(href="https://4cat.nl")
         link.add(
-            Text(insert=("50%", "50%"), text=footer, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
-                 style="font-size:%ipx" % fontsize_small))
+            Text(
+                insert=("50%", "50%"),
+                text=footer,
+                dominant_baseline="middle",
+                text_anchor="middle",
+                fill="#FFF",
+                style="font-size:%ipx" % fontsize_small,
+            )
+        )
         footer_shape.add(link)
         canvas.add(footer_shape)
 
@@ -607,7 +729,7 @@ def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
-    Calls the internal API and returns interpreted response. "status" is always 
+    Calls the internal API and returns interpreted response. "status" is always
     None if wait_for_response is False.
 
     :param str action: API action
@@ -620,18 +742,14 @@ def call_api(action, payload=None, wait_for_response=True):
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
     try:
-        connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+        connection.connect((config.get("API_HOST"), config.get("API_PORT")))
     except ConnectionRefusedError:
         return {"status": "error", "error": "Connection refused"}
 
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
 
-    response_data = {
-        "status": None,
-        "response": None,
-        "error": None
-    }
+    response_data = {"status": None, "response": None, "error": None}
 
     if wait_for_response:
         try:
@@ -658,13 +776,16 @@ def call_api(action, payload=None, wait_for_response=True):
             json_response = json.loads(response)
             response_data["response"] = json_response["response"]
             response_data["error"] = json_response.get("error", None)
-            response_data["status"] = "error" if json_response.get("error") else "success"
+            response_data["status"] = (
+                "error" if json_response.get("error") else "success"
+            )
         except json.JSONDecodeError:
             response_data["status"] = "error"
             response_data["error"] = "Invalid JSON response"
             response_data["response"] = response
-    
+
     return response_data
+
 
 def get_interval_descriptor(item, interval, item_column="timestamp"):
     """
@@ -681,7 +802,7 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
     """
     if interval in ("all", "overall"):
         return interval
-    
+
     if not item.get(item_column, None):
         return "unknown_date"
 
@@ -694,7 +815,9 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
             raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
     except (TypeError, ValueError):
         try:
-            timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.datetime.strptime(
+                item["timestamp"], "%Y-%m-%d %H:%M:%S"
+            )
         except (ValueError, TypeError):
             raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
 
@@ -703,15 +826,41 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
     elif interval == "month":
         return str(timestamp.year) + "-" + str(timestamp.month).zfill(2)
     elif interval == "week":
-        return str(timestamp.isocalendar()[0]) + "-" + str(timestamp.isocalendar()[1]).zfill(2)
+        return (
+            str(timestamp.isocalendar()[0])
+            + "-"
+            + str(timestamp.isocalendar()[1]).zfill(2)
+        )
     elif interval == "hour":
-        return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(
-            2) + " " + str(timestamp.hour).zfill(2)
+        return (
+            str(timestamp.year)
+            + "-"
+            + str(timestamp.month).zfill(2)
+            + "-"
+            + str(timestamp.day).zfill(2)
+            + " "
+            + str(timestamp.hour).zfill(2)
+        )
     elif interval == "minute":
-        return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(
-            2) + " " + str(timestamp.hour).zfill(2) + ":" + str(timestamp.minute).zfill(2)
+        return (
+            str(timestamp.year)
+            + "-"
+            + str(timestamp.month).zfill(2)
+            + "-"
+            + str(timestamp.day).zfill(2)
+            + " "
+            + str(timestamp.hour).zfill(2)
+            + ":"
+            + str(timestamp.minute).zfill(2)
+        )
     else:
-        return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(2)
+        return (
+            str(timestamp.year)
+            + "-"
+            + str(timestamp.month).zfill(2)
+            + "-"
+            + str(timestamp.day).zfill(2)
+        )
 
 
 def pad_interval(intervals, first_interval=None, last_interval=None):
@@ -747,19 +896,38 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     else:
         first_year = min([int(i[0:4]) for i in intervals])
         if len(test_key) > 4:
-            first_month = min([int(i[5:7]) for i in intervals if int(i[0:4]) == first_year])
+            first_month = min(
+                [int(i[5:7]) for i in intervals if int(i[0:4]) == first_year]
+            )
         if len(test_key) > 7:
             first_day = min(
-                [int(i[8:10]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month])
+                [
+                    int(i[8:10])
+                    for i in intervals
+                    if int(i[0:4]) == first_year and int(i[5:7]) == first_month
+                ]
+            )
         if len(test_key) > 10:
             first_hour = min(
-                [int(i[11:13]) for i in intervals if
-                 int(i[0:4]) == first_year and int(i[5:7]) == first_month and int(i[8:10]) == first_day])
+                [
+                    int(i[11:13])
+                    for i in intervals
+                    if int(i[0:4]) == first_year
+                    and int(i[5:7]) == first_month
+                    and int(i[8:10]) == first_day
+                ]
+            )
         if len(test_key) > 13:
             first_minute = min(
-                [int(i[14:16]) for i in intervals if
-                 int(i[0:4]) == first_year and int(i[5:7]) == first_month and int(i[8:10]) == first_day and int(
-                     i[11:13]) == first_hour])
+                [
+                    int(i[14:16])
+                    for i in intervals
+                    if int(i[0:4]) == first_year
+                    and int(i[5:7]) == first_month
+                    and int(i[8:10]) == first_day
+                    and int(i[11:13]) == first_hour
+                ]
+            )
 
     if last_interval:
         last_interval = str(last_interval)
@@ -775,19 +943,38 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     else:
         last_year = max([int(i[0:4]) for i in intervals])
         if len(test_key) > 4:
-            last_month = max([int(i[5:7]) for i in intervals if int(i[0:4]) == last_year])
+            last_month = max(
+                [int(i[5:7]) for i in intervals if int(i[0:4]) == last_year]
+            )
         if len(test_key) > 7:
             last_day = max(
-                [int(i[8:10]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month])
+                [
+                    int(i[8:10])
+                    for i in intervals
+                    if int(i[0:4]) == last_year and int(i[5:7]) == last_month
+                ]
+            )
         if len(test_key) > 10:
             last_hour = max(
-                [int(i[11:13]) for i in intervals if
-                 int(i[0:4]) == last_year and int(i[5:7]) == last_month and int(i[8:10]) == last_day])
+                [
+                    int(i[11:13])
+                    for i in intervals
+                    if int(i[0:4]) == last_year
+                    and int(i[5:7]) == last_month
+                    and int(i[8:10]) == last_day
+                ]
+            )
         if len(test_key) > 13:
             last_minute = max(
-                [int(i[14:16]) for i in intervals if
-                 int(i[0:4]) == last_year and int(i[5:7]) == last_month and int(i[8:10]) == last_day and int(
-                     i[11:13]) == last_hour])
+                [
+                    int(i[14:16])
+                    for i in intervals
+                    if int(i[0:4]) == last_year
+                    and int(i[5:7]) == last_month
+                    and int(i[8:10]) == last_day
+                    and int(i[11:13]) == last_hour
+                ]
+            )
 
     has_month = re.match(r"^[0-9]{4}-[0-9]", test_key)
     has_day = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", test_key)
@@ -811,8 +998,14 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
                 all_intervals.append(month_interval)
                 continue
 
-            start_day = first_day if all((year == first_year, month == first_month)) else 1
-            end_day = last_day if all((year == last_year, month == last_month)) else monthrange(year, month)[1]
+            start_day = (
+                first_day if all((year == first_year, month == first_month)) else 1
+            )
+            end_day = (
+                last_day
+                if all((year == last_year, month == last_month))
+                else monthrange(year, month)[1]
+            )
             for day in range(start_day, end_day + 1):
                 day_interval = month_interval + "-" + str(day).zfill(2)
 
@@ -820,8 +1013,16 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
                     all_intervals.append(day_interval)
                     continue
 
-                start_hour = first_hour if all((year == first_year, month == first_month, day == first_day)) else 0
-                end_hour = last_hour if all((year == last_year, month == last_month, day == last_day)) else 23
+                start_hour = (
+                    first_hour
+                    if all((year == first_year, month == first_month, day == first_day))
+                    else 0
+                )
+                end_hour = (
+                    last_hour
+                    if all((year == last_year, month == last_month, day == last_day))
+                    else 23
+                )
                 for hour in range(start_hour, end_hour + 1):
                     hour_interval = day_interval + " " + str(hour).zfill(2)
 
@@ -829,10 +1030,30 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
                         all_intervals.append(hour_interval)
                         continue
 
-                    start_minute = first_minute if all(
-                        (year == first_year, month == first_month, day == first_day, hour == first_hour)) else 0
-                    end_minute = last_minute if all(
-                        (year == last_year, month == last_month, day == last_day, hour == last_hour)) else 59
+                    start_minute = (
+                        first_minute
+                        if all(
+                            (
+                                year == first_year,
+                                month == first_month,
+                                day == first_day,
+                                hour == first_hour,
+                            )
+                        )
+                        else 0
+                    )
+                    end_minute = (
+                        last_minute
+                        if all(
+                            (
+                                year == last_year,
+                                month == last_month,
+                                day == last_day,
+                                hour == last_hour,
+                            )
+                        )
+                        else 59
+                    )
 
                     for minute in range(start_minute, end_minute + 1):
                         minute_interval = hour_interval + ":" + str(minute).zfill(2)
@@ -955,11 +1176,13 @@ def dict_search_and_update(item, keyword_matches, function):
         if isinstance(d_or_l, dict):
             # Iterate through dictionary
             for key, value in iter(d_or_l.items()):
-                if match_terms == 'True' or any([fnmatch.fnmatch(key, match_term) for match_term in match_terms]):
+                if match_terms == "True" or any(
+                    [fnmatch.fnmatch(key, match_term) for match_term in match_terms]
+                ):
                     # Match found; apply function to all items and sub-items
                     if isinstance(value, (list, dict)):
                         # Pass item through again with match_terms = True
-                        loop_helper_function(value, 'True', change_function)
+                        loop_helper_function(value, "True", change_function)
                     elif value is None:
                         pass
                     else:
@@ -974,11 +1197,11 @@ def dict_search_and_update(item, keyword_matches, function):
                 if isinstance(value, (list, dict)):
                     # Continue search
                     loop_helper_function(value, match_terms, change_function)
-                elif match_terms == 'True':
+                elif match_terms == "True":
                     # List item nested in matching
                     d_or_l[n] = change_function(value)
         else:
-            raise Exception('Must pass list or dictionary')
+            raise Exception("Must pass list or dictionary")
 
     # Lowercase keyword_matches
     keyword_matches = [keyword.lower() for keyword in keyword_matches]
@@ -1001,7 +1224,7 @@ def get_last_line(filepath):
             # start at the end of file
             file.seek(-2, os.SEEK_END)
             # check if NOT endline i.e. '\n'
-            while file.read(1) != b'\n':
+            while file.read(1) != b"\n":
                 # if not '\n', back up two characters and check again
                 file.seek(-2, os.SEEK_CUR)
         except OSError:
@@ -1011,12 +1234,16 @@ def get_last_line(filepath):
 
 
 def add_notification(db, user, notification, expires=None, allow_dismiss=True):
-    db.insert("users_notifications", {
-        "username": user,
-        "notification": notification,
-        "timestamp_expires": expires,
-        "allow_dismiss": allow_dismiss
-    }, safe=True)
+    db.insert(
+        "users_notifications",
+        {
+            "username": user,
+            "notification": notification,
+            "timestamp_expires": expires,
+            "allow_dismiss": allow_dismiss,
+        },
+        safe=True,
+    )
 
 
 def send_email(recipient, message):
@@ -1033,26 +1260,32 @@ def send_email(recipient, message):
     context = ssl.create_default_context()
 
     # Decide which connection type
-    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get(
-            'mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'),
-                                                   port=config.get('mail.port', 0)) as server:
-        if config.get('mail.ssl') == 'tls':
+    with (
+        smtplib.SMTP_SSL(
+            config.get("mail.server"), port=config.get("mail.port", 0), context=context
+        )
+        if config.get("mail.ssl") == "ssl"
+        else smtplib.SMTP(
+            config.get("mail.server"), port=config.get("mail.port", 0)
+        ) as server
+    ):
+        if config.get("mail.ssl") == "tls":
             # smtplib.SMTP adds TLS context here
             server.starttls(context=context)
 
         # Log in
-        if config.get('mail.username') and config.get('mail.password'):
+        if config.get("mail.username") and config.get("mail.password"):
             server.ehlo()
-            server.login(config.get('mail.username'), config.get('mail.password'))
+            server.login(config.get("mail.username"), config.get("mail.password"))
 
         # Send message
         if type(message) is str:
-            server.sendmail(config.get('mail.noreply'), recipient, message)
+            server.sendmail(config.get("mail.noreply"), recipient, message)
         else:
-            server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+            server.sendmail(config.get("mail.noreply"), recipient, message.as_string())
 
 
-def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
+def flatten_dict(d: MutableMapping, parent_key: str = "", sep: str = "."):
     """
     Return a flattened dictionary where nested dictionary objects are given new
     keys using the partent key combined using the seperator with the child key.
@@ -1071,8 +1304,17 @@ def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
             if isinstance(v, MutableMapping):
                 yield from flatten_dict(v, new_key, sep=sep).items()
             elif isinstance(v, (list, set)):
-                yield new_key, json.dumps(
-                    [flatten_dict(item, new_key, sep=sep) if isinstance(item, MutableMapping) else item for item in v])
+                yield (
+                    new_key,
+                    json.dumps(
+                        [
+                            flatten_dict(item, new_key, sep=sep)
+                            if isinstance(item, MutableMapping)
+                            else item
+                            for item in v
+                        ]
+                    ),
+                )
             else:
                 yield new_key, v
 
@@ -1088,8 +1330,14 @@ def sets_to_lists(d: MutableMapping):
     """
 
     def _check_list(lst):
-        return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (
-        set, list)) else item for item in lst]
+        return [
+            sets_to_lists(item)
+            if isinstance(item, MutableMapping)
+            else _check_list(item)
+            if isinstance(item, (set, list))
+            else item
+            for item in lst
+        ]
 
     def _sets_to_lists_gen(d):
         for k, v in d.items():
@@ -1145,12 +1393,12 @@ def split_urls(url_string, allowed_schemes=None):
     this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
     """
     if allowed_schemes is None:
-        allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
+        allowed_schemes = ("http://", "https://", "ftp://", "ftps://")
     potential_urls = []
     # Split the text by \n
-    for line in url_string.split('\n'):
+    for line in url_string.split("\n"):
         # Handle commas that may exist within URLs
-        parts = line.split(',')
+        parts = line.split(",")
         recombined_url = ""
         for part in parts:
             if part.startswith(allowed_schemes):  # Other schemes exist
@@ -1176,7 +1424,7 @@ def split_urls(url_string, allowed_schemes=None):
     return potential_urls
 
 
-def folder_size(path='.'):
+def folder_size(path="."):
     """
     Get the size of a folder using os.scandir for efficiency
     """
@@ -1187,6 +1435,7 @@ def folder_size(path='.'):
         elif entry.is_dir():
             total += folder_size(entry.path)
     return total
+
 
 def hash_to_md5(string: str) -> str:
     """

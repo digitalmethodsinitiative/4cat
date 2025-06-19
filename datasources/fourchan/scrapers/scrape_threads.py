@@ -20,6 +20,7 @@ Flow:
          -> queue_image(): if an image was attached, queue a job to scrape it
    -> update_thread(): update thread data
 """
+
 import psycopg2
 import hashlib
 import base64
@@ -33,361 +34,569 @@ from common.config_manager import config
 
 
 class ThreadScraper4chan(BasicJSONScraper):
-	"""
-	Scrape 4chan threads
+    """
+    Scrape 4chan threads
 
-	This scrapes individual threads, and saves the posts into the database.
+    This scrapes individual threads, and saves the posts into the database.
 
-	Contains some provisions for 8chan's idiosyncracies as well, since that requires
-	only a few lines of extra code and eliminates replicating the full class in the
-	8chan scraper.
-	"""
-	type = "fourchan-thread"
-	max_workers = 4
+    Contains some provisions for 8chan's idiosyncracies as well, since that requires
+    only a few lines of extra code and eliminates replicating the full class in the
+    8chan scraper.
+    """
 
-	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
-	# JSONified dict
-	known_fields = ["no", "resto", "sticky", "closed", "archived", "archived_on", "now", "time", "name", "trip", "id",
-					"capcode", "country", "country_name", "board_flag", "flag_name", "sub", "com", "tim", "filename", "ext", "fsize", "md5", "w",
-					"h", "tn_w", "tn_h", "filedeleted", "spoiler", "custom_spoiler", "omitted_posts", "omitted_images",
-					"replies", "images", "bumplimit", "imagelimit", "capcode_replies", "last_modified", "tag",
-					"semantic_url", "since4pass", "unique_ips", "tail_size"]
+    type = "fourchan-thread"
+    max_workers = 4
 
-	# these fields should be present for every single post, and if they're not something weird is going on
-	required_fields = ["no", "resto", "now", "time"]
-	required_fields_op = ["no", "resto", "now", "time", "replies", "images"]
+    # for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
+    # JSONified dict
+    known_fields = [
+        "no",
+        "resto",
+        "sticky",
+        "closed",
+        "archived",
+        "archived_on",
+        "now",
+        "time",
+        "name",
+        "trip",
+        "id",
+        "capcode",
+        "country",
+        "country_name",
+        "board_flag",
+        "flag_name",
+        "sub",
+        "com",
+        "tim",
+        "filename",
+        "ext",
+        "fsize",
+        "md5",
+        "w",
+        "h",
+        "tn_w",
+        "tn_h",
+        "filedeleted",
+        "spoiler",
+        "custom_spoiler",
+        "omitted_posts",
+        "omitted_images",
+        "replies",
+        "images",
+        "bumplimit",
+        "imagelimit",
+        "capcode_replies",
+        "last_modified",
+        "tag",
+        "semantic_url",
+        "since4pass",
+        "unique_ips",
+        "tail_size",
+    ]
 
-	def process(self, data):
-		"""
-		Process scraped thread data
+    # these fields should be present for every single post, and if they're not something weird is going on
+    required_fields = ["no", "resto", "now", "time"]
+    required_fields_op = ["no", "resto", "now", "time", "replies", "images"]
 
-		Adds new posts to the database, updates thread info, and queues images
-		for downloading.
+    def process(self, data):
+        """
+        Process scraped thread data
 
-		:param dict data: The thread data, as parsed JSON data
-		:return: The amount of posts added, or False if processing could not be completed
-		"""
-		self.datasource = self.type.split("-")[0]
+        Adds new posts to the database, updates thread info, and queues images
+        for downloading.
 
-		if "posts" not in data or not data["posts"]:
-			self.log.warning(
-				"JSON response for thread %s/%s contained no posts, could not process" % (self.datasource, self.job.data["remote_id"]))
-			return False
+        :param dict data: The thread data, as parsed JSON data
+        :return: The amount of posts added, or False if processing could not be completed
+        """
+        self.datasource = self.type.split("-")[0]
 
-		# determine OP id (8chan sequential threads are an exception here)
-		first_post = data["posts"][0]
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
+        if "posts" not in data or not data["posts"]:
+            self.log.warning(
+                "JSON response for thread %s/%s contained no posts, could not process"
+                % (self.datasource, self.job.data["remote_id"])
+            )
+            return False
 
-		# check if OP has all the required data
-		missing = set(self.required_fields_op) - set(first_post.keys())
-		if missing != set():
-			self.log.warning("OP in %s/%s is missing required fields %s, ignoring" % (self.datasource, self.job.data["remote_id"], repr(missing)))
-			return False
+        # determine OP id (8chan sequential threads are an exception here)
+        first_post = data["posts"][0]
+        thread_db_id = str(
+            first_post["id"]
+            if "id" in first_post and self.type != "fourchan-thread"
+            else first_post["no"]
+        )
 
-		# check if thread exists in the db and has new data
-		last_reply = max([post["time"] for post in data["posts"] if "time" in post])
-		last_post = max([post["no"] for post in data["posts"] if "no" in post])
-		archived = first_post.get("archived_on", 0)
+        # check if OP has all the required data
+        missing = set(self.required_fields_op) - set(first_post.keys())
+        if missing != set():
+            self.log.warning(
+                "OP in %s/%s is missing required fields %s, ignoring"
+                % (self.datasource, self.job.data["remote_id"], repr(missing))
+            )
+            return False
 
-		thread = self.register_thread(first_post, last_reply, last_post, len(data["posts"]), archived)
+        # check if thread exists in the db and has new data
+        last_reply = max([post["time"] for post in data["posts"] if "time" in post])
+        last_post = max([post["no"] for post in data["posts"] if "no" in post])
+        archived = first_post.get("archived_on", 0)
 
-		if not thread:
-			self.log.info("Thread %s/%s/%s scraped, but no changes found" % (self.datasource, self.job.details["board"], first_post["no"]))
-			return True
+        thread = self.register_thread(
+            first_post, last_reply, last_post, len(data["posts"]), archived
+        )
 
-		if thread["timestamp_deleted"] > 0:
-			self.log.info("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
-			self.datasource, self.job.details["board"], first_post["no"], thread["timestamp_deleted"]))
-			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
+        if not thread:
+            self.log.info(
+                "Thread %s/%s/%s scraped, but no changes found"
+                % (self.datasource, self.job.details["board"], first_post["no"])
+            )
+            return True
 
-		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
-		known_posts = self.db.fetchall("SELECT id, id_seq FROM posts_" + self.prefix + " WHERE thread_id = %s AND board = %s ORDER BY id ASC",
-										 (thread_db_id, self.job.details["board"]))
-		post_dict_scrape = {str(post["no"]): post for post in data["posts"] if "no" in post}
-		post_dict_db = {str(post["id"]): post for post in known_posts}
-		post_id_map = {str(post["id"]): post["id_seq"] for post in known_posts}
+        if thread["timestamp_deleted"] > 0:
+            self.log.info(
+                "Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s"
+                % (
+                    self.datasource,
+                    self.job.details["board"],
+                    first_post["no"],
+                    thread["timestamp_deleted"],
+                )
+            )
+            self.db.update(
+                "threads_" + self.prefix,
+                where={"id": thread_db_id},
+                data={"timestamp_deleted": 0},
+            )
 
-		# mark deleted posts as such
-		# (but not for sticky threads; posts in stickies
-		# disappear from 4chan after 1000 replies, but 4CAT
-		# considers these as organic activity)
-		deleted = set()
-		if not thread["is_sticky"]:
-			deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
-			for post_id in deleted:
-				self.db.upsert("posts_%s_deleted" % self.prefix, data={"id_seq": post_id_map[post_id], "timestamp_deleted": self.init_time}, constraints=["id_seq"], commit=False)
-			self.db.commit()
+        # create a dict mapped as `post id`: `post data` for easier comparisons with existing data
+        known_posts = self.db.fetchall(
+            "SELECT id, id_seq FROM posts_"
+            + self.prefix
+            + " WHERE thread_id = %s AND board = %s ORDER BY id ASC",
+            (thread_db_id, self.job.details["board"]),
+        )
+        post_dict_scrape = {
+            str(post["no"]): post for post in data["posts"] if "no" in post
+        }
+        post_dict_db = {str(post["id"]): post for post in known_posts}
+        post_id_map = {str(post["id"]): post["id_seq"] for post in known_posts}
 
-		# add new posts
-		new = set(post_dict_scrape.keys()) - set(post_dict_db.keys())
-		new_posts = 0
-		new_ids = set()
-		for post_id in new:
-			added = self.save_post(post_dict_scrape[post_id], thread, first_post)
-			if added:
-				new_posts += 1
-				new_ids.add(added)
+        # mark deleted posts as such
+        # (but not for sticky threads; posts in stickies
+        # disappear from 4chan after 1000 replies, but 4CAT
+        # considers these as organic activity)
+        deleted = set()
+        if not thread["is_sticky"]:
+            deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
+            for post_id in deleted:
+                self.db.upsert(
+                    "posts_%s_deleted" % self.prefix,
+                    data={
+                        "id_seq": post_id_map[post_id],
+                        "timestamp_deleted": self.init_time,
+                    },
+                    constraints=["id_seq"],
+                    commit=False,
+                )
+            self.db.commit()
 
-		all_ids = set([post_id_map[post_id] for post_id in post_dict_scrape.keys() if post_id in post_id_map]).union(new_ids)
-		undeleted = 0
-		if all_ids:
-			undeleted = self.db.delete("posts_%s_deleted" % self.prefix, where={"id_seq": list(all_ids)})
+        # add new posts
+        new = set(post_dict_scrape.keys()) - set(post_dict_db.keys())
+        new_posts = 0
+        new_ids = set()
+        for post_id in new:
+            added = self.save_post(post_dict_scrape[post_id], thread, first_post)
+            if added:
+                new_posts += 1
+                new_ids.add(added)
 
-		# update thread data
-		self.db.commit()
-		self.update_thread(thread, first_post, last_reply, last_post, thread["num_replies"] + new_posts)
+        all_ids = set(
+            [
+                post_id_map[post_id]
+                for post_id in post_dict_scrape.keys()
+                if post_id in post_id_map
+            ]
+        ).union(new_ids)
+        undeleted = 0
+        if all_ids:
+            undeleted = self.db.delete(
+                "posts_%s_deleted" % self.prefix, where={"id_seq": list(all_ids)}
+            )
 
-		# save to database
-		self.log.info("Updating %s/%s/%s, new: %s, old: %s, deleted: %s, undeleted: %s" % (
-			self.datasource, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted), undeleted))
-		self.db.commit()
+        # update thread data
+        self.db.commit()
+        self.update_thread(
+            thread, first_post, last_reply, last_post, thread["num_replies"] + new_posts
+        )
 
-		# return the amount of new posts
-		return new_posts
+        # save to database
+        self.log.info(
+            "Updating %s/%s/%s, new: %s, old: %s, deleted: %s, undeleted: %s"
+            % (
+                self.datasource,
+                self.job.details["board"],
+                first_post["no"],
+                new_posts,
+                len(post_dict_db),
+                len(deleted),
+                undeleted,
+            )
+        )
+        self.db.commit()
 
-	def save_post(self, post, thread, first_post):
-		"""
-		Add post to database
+        # return the amount of new posts
+        return new_posts
 
-		:param dict post: Post data to add
-		:param dict thread: Data for thread the post belongs to
-		:param dict first_post:  First post in thread
-		:return bool:  Whether the post was inserted
-		"""
-		# check for data integrity
-		missing = set(self.required_fields) - set(post.keys())
-		if missing != set():
-			self.log.warning("Missing fields %s in scraped post in %s/%s, ignoring" % (repr(missing), self.datasource, self.job.data["remote_id"]))
-			return False
+    def save_post(self, post, thread, first_post):
+        """
+        Add post to database
 
-		# save dimensions as a dumpable dict - no need to make it indexable
-		if len({"w", "h", "tn_h", "tn_w"} - set(post.keys())) == 0:
-			dimensions = {"w": post["w"], "h": post["h"], "tw": post["tn_w"], "th": post["tn_h"]}
-		else:
-			dimensions = {}
+        :param dict post: Post data to add
+        :param dict thread: Data for thread the post belongs to
+        :param dict first_post:  First post in thread
+        :return bool:  Whether the post was inserted
+        """
+        # check for data integrity
+        missing = set(self.required_fields) - set(post.keys())
+        if missing != set():
+            self.log.warning(
+                "Missing fields %s in scraped post in %s/%s, ignoring"
+                % (repr(missing), self.datasource, self.job.data["remote_id"])
+            )
+            return False
 
-		# aggregate post data
-		post_data = {
-			"id": post["no"],
-			"board": self.job.details["board"],
-			"thread_id": thread["id"],
-			"timestamp": post["time"],
-			"subject": post.get("sub", ""),
-			"body": post.get("com", ""),
-			"author": post.get("name", ""),
-			"author_trip": post.get("trip", ""),
-			"author_type": post["id"] if "id" in post and self.type == "fourchan-thread" else "",
-			"author_type_id": post.get("capcode", ""),
-			"country_code": post.get("country", "") if "board_flag" not in post else "t_" + post["board_flag"],
-			"country_name": post.get("country_name", "") if "flag_name" not in post else post["flag_name"],
-			"image_file": post["filename"] + post["ext"] if "filename" in post else "",
-			"image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
-			"image_md5": post.get("md5", ""),
-			"image_filesize": post.get("fsize", 0),
-			"image_dimensions": json.dumps(dimensions),
-			"semantic_url": post.get("semantic_url", ""),
-			"unsorted_data": json.dumps(
-				{field: post[field] for field in post.keys() if field not in self.known_fields})
-		}
+        # save dimensions as a dumpable dict - no need to make it indexable
+        if len({"w", "h", "tn_h", "tn_w"} - set(post.keys())) == 0:
+            dimensions = {
+                "w": post["w"],
+                "h": post["h"],
+                "tw": post["tn_w"],
+                "th": post["tn_h"],
+            }
+        else:
+            dimensions = {}
 
-		# now insert the post into the database
-		return_value = True
-		try:
-			for field in post_data:
-				if not isinstance(post_data[field], six.string_types):
-					continue
-				# apparently, sometimes \0 appears in posts or something; psycopg2 can't cope with this
-				post_data[field] = post_data[field].replace("\0", "")
+        # aggregate post data
+        post_data = {
+            "id": post["no"],
+            "board": self.job.details["board"],
+            "thread_id": thread["id"],
+            "timestamp": post["time"],
+            "subject": post.get("sub", ""),
+            "body": post.get("com", ""),
+            "author": post.get("name", ""),
+            "author_trip": post.get("trip", ""),
+            "author_type": post["id"]
+            if "id" in post and self.type == "fourchan-thread"
+            else "",
+            "author_type_id": post.get("capcode", ""),
+            "country_code": post.get("country", "")
+            if "board_flag" not in post
+            else "t_" + post["board_flag"],
+            "country_name": post.get("country_name", "")
+            if "flag_name" not in post
+            else post["flag_name"],
+            "image_file": post["filename"] + post["ext"] if "filename" in post else "",
+            "image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
+            "image_md5": post.get("md5", ""),
+            "image_filesize": post.get("fsize", 0),
+            "image_dimensions": json.dumps(dimensions),
+            "semantic_url": post.get("semantic_url", ""),
+            "unsorted_data": json.dumps(
+                {
+                    field: post[field]
+                    for field in post.keys()
+                    if field not in self.known_fields
+                }
+            ),
+        }
 
-			return_value = self.db.insert("posts_" + self.prefix, post_data, return_field="id_seq")
-		except psycopg2.IntegrityError as e:
-			self.db.rollback()
-			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),))
-			if dupe:
-				self.log.info("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
-				 post["no"], self.datasource, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
-			else:
-				self.log.error("Post %s in thread %s/%s/%s hit database constraint (%s) but no dupe was found?" % (
-				post["no"], self.datasource, thread["board"], thread["id"], e))
+        # now insert the post into the database
+        return_value = True
+        try:
+            for field in post_data:
+                if not isinstance(post_data[field], six.string_types):
+                    continue
+                # apparently, sometimes \0 appears in posts or something; psycopg2 can't cope with this
+                post_data[field] = post_data[field].replace("\0", "")
 
-			return False
-		except ValueError as e:
-			self.db.rollback()
-			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
+            return_value = self.db.insert(
+                "posts_" + self.prefix, post_data, return_field="id_seq"
+            )
+        except psycopg2.IntegrityError as e:
+            self.db.rollback()
+            dupe = self.db.fetchone(
+                "SELECT * from posts_"
+                + self.prefix
+                + " WHERE id = %s" % (str(post["no"]),)
+            )
+            if dupe:
+                self.log.info(
+                    "Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s"
+                    % (
+                        post["no"],
+                        self.datasource,
+                        thread["board"],
+                        thread["id"],
+                        post["time"],
+                        dupe["id"],
+                        dupe["thread_id"],
+                        dupe["timestamp"],
+                    )
+                )
+            else:
+                self.log.error(
+                    "Post %s in thread %s/%s/%s hit database constraint (%s) but no dupe was found?"
+                    % (post["no"], self.datasource, thread["board"], thread["id"], e)
+                )
 
-		# Download images (exclude .webm files)
-		if "filename" in post and post["ext"] != ".webm" and config.get("fourchan-search.save_images"):
-			self.queue_image(post, thread)
+            return False
+        except ValueError as e:
+            self.db.rollback()
+            self.log.error(
+                "ValueError (%s) during scrape of thread %s" % (e, post["no"])
+            )
 
-		return return_value
+        # Download images (exclude .webm files)
+        if (
+            "filename" in post
+            and post["ext"] != ".webm"
+            and config.get("fourchan-search.save_images")
+        ):
+            self.queue_image(post, thread)
 
-	def queue_image(self, post, thread):
-		"""
-		Queue image for downloading
+        return return_value
 
-		This queues the image for downloading, if it hasn't been downloaded yet
-		and a valid image folder has been set. This is the only place in the
-		backend where the image path is determined!
+    def queue_image(self, post, thread):
+        """
+        Queue image for downloading
 
-		:param dict post:  Post data to queue image download for
-		:param dict thread:  Thread data of thread within which image was posted
-		"""
+        This queues the image for downloading, if it hasn't been downloaded yet
+        and a valid image folder has been set. This is the only place in the
+        backend where the image path is determined!
 
-		# generate image path
-		md5 = hashlib.md5()
-		md5.update(base64.b64decode(post["md5"]))
+        :param dict post:  Post data to queue image download for
+        :param dict thread:  Thread data of thread within which image was posted
+        """
 
-		image_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_IMAGES'))
-		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
+        # generate image path
+        md5 = hashlib.md5()
+        md5.update(base64.b64decode(post["md5"]))
 
-		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
-			claimtime = int(time.time()) + int(config.get("fourchan-search.image_interval"))
+        image_folder = config.get("PATH_ROOT").joinpath(config.get("PATH_IMAGES"))
+        image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
-			try:
-				self.queue.add_job("fourchan-image", remote_id=post["md5"], claim_after=claimtime, details={
-					"board": thread["board"],
-					"ext": post["ext"],
-					"tim": post["tim"],
-					"destination": str(image_path),
-				})
-			except JobAlreadyExistsException:
-				pass
+        if (
+            config.get("PATH_IMAGES")
+            and image_folder.is_dir()
+            and not image_path.is_file()
+        ):
+            claimtime = int(time.time()) + int(
+                config.get("fourchan-search.image_interval")
+            )
 
-	def register_thread(self, first_post, last_reply, last_post, num_replies, archived):
-		"""
-		Check if thread exists
+            try:
+                self.queue.add_job(
+                    "fourchan-image",
+                    remote_id=post["md5"],
+                    claim_after=claimtime,
+                    details={
+                        "board": thread["board"],
+                        "ext": post["ext"],
+                        "tim": post["tim"],
+                        "destination": str(image_path),
+                    },
+                )
+            except JobAlreadyExistsException:
+                pass
 
-		Acquires thread data from the database and determines whether there is
-		any new data that belongs to this thread.
+    def register_thread(self, first_post, last_reply, last_post, num_replies, archived):
+        """
+        Check if thread exists
 
-		:param dict first_post:  Post data for the OP
-		:param int last_reply:  Timestamp of last reply in thread
-		:param int last_post:  ID of last post in thread
-		:param int num_replies:  Number of posts in thread (including OP)
-		:param int archived:	Timestamp of when the thread was archived
-		:return: Thread data (dict), updated, or `None` if no further work is needed
-		"""
-		# we need the following to check whether the thread has changed since the last scrape
-		# 8chan doesn't always include this, in which case "-1" is as good a placeholder as any
-		# account for 8chan-style cyclical ID
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
-		thread = self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,))
-		
-		if not thread:
-			# This very rarely happens, but sometimes the thread is not yet in the database, somehow
-			# In this case, a thread with the bare minimum of metadata is created - more extensive
-			# data will be added in update_thread later.
-			thread = self.add_thread(first_post, last_reply, last_post)
-			return thread
+        Acquires thread data from the database and determines whether there is
+        any new data that belongs to this thread.
 
-		# We don't have to check if there's no changes in the number of replies
-		# and if the thread still has the same timestamps for deletion/archival.
-		if (thread["num_replies"] == num_replies and num_replies != -1 and thread["timestamp_modified"] == last_reply) and (thread["timestamp_archived"] == archived):
-			# no updates, no need to check posts any further
-			self.log.debug("No changes in thread %s/%s/%s" % (self.datasource, self.job.data["remote_id"], first_post["no"]))
-			return None
-		else:
-			return thread
+        :param dict first_post:  Post data for the OP
+        :param int last_reply:  Timestamp of last reply in thread
+        :param int last_post:  ID of last post in thread
+        :param int num_replies:  Number of posts in thread (including OP)
+        :param int archived:	Timestamp of when the thread was archived
+        :return: Thread data (dict), updated, or `None` if no further work is needed
+        """
+        # we need the following to check whether the thread has changed since the last scrape
+        # 8chan doesn't always include this, in which case "-1" is as good a placeholder as any
+        # account for 8chan-style cyclical ID
+        thread_db_id = str(
+            first_post["id"]
+            if "id" in first_post and self.type != "fourchan-thread"
+            else first_post["no"]
+        )
+        thread = self.db.fetchone(
+            "SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,)
+        )
 
-	def update_thread(self, thread, first_post, last_reply, last_post, num_replies):
-		"""
-		Update thread info
+        if not thread:
+            # This very rarely happens, but sometimes the thread is not yet in the database, somehow
+            # In this case, a thread with the bare minimum of metadata is created - more extensive
+            # data will be added in update_thread later.
+            thread = self.add_thread(first_post, last_reply, last_post)
+            return thread
 
-		:param dict first_post:  Post data for the OP
-		:param int last_reply:  Timestamp of last reply in thread
-		:param int last_post:  ID of last post in thread
-		:param int num_replies:  Number of posts in thread (including OP)
-		:return: Thread data (dict), updated, or `None` if no further work is needed
-		"""
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
+        # We don't have to check if there's no changes in the number of replies
+        # and if the thread still has the same timestamps for deletion/archival.
+        if (
+            thread["num_replies"] == num_replies
+            and num_replies != -1
+            and thread["timestamp_modified"] == last_reply
+        ) and (thread["timestamp_archived"] == archived):
+            # no updates, no need to check posts any further
+            self.log.debug(
+                "No changes in thread %s/%s/%s"
+                % (self.datasource, self.job.data["remote_id"], first_post["no"])
+            )
+            return None
+        else:
+            return thread
 
-		# first post has useful metadata for the *thread*
-		# 8chan uses "bumplocked" but otherwise it's the same
-		bumplimit = ("bumplimit" in first_post and first_post["bumplimit"] == 1) or (
-					"bumplocked" in first_post and first_post["bumplocked"] == 1)
+    def update_thread(self, thread, first_post, last_reply, last_post, num_replies):
+        """
+        Update thread info
 
-		# compile data
-		thread_update = {
-			"timestamp": first_post["time"],
-			"num_unique_ips": first_post["unique_ips"] if "unique_ips" in first_post else -1,
-			"num_images": first_post["images"] if "images" in first_post else -1,
-			"num_replies": num_replies,
-			"limit_bump": bumplimit,
-			"limit_image": ("imagelimit" in first_post and first_post["imagelimit"] == 1),
-			"is_sticky": ("sticky" in first_post and first_post["sticky"] == 1),
-			"is_closed": ("closed" in first_post and first_post["closed"] == 1),
-			"post_last": last_post
-		}
+        :param dict first_post:  Post data for the OP
+        :param int last_reply:  Timestamp of last reply in thread
+        :param int last_post:  ID of last post in thread
+        :param int num_replies:  Number of posts in thread (including OP)
+        :return: Thread data (dict), updated, or `None` if no further work is needed
+        """
+        thread_db_id = str(
+            first_post["id"]
+            if "id" in first_post and self.type != "fourchan-thread"
+            else first_post["no"]
+        )
 
-		if "archived" in first_post and first_post["archived"] == 1:
-			thread_update["timestamp_archived"] = first_post["archived_on"]
+        # first post has useful metadata for the *thread*
+        # 8chan uses "bumplocked" but otherwise it's the same
+        bumplimit = ("bumplimit" in first_post and first_post["bumplimit"] == 1) or (
+            "bumplocked" in first_post and first_post["bumplocked"] == 1
+        )
 
-		self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data=thread_update)
-		return {**thread, **thread_update}
+        # compile data
+        thread_update = {
+            "timestamp": first_post["time"],
+            "num_unique_ips": first_post["unique_ips"]
+            if "unique_ips" in first_post
+            else -1,
+            "num_images": first_post["images"] if "images" in first_post else -1,
+            "num_replies": num_replies,
+            "limit_bump": bumplimit,
+            "limit_image": (
+                "imagelimit" in first_post and first_post["imagelimit"] == 1
+            ),
+            "is_sticky": ("sticky" in first_post and first_post["sticky"] == 1),
+            "is_closed": ("closed" in first_post and first_post["closed"] == 1),
+            "post_last": last_post,
+        }
 
-	def add_thread(self, first_post, last_reply, last_post):
-		"""
-		Add thread to database
+        if "archived" in first_post and first_post["archived"] == 1:
+            thread_update["timestamp_archived"] = first_post["archived_on"]
 
-		This should not happen, usually. But if a thread is not in the database
-		yet when it is scraped, add some basic data and let the update method
-		handle the rest of the details.
+        self.db.update(
+            "threads_" + self.prefix, where={"id": thread_db_id}, data=thread_update
+        )
+        return {**thread, **thread_update}
 
-		:param dict first_post:  Post data for the OP
-		:param int last_reply:  Timestamp of last reply in thread
-		:param int last_post:  ID of last post in thread
-		:return dict:  Thread row that was added
-		"""
+    def add_thread(self, first_post, last_reply, last_post):
+        """
+        Add thread to database
 
-		# account for 8chan-style cyclical threads
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "fourchan-thread" else first_post["no"])
+        This should not happen, usually. But if a thread is not in the database
+        yet when it is scraped, add some basic data and let the update method
+        handle the rest of the details.
 
-		self.db.insert("threads_" + self.prefix, {
-			"id": thread_db_id,
-			"board": self.job.details["board"],
-			"timestamp": first_post["time"],
-			"timestamp_scraped": self.init_time,
-			"timestamp_modified": first_post["time"],
-			"post_last": last_post
-		})
+        :param dict first_post:  Post data for the OP
+        :param int last_reply:  Timestamp of last reply in thread
+        :param int last_post:  ID of last post in thread
+        :return dict:  Thread row that was added
+        """
 
-		return self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,))
+        # account for 8chan-style cyclical threads
+        thread_db_id = str(
+            first_post["id"]
+            if "id" in first_post and self.type != "fourchan-thread"
+            else first_post["no"]
+        )
 
-	def not_found(self):
-		"""
-		If the resource could not be found, that indicates the whole thread has
-		been deleted.
-		"""
+        self.db.insert(
+            "threads_" + self.prefix,
+            {
+                "id": thread_db_id,
+                "board": self.job.details["board"],
+                "timestamp": first_post["time"],
+                "timestamp_scraped": self.init_time,
+                "timestamp_modified": first_post["time"],
+                "post_last": last_post,
+            },
+        )
 
-		self.datasource = self.type.split("-")[0]
-		thread_db_id = self.job.data["remote_id"].split("/").pop()
+        return self.db.fetchone(
+            "SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,)
+        )
 
-		board = self.job.details["board"]
-		remote_id = self.job.data["remote_id"]
+    def not_found(self):
+        """
+        If the resource could not be found, that indicates the whole thread has
+        been deleted.
+        """
 
-		# Insert `timestamp_deleted` to threads table.
-		self.log.info(
-			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, board, remote_id))
-		self.db.update("threads_" + self.prefix, data={"timestamp_deleted": self.init_time},
-					   where={"id": thread_db_id, "timestamp_deleted": 0})
-		
-		# We're also adding the OP id to the posts_{datasource}_deleted table.
-		# For this we first need the id_seq of the post.
-		id_seq = self.db.fetchone("SELECT id_seq FROM posts_" + self.prefix + " WHERE board = %s AND id = %s AND thread_id = %s", (board, thread_db_id, thread_db_id))
+        self.datasource = self.type.split("-")[0]
+        thread_db_id = self.job.data["remote_id"].split("/").pop()
 
-		if id_seq:
-			# Then add it to the posts_{datasource}_deleted table.
-			self.db.insert("posts_" + self.prefix + "_deleted", data={"id_seq": id_seq["id_seq"], "timestamp_deleted": self.init_time}, safe=True)
-		else:
-			self.log.info("Thread OP %s/%s/%s wasn't found in the posts table, unable to mark as deleted" % (self.datasource, board, remote_id))
+        board = self.job.details["board"]
+        remote_id = self.job.data["remote_id"]
 
-		self.job.finish()
+        # Insert `timestamp_deleted` to threads table.
+        self.log.info(
+            "Thread %s/%s/%s was deleted, marking as such"
+            % (self.datasource, board, remote_id)
+        )
+        self.db.update(
+            "threads_" + self.prefix,
+            data={"timestamp_deleted": self.init_time},
+            where={"id": thread_db_id, "timestamp_deleted": 0},
+        )
 
-	def get_url(self):
-		"""
-		Get URL to scrape for the current job
+        # We're also adding the OP id to the posts_{datasource}_deleted table.
+        # For this we first need the id_seq of the post.
+        id_seq = self.db.fetchone(
+            "SELECT id_seq FROM posts_"
+            + self.prefix
+            + " WHERE board = %s AND id = %s AND thread_id = %s",
+            (board, thread_db_id, thread_db_id),
+        )
 
-		:return string: URL to scrape
-		"""
-		thread_id = self.job.data["remote_id"].split("/").pop()
-		return "http://a.4cdn.org/%s/thread/%s.json" % (self.job.details["board"], thread_id)
+        if id_seq:
+            # Then add it to the posts_{datasource}_deleted table.
+            self.db.insert(
+                "posts_" + self.prefix + "_deleted",
+                data={"id_seq": id_seq["id_seq"], "timestamp_deleted": self.init_time},
+                safe=True,
+            )
+        else:
+            self.log.info(
+                "Thread OP %s/%s/%s wasn't found in the posts table, unable to mark as deleted"
+                % (self.datasource, board, remote_id)
+            )
+
+        self.job.finish()
+
+    def get_url(self):
+        """
+        Get URL to scrape for the current job
+
+        :return string: URL to scrape
+        """
+        thread_id = self.job.data["remote_id"].split("/").pop()
+        return "http://a.4cdn.org/%s/thread/%s.json" % (
+            self.job.details["board"],
+            thread_id,
+        )

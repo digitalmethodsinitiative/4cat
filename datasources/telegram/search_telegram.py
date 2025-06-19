@@ -1,6 +1,7 @@
 """
 Search Telegram via API
 """
+
 import traceback
 import hashlib
 import asyncio
@@ -12,26 +13,38 @@ import re
 from pathlib import Path
 
 from backend.lib.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
-    QueryNeedsFurtherInputException
+from common.lib.exceptions import (
+    QueryParametersException,
+    ProcessorInterruptedException,
+    ProcessorException,
+    QueryNeedsFurtherInputException,
+)
 from common.lib.helpers import convert_to_int, UserInput
 from common.lib.item_mapping import MappedItem
 from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient
-from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, \
-    FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
+from telethon.errors.rpcerrorlist import (
+    UsernameInvalidError,
+    TimeoutError,
+    ChannelPrivateError,
+    BadRequestError,
+    FloodWaitError,
+    ApiIdInvalidError,
+    PhoneNumberInvalidError,
+    RPCError,
+)
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import MessageEntityMention
-
 
 
 class SearchTelegram(Search):
     """
     Search Telegram via API
     """
+
     type = "telegram-search"  # job ID
     category = "Search"  # category
     title = "Telegram API search"  # title displayed in UI
@@ -45,7 +58,9 @@ class SearchTelegram(Search):
     failures_cache = None
     eventloop = None
     import_issues = 0
-    end_if_rate_limited = 600  # break if Telegram requires wait time above number of seconds
+    end_if_rate_limited = (
+        600  # break if Telegram requires wait time above number of seconds
+    )
 
     max_workers = 1
     max_retries = 3
@@ -56,7 +71,7 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Remove message amount limit",
             "default": False,
-            "tooltip": "Allows users to query unlimited messages from Telegram. This can lead to HUGE datasets!"
+            "tooltip": "Allows users to query unlimited messages from Telegram. This can lead to HUGE datasets!",
         },
         "telegram-search.max_entities": {
             "type": UserInput.OPTION_TEXT,
@@ -65,7 +80,7 @@ class SearchTelegram(Search):
             "min": 0,
             "default": 25,
             "tooltip": "Amount of entities that can be queried at a time. Entities are groups or channels. 0 to "
-                       "disable limit."
+            "disable limit.",
         },
         "telegram-search.max_crawl_depth": {
             "type": UserInput.OPTION_TEXT,
@@ -74,9 +89,9 @@ class SearchTelegram(Search):
             "min": 0,
             "default": 0,
             "tooltip": "If higher than 0, 4CAT can automatically add new entities to the query based on forwarded "
-                       "messages. Recommended to leave at 0 for most users since this can exponentially increase "
-                       "dataset sizes."
-        }
+            "messages. Recommended to leave at 0 for most users since this can exponentially increase "
+            "dataset sizes.",
+        },
     }
 
     @classmethod
@@ -98,9 +113,9 @@ class SearchTelegram(Search):
             "intro": {
                 "type": UserInput.OPTION_INFO,
                 "help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
-                        "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
-                        "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
-                        "authentication for Telegram."
+                "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
+                "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
+                "authentication for Telegram.",
             },
             "api_id": {
                 "type": UserInput.OPTION_TEXT,
@@ -116,83 +131,82 @@ class SearchTelegram(Search):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Phone number",
                 "cache": True,
-                "default": "+xxxxxxxxxx"
+                "default": "+xxxxxxxxxx",
             },
-            "divider": {
-                "type": UserInput.OPTION_DIVIDER
-            },
+            "divider": {"type": UserInput.OPTION_DIVIDER},
             "query-intro": {
                 "type": UserInput.OPTION_INFO,
-                "help": "Separate with commas or line breaks."
+                "help": "Separate with commas or line breaks.",
             },
             "query": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Entities to scrape",
-                "tooltip": "Separate with commas or line breaks."
+                "tooltip": "Separate with commas or line breaks.",
             },
             "max_posts": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Messages per group",
                 "min": 1,
                 "max": 50000,
-                "default": 10
+                "default": 10,
             },
-            "daterange": {
-                "type": UserInput.OPTION_DATERANGE,
-                "help": "Date range"
-            },
-            "divider-2": {
-                "type": UserInput.OPTION_DIVIDER
-            },
+            "daterange": {"type": UserInput.OPTION_DATERANGE, "help": "Date range"},
+            "divider-2": {"type": UserInput.OPTION_DIVIDER},
             "info-sensitive": {
                 "type": UserInput.OPTION_INFO,
                 "help": "Your API credentials and phone number **will be sent to the 4CAT server** and will be stored "
-                        "there while data is fetched. After the dataset has been created your credentials will be "
-                        "deleted from the server, unless you enable the option below. If you want to download images "
-                        "attached to the messages in your collected data, you need to enable this option. Your "
-                        "credentials will never be visible to other users and can be erased later via the result page."
+                "there while data is fetched. After the dataset has been created your credentials will be "
+                "deleted from the server, unless you enable the option below. If you want to download images "
+                "attached to the messages in your collected data, you need to enable this option. Your "
+                "credentials will never be visible to other users and can be erased later via the result page.",
             },
             "save-session": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Save session:",
-                "default": False
+                "default": False,
             },
             "resolve-entities-intro": {
                 "type": UserInput.OPTION_INFO,
                 "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
-                        "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                        "figure out where or who a message was forwarded from.\n\nHowever, this increases query time and "
-                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
-                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
-                        "data, so only enable this if you really need it!"
+                "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
+                "figure out where or who a message was forwarded from.\n\nHowever, this increases query time and "
+                "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
+                "to finish capturing. It will also dramatically increase the disk space needed to store the "
+                "data, so only enable this if you really need it!",
             },
             "resolve-entities": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Resolve references",
                 "default": False,
-            }
+            },
         }
 
         if max_entities:
-            options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
-                                              f"(channels or groups) at a time. Separate with line breaks or commas.")
+            options["query-intro"]["help"] = (
+                f"You can collect messages from up to **{max_entities:,}** entities "
+                f"(channels or groups) at a time. Separate with line breaks or commas."
+            )
 
-        all_messages = config.get("telegram-search.can_query_all_messages", False, user=user)
+        all_messages = config.get(
+            "telegram-search.can_query_all_messages", False, user=user
+        )
         if all_messages:
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
         else:
-            options["max_posts"]["help"] = (f"Messages to collect per entity. You can query up to "
-                                             f"{options['max_posts']['max']:,} messages per entity.")
+            options["max_posts"]["help"] = (
+                f"Messages to collect per entity. You can query up to "
+                f"{options['max_posts']['max']:,} messages per entity."
+            )
 
         if config.get("telegram-search.max_crawl_depth", 0, user=user) > 0:
             options["crawl_intro"] = {
                 "type": UserInput.OPTION_INFO,
                 "help": "Optionally, 4CAT can 'discover' new entities via forwarded messages; for example, if a "
-                        "channel X you are collecting data for contains a message forwarded from channel Y, 4CAT can "
-                        "collect messages from both channel X and Y. **Use this feature with caution**, as datasets can "
-                        "rapidly grow when adding newly discovered entities to the query this way. Note that dataset "
-                        "progress cannot be accurately tracked when you use this feature."
+                "channel X you are collecting data for contains a message forwarded from channel Y, 4CAT can "
+                "collect messages from both channel X and Y. **Use this feature with caution**, as datasets can "
+                "rapidly grow when adding newly discovered entities to the query this way. Note that dataset "
+                "progress cannot be accurately tracked when you use this feature.",
             }
             options["crawl-depth"] = {
                 "type": UserInput.OPTION_TEXT,
@@ -202,8 +216,8 @@ class SearchTelegram(Search):
                 "default": 0,
                 "help": "Crawl depth",
                 "tooltip": "How many 'hops' to make when crawling messages. This is the distance from an initial "
-                           "query, i.e. at most this many hops can be needed to reach the entity from one of the "
-                           "starting entities."
+                "query, i.e. at most this many hops can be needed to reach the entity from one of the "
+                "starting entities.",
             }
             options["crawl-threshold"] = {
                 "type": UserInput.OPTION_TEXT,
@@ -212,19 +226,18 @@ class SearchTelegram(Search):
                 "default": 5,
                 "help": "Crawl threshold",
                 "tooltip": "Entities need to be references at least this many times to be added to the query. Only "
-                           "references discovered below the max crawl depth are taken into account."
+                "references discovered below the max crawl depth are taken into account.",
             }
             options["crawl-via-links"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": False,
                 "help": "Extract new groups from links",
                 "tooltip": "Look for references to other groups in message content via t.me links and @references. "
-                           "This is more error-prone than crawling only via forwards, but can be a way to discover "
-                           "links that would otherwise remain undetected."
+                "This is more error-prone than crawling only via forwards, but can be a way to discover "
+                "links that would otherwise remain undetected.",
             }
 
         return options
-
 
     def get_items(self, query):
         """
@@ -236,13 +249,16 @@ class SearchTelegram(Search):
         :return list:  Posts, sorted by thread and post ID, in ascending order
         """
         if "api_phone" not in query or "api_hash" not in query or "api_id" not in query:
-            self.dataset.update_status("Could not create dataset since the Telegram API Hash and ID are missing. Try "
-                                       "creating it again from scratch.", is_final=True)
+            self.dataset.update_status(
+                "Could not create dataset since the Telegram API Hash and ID are missing. Try "
+                "creating it again from scratch.",
+                is_final=True,
+            )
             return None
 
         self.details_cache = {}
         self.failures_cache = set()
-        #TODO: This ought to yield as we're holding everything in memory; async generator? execute_queries() also needs to be modified for this
+        # TODO: This ought to yield as we're holding everything in memory; async generator? execute_queries() also needs to be modified for this
         results = asyncio.run(self.execute_queries())
 
         if not query.get("save-session"):
@@ -251,8 +267,11 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_id", instant=True)
 
         if self.flawless:
-            self.dataset.update_status(f"Dataset completed, but {self.flawless} requested entities were unavailable (they may have "
-                                       "been private). View the log file for details.", is_final=True)
+            self.dataset.update_status(
+                f"Dataset completed, but {self.flawless} requested entities were unavailable (they may have "
+                "been private). View the log file for details.",
+                is_final=True,
+            )
 
         return results
 
@@ -270,17 +289,25 @@ class SearchTelegram(Search):
         # order to avoid having to re-enter the security code
         query = self.parameters
 
-        session_id = SearchTelegram.create_session_id(query["api_phone"].strip(),
-                                                      query["api_id"].strip(),
-                                                      query["api_hash"].strip())
-        self.dataset.log(f'Telegram session id: {session_id}')
-        session_path = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_SESSIONS"), session_id + ".session")
+        session_id = SearchTelegram.create_session_id(
+            query["api_phone"].strip(),
+            query["api_id"].strip(),
+            query["api_hash"].strip(),
+        )
+        self.dataset.log(f"Telegram session id: {session_id}")
+        session_path = Path(config.get("PATH_ROOT")).joinpath(
+            config.get("PATH_SESSIONS"), session_id + ".session"
+        )
 
         client = None
 
         try:
-            client = TelegramClient(str(session_path), int(query.get("api_id")), query.get("api_hash"),
-                                    loop=self.eventloop)
+            client = TelegramClient(
+                str(session_path),
+                int(query.get("api_id")),
+                query.get("api_hash"),
+                loop=self.eventloop,
+            )
             await client.start(phone=SearchTelegram.cancel_start)
         except RuntimeError:
             # session is no longer useable, delete file so user will be asked
@@ -288,7 +315,8 @@ class SearchTelegram(Search):
             # `cancel_start()`
             self.dataset.update_status(
                 "Session is not authenticated: login security code may have expired. You need to re-enter the security code.",
-                is_final=True)
+                is_final=True,
+            )
 
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
@@ -301,7 +329,10 @@ class SearchTelegram(Search):
             # not sure what exception specifically is triggered here, but it
             # always means the connection failed
             self.log.error(f"Telegram: {e}\n{traceback.format_exc()}")
-            self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
+            self.dataset.update_status(
+                "Error connecting to the Telegram API with provided credentials.",
+                is_final=True,
+            )
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
             return []
@@ -329,7 +360,9 @@ class SearchTelegram(Search):
 
         posts = []
         try:
-            async for post in self.gather_posts(client, queries, max_items, min_date, max_date):
+            async for post in self.gather_posts(
+                client, queries, max_items, min_date, max_date
+            ):
                 posts.append(post)
             return posts
         except ProcessorInterruptedException as e:
@@ -337,8 +370,12 @@ class SearchTelegram(Search):
         except Exception:
             # catch-all so we can disconnect properly
             # ...should we?
-            self.dataset.update_status("Error scraping posts from Telegram; halting collection.")
-            self.log.error(f"Telegram scraping error (dataset {self.dataset.key}): {traceback.format_exc()}")
+            self.dataset.update_status(
+                "Error scraping posts from Telegram; halting collection."
+            )
+            self.log.error(
+                f"Telegram scraping error (dataset {self.dataset.key}): {traceback.format_exc()}"
+            )
             # May as well return what was captured, yes?
             return posts
         finally:
@@ -362,9 +399,7 @@ class SearchTelegram(Search):
 
         # This is used for the 'crawl' feature so we know at which depth a
         # given entity was discovered
-        depth_map = {
-            entity: 0 for entity in queries
-        }
+        depth_map = {entity: 0 for entity in queries}
 
         crawl_max_depth = self.parameters.get("crawl-depth", 0)
         crawl_msg_threshold = self.parameters.get("crawl-threshold", 10)
@@ -400,24 +435,32 @@ class SearchTelegram(Search):
 
             if no_additional_queries:
                 # Note that we are not completing this query
-                self.dataset.update_status(f"Rate-limited by Telegram; not executing query {entity_id_map.get(query, query)}")
+                self.dataset.update_status(
+                    f"Rate-limited by Telegram; not executing query {entity_id_map.get(query, query)}"
+                )
                 continue
 
             while True:
-                self.dataset.update_status(f"Retrieving messages for entity '{entity_id_map.get(query, query)}'")
+                self.dataset.update_status(
+                    f"Retrieving messages for entity '{entity_id_map.get(query, query)}'"
+                )
                 entity_posts = 0
                 discovered = 0
                 try:
-                    async for message in client.iter_messages(entity=query, offset_date=max_date):
+                    async for message in client.iter_messages(
+                        entity=query, offset_date=max_date
+                    ):
                         entity_posts += 1
                         total_messages += 1
                         if self.interrupted:
                             raise ProcessorInterruptedException(
-                                "Interrupted while fetching message data from the Telegram API")
+                                "Interrupted while fetching message data from the Telegram API"
+                            )
 
                         if entity_posts % 100 == 0:
                             self.dataset.update_status(
-                                f"Retrieved {entity_posts:,} posts for entity '{entity_id_map.get(query, query)}' ({total_messages:,} total)")
+                                f"Retrieved {entity_posts:,} posts for entity '{entity_id_map.get(query, query)}' ({total_messages:,} total)"
+                            )
 
                         if message.action is not None:
                             # e.g. someone joins the channel - not an actual message
@@ -430,14 +473,23 @@ class SearchTelegram(Search):
                         if "_chat" in serialized_message:
                             # Add query ID to check if queries have been crawled previously
                             full_query.add(serialized_message["_chat"]["id"])
-                            if query not in entity_id_map and serialized_message["_chat"]["id"] == query:
+                            if (
+                                query not in entity_id_map
+                                and serialized_message["_chat"]["id"] == query
+                            ):
                                 # once we know what a channel ID resolves to, use the username instead so it is easier to
                                 # understand for the user
-                                entity_id_map[query] = serialized_message["_chat"]["username"]
-                                self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
+                                entity_id_map[query] = serialized_message["_chat"][
+                                    "username"
+                                ]
+                                self.dataset.update_status(
+                                    f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})"
+                                )
 
                         if resolve_refs:
-                            serialized_message = await self.resolve_groups(client, serialized_message)
+                            serialized_message = await self.resolve_groups(
+                                client, serialized_message
+                            )
 
                         # Stop if we're below the min date
                         if min_date and serialized_message.get("date") < min_date:
@@ -457,38 +509,60 @@ class SearchTelegram(Search):
                                     # resolve entities to crawl iteratively
                                     fwd_from = int(message_fwd["from_id"]["channel_id"])
                                     fwd_source_type = "channel"
-                                elif message_fwd and message_fwd.get("from_id", {}).get('full_chat',{}):
+                                elif message_fwd and message_fwd.get("from_id", {}).get(
+                                    "full_chat", {}
+                                ):
                                     # TODO: do we need a check here to only follow certain types of messages? this is similar to resolving, but the types do not appear the same to me
                                     # Note: message_fwd["from_id"]["channel_id"] == message_fwd["from_id"]["full_chat"]["id"] in test cases so far
-                                    fwd_from = int(message_fwd["from_id"]["full_chat"]["id"])
+                                    fwd_from = int(
+                                        message_fwd["from_id"]["full_chat"]["id"]
+                                    )
                                     fwd_source_type = "channel"
-                                elif message_fwd and (message_fwd.get("from_id", {}).get('full_user',{}) or message_fwd.get("from_id", {}).get("_type") == "PeerUser"):
+                                elif message_fwd and (
+                                    message_fwd.get("from_id", {}).get("full_user", {})
+                                    or message_fwd.get("from_id", {}).get("_type")
+                                    == "PeerUser"
+                                ):
                                     # forwards can also come from users
                                     # these can never be followed, so don't add these to the crawl, but do document them
                                     fwd_source_type = "user"
                                 else:
                                     print(json.dumps(message_fwd))
-                                    self.log.warning(f"Telegram (dataset {self.dataset.key}): Unknown fwd_from data structure; unable to crawl")
+                                    self.log.warning(
+                                        f"Telegram (dataset {self.dataset.key}): Unknown fwd_from data structure; unable to crawl"
+                                    )
                                     fwd_source_type = "unknown"
 
                                 if fwd_from:
                                     linked_entities.add(fwd_from)
 
-
                             if crawl_via_links:
                                 # t.me links
-                                all_links = ural.urls_from_text(serialized_message["message"])
-                                all_links = [link.split("t.me/")[1] for link in all_links if ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
+                                all_links = ural.urls_from_text(
+                                    serialized_message["message"]
+                                )
+                                all_links = [
+                                    link.split("t.me/")[1]
+                                    for link in all_links
+                                    if ural.get_hostname(link) == "t.me"
+                                    and len(link.split("t.me/")) > 1
+                                ]
                                 for link in all_links:
                                     if link.startswith("+"):
                                         # invite links
                                         continue
 
-                                    entity_name = link.split("/")[0].split("?")[0].split("#")[0]
+                                    entity_name = (
+                                        link.split("/")[0].split("?")[0].split("#")[0]
+                                    )
                                     linked_entities.add(entity_name)
 
                                 # @references
-                                references = [r for t, r in message.get_entities_text() if type(t) is MessageEntityMention]
+                                references = [
+                                    r
+                                    for t, r in message.get_entities_text()
+                                    if type(t) is MessageEntityMention
+                                ]
                                 for reference in references:
                                     if reference.startswith("@"):
                                         reference = reference[1:]
@@ -499,11 +573,18 @@ class SearchTelegram(Search):
 
                             # Check if fwd_from or the resolved entity ID is already queued or has been queried
                             for link in linked_entities:
-                                if link not in full_query and link not in queries and fwd_source_type not in ("user",):
+                                if (
+                                    link not in full_query
+                                    and link not in queries
+                                    and fwd_source_type not in ("user",)
+                                ):
                                     # new entity discovered!
                                     # might be discovered (before collection) multiple times, so retain lowest depth
                                     # print(f"Potentially crawling {link}")
-                                    depth_map[link] = min(depth_map.get(link, crawl_max_depth), depth_map[query] + 1)
+                                    depth_map[link] = min(
+                                        depth_map.get(link, crawl_max_depth),
+                                        depth_map[query] + 1,
+                                    )
                                     if link not in crawl_references:
                                         crawl_references[link] = 0
                                     crawl_references[link] += 1
@@ -514,14 +595,14 @@ class SearchTelegram(Search):
                                         full_query.add(link)
                                         num_queries += 1
                                         discovered += 1
-                                        self.dataset.update_status(f"Discovered new entity {entity_id_map.get(link, link)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
-
-
+                                        self.dataset.update_status(
+                                            f"Discovered new entity {entity_id_map.get(link, link)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query"
+                                        )
 
                         serialized_message["4CAT_metadata"] = {
-                            "collected_at": datetime.now().isoformat(), # this is relevant for rather long crawls
-                            "query": query, # possibly redundant, but we are adding non-user defined queries by crawling and may be useful to know exactly what query was used to collect an entity
-                            "query_depth": depth_map.get(query, 0)
+                            "collected_at": datetime.now().isoformat(),  # this is relevant for rather long crawls
+                            "query": query,  # possibly redundant, but we are adding non-user defined queries by crawling and may be useful to know exactly what query was used to collect an entity
+                            "query_depth": depth_map.get(query, 0),
                         }
                         yield serialized_message
 
@@ -529,15 +610,21 @@ class SearchTelegram(Search):
                             break
 
                 except ChannelPrivateError:
-                    self.dataset.update_status(f"Entity {entity_id_map.get(query, query)} is private, skipping")
+                    self.dataset.update_status(
+                        f"Entity {entity_id_map.get(query, query)} is private, skipping"
+                    )
                     self.flawless += 1
 
                 except (UsernameInvalidError,):
-                    self.dataset.update_status(f"Could not scrape entity '{entity_id_map.get(query, query)}', does not seem to exist, skipping")
+                    self.dataset.update_status(
+                        f"Could not scrape entity '{entity_id_map.get(query, query)}', does not seem to exist, skipping"
+                    )
                     self.flawless += 1
 
                 except FloodWaitError as e:
-                    self.dataset.update_status(f"Rate-limited by Telegram: {e}; waiting")
+                    self.dataset.update_status(
+                        f"Rate-limited by Telegram: {e}; waiting"
+                    )
                     if e.seconds < self.end_if_rate_limited:
                         time.sleep(e.seconds)
                         continue
@@ -545,37 +632,46 @@ class SearchTelegram(Search):
                         self.flawless += 1
                         no_additional_queries = True
                         self.dataset.update_status(
-                            f"Telegram wait grown larger than {int(e.seconds / 60)} minutes, ending")
+                            f"Telegram wait grown larger than {int(e.seconds / 60)} minutes, ending"
+                        )
                         break
 
                 except BadRequestError as e:
                     self.dataset.update_status(
-                        f"Error '{e.__class__.__name__}' while collecting entity {entity_id_map.get(query, query)}, skipping")
+                        f"Error '{e.__class__.__name__}' while collecting entity {entity_id_map.get(query, query)}, skipping"
+                    )
                     self.flawless += 1
 
                 except ValueError as e:
-                    self.dataset.update_status(f"Error '{e}' while collecting entity {entity_id_map.get(query, query)}, skipping")
+                    self.dataset.update_status(
+                        f"Error '{e}' while collecting entity {entity_id_map.get(query, query)}, skipping"
+                    )
                     self.flawless += 1
 
                 except ChannelPrivateError as e:
                     self.dataset.update_status(
-                        f"QUERY '{entity_id_map.get(query, query)}' unable to complete due to error {e}. Skipping.")
+                        f"QUERY '{entity_id_map.get(query, query)}' unable to complete due to error {e}. Skipping."
+                    )
                     break
 
                 except TimeoutError:
                     if retries < 3:
                         self.dataset.update_status(
-                            f"Tried to fetch messages for entity '{entity_id_map.get(query, query)}' but timed out {retries:,} times. Skipping.")
+                            f"Tried to fetch messages for entity '{entity_id_map.get(query, query)}' but timed out {retries:,} times. Skipping."
+                        )
                         self.flawless += 1
                         break
 
                     self.dataset.update_status(
-                        f"Got a timeout from Telegram while fetching messages for entity '{entity_id_map.get(query, query)}'. Trying again in {delay:,} seconds.")
+                        f"Got a timeout from Telegram while fetching messages for entity '{entity_id_map.get(query, query)}'. Trying again in {delay:,} seconds."
+                    )
                     time.sleep(delay)
                     delay *= 2
                     continue
 
-                self.dataset.log(f"Completed {entity_id_map.get(query, query)} with {entity_posts} messages (discovered {discovered} new entities)")
+                self.dataset.log(
+                    f"Completed {entity_id_map.get(query, query)} with {entity_posts} messages (discovered {discovered} new entities)"
+                )
                 break
 
     async def resolve_groups(self, client, message):
@@ -594,14 +690,21 @@ class SearchTelegram(Search):
                     # does not represent an entity
                     continue
 
-                elif "_type" in value and value["_type"] in ("InputPeerChannel", "PeerChannel"):
+                elif "_type" in value and value["_type"] in (
+                    "InputPeerChannel",
+                    "PeerChannel",
+                ):
                     # forwarded from a channel!
                     if value["channel_id"] in self.failures_cache:
                         continue
 
                     if value["channel_id"] not in self.details_cache:
-                        channel = await client(GetFullChannelRequest(value["channel_id"]))
-                        self.details_cache[value["channel_id"]] = SearchTelegram.serialize_obj(channel)
+                        channel = await client(
+                            GetFullChannelRequest(value["channel_id"])
+                        )
+                        self.details_cache[value["channel_id"]] = (
+                            SearchTelegram.serialize_obj(channel)
+                        )
 
                     resolved_message[key] = self.details_cache[value["channel_id"]]
                     resolved_message[key]["channel_id"] = value["channel_id"]
@@ -613,7 +716,9 @@ class SearchTelegram(Search):
 
                     if value["user_id"] not in self.details_cache:
                         user = await client(GetFullUserRequest(value["user_id"]))
-                        self.details_cache[value["user_id"]] = SearchTelegram.serialize_obj(user)
+                        self.details_cache[value["user_id"]] = (
+                            SearchTelegram.serialize_obj(user)
+                        )
 
                     resolved_message[key] = self.details_cache[value["user_id"]]
                     resolved_message[key]["user_id"] = value["user_id"]
@@ -623,9 +728,13 @@ class SearchTelegram(Search):
             except (TypeError, ChannelPrivateError, UsernameInvalidError) as e:
                 self.failures_cache.add(value.get("channel_id", value.get("user_id")))
                 if type(e) in (ChannelPrivateError, UsernameInvalidError):
-                    self.dataset.log(f"Cannot resolve entity with ID {value.get('channel_id', value.get('user_id'))} of type {value['_type']} ({e.__class__.__name__}), leaving as-is")
+                    self.dataset.log(
+                        f"Cannot resolve entity with ID {value.get('channel_id', value.get('user_id'))} of type {value['_type']} ({e.__class__.__name__}), leaving as-is"
+                    )
                 else:
-                    self.dataset.log(f"Cannot resolve entity with ID {value.get('channel_id', value.get('user_id'))} of type {value['_type']}, leaving as-is")
+                    self.dataset.log(
+                        f"Cannot resolve entity with ID {value.get('channel_id', value.get('user_id'))} of type {value['_type']}, leaving as-is"
+                    )
 
         return resolved_message
 
@@ -668,7 +777,9 @@ class SearchTelegram(Search):
         fullname = ""
         username = ""
         user_id = message["_sender"]["id"] if message.get("_sender") else ""
-        user_is_bot = message["_sender"].get("bot", False) if message.get("_sender") else ""
+        user_is_bot = (
+            message["_sender"].get("bot", False) if message.get("_sender") else ""
+        )
 
         if message.get("_sender") and message["_sender"].get("username"):
             username = message["_sender"]["username"]
@@ -690,16 +801,28 @@ class SearchTelegram(Search):
         attachment_filename = ""
 
         if attachment_type == "contact":
-            contact_data = ["phone_number", "first_name", "last_name", "vcard", "user_id"]
-            if message["media"].get('contact', False):
+            contact_data = [
+                "phone_number",
+                "first_name",
+                "last_name",
+                "vcard",
+                "user_id",
+            ]
+            if message["media"].get("contact", False):
                 # Old datastructure
                 attachment = message["media"]["contact"]
-            elif all([property in message["media"].keys() for property in contact_data]):
+            elif all(
+                [property in message["media"].keys() for property in contact_data]
+            ):
                 # New datastructure 2022/7/25
                 attachment = message["media"]
             else:
-                raise ProcessorException('Cannot find contact data; Telegram datastructure may have changed')
-            attachment_data = json.dumps({property: attachment.get(property) for property in contact_data})
+                raise ProcessorException(
+                    "Cannot find contact data; Telegram datastructure may have changed"
+                )
+            attachment_data = json.dumps(
+                {property: attachment.get(property) for property in contact_data}
+            )
 
         elif attachment_type == "document":
             # videos, etc
@@ -708,11 +831,13 @@ class SearchTelegram(Search):
             attachment_type = message["media"]["document"]["mime_type"].split("/")[0]
             if attachment_type == "video":
                 attachment = message["media"]["document"]
-                attachment_data = json.dumps({
-                    "id": attachment["id"],
-                    "dc_id": attachment["dc_id"],
-                    "file_reference": attachment["file_reference"],
-                })
+                attachment_data = json.dumps(
+                    {
+                        "id": attachment["id"],
+                        "dc_id": attachment["dc_id"],
+                        "file_reference": attachment["file_reference"],
+                    }
+                )
             else:
                 attachment_data = ""
 
@@ -720,17 +845,27 @@ class SearchTelegram(Search):
         # untested whether geo_live is significantly different from geo
         #    attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
 
-        elif attachment_type == "photo" or attachment_type == "url" and message["media"]["webpage"].get("photo"):
+        elif (
+            attachment_type == "photo"
+            or attachment_type == "url"
+            and message["media"]["webpage"].get("photo")
+        ):
             # we don't actually store any metadata about the photo, since very
             # little of the metadata attached is of interest. Instead, the
             # actual photos may be downloaded via a processor that is run on the
             # search results
-            attachment = message["media"]["photo"] if attachment_type == "photo" else message["media"]["webpage"]["photo"]
-            attachment_data = json.dumps({
-                "id": attachment["id"],
-                "dc_id": attachment["dc_id"],
-                "file_reference": attachment["file_reference"],
-            })
+            attachment = (
+                message["media"]["photo"]
+                if attachment_type == "photo"
+                else message["media"]["webpage"]["photo"]
+            )
+            attachment_data = json.dumps(
+                {
+                    "id": attachment["id"],
+                    "dc_id": attachment["dc_id"],
+                    "file_reference": attachment["file_reference"],
+                }
+            )
             attachment_filename = thread + "-" + str(message["id"]) + ".jpeg"
 
         elif attachment_type == "poll":
@@ -738,18 +873,24 @@ class SearchTelegram(Search):
             # actually voted on the poll - that will usually not be the case,
             # so we store -1 as the vote count
             attachment = message["media"]
-            options = {option["option"]: option["text"] for option in attachment["poll"]["answers"]}
-            attachment_data = json.dumps({
-                "question": attachment["poll"]["question"],
-                "voters": attachment["results"]["total_voters"],
-                "answers": [{
-                    "answer": options[answer["option"]],
-                    "votes": answer["voters"]
-                } for answer in attachment["results"]["results"]] if attachment["results"]["results"] else [{
-                    "answer": options[option],
-                    "votes": -1
-                } for option in options]
-            })
+            options = {
+                option["option"]: option["text"]
+                for option in attachment["poll"]["answers"]
+            }
+            attachment_data = json.dumps(
+                {
+                    "question": attachment["poll"]["question"],
+                    "voters": attachment["results"]["total_voters"],
+                    "answers": [
+                        {"answer": options[answer["option"]], "votes": answer["voters"]}
+                        for answer in attachment["results"]["results"]
+                    ]
+                    if attachment["results"]["results"]
+                    else [
+                        {"answer": options[option], "votes": -1} for option in options
+                    ],
+                }
+            )
 
         else:
             attachment_data = ""
@@ -759,7 +900,11 @@ class SearchTelegram(Search):
         forwarded_name = ""
         forwarded_id = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"] and type(message["fwd_from"]["from_id"]) is not int:
+        if (
+            message.get("fwd_from")
+            and "from_id" in message["fwd_from"]
+            and type(message["fwd_from"]["from_id"]) is not int
+        ):
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not
@@ -776,7 +921,12 @@ class SearchTelegram(Search):
             if from_data and from_data.get("from_name"):
                 forwarded_name = message["fwd_from"]["from_name"]
 
-            if from_data and from_data.get("users") and len(from_data["users"]) > 0 and "user" not in from_data:
+            if (
+                from_data
+                and from_data.get("users")
+                and len(from_data["users"]) > 0
+                and "user" not in from_data
+            ):
                 from_data["user"] = from_data["users"][0]
 
             if from_data and ("user" in from_data or "chats" in from_data):
@@ -817,7 +967,10 @@ class SearchTelegram(Search):
 
         if message.get("reactions") and message["reactions"].get("results"):
             for reaction in message["reactions"]["results"]:
-                if type(reaction["reaction"]) is dict and "emoticon" in reaction["reaction"]:
+                if (
+                    type(reaction["reaction"]) is dict
+                    and "emoticon" in reaction["reaction"]
+                ):
                     # Updated to support new reaction datastructure
                     reactions += reaction["reaction"]["emoticon"] * reaction["count"]
                 elif type(reaction["reaction"]) is str and "count" in reaction:
@@ -835,8 +988,11 @@ class SearchTelegram(Search):
         # t.me links
         linked_entities = set()
         all_links = ural.urls_from_text(message["message"])
-        all_links = [link.split("t.me/")[1] for link in all_links if
-                     ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
+        all_links = [
+            link.split("t.me/")[1]
+            for link in all_links
+            if ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1
+        ]
 
         for link in all_links:
             if link.startswith("+"):
@@ -856,7 +1012,9 @@ class SearchTelegram(Search):
 
         # make this case-insensitive since people may use different casing in
         # messages than the 'official' username for example
-        all_connections = set([v for v in [forwarded_username, *linked_entities, *all_mentions] if v])
+        all_connections = set(
+            [v for v in [forwarded_username, *linked_entities, *all_mentions] if v]
+        )
         all_ci_connections = set()
         seen = set()
         for connection in all_connections:
@@ -864,42 +1022,54 @@ class SearchTelegram(Search):
                 all_ci_connections.add(connection)
                 seen.add(connection.lower())
 
-        return MappedItem({
-            "id": f"{message['_chat']['username']}-{message['id']}",
-            "thread_id": thread,
-            "chat": message["_chat"]["username"],
-            "author": user_id,
-            "author_username": username,
-            "author_name": fullname,
-            "author_is_bot": "yes" if user_is_bot else "no",
-            "body": message["message"],
-            "body_markdown": message["message_markdown"],
-            "is_reply": is_reply,
-            "reply_to": reply_to,
-            "views": message["views"] if message["views"] else "",
-            # "forwards": message.get("forwards", MissingMappedField(0)),
-            "reactions": reactions,
-            "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
-            "unix_timestamp": int(message["date"]),
-            "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message[
-                "edit_date"] else "",
-            "unix_timestamp_edited": int(message["edit_date"]) if message["edit_date"] else "",
-            "author_forwarded_from_name": forwarded_name,
-            "author_forwarded_from_username": forwarded_username,
-            "author_forwarded_from_id": forwarded_id,
-            "entities_linked": ",".join(linked_entities),
-            "entities_mentioned": ",".join(all_mentions),
-            "all_connections": ",".join(all_ci_connections),
-            "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
-                "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
-            "unix_timestamp_forwarded_from": forwarded_timestamp,
-            "link_title": link_title,
-            "link_description": link_description,
-            "link_attached": link_attached,
-            "attachment_type": attachment_type,
-            "attachment_data": attachment_data,
-            "attachment_filename": attachment_filename
-        })
+        return MappedItem(
+            {
+                "id": f"{message['_chat']['username']}-{message['id']}",
+                "thread_id": thread,
+                "chat": message["_chat"]["username"],
+                "author": user_id,
+                "author_username": username,
+                "author_name": fullname,
+                "author_is_bot": "yes" if user_is_bot else "no",
+                "body": message["message"],
+                "body_markdown": message["message_markdown"],
+                "is_reply": is_reply,
+                "reply_to": reply_to,
+                "views": message["views"] if message["views"] else "",
+                # "forwards": message.get("forwards", MissingMappedField(0)),
+                "reactions": reactions,
+                "timestamp": datetime.fromtimestamp(message["date"]).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+                "unix_timestamp": int(message["date"]),
+                "timestamp_edited": datetime.fromtimestamp(
+                    message["edit_date"]
+                ).strftime("%Y-%m-%d %H:%M:%S")
+                if message["edit_date"]
+                else "",
+                "unix_timestamp_edited": int(message["edit_date"])
+                if message["edit_date"]
+                else "",
+                "author_forwarded_from_name": forwarded_name,
+                "author_forwarded_from_username": forwarded_username,
+                "author_forwarded_from_id": forwarded_id,
+                "entities_linked": ",".join(linked_entities),
+                "entities_mentioned": ",".join(all_mentions),
+                "all_connections": ",".join(all_ci_connections),
+                "timestamp_forwarded_from": datetime.fromtimestamp(
+                    forwarded_timestamp
+                ).strftime("%Y-%m-%d %H:%M:%S")
+                if forwarded_timestamp
+                else "",
+                "unix_timestamp_forwarded_from": forwarded_timestamp,
+                "link_title": link_title,
+                "link_description": link_description,
+                "link_attached": link_attached,
+                "attachment_type": attachment_type,
+                "attachment_data": attachment_data,
+                "attachment_filename": attachment_filename,
+            }
+        )
 
     @staticmethod
     def get_media_type(media):
@@ -923,7 +1093,7 @@ class SearchTelegram(Search):
                 "MessageMediaPoll": "poll",
                 "MessageMediaUnsupported": "unsupported",
                 "MessageMediaVenue": "venue",
-                "MessageMediaWebPage": "url"
+                "MessageMediaWebPage": "url",
             }[media.get("_type", None)]
         except (AttributeError, KeyError):
             return ""
@@ -955,10 +1125,15 @@ class SearchTelegram(Search):
         for item, value in obj.items():
             if type(value) is datetime:
                 mapped_obj[item] = value.timestamp()
-            elif type(value).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
+            elif type(value).__module__ in (
+                "telethon.tl.types",
+                "telethon.tl.custom.forward",
+            ):
                 mapped_obj[item] = SearchTelegram.serialize_obj(value)
             elif type(value) is list:
-                mapped_obj[item] = [SearchTelegram.serialize_obj(item) for item in value]
+                mapped_obj[item] = [
+                    SearchTelegram.serialize_obj(item) for item in value
+                ]
             elif type(value) is bytes:
                 mapped_obj[item] = value.hex()
             elif type(value) not in scalars and value is not None:
@@ -968,7 +1143,10 @@ class SearchTelegram(Search):
                 mapped_obj[item] = value
 
         # Add the _type if the original object was a telethon type
-        if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
+        if type(input_obj).__module__ in (
+            "telethon.tl.types",
+            "telethon.tl.custom.forward",
+        ):
             mapped_obj["_type"] = type(input_obj).__name__
 
         # Store the markdown-formatted text
@@ -991,20 +1169,36 @@ class SearchTelegram(Search):
         if not query.get("query", "").strip():
             raise QueryParametersException("You must provide a search query.")
 
-        if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
-            raise QueryParametersException("You need to provide valid Telegram API credentials first.")
+        if (
+            not query.get("api_id", None)
+            or not query.get("api_hash", None)
+            or not query.get("api_phone", None)
+        ):
+            raise QueryParametersException(
+                "You need to provide valid Telegram API credentials first."
+            )
 
-        all_posts = config.get("telegram-search.can_query_all_messages", False, user=user)
+        all_posts = config.get(
+            "telegram-search.can_query_all_messages", False, user=user
+        )
         max_entities = config.get("telegram-search.max_entities", 25, user=user)
 
-        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options()["max_posts"]["max"])
+        num_items = (
+            query.get("max_posts")
+            if all_posts
+            else min(
+                query.get("max_posts"), SearchTelegram.get_options()["max_posts"]["max"]
+            )
+        )
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
         items = whitespace.sub("", query.get("query").replace("\n", ","))
         if max_entities > 0 and len(items.split(",")) > max_entities:
-            raise QueryParametersException(f"You cannot query more than {max_entities:,} items at a time.")
+            raise QueryParametersException(
+                f"You cannot query more than {max_entities:,} items at a time."
+            )
 
         sanitized_items = []
         # handle telegram URLs
@@ -1021,14 +1215,19 @@ class SearchTelegram(Search):
 
         # now check if there is an active API session
         if not user or not user.is_authenticated or user.is_anonymous:
-            raise QueryParametersException("Telegram scraping is only available to logged-in users with personal "
-                                           "accounts.")
+            raise QueryParametersException(
+                "Telegram scraping is only available to logged-in users with personal "
+                "accounts."
+            )
 
         # check for the information we need
-        session_id = SearchTelegram.create_session_id(query.get("api_phone"), query.get("api_id"),
-                                                      query.get("api_hash"))
+        session_id = SearchTelegram.create_session_id(
+            query.get("api_phone"), query.get("api_id"), query.get("api_hash")
+        )
         user.set_value("telegram.session", session_id)
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
+        session_path = Path(config.get("PATH_ROOT")).joinpath(
+            config.get("PATH_SESSIONS"), session_id + ".session"
+        )
 
         client = None
 
@@ -1039,7 +1238,10 @@ class SearchTelegram(Search):
             raise QueryParametersException("Invalid API ID.")
 
         # maybe we've entered a code already and submitted it with the request
-        if "option-security-code" in request.form and request.form.get("option-security-code").strip():
+        if (
+            "option-security-code" in request.form
+            and request.form.get("option-security-code").strip()
+        ):
             code_callback = lambda: request.form.get("option-security-code")  # noqa: E731
             max_attempts = 1
         else:
@@ -1055,52 +1257,70 @@ class SearchTelegram(Search):
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            client = TelegramClient(str(session_path), api_id, query.get("api_hash"), loop=loop)
+            client = TelegramClient(
+                str(session_path), api_id, query.get("api_hash"), loop=loop
+            )
 
             try:
-                client.start(max_attempts=max_attempts, phone=query.get("api_phone"), code_callback=code_callback)
+                client.start(
+                    max_attempts=max_attempts,
+                    phone=query.get("api_phone"),
+                    code_callback=code_callback,
+                )
 
             except ValueError as e:
                 # this happens if 2FA is required
-                raise QueryParametersException("Your account requires two-factor authentication. 4CAT at this time "
-                                               f"does not support this authentication mode for Telegram. ({e})")
+                raise QueryParametersException(
+                    "Your account requires two-factor authentication. 4CAT at this time "
+                    f"does not support this authentication mode for Telegram. ({e})"
+                )
             except RuntimeError:
                 # A code was sent to the given phone number
                 needs_code = True
         except FloodWaitError as e:
             # uh oh, we got rate-limited
-            raise QueryParametersException("You were rate-limited and should wait a while before trying again. " +
-                                           str(e).split("(")[0] + ".")
+            raise QueryParametersException(
+                "You were rate-limited and should wait a while before trying again. "
+                + str(e).split("(")[0]
+                + "."
+            )
         except ApiIdInvalidError:
             # wrong credentials
             raise QueryParametersException("Your API credentials are invalid.")
         except PhoneNumberInvalidError:
             # wrong phone number
             raise QueryParametersException(
-                "The phone number provided is not a valid phone number for these credentials.")
+                "The phone number provided is not a valid phone number for these credentials."
+            )
         except RPCError as e:
             # only seen this with an 'UPDATE_APP_TO_LOGIN' status
-            raise QueryParametersException(f"Could not verify your authentication. You may need to update your "
-                                           f"Telegram app(s) to the latest version to proceed ({e}).")
+            raise QueryParametersException(
+                f"Could not verify your authentication. You may need to update your "
+                f"Telegram app(s) to the latest version to proceed ({e})."
+            )
         except Exception as e:
             # ?
             raise QueryParametersException(
-                f"An unexpected error ({e}) occurred and your authentication could not be verified.")
+                f"An unexpected error ({e}) occurred and your authentication could not be verified."
+            )
         finally:
             if client:
                 client.disconnect()
 
         if needs_code:
-            raise QueryNeedsFurtherInputException(config={
-                "code-info": {
-                    "type": UserInput.OPTION_INFO,
-                    "help": "Please enter the security code that was sent to your Telegram app to continue."
-                },
-                "security-code": {
-                    "type": UserInput.OPTION_TEXT,
-                    "help": "Security code",
-                    "sensitive": True
-                }})
+            raise QueryNeedsFurtherInputException(
+                config={
+                    "code-info": {
+                        "type": UserInput.OPTION_INFO,
+                        "help": "Please enter the security code that was sent to your Telegram app to continue.",
+                    },
+                    "security-code": {
+                        "type": UserInput.OPTION_TEXT,
+                        "help": "Security code",
+                        "sensitive": True,
+                    },
+                }
+            )
 
         # simple!
         return {
@@ -1115,7 +1335,7 @@ class SearchTelegram(Search):
             "max_date": max_date,
             "crawl-depth": query.get("crawl-depth"),
             "crawl-threshold": query.get("crawl-threshold"),
-            "crawl-via-links": query.get("crawl-via-links")
+            "crawl-via-links": query.get("crawl-via-links"),
         }
 
     @staticmethod
@@ -1131,5 +1351,7 @@ class SearchTelegram(Search):
         :param str api_hash:  Telegram API Hash
         :return str: A hash value derived from the input
         """
-        hash_base = api_phone.strip().replace("+", "") + str(api_id).strip() + api_hash.strip()
+        hash_base = (
+            api_phone.strip().replace("+", "") + str(api_id).strip() + api_hash.strip()
+        )
         return hashlib.blake2b(hash_base.encode("ascii")).hexdigest()

@@ -6,6 +6,7 @@ Initialize Tumblr data source
 # data source. A default function that does this is available from the
 # backend helpers library.
 from common.lib.helpers import init_datasource
+
 __all__ = ("init_datasource",)
 
 # Internal identifier for this data source

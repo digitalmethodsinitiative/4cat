@@ -1,6 +1,7 @@
 """
 Filter posts by lexicon
 """
+
 import re
 
 from processors.filtering.base_filter import BaseFilter
@@ -17,15 +18,18 @@ class LexicalFilter(BaseFilter):
     """
     Retain only posts matching a given lexicon
     """
+
     type = "lexical-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by words or phrases"  # title displayed in UI
-    description = "Retains posts that contain selected words or phrases, including preset word lists. " \
-                  "This creates a new dataset."  # description displayed in UI
+    description = (
+        "Retains posts that contain selected words or phrases, including preset word lists. "
+        "This creates a new dataset."
+    )  # description displayed in UI
 
     references = [
         "[Hatebase](https://hatebase.org)",
-        "[Regex101](https://regex101.com/)"
+        "[Regex101](https://regex101.com/)",
     ]
 
     # the following determines the options available to the user via the 4CAT
@@ -38,30 +42,30 @@ class LexicalFilter(BaseFilter):
                 "hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
                 "hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
             },
-            "help": "Filter items containing words in these lexicons. Note that they may be outdated."
+            "help": "Filter items containing words in these lexicons. Note that they may be outdated.",
         },
         "lexicon-custom": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
-            "help": "Custom word list (separate with commas)"
+            "help": "Custom word list (separate with commas)",
         },
         "as_regex": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Interpret custom word list as a regular expression",
-            "tooltip": "Regular expressions are parsed with Python"
+            "tooltip": "Regular expressions are parsed with Python",
         },
         "exclude": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Should not include the above word(s)",
-            "tooltip": "Only posts that do not match the above words are retained"
+            "tooltip": "Only posts that do not match the above words are retained",
         },
         "case-sensitive": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
-            "help": "Case sensitive"
-        }
+            "help": "Case sensitive",
+        },
     }
 
     @classmethod
@@ -87,7 +91,9 @@ class LexicalFilter(BaseFilter):
         # load lexicons from word lists
         lexicons = {}
         for lexicon_id in self.parameters.get("lexicon", []):
-            lexicon_file = config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{lexicon_id}.txt")
+            lexicon_file = config.get("PATH_ROOT").joinpath(
+                f"common/assets/wordlists/{lexicon_id}.txt"
+            )
             if not lexicon_file.exists():
                 continue
 
@@ -103,7 +109,12 @@ class LexicalFilter(BaseFilter):
             lexicons[custom_id] = set()
 
         custom_lexicon = set(
-            [word.strip() for word in self.parameters.get("lexicon-custom", "").split(",") if word.strip()])
+            [
+                word.strip()
+                for word in self.parameters.get("lexicon-custom", "").split(",")
+                if word.strip()
+            ]
+        )
         lexicons[custom_id] |= custom_lexicon
 
         # compile into regex for quick matching
@@ -120,13 +131,16 @@ class LexicalFilter(BaseFilter):
             try:
                 if not case_sensitive:
                     lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b",
-                        flags=re.IGNORECASE)
+                        r"\b(" + "|".join(phrases) + r")\b", flags=re.IGNORECASE
+                    )
                 else:
                     lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b")
+                        r"\b(" + "|".join(phrases) + r")\b"
+                    )
             except re.error:
-                self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
+                self.dataset.update_status(
+                    "Invalid regular expression, cannot use as filter", is_final=True
+                )
                 self.dataset.finish(0)
                 return
 
@@ -140,7 +154,9 @@ class LexicalFilter(BaseFilter):
                 continue
 
             if processed % 2500 == 0:
-                self.dataset.update_status("Processed %i posts (%i matching)" % (processed, matching_items))
+                self.dataset.update_status(
+                    "Processed %i posts (%i matching)" % (processed, matching_items)
+                )
                 self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
             # if 'partition' is false, there will just be one combined

@@ -1,6 +1,7 @@
 """
 Log handler
 """
+
 import traceback
 import platform
 import logging
@@ -20,6 +21,7 @@ class WebHookLogHandler(HTTPHandler):
 
     In essence, an HTTPHandler that formats its payload as JSON.
     """
+
     server_name = ""
 
     def __init__(self, url):
@@ -46,6 +48,7 @@ class WebHookLogHandler(HTTPHandler):
         """
         try:
             import http.client
+
             host = self.host
             if self.secure:
                 h = http.client.HTTPSConnection(host, context=self.context)
@@ -56,10 +59,10 @@ class WebHookLogHandler(HTTPHandler):
             data = json.dumps(self.mapLogRecord(record))
             #####################################################
             if self.method == "GET":
-                if (url.find('?') >= 0):
-                    sep = '&'
+                if url.find("?") >= 0:
+                    sep = "&"
                 else:
-                    sep = '?'
+                    sep = "?"
                 url = url + "%c%s" % (sep, data)
             h.putrequest(self.method, url)
             # support multiple hosts on one IP address...
@@ -77,12 +80,13 @@ class WebHookLogHandler(HTTPHandler):
                 h.putheader("Content-length", str(len(data)))
             if self.credentials:
                 import base64
-                s = ('%s:%s' % self.credentials).encode('utf-8')
-                s = 'Basic ' + base64.b64encode(s).strip().decode('ascii')
-                h.putheader('Authorization', s)
+
+                s = ("%s:%s" % self.credentials).encode("utf-8")
+                s = "Basic " + base64.b64encode(s).strip().decode("ascii")
+                h.putheader("Authorization", s)
             h.endheaders()
             if self.method == "POST":
-                h.send(data.encode('utf-8'))
+                h.send(data.encode("utf-8"))
             h.getresponse()  # can't do anything with the result
         except Exception:
             self.handleError(record)
@@ -114,35 +118,41 @@ class SlackLogHandler(WebHookLogHandler):
             # the last 9 frames are not specific to the exception (general logging code etc)
             # the frame before that is where the exception was raised
             frames = traceback.extract_stack()[:-9]
-        location = "`%s`" % "` → `".join([frame.filename.split("/")[-1] + ":" + str(frame.lineno) for frame in frames])
+        location = "`%s`" % "` → `".join(
+            [
+                frame.filename.split("/")[-1] + ":" + str(frame.lineno)
+                for frame in frames
+            ]
+        )
 
         # prepare slack webhook payload
-        fields = [{
-            "title": "Stack trace:",
-            "value": location,
-            "short": False
-        }]
+        fields = [{"title": "Stack trace:", "value": location, "short": False}]
 
         # try to read some metadata from the offending file
         try:
             with Path(record.frame.filename).open() as infile:
-                fields.append({
-                    "title": "Code (`" + record.frame.filename.split("/")[-1] + ":" + str(record.frame.lineno) + "`):",
-                    "value": "```" + infile.readlines()[record.frame.lineno - 1].strip() + "```",
-                    "short": False
-                })
+                fields.append(
+                    {
+                        "title": "Code (`"
+                        + record.frame.filename.split("/")[-1]
+                        + ":"
+                        + str(record.frame.lineno)
+                        + "`):",
+                        "value": "```"
+                        + infile.readlines()[record.frame.lineno - 1].strip()
+                        + "```",
+                        "short": False,
+                    }
+                )
         except (IndexError, AttributeError):
             # the file is not readable, or the line number is out of bounds
             pass
 
         return {
-            "text": ":bell: 4CAT %s logged on `%s`:" % (record.levelname.lower(), platform.uname().node),
+            "text": ":bell: 4CAT %s logged on `%s`:"
+            % (record.levelname.lower(), platform.uname().node),
             "mrkdwn_in": ["text"],
-            "attachments": [{
-                "color": color,
-                "text": record.message,
-                "fields": fields
-            }]
+            "attachments": [{"color": color, "text": record.message, "fields": fields}],
         }
 
 
@@ -152,6 +162,7 @@ class Logger:
 
     Sets up a rotating logger that writes to a log file
     """
+
     logger = None
     log_path = None
     print_logs = True
@@ -163,11 +174,17 @@ class Logger:
         "WARNING": logging.WARNING,
         "ERROR": logging.ERROR,
         "CRITICAL": logging.CRITICAL,
-        "FATAL": logging.FATAL
+        "FATAL": logging.FATAL,
     }
     alert_level = "FATAL"
 
-    def __init__(self, logger_name='4cat-backend', output=False, filename='4cat.log', log_level="INFO"):
+    def __init__(
+        self,
+        logger_name="4cat-backend",
+        output=False,
+        filename="4cat.log",
+        log_level="INFO",
+    ):
         """
         Set up log handler
 
@@ -178,7 +195,7 @@ class Logger:
         log_level = self.levels.get(log_level, logging.INFO)
 
         self.print_logs = output
-        log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
+        log_folder = config.get("PATH_ROOT").joinpath(config.get("PATH_LOGS"))
         if not log_folder.exists():
             log_folder.mkdir(parents=True)
 
@@ -190,10 +207,16 @@ class Logger:
 
         # this handler manages the text log files
         if not self.logger.handlers:
-            handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
+            handler = RotatingFileHandler(
+                self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1
+            )
             handler.setLevel(log_level)
-            handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
-                                                   "%d-%m-%Y %H:%M:%S"))
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
+                    "%d-%m-%Y %H:%M:%S",
+                )
+            )
             self.logger.addHandler(handler)
 
             # the slack webhook has its own handler, and is only active if the
@@ -201,7 +224,11 @@ class Logger:
             try:
                 if config.get("logging.slack.webhook"):
                     slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
-                    slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
+                    slack_handler.setLevel(
+                        self.levels.get(
+                            config.get("logging.slack.level"), self.alert_level
+                        )
+                    )
                     self.logger.addHandler(slack_handler)
             except Exception:
                 # we *may* need the logger before the database is in working order
@@ -234,7 +261,9 @@ class Logger:
 
         # Logging uses the location, Slack uses the full stack
         location = frame.filename.split("/")[-1] + ":" + str(frame.lineno)
-        self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack})
+        self.logger.log(
+            level, message, extra={"location": location, "frame": frame, "stack": stack}
+        )
 
     def debug(self, message, frame=None):
         """

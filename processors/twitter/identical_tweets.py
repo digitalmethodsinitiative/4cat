@@ -1,6 +1,7 @@
 """
 Twitter APIv2 hashtag statistics
 """
+
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
 
@@ -14,21 +15,29 @@ class TwitterIdenticalTweets(TwitterStatsBase):
     """
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
+
     type = "twitter-identical-tweets"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Identical Tweet Frequency"  # title displayed in UI
     description = "Groups tweets by text and counts the number of times they have been (re)tweeted indentically."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    sorted = 'Number of Identical Tweets'
+    sorted = "Number of Identical Tweets"
 
     options = {
         "timeframe": {
             "type": UserInput.OPTION_CHOICE,
             "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
+            "options": {
+                "all": "Overall",
+                "year": "Year",
+                "month": "Month",
+                "week": "Week",
+                "day": "Day",
+                "hour": "Hour",
+                "minute": "Minute",
+            },
+            "help": "Produce counts per",
         },
     }
 
@@ -48,23 +57,40 @@ class TwitterIdenticalTweets(TwitterStatsBase):
 
         E.g. number of tweets might be aggregated (summed over interval), but username of tweeter will be static.
         """
-        group_by_key_bool = 'Tweet Text'
+        group_by_key_bool = "Tweet Text"
 
-        tweet_text = post.get('text')
+        tweet_text = post.get("text")
         # Expand tweet text if it is a retweet
-        original_id = [post.get('id')]
-        if any([ref.get("type") == "retweeted" for ref in post.get("referenced_tweets", [])]):
-            retweeted_tweet = [t for t in post["referenced_tweets"] if t.get("type") == "retweeted"][0]
+        original_id = [post.get("id")]
+        if any(
+            [
+                ref.get("type") == "retweeted"
+                for ref in post.get("referenced_tweets", [])
+            ]
+        ):
+            retweeted_tweet = [
+                t for t in post["referenced_tweets"] if t.get("type") == "retweeted"
+            ][0]
             retweeted_body = retweeted_tweet.get("text")
-            original_id = [retweeted_tweet.get('id')]
+            original_id = [retweeted_tweet.get("id")]
             # Get user's username that was retweeted
-            if retweeted_tweet.get('author_user') and retweeted_tweet.get('author_user').get('username'):
-                tweet_text = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
-            elif post.get('entities', {}).get('mentions', []):
+            if retweeted_tweet.get("author_user") and retweeted_tweet.get(
+                "author_user"
+            ).get("username"):
+                tweet_text = (
+                    "RT @"
+                    + retweeted_tweet.get("author_user", {}).get("username")
+                    + ": "
+                    + retweeted_body
+                )
+            elif post.get("entities", {}).get("mentions", []):
                 # Username may not always be in retweeted_tweet["author_user"]["username"] when user was removed/deleted
                 # It will be in a mention and and the retweeted_tweet will still have an author id which we can use
-                retweeting_users = [mention.get('username') for mention in post.get('entities', {}).get('mentions', [])
-                                    if mention.get('id') == retweeted_tweet.get('author_id')]
+                retweeting_users = [
+                    mention.get("username")
+                    for mention in post.get("entities", {}).get("mentions", [])
+                    if mention.get("id") == retweeted_tweet.get("author_id")
+                ]
                 if retweeting_users:
                     # should only ever be one, but this verifies that there IS one and not NONE
                     tweet_text = "RT @" + retweeting_users[0] + ": " + retweeted_body
@@ -73,13 +99,13 @@ class TwitterIdenticalTweets(TwitterStatsBase):
         # So I'm not touching them here, but that's open for discussion.
 
         sum_map = {
-                    "Number of Identical Tweets": 1,
-                }
+            "Number of Identical Tweets": 1,
+        }
 
         static_map = {}
 
         # This could be a static item, but there is an edge case of two or more tweets being identical and NOT sharing a
-        list_map = {'Original (Re)Tweet ID': original_id}
+        list_map = {"Original (Re)Tweet ID": original_id}
 
         return group_by_key_bool, tweet_text, sum_map, static_map, list_map
 
@@ -88,7 +114,7 @@ class TwitterIdenticalTweets(TwitterStatsBase):
         Modify the intervals on a second loop once all the data has been collected. This is particularly useful for
         lists or sets of items that were collected.
         """
-        data['Original (Re)Tweet ID'] = ', '.join(set(data['Original (Re)Tweet ID']))
-        data.pop('Created at Timestamp')
+        data["Original (Re)Tweet ID"] = ", ".join(set(data["Original (Re)Tweet ID"]))
+        data.pop("Created at Timestamp")
 
         return data

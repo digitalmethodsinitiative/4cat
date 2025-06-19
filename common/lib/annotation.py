@@ -2,7 +2,6 @@
 Annotation class
 """
 
-
 import time
 import json
 
@@ -25,20 +24,20 @@ class Annotation:
     data = None
     db = None
 
-    id = None                 # Unique ID for this annotation
-    item_id = None            # ID of the item that this annotation was made for, e.g. a post ID.
-    field_id = None           # ID for the annotation field
-    dataset = None            # Dataset key this annotation is generated from
-    timestamp = None          # When this annotation was edited
+    id = None  # Unique ID for this annotation
+    item_id = None  # ID of the item that this annotation was made for, e.g. a post ID.
+    field_id = None  # ID for the annotation field
+    dataset = None  # Dataset key this annotation is generated from
+    timestamp = None  # When this annotation was edited
     timestamp_created = None  # When this annotation was created
-    label = None              # Label of annotation
-    type = None               # Type of annotation (e.g. `text`)
-    options = None            # Possible options
-    value = None              # The actual annotation value
-    author = None             # Who last edited the annotation
-    author_original = None    # Who originally made the annotation
-    by_processor = None       # Whether the annotation was made by a processor
-    metadata = None           # Misc metadata
+    label = None  # Label of annotation
+    type = None  # Type of annotation (e.g. `text`)
+    options = None  # Possible options
+    value = None  # The actual annotation value
+    author = None  # Who last edited the annotation
+    author_original = None  # Who originally made the annotation
+    by_processor = None  # Whether the annotation was made by a processor
+    metadata = None  # Misc metadata
 
     def __init__(self, data=None, annotation_id=None, db=None):
         """
@@ -53,8 +52,12 @@ class Annotation:
         required_fields = ["label", "item_id", "dataset"]
 
         # Must have an ID or data
-        if (annotation_id is None and data is None) or (data is not None and not isinstance(data, dict)):
-            raise AnnotationException("Annotation() requires either a valid `data` dictionary or ID.")
+        if (annotation_id is None and data is None) or (
+            data is not None and not isinstance(data, dict)
+        ):
+            raise AnnotationException(
+                "Annotation() requires either a valid `data` dictionary or ID."
+            )
 
         if not db:
             raise AnnotationException("Annotation() needs a `db` database object")
@@ -73,14 +76,18 @@ class Annotation:
             current = self.get_by_id(annotation_id)
             if not current:
                 raise AnnotationException(
-                    "Annotation() requires a valid ID for an existing annotation, %s given" % id)
+                    "Annotation() requires a valid ID for an existing annotation, %s given"
+                    % id
+                )
 
         # If an ID is not given, get or create an Annotation object from its data.
         # First check if required fields are present in `data`.
         else:
             for required_field in required_fields:
                 if required_field not in data or not data[required_field]:
-                    raise AnnotationException("Annotation() requires a %s field" % required_field)
+                    raise AnnotationException(
+                        "Annotation() requires a %s field" % required_field
+                    )
 
             # Check if this annotation already exists, based on dataset key, item id, and label.
             current = self.get_by_field(data["dataset"], data["item_id"], data["label"])
@@ -110,7 +117,8 @@ class Annotation:
                 "dataset": data["dataset"],
                 "item_id": data["item_id"],
                 "field_id": data["field_id"]
-                if data.get("field_id") else self.set_field_id(data["dataset"], data["label"]),
+                if data.get("field_id")
+                else self.set_field_id(data["dataset"], data["label"]),
                 "timestamp": created_timestamp,
                 "timestamp_created": created_timestamp,
                 "label": data["label"],
@@ -140,7 +148,9 @@ class Annotation:
                 elif k == "by_processor":
                     v = bool(v)
             except ValueError as e:
-                raise AnnotationException("Annotation fields are not of the right type (%s)" % e)
+                raise AnnotationException(
+                    "Annotation fields are not of the right type (%s)" % e
+                )
             self.__setattr__(k, v)
 
         # Write to db if anything changed
@@ -161,7 +171,9 @@ class Annotation:
         except ValueError:
             raise AnnotationException("Id '%s' is not valid" % annotation_id)
 
-        data = self.db.fetchone("SELECT * FROM annotations WHERE id = %s" % annotation_id)
+        data = self.db.fetchone(
+            "SELECT * FROM annotations WHERE id = %s" % annotation_id
+        )
 
         if not data:
             return {}
@@ -184,8 +196,10 @@ class Annotation:
         :return data: A dict with data of the retrieved annotation, or an empty dict if it doesn't exist.
         """
 
-        data = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND label = %s",
-                                (dataset_key, str(item_id), label))
+        data = self.db.fetchone(
+            "SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND label = %s",
+            (dataset_key, str(item_id), label),
+        )
         if not data:
             return {}
 
@@ -221,7 +235,9 @@ class Annotation:
         if db_data["type"] == "checkbox":
             db_data["value"] = ",".join(db_data["value"])
 
-        return self.db.upsert("annotations", data=db_data, constraints=["label", "dataset", "item_id"])
+        return self.db.upsert(
+            "annotations", data=db_data, constraints=["label", "dataset", "item_id"]
+        )
 
     def delete(self):
         """
@@ -229,9 +245,10 @@ class Annotation:
         """
         return self.db.delete("annotations", {"id": self.id})
 
-
     @staticmethod
-    def get_annotations_for_dataset(db: Database, dataset_key: str, item_id=None) -> list:
+    def get_annotations_for_dataset(
+        db: Database, dataset_key: str, item_id=None
+    ) -> list:
         """
         Returns all annotations for a dataset.
         :param db:                  Database object.
@@ -246,10 +263,15 @@ class Annotation:
         if item_id:
             data = db.fetchall(
                 "SELECT * FROM annotations WHERE dataset = %s AND item_id = %s",
-                (dataset_key, str(item_id),)
+                (
+                    dataset_key,
+                    str(item_id),
+                ),
             )
         else:
-            data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s", (dataset_key,))
+            data = db.fetchall(
+                "SELECT * FROM annotations WHERE dataset = %s", (dataset_key,)
+            )
         if not data:
             return []
 
@@ -286,7 +308,9 @@ class Annotation:
         return db.delete("annotations", where)
 
     @staticmethod
-    def update_annotations_via_fields(dataset_key: str, old_fields: dict, new_fields: dict, db: Database) -> int:
+    def update_annotations_via_fields(
+        dataset_key: str, old_fields: dict, new_fields: dict, db: Database
+    ) -> int:
         """
         Updates annotations in the annotations table if the input fields
         themselves have been changed, for instance if a dropdown label is renamed
@@ -307,13 +331,12 @@ class Annotation:
         if old_fields == new_fields:
             return 0
 
-        fields_to_delete = set()        # Delete all annotations with this field ID
-        fields_to_update = {}           # Update values of annotations with this field ID
+        fields_to_delete = set()  # Delete all annotations with this field ID
+        fields_to_update = {}  # Update values of annotations with this field ID
         old_options = {}
 
         # Loop through the old annotation fields
         for old_field_id, old_field in old_fields.items():
-
             # Delete all annotations of this type if the field is deleted.
             if old_field_id not in new_fields:
                 fields_to_delete.add(old_field_id)
@@ -325,7 +348,10 @@ class Annotation:
             # If the annotation type has changed, also delete existing annotations,
             # except between text and textarea, where we can just change the type and keep the text.
             if old_field["type"] != new_field["type"]:
-                if old_field["type"] not in text_fields and new_field["type"] not in text_fields:
+                if (
+                    old_field["type"] not in text_fields
+                    and new_field["type"] not in text_fields
+                ):
                     fields_to_delete.add(field_id)
                     continue
 
@@ -333,15 +359,12 @@ class Annotation:
             # and update in case it's different from the old values.
             update_data = {}
             for field_key, field_value in new_field.items():
-
                 # Update if values don't match
                 if field_value != old_field.get(field_key):
-
                     # Special case: option values that are removed/renamed.
                     # Here we may have to change/delete values within the
                     # values column.
                     if field_key == "options":
-
                         new_options = field_value
 
                         # Edge case: delete annotations of this type if all option fields are deleted
@@ -383,26 +406,30 @@ class Annotation:
         count = 0
         if fields_to_update:
             for field_id, updates in fields_to_update.items():
-
                 # Write to db
                 for column, update_value in updates.items():
-
                     update_value_insert = update_value
                     if column == "options":
-                        update_value_insert = ",".join(list(update_value["options"].values()))
+                        update_value_insert = ",".join(
+                            list(update_value["options"].values())
+                        )
 
                     # Change values of columns
-                    updates = db.update("annotations", {column: update_value_insert},
-                                        where={"dataset": dataset_key, "field_id": field_id})
+                    updates = db.update(
+                        "annotations",
+                        {column: update_value_insert},
+                        where={"dataset": dataset_key, "field_id": field_id},
+                    )
                     count += updates
 
                     # Special case: Changed option labels.
                     # Here we have to also rename/remove inserted options from the `value` column.
                     if column == "options":
-
-                        annotations = db.fetchall("SELECT id, options, value FROM annotations "
-                                                  "WHERE dataset = '%s' and field_id = '%s' AND value != '';"
-                                                  % (dataset_key, field_id))
+                        annotations = db.fetchall(
+                            "SELECT id, options, value FROM annotations "
+                            "WHERE dataset = '%s' and field_id = '%s' AND value != '';"
+                            % (dataset_key, field_id)
+                        )
 
                         for annotation in annotations:
                             annotation_id = annotation["id"]
@@ -410,12 +437,18 @@ class Annotation:
 
                             # Remove or rename options
                             new_values = []
-                            new_options = update_value["options"]  # Dict with option id->label as items
+                            new_options = update_value[
+                                "options"
+                            ]  # Dict with option id->label as items
 
                             for ann_value in annotation_values:
                                 # Get the option ID, so we can see if it's new, deleted, or renamed.
                                 # Should always be present in old options dict
-                                option_id = [k for k, v in old_options[field_id].items() if v == ann_value][0]
+                                option_id = [
+                                    k
+                                    for k, v in old_options[field_id].items()
+                                    if v == ann_value
+                                ][0]
                                 # Deleted...
                                 if option_id not in new_options:
                                     continue
@@ -424,7 +457,11 @@ class Annotation:
                                     new_values.append(new_options[option_id])
 
                             new_values = ",".join(new_values)
-                            db.update("annotations", {"value": new_values}, where={"id": annotation_id})
+                            db.update(
+                                "annotations",
+                                {"value": new_values},
+                                where={"id": annotation_id},
+                            )
 
         return count
 

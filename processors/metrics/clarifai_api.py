@@ -1,6 +1,7 @@
 """
 Request tags and labels from the Google Vision API for a given set of images
 """
+
 import json
 import csv
 
@@ -25,12 +26,15 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
     Request tags and labels from the Clarifai API for a given set of images
     """
+
     type = "clarifai-api"  # job type ID
     category = "Post metrics"  # category
     title = "Clarifai API Analysis"  # title displayed in UI
-    description = "Use the Clarifai API to annotate images with tags and labels identified via machine learning. " \
-                  "One request will be made per image per annotation type. Note that this is NOT a free service and " \
-                  "requests will be credited by Clarifai to the owner of the API token you provide!"  # description displayed in UI
+    description = (
+        "Use the Clarifai API to annotate images with tags and labels identified via machine learning. "
+        "One request will be made per image per annotation type. Note that this is NOT a free service and "
+        "requests will be credited by Clarifai to the owner of the API token you provide!"
+    )  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     followups = ["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"]
@@ -38,7 +42,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
     references = [
         "[Clarifai](https://www.clarifai.com/)",
         "[Clarifai API Pricing & Free Usage Limits](https://www.clarifai.com/pricing)",
-        "[Clarifai model browser](https://clarifai.com/clarifai/main/models)"
+        "[Clarifai model browser](https://clarifai.com/clarifai/main/models)",
     ]
 
     @classmethod
@@ -48,7 +52,11 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
+        return (
+            module.get_media_type() == "image"
+            or module.type.startswith("image-downloader")
+            or module.type == "video-frames"
+        )
 
     options = {
         "amount": {
@@ -56,7 +64,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "help": "Images to process (0 = all)",
             "cache": True,
             "sensitive": True,
-            "default": 0
+            "default": 0,
         },
         "api_key": {
             "type": UserInput.OPTION_TEXT,
@@ -64,13 +72,13 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "cache": True,
             "sensitive": True,
             "tooltip": "The API Key for the Clarifai account you want to query with. You can generate and find this"
-                       "key on the API dashboard."
+            "key on the API dashboard.",
         },
         "models": {
             "type": UserInput.OPTION_MULTI,
             "help": "Models",
             "tooltip": "Which models to use for recognition? More models = more API calls = potentially more costs. "
-                       "See the model browser in processor references for more details on each model.",
+            "See the model browser in processor references for more details on each model.",
             "options": {
                 "general-image-recognition": "General Concept Recognition (general-image-recognition)",
                 "apparel-recognition": "Clothing & Apparal (apparel-recognition)",
@@ -79,10 +87,10 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 "food-item-recognition": "Food items (food-item-recognition)",
                 "moderation-recognition": "Inappropriate content (moderation-recognition)",
                 "nsfw-recognition": "NSFW content (mostly nudity, nsfw-recognition)",
-                "texture-recognition": "Materials & textures (texture-recognition)"
+                "texture-recognition": "Materials & textures (texture-recognition)",
             },
-            "default": ["general-image-recognition"]
-        }
+            "default": ["general-image-recognition"],
+        },
     }
 
     def process(self):
@@ -92,7 +100,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
         for the image, and one with the amount of times the image was used
         """
         api_key = self.parameters.get("api_key")
-        #application_id = self.parameters.get("application_id")
+        # application_id = self.parameters.get("application_id")
 
         models = self.parameters.get("models")
         if type(models) is str:
@@ -100,7 +108,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
         if not models:
             return self.dataset.finish_with_error(
-                "No models selected; select at least one model for concept recognition.")
+                "No models selected; select at least one model for concept recognition."
+            )
 
         metadata = (("authorization", f"Key {api_key}"),)
         stub = service_pb2_grpc.V2Stub(ClarifaiChannel.get_grpc_channel())
@@ -109,7 +118,9 @@ class ClarifaiAPIFetcher(BasicProcessor):
         batch_size = 16
 
         num_images = self.source_dataset.num_rows - 1  # .metadata.json
-        total_annotations = (num_images if limit == 0 else min(limit, num_images)) * len(models)
+        total_annotations = (
+            num_images if limit == 0 else min(limit, num_images)
+        ) * len(models)
         errors = 0
         processed = 0
         annotated = 0
@@ -142,11 +153,13 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     with image.open("rb") as infile:
                         encoded_image = infile.read()
 
-                    batch.append(resources_pb2.Input(
-                        data=resources_pb2.Data(image=resources_pb2.Image(
-                            base64=encoded_image
-                        ))
-                    ))
+                    batch.append(
+                        resources_pb2.Input(
+                            data=resources_pb2.Data(
+                                image=resources_pb2.Image(base64=encoded_image)
+                            )
+                        )
+                    )
 
                     images_names[len(batch) - 1] = image.name
 
@@ -162,7 +175,9 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     processed += len(response.outputs)
 
                     self.dataset.update_progress(processed / total_annotations)
-                    self.dataset.update_status(f"Collected {processed:,} of {total_annotations:,} annotations")
+                    self.dataset.update_status(
+                        f"Collected {processed:,} of {total_annotations:,} annotations"
+                    )
 
                     if response.status.code == status_code_pb2.MIXED_STATUS:
                         # handled individually per image
@@ -170,15 +185,21 @@ class ClarifaiAPIFetcher(BasicProcessor):
                         pass
                     elif response.status.code != status_code_pb2.SUCCESS:
                         # this is bad!
-                        self.dataset.log(f"Error fetching {model_id} annotations from Clarifai annotated ({response.status.code}"
-                                                   f"/{response.status.description})")
-                        return self.dataset.finish_with_error(f"Error connecting to Clarifai ({response.status.description}), stopping.")
+                        self.dataset.log(
+                            f"Error fetching {model_id} annotations from Clarifai annotated ({response.status.code}"
+                            f"/{response.status.description})"
+                        )
+                        return self.dataset.finish_with_error(
+                            f"Error connecting to Clarifai ({response.status.description}), stopping."
+                        )
 
                     # collect annotated concepts
                     for index, output in enumerate(response.outputs):
                         image_name = images_names[index]
                         if output.status.code != status_code_pb2.SUCCESS:
-                            self.dataset.update_status(f"Image {image_name} could not be annotated ({output.status.description}), skipping")
+                            self.dataset.update_status(
+                                f"Image {image_name} could not be annotated ({output.status.description}), skipping"
+                            )
                             errors += 1
                             continue
 
@@ -188,7 +209,10 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
                         # add concepts to buffer to write them to the result
                         # file later
-                        buffer[image_name][model_id] = {concept.name: concept.value for concept in output.data.concepts}
+                        buffer[image_name][model_id] = {
+                            concept.name: concept.value
+                            for concept in output.data.concepts
+                        }
 
                     images_names = {}
                     batch = []
@@ -201,17 +225,17 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 for model_annotations in annotations.values():
                     all_annotations.update(model_annotations)
 
-                item = {
-                    "image": image,
-                    **annotations,
-                    "combined": all_annotations
-                }
+                item = {"image": image, **annotations, "combined": all_annotations}
                 outfile.write(json.dumps(item) + "\n")
 
         if errors:
-            self.dataset.update_status(f"Collected {annotated} annotations, {errors} skipped - see dataset log for details",
-                                       is_final=True)
+            self.dataset.update_status(
+                f"Collected {annotated} annotations, {errors} skipped - see dataset log for details",
+                is_final=True,
+            )
         else:
-            self.dataset.update_status(f"Collected {annotated} annotations", is_final=True)
+            self.dataset.update_status(
+                f"Collected {annotated} annotations", is_final=True
+            )
 
         self.dataset.finish(len(buffer))

@@ -8,13 +8,22 @@ from pathlib import Path
 
 # first-run.py ensures everything is set up right when running 4CAT for the first time
 first_run = Path(__file__).parent.parent.joinpath("helper-scripts", "first-run.py")
-result = subprocess.run([sys.executable, str(first_run)], stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE)
+result = subprocess.run(
+    [sys.executable, str(first_run)], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+)
 
 if result.returncode != 0:
     print("Unexpected error while preparing 4CAT. You may need to re-install 4CAT.")
-    print("stdout:\n".join(["  " + line for line in result.stdout.decode("utf-8").split("\n")]))
-    print("stderr:\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
+    print(
+        "stdout:\n".join(
+            ["  " + line for line in result.stdout.decode("utf-8").split("\n")]
+        )
+    )
+    print(
+        "stderr:\n".join(
+            ["  " + line for line in result.stderr.decode("utf-8").split("\n")]
+        )
+    )
     exit(1)
 
 # the following are imported *after* the first-run stuff because they may rely
@@ -49,26 +58,28 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 if config.get("USING_DOCKER"):
     # in Docker it is useful to have two separate files - since 4CAT is also
     # in two separate containers
-    log = Logger(logger_name='4cat-frontend', filename='frontend_4cat.log')
+    log = Logger(logger_name="4cat-frontend", filename="frontend_4cat.log")
 else:
-    log = Logger(logger_name='4cat-frontend')
+    log = Logger(logger_name="4cat-frontend")
 
 # set up logging for Gunicorn
 # this redirects Gunicorn log messages to the logger instantiated above - more
 # sensible than having yet another separate log file
 if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     # Add Gunicorn error log to main app logger
-    gunicorn_logger = logging.getLogger('gunicorn.error')
+    gunicorn_logger = logging.getLogger("gunicorn.error")
     app.logger.handlers = gunicorn_logger.handlers
-    app.logger.setLevel(gunicorn_logger.level) # debug is int 10
+    app.logger.setLevel(gunicorn_logger.level)  # debug is int 10
 
     # Gunicorn Error Log file
-    error_file_path = Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), 'error_gunicorn.log')
+    error_file_path = Path(
+        config.get("PATH_ROOT"), config.get("PATH_LOGS"), "error_gunicorn.log"
+    )
     file_handler = logging.handlers.RotatingFileHandler(
-                                                        filename=error_file_path,
-                                                        maxBytes=int( 50 * 1024 * 1024),
-                                                        backupCount= 1,
-                                                        )
+        filename=error_file_path,
+        maxBytes=int(50 * 1024 * 1024),
+        backupCount=1,
+    )
     logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
     file_handler.setFormatter(logFormatter)
     app.logger.addHandler(file_handler)
@@ -79,41 +90,62 @@ if app.logger.getEffectiveLevel() == 10:
     # if we're in debug mode, we want to see how long it takes to load datasets
     import time
     from functools import wraps
+
     def time_this(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             start_time = time.time()
             r = func(*args, **kwargs)
-            app.logger.debug("%s dataset took %.2f seconds" % (func.__name__, time.time() - start_time))
+            app.logger.debug(
+                "%s dataset took %.2f seconds"
+                % (func.__name__, time.time() - start_time)
+            )
             return r
+
         return wrapper
 else:
+
     def time_this(func):
         return func
+
+
 app.time_this = time_this
 
 # 4CAT compontents we need access to from within the web app
-db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
-              password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
-              port=config.get("DB_PORT"), appname="frontend")
+db = Database(
+    logger=log,
+    dbname=config.get("DB_NAME"),
+    user=config.get("DB_USER"),
+    password=config.get("DB_PASSWORD"),
+    host=config.get("DB_HOST"),
+    port=config.get("DB_PORT"),
+    appname="frontend",
+)
 config.with_db(db)
 queue = JobQueue(logger=log, database=db)
 
 # make sure a secret key was set in the config file, for secure session cookies
-if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPLACE_THIS":
-    raise Exception("You need to set the flask.secret_key setting running the web tool.")
+if (
+    not config.get("flask.secret_key")
+    or config.get("flask.secret_key") == "REPLACE_THIS"
+):
+    raise Exception(
+        "You need to set the flask.secret_key setting running the web tool."
+    )
 
 # initialize Flask configuration from config manager
-app.config.from_mapping({
-    "FLASK_APP": config.get("flask.flask_app"),
-    "SECRET_KEY": config.get("flask.secret_key"),
-    "SERVER_NAME": config.get("flask.server_name"),
-    "SERVER_HTTPS": config.get("flask.https"),
-    "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
-    "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
-    "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
-    "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http"
-})
+app.config.from_mapping(
+    {
+        "FLASK_APP": config.get("flask.flask_app"),
+        "SECRET_KEY": config.get("flask.secret_key"),
+        "SERVER_NAME": config.get("flask.server_name"),
+        "SERVER_HTTPS": config.get("flask.https"),
+        "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
+        "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
+        "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
+        "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http",
+    }
+)
 
 # Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
 app.request_class.max_form_parts = config.get("flask.max_form_parts", 1000)
@@ -153,7 +185,7 @@ with app.app_context():
     import webtool.views.views_explorer  # noqa: E402
     import webtool.views.api_standalone  # noqa: E402
     import webtool.views.api_tool  # noqa: E402
-    
+
     app.register_blueprint(webtool.views.views_restart.component)
     app.register_blueprint(webtool.views.views_admin.component)
     app.register_blueprint(webtool.views.views_extensions.component)
@@ -191,5 +223,5 @@ generate_css_colours()
 
 # run it (when called directly)
 if __name__ == "__main__":
-    print('Starting server...')
-    app.run(host='0.0.0.0', debug=True)
+    print("Starting server...")
+    app.run(host="0.0.0.0", debug=True)

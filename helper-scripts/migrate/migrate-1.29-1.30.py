@@ -24,8 +24,16 @@ ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
 db_config = ini["DATABASE"]
 
-db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
-              host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
+db = Database(
+    logger=log,
+    dbname=db_config["db_name"],
+    user=db_config["db_user"],
+    password=db_config["db_password"],
+    host=db_config["db_host"],
+    port=db_config["db_port"],
+    appname="4cat-migrate",
+)
+
 
 def config_get(attribute, default=None):
     """
@@ -37,8 +45,9 @@ def config_get(attribute, default=None):
     :param attribute:
     :return:
     """
-    v = db.fetchone("SELECT value FROM settings WHERE name = %s", (attribute, ))
+    v = db.fetchone("SELECT value FROM settings WHERE name = %s", (attribute,))
     return v["value"] if v else default
+
 
 def config_set(attribute, value):
     """
@@ -50,10 +59,14 @@ def config_set(attribute, value):
     :param attribute:
     :return:
     """
-    return db.update("settings", where={"name": attribute}, data={"value": json.dumps(value)})
+    return db.update(
+        "settings", where={"name": attribute}, data={"value": json.dumps(value)}
+    )
+
 
 def delete_setting(attribute):
     return db.delete("settings", where={"name": attribute})
+
 
 # ---------------------------------------------
 #     New format for data source settings
@@ -64,8 +77,12 @@ if type(datasources) is dict:
     new_datasources = list(datasources.keys())
 
     # 'customimport' and 'custom' have been replaced with 'upload'
-    if ("custom" in new_datasources or "customimport" in new_datasources) and "upload" not in new_datasources:
-        print("  - Enabling new 'upload' datasource because 'custom' or 'customimport' were enabled")
+    if (
+        "custom" in new_datasources or "customimport" in new_datasources
+    ) and "upload" not in new_datasources:
+        print(
+            "  - Enabling new 'upload' datasource because 'custom' or 'customimport' were enabled"
+        )
         new_datasources.append("upload")
 
     if "custom" in new_datasources:
@@ -87,8 +104,10 @@ if type(datasources) is dict:
         for setting in ("boards", "no_scrape", "autoscrape", "interval"):
             if platform in datasources and datasources[platform].get(setting):
                 print(f"  - Migrating setting {platform}.{setting}...")
-                config_set(platform.replace("4", "four").replace("8", "eight") + "." + setting,
-                           datasources[platform][setting])
+                config_set(
+                    platform.replace("4", "four").replace("8", "eight") + "." + setting,
+                    datasources[platform][setting],
+                )
 
     for platform in ("dmi-tcat", "dmi-tcatv2"):
         for setting in ("instances",):
@@ -97,8 +116,11 @@ if type(datasources) is dict:
                 config_set(platform + "." + setting, datasources[platform][setting])
 
     print("  - Migrating data source-specific expiration settings...")
-    expiration = {datasource: {"timeout": info["expire-datasets"], "allow_optout": False} for datasource, info in
-                  datasources.items() if "expire-datasets" in info}
+    expiration = {
+        datasource: {"timeout": info["expire-datasets"], "allow_optout": False}
+        for datasource, info in datasources.items()
+        if "expire-datasets" in info
+    }
     config_set("expire.datasources", expiration)
 
     print("  - Updating DATASOURCES setting...")
@@ -112,7 +134,9 @@ if config_get("IMAGE_INTERVAL"):
     config_set("fourchan.image_interval", config_get("IMAGE_INTERVAL", 60))
     delete_setting("IMAGE_INTERVAL")
 
-print("  - WARN_EMAILS, WARN_INTERVAL, image_downloader_telegram.MAX_NUMBER_IMAGES -> removed")
+print(
+    "  - WARN_EMAILS, WARN_INTERVAL, image_downloader_telegram.MAX_NUMBER_IMAGES -> removed"
+)
 delete_setting("WARN_EMAILS")
 delete_setting("WARN_INTERVAL")
 delete_setting("image_downloader_telegram.MAX_NUMBER_IMAGES")
@@ -133,11 +157,11 @@ if config_path.exists():
         # NOTE: this checks the COPIED .env file in the Docker container not the actual file used by Docker
         # It should still represent the version used when creating the Docker container, but if that file is updated and
         # container is not rebuilt AND migrate runs again, this message will be added again and may cause confusion.
-        with open('.env') as f:
+        with open(".env") as f:
             for line in f.readlines():
                 if "DOCKER_TAG" in line:
-                    docker_version = line.split('=')[-1].strip()
-                    if docker_version not in ['latest', 'stable']:
+                    docker_version = line.split("=")[-1].strip()
+                    if docker_version not in ["latest", "stable"]:
                         notification = f"You have updated 4CAT, but your Docker .env file indicates you installed a specific version. If you recreate your 4CAT Docker containers, 4CAT will regress to {docker_version}. Consider updating DOCKER_TAG in .env to the 'stable' tag to always use the latest version."
                         add_notification(db, "!admin", notification)
                     break
@@ -159,23 +183,38 @@ else:
 
     ffmpeg = shutil.which(config_get("video_downloader.ffmpeg-path", "ffmpeg"))
     if ffmpeg:
-        print(f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path")
+        print(
+            f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path"
+        )
         config_set("video_downloader.ffmpeg-path", ffmpeg)
     elif in_docker:
         print("  - ffmpeg not found, detected Docker environment, installing via apt")
-        ffmpeg_install = subprocess.run(oslex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ffmpeg_install = subprocess.run(
+            oslex.split("apt install -y ffmpeg"),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         if ffmpeg_install.returncode == 0:
             print("  - ffmpeg intalled with apt!")
             config_set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"))
         else:
-            print(f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video")
-            print("    processors will be unavailable until you rebuild the Docker containers.")
+            print(
+                f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video"
+            )
+            print(
+                "    processors will be unavailable until you rebuild the Docker containers."
+            )
             print("    apt output is printed below:")
             print(ffmpeg_install.stderr)
             print(ffmpeg_install.stdout)
     else:
-        print("  - ffmpeg not found on system! Some video processors will not be available.")
-        print("    Install ffmpeg and configure its path in the 4CAT General Settings to enable")
+        print(
+            "  - ffmpeg not found on system! Some video processors will not be available."
+        )
+        print(
+            "    Install ffmpeg and configure its path in the 4CAT General Settings to enable"
+        )
         print("    these.")
 
 # ---------------------------------------------
@@ -186,11 +225,13 @@ print("  Creating new indexes for enabled imageboard datasources...")
 imageboards_enabled = False
 
 # remove obsolete data sources
-to_delete = (Path())
+to_delete = Path()
 
 # Check for 8kun
 is_8kun = db.fetchone(
-    "SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_name = %s )" % "'threads_8kun'")
+    "SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_name = %s )"
+    % "'threads_8kun'"
+)
 if is_8kun["exists"]:
     imageboards_enabled = True
 
@@ -207,7 +248,9 @@ if is_8kun["exists"]:
 
 # Check for 4chan
 is_4chan = db.fetchone(
-    "SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_name = %s )" % "'threads_4chan'")
+    "SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_name = %s )"
+    % "'threads_4chan'"
+)
 if is_4chan["exists"]:
     imageboards_enabled = True
 

@@ -1,6 +1,7 @@
 """
 Delete all files from the results folder that are not linked to a query
 """
+
 import glob
 import sys
 import os
@@ -15,13 +16,13 @@ from common.config_manager import config
 logger = Logger()
 database = Database(logger=logger, appname="result-cleaner")
 
-os.chdir(config.get('PATH_DATA'))
+os.chdir(config.get("PATH_DATA"))
 files = glob.glob("*.*")
 
 for file in files:
-	key = file.split(".")[0].split("-")[-1]
-	try:
-		query = DataSet(key=key, db=database)
-	except DataSetException:
-		print("Not linked to a query: %s" % file)
-		os.unlink(config.get('PATH_DATA').joinpath(file))
+    key = file.split(".")[0].split("-")[-1]
+    try:
+        query = DataSet(key=key, db=database)
+    except DataSetException:
+        print("Not linked to a query: %s" % file)
+        os.unlink(config.get("PATH_DATA").joinpath(file))

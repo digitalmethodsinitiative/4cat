@@ -1,6 +1,7 @@
 """
 Request tags and labels from the Google Vision API for a given set of images
 """
+
 import requests
 import base64
 import json
@@ -26,20 +27,27 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
     Request tags and labels from the Google Vision API for a given set of images
     """
+
     type = "google-vision-api"  # job type ID
     category = "Post metrics"  # category
     title = "Google Vision API Analysis"  # title displayed in UI
-    description = "Use the Google Vision API to annotate images with tags and labels identified via machine learning. " \
-                  "One request will be made per image per annotation type. Note that this is not a free service and " \
-                  "requests will be credited by Google to the owner of the API token you provide. Requires billing " \
-                  "and Google Vision API enabled (this may take a few minutes)."  # description displayed in UI
+    description = (
+        "Use the Google Vision API to annotate images with tags and labels identified via machine learning. "
+        "One request will be made per image per annotation type. Note that this is not a free service and "
+        "requests will be credited by Google to the owner of the API token you provide. Requires billing "
+        "and Google Vision API enabled (this may take a few minutes)."
+    )  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
-    followups = ["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"]
+    followups = [
+        "convert-google-vision-to-csv",
+        "vision-bipartite-network",
+        "vision-label-network",
+    ]
 
     references = [
         "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
-        "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)"
+        "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)",
     ]
 
     @classmethod
@@ -49,19 +57,23 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
+        return (
+            module.get_media_type() == "image"
+            or module.type.startswith("image-downloader")
+            or module.type == "video-frames"
+        )
 
     options = {
         "amount": {
             "type": UserInput.OPTION_TEXT,
             "help": "Images to process (0 = all)",
-            "default": 0
+            "default": 0,
         },
         "api_key": {
             "type": UserInput.OPTION_TEXT,
             "help": "API Key",
             "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
-                       "key on console.cloud.google.com. You also need to enable billing and Vision API."
+            "key on console.cloud.google.com. You also need to enable billing and Vision API.",
         },
         "features": {
             "type": UserInput.OPTION_MULTI,
@@ -77,10 +89,10 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 "IMAGE_PROPERTIES": "Image Properties",
                 "CROP_HINTS": "Crop Hints",
                 "WEB_DETECTION": "Web Detection",
-                "OBJECT_LOCALIZATION": "Object Localization"
+                "OBJECT_LOCALIZATION": "Object Localization",
             },
-            "default": ["LABEL_DETECTION"]
-        }
+            "default": ["LABEL_DETECTION"],
+        },
     }
 
     def process(self):
@@ -105,7 +117,11 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             return
 
         max_images = convert_to_int(self.parameters.get("amount", 0), 100)
-        total = self.source_dataset.num_rows if not max_images else min(max_images, self.source_dataset.num_rows)
+        total = (
+            self.source_dataset.num_rows
+            if not max_images
+            else min(max_images, self.source_dataset.num_rows)
+        )
         processed = 0
         done = 0
 
@@ -115,20 +131,26 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         # Loop through images
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
+                raise ProcessorInterruptedException(
+                    "Interrupted while fetching data from Google Vision API"
+                )
 
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
             self.dataset.update_progress(done / total)
 
-            if image_file.name.startswith(".") or image_file.suffix in (".json", ".log"):
-
+            if image_file.name.startswith(".") or image_file.suffix in (
+                ".json",
+                ".log",
+            ):
                 # Get the .metadata.json file so we can also save post IDs.
                 if image_file.name == ".metadata.json":
                     img_metadata = json.load(image_file.open())
                     if img_metadata:
                         img_metadata = [v for v in img_metadata.values()]
 
-                self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
+                self.dataset.log(
+                    f"Skipping file {image_file.name}, probably not an image."
+                )
                 continue
 
             try:
@@ -144,7 +166,8 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             annotations = {
                 "file_name": image_file.name,
                 "post_ids": img_metadata[processed - 1].get("post_ids", []),
-                **annotations}
+                **annotations,
+            }
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:
                 outfile.write(json.dumps(annotations) + "\n")
@@ -153,7 +176,11 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             if max_images and done >= max_images:
                 break
 
-        self.dataset.update_status("Annotations retrieved for %i images (%i processed in total)" % (done, processed), is_final=True)
+        self.dataset.update_status(
+            "Annotations retrieved for %i images (%i processed in total)"
+            % (done, processed),
+            is_final=True,
+        )
         self.dataset.finish(done)
 
     def annotate_image(self, image_file: Path, api_key: str, features: list):
@@ -171,37 +198,50 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             base64_image = base64.b64encode(infile.read()).decode("ascii")
 
         api_params = {
-            "requests": {
-                "image": {"content": base64_image},
-                "features": features
-            }
+            "requests": {"image": {"content": base64_image}, "features": features}
         }
 
         try:
             api_request = requests.post(endpoint, json=api_params)
         except (requests.RequestException, ConnectionError) as e:
-            self.dataset.update_status("Skipping image %s due to %s (%s)" % (image_file.name, e.__name__, str(e)))
+            self.dataset.update_status(
+                "Skipping image %s due to %s (%s)"
+                % (image_file.name, e.__name__, str(e))
+            )
             return None
 
         if api_request.status_code == 401:
-            self.dataset.update_status("Invalid API key or reached API quota, halting", is_final=True)
+            self.dataset.update_status(
+                "Invalid API key or reached API quota, halting", is_final=True
+            )
             raise RuntimeError()  # not recoverable
 
         elif api_request.status_code == 400 and "BILLING_DISABLED" in api_request.text:
-            self.dataset.update_status("Billing is not enabled for your API key. You need to enable billing to use "
-                                       "the Google Vision API.", is_final=True)
+            self.dataset.update_status(
+                "Billing is not enabled for your API key. You need to enable billing to use "
+                "the Google Vision API.",
+                is_final=True,
+            )
             raise RuntimeError()  # not recoverable
 
         elif api_request.status_code != 200:
-            self.dataset.update_status("Got response code %i from Google Vision API for image %s, skipping" % (api_request.status_code, image_file.name))
-            self.dataset.log(f"Code {api_request.status_code}; Text: {api_request.text}")
+            self.dataset.update_status(
+                "Got response code %i from Google Vision API for image %s, skipping"
+                % (api_request.status_code, image_file.name)
+            )
+            self.dataset.log(
+                f"Code {api_request.status_code}; Text: {api_request.text}"
+            )
             return None
 
         try:
             response = api_request.json()
             response = response["responses"]
         except (json.JSONDecodeError, KeyError):
-            self.dataset.update_status("Got an improperly formatted response from Google Vision API for image %s, skipping" % image_file.name)
+            self.dataset.update_status(
+                "Got an improperly formatted response from Google Vision API for image %s, skipping"
+                % image_file.name
+            )
             return None
 
         return response.pop()

@@ -1,6 +1,7 @@
 """
 4CAT Module superclass for DataSets and BasicProcessors
 """
+
 import abc
 
 
@@ -15,4 +16,5 @@ class FourcatModule(metaclass=abc.ABCMeta):
     processor. This reduces boilerplate code in `is_compatible_with` methods
     in processors.
     """
+
     pass

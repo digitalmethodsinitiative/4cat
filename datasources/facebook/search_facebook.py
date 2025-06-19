@@ -4,6 +4,7 @@ Import scraped Facebook data
 It's prohibitively difficult to scrape data from Facebook within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+
 from datetime import datetime
 import json
 
@@ -15,6 +16,7 @@ class SearchFacebook(Search):
     """
     Import scraped 9gag data
     """
+
     type = "facebook-search"  # job ID
     category = "Search"  # category
     title = "Import scraped Facebook data"  # title displayed in UI
@@ -26,7 +28,7 @@ class SearchFacebook(Search):
     accepts = [None]
     references = [
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
-        "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)"
+        "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok)",
     ]
 
     def get_items(self, query):
@@ -35,7 +37,9 @@ class SearchFacebook(Search):
 
         Not available for 9gag
         """
-        raise NotImplementedError("Facebook datasets can only be created by importing data from elsewhere")
+        raise NotImplementedError(
+            "Facebook datasets can only be created by importing data from elsewhere"
+        )
 
     @staticmethod
     def map_item(post):
@@ -46,7 +50,13 @@ class SearchFacebook(Search):
             raise e
 
         # lol, get a load of this
-        metadata = [m for m in post["comet_sections"]["context_layout"]["story"]["comet_sections"]["metadata"] if m["__typename"] == "CometFeedStoryMinimizedTimestampStrategy"].pop(0)["story"]
+        metadata = [
+            m
+            for m in post["comet_sections"]["context_layout"]["story"][
+                "comet_sections"
+            ]["metadata"]
+            if m["__typename"] == "CometFeedStoryMinimizedTimestampStrategy"
+        ].pop(0)["story"]
         post_timestamp = datetime.fromtimestamp(int(metadata["creation_time"]))
 
         in_group = "/groups/" in metadata["url"]
@@ -60,19 +70,22 @@ class SearchFacebook(Search):
         video_urls = []
         for attachment in main_data["attachments"]:
             if attachment["target"]["__typename"] == "Photo":
-                image_urls.append(f"https://www.facebook.com/photo/?fbid={attachment['target']['id']}")
+                image_urls.append(
+                    f"https://www.facebook.com/photo/?fbid={attachment['target']['id']}"
+                )
 
-
-        return MappedItem({
-            "id": main_data["post_id"],
-            "url": main_data["wwwURL"],
-            "body": main_data.get("message", {}).get("text", ""),
-            "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "author": author.get("url").split("/")[-1],
-            "author_name": author.get("name", ""),
-            "image_url": ",".join(image_urls),
-            "video_url": ",".join(video_urls),
-            "is_in_group": "yes" if in_group else "no",
-            "group_name": group,
-            "unix_timestamp": int(post_timestamp.timestamp()),
-        })
+        return MappedItem(
+            {
+                "id": main_data["post_id"],
+                "url": main_data["wwwURL"],
+                "body": main_data.get("message", {}).get("text", ""),
+                "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "author": author.get("url").split("/")[-1],
+                "author_name": author.get("name", ""),
+                "image_url": ",".join(image_urls),
+                "video_url": ",".join(video_urls),
+                "is_in_group": "yes" if in_group else "no",
+                "group_name": group,
+                "unix_timestamp": int(post_timestamp.timestamp()),
+            }
+        )

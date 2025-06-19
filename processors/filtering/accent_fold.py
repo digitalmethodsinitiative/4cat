@@ -1,6 +1,7 @@
 """
 Fold accents, case, and diacritics.
 """
+
 import unicodedata
 import csv
 
@@ -20,11 +21,14 @@ class AccentFoldingFilter(BasicProcessor):
     """
     Fold accents, case, and diacritics.
     """
+
     type = "accent-folder"  # job type ID
     category = "Filtering"  # category
     title = "Replace or transliterate accented and non-Latin characters"  # title displayed in UI
-    description = "Replaces non-latin characters with the closest ASCII equivalent, convertng e.g. 'á' to 'a', 'ç' " \
-                  "to 'c', et cetera. Creates a new dataset."
+    description = (
+        "Replaces non-latin characters with the closest ASCII equivalent, convertng e.g. 'á' to 'a', 'ç' "
+        "to 'c', et cetera. Creates a new dataset."
+    )
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
@@ -33,24 +37,24 @@ class AccentFoldingFilter(BasicProcessor):
             "type": UserInput.OPTION_CHOICE,
             "options": {
                 "fold": "Fold only accented latin characters",
-                "transliterate": "Transliterate non-ASCII characters"
+                "transliterate": "Transliterate non-ASCII characters",
             },
             "default": "fold",
             "tooltip": "Transliteration will ensure that only pure ASCII characters are left, but makes larger changes"
-                       " to the text (i.e. 北亰 is replaced with 'Bei Jing'). Folding will only replace accented "
-                       "characters with their closest un-accented ASCII equivalent, e.g. á -> a."
+            " to the text (i.e. 北亰 is replaced with 'Bei Jing'). Folding will only replace accented "
+            "characters with their closest un-accented ASCII equivalent, e.g. á -> a.",
         },
         "case-fold": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Also convert all text to lowercase",
-            "default": False
+            "default": False,
         },
         "columns": {
             "type": UserInput.OPTION_TEXT,
             "help": "Column(s) to apply folding on",
             "inline": True,
             "default": "body",
-        }
+        },
     }
 
     @classmethod
@@ -60,7 +64,9 @@ class AccentFoldingFilter(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.is_top_dataset() and module.get_extension() in ["csv",]
+        return module.is_top_dataset() and module.get_extension() in [
+            "csv",
+        ]
 
     def process(self):
         """
@@ -89,8 +95,12 @@ class AccentFoldingFilter(BasicProcessor):
                 processed_items += 1
                 if processed_items % 500 == 0:
                     self.dataset.update_status(
-                        "Processed %i/%i items" % (processed_items, self.source_dataset.num_rows))
-                    self.dataset.update_progress((processed_items / self.source_dataset.num_rows))
+                        "Processed %i/%i items"
+                        % (processed_items, self.source_dataset.num_rows)
+                    )
+                    self.dataset.update_progress(
+                        (processed_items / self.source_dataset.num_rows)
+                    )
 
                 for field in columns:
                     if type(item[field]) is not str:
@@ -153,4 +163,8 @@ class AccentFoldingFilter(BasicProcessor):
         :param errors:  Dummy parameter for compatibility with unidecode
         :return:  Case-folded text
         """
-        return ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+        return "".join(
+            c
+            for c in unicodedata.normalize("NFD", text)
+            if unicodedata.category(c) != "Mn"
+        )

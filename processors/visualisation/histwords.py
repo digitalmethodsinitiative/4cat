@@ -1,6 +1,7 @@
 """
 Project word embedding vectors for to a 2D space and highlight given words
 """
+
 import shutil
 import numpy
 import csv
@@ -35,6 +36,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     Based on Hamilton et al.'s 'HistWords' algorithm. Reduces vectors to two
     dimensions, plots them, and highlights given words and their neighbours.
     """
+
     type = "histwords-vectspace"  # job type ID
     category = "Visual"  # category
     title = "Chart diachronic nearest neighbours"  # title displayed in UI
@@ -46,14 +48,14 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         "HistWords: [William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)",
         "t-SNE: [Maaten, L. V. D., & Hinton, G. (2008). Visualizing data using t-SNE. *Journal of machine learning research*, 9(Nov), 2579-2605.](https://www.jmlr.org/papers/v9/vandermaaten08a.html)",
         "PCA: [Joliffe, I. T., & Morgan, B. J. T. (1992). Principal component analysis and exploratory factor analysis. *Statistical methods in medical research*, 1(1), 69-95.](https://journals.sagepub.com/doi/abs/10.1177/096228029200100105)",
-        "Truncated SVD: [Manning, C. D., Raghavan, P., & Schütze, H. (2008). Matrix decompositions and latent semantic indexing. *Introduction to information retrieval*, 403-417.](http://nlp.stanford.edu/IR-book/pdf/18lsi.pdf)"
+        "Truncated SVD: [Manning, C. D., Raghavan, P., & Schütze, H. (2008). Matrix decompositions and latent semantic indexing. *Introduction to information retrieval*, 403-417.](http://nlp.stanford.edu/IR-book/pdf/18lsi.pdf)",
     ]
 
     options = {
         "words": {
             "type": UserInput.OPTION_TEXT,
             "help": "Word(s)",
-            "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted"
+            "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted",
         },
         "method": {
             "type": UserInput.OPTION_CHOICE,
@@ -61,9 +63,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             "options": {
                 "t-SNE": "t-SNE (learning rate: 150)",
                 "PCA": "PCA",
-                "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)"
+                "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)",
             },
-            "default": "tsne"
+            "default": "tsne",
         },
         "num-words": {
             "type": UserInput.OPTION_TEXT,
@@ -71,26 +73,26 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             "min": 1,
             "default": 15,
             "max": 100,
-            "tooltip": "Amount of neighbours to chart per model, per queried word"
+            "tooltip": "Amount of neighbours to chart per model, per queried word",
         },
         "threshold": {
             "type": UserInput.OPTION_TEXT,
             "help": "Similarity threshold",
             "tooltip": "Decimal value between 0 and 1; only neighbours with a higher similarity score than this will be included",
-            "default": "0.3"
+            "default": "0.3",
         },
         "overlay": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Plot all models",
             "default": True,
-            "tooltip": "Plot similar words for all models. If unchecked, only similar words for the most recent model will be plotted."
+            "tooltip": "Plot similar words for all models. If unchecked, only similar words for the most recent model will be plotted.",
         },
         "all-words": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Always include all words",
             "default": False,
-            "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
-        }
+            "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model.",
+        },
     }
 
     @classmethod
@@ -106,7 +108,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # parse parameters
         input_words = self.parameters.get("words", "")
         if not input_words or not input_words.split(","):
-            self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
+            self.dataset.update_status(
+                "No input words provided, cannot look for similar words.", is_final=True
+            )
             self.dataset.finish(0)
             return
 
@@ -135,12 +139,16 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         for model_file in staging_area.glob("*.model"):
             if self.interrupted:
                 shutil.rmtree(staging_area)
-                raise ProcessorInterruptedException("Interrupted while processing word embedding models")
+                raise ProcessorInterruptedException(
+                    "Interrupted while processing word embedding models"
+                )
 
             model = KeyedVectors.load(str(model_file))
             models[model_file.stem] = model
             if vector_size is None:
-                vector_size = model.vector_size  # needed later for dimensionality reduction
+                vector_size = (
+                    model.vector_size
+                )  # needed later for dimensionality reduction
 
             if common_vocab is None:
                 common_vocab = set(model.key_to_index.keys())
@@ -148,7 +156,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 common_vocab &= set(model.key_to_index.keys())  # intersect
 
         if not common_vocab:
-            self.dataset.update_status("No vocabulary common across all models, cannot diachronically chart words", is_final=True)
+            self.dataset.update_status(
+                "No vocabulary common across all models, cannot diachronically chart words",
+                is_final=True,
+            )
             return
 
         # sort common vocabulary by combined frequency across all models
@@ -157,7 +168,12 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         common_vocab = list(common_vocab)
 
         # this trips Flake8 for some reason, can ignore
-        common_vocab.sort(key=lambda w: sum([model.get_vecattr(w, "count") for model in models.values()]), reverse=True)  # noqa: F821
+        common_vocab.sort(
+            key=lambda w: sum(
+                [model.get_vecattr(w, "count") for model in models.values()]
+            ),
+            reverse=True,
+        )  # noqa: F821
 
         # initial boundaries of 2D space (to be adjusted later based on t-sne
         # outcome)
@@ -179,26 +195,43 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
         # now process each model
         for model_name, model in models.items():
-            relevant_words[model_name] = set()  # not a set, since order needs to be preserved
-            self.dataset.update_status("Finding similar words in model '%s'" % model_name)
+            relevant_words[model_name] = (
+                set()
+            )  # not a set, since order needs to be preserved
+            self.dataset.update_status(
+                "Finding similar words in model '%s'" % model_name
+            )
 
             for query in input_words:
                 if query not in model.key_to_index:
-                    self.dataset.update_status("Query '%s' was not found in model %s; cannot find nearest neighbours." % (query, model_name), is_final=True)
+                    self.dataset.update_status(
+                        "Query '%s' was not found in model %s; cannot find nearest neighbours."
+                        % (query, model_name),
+                        is_final=True,
+                    )
                     self.dataset.finish(0)
                     return
 
                 if self.interrupted:
                     shutil.rmtree(staging_area)
-                    raise ProcessorInterruptedException("Interrupted while finding similar words")
+                    raise ProcessorInterruptedException(
+                        "Interrupted while finding similar words"
+                    )
 
                 # use a larger sample (topn) than required since some of the
                 # nearest neighbours may not be in the common vocabulary and
                 # will therefore need to be ignored
-                context = set([word[0] for word in model.most_similar(query, topn=1000) if
-                                word[0] in common_vocab and word[1] >= threshold][:num_words])
+                context = set(
+                    [
+                        word[0]
+                        for word in model.most_similar(query, topn=1000)
+                        if word[0] in common_vocab and word[1] >= threshold
+                    ][:num_words]
+                )
 
-                relevant_words[model_name] |= {query} | context  # always include query word
+                relevant_words[model_name] |= {
+                    query
+                } | context  # always include query word
 
         # now do another loop to determine which words to plot for each model
         # this is either the same as relevant_words, or a superset which
@@ -214,10 +247,14 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             # determine which words to plot for this model. either the nearest
             # neighbours for this model, or all nearest neighbours found across
             # all models
-            words_to_include = all_relevant_words if all_words else relevant_words[model_name]
+            words_to_include = (
+                all_relevant_words if all_words else relevant_words[model_name]
+            )
 
             for word in words_to_include:
-                if word in plottable_words[model_name] or (not overlay and model_name != last_model and word not in input_words):
+                if word in plottable_words[model_name] or (
+                    not overlay and model_name != last_model and word not in input_words
+                ):
                     # only plot each word once per model, or if 'overlay'
                     # is not set, only once overall (for the most recent
                     # model)
@@ -244,15 +281,21 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             try:
                 vectors = tsne.fit_transform(vectors)
             except ValueError:
-                self.dataset.finish_with_error("Insufficient data to reduce to 2D. The word embeddings model may be too small to visualise properly.")
+                self.dataset.finish_with_error(
+                    "Insufficient data to reduce to 2D. The word embeddings model may be too small to visualise properly."
+                )
                 return
         elif reduction_method == "TruncatedSVD":
             # standard sklearn parameters made explicit
-            svd = TruncatedSVD(n_components=2, algorithm="randomized", n_iter=5, random_state=0)
+            svd = TruncatedSVD(
+                n_components=2, algorithm="randomized", n_iter=5, random_state=0
+            )
             vectors = svd.fit_transform(vectors)
         else:
             shutil.rmtree(staging_area)
-            self.dataset.update_status("Invalid dimensionality reduction technique selected", is_final=True)
+            self.dataset.update_status(
+                "Invalid dimensionality reduction technique selected", is_final=True
+            )
             self.dataset.finish(0)
             return
 
@@ -270,8 +313,24 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # plotting them in a graph
 
         # a palette generated with https://medialab.github.io/iwanthue/
-        colours = ["#d58eff", "#cf9000", "#3391ff", "#a15700", "#911ca7", "#00ddcb", "#cc25a9", "#d5c776", "#6738a8",
-                   "#ff9470", "#47c2ff", "#a4122c", "#00b0ca", "#9a0f76", "#ff70c8", "#713c88"]
+        colours = [
+            "#d58eff",
+            "#cf9000",
+            "#3391ff",
+            "#a15700",
+            "#911ca7",
+            "#00ddcb",
+            "#cc25a9",
+            "#d5c776",
+            "#6738a8",
+            "#ff9470",
+            "#47c2ff",
+            "#a4122c",
+            "#00b0ca",
+            "#9a0f76",
+            "#ff70c8",
+            "#713c88",
+        ]
         colour_index = 0
 
         # make sure all coordinates are positive
@@ -289,8 +348,13 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         height += 2 * margin
 
         # normalize all known positions to fit within the graph
-        vectors = [(margin + ((position[0] - min_x) * scale), margin + ((position[1] - min_y) * scale)) for position in
-                   vectors]
+        vectors = [
+            (
+                margin + ((position[0] - min_x) * scale),
+                margin + ((position[1] - min_y) * scale),
+            )
+            for position in vectors
+        ]
 
         # now all positions are finalised, we can determine the "journey" of
         # each query - the sequence of positions in the graph it takes, so we
@@ -309,11 +373,16 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
         # now we have the dimensions, the canvas can be instantiated
         model_type = self.source_dataset.parameters.get("model-type", "word2vec")
-        canvas = get_4cat_canvas(self.dataset.get_results_path(), width, height,
-                                 header="%s nearest neighbours (fitting: %s) - '%s'" % (model_type, reduction_method, ",".join(input_words)),
-                                 fontsize_normal=fontsize_normal,
-                                 fontsize_large=fontsize_large,
-                                 fontsize_small=fontsize_small)
+        canvas = get_4cat_canvas(
+            self.dataset.get_results_path(),
+            width,
+            height,
+            header="%s nearest neighbours (fitting: %s) - '%s'"
+            % (model_type, reduction_method, ",".join(input_words)),
+            fontsize_normal=fontsize_normal,
+            fontsize_large=fontsize_large,
+            fontsize_small=fontsize_small,
+        )
 
         # use colour-coded backgrounds to distinguish the query words in the
         # graph, each model (= interval) with a separate colour
@@ -334,7 +403,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         colour_index = 0
 
         for model_name, labels in plottable_words.items():
-            positions = vectors[vector_offsets[model_name]:vector_offsets[model_name] + len(labels)]
+            positions = vectors[
+                vector_offsets[model_name] : vector_offsets[model_name] + len(labels)
+            ]
 
             label_index = 0
             for position in positions:
@@ -350,14 +421,16 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                     word += " (" + model_name + ")"
 
                 label_container = SVG(insert=position, size=(1, 1), overflow="visible")
-                label_container.add(Text(
-                    insert=("50%", "50%"),
-                    text=word,
-                    dominant_baseline="middle",
-                    text_anchor="middle",
-                    style="fill:%s;font-size:%ipx" % (colour, fontsize),
-                    filter=filter
-                ))
+                label_container.add(
+                    Text(
+                        insert=("50%", "50%"),
+                        text=word,
+                        dominant_baseline="middle",
+                        text_anchor="middle",
+                        style="fill:%s;font-size:%ipx" % (colour, fontsize),
+                        filter=filter,
+                    )
+                )
 
                 # we make sure the queries are always rendered on top by
                 # putting them in a separate SVG container
@@ -377,8 +450,14 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                     previous_position = position
                     continue
 
-                lines.add(Line(start=previous_position, end=position,
-                               stroke="#CE1B28", stroke_width=2))
+                lines.add(
+                    Line(
+                        start=previous_position,
+                        end=position,
+                        stroke="#CE1B28",
+                        stroke_width=2,
+                    )
+                )
                 previous_position = position
 
         canvas.add(lines)

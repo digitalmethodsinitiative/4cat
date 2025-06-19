@@ -1,6 +1,7 @@
 """
 User class
 """
+
 import html2text
 import hashlib
 import smtplib
@@ -23,6 +24,7 @@ class User:
 
     Compatible with Flask-Login
     """
+
     data = None
     userdata = None
     is_authenticated = False
@@ -52,7 +54,9 @@ class User:
         if not user or not user.get("password", None):
             # registration not finished yet
             return None
-        elif not user or not bcrypt.checkpw(password.encode("ascii"), user["password"].encode("ascii")):
+        elif not user or not bcrypt.checkpw(
+            password.encode("ascii"), user["password"].encode("ascii")
+        ):
             # non-existing user or wrong password
             return None
         else:
@@ -89,7 +93,8 @@ class User:
         """
         user = db.fetchone(
             "SELECT * FROM users WHERE register_token = %s AND (timestamp_token = 0 OR timestamp_token > %s)",
-            (token, int(time.time()) - (7 * 86400)))
+            (token, int(time.time()) - (7 * 86400)),
+        )
         if not user:
             return None
         else:
@@ -125,7 +130,11 @@ class User:
         self.userdata = json.loads(self.data.get("userdata", "{}"))
 
         if not self.is_anonymous and self.is_authenticated:
-            self.db.update("users", where={"name": self.data["name"]}, data={"timestamp_seen": int(time.time())})
+            self.db.update(
+                "users",
+                where={"name": self.data["name"]},
+                data={"timestamp_seen": int(time.time())},
+            )
 
     def authenticate(self):
         """
@@ -191,7 +200,11 @@ class User:
 
         :return:
         """
-        self.db.update("users", data={"register_token": "", "timestamp_token": 0}, where={"name": self.get_id()})
+        self.db.update(
+            "users",
+            data={"register_token": "", "timestamp_token": 0},
+            where={"name": self.get_id()},
+        )
 
     def can_access_dataset(self, dataset, role=None):
         """
@@ -210,7 +223,7 @@ class User:
 
         elif self.is_admin:
             return True
-        
+
         elif self.config.get("privileges.can_view_private_datasets", user=self):
             # Allowed to see dataset, but perhaps not run processors (need privileges.admin.can_manipulate_all_datasets or dataset ownership)
             return True
@@ -275,8 +288,10 @@ class User:
                           account?
         :return str:  Link for the user to set their password with
         """
-        if not self.config.get('mail.server'):
-            raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")
+        if not self.config.get("mail.server"):
+            raise RuntimeError(
+                "No e-mail server configured. 4CAT cannot send any e-mails."
+            )
 
         if self.is_special:
             raise ValueError("Cannot send password reset e-mails for a special user.")
@@ -287,7 +302,7 @@ class User:
         register_token = self.generate_token(regenerate=True)
 
         # prepare welcome e-mail
-        sender = self.config.get('mail.noreply')
+        sender = self.config.get("mail.noreply")
         message = MIMEMultipart("alternative")
         message["From"] = sender
         message["To"] = username
@@ -299,7 +314,6 @@ class User:
 
         # we use slightly different e-mails depending on whether this is the first time setting a password
         if new:
-
             message["Subject"] = "Account created"
             mail = """
 			<p>Hello %s,</p>
@@ -309,7 +323,6 @@ class User:
 			<p>Please complete your registration within 72 hours as the link above will become invalid after this time.</p>
 			""" % (username, protocol, url_base, url_base, url, url)
         else:
-
             message["Subject"] = "Password reset"
             mail = """
 			<p>Hello %s,</p>
@@ -328,7 +341,12 @@ class User:
         try:
             send_email([username], message)
             return url
-        except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout, socket.gaierror) as e:
+        except (
+            smtplib.SMTPException,
+            ConnectionRefusedError,
+            socket.timeout,
+            socket.gaierror,
+        ) as e:
             raise RuntimeError("Could not send password reset e-mail: %s" % e)
 
     def generate_token(self, username=None, regenerate=True):
@@ -351,8 +369,14 @@ class User:
         register_token = hashlib.sha256()
         register_token.update(os.urandom(128))
         register_token = register_token.hexdigest()
-        self.db.update("users", data={"register_token": register_token, "timestamp_token": int(time.time())},
-                       where={"name": username})
+        self.db.update(
+            "users",
+            data={
+                "register_token": register_token,
+                "timestamp_token": int(time.time()),
+            },
+            where={"name": username},
+        )
 
         return register_token
 
@@ -377,7 +401,11 @@ class User:
         self.userdata[key] = value
         self.data["userdata"] = json.dumps(self.userdata)
 
-        self.db.update("users", where={"name": self.get_id()}, data={"userdata": json.dumps(self.userdata)})
+        self.db.update(
+            "users",
+            where={"name": self.get_id()},
+            data={"userdata": json.dumps(self.userdata)},
+        )
 
     def set_password(self, password):
         """
@@ -391,7 +419,11 @@ class User:
         salt = bcrypt.gensalt()
         password_hash = bcrypt.hashpw(password.encode("ascii"), salt)
 
-        self.db.update("users", where={"name": self.data["name"]}, data={"password": password_hash.decode("utf-8")})
+        self.db.update(
+            "users",
+            where={"name": self.data["name"]},
+            data={"password": password_hash.decode("utf-8")},
+        )
 
     def add_notification(self, notification, expires=None, allow_dismiss=True):
         """
@@ -407,12 +439,16 @@ class User:
         :param bool allow_dismiss:  Whether to allow a user to dismiss the
         notification.
         """
-        self.db.insert("users_notifications", {
-            "username": self.get_id(),
-            "notification": notification,
-            "timestamp_expires": expires,
-            "allow_dismiss": allow_dismiss
-        }, safe=True)
+        self.db.insert(
+            "users_notifications",
+            {
+                "username": self.get_id(),
+                "notification": notification,
+                "timestamp_expires": expires,
+                "allow_dismiss": allow_dismiss,
+            },
+            safe=True,
+        )
 
     def dismiss_notification(self, notification_id):
         """
@@ -422,7 +458,9 @@ class User:
 
         :param int notification_id:  ID of the notification to dismiss
         """
-        current_notifications = [n["id"] for n in self.get_notifications() if n["allow_dismiss"]]
+        current_notifications = [
+            n["id"] for n in self.get_notifications() if n["allow_dismiss"]
+        ]
         if notification_id not in current_notifications:
             return
 
@@ -437,7 +475,10 @@ class User:
 
         :return list:  Notifications, as a list of dictionaries
         """
-        tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.config.get_active_tags(self)]]
+        tag_recipients = [
+            "!everyone",
+            *[f"!{tag}" for tag in self.config.get_active_tags(self)],
+        ]
         if self.is_admin:
             # for backwards compatibility - used to be called '!admins' even if the tag is 'admin'
             tag_recipients.append("!admins")
@@ -445,7 +486,9 @@ class User:
         notifications = self.db.fetchall(
             "SELECT n.* FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s "
-            "AND (u.name = n.username OR n.username IN %s)", (self.get_id(), tuple(tag_recipients)))
+            "AND (u.name = n.username OR n.username IN %s)",
+            (self.get_id(), tuple(tag_recipients)),
+        )
 
         return notifications
 
@@ -498,19 +541,27 @@ class User:
         sorted_tags = [tag for tag in sorted_tags if tag.strip()]
 
         self.data["tags"] = sorted_tags
-        self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
+        self.db.update(
+            "users",
+            where={"name": self.get_id()},
+            data={"tags": json.dumps(sorted_tags)},
+        )
 
     def delete(self, also_datasets=True):
         from common.lib.dataset import DataSet
 
         username = self.data["name"]
 
-        self.db.delete("users_favourites", where={"name": username}, commit=False),
-        self.db.delete("users_notifications", where={"username": username}, commit=False)
+        (self.db.delete("users_favourites", where={"name": username}, commit=False),)
+        self.db.delete(
+            "users_notifications", where={"username": username}, commit=False
+        )
         self.db.delete("access_tokens", where={"name": username}, commit=False)
 
         # find datasets and delete
-        datasets = self.db.fetchall("SELECT key FROM datasets_owners WHERE name = %s", (username,))
+        datasets = self.db.fetchall(
+            "SELECT key FROM datasets_owners WHERE name = %s", (username,)
+        )
 
         # delete any datasets and jobs related to deleted datasets
         if datasets:
@@ -523,7 +574,9 @@ class User:
 
                 if len(dataset.get_owners()) == 1 and also_datasets:
                     dataset.delete(commit=False)
-                    self.db.delete("jobs", where={"remote_id": dataset.key}, commit=False)
+                    self.db.delete(
+                        "jobs", where={"remote_id": dataset.key}, commit=False
+                    )
                 else:
                     dataset.remove_owner(self)
 

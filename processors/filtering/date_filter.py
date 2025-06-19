@@ -1,6 +1,7 @@
 """
 Filter posts by a dates
 """
+
 import dateutil.parser
 from dateutil.parser import ParserError
 from datetime import datetime
@@ -18,18 +19,14 @@ class DateFilter(BaseFilter):
     """
     Retain only posts between specific dates
     """
+
     type = "date-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by date"  # title displayed in UI
     description = "Retains posts between given dates. This will create a new dataset."
 
-    options = {
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range:"
-        }
-    }   
-    
+    options = {"daterange": {"type": UserInput.OPTION_DATERANGE, "help": "Date range:"}}
+
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         options = cls.options
@@ -43,9 +40,9 @@ class DateFilter(BaseFilter):
                 "type": UserInput.OPTION_CHOICE,
                 "options": parent_columns,
                 "help": "Timestamp column",
-                "default": "timestamp"  # Default column name
-        }
-        
+                "default": "timestamp",  # Default column name
+            }
+
         return options
 
     @classmethod
@@ -89,12 +86,19 @@ class DateFilter(BaseFilter):
             # Update 4CAT and user on status
             processed_items += 1
             if processed_items % 500 == 0:
-                self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items, matching_items, invalid_dates))
-                self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
-            
+                self.dataset.update_status(
+                    "Processed %i items (%i matching, %i invalid dates)"
+                    % (processed_items, matching_items, invalid_dates)
+                )
+                self.dataset.update_progress(
+                    processed_items / self.source_dataset.num_rows
+                )
+
             if consecutive_invalid > 25:
                 # If we have too many consecutive invalid dates, stop processing
-                self.dataset.finish_with_error(f"Too many consecutive invalid dates, does {date_column_name} column contain valid dates?")
+                self.dataset.finish_with_error(
+                    f"Too many consecutive invalid dates, does {date_column_name} column contain valid dates?"
+                )
                 return
 
             # Attempt to parse timestamp
@@ -104,7 +108,11 @@ class DateFilter(BaseFilter):
                 invalid_dates += 1
                 # Not marking as consecutive invalid because this may not be an error
                 continue
-            elif type(item_date) is int or (type(item_date) is str and item_date.replace(".", "").isdecimal() and item_date.count(".") <= 1):
+            elif type(item_date) is int or (
+                type(item_date) is str
+                and item_date.replace(".", "").isdecimal()
+                and item_date.count(".") <= 1
+            ):
                 # If the date is a a decimal, parse as timestamp
                 try:
                     item_date = datetime.fromtimestamp(float(item_date))
@@ -136,8 +144,15 @@ class DateFilter(BaseFilter):
             # Must be a good date!
             matching_items += 1
             yield mapped_item.original
-        
+
         if matching_items == 0:
-            self.dataset.update_status("No items matched your criteria (%i invalid dates)" % invalid_dates, is_final=True)
+            self.dataset.update_status(
+                "No items matched your criteria (%i invalid dates)" % invalid_dates,
+                is_final=True,
+            )
         elif invalid_dates > 0:
-            self.dataset.update_status("Matched %i items (%i processed, %i invalid dates)" % (matching_items, processed_items, invalid_dates), is_final=True)
+            self.dataset.update_status(
+                "Matched %i items (%i processed, %i invalid dates)"
+                % (matching_items, processed_items, invalid_dates),
+                is_final=True,
+            )
