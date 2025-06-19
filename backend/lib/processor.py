@@ -397,92 +397,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# cancel job
 			self.job.finish()
 
-	def add_field_to_parent(self, field_name, new_data, which_parent=source_dataset, update_existing=False):
-		"""
-		This function adds a new field to the parent dataset. Expects a list of data points, one for each item
-		in the parent dataset. Processes csv and ndjson. If update_existing is set to True, this can be used
-		to overwrite an existing field.
-
-		TODO: could be improved by accepting different types of data depending on csv or ndjson.
-
-		:param str field_name: 	Name of the desired new field
-		:param List new_data: 	List of data to be added to parent dataset
-		:param DataSet which_parent: 	DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
-		:param bool update_existing: 	False (default) will raise an error if the field_name already exists
-										True will allow updating existing data
-		"""
-		if len(new_data) < 1:
-			# no data
-			raise ProcessorException('No data provided')
-
-		if not hasattr(self, "source_dataset") and which_parent is not None:
-			# no source to update
-			raise ProcessorException('No source dataset to update')
-
-		# Get the source file data path
-		parent_path = which_parent.get_results_path()
-
-		if len(new_data) != which_parent.num_rows:
-			raise ProcessorException('Must have new data point for each record: parent dataset: %i, new data points: %i' % (which_parent.num_rows, len(new_data)))
-
-		self.dataset.update_status("Adding new field %s to the source file" % field_name)
-
-		# Get a temporary path where we can store the data
-		tmp_path = self.dataset.get_staging_area()
-		tmp_file_path = tmp_path.joinpath(parent_path.name)
-
-		# go through items one by one, optionally mapping them
-		if parent_path.suffix.lower() == ".csv":
-			# Get field names
-			fieldnames = which_parent.get_columns()
-			if not update_existing and field_name in fieldnames:
-				raise ProcessorException('field_name %s already exists!' % field_name)
-			fieldnames.append(field_name)
-
-			# Iterate through the original dataset and add values to a new column
-			self.dataset.update_status("Writing new source file with %s." % field_name)
-			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-				writer = csv.DictWriter(output, fieldnames=fieldnames)
-				writer.writeheader()
-
-				for count, post in enumerate(which_parent.iterate_items(self)):
-					# stop processing if worker has been asked to stop
-					if self.interrupted:
-						raise ProcessorInterruptedException("Interrupted while writing CSV file")
-
-					post.original[field_name] = new_data[count]
-					writer.writerow(post.original)
-
-		elif parent_path.suffix.lower() == ".ndjson":
-			# JSON cannot encode sets
-			if type(new_data[0]) is set:
-				# could check each if type(datapoint) is set, but that could be extensive...
-				new_data = [list(datapoint) for datapoint in new_data]
-
-			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-				for count, post in enumerate(which_parent.iterate_items(self)):
-					# stop processing if worker has been asked to stop
-					if self.interrupted:
-						raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
-
-					if not update_existing and field_name in post.original.keys():
-						raise ProcessorException('field_name %s already exists!' % field_name)
-
-					# Update data
-					post.original[field_name] = new_data[count]
-
-					output.write(json.dumps(post.original) + "\n")
-		else:
-			raise NotImplementedError("Cannot iterate through %s file" % parent_path.suffix)
-
-		# Replace the source file path with the new file
-		shutil.copy(str(tmp_file_path), str(parent_path))
-
-		# delete temporary files and folder
-		shutil.rmtree(tmp_path)
-
-		self.dataset.update_status("Parent dataset updated.")
-
 	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
 		"""
 		A generator that iterates through files in an archive
@@ -724,21 +638,27 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		return standalone
 
-	def save_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
+	def save_annotations(self, annotations: list, source_dataset=None, overwrite=False, editable=False,
+						 hide_in_explorer=False) -> int:
 		"""
 		Saves annotations made by this processor on the basis of another dataset.
 		Also adds some data regarding this processor: set `author` and `label` to processor name,
 		and add parameters to `metadata` (unless explicitly indicated).
 
-		:param annotations:		List of dictionaries with annotation items. Must have `item_id` and `value`.
-								E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
-		:param source_dataset:	The dataset that these annotations will be saved on. If None, will use the top parent.
-		:param bool overwrite:	Whether to overwrite annotations if the label is already present
-								for the dataset. If this is False and the label is already present,
-								we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
-								Else we'll just replace the old data.
+		:param annotations:				List of dictionaries with annotation items. Must have `item_id` and `value`.
+										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
+		:param source_dataset:			The dataset that these annotations will be saved on. If None, will use the
+										top parent.
+		:param bool overwrite:			Whether to overwrite annotations if the label is already present
+										for the dataset. If this is False and the label is already present,
+										we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
+										Else we'll just replace the old data.
+		:param bool editable:			Whether the annotation can be edited in the Explorer.
+		:param bool hide_in_explorer:	Whether this annotation is hidden in the Explorer (still shows in
+										`iterate_items()`).
 
-		:returns int:			How many annotations were saved.
+
+		:returns int:					How many annotations were saved.
 
 		"""
 
@@ -749,30 +669,25 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not source_dataset:
 			source_dataset = self.source_dataset.top_parent()
 
-		# Check if this dataset already has annotation fields
-		existing_labels = source_dataset.get_annotation_field_labels()
+		# Check if this dataset already has annotation fields, and if so, store some values to use per annotation.
+		existing_fields = source_dataset.get_annotation_fields()
+		existing_labels = []
+		existing_field = None
+		for field_data in existing_fields.values():
+			existing_labels.append(field_data["label"])
+			if field_data.get("from_dataset") == self.dataset.key:
+				existing_field = field_data
 
+		# If this specific processor instance has not already generated annotations (e.g. when done in batches),
+		# and if we have a label that already exists, add the dataset key as suffix.
+		label = existing_field.get("label") if existing_field else self.name
+		if not overwrite and label == self.name and label in existing_labels:
+			label += "-" + self.dataset.key
+		print("LABELLLL", label)
 		# Set some values
 		for annotation in annotations:
 
-			if not annotation.get("label"):
-				# If there's no label, set the default label to this processor's name
-				label = self.name
-			else:
-				# If we have a custom label, use that
-				label = annotation["label"]
-				# Shorten if necessary
-				if len(label) > 100:
-					label = label[:100]
-
-			# If the processor has already generated annotation fields,
-			# or if we have a custom label that already exists
-			# add a number suffix to differentiate
-			if not overwrite and label in existing_labels:
-				label += "-" + str(len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
-			# Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
 			annotation["label"] = label
-
 			# Set the author to this processor's name
 			if not annotation.get("author"):
 				annotation["author"] = self.name
@@ -781,7 +696,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 			annotation["by_processor"] = True
 
-		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+		annotations_saved = source_dataset.save_annotations(annotations,
+															overwrite=overwrite,
+															from_dataset=self.dataset.key,
+															editable=editable,
+															hide_in_explorer=hide_in_explorer
+															)
 		return annotations_saved
 
 	@classmethod
@@ -918,8 +838,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		else:
 			# A non filter processor updated the base Processor extension to None/False?
 			return None
-
-
 
 	@classmethod
 	def is_rankable(cls, multiple_items=True):

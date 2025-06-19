@@ -390,19 +390,18 @@ class AudioToText(BasicProcessor):
                     result_data.update({"4CAT_metadata": fourcat_metadata})
                     outfile.write(json.dumps(result_data) + "\n")
 
-                    if save_annotations:
-                        for item_id in audio_metadata.get("post_ids", []):
-                            annotations.append({
-                                "label": "audio transcription",
-                                "item_id": item_id,
-                                "value": result_data.get("text", ""),
-                                "type": "textarea"
-                            })
-
+                if save_annotations:
+                    for item_id in audio_metadata.get("post_ids", []):
+                        annotations.append({
+                            "label": "audio transcription",
+                            "item_id": item_id,
+                            "value": result_data.get("text", ""),
+                            "type": "textarea"
+                        })
+                        #annotated += 1
                     processed += 1
 
         if save_annotations:
-            self.dataset.update_status(f"Writing annotations")
             self.save_annotations(annotations, overwrite=False)
 
         self.dataset.update_status(f"Detected speech in {processed} of {total_audio_files} audio files")

@@ -1883,6 +1883,7 @@ class DataSet(FourcatModule):
 	def has_annotation_fields(self) -> bool:
 		"""
 		Returns True if there's annotation fields saved tot the dataset table
+		Annotation fields are metadata that describe a type of annotation (with info on `id`, `type`, etc.).
 		"""
 
 		annotation_fields = self.get_annotation_fields()
@@ -1898,7 +1899,6 @@ class DataSet(FourcatModule):
 		"""
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.key,))
-
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
 		else:
@@ -1923,7 +1923,8 @@ class DataSet(FourcatModule):
 
 		return labels
 
-	def save_annotations(self, annotations: list, overwrite=True) -> int:
+	def save_annotations(self, annotations: list, overwrite=True, from_dataset="", editable=True,
+						 hide_in_explorer=False) -> int:
 		"""
 		Takes a list of annotations and saves them to the annotations table.
 		If a field is not yet present in the `annotation_fields` column in
@@ -1932,6 +1933,11 @@ class DataSet(FourcatModule):
 		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
 										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
 		:param bool overwrite:			Whether to overwrite the annotation if it is already present.
+		:param str from_dataset:		The dataset key that this annotation has been generated from. Only relevant
+										for processor-generated annotations.
+		:param bool editable:			Whether the annotation can be edited in the Explorer.
+		:param bool hide_in_explorer:	Whether to hide this annotation in the Explorer (still shows through
+										`iterate_items()`).
 
 		:returns int:					How many annotations were saved.
 
@@ -1944,7 +1950,8 @@ class DataSet(FourcatModule):
 		annotation_fields = self.get_annotation_fields()
 		annotation_labels = self.get_annotation_field_labels()
 
-		field_id = ""
+		field_id = "" if not from_dataset else from_dataset
+		print("FI", field_id)
 		salt = str(random.randrange(0, 1000000))
 
 		# Add some dataset data to annotations, if not present
@@ -1970,14 +1977,12 @@ class DataSet(FourcatModule):
 			if not annotation_data.get("author"):
 				annotation_data["author"] = self.get_owners()[0]
 
-			# The field ID can already exist for the same dataset/key combo,
-			# if a previous label has been renamed.
-			# If we're not overwriting, create a new key with some salt.
-			if not overwrite:
-				if not field_id:
-					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] + salt)
-				if field_id in annotation_fields:
-					annotation_data["field_id"] = field_id
+			# The field ID can already exist for the same dataset/key combo if a previous label has been renamed.
+			# In this case create a new key with some salt.
+			if not overwrite and not field_id:
+				field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] + salt)
+
+			annotation_data["field_id"] = field_id
 
 			# Create Annotation object, which also saves it to the database
 			# If this dataset/item ID/label combination already exists, this retrieves the
@@ -1985,20 +1990,25 @@ class DataSet(FourcatModule):
 			annotation = Annotation(data=annotation_data, db=self.db)
 
 			# Add data on the type of annotation field, if it is not saved to the datasets table yet.
-			# For now this is just a simple dict with a field ID, type, label, and possible options.
+			# For now this is just a simple dict with a field ID, type, label, job ID (for processors),
+			# and possible options.
 			if not annotation_fields or annotation.field_id not in annotation_fields:
 				annotation_fields[annotation.field_id] = {
 					"label": annotation.label,
-					"type": annotation.type		# Defaults to `text`
+					"type": annotation.type,  # Defaults to `text`
+					"editable": editable,
+					"hide_in_explorer": hide_in_explorer
 				}
+				if from_dataset:
+					annotation_fields[annotation.field_id]["from_dataset"] = from_dataset
 				if annotation.options:
 					annotation_fields[annotation.options] = annotation.options
 
 			count += 1
 
-		# Save annotation fields if things changed
-		if annotation_fields != self.get_annotation_fields():
-			self.save_annotation_fields(annotation_fields)
+			# Save annotation fields if things changed
+			if annotation_fields != self.get_annotation_fields():
+				self.save_annotation_fields(annotation_fields)
 
 		# columns may have changed if there are new annotations
 		self._cached_columns = None
@@ -2043,7 +2053,6 @@ class DataSet(FourcatModule):
 		# Get existing annotation fields to see if stuff changed.
 		old_fields = self.get_annotation_fields()
 		changes = False
-
 		# Do some validation
 		# Annotation field must be valid JSON.
 		try:
