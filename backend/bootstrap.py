@@ -27,68 +27,29 @@ def run(as_daemon=True, log_level="INFO"):
         indent = (
             "".join([" " for i in range(0, indent_spaces)]) if indent_spaces > 0 else ""
         )
+        # fmt: off
         print("\n\n")
-        print(
-            indent + "+---------------------------------------------------------------+"
-        )
-        print(
-            indent + "|                                                               |"
-        )
-        print(
-            indent + "|                           welcome to                          |"
-        )
-        print(
-            indent + "|                                                               |"
-        )
-        print(
-            indent + "|                  j88D   .o88b.  .d8b.  d888888b               |"
-        )
-        print(
-            indent + "|                 j8~88  d8P  Y8 d8' `8b `~~88~~'               |"
-        )
-        print(
-            indent + "|                j8' 88  8P      88ooo88    88                  |"
-        )
-        print(
-            indent + "|                V88888D 8b      88~~~88    88                  |"
-        )
-        print(
-            indent + "|                    88  Y8b  d8 88   88    88                  |"
-        )
-        print(
-            indent + "|                    VP   `Y88P' YP   YP    YP                  |"
-        )
-        print(
-            indent + "|                                                               |"
-        )
-        print(
-            indent + "|               4CAT: Capture and Analysis Toolkit              |"
-        )
-        print(
-            indent + "|                                                               |"
-        )
-        print(
-            indent + "|                                                               |"
-        )
-        print(
-            indent + "+---------------------------------------------------------------+"
-        )
-        print(
-            indent + "|                   use ctrl + c to shut down                   |"
-        )
-        print(
-            indent + "|                                                               |"
-        )
-        print(
-            indent + "| WARNING: Not running as a daemon.  Quitting this process will |"
-        )
-        print(
-            indent + "|                 shut down the backend as well.                |"
-        )
-        print(
-            indent
-            + "+---------------------------------------------------------------+\n\n"
-        )
+        print(indent + "+---------------------------------------------------------------+")
+        print(indent + "|                                                               |")
+        print(indent + "|                           welcome to                          |")
+        print(indent + "|                                                               |")
+        print(indent + "|                  j88D   .o88b.  .d8b.  d888888b               |")
+        print(indent + "|                 j8~88  d8P  Y8 d8' `8b `~~88~~'               |")
+        print(indent + "|                j8' 88  8P      88ooo88    88                  |")
+        print(indent + "|                V88888D 8b      88~~~88    88                  |")
+        print(indent + "|                    88  Y8b  d8 88   88    88                  |")
+        print(indent + "|                    VP   `Y88P' YP   YP    YP                  |")
+        print(indent + "|                                                               |")
+        print(indent + "|               4CAT: Capture and Analysis Toolkit              |")
+        print(indent + "|                                                               |")
+        print(indent + "|                                                               |")
+        print(indent + "+---------------------------------------------------------------+")
+        print(indent + "|                   use ctrl + c to shut down                   |")
+        print(indent + "|                                                               |")
+        print(indent + "| WARNING: Not running as a daemon.  Quitting this process will |")
+        print(indent + "|                 shut down the backend as well.                |")
+        print(indent + "+---------------------------------------------------------------+\n\n")
+        # fmt: on
 
     # load everything
     if config.get("USING_DOCKER"):
