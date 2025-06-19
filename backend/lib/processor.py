@@ -6,18 +6,16 @@ import traceback
 import zipfile
 import typing
 import shutil
-import json
 import abc
 import csv
 import os
-import random
 
 from pathlib import Path, PurePath
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_commit, remove_nuls, send_email
+from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
 								   DataSetException, MapItemException, AnnotationException)
 from common.config_manager import config, ConfigWrapper
@@ -670,38 +668,42 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			source_dataset = self.source_dataset.top_parent()
 
 		# Check if this dataset already has annotation fields, and if so, store some values to use per annotation.
-		existing_fields = source_dataset.get_annotation_fields()
-		existing_labels = []
-		existing_field = None
-		for field_data in existing_fields.values():
-			existing_labels.append(field_data["label"])
-			if field_data.get("from_dataset") == self.dataset.key:
-				existing_field = field_data
+		annotation_fields = source_dataset.get_annotation_fields()
+		annotation_labels = source_dataset.get_annotation_field_labels()
 
 		# If this specific processor instance has not already generated annotations (e.g. when done in batches),
 		# and if we have a label that already exists, add the dataset key as suffix.
-		label = existing_field.get("label") if existing_field else self.name
-		if not overwrite and label == self.name and label in existing_labels:
-			label += "-" + self.dataset.key
-		print("LABELLLL", label)
-		# Set some values
-		for annotation in annotations:
+		default_label = self.name
+		if not overwrite and default_label in annotation_labels:
+			default_label += "-" + self.dataset.key
 
-			annotation["label"] = label
+		# Set some values
+		unique_fields = set()
+		for annotation in annotations:
+			if not annotation.get("label"):  # Only use default label if no custom one is given
+				annotation["label"] = default_label
+			annotation["from_dataset"] = self.dataset.key
 			# Set the author to this processor's name
 			if not annotation.get("author"):
 				annotation["author"] = self.name
 			if not annotation.get("author_original"):
 				annotation["author_original"] = self.name
-
 			annotation["by_processor"] = True
 
-		annotations_saved = source_dataset.save_annotations(annotations,
-															overwrite=overwrite,
-															from_dataset=self.dataset.key,
-															editable=editable,
-															hide_in_explorer=hide_in_explorer
-															)
+			# Store annotation field data for every unique dataset->label combo!
+			if (annotation["from_dataset"], annotation["label"]) not in unique_fields:
+				unique_fields.add((annotation["from_dataset"], annotation["label"]))
+				field_id = hash_to_md5(self.source_dataset.key + annotation["label"] + annotation["from_dataset"])
+				annotation_fields[field_id] = {
+					"label": annotation["label"],
+					"type": annotation["type"] if annotation.get("type") else "textarea",
+					"editable": editable,
+					"from_dataset": annotation["from_dataset"]
+				}
+
+		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+		source_dataset.save_annotation_fields(annotation_fields)
+
 		return annotations_saved
 
 	@classmethod

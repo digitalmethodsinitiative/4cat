@@ -201,7 +201,6 @@ function init() {
 			$(".annotation-field").each(function(){
 
 				let ann_field = $(this);
-				console.log(ann_field)
 				let label_field = ann_field.find(".annotation-field-label");
 				let type = ann_field.find(".annotation-field-type").val();
 				let option_fields = ann_field.find(".option-fields");
