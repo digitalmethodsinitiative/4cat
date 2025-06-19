@@ -240,7 +240,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             next_parameters = next.get("parameters", {})
             next_type = next.get("type", "")
             try:
-                available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
+                available_processors = self.dataset.get_available_processors(config=self.config)
             except ValueError:
                 self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
                 break

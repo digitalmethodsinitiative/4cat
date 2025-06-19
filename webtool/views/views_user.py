@@ -38,7 +38,7 @@ def load_user(user_name):
     user = User.get_by_name(current_app.db, user_name)
     if user:
         user.authenticate()
-        user.with_config(ConfigWrapper(g.config, user=user, request=request))
+        user.with_config(ConfigWrapper(current_app.fourcat_config, user=user, request=request))
 
     return user
 

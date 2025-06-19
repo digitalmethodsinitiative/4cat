@@ -137,12 +137,13 @@ class ImageDownloader(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on top image rankings, collectors, but not specific collectors with their own image
         collection methods
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return (
             (module.type == "top-images" or module.is_from_collector())
