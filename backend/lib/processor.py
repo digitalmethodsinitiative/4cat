@@ -696,42 +696,32 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if not source_dataset:
             source_dataset = self.source_dataset.top_parent()
 
-        # Check if this dataset already has annotation fields
-        existing_labels = source_dataset.get_annotation_field_labels()
+		# Check if this dataset already has annotation fields, and if so, store some values to use per annotation.
+		annotation_labels = source_dataset.get_annotation_field_labels()
 
-        # Set some values
-        for annotation in annotations:
+		# Set some values
+		seen_fields = set((a["from_dataset"], a["label"]) for a in annotation_fields.values() if "from_dataset" in a)
+		for annotation in annotations:
+			# Keep track of what dataset generated this annotation
+			annotation["from_dataset"] = self.dataset.key
+			# Set the author to this processor's name
+			if not annotation.get("author"):
+				annotation["author"] = self.name
+			if not annotation.get("author_original"):
+				annotation["author_original"] = self.name
+			annotation["by_processor"] = True
 
-            if not annotation.get("label"):
-                # If there's no label, set the default label to this processor's name
-                label = self.name
-            else:
-                # If we have a custom label, use that
-                label = annotation["label"]
-                # Shorten if necessary
-                if len(label) > 100:
-                    label = label[:100]
+			# Only use a default label if no custom one is given
+			if not annotation.get("label"):
+				annotation["label"] = self.name
+			# If this specific processor instance has not already generated annotations (e.g. when done in batches),
+			# and if we're not overwriting, add the from_dataset key as suffix.
+			if not overwrite and annotation["label"] in annotation_labels:
+				annotation["label"] += "-" + self.dataset.key
 
-            # If the processor has already generated annotation fields,
-            # or if we have a custom label that already exists
-            # add a number suffix to differentiate
-            if not overwrite and label in existing_labels:
-                label += "-" + str(
-                    len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
-            # Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
-            annotation["label"] = label
-
-            # Set the author to this processor's name
-            if not annotation.get("author"):
-                annotation["author"] = self.name
-            if not annotation.get("author_original"):
-                annotation["author_original"] = self.name
-
-            annotation["by_processor"] = True
-
-			# Store annotation field data for every unique dataset->label combo!
-			if (annotation["from_dataset"], annotation["label"]) not in unique_fields:
-				unique_fields.add((annotation["from_dataset"], annotation["label"]))
+			# Store annotation field if this dataset -> label combo hasn't been seen yet
+			if (annotation["from_dataset"], annotation["label"]) not in seen_fields:
+				seen_fields.add((annotation["from_dataset"], annotation["label"]))
 				field_id = hash_to_md5(self.source_dataset.key + annotation["label"] + annotation["from_dataset"])
 				annotation_fields[field_id] = {
 					"label": annotation["label"],
@@ -894,8 +884,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         Used for processor compatibility
 
-        To be defined by the child processor if it should exclude certain follow-up processors.
-        e.g.:
+		To be defined by the child processor if it should exclude certain follow-up processors.
+		e.g.:
 
         def exclude_followup_processors(cls, processor_type):
             if processor_type in ["undesirable-followup-processor"]:
