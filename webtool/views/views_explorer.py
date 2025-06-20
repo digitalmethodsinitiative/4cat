@@ -62,11 +62,10 @@ def explorer_dataset(dataset_key: str, page=1):
 	# Get the datasets that generated annotations
 	from_datasets = {}
 	for annotation_field in annotation_fields.values():
-		if annotation_field["from_dataset"]:
+		if annotation_field.get("from_dataset"):
 			key = annotation_field["from_dataset"]
 			try:
-				from_dataset = DataSet(key=key, db=db, modules=fourcat_modules)
-				from_datasets[key] = from_dataset
+				from_datasets[key] = DataSet(key=key, db=db, modules=fourcat_modules)
 			except DataSetException:
 				return error(404, error="Dataset not found.")
 
