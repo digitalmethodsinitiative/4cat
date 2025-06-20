@@ -47,8 +47,11 @@ def log_exception(e):
 
         # Get the request URL
         request_url = request.url
-
-        log.error(f"{type(cause).__name__}{(' ('+request_url+')') if request_url else ''}: {cause}", frame=tb if tb else None)
+        log.error(f" {type(cause).__name__}"
+                  f" in {tb[-1].filename if tb else ''}:"
+                  f"{tb[-1].lineno if tb else ''}"
+                  f"{(' ('+request_url+')') if request_url else ''}"
+                  f": {cause}", frame=tb if tb else None)
         return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
     else:
         # Should be just 4xx errors; return and allow Flask to handle them
