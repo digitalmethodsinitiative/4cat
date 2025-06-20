@@ -42,9 +42,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 	.. code-block:: python
 
-        @classmethod
-        def is_compatible_with(cls, module=None, user=None):
-            return module.type == "linguistic-features"
+		@classmethod
+		def is_compatible_with(cls, module=None, user=None):
+			return module.type == "linguistic-features"
 
 
 	"""
@@ -210,7 +210,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.remove_files()
 
 				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
-				self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
+					self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
 		else:
 			# dataset already finished, job shouldn't be open anymore
 			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))
@@ -326,7 +326,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			except ValueError:
 				# dataset with key to attach to doesn't exist...
 				self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (
-				self.dataset.key, self.parameters["attach_to"]))
+					self.dataset.key, self.parameters["attach_to"]))
 
 		self.job.finish()
 
@@ -348,13 +348,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				message["To"] = owner
 				message["Subject"] = "4CAT dataset completed: %s - %s" % (self.dataset.type, self.dataset.get_label())
 				mail = """
-					<p>Hello %s,</p>
-					<p>4CAT has finished collecting your %s dataset labeled: %s</p>
-					<p>You can view your dataset via the following link:</p>
-					<p><a href="%s">%s</a></p> 
-					<p>Sincerely,</p>
-					<p>Your friendly neighborhood 4CAT admin</p>
-					""" % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
+                    <p>Hello %s,</p>
+                    <p>4CAT has finished collecting your %s dataset labeled: %s</p>
+                    <p>You can view your dataset via the following link:</p>
+                    <p><a href="%s">%s</a></p> 
+                    <p>Sincerely,</p>
+                    <p>Your friendly neighborhood 4CAT admin</p>
+                    """ % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
 				html_parser = html2text.HTML2Text()
 				message.attach(MIMEText(html_parser.handle(mail), "plain"))
 				message.attach(MIMEText(mail, "html"))
@@ -497,7 +497,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param str filename:  Name of file to extract
 		:param Path archive_path:  Path to zip file to read
 		:param Path staging_area:  Where to store the files while they're
-		  		being worked with. If omitted, a temporary folder is created
+				being worked with. If omitted, a temporary folder is created
 		:return Path:  A path to the extracted file
 		"""
 		if not archive_path.exists():
@@ -671,17 +671,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		annotation_fields = source_dataset.get_annotation_fields()
 		annotation_labels = source_dataset.get_annotation_field_labels()
 
-		# If this specific processor instance has not already generated annotations (e.g. when done in batches),
-		# and if we have a label that already exists, add the dataset key as suffix.
-		default_label = self.name
-		if not overwrite and default_label in annotation_labels:
-			default_label += "-" + self.dataset.key
-
 		# Set some values
-		unique_fields = set()
+		seen_fields = set((a["from_dataset"], a["label"]) for a in annotation_fields.values() if "from_dataset" in a)
 		for annotation in annotations:
-			if not annotation.get("label"):  # Only use default label if no custom one is given
-				annotation["label"] = default_label
+			# Keep track of what dataset generated this annotation
 			annotation["from_dataset"] = self.dataset.key
 			# Set the author to this processor's name
 			if not annotation.get("author"):
@@ -690,9 +683,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				annotation["author_original"] = self.name
 			annotation["by_processor"] = True
 
-			# Store annotation field data for every unique dataset->label combo!
-			if (annotation["from_dataset"], annotation["label"]) not in unique_fields:
-				unique_fields.add((annotation["from_dataset"], annotation["label"]))
+			# Only use a default label if no custom one is given
+			if not annotation.get("label"):
+				annotation["label"] = self.name
+			# If this specific processor instance has not already generated annotations (e.g. when done in batches),
+			# and if we're not overwriting, add the from_dataset key as suffix.
+			if not overwrite and annotation["label"] in annotation_labels:
+				annotation["label"] += "-" + self.dataset.key
+
+			# Store annotation field if this dataset -> label combo hasn't been seen yet
+			if (annotation["from_dataset"], annotation["label"]) not in seen_fields:
+				seen_fields.add((annotation["from_dataset"], annotation["label"]))
 				field_id = hash_to_md5(self.source_dataset.key + annotation["label"] + annotation["from_dataset"])
 				annotation_fields[field_id] = {
 					"label": annotation["label"],
@@ -854,19 +855,19 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	@classmethod
 	def exclude_followup_processors(cls, processor_type=None):
 		"""
-        Used for processor compatibility
+		Used for processor compatibility
 
-        To be defined by the child processor if it should exclude certain follow-up processors.
-        e.g.:
+		To be defined by the child processor if it should exclude certain follow-up processors.
+		e.g.:
 
-        def exclude_followup_processors(cls, processor_type):
+		def exclude_followup_processors(cls, processor_type):
 			if processor_type in ["undesirable-followup-processor"]:
 				return True
 			return False
 
-        :param str processor_type:  Processor type to exclude
-        :return bool:  True if processor should be excluded, False otherwise
-        """
+		:param str processor_type:  Processor type to exclude
+		:return bool:  True if processor should be excluded, False otherwise
+		"""
 		return False
 
 	@abc.abstractmethod
@@ -885,7 +886,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		This is used to determine whether a class is a 4CAT
 		processor.
-		
+
 		:return:  True
 		"""
 		return True
