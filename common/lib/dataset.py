@@ -2051,9 +2051,15 @@ class DataSet(FourcatModule):
 			# Keep track of whether existing fields have changed; if so, we're going to
 			# update the annotations table.
 			if field_id in old_fields:
+				# Keep `from_dataset`, `editable`)
+				for k, v in [key for key in old_fields[field_id].items() if key not in annotation_field.keys()]:
+					if k in ("editable", "from_dataset"):
+						annotation_field[k] = v
+					new_fields[field_id] = annotation_field
+				# Make sure we re-save annotation fields if things have changed
 				if old_fields[field_id] != annotation_field:
 					changes = True
-
+		print(old_fields)
 		# Check if fields are removed
 		if not add:
 			for field_id in old_fields.keys():
