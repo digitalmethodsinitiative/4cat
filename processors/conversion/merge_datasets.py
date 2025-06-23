@@ -44,14 +44,14 @@ class DatasetMerger(BasicProcessor):
                 "remove": "Remove duplicates",
                 "keep": "Keep duplicates"
             },
-            "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their ID "
-                       "is identical, regardless of the value of other properties",
+            "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their "
+                       "`id` field is identical, regardless of the value of other properties.",
             "default": "remove"
         },
         "label": {
             "type": UserInput.OPTION_TEXT,
             "help": "Dataset name",
-            "tooltip": "Name of the merged dataset. If left empty, a name will be generated"
+            "tooltip": "Name of the merged dataset. If left empty, a name will be generated."
         }
     }
 
@@ -82,6 +82,25 @@ class DatasetMerger(BasicProcessor):
         source_url = ural.normalize_url(url)
         source_key = source_url.split("/")[-1]
         return DataSet(key=source_key, db=db, modules=modules)
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        Sets the default merged dataset name to a name based on the primary
+        dataset's current name.
+
+        :param DataSet parent_dataset:  Parent dataset
+        :param user:  User (passed by Flask in webtool context)
+        :return dict:  Processor options
+        """
+        options = cls.options
+
+        if parent_dataset and isinstance(parent_dataset, DataSet):
+            options["label"]["default"] = f"(Merged) {parent_dataset.get_label()}"
+
+        return options
 
     def process(self):
         """
