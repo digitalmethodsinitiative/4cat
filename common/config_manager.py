@@ -1,7 +1,6 @@
 import itertools
 import pickle
 import time
-import traceback
 import json
 
 from pymemcache.client.base import Client as MemcacheClient
@@ -38,6 +37,8 @@ class ConfigManager:
         # establish database connection if none available
         if db:
             self.with_db(db)
+
+        self.url = ""
 
     def with_db(self, db=None):
         """
@@ -290,23 +291,10 @@ class ConfigManager:
         if memcache:
             memcache_id = self._get_memcache_id(attribute_name, user, tags)
             try:
-                cached_value = memcache.get(memcache_id, default=CacheMiss)
-            except Exception as e:
-                frames = traceback.extract_stack()[17:]
-                location = "`%s`" % "` → `".join(
-                    [
-                        frame.filename.split("/")[-1] + ":" + str(frame.lineno)
-                        for frame in frames
-                    ]
-                )
-                print(e)
-                print(location)
-            if cached_value is not CacheMiss:
-                # do *not* use the method's `default` argument here - this is
-                # just to determine if we have a memcached value
-                return cached_value
-            else:
-                print(f"<- cache miss for {memcache_id}")
+                return memcache.get(memcache_id)
+            except KeyError:
+                # cache miss, it's fine
+                pass
 
         # if trying to access a setting that's not a core setting, attempt to
         # initialise the database connection
@@ -342,7 +330,6 @@ class ConfigManager:
             value = default
 
         if memcache:
-            print(f"-> caching {attribute_name}")
             memcache.set(memcache_id, value)
 
         return value
@@ -546,19 +533,20 @@ class ConfigWrapper:
             self.tags = tags if tags else config.tags
             self.request = request if request else config.request
             self.config = config.config
+            self.memcache = config.memcache
         else:
             self.config = config
             self.user = user
             self.tags = tags
             self.request = request
 
+            # this ensures we use our own memcache client, important in threaded
+            # contexts because pymemcache is not thread-safe
+            self.memcache = self.config.load_memcache()
+
         # this ensures the user object in turn reads from the wrapper
         if self.user:
             self.user.with_config(self, rewrap=False)
-
-        # this ensures we use our own memcache client, important in threaded
-        # contexts because pymemcache is not thread-safe
-        self.memcache = self.config.load_memcache()
 
 
     def set(self, *args, **kwargs):
