@@ -3,7 +3,9 @@ import pickle
 import time
 import json
 
-from pymemcache.client.base import Client
+from pymemcache.client.base import Client as MemcacheClient
+from pymemcache.exceptions import MemcacheError
+from pymemcache import serde
 from pathlib import Path
 from common.lib.database import Database
 
@@ -22,7 +24,6 @@ class ConfigManager:
 
     core_settings = {}
     config_definition = {}
-    tag_context = []  # todo
 
     def __init__(self, db=None):
         # ensure core settings (including database config) are loaded
@@ -50,12 +51,6 @@ class ConfigManager:
         else:
             # self.db already initialized and no db provided
             pass
-
-        # now we have a database connection, we can initialise the memcached
-        # client (since the address is stored in the database)
-        memcache_address = self.get("4cat.memcached_server")
-        if memcache_address:
-            self.memcache = Client(memcache_address)
 
     def load_user_settings(self):
         """
@@ -133,6 +128,8 @@ class ConfigManager:
             "API_HOST": config_reader["API"].get("api_host"),
             "API_PORT": config_reader["API"].getint("api_port"),
 
+            "MEMCACHE_SERVER": config_reader.get("MEMCACHE", option="memcache_host", fallback={}),
+
             "PATH_ROOT": Path(os.path.abspath(os.path.dirname(__file__))).joinpath(
                 "..").resolve(),  # better don"t change this
             "PATH_LOGS": Path(config_reader["PATHS"].get("path_logs", "")),
@@ -144,6 +141,19 @@ class ConfigManager:
             "ANONYMISATION_SALT": config_reader["GENERATE"].get("anonymisation_salt"),
             "SECRET_KEY": config_reader["GENERATE"].get("secret_key")
         })
+
+        if self.get("MEMCACHE_SERVER"):
+            try:
+                # do one test fetch to test if connection is valid
+                self.memcache = MemcacheClient(self.get("MEMCACHE_SERVER"), serde=serde.pickle_serde, ignore_exc=True)
+                self.memcache.get("4cat-dummy-fail-expected")
+            except (SystemError, ValueError, MemcacheError):
+                # we have no access to the logger here so we simply pass
+                # later we can detect elsewhere that a memcache address is
+                # configured but no connection is there - then we can log
+                # config reader still works without memcache
+                pass
+
 
     def ensure_database(self):
         """
@@ -226,7 +236,16 @@ class ConfigManager:
 
         :return:  Setting value, or the provided fallback, or `None`.
         """
+        # short-circuit via memcache if appropriate
+        memcache_id = self._get_memcache_id(attribute_name, user, tags)
+        if self.memcache:
+            if cached_value := self.memcache.get(memcache_id, default=None):
+                # do *not* use the method's `default` argument here - this is
+                # just to determine if we have a memcached value
+                return cached_value
+
         # core settings are not from the database
+        # they are therefore also not memcached - too little gain
         if type(attribute_name) is str:
             if attribute_name in self.core_settings:
                 return self.core_settings[attribute_name]
@@ -290,10 +309,16 @@ class ConfigManager:
             # this works because attribute_name is converted to a tuple (else already returned)
             # if attribute_name is None, return all settings
             # print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
-            return list(final_settings.values())[0]
+            return_value = list(final_settings.values())[0]
         else:
             # All settings requested (via get_all)
-            return final_settings
+            return_value = final_settings
+
+        if self.memcache:
+            print(memcache_id + ":::" + repr(return_value))
+            self.memcache.set(memcache_id, return_value)
+
+        return return_value
 
     def get_active_tags(self, user=None, tags=None):
         """
@@ -379,6 +404,11 @@ class ConfigManager:
         updated_rows = self.db.cursor.rowcount
         self.db.log.debug(f"Updated setting for {attribute_name}: {value} (tag: {tag})")
 
+        if self.memcache:
+            # invalidate any cached value for this settings
+            memcache_id = self._get_memcache_id(attribute_name, None, tag)
+            self.memcache.delete(memcache_id)
+
         return updated_rows
 
     def delete_for_tag(self, attribute_name, tag):
@@ -393,6 +423,48 @@ class ConfigManager:
         updated_rows = self.db.cursor.rowcount
 
         return updated_rows
+
+    def clear_cache(self):
+        """
+        Clear cached configuration values
+
+        Called when the backend restarts - helps start with a blank slate.
+        """
+        if not self.memcache:
+            return
+
+        self.memcache.flush_all()
+
+    def _get_memcache_id(self, attribute_name, user=None, tags=None):
+        """
+        Generate a memcache key for a config setting request
+
+        This includes the relevant user name/tags because the value may be
+        different depending on the value of these parameters.
+
+        :param str attribute_name:
+        :param str|User user:
+        :param str|list tags:
+        :return str:
+        """
+        if tags and isinstance(tags, str):
+            tags = [tags]
+
+        tag_bit = []
+        if tags:
+            tag_bit.append("|".join(tags))
+
+        if user:
+            if type(user) is not str:
+                user = user.name
+
+            tag_bit.append(f"{user}:{tag_bit}")
+
+        memcache_id = f"4cat-config-{attribute_name}"
+        if tag_bit:
+            memcache_id += f"-{'-'.join(tag_bit)}"
+
+        return memcache_id
 
     def __getattr__(self, attr):
         """
