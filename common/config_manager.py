@@ -690,24 +690,5 @@ class ConfigWrapper:
         else:
             raise AttributeError(f"'{self.__name__}' object has no attribute '{item}'")
 
-class ConfigDummy:
-    """
-    Dummy class to use as initial value for class-based configs
-
-    The config manager in processor objects takes the owner of the dataset of
-    the processor into account. This is only available after the object has
-    been inititated, so until then use this dummy wrapper that throws an error
-    when used to access config variables
-    """
-    def __getattribute__(self, item):
-        """
-        Access class attribute
-
-        :param item:
-        :raises NotImplementedError:
-        """
-        raise NotImplementedError("Cannot call processor config object in a class or static method - call global "
-                                  "configuration manager instead.")
-
 
 config = ConfigManager()
