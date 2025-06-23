@@ -1,22 +1,24 @@
 import collections
 import itertools
 import datetime
-import hashlib
 import fnmatch
+import random
 import shutil
 import json
 import time
 import csv
 import re
 
-from pathlib import Path
-
-import backend
 from common.config_manager import config
+from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version, NullAwareTextIOWrapper, convert_to_int
+from common.lib.module_loader import ModuleCollector
+from common.lib.helpers import convert_to_float, get_software_version, call_api
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_to_md5
+from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
-from common.lib.exceptions import ProcessorInterruptedException, DataSetException, MapItemException
+from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
+								   MapItemException, MappedItemIncompleteException, AnnotationException)
 
 
 class DataSet(FourcatModule):
@@ -37,11 +39,13 @@ class DataSet(FourcatModule):
 	data = None
 	key = ""
 
-	children = None
+	_children = None
+	_cached_columns = None
 	available_processors = None
 	genealogy = None
 	preset_parent = None
 	parameters = None
+	modules = None
 
 	owners = None
 	tagged_owners = None
@@ -52,55 +56,71 @@ class DataSet(FourcatModule):
 
 	no_status_updates = False
 	staging_areas = None
-	queue_position = None
+	_queue_position = None
 
 	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
-				 type=None, is_private=True, owner="anonymous"):
+				 type=None, is_private=True, owner="anonymous", modules=None):
 		"""
 		Create new dataset object
 
 		If the dataset is not in the database yet, it is added.
 
-		:param parameters:  Parameters, e.g. search query, date limits, et cetera
+		:param dict parameters:  Only when creating a new dataset. Dataset
+		parameters, free-form dictionary.
+		:param str key: Dataset key. If given, dataset with this key is loaded.
+		:param int job: Job ID. If given, dataset corresponding to job is
+		loaded.
+		:param dict data: Dataset data, corresponding to a row in the datasets
+		database table. If not given, retrieved from database depending on key.
 		:param db:  Database connection
+		:param str parent:  Only when creating a new dataset. Parent dataset
+		key to which the one being created is a child.
+		:param str extension: Only when creating a new dataset. Extension of
+		dataset result file.
+		:param str type: Only when creating a new dataset. Type of the dataset,
+		corresponding to the type property of a processor class.
+		:param bool is_private: Only when creating a new dataset. Whether the
+		dataset is private or public.
+		:param str owner: Only when creating a new dataset. The user name of
+		the dataset's creator.
+		:param modules: Module cache. If not given, will be loaded when needed
+		(expensive). Used to figure out what processors are compatible with
+		this dataset.
 		"""
 		self.db = db
 		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}
-		self.children = []
 		self.available_processors = {}
 		self.genealogy = []
 		self.staging_areas = []
+		self.modules = modules
 
 		if key is not None:
 			self.key = key
 			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
 			if not current:
-				raise TypeError("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
+				raise DataSetNotFoundException("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
-			query = current["query"]
 		elif job is not None:
-			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
+			current = self.db.fetchone("SELECT * FROM datasets WHERE (parameters::json->>'job')::text = %s", (str(job),))
 			if not current:
-				raise TypeError("DataSet() requires a valid job ID for its 'job' argument")
+				raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
 
-			query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
-				raise ValueError("DataSet() requires a complete dataset record for its 'data' argument")
+				raise DataSetException("DataSet() requires a complete dataset record for its 'data' argument")
 
-			query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
-				raise TypeError("DataSet() requires either 'key', or 'parameters' to be given")
+				raise DataSetException("DataSet() requires either 'key', or 'parameters' to be given")
 
 			if not type:
-				raise ValueError("Datasets must have their type set explicitly")
+				raise DataSetException("Datasets must have their type set explicitly")
 
 			query = self.get_label(parameters, default=type)
 			self.key = self.get_key(query, parameters, parent)
@@ -111,6 +131,9 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			self.data = {"type": type}  # get_own_processor needs this
+			own_processor = self.get_own_processor()
+			version = get_software_commit(own_processor)
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
@@ -122,7 +145,8 @@ class DataSet(FourcatModule):
 				"timestamp": int(time.time()),
 				"is_finished": False,
 				"is_private": is_private,
-				"software_version": get_software_version(),
+				"software_version": version[0],
+				"software_source": version[1],
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
@@ -136,9 +160,8 @@ class DataSet(FourcatModule):
 
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
-				own_processor = self.get_own_processor()
 				if own_processor:
-					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db) if parent else None)
+					extension = own_processor.get_extension(parent_dataset=DataSet(key=parent, db=db, modules=self.modules) if parent else None)
 				# Still no extension, default to 'csv'
 				if not extension:
 					extension = "csv"
@@ -146,13 +169,7 @@ class DataSet(FourcatModule):
 			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
 
-		# retrieve analyses and processors that may be run for this dataset
-		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
-							   key=lambda dataset: dataset.is_finished(), reverse=True)
-
 		self.refresh_owners()
-		self.get_place_in_queue()
 
 	def check_dataset_finished(self):
 		"""
@@ -215,19 +232,8 @@ class DataSet(FourcatModule):
 		extension.
 		"""
 		log_path = self.get_log_path()
-		with log_path.open("w") as outfile:
+		with log_path.open("w"):
 			pass
-
-	def has_log_file(self):
-		"""
-		Check if a log file exists for this dataset
-
-		This should be the case, but datasets created before status logging was
-		added may not have one, so we need to be able to check this.
-
-		:return bool:  Does a log file exist?
-		"""
-		return self.get_log_path().exists()
 
 	def log(self, log):
 		"""
@@ -244,40 +250,17 @@ class DataSet(FourcatModule):
 		with log_path.open("a", encoding="utf-8") as outfile:
 			outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
 
-	def get_log_iterator(self):
-		"""
-		Return an iterator with a (time, message) tuple per line in the log
-
-		Just a convenience function!
-
-		:return iterator:  (time, message) per log message
-		"""
-		log_path = self.get_log_path()
-		if not log_path.exists():
-			return
-
-		with log_path.open(encoding="utf-8") as infile:
-			for line in infile:
-				logtime = line.split(":")[0]
-				logmsg = ":".join(line.split(":")[1:])
-				yield (logtime, logmsg)
-
-	def iterate_items(self, processor=None, bypass_map_item=False, warn_unmappable=True):
+	def _iterate_items(self, processor=None):
 		"""
 		A generator that iterates through a CSV or NDJSON file
+
+		This is an internal method and should not be called directly. Rather,
+		call iterate_items() and use the generated dictionary and its properties.
 
 		If a reference to a processor is provided, with every iteration,
 		the processor's 'interrupted' flag is checked, and if set a
 		ProcessorInterruptedException is raised, which by default is caught
 		in the worker and subsequently stops execution gracefully.
-
-		Processors can define a method called `map_item` that can be used to
-		map an item from the dataset file before it is processed any further
-		this is slower than storing the data file in the right format to begin
-		with but not all data sources allow for easy 'flat' mapping of items,
-		e.g. tweets are nested objects when retrieved from the twitter API
-		that are easier to store as a JSON file than as a flat CSV file, and
-		it would be a shame to throw away that data.
 
 		There are two file types that can be iterated (currently): CSV files
 		and NDJSON (newline-delimited JSON) files. In the future, one could
@@ -286,87 +269,113 @@ class DataSet(FourcatModule):
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
-		:param bool bypass_map_item:  If set to `True`, this ignores any
-		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
-		unmapped_items = False
 		path = self.get_results_path()
 
-		# see if an item mapping function has been defined
-		# open question if 'source_dataset' shouldn't be an attribute of the dataset
-		# instead of the processor...
-		item_mapper = False
-		own_processor = self.get_own_processor()
-		if not bypass_map_item and own_processor is not None:
-			if own_processor.map_item_method_available(dataset=self):
-				item_mapper = True
-
-		# go through items one by one, optionally mapping them
+		# Yield through items one by one
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
-				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
-				reader = csv.DictReader(wrapped_infile, **csv_parameters)
+				reader = csv.DictReader(wrapped_infile)
 
-				for i, item in enumerate(reader):
+				if not self.get_own_processor():
+					# Processor was deprecated or removed; CSV file is likely readable but some legacy types are not
+					first_item = next(reader)
+					if first_item is None or any([True for key in first_item if type(key) is not str]):
+						raise NotImplementedError(f"Cannot iterate through CSV file (deprecated processor {self.type})")
+					yield first_item
+
+				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
-
-					if item_mapper:
-						try:
-							item = own_processor.get_mapped_item(item)
-						except MapItemException as e:
-							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
-								unmapped_items = True
-							continue
 
 					yield item
 
 		elif path.suffix.lower() == ".ndjson":
-			# in this format each line in the file is a self-contained JSON
-			# file
+			# In NDJSON format each line in the file is a self-contained JSON
 			with path.open(encoding="utf-8") as infile:
-				for i, line in enumerate(infile):
+				for line in infile:
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
-					item = json.loads(line)
-					if item_mapper:
-						try:
-							item = own_processor.get_mapped_item(item)
-						except MapItemException as e:
-							if warn_unmappable:
-								self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
-								unmapped_items = True
-							continue
-
-					yield item
+					yield json.loads(line)
 
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
-	def iterate_mapped_items(self, processor=None, warn_unmappable=True):
+	def iterate_items(self, processor=None, warn_unmappable=True, map_missing="default"):
 		"""
-		Wrapper for iterate_items that returns both the original item and the mapped item (or else the same identical item).
-		No extension check is performed here as the point is to be able to handle the original object and save as an appropriate
-		filetype.
+		Generate mapped dataset items
+
+		Wrapper for _iterate_items that returns a DatasetItem, which can be
+		accessed as a dict returning the original item or (if a mapper is
+		available) the mapped item. Mapped or original versions of the item can
+		also be accessed via the `original` and `mapped_object` properties of
+		the DatasetItem.
+
+		Processors can define a method called `map_item` that can be used to map
+		an item from the dataset file before it is processed any further. This is
+		slower than storing the data file in the right format to begin with but
+		not all data sources allow for easy 'flat' mapping of items, e.g. tweets
+		are nested objects when retrieved from the twitter API that are easier
+		to store as a JSON file than as a flat CSV file, and it would be a shame
+		to throw away that data.
+
+		Note the two parameters warn_unmappable and map_missing. Items can be
+		unmappable in that their structure is too different to coerce into a
+		neat dictionary of the structure the data source expects. This makes it
+		'unmappable' and warn_unmappable determines what happens in this case.
+		It can also be of the right structure, but with some fields missing or
+		incomplete. map_missing determines what happens in that case. The
+		latter is for example possible when importing data via Zeeschuimer,
+		which produces unstably-structured data captured from social media
+		sites.
 
 		:param BasicProcessor processor:  A reference to the processor
 		iterating the dataset.
-		:return generator:  A generator that yields a tuple with the unmapped item followed by the mapped item
+		:param bool warn_unmappable:  If an item is not mappable, skip the item
+		and log a warning
+		:param map_missing: Indicates what to do with mapped items for which
+		some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
+		- 'default': fill missing fields with the default passed by map_item
+		- 'abort': raise a MappedItemIncompleteException if a field is missing
+		- a callback: replace missing field with the return value of the
+		  callback. The MappedItem object is passed to the callback as the
+		  first argument and the name of the missing field as the second.
+		- a dictionary with a key for each possible missing field: replace missing
+		  field with a strategy for that field ('default', 'abort', or a callback)
+
+		:return generator:  A generator that yields DatasetItems
 		"""
 		unmapped_items = False
 		# Collect item_mapper for use with filter
 		item_mapper = False
 		own_processor = self.get_own_processor()
-		if own_processor.map_item_method_available(dataset=self):
+		if own_processor and own_processor.map_item_method_available(dataset=self):
 			item_mapper = True
 
+		# Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
+		annotation_labels = self.get_annotation_field_labels()
+		num_annotations = 0 if not annotation_labels else self.num_annotations()
+		all_annotations = None
+		# If this dataset has less than n annotations, just retrieve them all before iterating
+		if num_annotations <= 500:
+			# Convert to dict for faster lookup when iterating over items
+			all_annotations = collections.defaultdict(list)
+			for annotation in self.get_annotations():
+				all_annotations[annotation.item_id].append(annotation)
+
+		# missing field strategy can be for all fields at once, or per field
+		# if it is per field, it is a dictionary with field names and their strategy
+		# if it is for all fields, it may be a callback, 'abort', or 'default'
+		default_strategy = "default"
+		if type(map_missing) is not dict:
+			default_strategy = map_missing
+			map_missing = {}
+
 		# Loop through items
-		for i, item in enumerate(self.iterate_items(processor=processor, bypass_map_item=True)):
+		for i, item in enumerate(self._iterate_items(processor)):
 			# Save original to yield
 			original_item = item.copy()
 
@@ -379,36 +388,216 @@ class DataSet(FourcatModule):
 						self.warn_unmappable_item(i, processor, e, warn_admins=unmapped_items is False)
 						unmapped_items = True
 					continue
+
+				# check if fields have been marked as 'missing' in the
+				# underlying data, and treat according to the chosen strategy
+				if mapped_item.get_missing_fields():
+					for missing_field in mapped_item.get_missing_fields():
+						strategy = map_missing.get(missing_field, default_strategy)
+
+						if callable(strategy):
+							# delegate handling to a callback
+							mapped_item.data[missing_field] = strategy(mapped_item.data, missing_field)
+						elif strategy == "abort":
+							# raise an exception to be handled at the processor level
+							raise MappedItemIncompleteException(f"Cannot process item, field {missing_field} missing in source data.")
+						elif strategy == "default":
+							# use whatever was passed to the object constructor
+							mapped_item.data[missing_field] = mapped_item.data[missing_field].value
+						else:
+							raise ValueError("map_missing must be 'abort', 'default', or a callback.")
 			else:
 				mapped_item = original_item
 
-			# Yield the two items
-			yield original_item, mapped_item
+			# Add possible annotation values
+			if annotation_labels:
 
-	def get_item_keys(self, processor=None):
+				# We're always handling annotated data as a MappedItem object,
+				# even if no map_item() function is available for the data source.
+				if not isinstance(mapped_item, MappedItem):
+					mapped_item = MappedItem(mapped_item)
+
+				# Retrieve from all annotations
+				if all_annotations:
+					item_annotations = all_annotations.get(mapped_item.data["id"])
+				# Or get annotations per item for large datasets (more queries but less memory usage)
+				else:
+					item_annotations = self.get_annotations_for_item(mapped_item.data["id"])
+
+				# Loop through annotation field labels
+				for annotation_label in annotation_labels:
+					# Set default value to an empty string
+					value = ""
+					# Set value if this item has annotations
+					if item_annotations:
+						# Items can have multiple annotations
+						for annotation in item_annotations:
+							if annotation.label == annotation_label:
+								value = annotation.value
+							if isinstance(value, list):
+								value = ",".join(value)
+
+					# We're always adding an annotation value
+					# as an empty string, even if it's absent.
+					mapped_item.data[annotation_label] = value
+
+			# yield a DatasetItem, which is a dict with some special properties
+			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
+
+	def sort_and_iterate_items(self, sort="", reverse=False, chunk_size=50000, **kwargs) -> dict:
 		"""
-		Get item attribute names
+		Loop through items in a dataset, sorted by a given key.
 
-		It can be useful to know what attributes an item in the dataset is
-		stored with, e.g. when one wants to produce a new dataset identical
-		to the source_dataset one but with extra attributes. This method provides
-		these, as a list.
+		This is a wrapper function for `iterate_items()` with the
+		added functionality of sorting a dataset. 
 
-		:param BasicProcessor processor:  A reference to the processor
-		asking for the item keys, to pass on to iterate_itesm
-		:return list:  List of keys, may be empty if there are no items in the
-		  dataset
+		:param sort:				The item key that determines the sort order.
+		:param reverse:				Whether to sort by largest values first.
+
+		:returns dict:				Yields iterated post
 		"""
+		def sort_items(items_to_sort, sort_key, reverse, convert_sort_to_float=False):
+			"""
+			Sort items based on the given key and order.
 
-		items = self.iterate_items(processor, warn_unmappable=False)
-		try:
-			keys = list(items.__next__().keys())
-		except StopIteration:
-			return []
-		finally:
-			del items
+			:param items_to_sort:  The items to sort
+			:param sort_key:  The key to sort by
+			:param reverse:  Whether to sort in reverse order
+			:return:  Sorted items
+			"""
+			if reverse is False and (sort_key == "dataset-order" or sort_key == ""):
+				# Sort by dataset order
+				yield from items_to_sort
+			elif sort_key == "dataset-order" and reverse:
+				# Sort by dataset order in reverse
+				yield from reversed(list(items_to_sort))
+			else:
+				# Sort on the basis of a column value
+				if not convert_sort_to_float:
+					yield from sorted(items_to_sort, key=lambda x: x.get(sort_key, ""), reverse=reverse)
+				else:
+					# Dataset fields can contain integers and empty strings.
+					# Since these cannot be compared, we will convert every
+					# empty string to 0.
+					yield from sorted(items_to_sort, key=lambda x: convert_to_float(x.get(sort_key, "")), reverse=reverse)	
 
-		return keys
+		if self.num_rows < chunk_size:
+			try:
+				yield from sort_items(self.iterate_items(**kwargs), sort, reverse)
+			except TypeError:
+				# Dataset fields can contain integers and empty strings.
+				# Since these cannot be compared, we will convert every
+				# empty string to 0.
+				yield from sort_items(self.iterate_items(**kwargs), sort, reverse, convert_sort_to_float=True)
+
+		else:
+			# For large datasets, we will use chunk sorting
+			staging_area = self.get_staging_area()
+			buffer = []
+			chunk_files = []
+			convert_sort_to_float = False
+			fieldnames = self.get_columns()
+
+			def write_chunk(buffer, chunk_index):
+				"""
+				Write a chunk of data to a temporary file
+
+				:param buffer:  The buffer containing the chunk of data
+				:param chunk_index:  The index of the chunk
+				:return:  The path to the temporary file
+				"""
+				temp_file = staging_area.joinpath(f"chunk_{chunk_index}.csv")
+				with temp_file.open("w", encoding="utf-8") as chunk_file:
+					writer = csv.DictWriter(chunk_file, fieldnames=fieldnames)
+					writer.writeheader()
+					writer.writerows(buffer)
+				return temp_file
+			
+			# Divide the dataset into sorted chunks
+			for item in self.iterate_items(**kwargs):
+				buffer.append(item)
+				if len(buffer) >= chunk_size:
+					try:
+						buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+					except TypeError:
+						# Dataset fields can contain integers and empty strings.
+						# Since these cannot be compared, we will convert every
+						# empty string to 0.
+						convert_sort_to_float = True
+						buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+
+					chunk_files.append(write_chunk(buffer, len(chunk_files)))
+					buffer.clear()
+
+			# Sort and write any remaining items in the buffer
+			if buffer:
+				buffer = list(sort_items(buffer, sort, reverse, convert_sort_to_float))
+				chunk_files.append(write_chunk(buffer, len(chunk_files)))
+				buffer.clear()
+				
+			# Merge sorted chunks into the final sorted file
+			sorted_file = staging_area.joinpath("sorted_" + self.key + ".csv")
+			with sorted_file.open("w", encoding="utf-8") as outfile:
+				writer = csv.DictWriter(outfile, fieldnames=self.get_columns())
+				writer.writeheader()
+
+				# Open all chunk files for reading
+				chunk_readers = [csv.DictReader(chunk.open("r", encoding="utf-8")) for chunk in chunk_files]
+				heap = []
+
+				# Initialize the heap with the first row from each chunk
+				for i, reader in enumerate(chunk_readers):
+					try:
+						row = next(reader)
+						if sort == "dataset-order" and reverse:
+							# Use a reverse index for "dataset-order" and reverse=True
+							sort_key = -i
+						elif convert_sort_to_float:
+							# Negate numeric keys for reverse sorting
+							sort_key = -convert_to_float(row.get(sort, "")) if reverse else convert_to_float(row.get(sort, ""))
+						else:
+							if reverse:
+                                # For reverse string sorting, invert string comparison by creating a tuple
+                                # with an inverted string - this makes Python's tuple comparison work in reverse
+								sort_key = (tuple(-ord(c) for c in row.get(sort, "")), -i)
+							else:
+								sort_key = (row.get(sort, ""), i)
+						heap.append((sort_key, i, row))
+					except StopIteration:
+						pass
+
+				# Use a heap to merge sorted chunks
+				import heapq
+				heapq.heapify(heap)
+				while heap:
+					_, chunk_index, smallest_row = heapq.heappop(heap)
+					writer.writerow(smallest_row)
+					try:
+						next_row = next(chunk_readers[chunk_index])
+						if sort == "dataset-order" and reverse:
+							# Use a reverse index for "dataset-order" and reverse=True
+							sort_key = -chunk_index
+						elif convert_sort_to_float:
+							sort_key = -convert_to_float(next_row.get(sort, "")) if reverse else convert_to_float(next_row.get(sort, ""))
+						else:
+							# Use the same inverted comparison for string values
+							if reverse:
+								sort_key = (tuple(-ord(c) for c in next_row.get(sort, "")), -chunk_index)
+							else:
+								sort_key = (next_row.get(sort, ""), chunk_index)
+						heapq.heappush(heap, (sort_key, chunk_index, next_row))
+					except StopIteration:
+						pass
+
+			# Read the sorted file and yield each item
+			with sorted_file.open("r", encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+				for item in reader:
+					yield item
+
+			# Remove the temporary files
+			if staging_area.is_dir():
+				shutil.rmtree(staging_area)
 
 	def get_staging_area(self):
 		"""
@@ -422,8 +611,8 @@ class DataSet(FourcatModule):
 		:return Path:  Path to folder
 		"""
 		results_file = self.get_results_path()
-
-		results_dir_base = Path(results_file.parent)
+	
+		results_dir_base = results_file.parent
 		results_dir = results_file.name.replace(".", "") + "-staging"
 		results_path = results_dir_base.joinpath(results_dir)
 		index = 1
@@ -449,18 +638,6 @@ class DataSet(FourcatModule):
 				if staging_area.is_dir():
 					shutil.rmtree(staging_area)
 
-	def get_results_dir(self):
-		"""
-		Get path to results directory
-
-		Always returns a path, that will at some point contain the dataset
-		data, but may not do so yet. Use this to get the location to write
-		generated results to.
-
-		:return str:  A path to the results directory
-		"""
-		return self.folder
-
 	def finish(self, num_rows=0):
 		"""
 		Declare the dataset finished
@@ -469,35 +646,9 @@ class DataSet(FourcatModule):
 			raise RuntimeError("Cannot finish a finished dataset again")
 
 		self.db.update("datasets", where={"key": self.data["key"]},
-					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
+					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0, "timestamp_finished": int(time.time())})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
-
-	def unfinish(self):
-		"""
-		Declare unfinished, and reset status, so that it may be executed again.
-		"""
-		if not self.is_finished():
-			raise RuntimeError("Cannot unfinish an unfinished dataset")
-
-		try:
-			self.get_results_path().unlink()
-		except FileNotFoundError:
-			pass
-
-		self.data["timestamp"] = int(time.time())
-		self.data["is_finished"] = False
-		self.data["num_rows"] = 0
-		self.data["status"] = "Dataset is queued."
-		self.data["progress"] = 0
-
-		self.db.update("datasets", data={
-			"timestamp": self.data["timestamp"],
-			"is_finished": self.data["is_finished"],
-			"num_rows": self.data["num_rows"],
-			"status": self.data["status"],
-			"progress": 0
-		}, where={"key": self.key})
 
 	def copy(self, shallow=True):
 		"""
@@ -519,7 +670,7 @@ class DataSet(FourcatModule):
 		parameters["copied_from"] = self.key
 		parameters["copied_at"] = time.time()
 
-		copy = DataSet(parameters=parameters, db=self.db, extension=self.result_file.split(".")[-1], type=self.type)
+		copy = DataSet(parameters=parameters, db=self.db, extension=self.result_file.split(".")[-1], type=self.type, modules=self.modules)
 		for field in self.data:
 			if field in ("id", "key", "timestamp", "job", "parameters", "result_file"):
 				continue
@@ -541,40 +692,66 @@ class DataSet(FourcatModule):
 
 		return copy
 
-	def delete(self, commit=True):
+	def delete(self, commit=True, queue=None):
 		"""
 		Delete the dataset, and all its children
 
 		Deletes both database records and result files. Note that manipulating
 		a dataset object after it has been deleted is undefined behaviour.
 
-		:param commit bool:  Commit SQL DELETE query?
+		:param bool commit:  Commit SQL DELETE query?
 		"""
 		# first, recursively delete children
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
 			try:
-				child = DataSet(key=child["key"], db=self.db)
+				child = DataSet(key=child["key"], db=self.db, modules=self.modules)
 				child.delete(commit=commit)
-			except TypeError:
+			except DataSetException:
 				# dataset already deleted - race condition?
 				pass
 
+		# delete any queued jobs for this dataset
+		try:
+			job = Job.get_by_remote_ID(self.key, self.db, self.type)
+			if job.is_claimed:
+				# tell API to stop any jobs running for this dataset
+				# level 2 = cancel job
+				# we're not interested in the result - if the API is available,
+				# it will do its thing, if it's not the backend is probably not
+				# running so the job also doesn't need to be interrupted
+				call_api(
+					"cancel-job",
+					{"remote_id": self.key, "jobtype": self.type, "level": 2},
+					False
+				)
+
+			# this deletes the job from the database
+			job.finish(True)
+
+		except JobNotFoundException:
+			pass
+
 		# delete from database
+		self.delete_annotations()
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 		self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
 		self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
 		# delete from drive
 		try:
-			self.get_results_path().unlink()
+			if self.get_results_path().exists():
+				self.get_results_path().unlink()
 			if self.get_results_path().with_suffix(".log").exists():
 				self.get_results_path().with_suffix(".log").unlink()
 			if self.get_results_folder_path().exists():
 				shutil.rmtree(self.get_results_folder_path())
+
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
+		except PermissionError as e:
+			self.db.log.error(f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}")
 
 	def update_children(self, **kwargs):
 		"""
@@ -585,9 +762,7 @@ class DataSet(FourcatModule):
 
 		:param kwargs:  Parameters corresponding to known dataset attributes
 		"""
-		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
-		for child in children:
-			child = DataSet(key=child["key"], db=self.db)
+		for child in self.get_children(update=True):
 			for attr, value in kwargs.items():
 				child.__setattr__(attr, value)
 
@@ -598,7 +773,7 @@ class DataSet(FourcatModule):
 		Check if dataset is finished
 		:return bool:
 		"""
-		return self.data["is_finished"] == True
+		return bool(self.data["is_finished"])
 
 	def is_rankable(self, multiple_items=True):
 		"""
@@ -620,10 +795,7 @@ class DataSet(FourcatModule):
 			column_options.add("word_1")
 
 		with self.get_results_path().open(encoding="utf-8") as infile:
-			own_processor = self.get_own_processor()
-			csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
-			reader = csv.DictReader(infile, **csv_parameters)
+			reader = csv.DictReader(infile)
 			try:
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
@@ -670,7 +842,7 @@ class DataSet(FourcatModule):
 
 		# owners that are owner by being part of a tag
 		owners.extend(itertools.chain(*[tagged_owners for tag, tagged_owners in self.tagged_owners.items() if
-									   role is None or self.owners[f"tag:{tag}"]["role"] == role]))
+										role is None or self.owners[f"tag:{tag}"]["role"] == role]))
 
 		# de-duplicate before returning
 		return set(owners)
@@ -723,7 +895,7 @@ class DataSet(FourcatModule):
 			self.refresh_owners()
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(update=True):
 			child.add_owner(username, role)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -754,7 +926,7 @@ class DataSet(FourcatModule):
 			del self.tagged_owners[username]
 
 		# make sure children's owners remain in sync
-		for child in self.children:
+		for child in self.get_children(update=True):
 			child.remove_owner(username)
 			# not recursive, since we're calling it from recursive code!
 			child.copy_ownership_from(self, recursive=False)
@@ -795,11 +967,11 @@ class DataSet(FourcatModule):
 		for role in ("owner", "viewer"):
 			owners = dataset.get_owners(role=role)
 			for owner in owners:
-				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False)
+				self.db.insert("datasets_owners", data={"key": self.key, "name": owner, "role": role}, commit=False, safe=True)
 
 		self.db.commit()
 		if recursive:
-			for child in self.children:
+			for child in self.get_children(update=True):
 				child.copy_ownership_from(self, recursive=recursive)
 
 	def get_parameters(self):
@@ -829,51 +1001,33 @@ class DataSet(FourcatModule):
 
 		:return list:  List of dataset columns; empty list if unable to parse
 		"""
-
 		if not self.get_results_path().exists():
 			# no file to get columns from
-			return False
-
-		if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor() is not None and self.get_own_processor().map_item_method_available(dataset=self)):
-			return self.get_item_keys(processor=self.get_own_processor())
-		else:
-			# Filetype not CSV or an NDJSON with `map_item`
 			return []
 
-	def get_annotation_fields(self):
-		"""
-		Retrieves the saved annotation fields for this dataset.
-		:return dict: The saved annotation fields.
-		"""
+		if self._cached_columns is None:
+			if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor() is not None and self.get_own_processor().map_item_method_available(dataset=self)):
+				items = self.iterate_items(warn_unmappable=False)
+				try:
+					keys = list(items.__next__().keys())
+					self._cached_columns = keys
+				except (StopIteration, NotImplementedError):
+					# No items or otherwise unable to iterate
+					self._cached_columns = []
+				finally:
+					del items
+			else:
+				# Filetype not CSV or an NDJSON with `map_item`
+				self._cached_columns = []
 
-		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
-		
-		if annotation_fields and annotation_fields.get("annotation_fields"):
-			annotation_fields = json.loads(annotation_fields["annotation_fields"])
-		else:
-			annotation_fields = {}
-
-		return annotation_fields
-
-	def get_annotations(self):
-		"""
-		Retrieves the annotations for this dataset.
-		return dict: The annotations
-		"""
-
-		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
-
-		if annotations and annotations.get("annotations"):
-			return json.loads(annotations["annotations"])
-		else:
-			return None
+		return self._cached_columns
 
 	def update_label(self, label):
 		"""
 		Update label for this dataset
 
-		:param str label:  New label
-		:return str:  The new label, as returned by get_label
+		:param str label:  	New label
+		:return str: 		The new label, as returned by get_label
 		"""
 		self.parameters["label"] = label
 
@@ -904,10 +1058,12 @@ class DataSet(FourcatModule):
 		elif parameters.get("subject_match") and parameters["subject_match"] != "empty":
 			return parameters["subject_match"]
 		elif parameters.get("query"):
-			label = parameters["query"] if len(parameters["query"]) < 30 else parameters["query"][:25] + "..."
+			label = parameters["query"]
 			# Some legacy datasets have lists as query data
 			if isinstance(label, list):
 				label = ", ".join(label)
+
+			label = label if len(label) < 30 else label[:25] + "..."
 			label = label.strip().replace("\n", ", ")
 			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
@@ -918,8 +1074,8 @@ class DataSet(FourcatModule):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
-		elif "datasource" in parameters and parameters["datasource"] in backend.all_modules.datasources:
-			return backend.all_modules.datasources[parameters["datasource"]]["name"] + " Dataset"
+		elif "datasource" in parameters and parameters["datasource"] in self.modules.datasources:
+			return self.modules.datasources[parameters["datasource"]]["name"] + " Dataset"
 		else:
 			return default
 
@@ -977,7 +1133,7 @@ class DataSet(FourcatModule):
 		self.data["result_file"] = file
 		return updated > 0
 
-	def get_key(self, query, parameters, parent=""):
+	def get_key(self, query, parameters, parent="", time_offset=0):
 		"""
 		Generate a unique key for this dataset that can be used to identify it
 
@@ -987,6 +1143,9 @@ class DataSet(FourcatModule):
 		:param str query:  Query string
 		:param parameters:  Dataset parameters
 		:param parent: Parent dataset's key (if applicable)
+		:param time_offset:  Offset to add to the time component of the dataset
+		key. This can be used to ensure a unique key even if the parameters and
+		timing is otherwise identical to an existing dataset's
 
 		:return str:  Dataset key
 		"""
@@ -999,16 +1158,53 @@ class DataSet(FourcatModule):
 		for key in sorted(parameters):
 			param_key[key] = parameters[key]
 
-		# this ensures a different key for the same query if not queried
-		# at the exact same second. Since the same query may return
-		# different results when done at different times, getting a
-		# duplicate key is not actually always desirable. The resolution
-		# of this salt could be experimented with...
-		param_key["_salt"] = int(time.time())
+		# we additionally use the current time as a salt - this should usually
+		# ensure a unique key for the dataset. if for some reason there is a
+		# hash collision
+		param_key["_salt"] = int(time.time()) + time_offset
 
 		parent_key = str(parent) if parent else ""
 		plain_key = repr(param_key) + str(query) + parent_key
-		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		hashed_key = hash_to_md5(plain_key)
+
+		if self.db.fetchone("SELECT key FROM datasets WHERE key = %s", (hashed_key,)):
+			# key exists, generate a new one
+			return self.get_key(query, parameters, parent, time_offset=random.randint(1,10))
+		else:
+			return hashed_key
+
+	def set_key(self, key):
+		"""
+		Change dataset key
+
+		In principe, keys should never be changed. But there are rare cases
+		where it is useful to do so, in particular when importing a dataset
+		from another 4CAT instance; in that case it makes sense to try and
+		ensure that the key is the same as it was before. This function sets
+		the dataset key and updates any dataset references to it.
+
+		:param str key:  Key to set
+		:return str:  Key that was set. If the desired key already exists, the
+		original key is kept.
+		"""
+		key_exists = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (key,))
+		if key_exists or not key:
+			return self.key
+
+		old_key = self.key
+		self.db.update("datasets", data={"key": key}, where={"key": old_key})
+
+		# update references
+		self.db.update("datasets", data={"key_parent": key}, where={"key_parent": old_key})
+		self.db.update("datasets_owners", data={"key": key}, where={"key": old_key})
+		self.db.update("jobs", data={"remote_id": key}, where={"remote_id": old_key})
+		self.db.update("users_favourites", data={"key": key}, where={"key": old_key})
+
+		# for good measure
+		self.db.commit()
+		self.key = key
+
+		return self.key
 
 	def get_status(self):
 		"""
@@ -1110,12 +1306,13 @@ class DataSet(FourcatModule):
 		try:
 			# this fails if the processor type is unknown
 			# edge case, but let's not crash...
-			processor_path = backend.all_modules.processors.get(self.data["type"]).filepath
+			processor_path = self.modules.processors.get(self.data["type"]).filepath
 		except AttributeError:
 			processor_path = ""
 
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
-			"software_version": version,
+			"software_version": version[0],
+			"software_source": version[1],
 			"software_file": processor_path
 		})
 
@@ -1150,10 +1347,15 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.get("4cat.github_url"):
+		if not self.data["software_source"]:
 			return ""
 
-		return config.get("4cat.github_url") + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		filepath = self.data.get("software_file", "")
+		if filepath.startswith("/extensions/"):
+			# go to root of extension
+			filepath = "/" + "/".join(filepath.split("/")[3:])
+
+		return self.data["software_source"] + "/blob/" + self.data["software_version"] + filepath
 
 	def top_parent(self):
 		"""
@@ -1185,8 +1387,8 @@ class DataSet(FourcatModule):
 
 		while key_parent:
 			try:
-				parent = DataSet(key=key_parent, db=self.db)
-			except TypeError:
+				parent = DataSet(key=key_parent, db=self.db, modules=self.modules)
+			except DataSetException:
 				break
 
 			genealogy.append(parent)
@@ -1201,7 +1403,22 @@ class DataSet(FourcatModule):
 		self.genealogy = genealogy
 		return self.genealogy
 
-	def get_all_children(self, recursive=True):
+	def get_children(self, update=False):
+		"""
+		Get children of this dataset
+
+		:param bool update:  Update the list of children from database if True, else return cached value
+		:return list:  List of child datasets
+		"""
+		if self._children is not None and not update:
+			return self._children
+
+		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC",
+										(self.key,))
+		self._children = [DataSet(data=analysis, db=self.db, modules=self.modules) for analysis in analyses]
+		return self._children
+		
+	def get_all_children(self, recursive=True, update=True):
 		"""
 		Get all children of this dataset
 
@@ -1211,11 +1428,11 @@ class DataSet(FourcatModule):
 
 		:return list:  List of DataSets
 		"""
-		children = [DataSet(data=record, db=self.db) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		children = self.get_children(update=update)
 		results = children.copy()
 		if recursive:
 			for child in children:
-				results += child.get_all_children(recursive)
+				results += child.get_all_children(recursive=recursive, update=update)
 
 		return results
 
@@ -1256,6 +1473,8 @@ class DataSet(FourcatModule):
 			while key_parent:
 				try:
 					parent = self.db.fetchone("SELECT key_parent FROM datasets WHERE key = %s", (key_parent,))
+					if not parent:
+						break
 				except TypeError:
 					break
 
@@ -1283,11 +1502,15 @@ class DataSet(FourcatModule):
 
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
-		processors = backend.all_modules.processors
+		processors = self.modules.processors
 
 		available = {}
 		for processor_type, processor in processors.items():
 			if processor.is_from_collector():
+				continue
+
+			own_processor = self.get_own_processor()
+			if own_processor and own_processor.exclude_followup_processors(processor_type):
 				continue
 
 			# consider a processor compatible if its is_compatible_with
@@ -1299,28 +1522,47 @@ class DataSet(FourcatModule):
 
 		return available
 
-	def get_place_in_queue(self):
+	def get_place_in_queue(self, update=False):
 		"""
 		Determine dataset's position in queue
 
 		If the dataset is already finished, the position is -1. Else, the
-		position is the amount of datasets to be completed before this one will
+		position is the number of datasets to be completed before this one will
 		be processed. A position of 0 would mean that the dataset is currently
 		being executed, or that the backend is not running.
 
+		:param bool update:  Update the queue position from database if True, else return cached value
 		:return int:  Queue position
 		"""
 		if self.is_finished() or not self.data.get("job"):
-			self.queue_position = -1
-			return
+			self._queue_position = -1
+			return self._queue_position
+		elif not update and self._queue_position is not None:
+			# Use cached value
+			return self._queue_position
 		else:
+			# Collect queue position from database via the job
 			try:
 				job = Job.get_by_ID(self.data["job"], self.db)
-				self.queue_position = job.data["queue_ahead"]
+				self._queue_position = job.get_place_in_queue()
 			except JobNotFoundException:
-				self.queue_position = -1
+				self._queue_position = -1
 
-		return self.queue_position
+			return self._queue_position
+
+	def get_modules(self):
+		"""
+		Get 4CAT modules
+
+		Is a function because loading them is not free, and this way we can
+		cache the result.
+
+		:return:
+		"""
+		if not self.modules:
+			self.modules = ModuleCollector()
+
+		return self.modules
 
 	def get_own_processor(self):
 		"""
@@ -1329,10 +1571,10 @@ class DataSet(FourcatModule):
 		:return:  Processor class, or `None` if not available.
 		"""
 		processor_type = self.parameters.get("type", self.data.get("type"))
-		return backend.all_modules.processors.get(processor_type)
 
+		return self.modules.processors.get(processor_type)
 
-	def get_available_processors(self, user=None):
+	def get_available_processors(self, user=None, exclude_hidden=False):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1343,19 +1585,28 @@ class DataSet(FourcatModule):
 
 		:param str|User|None user:  User to get compatibility for. If set,
 		use the user-specific config settings where available.
+		:param bool exclude_hidden:  Exclude processors that should be displayed
+		in the UI? If `False`, all processors are returned.
 
 		:return dict:  Available processors, `name => properties` mapping
 		"""
 		if self.available_processors:
-			return self.available_processors
+			# Update to reflect exclude_hidden parameter which may be different from last call
+			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
+			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not exclude_hidden or not processor.is_hidden}
 
 		processors = self.get_compatible_processors(user=user)
 
-		for analysis in self.children:
+		for analysis in self.get_children(update=True):
 			if analysis.type not in processors:
 				continue
 
 			if not processors[analysis.type].get_options():
+				# No variable options; this processor has been run so remove
+				del processors[analysis.type]
+				continue
+
+			if exclude_hidden and processors[analysis.type].is_hidden:
 				del processors[analysis.type]
 
 		self.available_processors = processors
@@ -1376,7 +1627,7 @@ class DataSet(FourcatModule):
 		:todo: If the job column ever gets used, make sure it always contains
 		       a valid value, rather than silently failing this method.
 		"""
-		if type(job) != Job:
+		if type(job) is not Job:
 			raise TypeError("link_job requires a Job object as its argument")
 
 		if "id" not in job.data:
@@ -1401,7 +1652,7 @@ class DataSet(FourcatModule):
 
 		:return DataSet:  Parent dataset, or `None` if not applicable
 		"""
-		return DataSet(key=self.key_parent, db=self.db) if self.key_parent else None
+		return DataSet(key=self.key_parent, db=self.db, modules=self.modules) if self.key_parent else None
 
 	def detach(self):
 		"""
@@ -1510,6 +1761,39 @@ class DataSet(FourcatModule):
 
 		return False
 
+	def get_media_type(self):
+		"""
+		Gets the media type of the dataset file.
+
+		:return str: media type, e.g., "text"
+		"""
+		own_processor = self.get_own_processor()
+		if hasattr(self, "media_type"):
+			# media type can be defined explicitly in the dataset; this is the priority
+			return self.media_type
+		elif own_processor is not None:
+			# or media type can be defined in the processor
+			# some processors can set different media types for different datasets (e.g., import_media)
+			if hasattr(own_processor, "media_type"):
+				return own_processor.media_type
+
+		# Default to text
+		return self.parameters.get("media_type", "text")
+
+	def get_metadata(self):
+		"""
+		Get dataset metadata
+
+		This consists of all the data stored in the database for this dataset, plus the current 4CAT version (appended
+		as 'current_4CAT_version'). This is useful for exporting datasets, as it can be used by another 4CAT instance to
+		update its database (and ensure compatibility with the exporting version of 4CAT).
+		"""
+		metadata = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
+
+		# get 4CAT version (presumably to ensure export is compatible with import)
+		metadata["current_4CAT_version"] = get_software_version()
+		return metadata
+
 	def get_result_url(self):
 		"""
 		Gets the 4CAT frontend URL of a dataset file.
@@ -1520,7 +1804,7 @@ class DataSet(FourcatModule):
 		"""
 		filename = self.get_results_path().name
 		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
-						config.get("flask.server_name") + '/result/' + filename
+					  config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
 	def warn_unmappable_item(self, item_count, processor=None, error_message=None, warn_admins=True):
@@ -1541,10 +1825,285 @@ class DataSet(FourcatModule):
 			if processor is not None:
 				processor.log.warning(f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}.")
 			elif hasattr(self.db, "log"):
+				# borrow the database's log handler
 				self.db.log.warning(f"Unable to map item all items for dataset {closest_dataset.key}.")
 			else:
 				# No other log available
 				raise DataSetException(f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn")
+
+	# Annotation functions (most of it is handled in Annotations)
+	def has_annotations(self) -> bool:
+		"""
+		Whether this dataset has annotations
+		"""
+
+		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+
+		return True if annotation else False
+
+	def num_annotations(self) -> int:
+		"""
+		Get the amount of annotations
+		"""
+		return self.db.fetchone("SELECT COUNT(*) FROM annotations WHERE dataset = %s", (self.key,))["count"]
+
+	def get_annotation(self, data: dict):
+		"""
+		Retrieves a specific annotation if it exists.
+
+		:param data:		A dictionary with which to get the annotations from.
+							To get specific annotations, include either an `id` field or `field_id` and `label` fields.
+
+		return Annotation:	Annotation object.
+		"""
+
+		if "id" not in data or ("field_id" not in data and "label" not in data):
+			return None
+
+		return Annotation(data=data, db=self.db)
+
+	def get_annotations(self) -> list:
+		"""
+		Retrieves all annotations for this dataset.
+
+		return list: 	List of Annotation objects.
+		"""
+
+		return Annotation.get_annotations_for_dataset(self.db, self.key)
+
+	def get_annotations_for_item(self, item_id: str) -> list:
+		"""
+		Retrieves all annotations from this dataset for a specific item (e.g. social media post).
+		"""
+		return Annotation.get_annotations_for_dataset(self.db, self.key, item_id=item_id)
+
+	def has_annotation_fields(self) -> bool:
+		"""
+		Returns True if there's annotation fields saved tot the dataset table
+		"""
+
+		annotation_fields = self.get_annotation_fields()
+
+		return True if annotation_fields else False
+
+	def get_annotation_fields(self) -> dict:
+		"""
+		Retrieves the saved annotation fields for this dataset.
+		These are stored in the annotations table.
+
+		:return dict: The saved annotation fields.
+		"""
+
+		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.key,))
+
+		if annotation_fields and annotation_fields.get("annotation_fields"):
+			annotation_fields = json.loads(annotation_fields["annotation_fields"])
+		else:
+			annotation_fields = {}
+
+		return annotation_fields
+
+	def get_annotation_field_labels(self) -> list:
+		"""
+		Retrieves the saved annotation field labels for this dataset.
+		These are stored in the annotations table.
+
+		:return list: List of annotation field labels.
+		"""
+
+		annotation_fields = self.get_annotation_fields()
+
+		if not annotation_fields:
+			return []
+
+		labels = [v["label"] for v in annotation_fields.values()]
+
+		return labels
+
+	def save_annotations(self, annotations: list, overwrite=True) -> int:
+		"""
+		Takes a list of annotations and saves them to the annotations table.
+		If a field is not yet present in the `annotation_fields` column in
+		the datasets table, it also adds it there.
+
+		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
+										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
+		:param bool overwrite:			Whether to overwrite the annotation if it is already present.
+
+		:returns int:					How many annotations were saved.
+
+		"""
+
+		if not annotations:
+			return 0
+
+		count = 0
+		annotation_fields = self.get_annotation_fields()
+		annotation_labels = self.get_annotation_field_labels()
+
+		field_id = ""
+		salt = str(random.randrange(0, 1000000))
+
+		# Add some dataset data to annotations, if not present
+		for annotation_data in annotations:
+
+			# Check if the required fields are present
+			if "item_id" not in annotation_data:
+				raise AnnotationException("Can't save annotations; annotation must have an `item_id` referencing "
+										  "the item it annotated, got %s" % annotation_data)
+			if "label" not in annotation_data or not isinstance(annotation_data["label"], str):
+				raise AnnotationException("Can't save annotations; annotation must have a `label` field, "
+										  "got %s" % annotation_data)
+			if not overwrite and annotation_data["label"] in annotation_labels:
+				raise AnnotationException("Can't save annotations; annotation field with label %s "
+										  "already exists" % annotation_data["label"])
+
+			# Set dataset key
+			if not annotation_data.get("dataset"):
+				annotation_data["dataset"] = self.key
+
+			# Set default author to this dataset owner
+			# If this annotation is made by a processor, it will have the processor name
+			if not annotation_data.get("author"):
+				annotation_data["author"] = self.get_owners()[0]
+
+			# The field ID can already exist for the same dataset/key combo,
+			# if a previous label has been renamed.
+			# If we're not overwriting, create a new key with some salt.
+			if not overwrite:
+				if not field_id:
+					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] + salt)
+				if field_id in annotation_fields:
+					annotation_data["field_id"] = field_id
+
+			# Create Annotation object, which also saves it to the database
+			# If this dataset/item ID/label combination already exists, this retrieves the
+			# existing data and updates it with new values.
+			annotation = Annotation(data=annotation_data, db=self.db)
+
+			# Add data on the type of annotation field, if it is not saved to the datasets table yet.
+			# For now this is just a simple dict with a field ID, type, label, and possible options.
+			if not annotation_fields or annotation.field_id not in annotation_fields:
+				annotation_fields[annotation.field_id] = {
+					"label": annotation.label,
+					"type": annotation.type		# Defaults to `text`
+				}
+				if annotation.options:
+					annotation_fields[annotation.options] = annotation.options
+
+			count += 1
+
+		# Save annotation fields if things changed
+		if annotation_fields != self.get_annotation_fields():
+			self.save_annotation_fields(annotation_fields)
+
+		# columns may have changed if there are new annotations
+		self._cached_columns = None
+		return count
+
+	def delete_annotations(self, id=None, field_id=None):
+		"""
+		Deletes all annotations for an entire dataset.
+		If `id` or `field_id` are also given, it only deletes those annotations for this dataset.
+
+		:param li id:			A list or string of unique annotation IDs.
+		:param li field_id:		A list or string of IDs for annotation fields.
+
+		:return int: The number of removed records.
+		"""
+
+		where = {"dataset": self.key}
+
+		if id:
+			where["id"] = id
+		if field_id:
+			where["field_id"] = field_id
+
+		return self.db.delete("annotations", where)
+
+	def save_annotation_fields(self, new_fields: dict, add=False) -> int:
+		"""
+		Save annotation field data to the datasets table (in the `annotation_fields` column).
+		If changes to the annotation fields affect existing annotations,
+		this function will also call `update_annotations_via_fields()` to change them.
+
+		:param dict new_fields:  		New annotation fields, with a field ID as key.
+
+		:param bool add:				Whether we're merely adding new fields
+										or replacing the whole batch. If add is False,
+										`new_fields` should contain all fields.
+
+		:return int:					The number of annotation fields saved.
+
+		"""
+
+		# Get existing annotation fields to see if stuff changed.
+		old_fields = self.get_annotation_fields()
+		changes = False
+
+		# Do some validation
+		# Annotation field must be valid JSON.
+		try:
+			json.dumps(new_fields)
+		except ValueError:
+			raise AnnotationException("Can't save annotation fields: not valid JSON (%s)" % new_fields)
+
+		# No duplicate IDs
+		if len(new_fields) != len(set(new_fields)):
+			raise AnnotationException("Can't save annotation fields: field IDs must be unique")
+
+		# Annotation fields must at minimum have `type` and `label` keys.
+		seen_labels = []
+		for field_id, annotation_field in new_fields.items():
+			if not isinstance(field_id, str):
+				raise AnnotationException("Can't save annotation fields: field ID %s is not a valid string" % field_id)
+			if "label" not in annotation_field:
+				raise AnnotationException("Can't save annotation fields: all fields must have a label" % field_id)
+			if "type" not in annotation_field:
+				raise AnnotationException("Can't save annotation fields: all fields must have a type" % field_id)
+			if annotation_field["label"] in seen_labels:
+				raise AnnotationException("Can't save annotation fields: labels must be unique (%s)" % annotation_field["label"])
+			seen_labels.append(annotation_field["label"])
+
+			# Keep track of whether existing fields have changed; if so, we're going to
+			# update the annotations table.
+			if field_id in old_fields:
+				if old_fields[field_id] != annotation_field:
+					changes = True
+
+		# Check if fields are removed
+		if not add:
+			for field_id in old_fields.keys():
+				if field_id not in new_fields:
+					changes = True
+
+		# If we're just adding fields, add them to the old fields.
+		# If the field already exists, overwrite the old field.
+		if add and old_fields:
+			all_fields = old_fields
+			for field_id, annotation_field in new_fields.items():
+				all_fields[field_id] = annotation_field
+			new_fields = all_fields
+
+		# We're saving the new annotation fields as-is.
+		# Ordering of fields is preserved this way.
+		#self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
+		self.annotation_fields = json.dumps(new_fields)
+
+		# If anything changed with the annotation fields, possibly update
+		# existing annotations (e.g. to delete them or change their labels).
+		if changes:
+			Annotation.update_annotations_via_fields(self.key, old_fields, new_fields, self.db)
+
+		return len(new_fields)
+
+	def get_annotation_metadata(self) -> dict:
+		"""
+		Retrieves all the data for this dataset from the annotations table.
+		"""
+
+		annotation_data = self.db.fetchall("SELECT * FROM annotations WHERE dataset = '%s';" % self.key)
+		return annotation_data
 
 	def __getattr__(self, attr):
 		"""

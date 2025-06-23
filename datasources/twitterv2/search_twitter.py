@@ -1,5 +1,5 @@
 """
-Twitter keyword search via the Twitter API v2
+X/Twitter keyword search via the X API v2
 """
 import requests
 import datetime
@@ -12,34 +12,32 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
 from common.config_manager import config
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 
 class SearchWithTwitterAPIv2(Search):
     """
-    Get Tweets via the Twitter API
-
-    This only allows for historical search - use f.ex. TCAT for more advanced
-    queries.
+    Get Tweets via the X API
     """
     type = "twitterv2-search"  # job ID
-    title = "Twitter API (v2)"
+    title = "X/Twitter API (v2)"
     extension = "ndjson"
     is_local = False    # Whether this datasource is locally scraped
     is_static = False   # Whether this datasource is still updated
 
     previous_request = 0
-    flawless = True
+    import_issues = True
 
     references = [
-        "[Twitter API documentation](https://developer.twitter.com/en/docs/twitter-api)"
+        "[X/Twitter API documentation](https://developer.x.com/en/docs/x-api)"
     ]
 
     config = {
         "twitterv2-search.academic_api_key": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
-            "help": "Academic API Key",
-            "tooltip": "An API key for the Twitter v2 Academic API. If "
+            "help": "Research API Key",
+            "tooltip": "An API key for the X/Twitter v2 Research API. If "
                        "provided, the user will not need to enter their own "
                        "key to retrieve tweets. Note that this API key should "
                        "have access to the Full Archive Search endpoint."
@@ -49,15 +47,15 @@ class SearchWithTwitterAPIv2(Search):
             "default": 0,
             "min": 0,
             "max": 10_000_000,
-            "help": "Max tweets per dataset",
+            "help": "Max posts per dataset",
             "tooltip": "4CAT will never retrieve more than this amount of "
-                       "tweets per dataset. Enter '0' for unlimited tweets."
+                       "posts per dataset. Enter '0' for unlimited posts."
         },
         "twitterv2-search.id_lookup": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Allow lookup by ID",
-            "tooltip": "If enabled, allow users to enter a list of tweet IDs "
+            "tooltip": "If enabled, allow users to enter a list of post IDs "
                        "to retrieve. This is disabled by default because it "
                        "can be confusing to novice users."
         }
@@ -109,7 +107,7 @@ class SearchWithTwitterAPIv2(Search):
         }
 
         if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
-            endpoint = "https://api.twitter.com/2/tweets"
+            endpoint = "https://api.x.com/2/tweets"
 
             tweet_ids = self.parameters.get("query", []).split(',')
 
@@ -125,7 +123,7 @@ class SearchWithTwitterAPIv2(Search):
 
         else:
             # Query to all or search
-            endpoint = "https://api.twitter.com/2/tweets/search/" + api_type
+            endpoint = "https://api.x.com/2/tweets/search/" + api_type
 
             queries = [self.parameters.get("query", "")]
 
@@ -157,7 +155,7 @@ class SearchWithTwitterAPIv2(Search):
             while True:
 
                 if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
+                    raise ProcessorInterruptedException("Interrupted while getting posts from the Twitter API")
 
                 # there is a limit of one request per second, so stay on the safe side of this
                 while self.previous_request == int(time.time()):
@@ -187,18 +185,18 @@ class SearchWithTwitterAPIv2(Search):
                     try:
                         structured_response = api_response.json()
                         if structured_response.get("title") == "UsageCapExceeded":
-                            self.dataset.update_status("Hit the monthly tweet cap. You cannot capture more tweets "
-                                                       "until your API quota resets. Dataset completed with tweets "
+                            self.dataset.update_status("Hit the monthly post cap. You cannot capture more posts "
+                                                       "until your API quota resets. Dataset completed with posts "
                                                        "collected so far.", is_final=True)
                             return
                     except (json.JSONDecodeError, ValueError):
-                        self.dataset.update_status("Hit Twitter rate limit, but could not figure out why. Halting "
-                                                   "tweet collection.", is_final=True)
+                        self.dataset.update_status("Hit X's rate limit, but could not figure out why. Halting "
+                                                   "post collection.", is_final=True)
                         return
 
                     resume_at = convert_to_int(api_response.headers["x-rate-limit-reset"]) + 1
                     resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
-                    self.dataset.update_status("Hit Twitter rate limit - waiting until %s to continue." % resume_at_str)
+                    self.dataset.update_status("Hit X's rate limit - waiting until %s to continue." % resume_at_str)
                     while time.time() <= resume_at:
                         if self.interrupted:
                             raise ProcessorInterruptedException("Interrupted while waiting for rate limit to reset")
@@ -210,10 +208,10 @@ class SearchWithTwitterAPIv2(Search):
                 elif api_response.status_code == 403:
                     try:
                         structured_response = api_response.json()
-                        self.dataset.update_status("'Forbidden' error from the Twitter API. Could not connect to Twitter API "
+                        self.dataset.update_status("'Forbidden' error from the X API. Could not connect to X API "
                                                    "with this API key. %s" % structured_response.get("detail", ""), is_final=True)
                     except (json.JSONDecodeError, ValueError):
-                        self.dataset.update_status("'Forbidden' error from the Twitter API. Your key may not have access to "
+                        self.dataset.update_status("'Forbidden' error from the X API. Your key may not have access to "
                                                    "the full-archive search endpoint.", is_final=True)
                     finally:
                         return
@@ -223,7 +221,7 @@ class SearchWithTwitterAPIv2(Search):
                 elif api_response.status_code in (502, 503, 504):
                     resume_at = time.time() + 60
                     resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
-                    self.dataset.update_status("Twitter unavailable (status %i) - waiting until %s to continue." % (
+                    self.dataset.update_status("X unavailable (status %i) - waiting until %s to continue." % (
                     api_response.status_code, resume_at_str))
                     while time.time() <= resume_at:
                         time.sleep(0.5)
@@ -232,7 +230,7 @@ class SearchWithTwitterAPIv2(Search):
                 # this usually means the query is too long or otherwise contains
                 # a syntax error
                 elif api_response.status_code == 400:
-                    msg = "Response %i from the Twitter API; " % api_response.status_code
+                    msg = "Response %i from the X API; " % api_response.status_code
                     try:
                         api_response = api_response.json()
                         msg += api_response.get("title", "")
@@ -246,19 +244,19 @@ class SearchWithTwitterAPIv2(Search):
 
                 # invalid API key
                 elif api_response.status_code == 401:
-                    self.dataset.update_status("Invalid API key - could not connect to Twitter API", is_final=True)
+                    self.dataset.update_status("Invalid API key - could not connect to X API", is_final=True)
                     return
 
                 # haven't seen one yet, but they probably exist
                 elif api_response.status_code != 200:
                     self.dataset.update_status(
                         "Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
-                    self.log.warning("Twitter API v2 responded with status code %i. Response body: %s" % (
+                    self.log.warning("X API v2 responded with status code %i. Response body: %s" % (
                     api_response.status_code, api_response.text))
                     return
 
                 elif not api_response:
-                    self.dataset.update_status("Could not connect to Twitter. Cancelling.", is_final=True)
+                    self.dataset.update_status("Could not connect to X. Cancelling.", is_final=True)
                     return
 
                 api_response = api_response.json()
@@ -289,14 +287,14 @@ class SearchWithTwitterAPIv2(Search):
                     self.dataset.log('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
                 if num_missing_objects > 50:
                     # Large amount of missing objects; possible error with Twitter API
-                    self.flawless = False
-                    error_report.append('%i missing objects received following tweet number %i. Possible issue with Twitter API.' % (num_missing_objects, tweets))
+                    self.import_issues = False
+                    error_report.append('%i missing objects received following post number %i. Possible issue with X API.' % (num_missing_objects, tweets))
                     error_report.append('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
 
                 # Warn if new missing object is recorded (for developers to handle)
                 expected_error_types = ['user', 'media', 'poll', 'tweet', 'place']
                 if any(key not in expected_error_types for key in missing_objects.keys()):
-                    self.log.warning("Twitter API v2 returned unknown error types: %s" % str([key for key in missing_objects.keys() if key not in expected_error_types]))
+                    self.log.warning("X API v2 returned unknown error types: %s" % str([key for key in missing_objects.keys() if key not in expected_error_types]))
 
                 # Loop through and collect tweets
                 for tweet in api_response.get("data", []):
@@ -311,7 +309,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     tweets += 1
                     if tweets % 500 == 0:
-                        self.dataset.update_status("Received %s of ~%s tweets from the Twitter API" % ("{:,}".format(tweets), expected_tweets))
+                        self.dataset.update_status("Received %s of ~%s tweets from the X API" % ("{:,}".format(tweets), expected_tweets))
                         if num_expected_tweets is not None:
                             self.dataset.update_progress(tweets / num_expected_tweets)
 
@@ -332,7 +330,7 @@ class SearchWithTwitterAPIv2(Search):
                 else:
                     break
 
-        if not self.flawless:
+        if not self.import_issues:
             self.dataset.log('Error Report:\n' + '\n'.join(error_report))
             self.dataset.update_status("Completed with errors; Check log for Error Report.", is_final=True)
 
@@ -352,7 +350,7 @@ class SearchWithTwitterAPIv2(Search):
         splices the metadata into it where appropriate, and returns the
         enriched object.
 
-        /!\ This is not an efficient way to store things /!\ but it is more
+        **This is not an efficient way to store things** but it is more
         convenient.
 
         :param dict tweet:  The tweet object
@@ -473,21 +471,19 @@ class SearchWithTwitterAPIv2(Search):
         max_tweets = config.get("twitterv2-search.max_tweets", user=user)
 
         if have_api_key:
-            intro_text = ("This data source uses the full-archive search endpoint of the Twitter API (v2) to retrieve "
+            intro_text = ("This data source uses the full-archive search endpoint of the X API (v2) to retrieve "
                           "historic tweets that match a given query.")
 
         else:
-            intro_text = ("This data source uses either the Standard 7-day historical Search endpoint or the "
-                          "full-archive search endpoint of the Twitter API, v2. To use the latter, you must have "
-                          "access  to the Academic Research track of the Twitter API. In either case, you will need to "
-                          "provide a  valid [bearer "
-                          "token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The  bearer token "
-                          "**will be sent to the 4CAT server**, where it will be deleted after data collection has "
-                          "started. Note that any tweets retrieved  with 4CAT will count towards your monthly Tweet "
-                          "retrieval cap.")
+            intro_text = ("This data source uses the full-archive search endpoint of the X/Twitter API, v2. To use the "
+                          "it, you must have access  to the Research track of the X API. You will need to provide a "
+                          "valid [bearer token](https://developer.x.com/en/docs/authentication/oauth-2-0). The "
+                          "bearer token **will be sent to the 4CAT server**, where it will be deleted after data "
+                          "collection has started. Note that any posts retrieved with 4CAT will count towards your "
+                          "monthly post retrieval cap.")
 
-        intro_text += ("\n\nPlease refer to the [Twitter API documentation]("
-                          "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
+        intro_text += ("\n\nPlease refer to the [X API documentation]("
+                          "https://developer.x.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
                           "documentation for more information about this API endpoint and the syntax you can use in your "
                           "search query. Retweets are included by default; add `-is:retweet` to exclude them.")
 
@@ -499,16 +495,18 @@ class SearchWithTwitterAPIv2(Search):
         }
 
         if not have_api_key:
+            # options.update({
+            #     "api_type": {
+            #         "type": UserInput.OPTION_CHOICE,
+            #         "help": "API track",
+            #         "options": {
+            #             "all": "Research API: Full-archive search",
+            #             "recent": "Standard: Recent search (Tweets published in last 7 days)",
+            #         },
+            #         "default": "all"
+            #     }
+            # })
             options.update({
-                "api_type": {
-                    "type": UserInput.OPTION_CHOICE,
-                    "help": "API track",
-                    "options": {
-                        "all": "Academic: Full-archive search",
-                        "recent": "Standard: Recent search (Tweets published in last 7 days)",
-                    },
-                    "default": "all"
-                },
                 "api_bearer_token": {
                     "type": UserInput.OPTION_TEXT,
                     "sensitive": True,
@@ -522,10 +520,10 @@ class SearchWithTwitterAPIv2(Search):
                 "query_type": {
                     "type": UserInput.OPTION_CHOICE,
                     "help": "Query type",
-                    "tooltip": "Note: Num of Tweets and Date fields ignored with 'Tweets by ID' lookup",
+                    "tooltip": "Note: Num of posts and date fields are ignored with 'Posts by ID' lookup",
                     "options": {
                         "query": "Search query",
-                        "id_lookup": "Tweets by ID (list IDs seperated by commas or one per line)",
+                        "id_lookup": "Posts by ID (list IDs seperated by commas or one per line)",
                     },
                     "default": "query"
                 }
@@ -538,7 +536,7 @@ class SearchWithTwitterAPIv2(Search):
             },
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Tweets to retrieve",
+                "help": "Posts to retrieve",
                 "tooltip": "0 = unlimited (be careful!)" if not max_tweets else ("0 = maximum (%s)" % str(max_tweets)),
                 "min": 0,
                 "max": max_tweets if max_tweets else 10_000_000,
@@ -549,7 +547,7 @@ class SearchWithTwitterAPIv2(Search):
             },
             "daterange-info": {
                 "type": UserInput.OPTION_INFO,
-                "help": "By default, Twitter returns tweets up til 30 days ago. If you want to go back further, you "
+                "help": "By default, X returns posts up til 30 days ago. If you want to go back further, you "
                         "need to explicitly set a date range."
             },
             "daterange": {
@@ -590,7 +588,7 @@ class SearchWithTwitterAPIv2(Search):
                 raise QueryParametersException("Please provide a valid bearer token.")
 
         if len(query.get("query")) > 1024 and query.get("query_type", "query") != "id_lookup":
-            raise QueryParametersException("Twitter API queries cannot be longer than 1024 characters.")
+            raise QueryParametersException("X API queries cannot be longer than 1024 characters.")
 
         if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup", user=user):
             # reformat queries to be a comma-separated list with no wrapping
@@ -629,7 +627,7 @@ class SearchWithTwitterAPIv2(Search):
         # to dissuade users from running huge queries that will take forever
         # to process
         if params["query_type"] == "query" and (params.get("api_type") == "all" or have_api_key):
-            count_url = "https://api.twitter.com/2/tweets/counts/all"
+            count_url = "https://api.x.com/2/tweets/counts/all"
             count_params = {
                 "granularity": "day",
                 "query": params["query"],
@@ -667,7 +665,7 @@ class SearchWithTwitterAPIv2(Search):
 
                 elif response.status_code == 401:
                     raise QueryParametersException("Your bearer token seems to be invalid. Please make sure it is valid "
-                                                   "for the Academic Track of the Twitter API.")
+                                                   "for the Research track of the X API.")
 
                 elif response.status_code == 400:
                     raise QueryParametersException("Your query is invalid. Please make sure the date range does not "
@@ -712,7 +710,7 @@ class SearchWithTwitterAPIv2(Search):
         return params
 
     @staticmethod
-    def map_item(tweet):
+    def map_item(item):
         """
         Map a nested Tweet object to a flat dictionary
 
@@ -724,39 +722,39 @@ class SearchWithTwitterAPIv2(Search):
         throw away valuable data and allows for later changes that e.g. store
         the tweets more efficiently as a MongoDB collection.
 
-        :param tweet:  Tweet object as originally returned by the Twitter API
+        :param item:  Tweet object as originally returned by the Twitter API
         :return dict:  Dictionary in the format expected by 4CAT
         """
-        tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
+        tweet_time = datetime.datetime.strptime(item["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
 
         # For backward compatibility
-        author_username = tweet["author_user"]["username"] if tweet.get("author_user") else tweet["author_username"]
-        author_fullname = tweet["author_user"]["name"] if tweet.get("author_user") else tweet["author_fullname"]
-        author_followers = tweet["author_user"]["public_metrics"]["followers_count"] if tweet.get("author_user") else ""
+        author_username = item["author_user"]["username"] if item.get("author_user") else item["author_username"]
+        author_fullname = item["author_user"]["name"] if item.get("author_user") else item["author_fullname"]
+        author_followers = item["author_user"]["public_metrics"]["followers_count"] if item.get("author_user") else ""
 
-        hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
-        mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
-        urls = [tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]
-        images = [item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-        video_items = [item for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+        hashtags = [tag["tag"] for tag in item.get("entities", {}).get("hashtags", [])]
+        mentions = [tag["username"] for tag in item.get("entities", {}).get("mentions", [])]
+        urls = [tag.get("expanded_url", tag.get("display_url")) for tag in item.get("entities", {}).get("urls", []) if ("display_url" in tag or "expanded_url" in tag)]
+        images = [attachment["url"] for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
+        video_items = [attachment for attachment in item.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
         # by default, the text of retweets is returned as "RT [excerpt of
         # retweeted tweet]". Since we have the full tweet text, we can complete
         # the excerpt:
-        is_retweet = any([ref.get("type") == "retweeted" for ref in tweet.get("referenced_tweets", [])])
+        is_retweet = any([ref.get("type") == "retweeted" for ref in item.get("referenced_tweets", [])])
         if is_retweet:
-            retweeted_tweet = [t for t in tweet["referenced_tweets"] if t.get("type") == "retweeted"][0]
+            retweeted_tweet = [t for t in item["referenced_tweets"] if t.get("type") == "retweeted"][0]
             if retweeted_tweet.get("text", False):
                 retweeted_body = retweeted_tweet.get("text")
                 # Get user's username that was retweeted
                 if retweeted_tweet.get('author_user') and retweeted_tweet.get('author_user').get('username'):
-                    tweet["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
-                elif tweet.get('entities', {}).get('mentions', []):
+                    item["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
+                elif item.get('entities', {}).get('mentions', []):
                     # Username may not always be here retweeted_tweet["author_user"]["username"] when user was removed/deleted
-                    retweeting_users = [mention.get('username') for mention in tweet.get('entities', {}).get('mentions', []) if mention.get('id') == retweeted_tweet.get('author_id')]
+                    retweeting_users = [mention.get('username') for mention in item.get('entities', {}).get('mentions', []) if mention.get('id') == retweeted_tweet.get('author_id')]
                     if retweeting_users:
                         # should only ever be one, but this verifies that there IS one and not NONE
-                        tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
+                        item["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
             retweeted_user = retweeted_tweet["author_user"]["username"] if retweeted_tweet.get("author_user") else retweeted_tweet.get("author_username", "") # Reference tweets were not always enriched
 
@@ -764,13 +762,13 @@ class SearchWithTwitterAPIv2(Search):
             # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense
             [hashtags.append(tag["tag"]) for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]
             [mentions.append(tag["username"]) for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]
-            [urls.append(tag["expanded_url"]) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
+            [urls.append(tag.get("expanded_url", tag["display_url"])) for tag in retweeted_tweet.get("entities", {}).get("urls", []) if ("display_url" in tag or "expanded_url" in tag)]
             # Images appear to be inheritted by retweets, but just in case
-            [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-            [video_items.append(item) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+            [images.append(attachment["url"]) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "photo"]
+            [video_items.append(attachment) for attachment in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(attachment) is dict and attachment.get("type") == "video"]
 
-        is_quoted = any([ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])])
-        is_reply = any([ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])])
+        is_quoted = any([ref.get("type") == "quoted" for ref in item.get("referenced_tweets", [])])
+        is_reply = any([ref.get("type") == "replied_to" for ref in item.get("referenced_tweets", [])])
 
         videos = []
         for video in video_items:
@@ -778,33 +776,40 @@ class SearchWithTwitterAPIv2(Search):
             if variants:
                 videos.append(variants[0].get('url'))
 
-        return {
-            "id": tweet["id"],
-            "thread_id": tweet.get("conversation_id", tweet["id"]),
+        expected_metrics = {"impression_count", "retweet_count", "bookmark_count", "like_count", "quote_count", "reply_count"}
+        public_metrics = {k: item["public_metrics"].get(k, MissingMappedField(0)) for k in expected_metrics}
+        missing_metrics = [m for m in expected_metrics if m not in item["public_metrics"]]
+        warning = ""
+        if missing_metrics:
+            warning = f"The following metrics were missing from a tweet: {', '.join(missing_metrics)}. They will have a value of '0' in any exports."
+
+        return MappedItem({
+            "id": item["id"],
+            "thread_id": item.get("conversation_id", item["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(tweet_time.timestamp()),
-            'link': "https://twitter.com/%s/status/%s" % (author_username, tweet.get('id')),
-            "subject": tweet.get('subject', ""),
-            "body": tweet["text"],
+            'link': "https://x.com/%s/status/%s" % (author_username, item.get('id')),
+            "subject": "",
+            "body": item["text"],
             "author": author_username,
             "author_fullname": author_fullname,
-            "author_id": tweet["author_id"],
+            "author_id": item["author_id"],
             "author_followers": author_followers,
-            "source": tweet.get("source"),
-            "language_guess": tweet.get("lang"),
-            "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
-            **tweet["public_metrics"],
+            "source": item.get("source"),
+            "language_guess": item.get("lang"),
+            "possibly_sensitive": "yes" if item.get("possibly_sensitive") else "no",
+            **public_metrics,
             "is_retweet": "yes" if is_retweet else "no",
             "retweeted_user": "" if not is_retweet else retweeted_user,
             "is_quote_tweet": "yes" if is_quoted else "no",
-            "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
+            "quoted_user": "" if not is_quoted else [ref for ref in item["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
             "is_reply": "yes" if is_reply else "no",
-            "replied_user": tweet.get("in_reply_to_user", {}).get("username", ""),
+            "replied_user": item.get("in_reply_to_user", {}).get("username", ""),
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),
             "videos": ','.join(set(videos)),
             "mentions": ','.join(set(mentions)),
-            "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
-            'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
-        }
+            "long_lat": ', '.join([str(x) for x in item.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
+            'place_name': item.get('geo', {}).get('place', {}).get('full_name', ''),
+        }, message=warning)

@@ -16,36 +16,33 @@
             </h2>
             <div class="config-tag-info">
             {% if tag %}
-                Editing configuration for tag <span class="property-badge">{{ tag }}</span>. <a href="{{ url_for("manipulate_settings") }}">Return to global settings</a>.
+                Editing configuration for tag <span class="property-badge">{{ tag }}</span>. <a href="{{ url_for("admin.manipulate_settings") }}">Return to global settings</a>.
             {% else %}
-                Editing <em>global configuration</em>. View for tag instead: <form class="inline" action="{{ url_for("manipulate_settings") }}" method="GET"><input type="text" name="tag" placeholder="tag" style="width:5em;"> <button>View</button></form></button></form>
+                Editing <em>global configuration</em>. View for tag instead: <form class="inline" action="{{ url_for("admin.manipulate_settings") }}" method="GET"><input type="text" name="tag" placeholder="tag" style="width:5em;"> <button>View</button></form></button></form>
             {% endif %}
             </div>
             {% set tab = namespace(name="", open=False, first=True) %}
-            <form action="{{ url_for("manipulate_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
-                <nav class="tab-controls">
+            <form action="{{ url_for("admin.manipulate_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
+                <nav class="tab-controls settings">
                     <input type="hidden" name="current-tab" value="{{ current_tab }}">
+                    {% for submenu in ("core", "datasources", "processors", "other") %}
+                    <h3>{{ {"core": "4CAT Core", "datasources": "Data sources", "processors": "Processors", "other": "Other"}[submenu] }}</h3>
                     <ul>
                         {% set tab.name = '' %}
-                        {% for option in options %}
+                        {% for option in options if options[option].submenu == submenu %}
                             {% set option_category = option.split(".")[0] %}
                             {% if option_category != tab.name %}
                                 {% set tab.name = option_category %}
                                 <li class="{% if tab.name in changed %}changed{% endif %}{% if (tab.first and not current_tab) or tab.name == current_tab %} highlighted{% set tab.first = False %}{% endif %}">
                                     <a href="#tab-{{ tab.name }}" id="tablabel-{{ tab.name }}"
                                        aria-controls="tab-{{ tab.name }}">
-                                        {% if tab.name in categories %}
-                                            {{ categories[tab.name] }}
-                                        {% elif tab.name in modules %}
-                                            {{ modules[tab.name] }}
-                                        {% else %}
-                                            {{ tab.name }}
-                                        {% endif %}
+                                        {{ options[option].tabname }}
                                     </a>
                                 </li>
                             {% endif %}
                         {% endfor %}
                     </ul>
+                    {% endfor %}
                 </nav>
 
                 {% set tab = namespace(name="", open=False, first=True) %}
@@ -77,6 +74,7 @@
                         {% else %}
                             {% set settings = options[option] %}
                         {% endif %}
+                        
                         {% include 'components/datasource-option.html' %}
                         </div>
                     {% endfor %}

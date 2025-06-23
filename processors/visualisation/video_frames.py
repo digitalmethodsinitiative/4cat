@@ -6,12 +6,13 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
+from processors.visualisation.download_videos import VideoDownloaderPlus
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -31,12 +32,14 @@ class VideoFrames(BasicProcessor):
 	description = "Extract frames from videos"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	followups = ["video-timelines"] + VideoDownloaderPlus.followups
+
 	options = {
 		"frame_interval": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Number of frames extracted per second to extract from video",
 			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
-					   "pass 5, and so on.",
+					   "pass 5, and so on. Use '0' to only capture the first frame of the video.",
 			"coerce_type": float,
 			"default": 1,
 			"min": 0,
@@ -55,14 +58,12 @@ class VideoFrames(BasicProcessor):
 		},
 	}
 
-	followups = ["video-timelines"]
-
 	@classmethod
 	def is_compatible_with(cls, module=None, user=None):
 		"""
-		Allow on tiktok-search only for dev
+		Allow on videos
 		"""
-		return module.type.startswith("video-downloader") and \
+		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
 			   config.get("video-downloader.ffmpeg_path", user=user) and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
@@ -89,11 +90,11 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
-		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for path in self.iterate_archive_contents(self.source_file, staging_area):
+		for i, path in enumerate(self.iterate_archive_contents(self.source_file, staging_area)):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -108,12 +109,19 @@ class VideoFrames(BasicProcessor):
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", shlex.quote(str(path)),
-				"-r", str(frame_interval),
+				"-i", oslex.quote(str(path))
 			]
+
+			if frame_interval != 0:
+				command += ["-r", str(frame_interval)]
+			else:
+				command += ["-vframes", "1"]
+
 			if frame_size != 'no_modify':
-				command += ['-s', shlex.quote(frame_size)]
-			command += [shlex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
+				command += ['-s', oslex.quote(frame_size)]
+			command += [oslex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
+
+			self.dataset.log(" ".join(command))
 
 			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -130,17 +138,21 @@ class VideoFrames(BasicProcessor):
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:
-				error = 'Error Return Code with video %s: %s' % (vid_name, str(result.returncode))
-				self.dataset.log(error)
+				self.dataset.update_status(f"Unable to extract frames from video {vid_name} (see logs for details)")
+				self.dataset.log('Error Return Code (%s) with video %s: %s' % (str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
+			else:
+				processed_videos += 1
+				self.dataset.update_status("Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
 
-			processed_videos += 1
-			self.dataset.update_status(
-				"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
-			self.dataset.update_progress(processed_videos / total_possible_videos)
+			self.dataset.update_progress(i / total_possible_videos)
 
 		# Finish up
 		# We've created a directory and folder structure here as opposed to a single folder with single files as
 		# expected by self.write_archive_and_finish() so we use make_archive instead
+		if not processed_videos:
+			self.dataset.finish_with_error("Unable to extract frames from any videos")
+			return
+
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
 

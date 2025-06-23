@@ -147,7 +147,7 @@ while True:
 
 	try:
 		page_html = requests.get(page_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"})
-	except requests.RequestException as e:
+	except requests.RequestException:
 		print("RequestException while requesting page %i: %s" % (page, traceback.format_exc()))
 		break
 
@@ -186,7 +186,7 @@ while True:
 
 		try:
 			thread_html = requests.get(thread_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"})
-		except requests.RequestException as e:
+		except requests.RequestException:
 			print("RequestException while requesting thread %s: %s" % (thread_id, traceback.format_exc()))
 			break
 

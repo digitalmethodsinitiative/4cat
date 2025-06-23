@@ -17,7 +17,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_setting
 
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
-  id                     SERIAL PRIMARY KEY,
+  id                     BIGSERIAL PRIMARY KEY,
   jobtype                text    DEFAULT 'misc',
   remote_id              text,
   details                text,
@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS jobs (
   timestamp_after        integer DEFAULT 0,
   timestamp_lastclaimed  integer DEFAULT 0,
   timestamp_claimed      integer DEFAULT 0,
-  status                 text,
   attempts               integer DEFAULT 0,
   interval               integer DEFAULT 0
 );
@@ -40,24 +39,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 
 -- queries
 CREATE TABLE IF NOT EXISTS datasets (
-  id                SERIAL PRIMARY KEY,
-  key               text,
-  type              text DEFAULT 'search',
-  key_parent        text DEFAULT '' NOT NULL,
-  creator           VARCHAR DEFAULT 'anonymous',
-  query             text,
-  job               integer DEFAULT 0,
-  parameters        text,
-  result_file       text DEFAULT '',
-  timestamp         integer,
-  status            text,
-  num_rows          integer DEFAULT 0,
-  progress          float DEFAULT 0.0,
-  is_finished       boolean DEFAULT FALSE,
-  is_private        boolean DEFAULT TRUE,
-  software_version  text,
-  software_file     text DEFAULT '',
-  annotation_fields text DEFAULT ''
+  id                  SERIAL PRIMARY KEY,
+  key                 text,
+  type                text DEFAULT 'search',
+  key_parent          text DEFAULT '' NOT NULL,
+  creator             VARCHAR DEFAULT 'anonymous',
+  query               text,
+  job                 BIGINT DEFAULT 0,
+  parameters          text,
+  result_file         text DEFAULT '',
+  timestamp           integer,
+  status              text,
+  num_rows            integer DEFAULT 0,
+  progress            float DEFAULT 0.0,
+  is_finished         boolean DEFAULT FALSE,
+  timestamp_finished  integer DEFAULT NULL,
+  is_private          boolean DEFAULT TRUE,
+  software_version    text,
+  software_file       text DEFAULT '',
+  software_source     text DEFAULT '',
+  annotation_fields   text DEFAULT ''
 );
 
 CREATE TABLE datasets_owners (
@@ -67,12 +68,44 @@ CREATE TABLE datasets_owners (
 );
 
 CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("name" text_ops,key text_ops);
-
+CREATE INDEX datasets_owners_key ON datasets_owners (key);
 
 -- annotations
 CREATE TABLE IF NOT EXISTS annotations (
-  key               text UNIQUE PRIMARY KEY,
-  annotations       text DEFAULT ''
+  id                SERIAL PRIMARY KEY,
+  dataset           TEXT,
+  field_id          TEXT,
+  item_id           TEXT,
+  timestamp         INT DEFAULT 0,
+  timestamp_created INT DEFAULT 0,
+  label             TEXT,
+  type              TEXT,
+  options           TEXT,
+  value             TEXT,
+  author            TEXT,
+  author_original   TEXT,
+  by_processor      BOOLEAN DEFAULT FALSE,
+  metadata          TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS annotation_id
+ON annotations (
+    id
+);
+CREATE INDEX IF NOT EXISTS annotations_dataset
+ON annotations (
+    dataset
+);
+CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
+ON annotations (
+    dataset,
+    item_id,
+    label
+);
+CREATE INDEX IF NOT EXISTS annotation_dataset
+ON annotations (
+    dataset,
+    item_id
 );
 
 -- metrics
@@ -81,8 +114,11 @@ CREATE TABLE IF NOT EXISTS metrics (
   datasource         text,
   board              text,
   date               text,
-  count              integer
+  count              BIGINT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_metrics
+    ON metrics (metric, datasource, board, date);
 
 -- users
 CREATE TABLE IF NOT EXISTS users (

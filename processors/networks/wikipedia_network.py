@@ -3,18 +3,19 @@ Generate network of wikipedia pages + categories in posts
 """
 import re
 import requests
-
-from backend.lib.processor import BasicProcessor
 from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO
-
 import networkx as nx
+
+from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
 
 class WikiURLCoLinker(BasicProcessor):
 	"""
@@ -26,6 +27,15 @@ class WikiURLCoLinker(BasicProcessor):
 	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
 
+	@classmethod
+	def is_compatible_with(cls, module=None, user=None):
+		"""
+        Allow processor on top datasets.
+
+        :param module: Module to determine compatibility with
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -35,7 +45,7 @@ class WikiURLCoLinker(BasicProcessor):
 
 		# we use these to extract URLs and host names if needed
 		link_regex = re.compile(r"https?://en.wikipedia\.org/wiki/[^\s.]+")
-		wiki_page = re.compile(r"[\[\[[^\]]+\]\]")
+		# wiki_page = re.compile(r"[\[\[[^\]]+\]\]")
 		category_regex = re.compile(r"\[\[Category:[^\]]+\]\]")
 		trailing_comma = re.compile(r",$")
 
@@ -43,8 +53,6 @@ class WikiURLCoLinker(BasicProcessor):
 		all_categories = {}
 		errors = 0
 		page_categories = {}
-		page_links = {}
-		deep_pages = {}
 		processed = 0
 		network = nx.Graph()
 

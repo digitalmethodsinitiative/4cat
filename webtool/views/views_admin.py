@@ -1,10 +1,11 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
-import itertools
+from backend.lib.worker import BasicWorker
 import markdown2
 import datetime
 import psycopg2
+import psycopg2.errors
 import tailer
 import smtplib
 import time
@@ -16,33 +17,30 @@ import re
 from pathlib import Path
 from dateutil.parser import parse as parse_datetime, ParserError
 
-import backend
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response
+from flask import Blueprint, render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response, g
 from flask_login import current_user, login_required
 
-from webtool import app, db, config
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
 from common.lib.dataset import DataSet
-
-from common.lib.helpers import call_api, send_email, UserInput
-from common.lib.exceptions import QueryParametersException
+from common.lib.job import Job
+from common.lib.helpers import call_api, send_email, UserInput, get_git_branch
+from common.lib.exceptions import DataSetException, JobNotFoundException, QueryParametersException
 import common.lib.config_definition as config_definition
 
-from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user, request=request)
+component = Blueprint("admin", __name__)
 
 
-@app.route("/admin/")
+@component.route("/admin/")
 @login_required
-def admin_frontpage():
+def frontpage():
     # can be viewed if user has any admin privileges
-    admin_privileges = config.get(
-        [key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
+    admin_privileges = g.config.get(
+        [key for key in g.config.config_definition.keys() if key.startswith("privileges.admin")])
 
     if not any(admin_privileges.values()):
         return render_template("error.html", message="You cannot view this page."), 403
@@ -50,35 +48,39 @@ def admin_frontpage():
     # collect some stats
     now = time.time()
     num_items = {
-        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')", (now - 86400,))["num"],
-        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')", (now - (86400 * 7),))[
+        "day": g.db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')", (now - 86400,))["num"],
+        "week": g.db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s AND key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')", (now - (86400 * 7),))[
             "num"],
-        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')")["num"]
+        "overall": g.db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE key_parent = '' AND (type LIKE '%%-search' OR type LIKE '%%-import')")["num"]
     }
 
     num_datasets = {
-        "day": db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
-        "week": db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
-        "overall": db.fetchone("SELECT COUNT(*) AS num FROM datasets")["num"]
+        "day": g.db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
+        "week": g.db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
+        "overall": g.db.fetchone("SELECT COUNT(*) AS num FROM datasets")["num"]
     }
 
     disk_stats = {
-        "data": sum([f.stat().st_size for f in config.get("PATH_DATA").glob("**/*") if f.is_file()]),
-        "logs": sum([f.stat().st_size for f in config.get("PATH_LOGS").glob("**/*") if f.is_file()]),
-        "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
+        "data": g.db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_data'"),
+        "logs": g.db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_logs'"),
+        "db": g.db.fetchone("SELECT count FROM metrics WHERE datasource = '4cat' AND metric = 'size_db'"),
     }
 
-    upgrade_available = not not db.fetchone(
-        "SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+    # it is possible these stats don't exist yet, so replace with 0 if that is the case
+    disk_stats = {k: v["count"] if v else 0 for k, v in disk_stats.items()}
 
-    tags = config.get_active_tags(current_user)
+    upgrade_available = not not g.db.fetchone(
+        "SELECT * FROM users_notifications WHERE username = '!admin' AND notification LIKE 'A new version of 4CAT%'")
+
+    tags = g.config.get_active_tags(current_user)
+    current_branch = get_git_branch()
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats={
         "captured": num_items, "datasets": num_datasets, "disk": disk_stats
-    }, upgrade_available=upgrade_available, tags=tags)
+    }, upgrade_available=upgrade_available, tags=tags, current_branch=current_branch)
 
 
-@app.route("/admin/users/", defaults={"page": 1})
-@app.route("/admin/users/page/<int:page>/")
+@component.route("/admin/users/", defaults={"page": 1})
+@component.route("/admin/users/page/<int:page>/")
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def list_users(page):
@@ -97,13 +99,17 @@ def list_users(page):
     filter_bits = []
     replacements = []
     if filter_name:
-        filter_bits.append("(name LIKE %s OR userdata::json->>'notes' LIKE %s)")
+        filter_bits.append("(name ILIKE %s OR userdata::json->>'notes' ILIKE %s)")
         replacements.append("%" + filter_name + "%")
         replacements.append("%" + filter_name + "%")
 
     if tag:
-        filter_bits.append("tags != '[]' AND tags @> %s")
-        replacements.append('["' + tag + '"]')
+        if tag.startswith("user:"):
+            filter_bits.append("name LIKE %s")
+            replacements.append(re.sub("^user:", "", tag))
+        else:
+            filter_bits.append("tags != '[]' AND tags @> %s")
+            replacements.append('["' + tag + '"]')
 
     filter_bit = "WHERE " + (" AND ".join(filter_bits)) if filter_bits else ""
     order_bit = "name ASC"
@@ -112,40 +118,125 @@ def list_users(page):
     elif order == "status":
         order_bit = "tags @> '[\"admin\"]' DESC, timestamp_token > 0 DESC, is_deactivated DESC"
 
-    num_users = db.fetchone("SELECT COUNT(*) AS num FROM users " + filter_bit, replacements)["num"]
-    users = db.fetchall(
+    num_users = g.db.fetchone("SELECT COUNT(*) AS num FROM users " + filter_bit, replacements)["num"]
+    users = g.db.fetchall(
         f"SELECT * FROM users {filter_bit} ORDER BY {order_bit} LIMIT {page_size} OFFSET {offset}",
         replacements)
 
     # these are used for autocompletion in the filter form
-    distinct_tags = set.union(*[set(u["tags"]) for u in db.fetchall("SELECT DISTINCT tags FROM users")])
-    distinct_users = [u["name"] for u in db.fetchall("SELECT DISTINCT name FROM users")]
+    distinct_tags = set.union(*[set(u["tags"]) for u in g.db.fetchall("SELECT DISTINCT tags FROM users")])
+    distinct_users = [u["name"] for u in g.db.fetchall("SELECT DISTINCT name FROM users")]
 
-    pagination = Pagination(page, page_size, num_users, "list_users")
-    return render_template("controlpanel/users.html", users=[User(db, user) for user in users],
+    pagination = Pagination(page, page_size, num_users, "admin.list_users")
+    return render_template("controlpanel/users.html", users=[User(g.db, user) for user in users],
                            filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
 
-@app.route("/admin/worker-status/")
+@component.route("/admin/worker-status/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_worker_status():
-    workers = call_api("worker-status")["response"]["running"]
-    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
+    api_response = call_api("worker-status")
+    if api_response["status"] != "success":
+        return """<p class="content-placeholder">Backend unavailable; View logs</p>""", 200, {"Content-Type": "text/html"}
+    workers = [
+        {
+            **worker,
+            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=g.db)
+        } for worker in api_response["response"]["running"]
+    ]
+    return render_template("controlpanel/worker-status.html", workers=workers, worker_types=g.modules.workers,
                            now=time.time())
 
 
-@app.route("/admin/queue-status/")
+@component.route("/admin/queue-status/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_queue_status():
-    queue = call_api("worker-status")["response"]["queued"]
-    return render_template("controlpanel/queue-status.html", queue=queue, worker_types=backend.all_modules.workers,
+    api_response = call_api("worker-status")
+    if api_response["status"] != "success":
+        return """<p class="content-placeholder">Backend unavailable; View logs</p>""", 200, {"Content-Type": "text/html"}
+
+    queue = api_response["response"]["queued"]
+    return render_template("controlpanel/queue-status.html", queue=queue, worker_types=g.modules.workers,
                            now=time.time())
 
 
-@app.route("/admin/add-user/")
+@component.route("/admin/jobs/", defaults={"page": 1})
+@component.route("/admin/jobs/page/<int:page>/")
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def list_jobs(page):
+    """
+    List jobs
+
+    :param int page:
+    """
+    page_size = 25
+    offset = (page - 1) * page_size
+    filter_jobtype = request.args.get("jobtype", "*")
+
+    order = request.args.get("sort", "jobtype")
+
+    jobs = g.queue.get_all_jobs(jobtype=filter_jobtype, restrict_claimable=False, limit=page_size, offset=offset)
+    num_users = g.db.fetchall("SELECT COUNT(*) AS num FROM jobs WHERE jobtype != ''")[0]["num"]
+
+    # these are used for autocompletion in the filter form
+    distinct_jobs = set.union(*[set(u["jobtype"]) for u in g.db.fetchall("SELECT DISTINCT jobtype FROM jobs")])
+
+    pagination = Pagination(page, page_size, num_users, "admin.list_jobs")
+    return render_template("controlpanel/jobs.html", jobs=jobs,
+                           filter={"jobtype": filter_jobtype, "sort": order}, pagination=pagination,
+                           flashes=get_flashed_messages(), all_jobs=distinct_jobs, now= time.time())
+
+@component.route("/admin/delete-job/", methods=["POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def delete_job():
+    """
+    Delete a job
+    """
+    job_id = request.form.get("job_id")
+    redirect_to_page = request.form.get("redirect_to_page", "false").lower() == "true"
+    if not job_id:
+        return error(400, message="Job ID is required")
+    try:
+        job = Job.get_by_ID(id=job_id, database=g.db)
+    except JobNotFoundException:
+        return error(404, message="Job not found")
+    
+    # Check for an associated dataset
+    try:
+        dataset = DataSet(db=g.db, job=job.data["id"], modules=g.modules)
+    except DataSetException:
+        dataset = None
+    
+    if dataset:
+        # Check if the user has permission to manipulate the dataset
+        if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
+            return error(403, message="Not allowed to delete this job's dataset")
+        
+        # Delete the dataset
+        dataset.delete()
+
+    # Tell backend to cancel job if running
+    try:
+        call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["type"], "level": BasicWorker.INTERRUPT_CANCEL})
+    except ConnectionRefusedError:
+        return error(500,
+                        message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
+    
+    # Delete the job
+    job.finish(delete=True)
+    message =  f"Job {job.data['id']} {'and associated dataset' if dataset else ''}deleted successfully."
+    if redirect_to_page:
+        flash(message)
+        return redirect(request.referrer or url_for("admin.list_jobs", page=1))
+    else:
+        return jsonify({"status": "success", "job_id": job.data["id"], "dataset_key": dataset.key if dataset else None, "message": message})
+
+@component.route("/admin/add-user/")
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def add_user():
@@ -173,10 +264,10 @@ def add_user():
     else:
         username = email
         try:
-            db.insert("users", data={"name": username, "timestamp_token": int(time.time()),
+            g.db.insert("users", data={"name": username, "timestamp_token": int(time.time()),
                                      "timestamp_created": int(time.time())})
 
-            user = User.get_by_name(db, username)
+            user = User.get_by_name(g.db, username)
             if user is None:
                 response = {**response, **{"message": "User was created but could not be instantiated properly."}}
             else:
@@ -190,8 +281,8 @@ def add_user():
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
-        except psycopg2.IntegrityError:
-            db.rollback()
+        except (psycopg2.IntegrityError, psycopg2.errors.UniqueViolation):
+            g.db.rollback()
             if not force:
                 response = {**response, **{
                     "message": 'Error: User %s already exists. If you want to re-create the user and re-send the '
@@ -201,8 +292,8 @@ def add_user():
                 # if a user does not use their token in time, maybe you want to
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
-                user = User.get_by_name(db, username)
-                db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
+                user = User.get_by_name(g.db, username)
+                g.db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
                     url = user.email_token(new=True)
@@ -212,13 +303,18 @@ def add_user():
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
                             username, url, url)}}
                 except RuntimeError as e:
+                    # Grab the token and provide it to the admin, so they can send to user
+                    new_token = user.generate_token()
+                    url_base = g.config.get("flask.server_name")
+                    protocol = "https" if g.config.get("flask.https") else "http"
+                    url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, new_token)
                     response = {**response, **{
-                        "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
+                        "message": "Token was reset but registration e-mail could not be sent (%s). Reset password link: [%s](%s)" % (e, url, url)}}
 
     if fmt == "html":
         if redirect_to_page:
             flash(response["message"])
-            return redirect(url_for("manipulate_user", mode="edit", name=username))
+            return redirect(url_for("admin.manipulate_user", mode="edit", name=username))
         else:
             return render_template("error.html", message=response["message"],
                                    title=("New account created" if response["success"] else "Error"))
@@ -226,7 +322,7 @@ def add_user():
         return jsonify(response)
 
 
-@app.route("/admin/reject-user/", methods=["GET", "POST"])
+@component.route("/admin/reject-user/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def reject_user():
@@ -254,9 +350,9 @@ def reject_user():
 
     if incomplete:
         if not form_message:
-            form_answer = Path(config.get("PATH_ROOT"), "webtool/pages/reject-template.md")
+            form_answer = Path(g.config.get("PATH_ROOT"), "webtool/pages/reject-template.md")
             if not form_answer.exists():
-                form_message = "No %s 4 u" % config.get("4cat.name")
+                form_message = "No %s 4 u" % g.config.get("4cat.name")
             else:
                 form_message = form_answer.read_text(encoding="utf-8")
                 form_message = form_message.replace("{{ name }}", name)
@@ -266,9 +362,9 @@ def reject_user():
                                incomplete=incomplete)
 
     message = MIMEMultipart("alternative")
-    message["From"] = config.get("mail.noreply")
+    message["From"] = g.config.get("mail.noreply")
     message["To"] = email_address
-    message["Subject"] = "Your %s account request" % config.get("4cat.name")
+    message["Subject"] = "Your %s account request" % g.config.get("4cat.name")
 
     html_message = markdown2.markdown(form_message)
     message.attach(MIMEText(form_message, "plain"))
@@ -283,7 +379,7 @@ def reject_user():
     return render_template("error.html", message="Rejection sent to %s." % email_address, title="Rejection sent")
 
 
-@app.route("/admin/delete-user", methods=["POST"])
+@component.route("/admin/delete-user", methods=["POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def delete_user():
@@ -293,7 +389,7 @@ def delete_user():
     :return:
     """
     username = request.form.get("name")
-    user = User.get_by_name(db=db, name=username)
+    user = User.get_by_name(db=g.db, name=username)
     if not username:
         return render_template("error.html", message=f"User {username} does not exist.",
                                title="User not found"), 404
@@ -303,17 +399,17 @@ def delete_user():
                                title="User cannot be deleted"), 403
 
     if user.get_id() == current_user.get_id():
-        return render_template("error.html", message=f"You cannot delete your own account.",
+        return render_template("error.html", message="You cannot delete your own account.",
                                title="User cannot be deleted"), 403
 
     # first delete favourites and notifications and api tokens
     user.delete()
 
     flash(f"User {username} and their datasets have been deleted.")
-    return redirect(url_for("admin_frontpage"))
+    return redirect(url_for("admin.frontpage"))
 
 
-@app.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
+@component.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def manipulate_user(mode):
@@ -327,7 +423,7 @@ def manipulate_user(mode):
     if user_email in ("anonymous", "autologin"):
         return error(403, message="System users cannot be edited")
 
-    user = User.get_by_name(db, request.args.get("name")) if mode == "edit" else {}
+    user = User.get_by_name(g.db, request.args.get("name")) if mode == "edit" else {}
     if user is None:
         return error(404, message="User not found")
 
@@ -345,7 +441,7 @@ def manipulate_user(mode):
         old_tags = user.tags if user else []
         new_tags = [re.sub(r"[^a-z0-9_]", "", t.strip().lower()) for t in request.form.get("tags", "").split(",")]
         if "admin" in old_tags and "admin" not in new_tags:
-            admin_users = db.fetchall("SELECT name FROM users WHERE tags @> '[\"admin\"]'")
+            admin_users = g.db.fetchall("SELECT name FROM users WHERE tags @> '[\"admin\"]'")
             if len(admin_users) == 1:
                 # one admin user that would no longer be an admin - not OK
                 flash("There always needs to be at least one user with the 'admin' tag.")
@@ -359,19 +455,19 @@ def manipulate_user(mode):
             }
 
             if mode == "edit":
-                db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
-                user = User.get_by_name(db, user_data["name"])  # ensure updated data
+                g.db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
+                user = User.get_by_name(g.db, user_data["name"])  # ensure updated data
 
             else:
                 try:
-                    db.insert("users", user_data)
-                    user = User.get_by_name(db, user_data["name"])
+                    g.db.insert("users", user_data)
+                    user = User.get_by_name(g.db, user_data["name"])
 
                     if request.form.get("password"):
                         user.set_password(request.form.get("password"))
                     else:
                         token = user.generate_token(None, regenerate=True)
-                        link = url_for("reset_password", _external=True) + "?token=%s" % token
+                        link = url_for("user.reset_password", _external=True) + "?token=%s" % token
                         flash('User created. %s can set a password via<br><a href="%s">%s</a>.' % (
                             user_data["name"], link, link))
 
@@ -381,7 +477,7 @@ def manipulate_user(mode):
                 except psycopg2.IntegrityError:
                     flash("A user with this e-mail address already exists.")
                     incomplete.append("name")
-                    db.rollback()
+                    g.db.rollback()
 
             if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
@@ -411,24 +507,32 @@ def manipulate_user(mode):
                            mode=mode)
 
 
-@app.route("/admin/user-tags/", methods=["GET", "POST"])
+@component.route("/admin/user-tags/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_tags")
 def manipulate_tags():
-    tag_priority = config.get("flask.tag_order")
+    tag_priority = g.config.get("flask.tag_order")
 
     # explicit tags are already ordered; implicit tags have not been given a
     # place in the order yet, but are used for at least one user
     all_tags = set.union(
-        *[set(user["tags"]) for user in db.fetchall("SELECT tags FROM users")],
-        set([setting["tag"] for setting in db.fetchall("SELECT DISTINCT tag FROM settings") if setting["tag"]]))
+        *[set(user["tags"]) for user in g.db.fetchall("SELECT tags FROM users")],
+        set([setting["tag"] for setting in g.db.fetchall("SELECT DISTINCT tag FROM settings") if setting["tag"]]))
 
     tags = [{"tag": tag, "explicit": True} for tag in tag_priority]
     tags.extend([{"tag": tag, "explicit": False} for tag in all_tags if tag not in tag_priority])
 
-    if not tags:
+    if not [tag for tag in tags if tag["tag"] == "admin"]:
         # admin tag always exists
-        tags = [{"tag": "admin", "explicit": True}]
+        tags.append({"tag": "admin", "explicit": True})
+
+    num_admins = 0
+    for i, tag in enumerate(tags):
+        tags[i]["users"] = g.db.fetchone("SELECT COUNT(*) AS count FROM users WHERE tags != '[]' AND tags @> %s", ('["' + tag["tag"] + '"]',))["count"]
+        if tag["tag"] == "admin":
+            num_admins = tags[i]["users"]
+        elif tag["tag"].startswith("user:"):
+            tags[i]["users"] = 1  # by definition
 
     if request.method == "POST":
         try:
@@ -451,7 +555,7 @@ def manipulate_tags():
         # instead of having to cross-reference with the tag order value, at the
         # expense of some overhead when sorting tags (but that should not
         # happen often)
-        tagged_users = db.fetchall("SELECT name, tags FROM users WHERE tags != '{}'")
+        tagged_users = g.db.fetchall("SELECT name, tags FROM users WHERE tags != '{}'")
 
         for user in tagged_users:
             sorted_tags = []
@@ -459,20 +563,20 @@ def manipulate_tags():
                 if tag in user["tags"]:
                     sorted_tags.append(tag)
 
-            db.update("users", where={"name": user["name"]}, data={"tags": json.dumps(sorted_tags)}, commit=False)
+            g.db.update("users", where={"name": user["name"]}, data={"tags": json.dumps(sorted_tags)}, commit=False)
 
-        db.commit()
+        g.db.commit()
 
         # save global order, too
-        config.set("flask.tag_order", order, tag="")
+        g.config.set("flask.tag_order", order, tag="")
 
         # always async
         return jsonify({"success": True})
 
-    return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
+    return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
-@app.route("/admin/settings", methods=["GET", "POST"])
+@component.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
 def manipulate_settings():
@@ -481,17 +585,17 @@ def manipulate_settings():
     """
     tag = request.args.get("tag", "")
 
-    definition = config.config_definition
+    definition = g.config.config_definition
     categories = config_definition.categories
 
     modules = {
         **{datasource + "-search": definition["name"] for datasource, definition in
-           backend.all_modules.datasources.items()},
+           g.modules.datasources.items()},
         **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
-           backend.all_modules.processors.values()}
+           g.modules.processors.values()}
     }
 
-    global_settings = config.get_all(user=None, tags=None)
+    global_settings = g.config.get_all(user=None, tags=None)
     update_css = False
 
     if request.method == "POST":
@@ -524,10 +628,10 @@ def manipulate_settings():
                     # so here we compare the JSON from global_settings to the
                     # parsed value, encoded as JSON
                     if global_value == value and global_value is not None:
-                        config.delete_for_tag(setting, tag)
+                        g.config.delete_for_tag(setting, tag)
                         continue
 
-                valid = config.set(setting, value, tag=tag)
+                valid = g.config.set(setting, value, tag=tag)
 
                 if valid is None:
                     flash("Invalid value for %s" % setting)
@@ -543,11 +647,13 @@ def manipulate_settings():
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
-    all_settings = config.get_all(user=None, tags=[tag])
+    all_settings = g.config.get_all(user=None, tags=[tag])
+
     options = {}
 
     changed_categories = set()
-    for option in sorted({*all_settings.keys(), *definition.keys()}):
+
+    for option in {*all_settings.keys(), *definition.keys()}:
         tag_value = all_settings.get(option, definition.get(option, {}).get("default"))
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
         is_changed = tag and global_value != tag_value
@@ -556,13 +662,32 @@ def manipulate_settings():
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
             default = json.dumps(default)
 
+        # this is used for organising things in the UI
+        option_owner = option.split(".")[0]
+        submenu = "other"
+        if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
+                                    "logging", "ui"):
+            submenu = "core"
+        elif option_owner.endswith("-search"):
+            submenu = "datasources"
+        elif option_owner in g.modules.processors:
+            submenu = "processors"
+
+        tabname = config_definition.categories.get(option_owner)
+        if not tabname:
+            tabname = modules.get(option_owner)
+        if not tabname:
+            tabname = option_owner
+
         options[option] = {
             **definition.get(option, {
                 "type": UserInput.OPTION_TEXT,
                 "help": option,
                 "default": all_settings.get(option)
             }),
+            "submenu": submenu,
             "default": default,
+            "tabname": tabname,
             "is_changed": is_changed
         }
 
@@ -570,6 +695,16 @@ def manipulate_settings():
             changed_categories.add(option.split(".")[0])
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
+
+    # We are ordering the options based on how they are ordered in their dictionaries,
+    # and not the database order. To do so, we're adding a simple config order number
+    # and sort on this.
+    config_order = 0
+    for k, v in definition.items():
+        options[k]["config_order"] = config_order
+        config_order += 1
+
+    options = {k: options[k] for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))}
 
     # 'data sources' is one setting but we want to be able to indicate
     # overrides per sub-item
@@ -581,10 +716,10 @@ def manipulate_settings():
     datasources = {
         datasource: {
             **info,
-            "enabled": datasource in config.get("datasources.enabled"),
-            "expires": config.get("datasources.expiration").get(datasource, {})
+            "enabled": datasource in g.config.get("datasources.enabled"),
+            "expires": g.config.get("datasources.expiration").get(datasource, {})
         }
-        for datasource, info in backend.all_modules.datasources.items()}
+        for datasource, info in g.modules.datasources.items()}
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
@@ -592,7 +727,7 @@ def manipulate_settings():
                            expire_override=expire_override)
 
 
-@app.route("/manage-notifications/", methods=["GET", "POST"])
+@component.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_notifications")
 def manipulate_notifications():
@@ -613,39 +748,50 @@ def manipulate_notifications():
         if not params["username"]:
             incomplete.append("username")
 
-        recipient = User.get_by_name(db, params["username"])
-        if not recipient and params["username"] not in ("!everyone", "!admins"):
+        recipient = User.get_by_name(g.db, params["username"])
+        if not recipient and not params["username"].startswith("!"):
             flash("User '%s' does not exist" % params["username"])
             incomplete.append("username")
 
-        if params["expires"]:
+        expires = None
+        if params["expires-seconds"] and params["expires-date"]:
+            flash("Please specify either 'expires seconds' or 'expires date', not both.")
+            incomplete.append("expires-seconds")
+            incomplete.append("expires-date")
+        elif params["expires-seconds"]:
             try:
-                expires = int(params["expires"])
+                expires = int(time.time() + int(params["expires-seconds"]))
             except ValueError:
-                incomplete.append("expires")
-        else:
-            expires = None
-
+                incomplete.append("expires-seconds")
+                flash("Please provide a valid number of seconds.")
+        elif params["expires-date"]:
+            try:
+                parsed_choice = parse_datetime(params["expires-date"])
+                expires = int(parsed_choice.timestamp())
+            except ValueError:
+                incomplete.append("expires-date")
+                flash("Please provide a valid date in YYYY-MM-DD format.")
+        
         notification = {
             "username": params.get("username"),
             "notification": params.get("notification"),
-            "timestamp_expires": int(time.time() + expires) if expires else None,
+            "timestamp_expires": expires if expires else None,
             "allow_dismiss": not not params.get("allow_dismiss")
         }
 
         if not incomplete:
-            db.insert("users_notifications", notification, safe=True)
+            g.db.insert("users_notifications", notification, safe=True)
             flash("Notification added")
 
         else:
             flash("Please ensure all fields contain a valid value.")
 
-    notifications = db.fetchall("SELECT * FROM users_notifications ORDER BY username ASC, id ASC")
+    notifications = g.db.fetchall("SELECT * FROM users_notifications ORDER BY username ASC, id ASC")
     return render_template("controlpanel/notifications.html", incomplete=incomplete, flashes=get_flashed_messages(),
                            notification=notification, notifications=notifications)
 
 
-@app.route("/delete-notification/<int:notification_id>")
+@component.route("/delete-notification/<int:notification_id>")
 @login_required
 @setting_required("privileges.admin.can_manage_notifications")
 def delete_notification(notification_id):
@@ -657,16 +803,16 @@ def delete_notification(notification_id):
     :param notification_id:  ID of notification to delete
     :return:
     """
-    db.execute("DELETE FROM users_notifications WHERE id = %s", (notification_id,))
+    g.db.execute("DELETE FROM users_notifications WHERE id = %s", (notification_id,))
 
     redirect_url = request.headers.get("Referer")
     if not redirect_url:
-        redirect_url = url_for("admin_frontpage")
+        redirect_url = url_for("admin.frontpage")
 
     return redirect(redirect_url)
 
 
-@app.route("/logs/")
+@component.route("/logs/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def view_logs():
@@ -675,10 +821,11 @@ def view_logs():
 
     :return:
     """
-    return render_template("controlpanel/logs.html")
+    headers = "\n".join([f"{h}: {request.headers[h]}" for h in dict(request.headers)])
+    return render_template("controlpanel/logs.html", headers=headers)
 
 
-@app.route("/logs/<string:logfile>/")
+@component.route("/logs/<string:logfile>/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
 def get_log(logfile):
@@ -690,15 +837,17 @@ def get_log(logfile):
     :param str logfile: 'backend' or 'stderr'
     :return:
     """
-    if logfile not in ("stderr", "backend"):
+    if logfile not in ("stderr", "backend", "import"):
         return "Not Found", 404
 
     if logfile == "backend":
-        filename = "4cat.log" if not config.get("USING_DOCKER") else "backend_4cat.log"
-    else:
+        filename = "4cat.log" if not g.config.get("USING_DOCKER") else "backend_4cat.log"
+    elif logfile == "stderr":
         filename = "4cat.stderr"
+    else:
+        filename = f"{logfile}.log"
 
-    log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), filename)
+    log_file = g.config.get("PATH_ROOT").joinpath(g.config.get("PATH_LOGS")).joinpath(filename)
     if log_file.exists():
         with log_file.open() as infile:
             return "\n".join(tailer.tail(infile, 250))
@@ -706,7 +855,7 @@ def get_log(logfile):
         return ""
 
 
-@app.route("/user-bulk", methods=["GET", "POST"])
+@component.route("/user-bulk", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
 def user_bulk():
@@ -756,15 +905,15 @@ def user_bulk():
         if prospective_users:
             for user in prospective_users:
                 # prevent duplicate users
-                exists = db.fetchone("SELECT name FROM users WHERE name = %s", (user["name"],))
+                exists = g.db.fetchone("SELECT name FROM users WHERE name = %s", (user["name"],))
                 if exists:
                     dupes.append(user["name"])
                     continue
 
                 # only insert with username - other properties are set through
                 # the object
-                db.insert("users", {"name": user["name"], "timestamp_created": int(time.time())})
-                user_obj = User.get_by_name(db, user["name"])
+                g.db.insert("users", {"name": user["name"], "timestamp_created": int(time.time())})
+                user_obj = User.get_by_name(g.db, user["name"])
 
                 if user.get("expires"):
                     try:
@@ -782,7 +931,7 @@ def user_bulk():
                 if user.get("password"):
                     user_obj.set_password(user["password"])
 
-                elif config.get("mail.server") and not mail_fail and "@" in user.get("name"):
+                elif g.config.get("mail.server") and not mail_fail and "@" in user.get("name"):
                     # can send a registration e-mail, but only if the name is
                     # an email address and we have a mail server
                     try:
@@ -818,7 +967,7 @@ def user_bulk():
                            incomplete=incomplete)
 
 
-@app.route("/dataset-bulk/", methods=["GET", "POST"])
+@component.route("/dataset-bulk/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manipulate_all_datasets")
 def dataset_bulk():
@@ -830,7 +979,7 @@ def dataset_bulk():
     """
     incomplete = []
     forminput = {}
-    datasources = {datasource: meta["name"] for datasource, meta in backend.all_modules.datasources.items()}
+    datasources = {datasource: meta["name"] for datasource, meta in g.modules.datasources.items()}
 
     if request.method == "POST":
         # action depends on which button was clicked
@@ -871,7 +1020,7 @@ def dataset_bulk():
             where.append("parameters::json->>'datasource' IS NOT NULL AND parameters::json->>'datasource' IN %s")
             replacements.append(tuple(forminput["filter_datasource"]))
 
-        datasets_meta = db.fetchall(f"SELECT * FROM datasets {'WHERE' if where else ''} {' AND '.join(where)}",
+        datasets_meta = g.db.fetchall(f"SELECT * FROM datasets {'WHERE' if where else ''} {' AND '.join(where)}",
                                     tuple(replacements))
 
         if not datasets_meta:
@@ -887,7 +1036,7 @@ def dataset_bulk():
                 incomplete.append("bulk-owner")
 
             if not bulk_owner.startswith("tag:"):
-                users = db.fetchall("SELECT name FROM users WHERE name LIKE %s", (bulk_owner,))
+                users = g.db.fetchall("SELECT name FROM users WHERE name LIKE %s", (bulk_owner,))
                 if not users:
                     flash("No users match that username")
                     incomplete.append("bulk-owner")
@@ -899,7 +1048,7 @@ def dataset_bulk():
             flash(f"{len(bulk_owner):,} new owner(s) were added to the datasets.")
 
         if not incomplete:
-            datasets = [DataSet(data=dataset, db=db) for dataset in datasets_meta]
+            datasets = [DataSet(data=dataset, db=g.db, modules=g.modules) for dataset in datasets_meta]
             flash(f"{len(datasets):,} dataset(s) updated.")
 
             if action == "export":

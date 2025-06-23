@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.dataset import DataSet
+from common.lib.exceptions import DataSetException
 
 # parse parameters
 cli = argparse.ArgumentParser(description="Deletes a dataset, the corresponding job, and any child datasets.")
@@ -28,7 +29,7 @@ database = Database(logger=logger, appname="delete-dataset")
 # Initialize query
 try:
 	parent = DataSet(key=args.key, db=database)
-except TypeError:
+except DataSetException:
 	print("No dataset found with that key.")
 	sys.exit(1)
 

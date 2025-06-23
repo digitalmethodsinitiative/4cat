@@ -132,7 +132,7 @@ class SearchWithinTCATBinsV2(Search):
             self.dataset.log('Query: %s' % self.parameters.get("query"))
             unbuffered_cursor = db.connection.cursor(pymysql.cursors.SSCursor)
             try:
-                num_results = unbuffered_cursor.execute(self.parameters.get("query"))
+                unbuffered_cursor.execute(self.parameters.get("query"))
             except pymysql.err.ProgrammingError as e:
                 self.dataset.update_status("SQL query error: %s" % str(e), is_final=True)
                 return
@@ -219,7 +219,7 @@ class SearchWithinTCATBinsV2(Search):
             self.dataset.log('Query: %s' % query)
             self.dataset.log('Replacements: %s' % ', '.join([str(i) for i in replacements]))
             unbuffered_cursor = db.connection.cursor(pymysql.cursors.SSCursor)
-            num_results = unbuffered_cursor.execute(query, replacements)
+            unbuffered_cursor.execute(query, replacements)
             # self.dataset.update_status("Retrieving %i results" % int(num_results)) # num_results is CLEARLY not what I thought
             column_names = [description[0] for description in unbuffered_cursor.description]
             for result in unbuffered_cursor.fetchall_unbuffered():
@@ -250,7 +250,7 @@ class SearchWithinTCATBinsV2(Search):
                         'body': tweet.get('text', ''),
                         # 'created_at': tweet.get('created_at'),
                         'timestamp': int(datetime.datetime.timestamp(tweet.get('created_at'))) if type(
-                                                tweet.get('created_at')) == datetime.datetime else None,
+                                                tweet.get('created_at')) is datetime.datetime else None,
                         'subject': '',
                         'author': tweet.get('from_user_name', ''),
                         "author_fullname": tweet["from_user_realname"],
@@ -391,7 +391,7 @@ class SearchWithinTCATBinsV2(Search):
         :return dict:  Safe query parameters
         """
         # no query 4 u
-        if not query.get("bin", "").strip():
+        if not query.get("bin", ""):
             raise QueryParametersException("You must choose a query bin to get tweets from.")
 
         # the dates need to make sense as a range to search within
@@ -401,6 +401,7 @@ class SearchWithinTCATBinsV2(Search):
             raise QueryParametersException("A date range must start before it ends")
 
         query["min_date"], query["max_date"] = query.get("daterange")
+        query["bin"] = query.get("bin", "").strip()
         del query["daterange"]
 
         # simple!

@@ -11,7 +11,7 @@
                 <h2><span>Create new dataset</span></h2>
             </div>
 
-            <form id="query-form" action="{{ url_for('queue_dataset') }}" method="POST" enctype="multipart/form-data">
+            <form id="query-form" action="{{ url_for('toolapi.queue_dataset') }}" method="POST" enctype="multipart/form-data">
                 <fieldset class="datasource-form">
                     <p><br>Please be considerate of other users; {{ __user_config("4cat.name") }} is a shared resource and large dataset queries may
                         prevent others from using it if they take a very long time to complete. We recommend to start
@@ -24,7 +24,7 @@
                                 <select name="datasource" id="datasource-select" aria-label="Data sources">
                                 {% include 'components/datasource-select.html' %}
                                 </select>
-                                <span class="data-overview-link"><a href="{{ url_for('data_overview') }}{{ datasource }}">How is this data collected?</a></span>
+                                <span class="data-overview-link"><a href="{{ url_for('misc.data_overview') }}{{ datasource }}">How is this data collected?</a></span>
                             </div>
                             <button class="tooltip-trigger" aria-controls="tooltip-datasource-type" aria-label="Explain datasource type" id="datasource-type-label">Local</button>
                         </div>
@@ -36,11 +36,12 @@
                 </div>
 
                 <div id="data-options">
-                    <p class="form-intro">4CAT can remove information it identifies as relating to an item's author, or
+                    {% if __user_config("ui.offer_hashing") %}
+                    <p class="form-intro dataset-anonymisation">4CAT can remove information it identifies as relating to an item's author, or
                         replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value. Other
                         personal information may persist; it is your responsibility to further anonymise data where
                         appropriate.</p>
-                    <div class="form-element">
+                    <div class="form-element dataset-anonymisation">
                         <label for="data-pseudonymise">Pseudonymise:</label>
                         <div class="filter-parameters">
                             <select name="pseudonymise" id="data-pseudonymise">
@@ -50,16 +51,17 @@
                             </select>
                         </div>
                     </div>
+                    {% endif %}
+                    {% if __user_config("ui.offer_private") %}
                     <div class="form-element">
                         <label for="data-make-private">Make private:</label>
                         <div class="filter-parameters">
                             <label><input type="checkbox" name="make-private" id="data-make-private" checked="checked"> Make dataset private</label>
                             <button class="tooltip-trigger" aria-controls="tooltip-dataset-private" aria-label="Extended help for option">?</button>
                         </div>
-
-
                         <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and server administrators will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
                     </div>
+                    {% endif %}
                     {% if __user_config("ui.option_email") in ["both", "datasources_only"] and __user_config("mail.server") %}
                     <div class="form-element">
                         <label for="data-email-complete">Receive email on completion:</label>
@@ -71,7 +73,7 @@
                         <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
                     </div>
                     {% endif %}
-                    <div class="form-element">
+                    <div class="form-element dataset-labeling">
                         <label for="dataset-label">Dataset name:</label>
                         <input id="dataset-label" name="label">
 

@@ -1,5 +1,5 @@
 {% set option_settings = processor.get_options(dataset, current_user)[option] %}
-<div class="processor-option-wrap">
+<div class="processor-option-wrap"{% if option_settings.requires %} data-requires="{{ option_settings.requires }}"{% endif %}>
     <label class="option-type-{{ option_settings.type }}">
         {% if option_settings.type == "toggle" %}
             <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>
@@ -24,7 +24,7 @@
         <div class="multichoice-wrapper{% if option_settings.inline %} inline{% endif %}" style="flex-basis: 100%;">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
-                <option value="{{ choice }}"{% if choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+                <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
             {% endfor %}
             </select>
         </div>
@@ -32,10 +32,12 @@
         <div class="multi-select-wrapper">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
-                <option value="{{ choice }}"{% if choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+                <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
             {% endfor %}
             </select>
         </div>
+    {% elif option_settings.type == "file" %}
+        <input name="option-{{ option }}" value="{{ option_settings.default }}" type="file"{% if option_settings.accept %}accept=".csv"{% endif %}>
     {% elif option_settings.type == "daterange" %}
         <div class="daterange-wrapper">
             <input name="option-{{ option }}-min_proxy" id="forminput-{{ option }}" class="input-time" type="date"

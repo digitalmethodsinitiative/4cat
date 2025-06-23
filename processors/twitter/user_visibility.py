@@ -58,7 +58,9 @@ class TwitterUserVisibility(BasicProcessor):
 
         counter = 0
         # Iterate through each post and collect data for each interval
-        for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+        for post in self.source_dataset.iterate_items(self):
+            post = post.original
+
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while processing Tweets")
 

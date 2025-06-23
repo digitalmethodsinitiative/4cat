@@ -117,6 +117,9 @@ class VideoTimelines(BasicProcessor):
                 if previous_video is not None or not looping:
                     # draw the video filename/label on top of the rendered
                     # frame thumbnails
+                    if not previous_video:
+                        # This likely means no frames were found for the video and this processor should not have run
+                        continue
                     video_label = labels.get(previous_video, previous_video)
                     footersize = (fontsize * (len(video_label) + 2) * 0.5925, fontsize * 2)
                     footer_shape = SVG(insert=(0, base_height - footersize[1]), size=footersize)
@@ -141,7 +144,7 @@ class VideoTimelines(BasicProcessor):
 
                 if looping:
                     # Only prep for new timeline if still looping
-                    self.dataset.update_status(f"Rendering video timeline for collection {video}")
+                    self.dataset.update_status(f"Rendering video timeline for collection {video} ({len(timeline_widths)}/{self.source_dataset.num_rows})")
                     self.dataset.update_progress(len(timeline_widths) / self.source_dataset.num_rows)
                     # reset and ready for the next timeline
                     offset_y += base_height
@@ -164,6 +167,10 @@ class VideoTimelines(BasicProcessor):
                 frame_element = ImageElement(href=frame_data, insert=(timeline_widths[video], 0), size=(frame_width, base_height))
                 timeline.add(frame_element)
                 timeline_widths[video] += frame_width
+
+        if not timeline_widths:
+            self.dataset.finish_with_error("No video frames found")
+            return
 
         # now we know all dimensions we can instantiate the canvas too
         canvas_width = max(timeline_widths.values())
@@ -198,7 +205,7 @@ class VideoTimelines(BasicProcessor):
 
         for url, data in metadata.items():
             if data.get('success'):
-                for filename in [f["filename"] for f in data["files"]]:
+                for filename in [f["filename"] for f in data.get("files", [])]:
                     filename = ".".join(filename.split(".")[:-1])
                     mapping_ids[filename] = data["post_ids"]
                     if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:
@@ -207,16 +214,16 @@ class VideoTimelines(BasicProcessor):
                     labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():
-            dataset = DataSet(key=dataset, db=self.db).nearest("*-search")
+            dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest("*-search")
 
             # determine appropriate label
             # is this the right place? should it be in the datasource?
             if dataset.type == "tiktok-search":
-                mapper = lambda item: item.get("tiktok_url")
+                mapper = lambda item: item.get("tiktok_url")  # noqa: E731
             elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
-                mapper = lambda item: item.get("youtube_url")
+                mapper = lambda item: item.get("youtube_url")  # noqa: E731
             else:
-                mapper = lambda item: item.get("id")
+                mapper = lambda item: item.get("id")  # noqa: E731
 
             for item in dataset.iterate_items(self):
                 for filename in urls:

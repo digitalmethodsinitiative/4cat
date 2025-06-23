@@ -138,10 +138,11 @@ const processor = {
         e.preventDefault();
 
         if ($(this).text().includes('Run')) {
-            let form = $(this).parents('form');
+            const run_button = $(this);
+            let form = run_button.parents('form');
 
             // if it's a big dataset, ask if the user is *really* sure
-            let parent = $(this).parents('li.child-wrapper');
+            let parent = run_button.parents('li.child-wrapper');
             if (parent.length === 0) {
                 parent = $('.result-tree');
             }
@@ -153,12 +154,24 @@ const processor = {
                 }
             }
 
-            $.ajax(form.attr('data-async-action') + '?async', {
-                'method': form.attr('method'),
-                'data': form.serialize(),
-                'success': function (response) {
+            let reset_form = true;
+            fetch(form.attr('data-async-action') + '?async', {method: form.attr('method'), body: new FormData(form[0])})
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw response;
+                    }
+                    return response.json();
+                })
+                .then(function (response) {
                     if (response.hasOwnProperty("messages") && response.messages.length > 0) {
                         popup.alert(response.messages.join("\n\n"));
+                    } else if(response.hasOwnProperty('message')) {
+                        popup.alert(response.message);
+                    }
+
+                    if(response.hasOwnProperty('status') && response['status'] === 'error') {
+                        reset_form = false;
+                        return;
                     }
 
                     if (response.html.length > 0) {
@@ -196,27 +209,37 @@ const processor = {
                             expand();
                         }
                     }
-                },
-                'error': function (response) {
-                    try {
-                        response = JSON.parse(response.responseText);
-                        popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
-                    } catch (Exception) {
-                        popup.alert('The analysis could not be queued: ' + response.responseText, 'Warning');
+                })
+                .catch(function (error) {
+                    // Check if the error is a Response object
+                    if (error instanceof Response) {
+                        error.json().then((data) => {
+                            // Handle the error response
+                            popup.alert('The analysis could not be queued: ' + (data.error || data.message || 'Unknown error'), 'Warning');
+                        }).catch(() => {
+                            // Handle cases where the response is not JSON
+                            popup.alert('The analysis could not be queued: ' + error.statusText, 'Warning');
+                        });
+                    } else {
+                        // Handle other types of errors (e.g., network errors)
+                        console.error(error);
+                        popup.alert('A network error occurred. Please try again later.', 'Error');
                     }
-                }
-            });
-
-            if ($(this).data('original-content')) {
-                $(this).html($(this).data('original-content'));
-                $(this).trigger('click');
-                $(this).html($(this).data('original-content'));
-                form.trigger('reset');
-            }
+                })
+                .finally(() => {
+                    if (reset_form && run_button.data('original-content')) {
+                        run_button.html(run_button.data('original-content'));
+                        run_button.trigger('click');
+                        run_button.html(run_button.data('original-content'));
+                        form.trigger('reset');
+                        ui_helpers.toggleButton({target: run_button});
+                    }
+                });
         } else {
             $(this).data('original-content', $(this).html());
             $(this).find('.byline').html('Run');
             $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
+            ui_helpers.toggleButton({target: $(this)[0]});
         }
     },
 
@@ -227,7 +250,7 @@ const processor = {
             return;
         }
 
-        $.ajax(getRelativeURL('api/delete-dataset/'), {
+        $.ajax(getRelativeURL('api/delete-dataset/' + $(this).attr('data-key') + '/'), {
             method: 'DELETE',
             data: {key: $(this).attr('data-key')},
             success: function (json) {
@@ -237,7 +260,7 @@ const processor = {
                 if ($('.child-list.top-level li').length === 0) {
                     $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
                 }
-                query.enable_form();
+                query.reset_form();
             },
             error: function (json) {
                 popup.alert('Could not delete dataset: ' + json.status, 'Error');
@@ -261,7 +284,7 @@ const query = {
         // Check status of query
         if ($('body.result-page').length > 0) {
             query.update_status();
-            setInterval(query.update_status, 1000);
+            setInterval(query.update_status, 1500);
 
             // Check processor queue
             query.check_processor_queue();
@@ -308,13 +331,19 @@ const query = {
     /**
      * Enable query form, so settings may be changed
      */
-    enable_form: function () {
-        $('#query-status .delete-link').remove();
-        $('#query-status .status_message .dots').html('');
-        $('#query-status .message').html('Enter dataset parameters to begin.');
+    enable_form: function (reset=false) {
+        if(reset) {
+            $('#query-status .delete-link').remove();
+            $('#query-status .status_message .dots').html('');
+            $('#query-status .message').html('Enter dataset parameters to begin.');
+            $('#query-form .datasource-extra-input').remove();
+        }
         $('#query-form fieldset').prop('disabled', false);
-        $('#query-form .datasource-extra-input').remove();
         $('#query-status').removeClass('active');
+    },
+
+    reset_form: function() {
+        query.enable_form(true);
     },
 
     /**
@@ -336,6 +365,7 @@ const query = {
 
         // Show loader
         query.check_search_queue();
+        query.enable_form();
 
         let form = $('#query-form');
         let formdata = new FormData(form[0]);
@@ -343,17 +373,38 @@ const query = {
         if (!for_real) {
             // just for validation
             // limit file upload size
+            let newFormData = new FormData();
             let snippet_size = 128 * 1024; // 128K ought to be enough for everybody
             for (let pair of formdata.entries()) {
                 if (pair[1] instanceof File) {
-                    let content = await FileReaderPromise(pair[1]);
-                    if (content.byteLength > snippet_size) {
-                        content = content.slice(0, snippet_size);
-                        let snippet = new File([content], pair[1].name);
-                        formdata.set(pair[0], snippet)
+                    if (!['application/zip', 'application/x-zip-compressed'].includes(pair[1].type)) {
+                        const sample_size = Math.min(pair[1].size, snippet_size);
+                        const blob = pair[1].slice(0, sample_size); // do not load whole file into memory
+
+                        // make sure we're submitting utf-8 - read and then re-encode to be sure
+                        const blobAsText = await FileReaderPromise(blob);
+                        const snippet = new File([new TextEncoder().encode(blobAsText)], pair[1].name);
+                        newFormData.append(pair[0], snippet);
+                    } else {
+                        // if this is a zip file, don't bother with a snippet (which won't be
+                        // useful) but do send a list of files in the zip
+                        const reader = new zip.ZipReader(new zip.BlobReader(pair[1]));
+                        const entries = await reader.getEntries();
+                        newFormData.append(pair[0] + '-entries', JSON.stringify(
+                           entries.map(function(e) {
+                               return {
+                                   filename: e.filename,
+                                   filesize: e.compressedSize
+                               }
+                           })
+                        ));
+                        newFormData.append(pair[0], null);
                     }
+                } else {
+                    newFormData.append(pair[0], pair[1]);
                 }
             }
+            formdata = newFormData;
         }
 
         if (extra_data) {
@@ -371,6 +422,7 @@ const query = {
 
         // Disable form
         $('html,body').scrollTop(200);
+        query.disable_form();
 
         // AJAX the query to the server
         // first just to validate - then for real (if validated)
@@ -386,8 +438,10 @@ const query = {
             })
             .then(function (response) {
                 if (response['status'] === 'error') {
+                    query.reset_form();
                     popup.alert(response['message'], 'Error');
                 } else if (response['status'] === 'confirm') {
+                    query.enable_form();
                     popup.confirm(response['message'], 'Confirm', function () {
                         // re-send, but this time for real
                         query.start({'frontend-confirm': true}, true);
@@ -398,6 +452,7 @@ const query = {
                 } else if (response['status'] === 'extra-form') {
                     // new form elements to fill in
                     // some fancy css juggling to make it obvious that these need to be completed
+                    query.enable_form();
                     $('#query-status .message').html('Enter dataset parameters to continue.');
                     let target_top = $('#datasource-form')[0].offsetTop + $('#datasource-form')[0].offsetHeight - 50;
 
@@ -412,7 +467,6 @@ const query = {
                         });
                     });
                 } else {
-                    query.disable_form();
                     $('#query-status .message').html('Query submitted, waiting for results');
                     query.query_key = response['key'];
                     query.check(query.query_key);
@@ -426,7 +480,8 @@ const query = {
                 }
             })
             .catch(function (e) {
-                popup.alert('4CAT could not process the file you are trying to upload.', 'Error');
+                query.enable_form();
+                popup.alert('4CAT could not process your dataset.', 'Error');
             });
     },
 
@@ -456,8 +511,8 @@ const query = {
                     applyProgress($('#query-status'), 100);
                     let keyword = json.label;
 
-                    $('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
-                    query.enable_form();
+                    $('#query-results').append('<li><a href="../results/' + json.key + '/">' + keyword + ' (' + json.rows + ' items)</a></li>');
+                    query.reset_form();
                     popup.alert('Query for \'' + keyword + '\' complete!', 'Success');
                 } else {
                     let dots = '';
@@ -481,6 +536,11 @@ const query = {
     },
 
     check_resultpage: function () {
+        if (!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         let unfinished = $('.dataset-unfinished');
         if (unfinished.length === 0) {
             return;
@@ -525,7 +585,9 @@ const query = {
             return;
         }
 
-        let queued = $('.child-wrapper.running');
+        // first selector is top-level child datasets (always visible)
+        // second selector is children of children (only visible when expanded)
+        let queued = $('.top-level > .child-wrapper.running, div[aria-expanded=true] > ol > li.child-wrapper.running');
         if (queued.length === 0) {
             return;
         }
@@ -551,6 +613,7 @@ const query = {
                     $('#dataset-results').html(child.resultrow_html);
 
                     target.replaceWith(update);
+                    ui_helpers.conditional_form.init();
                     update.addClass('updated');
                     target.remove();
                 });
@@ -581,17 +644,17 @@ const query = {
 
                 for (let i = 0; i < json.length; i += 1) {
                     search_queue_length += json[i]['count'];
-                    search_queue_notice += " <span class='property-badge'>" + json[i]['jobtype'].replace('-search', '') + ' (' + json[i]['count'] + ')' + '</span>'
+                    search_queue_notice += " <span class='property-badge'>" + json[i]['processor_name'] + ' (' + json[i]['count'] + ')' + '</span>'
                 }
 
                 if (search_queue_length == 0) {
                     search_queue_box.html('Search queue is empty.');
                     search_queue_list.html('');
                 } else if (search_queue_length == 1) {
-                    search_queue_box.html('Currently processing 1 search query: ');
+                    search_queue_box.html('Currently collecting 1 dataset: ');
                     search_queue_list.html(search_queue_notice);
                 } else {
-                    search_queue_box.html('Currently processing ' + search_queue_length + ' search queries: ');
+                    search_queue_box.html('Currently collecting ' + search_queue_length + ' datasets: ');
                     search_queue_list.html(search_queue_notice);
                 }
             },
@@ -723,6 +786,8 @@ const query = {
                     multichoice.makeMultichoice();
                     multichoice.makeMultiSelect();
                 }
+
+                ui_helpers.conditional_form.manage(document.getElementById('query-form'));
             },
             'error': function () {
                 $('#datasource-select').parents('form').trigger('reset');
@@ -764,6 +829,16 @@ const query = {
             $(board_specific).prop('disabled', true);
             $('.form-element[data-board-specific*="' + board + '"]').prop('disabled', false);
             $('.form-element[data-board-specific*="' + board + '"]').show();
+        }
+
+        // there is one data source where the anonymisation and labeling
+        // controls are of no use...
+        if($('#query-form').hasClass('import_4cat')) {
+            $('.dataset-anonymisation').hide();
+            $('.dataset-labeling').hide();
+        } else {
+            $('.dataset-anonymisation').show();
+            $('.dataset-labeling').show();
         }
     },
 
@@ -1011,8 +1086,22 @@ const tooltip = {
 
             let width = parseFloat(tooltip_container.css('width').replace('px', ''));
             let height = parseFloat(tooltip_container.css('height').replace('px', ''));
-            tooltip_container.css('top', (position.top - height - 5) + 'px');
-            tooltip_container.css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
+            let top_position = (position.top - height - 5);
+
+            // if out of viewport, position below element instead
+            if(top_position < window.scrollY) {
+                top_position = position.top + parseFloat($(parent).css('height').replace('px', '')) + 5;
+            }
+            tooltip_container.css('top', top_position + 'px');
+
+            // do the same for horizontal placement
+            let hor_position = Math.max(window.scrollX, position.left + (parent_width / 2) - (width / 2));
+            if(hor_position + tooltip_container.width() - window.scrollX > document.documentElement.clientWidth) {
+                const scrollbar_width = window.innerWidth - document.documentElement.clientWidth;
+                console.log(scrollbar_width);
+                hor_position = document.documentElement.clientWidth + window.scrollX - tooltip_container.width() - 5 - scrollbar_width;
+            }
+            tooltip_container.css('left', hor_position + 'px');
         }
     },
 
@@ -1255,7 +1344,7 @@ const multichoice = {
      */
     init: function () {
         // Multichoice inputs need to be loaded dynamically
-        $(document).on('click', '.toggle-button', function () {
+        $(document).on('click', '.toggle-button, .processor-queue-button', function () {
             if ($(".multichoice-wrapper, .multi-select-wrapper").length > 0) {
                 multichoice.makeMultichoice();
                 multichoice.makeMultiSelect();
@@ -1426,6 +1515,10 @@ const ui_helpers = {
         //table controls
         $(document).on('input', '.copy-from', ui_helpers.table_control);
 
+        //mighty morphing web forms
+        $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select, #query-form input, #query-form select', ui_helpers.conditional_form.manage);
+        ui_helpers.conditional_form.init();
+
         //iframe flexible sizing
         $('iframe').on('load', ui_helpers.fit_iframe);
 
@@ -1588,7 +1681,6 @@ const ui_helpers = {
         }
     },
 
-
     /**
      * Ask for confirmation before doing whatever happens when the event goes through
      *
@@ -1646,11 +1738,13 @@ const ui_helpers = {
      * @param force_close  Assume the event is un-toggling something regardless of current state
      */
     toggleButton: function (e, force_close = false) {
-        if (!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') {
+        if ((!e.target.hasAttribute('type') || e.target.getAttribute('type') !== 'checkbox') && typeof e.preventDefault === "function") {
             e.preventDefault();
         }
 
-        let target = '#' + $(this).attr('aria-controls');
+        const button_target = $(e.target).is('.toggle-button, .processor-queue-button') ? $(e.target) : $(e.target).parents('.toggle-button, .processor-queue-button')[0];
+
+        let target = '#' + $(button_target).attr('aria-controls');
         let is_open = $(target).attr('aria-expanded') !== 'false';
 
         if (is_open || force_close) {
@@ -1705,7 +1799,7 @@ const ui_helpers = {
         e.preventDefault();
         let link = e.target;
         let target_id = link.getAttribute('aria-controls');
-        let controls = link.parentNode.parentNode;
+        let controls = find_parent(link, '.tab-controls');
         controls.querySelector('.highlighted').classList.remove('highlighted');
         link.parentNode.classList.add('highlighted');
         controls.parentNode.parentNode.querySelector('.tab-container *[aria-expanded=true]').setAttribute('aria-expanded', 'false');
@@ -1733,6 +1827,93 @@ const ui_helpers = {
                 element.value = value;
             }
         })
+    },
+
+    conditional_form: {
+        /**
+         * Set visibility of form elements when they are loaded
+         */
+        init: function(form=null) {
+            document.querySelectorAll('*[data-requires]').forEach((element) => {
+                const form = $(element).parents('form')[0];
+                if(form.getAttribute('data-form-managed')) {
+                    return;
+                }
+                ui_helpers.conditional_form.manage({target: element});
+            });
+        },
+
+        /**
+         * Manage visibility of form elements when forms are interacted with
+
+         * @param e  Event, or a form object
+         */
+        manage: function (e) {
+            let form;
+
+            if('tagName' in e && e.tagName === 'FORM') {
+                form = e;
+            } else {
+                form = $(e.target).parents('form')[0];
+            }
+
+            form.setAttribute('data-form-managed', true);
+            const conditionals = form.querySelectorAll('*[data-requires]');
+
+            if (!conditionals) {
+                return;
+            }
+
+            conditionals.forEach((element) => {
+                let requirement = RegExp(/([a-zA-Z0-9_-]+)([!=$~^]+)(.*)/g).exec(element.getAttribute('data-requires'));
+                if (!requirement || requirement.length !== 4) { // assume 'field is not empty'
+                    requirement = [null, element.getAttribute('data-requires'), '!=', ''];
+                }
+
+                const negate = requirement[2] === '!=';
+                const other_field = 'option-' + requirement[1];
+                const other_element = form.querySelector("*[name='" + other_field + "']");
+
+                if (!other_element) { //invalid reference
+                    return;
+                }
+
+                const other_value = other_element.value;
+
+                let requirement_met = false;
+                if (other_element.getAttribute('type') === 'checkbox') {
+                    // checkboxes are a bit different (and simpler)
+                    const other_is_checked = other_element.checked;
+                    if(requirement[2] === '!=') {
+                        if((other_is_checked && ['', 'false'].includes(requirement[3])) || (!other_is_checked && ['checked', 'true'].includes(requirement[3]))) {
+                            requirement_met = true;
+                        }
+                    } else {
+                        if((other_is_checked && ['checked', 'true'].includes(requirement[3])) || (!other_is_checked && ['', 'false'].includes(requirement[3]))) {
+                            requirement_met = true;
+                        }
+                    }
+                } else {
+                    if(requirement[2] === '!=') {
+                        requirement_met = other_value !== requirement[3];
+                    } else if(requirement[2] === '^=') {
+                        requirement_met = other_value.startsWith(requirement[3]);
+                    } else if(requirement[2] === '~=') {
+                        requirement_met = other_value.indexOf(requirement[3]) >= 0;
+                    } else if(requirement[2] === '$=') {
+                        requirement_met = other_value.endsWith(requirement[3]);
+                    } else if(['==', '='].includes(requirement[2])) {
+                        requirement_met = other_value === requirement[3];
+                    }
+                }
+
+                if (requirement_met) {
+                    $(element).show();
+                } else {
+                    $(element).hide();
+                }
+            });
+        }
     },
 
     /**
@@ -1797,7 +1978,7 @@ function FileReaderPromise(file) {
         fr.onload = () => {
             resolve(fr.result);
         }
-        fr.readAsArrayBuffer(file);
+        fr.readAsText(file);
     });
 }
 
@@ -1826,4 +2007,15 @@ function hsv2hsl(h, s, v) {
     l /= 2;
 
     return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
+}
+
+function find_parent(element, selector) {
+    while(element.parentNode) {
+        element = element.parentNode;
+        if(element.matches(selector)) {
+            return element;
+        }
+    }
+
+    return null;
 }

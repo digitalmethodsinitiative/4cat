@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, HTTPHandler
-from importlib.machinery import SourceFileLoader
 
 from common.config_manager import config
 
@@ -46,7 +45,7 @@ class WebHookLogHandler(HTTPHandler):
         :param logging.LogRecord record:  Log record to send
         """
         try:
-            import http.client, urllib.parse
+            import http.client
             host = self.host
             if self.secure:
                 h = http.client.HTTPSConnection(host, context=self.context)
@@ -108,9 +107,13 @@ class SlackLogHandler(WebHookLogHandler):
             color = "#3CC619"  # green
 
         # simple stack trace
-        # the last 9 frames are not specific to the exception (general logging code etc)
-        # the frame before that is where the exception was raised
-        frames = traceback.extract_stack()[:-9]
+        if record.stack:
+            # this is the stack where the log was called
+            frames = record.stack
+        else:
+            # the last 9 frames are not specific to the exception (general logging code etc)
+            # the frame before that is where the exception was raised
+            frames = traceback.extract_stack()[:-9]
         location = "`%s`" % "` → `".join([frame.filename.split("/")[-1] + ":" + str(frame.lineno) for frame in frames])
 
         # prepare slack webhook payload
@@ -128,18 +131,8 @@ class SlackLogHandler(WebHookLogHandler):
                     "value": "```" + infile.readlines()[record.frame.lineno - 1].strip() + "```",
                     "short": False
                 })
-        except IndexError:
-            pass
-
-        try:
-            module = SourceFileLoader(record.frame.filename.split("/")[-1].split(".")[0], record.frame.filename).load_module()
-            if "__maintainer__" in dir(module):
-                fields.append({
-                    "title": "Code maintainer:",
-                    "value": module.__maintainer__,
-                    "short": False
-                })
-        except ImportError:
+        except (IndexError, AttributeError):
+            # the file is not readable, or the line number is out of bounds
             pass
 
         return {
@@ -174,7 +167,7 @@ class Logger:
     }
     alert_level = "FATAL"
 
-    def __init__(self, output=False, filename='4cat.log'):
+    def __init__(self, logger_name='4cat-backend', output=False, filename='4cat.log', log_level="INFO"):
         """
         Set up log handler
 
@@ -182,6 +175,7 @@ class Logger:
         """
         if self.logger:
             return
+        log_level = self.levels.get(log_level, logging.INFO)
 
         self.print_logs = output
         log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
@@ -191,26 +185,28 @@ class Logger:
         self.log_path = log_folder.joinpath(filename)
         self.previous_report = time.time()
 
-        self.logger = logging.getLogger("4cat-backend")
-        self.logger.setLevel(logging.INFO)
+        self.logger = logging.getLogger(logger_name)
+        self.logger.setLevel(log_level)
 
         # this handler manages the text log files
-        handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
-        handler.setLevel(logging.INFO)
-        handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
-                                               "%d-%m-%Y %H:%M:%S"))
-        self.logger.addHandler(handler)
+        if not self.logger.handlers:
+            handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
+            handler.setLevel(log_level)
+            handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
+                                                   "%d-%m-%Y %H:%M:%S"))
+            self.logger.addHandler(handler)
 
-        # the slack webhook has its own handler, and is only active if the
-        # webhook URL is set
-        try:
-            if config.get("logging.slack.webhook"):
-                slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
-                slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
-                self.logger.addHandler(slack_handler)
-        except Exception:
-            # we *may* need the logger before the database is in working order
-            config.db.rollback()
+            # the slack webhook has its own handler, and is only active if the
+            # webhook URL is set
+            try:
+                if config.get("logging.slack.webhook"):
+                    slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
+                    slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
+                    self.logger.addHandler(slack_handler)
+            except Exception:
+                # we *may* need the logger before the database is in working order
+                if config.db is not None:
+                    config.db.rollback()
 
     def log(self, message, level=logging.INFO, frame=None):
         """
@@ -221,15 +217,24 @@ class Logger:
         :param frame:  Traceback frame. If no frame is given, it is
         extrapolated
         """
-        if self.print_logs and level > logging.DEBUG:
-            print("LOG: %s" % message)
+        if type(frame) is traceback.StackSummary:
+            # Full strack was provided
+            stack = frame
+            frame = stack[-1]
+        else:
+            # Collect the stack (used by Slack)
+            stack = traceback.extract_stack()[:-2]
 
-        # logging can include the full stack trace in the log, but that's a
-        # bit excessive - instead, only include the location the log was called
-        if not frame:
-            frame = traceback.extract_stack()[-3]
+        if frame is None:
+            # Use the last frame in the stack
+            frame = stack[-1]
+        else:
+            # Frame was provided; use it
+            pass
+
+        # Logging uses the location, Slack uses the full stack
         location = frame.filename.split("/")[-1] + ":" + str(frame.lineno)
-        self.logger.log(level, message, extra={"location": location, "frame": frame})
+        self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack})
 
     def debug(self, message, frame=None):
         """

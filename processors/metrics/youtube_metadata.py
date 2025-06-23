@@ -11,7 +11,6 @@ from googleapiclient.errors import HttpError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -34,6 +33,8 @@ class YouTubeMetadata(BasicProcessor):
 	title = "Extract YouTube metadata"  # title displayed in UI
 	description = "Extract information from YouTube videos and channels linked-to in the dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	followups = ["youtube-thumbnails"]
 
 	max_retries = 3
 	sleep_time = 20
@@ -73,7 +74,7 @@ class YouTubeMetadata(BasicProcessor):
 		:param module: Module to determine compatibility with
 		"""
 		# Compatible with every top-level dataset.
-		return module.is_top_dataset()
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
@@ -100,7 +101,6 @@ class YouTubeMetadata(BasicProcessor):
 		self.dataset.update_status("Extracting YouTube links")
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		www_regex = re.compile(r"^www\.")
 
 		for post in self.source_dataset.iterate_items(self):
 
@@ -336,7 +336,7 @@ class YouTubeMetadata(BasicProcessor):
 							ids[channel_id] = [url]
 						else:
 							ids[channel_id].append(url)
-				except Exception as error:
+				except Exception:
 					channel_id = False
 
 		return ids
@@ -365,7 +365,7 @@ class YouTubeMetadata(BasicProcessor):
 				try:
 					query = urllib.parse.urlparse(url)
 				# In large datasets, malformed links occur. Catch these and continue.
-				except ValueError as e:
+				except ValueError:
 					continue
 
 				# youtu.be URLs always reference videos
@@ -424,7 +424,6 @@ class YouTubeMetadata(BasicProcessor):
 		for i, ids_string in enumerate(ids_list):
 
 			retries = 0
-			api_error = ""
 
 			try:
 				# Use YouTubeDL and the YouTube API to request video data
@@ -436,10 +435,11 @@ class YouTubeMetadata(BasicProcessor):
 					self.invalid_api_key = True
 					return results
 			# Google API's also throws other weird errors that might be resolved by retrying, like SSLEOFError
-			except Exception as e:
+			except Exception:
 				time.sleep(self.sleep_time) # Wait a bit before trying again
 				pass
 
+			response = None
 			while retries < self.max_retries:
 				try:
 					if object_type == "video":
@@ -478,23 +478,23 @@ class YouTubeMetadata(BasicProcessor):
 						pass
 
 				# Google API's also throws other weird errors that might be resolved by retrying, like SSLEOFError
-				except Exception as e:
+				except Exception:
 					retries += 1
 					self.dataset.update_status("Error encoutered, sleeping for " + str(self.sleep_time))
 					time.sleep(self.sleep_time) # Wait a bit before trying again
 					pass
 
-			# Do nothing with the results if the requests failed
-			if retries > self.max_retries:
-				if self.api_limit_reached == True:
+			# Do nothing with the results if the requests failed after retries
+			if retries >= self.max_retries:
+				self.dataset.update_status("Failed to get metadata from " + str(ids_string) + " after " + str(retries) + " retries.")
+				if self.api_limit_reached:
 					self.dataset.update_status("Daily YouTube API requests exceeded.")
 
 				return results
 
-			else:
-
+			elif response is not None:
 				# Sometimes there's no results,
-				# and "respoonse" won't have an item key.
+				# and "response" won't have an item key.
 				if "items" not in response:
 					continue
 

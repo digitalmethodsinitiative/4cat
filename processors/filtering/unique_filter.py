@@ -87,7 +87,7 @@ class UniqueFilter(BaseFilter):
 		known_items = set()
 
 		# iterate through posts and see if they match
-		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+		for mapped_item in self.source_dataset.iterate_items(processor=self):
 			unique_item = False
 
 			if match_mode == "all":
@@ -114,7 +114,7 @@ class UniqueFilter(BaseFilter):
 
 			if unique_item:
 				unique += 1
-				yield original_item
+				yield mapped_item.original
 
 			if processed % 500 == 0:
 				self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
@@ -145,6 +145,6 @@ class UniqueFilter(BaseFilter):
 			columns = parent_dataset.get_columns()
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "body" if "body" in columns else None
+			options["columns"]["default"] = "body" if "body" in columns else ""
 
 		return options

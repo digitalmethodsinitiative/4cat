@@ -2,16 +2,16 @@
         </fieldset>
         {% set fieldset.open = False %}
     {% elif settings.type == "info" %}
-        <p class="form-intro">{{ settings.help|markdown|safe }}</p>
+        <div class="form-intro"{% if settings.requires %} data-requires="{{ settings.requires }}"{% endif %}>{{ settings.help|markdown|safe }}</div>
     {% else %}
-        <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}>
+        <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}{% if settings.requires %} data-requires="{{ settings.requires }}"{% endif %}>
             <label for="forminput-{{ option }}">{{ settings.help }}</label>
             <div{% if settings.type == "toggle" %} class="with-tail"{% endif %}>
         {% if settings.type == "toggle" %}
             <input name="option-{{ option }}" id="forminput-{{ option }}" type="checkbox" {% if settings.default %} checked{% endif %}>
-            {% if "tooltip" in settings %}<p class="option-help">{{ settings.tooltip }}</p>{% endif %}
+            {% if "tooltip" in settings %}<p class="option-help">{{ settings.tooltip|markdown(True)|safe }}</p>{% endif %}
         {% elif settings.type == "file" %}
-            <input name="option-{{ option }}" id="forminput-{{ option }}" type="file">
+            <input name="option-{{ option }}" id="forminput-{{ option }}" type="file"{% if settings.multiple %} multiple="true" {% endif %}{% if settings.accept %}accept=".csv"{% endif %}>
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
     	        <p role="tooltip" id="tooltip-option-{{ option }}">
@@ -19,7 +19,7 @@
                 </p>
             {% endif %}
         {% elif settings.type == "string" %}
-            <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min %} min="{{ settings.min }}"{% endif %}{% if settings.max %} max="{{ settings.max }}"{% endif %} type="{% if settings.min or settings.max %}number{% else %}text{% endif %}" value="{{ settings.default }}">
+            <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min %} min="{{ settings.min }}"{% endif %}{% if settings.max %} max="{{ settings.max }}"{% endif %} type="{% if settings.min or settings.max %}number{% elif settings.password %}password{% else %}text{% endif %}" value="{{ settings.default }}">
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
     	        <p role="tooltip" id="tooltip-option-{{ option }}">
@@ -146,6 +146,56 @@
                 </table>
                 <p role="tooltip" class="multiple" id="tooltip-setting-timeout" aria-hidden="true">In seconds; time after which datasets are automatically deleted. 0 or empty for no expiration. WARNING: after changing, newly eligible datasets will be deleted immediately!</p>
                 <p role="tooltip" class="multiple" id="tooltip-setting-optout" aria-hidden="true">Can users opt out of expiration? Overrides global setting.</p>
+            </div>
+        {% elif settings.type == "datasources_table" %}
+            {% set tooltips = {} %}
+            <div class="datasource-toggle-form">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Enabled data sources</th>
+                            {% for column_id, column in settings.columns.items() %}
+                                <th>{{ column.help }}
+                                {% if column.tooltip %}
+                                <button class="tooltip-trigger" aria-controls="tooltip-setting-{{ column_id }}" aria-label="Extended help for option">?</button>
+                                {% set x = tooltips.__setitem__(column_id, column.tooltip) %}
+                                {% endif %}
+                                </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for datasource, datasource_config in datasources_config.items() %}
+                        {% if datasource_config.enabled %}
+                        <tr>
+                            <td>{{ datasource_config.name }}</td>
+                            {% for column_id, column in settings.columns.items() %}
+                            <td>
+                                {% set column_value = "" %}
+                                {% if datasource in settings.default and settings.default[datasource][column_id] %}
+                                    {% set column_value = settings.default[datasource][column_id] %}
+                                {% endif %}
+                                {% if column.type == "string" %}
+                                    <input type="text" name="option-{{ option }}-{{ datasource }}-{{ column_id }}" value="{{ column_value }}">
+                                {% elif column.type == "toggle" %}
+                                    <input type="checkbox" name="option-{{ option }}-{{ datasource }}-{{ column_id }}" {% if column_value == true %}checked{% endif %}>
+                                {% elif column.type == "choice" %}
+                                    <select name="option-{{ option }}-{{ datasource }}-{{ column_id }}">
+                                    {% for value, label in column.options.items() %}
+                                        <option value="{{ value }}" {% if column_value == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                    </select>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% for tooltip, tooltip_text in tooltips.items() %}
+                <p role="tooltip" class="multiple" id="tooltip-setting-{{ tooltip }}" aria-hidden="true">{{ tooltip_text }}</p>
+                {% endfor %}
             </div>
         {% endif %}
             </div>

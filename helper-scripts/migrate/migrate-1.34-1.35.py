@@ -5,13 +5,13 @@ import os
 
 from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 from common.lib.database import Database
 from common.lib.logger import Logger
 
 log = Logger(output=True)
 
-import configparser
+import configparser  # noqa: E402
 ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
 db_config = ini["DATABASE"]

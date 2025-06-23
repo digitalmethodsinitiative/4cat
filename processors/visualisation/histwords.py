@@ -155,7 +155,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # this should make filtering for common words a bit faster further down
         self.dataset.update_status("Sorting vocabulary")
         common_vocab = list(common_vocab)
-        common_vocab.sort(key=lambda w: sum([model.get_vecattr(w, "count") for model in models.values()]), reverse=True)
+
+        # this trips Flake8 for some reason, can ignore
+        common_vocab.sort(key=lambda w: sum([model.get_vecattr(w, "count") for model in models.values()]), reverse=True)  # noqa: F821
 
         # initial boundaries of 2D space (to be adjusted later based on t-sne
         # outcome)
@@ -243,6 +245,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 vectors = tsne.fit_transform(vectors)
             except ValueError:
                 self.dataset.finish_with_error("Insufficient data to reduce to 2D. The word embeddings model may be too small to visualise properly.")
+                return
         elif reduction_method == "TruncatedSVD":
             # standard sklearn parameters made explicit
             svd = TruncatedSVD(n_components=2, algorithm="randomized", n_iter=5, random_state=0)

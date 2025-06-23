@@ -6,8 +6,9 @@ import json
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, DataSetException
 from common.lib.helpers import UserInput
+from common.lib.item_mapping import MappedItem
 import ural
 
 __author__ = "Stijn Peeters"
@@ -43,9 +44,14 @@ class DatasetMerger(BasicProcessor):
                 "remove": "Remove duplicates",
                 "keep": "Keep duplicates"
             },
-            "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their ID "
-                       "is identical, regardless of the value of other properties",
+            "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their "
+                       "`id` field is identical, regardless of the value of other properties.",
             "default": "remove"
+        },
+        "label": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Dataset name",
+            "tooltip": "Name of the merged dataset. If left empty, a name will be generated."
         }
     }
 
@@ -59,7 +65,7 @@ class DatasetMerger(BasicProcessor):
         return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
 
     @staticmethod
-    def get_dataset_from_url(url, db):
+    def get_dataset_from_url(url, db, modules=None):
         """
         Get dataset object based on dataset URL
 
@@ -67,11 +73,34 @@ class DatasetMerger(BasicProcessor):
 
         :param str url:  Dataset URL
         :param db:  Database handler (to retrieve metadata)
+        :param modules:  Modules handler (pass through to DataSet)
         :return DataSet:  The dataset
         """
+        if not url:
+            raise DataSetException("URL empty or not provided")
+
         source_url = ural.normalize_url(url)
         source_key = source_url.split("/")[-1]
-        return DataSet(key=source_key, db=db)
+        return DataSet(key=source_key, db=db, modules=modules)
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        Sets the default merged dataset name to a name based on the primary
+        dataset's current name.
+
+        :param DataSet parent_dataset:  Parent dataset
+        :param user:  User (passed by Flask in webtool context)
+        :return dict:  Processor options
+        """
+        options = cls.options
+
+        if parent_dataset and isinstance(parent_dataset, DataSet):
+            options["label"]["default"] = f"(Merged) {parent_dataset.get_label()}"
+
+        return options
 
     def process(self):
         """
@@ -83,11 +112,17 @@ class DatasetMerger(BasicProcessor):
         """
         source_datasets = [self.source_dataset]
         total_items = self.source_dataset.num_rows
-        for source_dataset in self.parameters.get("source").replace("\n", ",").split(","):
+        warnings = {}
+
+        for source_dataset in self.parameters.get("source").strip().replace("\n", ",").split(","):
             source_dataset_url = source_dataset.strip()
+            if not source_dataset_url:
+                # trailing commas, etc - skip
+                continue
+
             try:
-                source_dataset = self.get_dataset_from_url(source_dataset_url, self.db)
-            except TypeError:
+                source_dataset = self.get_dataset_from_url(source_dataset_url, self.db, modules=self.modules)
+            except DataSetException:
                 return self.dataset.finish_with_error(f"Dataset URL '{source_dataset_url} not found - cannot perform "
                                                       f"merge.")
 
@@ -113,6 +148,9 @@ class DatasetMerger(BasicProcessor):
                 total_items += source_dataset.num_rows
                 source_datasets.append(source_dataset)
 
+        if len(source_datasets) <= 1:
+            return self.dataset.finish_with_error("You need to provide at least one valid URL for a source dataset.")
+
         # clean up parameters
         self.dataset.parameters = {**self.dataset.parameters, "source": ", ".join([d.key for d in source_datasets])}
 
@@ -130,43 +168,71 @@ class DatasetMerger(BasicProcessor):
         seen_ids = set()
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
             for dataset in source_datasets:
-                for original_item, mapped_item in dataset.iterate_mapped_items():
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while mapping duplicates")
+                warnings[dataset.key] = {}
 
-                    if not canonical_fieldnames:
-                        canonical_fieldnames = set(mapped_item.keys())
-                        sorted_canonical_fieldnames = list(mapped_item.keys())
-                    else:
-                        item_fieldnames = set(mapped_item.keys())
-                        if item_fieldnames != canonical_fieldnames:
-                            return self.dataset.finish_with_error("Cannot merge datasets - not the same set of "
-                                                                  "attributes per item (are they not the same type or "
-                                                                  "has one been altered by a processor?)")
+                try:
+                    for mapped_item in dataset.iterate_items():
+                        if self.interrupted:
+                            raise ProcessorInterruptedException("Interrupted while mapping duplicates")
 
-                    processed += 1
-                    if self.parameters["merge"] != "keep" and mapped_item.get("id") in seen_ids:
-                        duplicates += 1
-                        continue
+                        if type(mapped_item.mapped_object) is MappedItem:
+                            # use the item data, but also store the warning if
+                            # one was raised during mapping
+                            warning = mapped_item.mapped_object.get_message()
+                            if warning:
+                                if warning not in warnings[dataset.key]:
+                                    warnings[dataset.key][warning] = 0
+                                warnings[dataset.key][warning] += 1
 
-                    seen_ids.add(mapped_item.get("id"))
-                    merged += 1
+                        if not canonical_fieldnames:
+                            canonical_fieldnames = set(mapped_item.keys())
+                            sorted_canonical_fieldnames = list(mapped_item.keys())
+                        else:
+                            item_fieldnames = set(mapped_item.keys())
+                            if item_fieldnames != canonical_fieldnames:
+                                return self.dataset.finish_with_error("Cannot merge datasets - not the same set of "
+                                                                      "attributes per item (are they not the same type or "
+                                                                      "has one been altered by a processor?)")
 
-                    if dataset.get_extension() == "csv":
-                        if not writer:
-                            writer = csv.DictWriter(outfile, fieldnames=sorted_canonical_fieldnames)
-                            writer.writeheader()
+                        processed += 1
+                        if self.parameters["merge"] != "keep" and mapped_item.get("id") in seen_ids:
+                            duplicates += 1
+                            continue
 
-                        writer.writerow(original_item)
+                        seen_ids.add(mapped_item.get("id"))
+                        merged += 1
 
-                    elif dataset.get_extension() == "ndjson":
-                        outfile.write(json.dumps(original_item) + "\n")
+                        if dataset.get_extension() == "csv":
+                            if not writer:
+                                writer = csv.DictWriter(outfile, fieldnames=sorted_canonical_fieldnames)
+                                writer.writeheader()
 
-                    self.update_progress(processed, total_items)
+                            writer.writerow(mapped_item.original)
+
+                        elif dataset.get_extension() == "ndjson":
+                            outfile.write(json.dumps(mapped_item.original) + "\n")
+
+                        self.update_progress(processed, total_items)
+
+                except NotImplementedError:
+                    self.dataset.finish_with_error(f"Datasets comprising {dataset.get_extension()} files cannot be merged. You can only merge NDJSON or CSV datasets.")
+
+        # log any raised warnings to dataset log
+        num_warnings = sum([sum(w.values()) for w in warnings.values()])
+        if num_warnings > 0:
+            for dataset, dataset_warnings in warnings.items():
+                if sum(dataset_warnings.values()) == 0:
+                    continue
+
+                self.dataset.log(f"The following warning(s) were raised while processing items from dataset {dataset}:")
+                for dataset_warning, num_items in dataset_warnings.items():
+                    self.dataset.log(f"  {dataset_warning} ({num_items:,} item(s))")
 
         # phew, finally done
-        self.dataset.update_status(f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped)",
+        self.dataset.update_status(f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped, {num_warnings:,} warnings). See dataset log for details.",
                                    is_final=True)
+
+
         self.dataset.update_progress(1)
 
         self.dataset.finish(processed)
@@ -215,6 +281,11 @@ class DatasetMerger(BasicProcessor):
         # merged dataset has the same type as the original
         if self.source_dataset.parameters.get("datasource"):
             standalone.change_datasource(self.source_dataset.parameters["datasource"])
+
+        if self.parameters.get("label"):
+            standalone.update_label(self.parameters.get("label"))
+        else:
+            standalone.update_label(f"(Merged) {self.source_dataset.get_label()}")
 
         standalone.parameters = {**self.dataset.parameters, "board": "merged"}
         standalone.type = self.source_dataset.type

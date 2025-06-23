@@ -39,6 +39,10 @@
     src: url("../fonts/fsex300-webfont.woff")
 }
 
+@font-face {
+    font-family: 'Inter';
+    src: url("../fonts/Inter-VariableFont_opsz,wght.ttf");
+}
 
 /** --------------------- *
      Basic HTML elements
@@ -470,6 +474,7 @@ nav > ul.flat > li:not(:last-child)::after {
 	position: absolute;
 	max-width: 25em;
 	border: 2px solid var(--contrast-dark);
+    z-index: 10;
 }
 
 *[role=tooltip].force-width, article p[role=toolip].force-width {
@@ -491,6 +496,10 @@ button.tooltip-trigger {
     padding: 0 0.5em;
     border-width: 1px;
     border-color: var(--gray-dark);
+}
+
+p[role=tooltip] > .tooltip-line {
+    display: inline-block;
 }
 
 
@@ -956,6 +965,11 @@ article section.data-overview .description {
     color: var(--contrast-bright);
 }
 
+.pagination .details {
+    margin: 0 auto;
+    text-align: center;
+}
+
 .tabs {
     border-bottom: 1px dotted var(--contrast-dark);
     max-height: 5em;
@@ -1205,4 +1219,12 @@ ol.result-list li.has_results .property-container.analysis a {
 .result-list .child-list > li {
     padding: 0;
     margin: 0.5em 0 0 0;
+}
+
+
+/** --------------------- *
+  Bsky widget
+  * --------------------- */
+#bsky-embed img[alt~='Thumbnail'] {
+    display: none;
 }

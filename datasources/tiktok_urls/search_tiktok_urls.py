@@ -17,7 +17,6 @@ from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
-from common.config_manager import config
 
 class SearchTikTokByID(Search):
     """
@@ -86,6 +85,10 @@ class SearchTikTokByID(Search):
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
+        if not query.get("urls"):
+            # no URLs provided
+            raise QueryParametersException("Missing \"Post URLs\" (\"urls\" parameter). Please provide a list of TikTok video URLs.")
+        
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
@@ -125,7 +128,7 @@ class SearchTikTokByID(Search):
 
 
 class TikTokScraper:
-    proxy_map = {}
+    proxy_map = None
     proxy_sleep = 1
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -142,11 +145,15 @@ class TikTokScraper:
     last_proxy_update = 0
     last_time_proxy_available = None
     no_available_proxy_timeout = 600
+    consecutive_failures = 0
+
+    VIDEO_NOT_FOUND = "oh no, sire, no video was found"
 
     def __init__(self, processor, config):
         """
         :param Processor processor:  The processor using this function and needing updates
         """
+        self.proxy_map = {}
         self.processor = processor
 
     def update_proxies(self):
@@ -324,7 +331,6 @@ class TikTokScraper:
                 if response.status_code == 404:
                     failed += 1
                     self.processor.dataset.log("Video at %s no longer exists (404), skipping" % response.url)
-                    skip_to_next = True
                     continue
 
                 # haven't seen these in the wild - 403 or 429 might happen?
@@ -337,6 +343,10 @@ class TikTokScraper:
                 # now! try to extract the JSON from the page
                 soup = BeautifulSoup(response.text, "html.parser")
                 sigil = soup.select_one("script#SIGI_STATE")
+
+                if not sigil:
+                    # alternatively, the JSON is here
+                    sigil = soup.select_one("script#__UNIVERSAL_DATA_FOR_REHYDRATION__")
 
                 if not sigil:
                     if url not in retries or retries[url] < 3:
@@ -367,9 +377,15 @@ class TikTokScraper:
                     continue
 
                 for video in self.reformat_metadata(metadata):
+                    if video == self.VIDEO_NOT_FOUND:
+                        failed += 1
+                        self.processor.dataset.log(f"Video for {url} not found, may have been removed, skipping")
+                        continue
+
                     if not video.get("stats") or video.get("createTime") == "0":
                         # sometimes there are empty videos? which seems to
                         # indicate a login wall
+
                         self.processor.dataset.log(
                             f"Empty metadata returned for video {url} ({video['id']}), skipping. This likely means that the post requires logging in to view.")
                         continue
@@ -399,6 +415,21 @@ class TikTokScraper:
         :param dict metadata: Metadata extracted from the TikTok video page
         :return:  Yields one dictionary per video
         """
+        # may need some extra parsing to find the item data...
+        if "__DEFAULT_SCOPE__" in metadata and "webapp.video-detail" in metadata["__DEFAULT_SCOPE__"]:
+            try:
+                video = metadata["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"]["itemStruct"]
+            except KeyError as e:
+                if "statusCode" in metadata["__DEFAULT_SCOPE__"]["webapp.video-detail"]:
+                    yield self.VIDEO_NOT_FOUND
+                    return
+                else:
+                    raise e.__class__ from e
+
+            metadata = {"ItemModule": {
+                video["id"]: video
+            }}
+
         if "ItemModule" in metadata:
             for video_id, item in metadata["ItemModule"].items():
                 if "CommentItem" in metadata:
@@ -459,7 +490,7 @@ class TikTokScraper:
                              "https": available_proxy} if available_proxy != "__localhost__" else None
                     session.headers.update(video_download_headers)
                     video_requests[video_download_url] = {
-                        "request": session.get(video_download_url, proxies=proxy, timeout=30),
+                        "request": session.get(video_download_url, proxies=proxy, timeout=30), # not using stream=True here, as it seems slower; possibly due to short video lengths
                         "video_id": video_id,
                         "type": "download",
                     }
@@ -553,6 +584,9 @@ class TikTokScraper:
                         request_metadata["error"] = error_message
                         download_results[video_id] = request_metadata
                         self.processor.dataset.log(error_message)
+                        self.consecutive_failures += 1
+                        if self.consecutive_failures > 5:
+                            raise ProcessorException("Too many consecutive failures, stopping")
                         continue
 
                     try:
@@ -564,8 +598,9 @@ class TikTokScraper:
                         self.processor.dataset.log(error_message)
                         self.processor.dataset.log(video_metadata["source"]["data"].values())
                         continue
-
+                    
                     # Add new download URL to be collected
+                    self.consecutive_failures = 0
                     video_download_urls.append((video_id, url))
                     metadata_collected += 1
                     self.processor.dataset.update_status("Collected metadata for %i/%i videos" %

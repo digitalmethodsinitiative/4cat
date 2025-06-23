@@ -9,7 +9,6 @@ from apiclient.discovery import build
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -28,6 +27,9 @@ class YouTubeThumbnails(BasicProcessor):
 	title = "Download YouTube thumbnails"  # title displayed in UI
 	description = "Downloads the thumbnails of YouTube videos and stores it in a zip archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	media_type = "image"  # media type of the result
+
+	followups = ["youtube-imagewall"]
 	
 	max_retries = 3
 	sleep_time = 10
@@ -85,7 +87,6 @@ class YouTubeThumbnails(BasicProcessor):
 				except Exception as error:
 					self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
 					retries += 1
-					api_error = error
 					time.sleep(self.sleep_time)  # Wait a bit before trying again
 
 			# Do nothing with the results if the requests failed -
@@ -108,8 +109,4 @@ class YouTubeThumbnails(BasicProcessor):
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")
-
-		# Save the count of images for `finish` function
-		image_count = 0
-
 		self.write_archive_and_finish(results_path)

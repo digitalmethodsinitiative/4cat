@@ -6,9 +6,10 @@
 [![Requires Python 3.8](https://img.shields.io/badge/py-v3.8-blue)](https://www.python.org/)
 [![Docker image status](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml)
 
-<p align="center">4CAT has a website at <a href="https://4cat.nl">4cat.nl</a>.</p>
 <p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>
 
+<p align="center">4CAT has a website at <a href="https://4cat.nl">4cat.nl</a>.</p>
+<p align="center"><a href="https://bsky.app/profile/4cat.nl">Follow 4CAT on Bluesky</a> for updates.</p>
 4CAT is a research tool that can be used to analyse and process data from
 online social platforms. Its goal is to make the capture and analysis of data
 from these platforms accessible to people through a web interface, without
@@ -26,39 +27,54 @@ such as the generation and visualisation of word embedding models.
 platforms that are part of the tool, but you can also [add additional data
 sources](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source)
 using 4CAT's Python API. The following data sources are currently supported
-actively and can be used to collect data with 4CAT:
+actively and can be used to collect data with 4CAT directly:
 
 * 4chan and 8kun
-* BitChute
-* Reddit
+* Bluesky
 * Telegram
+* TikTok (from a list of TikTok post URLs)
 * Tumblr
-* Twitter API v2 (Academic and regular tracks)
 
-The following platforms are supported through other tools, with which you can
-collect data to import data into 4CAT for analysis:
+The following platforms are supported through 
+[Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer), with 
+which you can collect data to import into 4CAT for analysis:
 
-* Instagram, TikTok, 9gag, Imgur, LinkedIn, Parler, Douyin and Twitter (via
-  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer))
-* Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) exports)
+* 9gag
+* Douyin
+* Gab
+* Imgur
+* Instagram (posts)
+* LinkedIn
+* Pinterest
+* Threads
+* Thruth.social
+* TikTok (posts and comments)
+* X/Twitter
+* Xiaohangshu
+
+It is also possible to upload data collected with other tools as CSV files, or 
+zip archives of media files (i.e. video, images, and audio). The following 
+tools are explicitly supported but other data can also be uploaded as long as 
+it is formatted as CSV or uses a common media file format:
+
+* Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) or [Facepager](https://github.com/strohne/Facepager) exports)
+* YouTube videos and comments (via the [YouTube Data Tools](https://ytdt.digitalmethods.net/))
+* Weibo (via [Bazhuayu](https://www.bazhuayu.com/))
 
 A number of other platforms have built-in support that is untested, or requires
 e.g. special API access. You can view the [data sources in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-data-sources) or review [the data
 sources' code](https://github.com/digitalmethodsinitiative/4cat/tree/master/datasources)
-in the GitHub repository. It is also possible to import your own CSV files into 
-4CAT for analysis.
+in the GitHub repository.
 
 ## Installation
-You can install 4CAT locally or on a server via Docker or manually. For easiest installation, we reccomend copying our [`docker-compose.yml file`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/docker-compose.yml), [`.env`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/.env) file, and running this terminal command in the folder where those files have been saved:
+You can install 4CAT locally or on a server via Docker or manually. For easiest installation, we recommend copying our [`docker-compose.yml file`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/docker-compose.yml), [`.env`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/.env) file, and running this terminal command in the folder where those files have been saved:
 
 ```
 docker-compose up -d
 ```
 
 In depth instructions on both Docker installation and manual installation can be found [in our
-wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
-
-A video walkthrough installing 4CAT via Docker can be found on [YouTube here](https://youtu.be/oWsB7bvNfOY).
+wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT). A video walkthrough installing 4CAT via Docker can be found on [YouTube here](https://youtu.be/oWsB7bvNfOY).
 
 Currently scraping of 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 

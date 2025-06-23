@@ -1,9 +1,8 @@
 """
 General helper functions for Flask templating and 4CAT views
 """
-import datetime
+import markdown
 import colorsys
-import math
 import csv
 import re
 
@@ -23,7 +22,7 @@ class Pagination(object):
 	Provide pagination
 	"""
 
-	def __init__(self, page, per_page, total_count, route="show_results"):
+	def __init__(self, page, per_page, total_count, route="dataset.show_results", route_args=None):
 		"""
 		Set up pagination object
 
@@ -36,6 +35,7 @@ class Pagination(object):
 		self.per_page = per_page
 		self.total_count = total_count
 		self.route = route
+		self.route_args = route_args if route_args else {}
 
 	@property
 	def pages(self):
@@ -94,30 +94,6 @@ def error(code=200, **kwargs):
 	response.status_code = code
 	return response
 
-
-def string_to_timestamp(string):
-	"""
-	Convert dd-mm-yyyy date to unix time
-
-	:param string: Date string to parse
-	:return: The unix time, or 0 if value could not be parsed
-	"""
-	bits = string.split("-")
-	if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", string):
-		bits = list(reversed(bits))
-
-	if len(bits) != 3:
-		return 0
-
-	try:
-		day = int(bits[0])
-		month = int(bits[1])
-		year = int(bits[2])
-		date = datetime.datetime(year, month, day)
-	except ValueError:
-		return 0
-
-	return int(date.timestamp())
 
 def pad_interval(intervals, first_interval=None, last_interval=None):
 	"""
@@ -223,7 +199,7 @@ def make_html_colour(rgb):
 def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="favicon.ico"):
 	"""
 	Converts an RGBA image to a different color by first converting to black and then colorizing the image
-	and readding the alpha stream. It works best with Black and White images (already colored images appear
+	and re-adding the alpha stream. It works best with Black and White images (already colored images appear
 	washed out).
 
 	:param str/RGB color:   Accepts either a string represening a color from ImageColor.colormap or a
@@ -232,7 +208,7 @@ def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="f
 	:param str output_filepath :     String path to save new image
 	"""
 	possible_colors = [k for k, v in ImageColor.colormap.items()]
-	if (type(color) != tuple or len(color) != 3) and (color not in possible_colors):
+	if (type(color) is not tuple or len(color) != 3) and (color not in possible_colors):
 		raise Exception("Color not available")
 
 	img = Image.open(input_filepath)
@@ -298,25 +274,6 @@ def generate_css_colours(force=False):
 	)
 
 
-def get_preview(query):
-	"""
-	Generate a data preview of 25 rows of a results csv
-	
-	:param query 
-	:return list: 
-	"""
-	preview = []
-	with query.get_results_path().open(encoding="utf-8") as resultfile:
-		posts = csv.DictReader(resultfile)
-		i = 0
-		for post in posts:
-			i += 1
-			preview.append(post)
-			if i > 25:
-				break
-	return preview
-
-
 def format_chan_post(post):
 	"""
 	Format a plain-text imageboard post post for HTML display
@@ -376,3 +333,11 @@ def setting_required(setting, required_value=True):
 		return decorated_view
 
 	return checking_decorator
+
+
+def parse_markdown(text, trim_container=False):
+	val = markdown.markdown(text)
+	if trim_container:
+		val = re.sub(r"^<p>", "", val)
+		val = re.sub(r"</p>$", "", val)
+	return val

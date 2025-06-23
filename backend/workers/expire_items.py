@@ -3,12 +3,11 @@ Delete old items
 """
 import datetime
 import time
-import json
 import re
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
-from common.config_manager import config
+from common.lib.exceptions import DataSetNotFoundException, WorkerInterruptedException
 
 from common.lib.user import User
 
@@ -55,10 +54,18 @@ class ThingExpirer(BasicWorker):
 		""")
 
 		for dataset in datasets:
-			dataset = DataSet(key=dataset["key"], db=self.db)
-			if dataset.is_expired():
-				self.log.info(f"Deleting dataset {dataset.key} (expired)")
-				dataset.delete()
+			if self.interrupted:
+				raise WorkerInterruptedException("Interrupted while expiring datasets")
+
+			try:
+				dataset = DataSet(key=dataset["key"], db=self.db)
+				if dataset.is_expired():
+					self.log.info(f"Deleting dataset {dataset.key} (expired)")
+					dataset.delete()
+
+			except DataSetNotFoundException:
+				# dataset already deleted I guess?
+				pass
 
 	def expire_users(self):
 		"""
@@ -76,6 +83,9 @@ class ThingExpirer(BasicWorker):
 		now = datetime.datetime.now()
 
 		for expiring_user in expiring_users:
+			if self.interrupted:
+				raise WorkerInterruptedException("Interrupted while expiring users")
+
 			user = User.get_by_name(self.db, expiring_user["name"])
 			username = user.data["name"]
 

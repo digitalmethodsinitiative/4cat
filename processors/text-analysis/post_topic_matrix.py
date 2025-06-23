@@ -26,6 +26,8 @@ class TopicModelWordExtractor(BasicProcessor):
     description = "Uses the LDA model to predict to which topic each item or sentence belongs and creates a CSV file showing this information. Each line represents one 'document'; if tokens are grouped per 'item' and only one column is used (e.g. only the 'body' column), there is one row per post/item, otherwise a post may be represented by multiple rows (for each sentence and/or column used)."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    followups = []
+
     options = {
         "include_top_features": {
             "type": UserInput.OPTION_TOGGLE,
@@ -34,9 +36,9 @@ class TopicModelWordExtractor(BasicProcessor):
             "tooltip": 'This may be useful in better understanding your topics.',
         },
         "columns": {
-            "type": UserInput.OPTION_TEXT,
+            "type": UserInput.OPTION_MULTI,
             "help": "Extra column(s) to include from original data",
-            "default": "id",
+            "default": ["id"],
             "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always included."
         },
     }
@@ -111,13 +113,22 @@ class TopicModelWordExtractor(BasicProcessor):
         token_metadata_parameters = token_metadata.pop('parameters')
         model_metadata_parameters = model_metadata.pop('parameters')
 
+        # Check token metadata is correct format
+        first_key = next(iter(token_metadata))
+        for interval, token_data in token_metadata[first_key].items():
+            if any([required_keys not in token_data for required_keys in ['interval', 'document_numbers', 'filename']]):
+                self.dataset.finish_with_error("Token metadata is not in correct format; please re-run tokenise-posts processor if not run since 4CAT update")
+                return
+            break
+
         # Collect column names of matrix
         post_column_names = list(set(['id', 'thread_id', 'timestamp', 'author', 'body'] + self.parameters.get('columns', []) + token_metadata_parameters.get('columns')))
         model_column_names = ['post_id', 'document_id', 'interval', 'top_topic(s)']
 
-        # Check if multiple documents exist per post/item and add 'document' column if needed
+        # Check if multiple documents exist per post/item and add a note if so
+        # TODO: We do not have the actual documents; we would either need to store them when tokenized or re-do the sentance split and, possibly, the columns if multiple were used.
         if token_metadata_parameters.get('grouped_by') != 'item' or len(token_metadata_parameters.get('columns')) > 1:
-            model_column_names.append('document')
+            model_column_names.append('original_document_split')
             multiple_docs_per_post = True
         else:
             multiple_docs_per_post = False
@@ -141,39 +152,48 @@ class TopicModelWordExtractor(BasicProcessor):
                     raise ProcessorInterruptedException("Interrupted while writing results file")
 
                 # Grab metadata related to post
-                token_data = token_metadata[str(post.get('id'))]
-                model_data = model_metadata[token_data.get('filename')]
-                interval = token_data['interval']
+                if post.get('id') not in token_metadata:
+                    # post has no tokens...
+                    continue
 
-                combined_data = {'post_id': str(post.get('id')), 'interval':interval}
-                # Add original post data
-                for post_column in post_column_names:
-                    combined_data[post_column] = post.get(post_column)
+                post_intervals = token_metadata[str(post.get('id'))]
 
-                # Add topic data
-                # Collect relevant topics for the model used on this post
-                # NOTE: adding 1 to the topic numbers to be constent with topic_words processor (and normal people don't start counting with 0)
-                if self.parameters.get('include_top_features'):
-                    related_topic_columns = [interval + '_topic_' + str(i+1) + '_' + '-'.join([f for f in model_metadata[interval+'.json']['model_topics'][str(i)]['top_five_features']]) for i in range(model_metadata_parameters.get('topics'))]
-                else:
-                    related_topic_columns = [interval + '_topic_' + str(i+1) for i in range(model_metadata_parameters.get('topics'))]
+                # Posts may have multiple intervals
+                for interval, token_data in post_intervals.items():
+                    model_data = model_metadata[token_data.get('filename')]
+                    interval = token_data['interval']
 
-                # Collect predictions for post
-                for document_number in token_data['document_numbers']:
-                    combined_data['id'] = str(post.get('id')) + '-' + str(document_number)
-                    combined_data['document_id'] = document_number
+                    combined_data = {'post_id': str(post.get('id')), 'interval':interval}
+                    # Add original post data
+                    for post_column in post_column_names:
+                        combined_data[post_column] = post.get(post_column)
 
-                    # Add specific document resulting in prediction if unclear (i.e. multiple documents per item/post)
-                    if multiple_docs_per_post:
-                        combined_data['document'] = token_data['documents'][str(document_number)]
+                    # Add topic data
+                    # Collect relevant topics for the model used on this post
+                    # NOTE: adding 1 to the topic numbers to be constent with topic_words processor (and normal people don't start counting with 0)
+                    if self.parameters.get('include_top_features'):
+                        related_topic_columns = [interval + '_topic_' + str(i+1) + '_' + '-'.join([f for f in model_metadata[interval+'.json']['model_topics'][str(i)]['top_five_features']]) for i in range(model_metadata_parameters.get('topics'))]
+                    else:
+                        related_topic_columns = [interval + '_topic_' + str(i+1) for i in range(model_metadata_parameters.get('topics'))]
 
-                    doc_predictions = model_data['predictions'][str(document_number)]
-                    combined_data['top_topic(s)'] = ', '.join([str(int(key) + 1) for key, value in doc_predictions.items() if value == max(doc_predictions.values())])  # add one to topic key here as well
-                    for i, topic in enumerate(related_topic_columns):
-                        combined_data[topic] = doc_predictions[str(i)]
+                    # Collect predictions for post
+                    for document_number in token_data['document_numbers']:
+                        combined_data['id'] = str(post.get('id')) + '-' + str(document_number)
+                        combined_data['document_id'] = document_number
 
-                    writer.writerow(combined_data)
-                    index += 1
+                        # Note if original document was split (by sentance or using multiple columns in tokenizer) resulting in prediction if unclear (i.e. multiple documents per item/post)
+                        #TODO: Either store the original document when tokenized or re-do the sentance split and, possibly, the columns if multiple were used.
+                        # The second seems unfeasible, but the first would require somehow storing the split documents and then retrieving them here by post_id and document_id; give me a database guys!
+                        if multiple_docs_per_post:
+                            combined_data['original_document_split'] = token_data['multiple_docs']
+
+                        doc_predictions = model_data['predictions'][str(document_number)]
+                        combined_data['top_topic(s)'] = ', '.join([str(int(key) + 1) for key, value in doc_predictions.items() if value == max(doc_predictions.values())])  # add one to topic key here as well
+                        for i, topic in enumerate(related_topic_columns):
+                            combined_data[topic] = doc_predictions[str(i)]
+
+                        writer.writerow(combined_data)
+                        index += 1
 
         self.dataset.update_status("Results saved")
         self.dataset.finish(index)

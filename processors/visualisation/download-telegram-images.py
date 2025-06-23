@@ -7,13 +7,16 @@ import json
 
 from pathlib import Path
 
+import telethon.errors
 from telethon import TelegramClient
+from telethon.errors import TimedOutError, BadRequestError
 
 from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, timify_long
 from common.lib.dataset import DataSet
+from processors.visualisation.download_images import ImageDownloader
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -34,7 +37,10 @@ class TelegramImageDownloader(BasicProcessor):
                   "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image"  # media type of the result
     flawless = True
+
+    followups = ImageDownloader.followups
 
     config = {
         "image-downloader-telegram.max": {
@@ -58,22 +64,34 @@ class TelegramImageDownloader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
+        # Get max number of images; if set to 0, there is no limit
         max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
 
-        return {
+        options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "No. of images (max %s)" % max_number_images,
+                "help": "No. of images" if max_number_images == 0 else f"No. of images (max {max_number_images})",
                 "default": 100,
-                "min": 0,
-                "max": max_number_images
+                "min": 0 if max_number_images == 0 else 1,
+                "tooltip": f"Maximum number of images to download{' (set to 0 to download all images)' if max_number_images == 0 else ''}"
             },
             "video-thumbnails": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Include videos (as thumbnails)",
                 "default": False
+            },
+            "website-thumbnails": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Include link thumbnails",
+                "default": False,
+                "tooltip": "This includes e.g. thumbnails for linked YouTube videos"
             }
         }
+        if max_number_images != 0:
+            # Only add max option if it is not set to 0 (unlimited)
+            options["amount"]["max"] = max_number_images
+
+        return options
 
 
     @classmethod
@@ -126,6 +144,7 @@ class TelegramImageDownloader(BasicProcessor):
         session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
         amount = self.parameters.get("amount")
         with_thumbnails = self.parameters.get("video-thumbnails")
+        with_websites = self.parameters.get("website-thumbnails")
         client = None
 
         # we need a session file, otherwise we can't retrieve the necessary data
@@ -148,11 +167,17 @@ class TelegramImageDownloader(BasicProcessor):
         # for. Right now, that's everything with a non-empty `photo` attachment
         # or `video` if we're also including thumbnails
         messages_with_photos = {}
-        downloadable_types = ("photo",) if not with_thumbnails else ("photo", "video")
+        downloadable_types = ["photo"]
+        if with_thumbnails:
+            downloadable_types.append("video")
+        if with_websites:
+            downloadable_types.append("url")
+
         total_media = 0
         self.dataset.update_status("Finding messages with image attachments")
         for message in self.source_dataset.iterate_items(self):
             if self.interrupted:
+                await client.disconnect()
                 raise ProcessorInterruptedException("Interrupted while processing messages")
 
             if not message.get("attachment_data") or message.get("attachment_type") not in downloadable_types:
@@ -161,7 +186,7 @@ class TelegramImageDownloader(BasicProcessor):
             if message["chat"] not in messages_with_photos:
                 messages_with_photos[message["chat"]] = []
 
-            messages_with_photos[message["chat"]].append(int(message["id"]))
+            messages_with_photos[message["chat"]].append(int(message["id"].split("-")[-1]))
             total_media += 1
 
             if amount and total_media >= amount:
@@ -176,14 +201,21 @@ class TelegramImageDownloader(BasicProcessor):
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while downloading images")
 
+                    if not message:
+                        # message no longer exists
+                        self.dataset.log("Could not download image for message - message is unavailable (it "
+                                         "may have been deleted)")
+                        self.flawless = False
+                        break
+
                     success = False
                     try:
                         # it's actually unclear if images are always jpegs, but this
                         # seems to work
-                        self.dataset.update_status("Downloading media %i/%i" % (media_done, total_media))
+                        self.dataset.update_status(f"Downloading media {media_done:,}/{total_media:,}")
                         self.dataset.update_progress(media_done / total_media)
 
-                        path = self.staging_area.joinpath("%s-%i.jpeg" % (entity, message.id))
+                        path = self.staging_area.joinpath(f"{entity}-{message.id}.jpeg")
                         filename = path.name
                         if hasattr(message.media, "photo"):
                             await message.download_media(str(path))
@@ -192,23 +224,39 @@ class TelegramImageDownloader(BasicProcessor):
                             await client.download_media(message, str(path), thumb=-1)
                         msg_id = message.id
                         success = True
-                    except (AttributeError, RuntimeError, ValueError, TypeError) as e:
-                        filename = "%s-index-%i" % (entity, media_done)
-                        msg_id = str(message.id) if hasattr(message, "id") else "with index %i" % media_done
-                        self.dataset.log("Could not download image for message %s (%s)" % (msg_id, str(e)))
+                    except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError) as e:
+                        filename = f"{entity}-index-{media_done}"
+                        msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
+                        self.dataset.log(f"Could not download image for message {msg_id} ({e})")
                         self.flawless = False
 
-                    media_done += 1
-                    self.metadata[filename] = {
-                        "filename": filename,
-                        "success": success,
-                        "from_dataset": self.source_dataset.key,
-                        "post_ids": [msg_id]
-                    }
+                    finally:
+                        media_done += 1
+                        self.metadata[filename] = {
+                            "filename": filename,
+                            "success": success,
+                            "from_dataset": self.source_dataset.key,
+                            "post_ids": [msg_id]
+                        }
+
+            except BadRequestError as e:
+                self.dataset.log(f"Couldn't retrieve images for {entity} - the channel is no longer accessible ({e})")
+                self.flawless = False
+
+            except telethon.errors.FloodError as e:
+                later = "later"
+                if hasattr(e, "seconds"):
+                    later = f"in {timify_long(e.seconds)}"
+                self.dataset.update_status(f"Rate-limited by Telegram after downloading {media_done-1:,} image(s); "
+                                           f"halting download process. Try again {later}.", is_final=True)
+                self.flawless = False
+                break
                     
             except ValueError as e:
-                self.dataset.log("Couldn't retrieve images for %s, it probably does not exist anymore (%s)" % (entity, str(e)))
+                self.dataset.log(f"Couldn't retrieve images for {entity}, it probably does not exist anymore ({e})")
                 self.flawless = False
+
+        await client.disconnect()
 
     @staticmethod
     def cancel_start():
@@ -234,7 +282,7 @@ class TelegramImageDownloader(BasicProcessor):
         """
         row = {
             "number_of_posts_with_image": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
+            "post_ids": ", ".join(map(str, data.get("post_ids", []))),
             "filename": filename,
             "download_successful": data.get('success', "")
         }

@@ -2,7 +2,6 @@
 Filter posts by lexicon
 """
 import re
-from pathlib import Path
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
@@ -136,7 +135,7 @@ class LexicalFilter(BaseFilter):
         # keep some stats
         processed = 0
         matching_items = 0
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(processor=self):
             if not mapped_item.get("body", None):
                 continue
 
@@ -169,7 +168,7 @@ class LexicalFilter(BaseFilter):
 
             # if one does, record which match, and save it to the output
             # TODO: this is a conversion and will not show via map_items() for NDJSONs
-            original_item["4cat_matching_lexicons"] = ",".join(matching_lexicons)
+            mapped_item.original["4cat_matching_lexicons"] = ",".join(matching_lexicons)
 
             matching_items += 1
-            yield original_item
+            yield mapped_item.original

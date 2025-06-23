@@ -1,0 +1,160 @@
+* {
+	color: black;
+}
+
+body {
+	background-color: rgb(244, 242, 238);
+}
+
+.posts li.post {
+	position: relative;
+	margin: 0 auto;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	padding: 10px;
+	max-width: 555px;
+	background-color: white;
+	color: #2d2d2d;
+	line-height: 1.5;
+	font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-size: 14px;
+	border: 1px solid rgb(227, 226, 223);
+	border-radius: 9px;
+	list-style-type: none;
+}
+
+.posts li.post a {
+	color: #1069c3;
+	text-decoration: none;
+	font-weight: bold;
+}
+
+header .inclusion-context {
+	font-size: 12px;
+	padding: 5px;
+	padding-bottom: 12px;
+	margin-bottom: 5px;
+	border-bottom: 1px solid #F0F0F0;
+	color: #707070;
+}
+
+/* Author info  */
+
+header .metadata {
+	margin-top: 5px;
+	margin-bottom: 10px;
+}
+
+header .author-avatar {
+	float: left;
+}
+
+header .author-avatar img {
+	width: 48px;
+	border-radius: 100%;
+	padding: 5px;
+	display: inline-block;
+}
+
+header .author-name a {
+	color: black;
+	font-size: 14px;
+}
+
+header .author .author-description, header .author .time, .metrics span {
+	font-size: 12px;
+	color: #707070;
+}
+
+.posts .external-url {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 10px;
+}
+
+/* Media  */
+.posts li.post .media-container {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	margin-top: 10px;
+	margin-bottom: 5px;
+}
+
+.posts li.post .media-container img {
+	width: 49.5%;
+	display: inline-block;
+}
+
+.posts li.post .media-container img:first-of-type {
+	width: 100%;
+}
+
+.video-thumb {
+	
+}
+
+.play-button {
+	position: absolute;
+	top: 50%;
+    left: 45%;
+	font-size: 80px;
+}
+
+.play-button i {
+	color: white;
+	opacity: .7;
+}
+
+/* Metrics */
+
+.metrics {
+	margin-top: 14px;
+}
+
+.metrics img {
+	height: 16px;
+	vertical-align: middle;
+}
+
+.metrics .shares-and-comments {
+	float: right;
+}
+
+
+/** --------------------- *
+     Annotation post elements
+  * --------------------- */
+.post-annotations {
+	background-color: #f2f2f2;
+	margin-top: 10px;
+	border-radius: 8px;
+}
+
+.post-annotation {
+    padding: 15px;
+}
+
+.post-annotation > .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    min-width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.post-annotation.checkbox > .post-annotation-options {
+    display: inline-block;
+}
+
+.post-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.post-annotation-options > input {
+    display: inline-block;
+}

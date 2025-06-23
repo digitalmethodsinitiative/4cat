@@ -11,20 +11,25 @@
                 from a variety of online sources, and analyze the data through analytical processors.</p>
             <p>4CAT is developed by <a href="https://oilab.eu">OILab</a> and the <a
                     href="https://www.digitalmethods.net">Digital Methods Initiative</a> at the University of Amsterdam.
-                For more information, take a look at the <a href="https://4cat.nl">4CAT website</a>.</p>
-            <h2><span>News and updates</span></h2>
-            <ol class="news">
-                {% if news %}
-                {% for item in news %}
-                <li>
-                    <time>{{ item.time }}</time>
-                    {{ item.text|markdown|safe }}
-                </li>
-                {% endfor %}
-                {% else %}
-                <li>You can add news for your 4CAT instance in <code>news.json</code> in the 4CAT root folder.</li>
-                {% endif %}
-            </ol>
+                For more information, take a look at the <a href="https://4cat.nl">4CAT website</a> or the tool's
+                <a href="https://github.com/digitalmethodsinitiative/4cat">GitHub repository</a>.</p>
+            {% if __user_config("4cat.about_this_server") %}
+            <h2><span>About this server</span></h2>
+            <p>{{ __user_config("4cat.about_this_server")|markdown|safe }}</p>
+            {% endif %}
+            <h2><span>4CAT updates</span></h2>
+            <p class="updates">
+                  <bsky-embed
+                    id = "bsky-embed"
+                    username="4cat.nl"
+                    mode=""
+                    limit="5"
+                    link_target="_blank"
+                    link_image="true"
+                    load_more="true"
+                  >
+                  </bsky-embed>
+            </p>
         </section>
 
         <aside>

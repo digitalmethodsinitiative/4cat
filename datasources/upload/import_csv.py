@@ -15,7 +15,7 @@ from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException, \
-    QueryNeedsExplicitConfirmationException
+    QueryNeedsExplicitConfirmationException, CsvDialectException
 from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
 
 
@@ -78,75 +78,119 @@ class SearchCustom(BasicProcessor):
         # guess and set the properties as defined in import_formats.py
         infile = temp_file.open("r", encoding=encoding)
         sample = infile.read(1024 * 1024)
-        dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
-        for prop in tool_format.get("csv_dialect", {}):
-            setattr(dialect, prop, tool_format["csv_dialect"][prop])
+        try:
+            possible_dialects = [csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))]
+        except csv.Error:
+            possible_dialects = csv.list_dialects()
+        if tool_format.get("csv_dialect", {}):
+            # Known dialects are defined in import_formats.py
+            dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+            for prop in tool_format.get("csv_dialect", {}):
+                setattr(dialect, prop, tool_format["csv_dialect"][prop])
+            possible_dialects.append(dialect)
 
-        # With validated csvs, save as is but make sure the raw file is sorted
-        infile.seek(0)
-        reader = csv.DictReader(infile, dialect=dialect)
+        while possible_dialects:
+            # With validated csvs, save as is but make sure the raw file is sorted
+            infile.seek(0)
+            dialect = possible_dialects.pop() # Use the last dialect first
+            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect) if type(dialect) is csv.Dialect else dialect}")
+            reader = csv.DictReader(infile, dialect=dialect)
 
-        if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
-                set(tool_format["columns"]) != set(tool_format["columns"]):
-            raise QueryParametersException("Not all columns are present")
+            if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
+                    set(tool_format["columns"]) != set(tool_format["columns"]):
+                raise QueryParametersException("Not all columns are present")
 
-        # hasher for pseudonymisation
-        salt = secrets.token_bytes(16)
-        hasher = hashlib.blake2b(digest_size=24, salt=salt)
-        hash_cache = HashCache(hasher)
+            # hasher for pseudonymisation
+            salt = secrets.token_bytes(16)
+            hasher = hashlib.blake2b(digest_size=24, salt=salt)
+            hash_cache = HashCache(hasher)
 
-        # write the resulting dataset
-        writer = None
-        done = 0
-        skipped = 0
-        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-            # mapper is defined in import_formats
-            try:
-                for item in tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters):
-                    if isinstance(item, import_formats.InvalidImportedItem):
-                        # if the mapper returns this class, the item is not written
-                        skipped += 1
-                        if hasattr(item, "reason"):
-                            self.dataset.log(f"Skipping item ({item.reason})")
-                        continue
+            # write the resulting dataset
+            writer = None
+            done = 0
+            skipped = 0
+            timestamp_missing = 0
+            with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+                # mapper is defined in import_formats
+                try:
+                    for i, item in enumerate(tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters)):
+                        if isinstance(item, import_formats.InvalidImportedItem):
+                            # if the mapper returns this class, the item is not written
+                            skipped += 1
+                            if hasattr(item, "reason"):
+                                self.dataset.log(f"Skipping item ({item.reason})")
+                            continue
 
-                    if not writer:
-                        writer = csv.DictWriter(output_csv, fieldnames=list(item.keys()))
-                        writer.writeheader()
+                        if not writer:
+                            writer = csv.DictWriter(output_csv, fieldnames=list(item.keys()))
+                            writer.writeheader()
 
-                    if self.parameters.get("strip_html") and "body" in item:
-                        item["body"] = strip_tags(item["body"])
+                        if self.parameters.get("strip_html") and "body" in item:
+                            item["body"] = strip_tags(item["body"])
 
-                    # pseudonymise or anonymise as needed
-                    filtering = self.parameters.get("pseudonymise")
-                    if filtering:
-                        for field, value in item.items():
-                            if field.startswith("author"):
-                                if filtering == "anonymise":
-                                    item[field] = "REDACTED"
-                                elif filtering == "pseudonymise":
-                                    item[field] = hash_cache.update_cache(value)
+                        # check for None/empty timestamp
+                        if not item.get("timestamp"):
+                            # Notify the user that items are missing a timestamp
+                            timestamp_missing += 1
+                            self.dataset.log(f"Item {i} ({item.get('id')}) has no timestamp.")
 
-                    try:
-                        writer.writerow(item)
-                    except ValueError as e:
-                        return self.dataset.finish_with_error("Could not parse CSV file. Have you selected the correct "
-                                                              "format?")
+                        # pseudonymise or anonymise as needed
+                        filtering = self.parameters.get("pseudonymise")
+                        try:
+                            if filtering:
+                                for field, value in item.items():
+                                    if field is None:
+                                        # This would normally be caught when writerow is called
+                                        raise CsvDialectException("Field is None")
+                                    if field.startswith("author"):
+                                        if filtering == "anonymise":
+                                            item[field] = "REDACTED"
+                                        elif filtering == "pseudonymise":
+                                            item[field] = hash_cache.update_cache(value)
 
-                    done += 1
+                            writer.writerow(item)
+                        except ValueError as e:
+                            if not possible_dialects:
+                                self.dataset.log(f"Error ({e}) writing item {i}: {item}")
+                                return self.dataset.finish_with_error("Could not parse CSV file. Have you selected the correct "
+                                                                      "format or edited the CSV after exporting? Try importing "
+                                                                      "as custom format.")
+                            else:
+                                raise CsvDialectException(f"Error ({e}) writing item {i}: {item}")
 
-            except import_formats.InvalidCustomFormat as e:
-                self.log.warning(f"Unable to import improperly formatted file for {tool_format['name']}. See dataset "
-                                 "log for details.")
-                infile.close()
-                temp_file.unlink()
-                return self.dataset.finish_with_error(str(e))
+                        done += 1
 
-        # done!
-        infile.close()
-        if skipped:
+                except import_formats.InvalidCustomFormat as e:
+                    self.log.warning(f"Unable to import improperly formatted file for {tool_format['name']}. See dataset "
+                                     "log for details.")
+                    infile.close()
+                    temp_file.unlink()
+                    return self.dataset.finish_with_error(str(e))
+
+                except UnicodeDecodeError:
+                    infile.close()
+                    temp_file.unlink()
+                    return self.dataset.finish_with_error("The uploaded file is not encoded with the UTF-8 character set. "
+                                                          "Make sure the file is encoded properly and try again.")
+
+                except CsvDialectException:
+                    self.dataset.log(f"Error with CSV dialect: {vars(dialect)}")
+                    continue
+
+            # done!
+            infile.close()
+            # We successfully read the CSV, no need to try other dialects
+            break
+
+        if skipped or timestamp_missing:
+            error_message = ""
+            if timestamp_missing:
+                error_message += f"{timestamp_missing:,} items had no timestamp"
+            if skipped:
+                error_message += f"{' and ' if timestamp_missing else ''}{skipped:,} items were skipped because they could not be parsed or did not match the expected format"
+            
             self.dataset.update_status(
-                "CSV file imported, but %i items were skipped because their date could not be parsed." % skipped,
+                f"CSV file imported, but {error_message}. See dataset log for details.",
                 is_final=True)
 
         temp_file.unlink()
@@ -178,29 +222,46 @@ class SearchCustom(BasicProcessor):
             raise QueryParametersException("No file was offered for upload.")
 
         if query.get("format") not in import_formats.tools:
-            raise QueryParametersException("Cannot import CSV from tool %s" % str(query.get("format")))
+            raise QueryParametersException(f"Cannot import CSV from tool {query.get('format')}")
 
+        # content_length seems unreliable, so figure out the length by reading
+        # the file...
+        upload_size = 0
+        while True:
+            bit = file.read(1024)
+            if len(bit) == 0:
+                break
+            upload_size += len(bit)
+
+        file.seek(0)
         encoding = sniff_encoding(file)
         tool_format = import_formats.tools.get(query.get("format"))
 
         try:
+            # try reading the file as csv here
+            # never read more than 128 kB (to keep it quick)
+            sample_size = min(upload_size, 128 * 1024)  # 128 kB is sent from the frontend at most
             wrapped_file = io.TextIOWrapper(file, encoding=encoding)
-            sample = wrapped_file.read(1024 * 1024)
-            wrapped_file.seek(0)
+            sample = wrapped_file.read(sample_size)
+
             if not csv.Sniffer().has_header(sample) and not query.get("frontend-confirm"):
+                # this may be intended, or the check may be bad, so allow user to continue
                 raise QueryNeedsExplicitConfirmationException(
                     "The uploaded file does not seem to have a header row. Continue anyway?")
-            dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
 
-            # override the guesses for specific formats if defiend so in
+            wrapped_file.seek(0)
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+
+            # override the guesses for specific formats if defined so in
             # import_formats.py
             for prop in tool_format.get("csv_dialect", {}):
                 setattr(dialect, prop, tool_format["csv_dialect"][prop])
+
         except UnicodeDecodeError:
             raise QueryParametersException("The uploaded file does not seem to be a CSV file encoded with UTF-8. "
                                            "Save the file in the proper format and try again.")
         except csv.Error:
-            raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
+            raise QueryParametersException("Uploaded file is not a well-formed, UTF 8-encoded CSV or TAB file.")
 
         # With validated csvs, save as is but make sure the raw file is sorted
         reader = csv.DictReader(wrapped_file, dialect=dialect)
@@ -210,7 +271,7 @@ class SearchCustom(BasicProcessor):
         try:
             fields = reader.fieldnames
         except UnicodeDecodeError:
-            raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
+            raise QueryParametersException("The uploaded file is not a well-formed, UTF 8-encoded CSV or TAB file.")
 
         incomplete_mapping = list(tool_format["columns"])
         for field in tool_format["columns"]:
@@ -223,6 +284,12 @@ class SearchCustom(BasicProcessor):
         # mapping for each column
         column_mapping = {}
         if tool_format.get("allow_user_mapping", False):
+            magic_mappings = {
+                "id": {"__4cat_auto_sequence": "[generate sequential IDs]"},
+                "thread_id": {"__4cat_auto_sequence": "[generate sequential IDs]"},
+                "empty": {"__4cat_empty_value": "[empty]"},
+                "timestamp": {"__4cat_now": "[current date and time]"}
+            }
             if incomplete_mapping:
                 raise QueryNeedsFurtherInputException({
                     "mapping-info": {
@@ -234,8 +301,7 @@ class SearchCustom(BasicProcessor):
                             "type": UserInput.OPTION_CHOICE,
                             "options": {
                                 "": "",
-                                **({"__4cat_auto_sequence": "[generate sequential IDs]"} if mappable_column in (
-                                "id", "thread_id") else {}),
+                                **magic_mappings.get(mappable_column, magic_mappings["empty"]),
                                 **{column: column for column in fields}
                             },
                             "default": mappable_column if mappable_column in fields else "",
@@ -249,7 +315,7 @@ class SearchCustom(BasicProcessor):
             for field in tool_format["columns"]:
                 mapping_field = "option-mapping-%s" % field
                 provided_field = request.form.get(mapping_field)
-                if (provided_field not in fields and provided_field != "__4cat_auto_sequence") or not provided_field:
+                if (provided_field not in fields and not provided_field.startswith("__4cat")) or not provided_field:
                     missing_mapping.append(field)
                 else:
                     column_mapping["mapping-" + field] = request.form.get(mapping_field)
@@ -272,14 +338,25 @@ class SearchCustom(BasicProcessor):
                 # stop parsing because no complete rows will follow
                 raise StopIteration
 
-            try:
-                if row[timestamp_column].isdecimal():
-                    datetime.fromtimestamp(float(row[timestamp_column]))
+            if row[timestamp_column]:
+                try:
+                    if row[timestamp_column].isdecimal():
+                        datetime.fromtimestamp(float(row[timestamp_column]))
+                    else:
+                        parse_datetime(row[timestamp_column])
+                except (ValueError, OSError):
+                    raise QueryParametersException(
+                        "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+            else:
+                # the timestamp column is empty or contains empty values
+                if not query.get("frontend-confirm"):
+                    # TODO: THIS never triggers! frontend-confirm is already set when columns are mapped
+                    # TODO: frontend-confirm exceptions need to be made unique
+                    raise QueryNeedsExplicitConfirmationException(
+                        "Your 'timestamp' column contains empty values. Continue anyway?")
                 else:
-                    parse_datetime(row[timestamp_column])
-            except (ValueError, OSError):
-                raise QueryParametersException(
-                    "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+                    # `None` value will be used
+                    pass
 
         except StopIteration:
             pass

@@ -6,21 +6,20 @@
 import configparser
 import subprocess
 import shutil
-import shlex
+import oslex
 import json
 import sys
 import os
 
 from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.helpers import add_notification
 
 log = Logger(output=True)
 
-import configparser
 ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
 db_config = ini["DATABASE"]
@@ -97,7 +96,7 @@ if type(datasources) is dict:
                 print(f"  - Migrating setting {platform}.{setting}...")
                 config_set(platform + "." + setting, datasources[platform][setting])
 
-    print(f"  - Migrating data source-specific expiration settings...")
+    print("  - Migrating data source-specific expiration settings...")
     expiration = {datasource: {"timeout": info["expire-datasets"], "allow_optout": False} for datasource, info in
                   datasources.items() if "expire-datasets" in info}
     config_set("expire.datasources", expiration)
@@ -140,7 +139,7 @@ if config_path.exists():
                     docker_version = line.split('=')[-1].strip()
                     if docker_version not in ['latest', 'stable']:
                         notification = f"You have updated 4CAT, but your Docker .env file indicates you installed a specific version. If you recreate your 4CAT Docker containers, 4CAT will regress to {docker_version}. Consider updating DOCKER_TAG in .env to the 'stable' tag to always use the latest version."
-                        add_notification(db, "!admins", notification)
+                        add_notification(db, "!admin", notification)
                     break
 
 
@@ -164,7 +163,7 @@ else:
         config_set("video_downloader.ffmpeg-path", ffmpeg)
     elif in_docker:
         print("  - ffmpeg not found, detected Docker environment, installing via apt")
-        ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ffmpeg_install = subprocess.run(oslex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if ffmpeg_install.returncode == 0:
             print("  - ffmpeg intalled with apt!")
             config_set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"))

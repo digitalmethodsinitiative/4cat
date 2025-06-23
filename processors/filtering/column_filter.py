@@ -75,11 +75,11 @@ class ColumnFilter(BaseFilter):
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
-        Allow processor on top datasets.
+        Allow processor on top datasets that are CSV or NDJSON.
 
         :param module: Module to determine compatibility with
         """
-        return module.is_top_dataset()
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -102,8 +102,8 @@ class ColumnFilter(BaseFilter):
     def filter_items(self):
         """
         Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
-        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
-        and yield `original_item`.
+        `for item in self.source_dataset.iterate_items(self)` to iterate through items and access the
+        underlying data item via item.original.
 
         :return generator:
         """
@@ -151,7 +151,7 @@ class ColumnFilter(BaseFilter):
         matching_items = 0
         processed_items = 0
         date_compare = None
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+        for mapped_item in self.source_dataset.iterate_items(processor=self):
             processed_items += 1
             if processed_items % 500 == 0:
                 self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
@@ -175,7 +175,7 @@ class ColumnFilter(BaseFilter):
                         self.dataset.finish(0)
                         return
             elif match_style in ["exact", "exact-not", "contains", "contains-not"]:
-                if type(mapped_item.get(column)) == str:
+                if type(mapped_item.get(column)) is str:
                     # Text
                     column_value = mapped_item.get(column).lower() if force_lowercase else mapped_item.get(column)
                 elif mapped_item.get(column) is None:
@@ -183,8 +183,7 @@ class ColumnFilter(BaseFilter):
                 else:
                     # Int/Float/Date
                     # If date, user may not be aware we normally store dates as timestamps
-                    column_value = mapped_item.get(column)
-                    # TODO: in order to use these match_styles on numerical data (e.g. "views == 1") we need to attempt to convert the match_values from strings
+                    column_value = str(mapped_item.get(column))
             else:
                 # Numerical
                 pass
@@ -223,7 +222,7 @@ class ColumnFilter(BaseFilter):
                     pass
 
             if matches:
-                yield original_item
+                yield mapped_item.original
                 matching_items += 1
 
     def filter_top(self, column, top_n, bottom=False):
@@ -242,10 +241,10 @@ class ColumnFilter(BaseFilter):
 
         ranked_items = 0
         top_values = sorted(list(possible_values), reverse=(not bottom))[:top_n]
-        for original_item, item in self.source_dataset.iterate_mapped_items():
+        for item in self.source_dataset.iterate_items(processor=self):
             if item.get(column) in top_values:
                 ranked_items = 0
-                yield original_item
+                yield item.original
 
             if ranked_items >= top_n:
                 return
@@ -263,11 +262,11 @@ class ColumnProcessorFilter(ColumnFilter):
     @classmethod
     def is_compatible_with(cls, module=None, user=None):
         """
-        Allow processor on top datasets.
+        Allow on child datasets and do not create a standalone dataset
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.get_extension() in ("csv", "ndjson") and not module.is_top_dataset()
+        return not module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
     def is_filter(cls):

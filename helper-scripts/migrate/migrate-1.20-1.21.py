@@ -5,14 +5,14 @@ import os
 
 from psycopg2.errors import UniqueViolation
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 from common.lib.database import Database
 
 try:
 	import config
 	import logging
 	db = Database(logger=logging, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
-except (SyntaxError, ImportError, AttributeError) as e:
+except (SyntaxError, ImportError, AttributeError):
 	from common.config_manager import config
 	from common.lib.logger import Logger
 	log = Logger(output=True)

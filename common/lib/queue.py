@@ -5,7 +5,6 @@ import time
 import json
 
 from common.lib.job import Job
-import psycopg2
 
 
 class JobQueue:
@@ -49,22 +48,17 @@ class JobQueue:
 		# longer than the job as well
 		replacements = [jobtype]
 		query = (
-			"SELECT main_queue.*, ( " \
-			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
-			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
-			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
-			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
-			"  ) " \
-			") AS queue_ahead FROM jobs AS main_queue"
-			"        WHERE main_queue.jobtype = %s")
+			"SELECT main_queue.* FROM jobs AS main_queue"
+			"        WHERE main_queue.jobtype = %s"
+		)
 
 		if restrict_claimable:
 			# claimability is determined through various timestamps
 			query += (
 			"          AND main_queue.timestamp_claimed = 0"
 			"          AND main_queue.timestamp_after < %s"
-			"          AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)")
+			"          AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)"
+			)
 			replacements.append(timestamp)
 			replacements.append(timestamp)
 
@@ -74,7 +68,7 @@ class JobQueue:
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
-	def get_all_jobs(self, jobtype="*", remote_id=False, restrict_claimable=True):
+	def get_all_jobs(self, jobtype="*", limit=None, offset=None, remote_id=False, restrict_claimable=True):
 		"""
 		Get all unclaimed (and claimable) jobs
 
@@ -94,21 +88,12 @@ class JobQueue:
 		else:
 			filter = "WHERE jobtype != ''"
 
-		# select the number of jobs of the same type that have been queued for
-		# longer than the job as well
-		query = "SELECT main_queue.*, ( " \
-				"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
-				"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
-				"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
-				"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
-				"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
-				"  ) " \
-				") AS queue_ahead FROM jobs AS main_queue " + filter
+		query = "SELECT * FROM jobs %s" % filter
 
 		if restrict_claimable:
-			query += ("        AND main_queue.timestamp_claimed = 0"
-					  "              AND main_queue.timestamp_after < %s"
-					  "              AND (main_queue.interval = 0 OR main_queue.timestamp_lastclaimed + main_queue.interval < %s)")
+			query += ("        AND timestamp_claimed = 0"
+					  "              AND timestamp_after < %s"
+					  "              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)")
 
 			now = int(time.time())
 			replacements.append(now)
@@ -116,15 +101,14 @@ class JobQueue:
 
 		query += "         ORDER BY timestamp ASC"
 
-		try:
-			jobs = self.db.fetchall(query, replacements)
-		except psycopg2.ProgrammingError:
-			# there seems to be a bug with psycopg2 where it sometimes raises
-			# this for empty query results even though it shouldn't. this
-			# doesn't seem to indicate an actual problem so we catch the
-			# exception and return an empty list
-			# https://github.com/psycopg/psycopg2/issues/346
-			jobs = []
+		if limit is not None:
+			query += " LIMIT %s"
+			replacements.append(limit)
+		if offset is not None:
+			query += " OFFSET %s"
+			replacements.append(offset)
+
+		jobs = self.db.fetchall(query, replacements)
 
 		return [Job.get_by_data(job, self.db) for job in jobs if job]
 

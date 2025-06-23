@@ -24,8 +24,10 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 	type = "overtime-hateful"  # job type ID
 	category = "Post metrics"  # category
 	title = "Over-time offensivess trend"  # title displayed in UI
-	description = "Extracts offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset. Also includes engagement metrics."  # description displayed in UI
+	description = "Extracts offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset. Also includes engagement metrics if available."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	followups = []
 
 	references = [
 		"[Hatebase.org](https://hatebase.org)",
@@ -41,7 +43,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 
 		:param module: Module to determine compatibility with
 		"""
-		return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
+		return module.parameters.get("datasource") in ("telegram", "instagram", "reddit", "upload")
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
@@ -100,8 +102,9 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 		hateful = {}
 		views = {}
 		intervals = set()
+		unknown_dates = 0
 
-		fieldnames = self.source_dataset.get_item_keys(self)
+		fieldnames = self.source_dataset.get_columns()
 		if "views" in fieldnames:
 			engagement_field = "views"
 		elif "score" in fieldnames:
@@ -109,9 +112,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 		elif "likes" in fieldnames:
 			engagement_field = "likes"
 		else:
-			self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
-			self.dataset.finish(0)
-			return
+			engagement_field = None
 
 		with config.get('PATH_ROOT').joinpath(f"common/assets/hatebase/hatebase-{language}.json").open() as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
@@ -120,12 +121,17 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase if not min_offensive or (hatebase[term]["average_offensiveness"] and hatebase[term]["average_offensiveness"] > min_offensive)]) + r")\b")
 
 		for post in self.source_dataset.iterate_items(self):
-			try:
-				time_unit = get_interval_descriptor(post, timeframe)
-			except ValueError as e:
-				self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
-				self.dataset.update_status(0)
-				return
+			# Ensure the post has a date
+			if timeframe != "all" and not post.get("timestamp"):
+				time_unit = "unknown_date"
+				unknown_dates += 1
+			else:
+				try:
+					time_unit = get_interval_descriptor(post, timeframe)
+				except ValueError as e:
+					self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
+					self.dataset.update_status(0)
+					return
 
 			# determine where to put this data
 			if time_unit not in activity:
@@ -140,10 +146,11 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 			intervals.add(time_unit)
 
 			activity[time_unit] += 1
-			try:
-				views[time_unit] += int(post[engagement_field])
-			except (ValueError, TypeError):
-				pass
+			if engagement_field:
+				try:
+					views[time_unit] += int(post[engagement_field])
+				except (ValueError, TypeError):
+					pass
 
 			terms = []
 			for term in hatebase_regex.findall(post["body"].lower()):
@@ -176,11 +183,12 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 				"item": "messages",
 				"value": activity[interval]
 			})
-			rows.append({
-				"date": interval,
-				"item": engagement_field,
-				"value": views[interval]
-			})
+			if engagement_field:
+				rows.append({
+					"date": interval,
+					"item": engagement_field,
+					"value": views[interval]
+				})
 
 		# write as csv
 		if rows:

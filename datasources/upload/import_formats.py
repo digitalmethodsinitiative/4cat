@@ -1,10 +1,10 @@
 import datetime
 import json
-import csv
 import re
 
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import ProcessorException
+from common.lib.helpers import convert_to_int
 
 
 class InvalidCustomFormat(ProcessorException):
@@ -121,7 +121,7 @@ def import_crowdtangle_facebook(reader, columns, dataset, parameters):
             "page_followers": item["Followers at Posting"],
             "page_shared_from": shared_page,
             "type": item["Type"],
-            "interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])) if item[
+            "interactions": convert_to_int(re.sub(r"[^0-9]", "", item["Total Interactions"]), 0) if item[
                 "Total Interactions"] else 0,
             "comments": item["Comments"],
             "shares": item["Shares"],
@@ -325,6 +325,7 @@ def map_csv_items(reader, columns, dataset, parameters):
     """
     # write to the result file
     indexes = {}
+    now_timestmap = str(int(datetime.datetime.now().timestamp()))
     for row in reader:
         mapped_row = {}
         for field in columns:
@@ -336,6 +337,10 @@ def map_csv_items(reader, columns, dataset, parameters):
                         indexes[field] = 1
                     mapped_row[field] = indexes[field]
                     indexes[field] += 1
+                elif mapping == "__4cat_empty_value":
+                    mapped_row[field] = ""
+                elif mapping == "__4cat_now":
+                    mapped_row[field] = now_timestmap
                 else:
                     # actual mapping
                     mapped_row[field] = row[mapping]
@@ -344,27 +349,43 @@ def map_csv_items(reader, columns, dataset, parameters):
         # is a unix timestamp. this will override the columns if they
         # already exist! but it is necessary for 4CAT to handle the
         # data in processors etc and should be an equivalent value.
-        try:
-            if mapped_row["timestamp"].isdecimal():
-                timestamp = datetime.datetime.fromtimestamp(float(mapped_row["timestamp"]))
-            else:
-                timestamp = parse_datetime(mapped_row["timestamp"])
+        if not mapped_row.get("timestamp"):
+            if mapped_row.get("unix_timestamp"):
+                # if unix timestamp is given, convert to datetime
+                try:
+                    timestamp = datetime.datetime.fromtimestamp(int(mapped_row["unix_timestamp"]))
+                    mapped_row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                except (ValueError, OSError) as e:
+                    yield InvalidImportedItem(f"{e.__class__.__name__} - {e} (value was '{mapped_row['unix_timestamp']}')")
+                    continue
 
-            mapped_row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            mapped_row["unix_timestamp"] = int(timestamp.timestamp())
+            # no timestamp given, set to empty string
+            mapped_row["timestamp"] = ""
+            mapped_row["unix_timestamp"] = None
+            
+        else:
+            try:
+                
+                if mapped_row["timestamp"].replace(".", "").isdecimal() and mapped_row["timestamp"].count(".") <= 1:  # ignore . for floats
+                    timestamp = datetime.datetime.fromtimestamp(float(mapped_row["timestamp"]))
+                else:
+                    timestamp = parse_datetime(mapped_row["timestamp"])
 
-            # this ensures that the required columns are always the first
-            # columns, and the rest is in original order
-            for field, value in row.items():
-                if field not in mapped_row and field:
-                    mapped_row[field] = value
+                mapped_row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                mapped_row["unix_timestamp"] = int(timestamp.timestamp())                
 
-        except (ValueError, OSError, AttributeError):
-            # skip rows without a valid timestamp - this may happen
-            # despite validation because only a sample is validated
-            # this is an OSError on Windows sometimes???
-            yield InvalidImportedItem()
-            continue
+            except (ValueError, OSError, AttributeError) as e:
+                # skip rows without a valid timestamp - this may happen
+                # despite validation because only a sample is validated
+                # this is an OSError on Windows sometimes???
+                yield InvalidImportedItem(f"{e.__class__.__name__} - {e} (value was '{mapped_row['timestamp']}')")
+                continue
+        
+        # this ensures that the required columns are always the first
+        # columns, and the rest is in original order
+        for field, value in row.items():
+            if field not in mapped_row and field:
+                mapped_row[field] = value
 
         yield mapped_row
 
@@ -407,13 +428,13 @@ tools = {
         "name": "YouTube videos (via YouTube Data Tools' Video List module)",
         "columns": {"publishedAt", "videoId", "channelId", "channelTitle", "videoDescription"},
         "mapper": import_ytdt_videolist,
-        "csv_dialect": {"doublequote": True}
+        "csv_dialect": {"doublequote": True, "escapechar": "\\"},
     },
     "youtube_comment_list": {
         "name": "YouTube comments (via YouTube Data Tools' Video Info module)",
         "columns": {"id", "isReplyTo", "authorName", "text", "publishedAt"},
         "mapper": import_ytdt_commentlist,
-        "csv_dialect": {"doublequote": True}
+        "csv_dialect": {"doublequote": True, "escapechar": "\\"},
     },
     "bazhuayu_weibo": {
         "name": "Sina Weibo (via Bazhuayu)",
