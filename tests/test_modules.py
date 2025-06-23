@@ -131,7 +131,7 @@ def test_worker_initialization(mock_database, mock_job, mock_job_queue):
             pass
 
     # Initialize the worker with mocks
-    worker = TestWorker(
+    TestWorker(
         logger=MagicMock(),
         job=mock_job,
         queue=mock_job_queue,
