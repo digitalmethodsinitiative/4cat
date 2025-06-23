@@ -47,6 +47,11 @@ class DatasetMerger(BasicProcessor):
             "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their ID "
                        "is identical, regardless of the value of other properties",
             "default": "remove"
+        },
+        "label": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Dataset name",
+            "tooltip": "Name of the merged dataset. If left empty, a name will be generated"
         }
     }
 
@@ -257,6 +262,11 @@ class DatasetMerger(BasicProcessor):
         # merged dataset has the same type as the original
         if self.source_dataset.parameters.get("datasource"):
             standalone.change_datasource(self.source_dataset.parameters["datasource"])
+
+        if self.parameters.get("label"):
+            standalone.update_label(self.parameters.get("label"))
+        else:
+            standalone.update_label(f"(Merged) {self.source_dataset.get_label()}")
 
         standalone.parameters = {**self.dataset.parameters, "board": "merged"}
         standalone.type = self.source_dataset.type
