@@ -17,7 +17,6 @@ from flask_login import login_user, login_required, logout_user, current_user
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
 from common.lib.helpers import send_email, get_software_commit
-from common.config_manager import ConfigWrapper
 
 from pathlib import Path
 
@@ -38,7 +37,6 @@ def load_user(user_name):
     user = User.get_by_name(current_app.db, user_name)
     if user:
         user.authenticate()
-        user.with_config(ConfigWrapper(current_app.fourcat_config, user=user, request=request))
 
     return user
 
@@ -122,7 +120,7 @@ def autologin_whitelist():
     logged in as the special "autologin" user.
     """
     # ok to use the app's config reader here since this is a global-only setting
-    if not current_app.fourcat_config.get("flask.autologin.hostnames"):
+    if not current_app.autologin.hostnames:
         # if there's no whitelist, there's no point in checking it
         return
 
@@ -149,7 +147,7 @@ def autologin_whitelist():
 
     # autologin is a special user that is automatically logged in for this
     # request only if the hostname or IP matches the whitelist
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.hostnames", [])]):
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in current_app.autologin.hostnames]):
         autologin_user = User.get_by_name(g.db, "autologin")
         autologin_user.with_config(g.config)
         if not autologin_user:
@@ -168,7 +166,7 @@ def exempt_from_limit():
     :return bool:  Whether the request's hostname is exempt
     """
     # ok to use the app's config reader here since this is a global-only setting
-    if not current_app.fourcat_config.get("flask.autologin.api"):
+    if not current_app.autologin.api:
         return False
 
     # filter by IP address and hostname, if the latter is available
@@ -180,7 +178,7 @@ def exempt_from_limit():
     except (socket.herror, socket.timeout):
         pass  # no hostname for this address
 
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.api", [])]):
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in current_app.autologin.api]):
         return True
 
     return False
