@@ -11,7 +11,6 @@ from common.lib.database import Database
 from common.lib.exceptions import WorkerInterruptedException, ProcessorException
 from common.config_manager import ConfigWrapper
 
-
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
     """
     Abstract Worker class
@@ -22,7 +21,6 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
     sure crashes are caught properly and the relevant data is available to the
     worker code.
     """
-
     #: Worker type - should match Job ID used when queuing jobs
     type = "misc"
 
@@ -105,29 +103,19 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         job is not run again immediately (which would probably instantly crash
         in the exact same way).
 
+        There is also some set-up to ensure that thread-unsafe objects such as
+        the config reader are only initialised once in a threaded context, i.e.
+        once this method is run.
+
         You can configure the `WARN_SLACK_URL` configuration variable to make
         reports of worker crashers be sent to a Slack channel, which is a good
         way to monitor a running 4CAT instance!
         """
         try:
-            # do some further set-up here because we are now in a thread context
-			# so we can set up thread-unsafe objects
             database_appname = "%s-%s" % (self.type, self.job.data["id"])
-            self.config = ConfigWrapper(
-                self.modules.config
-            )  # wrap for thread-safe memcache
-            self.db = Database(
-                logger=self.log,
-                appname=database_appname,
-                dbname=self.modules.config.DB_NAME,
-                user=self.modules.config.DB_USER,
-                password=self.config.DB_PASSWORD,
-                host=self.config.DB_HOST,
-                port=self.config.DB_PORT,
-            )
-            self.queue = (
-                JobQueue(logger=self.log, database=self.db) if not self.queue else self.queue
-            )
+            self.config = ConfigWrapper(self.modules.config)
+            self.db = Database(logger=self.log, appname=database_appname, dbname=self.config.DB_NAME, user=self.config.DB_USER, password=self.config.DB_PASSWORD, host=self.config.DB_HOST, port=self.config.DB_PORT)
+            self.queue = JobQueue(logger=self.log, database=self.db) if not self.queue else self.queue
             self.work()
         except WorkerInterruptedException:
             self.log.info("Worker %s interrupted - cancelling." % self.type)
@@ -143,16 +131,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             self.log.error(str(e), frame=e.frame)
         except Exception as e:
             stack = traceback.extract_tb(e.__traceback__)
-            frames = [
-                frame.filename.split("/").pop() + ":" + str(frame.lineno)
-                for frame in stack
-            ]
+            frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack]
             location = "->".join(frames)
-            self.log.error(
-                "Worker %s raised exception %s and will abort: %s at %s"
-                % (self.type, e.__class__.__name__, str(e), location),
-                frame=stack,
-            )
+            self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location), frame=stack)
 
         # Clean up after work successfully completed or terminates
         self.clean_up()
@@ -186,10 +167,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         :param int level:  Retry or cancel? Either `self.INTERRUPT_RETRY` or
           `self.INTERRUPT_CANCEL`.
         """
-        self.log.debug(
-            "Interrupt requested for worker %s/%s"
-            % (self.job.data["jobtype"], self.job.data["remote_id"])
-        )
+        self.log.debug("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
         self.interrupted = level
 
     @abc.abstractmethod
