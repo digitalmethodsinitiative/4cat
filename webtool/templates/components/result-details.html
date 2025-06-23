@@ -48,11 +48,9 @@
             {% if merge_sources %}
                 <div class="fullwidth notice">
                     This dataset is a merger of {% for source in merge_sources %}
-                    {% if source.__class__ is sameas str %}
-                    {{ source }}
-                    {% else %}
-                    <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% if loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
-                    {% endif %}
+                    {% if source is string %}
+                    {{ source }}{% else %}
+                    <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}{% if loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
                 {% endfor %}.
                 </div>
             {% elif "copied_from" in dataset.parameters %}
