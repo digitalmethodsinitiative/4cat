@@ -108,7 +108,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
                 "options": {"": "", **parent_columns},
                 "default": ""
             })
-        max_prompts = config.get("dmi-service-manager.sd_num_files")
+        max_prompts = config.get("dmi-service-manager.sd_num_files", 0)
         if max_prompts == 0:
             options["amount"]["tooltip"] = "Use '0' to allow unlimited number"
         else:

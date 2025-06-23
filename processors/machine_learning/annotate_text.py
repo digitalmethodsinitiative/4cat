@@ -107,7 +107,7 @@ class TextClassifier(BasicProcessor):
         """
         options = cls.options
 
-        models = config.get("dmi-service-manager.stormtrooper_models").split(",")
+        models = config.get("dmi-service-manager.stormtrooper_models", "").split(",")
         options["model"]["options"] = {m: m for m in models}
 
         if parent_dataset is None:
