@@ -45,10 +45,22 @@
                 </div>
             {% endif %}
 
-            {% if "copied_from" in dataset.parameters %}
+            {% if merge_sources %}
                 <div class="fullwidth notice">
-                    This dataset was generated from <a
-                        href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                    This dataset is a merger of {% for source in merge_sources %}
+                    {% if source is string %}
+                    {{ source }}{% else %}
+                    <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}{% if loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
+                {% endfor %}.
+                </div>
+            {% elif "copied_from" in dataset.parameters %}
+                <div class="fullwidth notice">
+                    This dataset was generated from
+                    {% if copy_source is string %}
+                        <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                    {% else %}
+                        the dataset '<a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{ copy_source.get_label()}}</a>'.
+                    {% endif %}
                 </div>
             {% endif %}
 

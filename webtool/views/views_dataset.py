@@ -114,7 +114,7 @@ def show_results(page):
     if filters["hide_empty"]:
         where.append("num_rows > 0")
 
-    # not all datasets have a datsource defined, but that is fine, since if
+    # not all datasets have a datasource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
     if filters["datasource"] and filters["datasource"] != "all":
         where.append("parameters::json->>'datasource' = %s")
@@ -423,6 +423,29 @@ def show_result(key):
     # erase them
     has_credentials = [p for p in dataset.parameters if p.startswith("api_") and p not in ("api_type", "api_track")]
 
+    # special case: merged datasets
+    # it is useful to know the labels of the datasets these were merged from!
+    # so fetch these
+    merge_sources = None
+    if dataset.parameters.get("source"):
+        source_keys = [k.strip() for k in dataset.parameters.get("source").split(",")]
+        merge_sources = []
+        for source in source_keys:
+            try:
+                merge_sources.append(DataSet(key=source, db=g.db, modules=g.modules))
+            except DataSetException:
+                merge_sources.append(source)
+
+    # special case: filtered datasets
+    # similar situation
+    copy_source = None
+    if dataset.parameters.get("copied_from"):
+        copy_source = dataset.parameters.get("copied_from")
+        try:
+            copy_source = DataSet(key=copy_source, db=g.db, modules=g.modules)
+        except DataSetException:
+            copy_source = dataset.parameters.get("copied_from")
+
     # we can either show this view as a separate page or as a bunch of html
     # to be retrieved via XHR
     standalone = "processors" not in request.url
@@ -432,7 +455,7 @@ def show_result(key):
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
-                           datasources=datasources)
+                           datasources=datasources, merge_sources=merge_sources, copy_source=copy_source)
 
 
 @component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
