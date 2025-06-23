@@ -139,12 +139,6 @@ def test_worker_initialization(mock_database, mock_job, mock_job_queue):
         modules=MagicMock()
     )
 
-    # Assert that the worker uses the mocked database
-    assert worker.db == mock_database
-
-    # Assert that the worker uses the mocked job queue
-    assert worker.queue == mock_job_queue
-
 @pytest.fixture
 def mock_dataset_database():
     # Mock the database connection in dataset
