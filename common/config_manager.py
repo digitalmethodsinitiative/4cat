@@ -1,4 +1,5 @@
 import itertools
+import threading
 import pickle
 import time
 import json
@@ -161,6 +162,7 @@ class ConfigManager:
                 # do one test fetch to test if connection is valid
                 memcache = MemcacheClient(self.get("MEMCACHE_SERVER"), serde=serde.pickle_serde, key_prefix=b"4cat-config")
                 memcache.get("4cat-dummy-fail-expected")
+                memcache.init_thread_id = threading.get_ident()
                 return memcache
             except (SystemError, ValueError, MemcacheError):
                 # we have no access to the logger here so we simply pass
@@ -290,6 +292,9 @@ class ConfigManager:
 
         if memcache:
             memcache_id = self._get_memcache_id(attribute_name, user, tags)
+            if threading.get_ident() != memcache.init_thread_id:
+                raise RuntimeError("Thread-unsafe use of memcache! Please fix your code.")
+
             try:
                 return memcache.get(memcache_id)
             except KeyError:
