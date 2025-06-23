@@ -71,20 +71,10 @@ def test_logger(logger, mock_logger_config):
         assert "This is a test log message." in logs
 
 @pytest.fixture
-def mock_module_config(mock_database):
-    """
-    Mock the module loader config; needs real PATH_ROOT to find modules
-    """
-    with patch("common.lib.module_loader.config") as mock_config:
-        mock_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
-            "PATH_ROOT": PATH_ROOT,
-        }.get(key, default))
-
-@pytest.fixture
-def fourcat_modules(mock_config):
+def fourcat_modules(mock_logger_config):
     from common.lib.module_loader import ModuleCollector
     # Initialize the ModuleCollector and return it
-    return ModuleCollector(config=mock_config)
+    return ModuleCollector(config=mock_logger_config)
 
 @pytest.mark.dependency()
 def test_module_collector(logger, fourcat_modules):
