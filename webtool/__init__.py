@@ -184,8 +184,6 @@ with app.app_context():
             # in contexts where we're serving static files through slack, save
             # some overhead
             return
-        else:
-            print(request.path)
 
         g.base_config = config
         g.queue = queue

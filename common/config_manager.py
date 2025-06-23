@@ -42,8 +42,6 @@ class ConfigManager:
         if db:
             self.with_db(db)
 
-        self.url = ""
-
     def with_db(self, db=None):
         """
         Initialise database
