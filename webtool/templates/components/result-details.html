@@ -55,8 +55,12 @@
                 </div>
             {% elif "copied_from" in dataset.parameters %}
                 <div class="fullwidth notice">
-                    This dataset was generated from <a
-                        href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                    This dataset was generated from
+                    {% if copy_source is string %}
+                        <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                    {% else %}
+                        the dataset '<a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{ copy_source.get_label()}}</a>'.
+                    {% endif %}
                 </div>
             {% endif %}
 

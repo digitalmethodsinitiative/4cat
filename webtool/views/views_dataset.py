@@ -436,6 +436,16 @@ def show_result(key):
             except DataSetException:
                 merge_sources.append(source)
 
+    # special case: filtered datasets
+    # similar situation
+    copy_source = None
+    if dataset.parameters.get("copied_from"):
+        copy_source = dataset.parameters.get("copied_from")
+        try:
+            copy_source = DataSet(key=copy_source, db=g.db, modules=g.modules)
+        except DataSetException:
+            copy_source = dataset.parameters.get("copied_from")
+
     # we can either show this view as a separate page or as a bunch of html
     # to be retrieved via XHR
     standalone = "processors" not in request.url
@@ -445,7 +455,7 @@ def show_result(key):
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
-                           datasources=datasources, merge_sources=merge_sources)
+                           datasources=datasources, merge_sources=merge_sources, copy_source=copy_source)
 
 
 @component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
