@@ -1,0 +1,114 @@
+
+/** ---------------------
+ *      Annotation post elements
+ * --------------------- */
+
+.post-annotations {
+    background-color: #bed4f9;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.post-annotations:empty {
+    display: none;
+}
+
+.post-annotation {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.post-annotation:last-child {
+    border-bottom: none;
+}
+
+.post-annotation .annotation-label {
+    flex-shrink: 0;
+    width: 150px;
+    text-align: right;
+    font-weight: 600;
+    line-height: 1.4;
+    word-wrap: break-word;
+    color: #2c3e50;
+    margin: 0;
+    padding-top: 6px; /* Align with input fields */
+}
+
+/* Link styling for processor-generated labels */
+.post-annotation a.from-dataset-link {
+    display: block;
+}
+
+.post-annotation .from-dataset-link:hover .annotation-label {
+    color: #215bc6;
+    text-decoration: underline;
+}
+
+/* Input container */
+.post-annotation-input-container {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Input field styling */
+.post-annotation-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #b8c6db;
+    background: white;
+    font-size: 14px;
+    line-height: 1.4;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    word-break: break-all;
+}
+
+.post-annotation-input:focus {
+    outline: none;
+    border-color: #215bc6;
+    box-shadow: 0 0 0 2px rgba(33, 91, 198, 0.2);
+}
+
+.post-annotation-input.from-dataset {
+    background: transparent;
+    border: none;
+}
+
+/* Textarea specific styling */
+textarea.post-annotation-input {
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.post-annotation.type-checkbox {
+    align-items: flex-start;
+}
+
+.post-annotation-options {
+    display: flex;
+    gap: 8px;
+}
+
+.post-annotation-options > label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.post-annotation-options input[type="checkbox"] {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}

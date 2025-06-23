@@ -5,8 +5,12 @@
 
 {% block body %}
 
+<!-- standard CSS for post annotations -->
+<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer/generic-post-annotations.css')}}">
+
 <!-- Custom JavaScript for Explorer-specific functions -->
 <script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
+
 
 <!-- Load some variables for which we need Jinja2 -->
 <script type="text/javascript">
@@ -27,7 +31,7 @@ for (a in annotation_fields) {
 
 </script>
 
-    <span id="current-username" style="display: none">{{ current_user.get_name() }}</span>
+<span id="current-username" style="display: none">{{ current_user.get_name() }}</span>
 
 <!-- Don't show certain data if the dataset is pseudonymised -->
 {% set pseudonymised = True if dataset.parameters and dataset.parameters.get('pseudonymise', False) %}

@@ -123,7 +123,7 @@ function init() {
 			}
 			else if (type === "dropdown" || type === "checkbox") {
 				if (options.children().length === 0) {
-					options.append(annotations.getInputField);
+					options.append(annotations.getInputField());
 				}
 			}
 		},
@@ -168,7 +168,7 @@ function init() {
 						return false;
 					}
 					$(this).append(`
-					<a class="button-like-small delete-option-field"><i class='fas fa-trash'></i></a>`);
+					<a class="button-like-small delete-option-field"><i class='fas fa-trash'></i></a> `);
 				});
 			}
 		},
@@ -210,7 +210,6 @@ function init() {
 				// Get the ID of the field, so we
 				// can later check if it already exists.
 				let field_id = ann_field.attr("id").split("-")[1];
-				console.log(field_id, field_id)
 				// Make sure the inputs have a label
 				if (!label.length > 0) {
 					label_field.addClass("invalid");
@@ -258,7 +257,7 @@ function init() {
 						// Input fields must have a unique label.
 						else if (option_labels.includes(option_label)) {
 							warning = "Fields must be unique";
-							$(this).addClass("invalid");
+							$(this).find("input").addClass("invalid");
 						}
 						// Fields for dropdowns and checkboxes may be emtpy.
 						// We simply don't push them in that case.
@@ -628,7 +627,7 @@ function init() {
 			let annotation_field = `
 			<li class="annotation-field" id="field-tohashrandomint">
 				<i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
-				 <span class="annotation-fields-row">
+				 <span class="annotation-field-input">
 					<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Label">
 				</span>
 				 <span>
@@ -640,7 +639,7 @@ function init() {
 					</select>
 				</span>
 				<span class="option-fields"></span>
-				<a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
+				<a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>			
             </li>
 			`.replace("randomint", Math.floor(Math.random() * 100000000).toString());
 			$("#annotation-field-settings").append(annotation_field);
@@ -651,7 +650,7 @@ function init() {
 			if (id === undefined || id === 0) {
 				id = Math.floor(Math.random() * 100000000).toString();
 			}
-			return "<span class='option-field'><input type='text' id='option-" + id + "' placeholder='Option'></span>";
+			return "<span class='option-field'><input type='text' id='option-" + id + "' placeholder='New option'></span>";
 		},
 
 		markChanges: function(el) {

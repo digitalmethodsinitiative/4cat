@@ -307,7 +307,7 @@ class ExtractURLs(BasicProcessor):
 
                     if save_annotations:
                         annotations.append({
-                            "label": "extracted_urls",
+                            "label": "Extracted URLs",
                             "type": "textarea",
                             "item_id": items.get("id", ""),
                             "value": items["extracted_urls"]
