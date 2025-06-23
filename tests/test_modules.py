@@ -32,8 +32,8 @@ def mock_logger_config(tmp_path, mock_database):
 
     with patch("common.lib.logger.config") as mock_logger_config:
         mock_logger_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
-            "PATH_ROOT": tmp_path,
-            "PATH_LOGS": tmp_path / "logs",
+            "PATH_ROOT": PATH_ROOT,
+            "PATH_LOGS": PATH_ROOT / "logs",
         }.get(key, default))
         # Create necessary directories
         (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
@@ -184,7 +184,7 @@ def mock_dataset(mock_dataset_database, fourcat_modules):
 
 
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
+def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_logger_config):
     """
     Test all processors separately ensuring they are valid and can be instantiated and report all failures at the end.
     """
@@ -213,15 +213,24 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
                 assert callable(getattr(processor_class, method)), f"{processor_name} has a non-callable method: {method}"
 
             # Test get_options with mock_dataset
-            processor_class.get_options(parent_dataset=mock_dataset, user=None)
+            try:
+                processor_class.get_options(parent_dataset=mock_dataset, config=mock_logger_config)
+            except Exception as e:
+                # Log the failure and add it to the failures list
+                logger.error(f"Processor {processor_name} failed in get_options: {e}")
+                failures.append((processor_name, str(e)))
 
             # Check if the processor can be instantiated
-            processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
+            try:
+                processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
+            except Exception as e:
+                logger.error(f"Processor {processor_name} failed in process(): {e}")
+                failures.append((processor_name, str(e)))
 
         except Exception as e:
-            # Log the failure and add it to the failures list
-            logger.error(f"Processor {processor_name} failed: {e}")
+            logger.error(f"Processor {processor_name} failed while setting up: {e}")
             failures.append((processor_name, str(e)))
+
 
     # Report all failures at the end
     if failures:
