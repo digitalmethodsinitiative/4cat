@@ -38,10 +38,9 @@ component = Blueprint("admin", __name__)
 @login_required
 def frontpage():
     # can be viewed if user has any admin privileges
-    admin_privileges = g.config.get(
-        [key for key in g.config.config_definition.keys() if key.startswith("privileges.admin")])
+    has_admin_privileges = any([g.config.get(key) for key in g.config.config_definition.keys() if key.startswith("privileges.admin")])
 
-    if not any(admin_privileges.values()):
+    if not has_admin_privileges:
         return render_template("error.html", message="You cannot view this page."), 403
 
     # collect some stats
@@ -599,7 +598,7 @@ def manipulate_settings():
            g.modules.processors.values()}
     }
 
-    global_settings = g.config.get_all(user=None, tags=None)
+    global_settings = dict(g.config.get_all(user=None, tags=None))
     update_css = False
 
     if request.method == "POST":
@@ -651,7 +650,7 @@ def manipulate_settings():
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
-    all_settings = g.config.get_all(user=None, tags=[tag])
+    all_settings = dict(g.config.get_all(user=None, tags=[tag]))
 
     options = {}
 

@@ -10,7 +10,7 @@ from functools import wraps
 from math import ceil
 from calendar import monthrange
 from flask_login import current_user
-from flask import (current_app, request, jsonify)
+from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
 from pathlib import Path
 
@@ -326,7 +326,7 @@ def setting_required(setting, required_value=True):
 	def checking_decorator(func):
 		@wraps(func)
 		def decorated_view(*args, **kwargs):
-			if not config.get(setting, user=current_user) == required_value:
+			if not g.config.get(setting, user=current_user) == required_value:
 				return current_app.login_manager.unauthorized()
 			return func(*args, **kwargs)
 
