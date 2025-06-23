@@ -190,7 +190,6 @@ with app.app_context():
         g.db = db
         g.log = log
         g.config = ConfigWrapper(g.base_config, user=current_user, request=request)
-        g.config.config.url = request.url
         g.modules = current_app.fourcat_modules
 
         current_user.with_config(g.config)
