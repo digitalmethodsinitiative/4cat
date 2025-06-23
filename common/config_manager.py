@@ -17,6 +17,9 @@ import configparser
 import os
 
 class CacheMiss:
+    """
+    Helper class to distinguish memcache misses from true `None` values
+    """
     pass
 
 
@@ -234,7 +237,7 @@ class ConfigManager:
 
         return settings
 
-    def get_all(self, is_json=False, user=None, tags=None):
+    def get_all(self, is_json=False, user=None, tags=None, memcache=None):
         """
         Get all known settings
 
@@ -249,12 +252,14 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
+        :param MemcacheClient memcache:  Memcache client. If `None` and
+        `self.memcache` exists, use that instead.
 
         :return dict: Setting value, as a dictionary with setting names as keys
         and setting values as values.
         """
         for setting in self.get_all_setting_names():
-            yield self.get(setting, None, is_json, user, tags)
+            yield setting, self.get(setting, None, is_json, user, tags, memcache=memcache)
 
 
     def get(self, attribute_name, default=None, is_json=False, user=None, tags=None, memcache=None):
@@ -281,7 +286,7 @@ class ConfigManager:
         # core settings are not from the database
         # they are therefore also not memcached - too little gain
         if type(attribute_name) is not str:
-            raise TypeError("attribute_name must be a string")
+            raise TypeError(f"attribute_name must be a str, {attribute_name.__class__.__name__} given")
 
         if attribute_name in self.core_settings:
             return self.core_settings[attribute_name]
@@ -296,7 +301,9 @@ class ConfigManager:
                 raise RuntimeError("Thread-unsafe use of memcache! Please fix your code.")
 
             try:
-                return memcache.get(memcache_id)
+                v = memcache.get(memcache_id, default=CacheMiss)
+                if v is not CacheMiss:
+                    return v
             except KeyError:
                 # cache miss, it's fine
                 pass
@@ -587,6 +594,8 @@ class ConfigWrapper:
         if "tags" not in kwargs:
             kwargs["tags"] = self.tags if self.tags else []
             kwargs["tags"] = self.request_override(kwargs["tags"])
+
+        kwargs["memcache"] = self.memcache
 
         return self.config.get_all(*args, **kwargs)
 
