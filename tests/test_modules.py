@@ -27,8 +27,9 @@ def mock_database():
 @pytest.fixture
 def mock_logger_config(tmp_path, mock_database):
     """
-    Mock the config manager in logger to return a temporary path for logs
+    Set up a config reader without connecting it to the database
     """
+
     with patch("common.lib.logger.config") as mock_logger_config:
         mock_logger_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
             "PATH_ROOT": tmp_path,
@@ -80,10 +81,10 @@ def mock_module_config(mock_database):
         }.get(key, default))
 
 @pytest.fixture
-def fourcat_modules(mock_module_config):
+def fourcat_modules(mock_config):
     from common.lib.module_loader import ModuleCollector
     # Initialize the ModuleCollector and return it
-    return ModuleCollector()
+    return ModuleCollector(config=mock_config)
 
 @pytest.mark.dependency()
 def test_module_collector(logger, fourcat_modules):
