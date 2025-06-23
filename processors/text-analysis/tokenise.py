@@ -75,7 +75,6 @@ class Tokenise(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        print(config)
         with config.get("PATH_ROOT").joinpath("common/assets/stopwords-languages.json").open() as infile:
             stopwords = json.load(infile)
 
