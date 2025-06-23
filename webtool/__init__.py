@@ -127,7 +127,6 @@ app.login_manager.login_view = "user.show_login"
 # initialize rate limiter
 app.limiter = Limiter(app=app, key_func=get_remote_address)
 
-
 # now create an app context to import Blueprints into
 # the app context allows us to pass some values for use inside the Blueprints
 # which they can access via `current_app` - this eliminates the need for
