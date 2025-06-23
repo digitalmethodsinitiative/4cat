@@ -8,6 +8,7 @@ from pathlib import Path
 
 from common.lib.queue import JobQueue
 from common.lib.database import Database
+from common.lib.module_loader import ModuleCollector
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
 
@@ -74,10 +75,12 @@ def run(as_daemon=True, log_level="INFO"):
 	config.with_db(db)
 	config.ensure_database()
 
+	# load 4CAT modules and cache the results
+	modules = ModuleCollector(config=config, write_cache=True)
 
 	# make it happen
 	# this is blocking until the back-end is shut down
-	WorkerManager(logger=log, database=db, queue=queue, as_daemon=as_daemon)
+	WorkerManager(logger=log, database=db, queue=queue, modules=modules, as_daemon=as_daemon)
 
 	# clean up pidfile, if running as daemon
 	if as_daemon:

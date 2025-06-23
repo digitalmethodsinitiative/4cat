@@ -13,7 +13,6 @@ from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
 
@@ -136,7 +135,7 @@ class SearchWithinTCATBins(Search):
     }
 
     @classmethod
-    def collect_all_bins(cls, force_update=False):
+    def collect_all_bins(cls, config, force_update=False):
         """
         Requests bin information from TCAT instances
         """
@@ -161,22 +160,22 @@ class SearchWithinTCATBins(Search):
                     pass
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get data source options
 
         This method takes the pre-defined options, but fills the 'bins' options
         with bins currently available from the configured TCAT instances.
 
+        :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
         the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
+can
         be used to show some options only to privileges users.
         """
         options = cls.options
 
-        cls.collect_all_bins()
+        cls.collect_all_bins(config)
         if all([data.get("failed", False) for instance, data in cls.bin_data["all_bins"].items()]):
             options["bin"] = {
                 "type": UserInput.OPTION_INFO,
@@ -217,7 +216,7 @@ class SearchWithinTCATBins(Search):
         # instance URL again here
         # while the parameter could be marked 'sensitive', the values would
         # still show up in e.g. the HTML of the 'create dataset' form
-        available_instances = config.get("dmi-tcat-search.instances", [])
+        available_instances = self.config.get("dmi-tcat-search.instances", [])
         instance_url = ""
         instance = None
         for available_instance in available_instances:
@@ -231,7 +230,7 @@ class SearchWithinTCATBins(Search):
             return self.dataset.finish_with_error("Invalid DMI-TCAT instance name '%s'" % bin_host)
 
         # Collect the bins again (ensure we have updated info in case bin is still active)
-        self.collect_all_bins(force_update=True)
+        self.collect_all_bins(self.config, force_update=True)
         # Add metadata to parameters
         try:
             current_bin = self.bin_data["all_bins"][instance][bin_name]
@@ -534,13 +533,13 @@ class SearchWithinTCATBins(Search):
         return APIv2_tweet
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate DMI-TCAT query input
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # no query 4 u

@@ -17,18 +17,18 @@ class AudioUploadToText(SearchMedia):
     description = "Upload your own audio and use OpenAI's Whisper model to create transcripts"  # description displayed in UI
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         #TODO: False here does not appear to actually remove the datasource from the "Create dataset" page so technically
         # this method is not necessary; if we can adjust that behavior, it ought to function as intended
 
         # Ensure the Whisper model is available
-        return AudioToText.is_compatible_with(module=module, user=user)
+        return AudioToText.is_compatible_with(module=module, config=config)
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, *args, **kwargs):
         # We need both sets of options for this datasource
-        media_options = SearchMedia.get_options(parent_dataset=parent_dataset, user=user)
-        whisper_options = AudioToText.get_options(parent_dataset=parent_dataset, user=user)
+        media_options = SearchMedia.get_options(*args, **kwargs)
+        whisper_options = AudioToText.get_options(*args, **kwargs)
         media_options.update(whisper_options)
 
         #TODO: there are some odd formatting issues if we use those derived options
@@ -43,9 +43,9 @@ class AudioUploadToText(SearchMedia):
         return media_options
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         # We need SearchMedia's validate_query to upload the media
-        media_query = SearchMedia.validate_query(query, request, user)
+        media_query = SearchMedia.validate_query(query, request, config)
 
         # Here's the real trick: act like a preset and add another processor to the pipeline
         media_query["next"] = [{"type": "audio-to-text",

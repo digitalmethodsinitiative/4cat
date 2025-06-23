@@ -561,7 +561,7 @@ def keep_dataset(key):
                                    message="All datasets of this data source (%s) are scheduled for automatic "
                                            "deletion. This cannot be overridden." % datasource), 403
 
-    if dataset.is_expiring(user=current_user):
+    if dataset.is_expiring(config=g.config):
         dataset.delete_parameter("expires-after")
         dataset.keep = True
 

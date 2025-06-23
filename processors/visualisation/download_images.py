@@ -10,7 +10,6 @@ import re
 from PIL import Image, UnidentifiedImageError
 from requests.structures import CaseInsensitiveDict
 
-from common.config_manager import config
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
@@ -90,7 +89,7 @@ class ImageDownloader(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -108,7 +107,7 @@ class ImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
+        max_number_images = int(config.get("image-downloader.max", 1000))
         if max_number_images != 0:
             options["amount"]["help"] = f"No. of images (max {max_number_images})"
             options["amount"]["max"] = max_number_images
@@ -138,12 +137,13 @@ class ImageDownloader(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on top image rankings, collectors, but not specific collectors with their own image
         collection methods
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return (
             (module.type == "top-images" or module.is_from_collector())

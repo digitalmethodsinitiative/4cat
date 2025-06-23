@@ -56,11 +56,12 @@ class DatasetMerger(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on any top-level CSV or NDJSON file
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
 
@@ -84,7 +85,7 @@ class DatasetMerger(BasicProcessor):
         return DataSet(key=source_key, db=db, modules=modules)
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -92,7 +93,7 @@ class DatasetMerger(BasicProcessor):
         dataset's current name.
 
         :param DataSet parent_dataset:  Parent dataset
-        :param user:  User (passed by Flask in webtool context)
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Processor options
         """
         options = cls.options

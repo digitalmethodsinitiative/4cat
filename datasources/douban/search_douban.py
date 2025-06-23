@@ -242,13 +242,13 @@ class SearchDouban(Search):
 
         return requests.get(url, **kwargs)
 
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate input for a dataset query on the Douban data source.
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         filtered_query = {}

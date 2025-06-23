@@ -370,6 +370,10 @@ class ConfigManager:
 
         # can provide either a string or user object
         if type(user) is not str:
+            if type(user).__name__ == "LocalProxy":
+                # passed on from Flask
+                user = user._get_current_object()
+
             if hasattr(user, "get_id"):
                 user = user.get_id()
             elif user != None:  # noqa: E711
@@ -535,14 +539,22 @@ class ConfigWrapper:
         serve 4CAT with a different configuration based on the proxy server
         used.
         """
-        self.config = config
-        self.user = user
-        self.tags = tags
-        self.request = request
+        if type(config) is ConfigWrapper:
+            # let's not do nested wrappers, but copy properties unless
+            # provided explicitly
+            self.user = user if user else config.user
+            self.tags = tags if tags else config.tags
+            self.request = request if request else config.request
+            self.config = config.config
+        else:
+            self.config = config
+            self.user = user
+            self.tags = tags
+            self.request = request
 
         # this ensures the user object in turn reads from the wrapper
         if self.user:
-            self.user.with_config(self)
+            self.user.with_config(self, rewrap=False)
 
         # this ensures we use our own memcache client, important in threaded
         # contexts because pymemcache is not thread-safe

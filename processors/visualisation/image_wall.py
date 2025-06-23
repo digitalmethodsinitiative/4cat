@@ -13,7 +13,6 @@ from pathlib import Path
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -48,17 +47,18 @@ class ImageWallGenerator(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token sets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		max_number_images = int(config.get("image-visuals.max_images", 1000, user=user))
+	def get_options(cls, parent_dataset=None, config=None):
+		max_number_images = int(config.get("image-visuals.max_images", 1000))
 		options = {
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
@@ -128,7 +128,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		# 0 = use as many images as in the archive, up to the max
 		if max_images == 0:
-			max_images = self.get_options()["amount"]["max"]
+			max_images = self.config.get("image-visuals.max_images", 1000)
 
 		# we loop through the images twice - once to reduce them to a value
 		# that can be sorted, and another time to actually copy them to the

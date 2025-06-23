@@ -12,9 +12,8 @@ import re
 from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
-from common.lib.module_loader import ModuleCollector
-from common.lib.helpers import convert_to_float, get_software_version, call_api
-from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, hash_to_md5
+
+from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api, hash_to_md5, convert_to_float
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
@@ -88,7 +87,7 @@ class DataSet(FourcatModule):
 		this dataset.
 		"""
 		self.db = db
-		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+
 		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
 		self.data = {}
 		self.parameters = {}
@@ -183,7 +182,7 @@ class DataSet(FourcatModule):
 		:return: A path to the results file, 'empty_file', or `None`
 		"""
 		if self.data["is_finished"] and self.data["num_rows"] > 0:
-			return self.folder.joinpath(self.data["result_file"])
+			return self.get_results_path()
 		elif self.data["is_finished"] and self.data["num_rows"] == 0:
 			return 'empty'
 		else:
@@ -199,6 +198,9 @@ class DataSet(FourcatModule):
 
 		:return Path:  A path to the results file
 		"""
+		# alas we need to instantiate a config reader here - no way around it
+		if not self.folder:
+			self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
 		return self.folder.joinpath(self.data["result_file"])
 
 	def get_results_folder_path(self):
@@ -209,7 +211,7 @@ class DataSet(FourcatModule):
 
 		:return Path:  A path to the results file
 		"""
-		return self.folder.joinpath("folder_" + self.key)
+		return self.get_results_path().parent.joinpath("folder_" + self.key)
 
 	def get_log_path(self):
 		"""
@@ -1121,16 +1123,14 @@ class DataSet(FourcatModule):
 			file = query_bit + "-" + self.data["key"]
 			file = re.sub(r"[-]+", "-", file)
 
-		path = self.folder.joinpath(file + "." + extension.lower())
+		self.data["result_file"] = file + "." + extension.lower()
 		index = 1
-		while path.is_file():
-			path = self.folder.joinpath(file + "-" + str(index) + "." + extension.lower())
+		while self.get_results_path().is_file():
+			self.data["result_file"] = file + "-" + str(index) + "." + extension.lower()
 			index += 1
 
-		file = path.name
 		updated = self.db.update("datasets", where={"query": self.data["query"], "key": self.data["key"]},
-								 data={"result_file": file})
-		self.data["result_file"] = file
+								 data={"result_file": self.data["result_file"]})
 		return updated > 0
 
 	def get_key(self, query, parameters, parent="", time_offset=0):
@@ -1488,7 +1488,7 @@ class DataSet(FourcatModule):
 			genealogy.append(self.key)
 			return ",".join(genealogy)
 
-	def get_compatible_processors(self, user=None):
+	def get_compatible_processors(self, config=None):
 		"""
 		Get list of processors compatible with this dataset
 
@@ -1497,9 +1497,10 @@ class DataSet(FourcatModule):
 		specify accepted types (via the `is_compatible_with` method), it is
 		assumed it accepts any top-level datasets
 
-		:param str|User|None user:  User to get compatibility for. If set,
-		use the user-specific config settings where available.
-
+		:param ConfigManager|None config:  Configuration reader to determine
+		compatibility through. This may not be the same reader the dataset was
+		instantiated with, e.g. when checking whether some other user should
+		be able to run processors on this dataset.
 		:return dict:  Compatible processors, `name => class` mapping
 		"""
 		processors = self.modules.processors
@@ -1517,7 +1518,7 @@ class DataSet(FourcatModule):
 			# method returns True *or* if it has no explicit compatibility
 			# check and this dataset is top-level (i.e. has no parent)
 			if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
-					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, user=user)):
+					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, config=config)):
 				available[processor_type] = processor
 
 		return available
@@ -1550,20 +1551,6 @@ class DataSet(FourcatModule):
 
 			return self._queue_position
 
-	def get_modules(self):
-		"""
-		Get 4CAT modules
-
-		Is a function because loading them is not free, and this way we can
-		cache the result.
-
-		:return:
-		"""
-		if not self.modules:
-			self.modules = ModuleCollector()
-
-		return self.modules
-
 	def get_own_processor(self):
 		"""
 		Get the processor class that produced this dataset
@@ -1574,7 +1561,7 @@ class DataSet(FourcatModule):
 
 		return self.modules.processors.get(processor_type)
 
-	def get_available_processors(self, user=None, exclude_hidden=False):
+	def get_available_processors(self, config=None, exclude_hidden=False):
 		"""
 		Get list of processors that may be run for this dataset
 
@@ -1583,8 +1570,10 @@ class DataSet(FourcatModule):
 		run but have options are included so they may be run again with a
 		different configuration
 
-		:param str|User|None user:  User to get compatibility for. If set,
-		use the user-specific config settings where available.
+		:param ConfigManager|None config:  Configuration reader to determine
+		compatibility through. This may not be the same reader the dataset was
+		instantiated with, e.g. when checking whether some other user should
+		be able to run processors on this dataset.
 		:param bool exclude_hidden:  Exclude processors that should be displayed
 		in the UI? If `False`, all processors are returned.
 
@@ -1595,13 +1584,13 @@ class DataSet(FourcatModule):
 			# TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
 			return {processor_type: processor for processor_type, processor in self.available_processors.items() if not exclude_hidden or not processor.is_hidden}
 
-		processors = self.get_compatible_processors(user=user)
+		processors = self.get_compatible_processors(config=config)
 
 		for analysis in self.get_children(update=True):
 			if analysis.type not in processors:
 				continue
 
-			if not processors[analysis.type].get_options():
+			if not processors[analysis.type].get_options(config=config):
 				# No variable options; this processor has been run so remove
 				del processors[analysis.type]
 				continue
@@ -1678,15 +1667,14 @@ class DataSet(FourcatModule):
 			return False
 		return True
 
-	def is_expiring(self, user=None):
+	def is_expiring(self, config):
 		"""
 		Determine if dataset is set to expire
 
 		Similar to `is_expired`, but checks if the dataset will be deleted in
 		the future, not if it should be deleted right now.
 
-		:param user:  User to use for configuration context. Provide to make
-		sure configuration overrides for this user are taken into account.
+        :param ConfigManager config:  Configuration reader (context-aware)
 		:return bool|int:  `False`, or the expiration date as a Unix timestamp.
 		"""
 		# has someone opted out of deleting this?
@@ -1698,7 +1686,7 @@ class DataSet(FourcatModule):
 			return self.parameters.get("expires-after")
 
 		# is the data source configured to have its datasets expire?
-		expiration = config.get("datasources.expiration", {}, user=user)
+		expiration = config.get("datasources.expiration", {})
 		if not expiration.get(self.parameters.get("datasource")):
 			return False
 
@@ -1708,19 +1696,18 @@ class DataSet(FourcatModule):
 
 		return False
 
-	def is_expired(self, user=None):
+	def is_expired(self, config):
 		"""
 		Determine if dataset should be deleted
 
 		Datasets can be set to expire, but when they should be deleted depends
 		on a number of factor. This checks them all.
 
-		:param user:  User to use for configuration context. Provide to make
-		sure configuration overrides for this user are taken into account.
+        :param ConfigManager config:  Configuration reader (context-aware)
 		:return bool:
 		"""
 		# has someone opted out of deleting this?
-		if not self.is_expiring():
+		if not self.is_expiring(config):
 			return False
 
 		# is this dataset explicitly marked as expiring after a certain time?
@@ -1729,7 +1716,7 @@ class DataSet(FourcatModule):
 			return True
 
 		# is the data source configured to have its datasets expire?
-		expiration = config.get("datasources.expiration", {}, user=user)
+		expiration = config.get("datasources.expiration", {})
 		if not expiration.get(self.parameters.get("datasource")):
 			return False
 
@@ -1803,8 +1790,11 @@ class DataSet(FourcatModule):
 		TODO: create more dynamic method of obtaining url.
 		"""
 		filename = self.get_results_path().name
-		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
-					  config.get("flask.server_name") + '/result/' + filename
+
+		# we cheat a little here by using the modules' config reader, but these
+		# will never be context-dependent values anyway
+		url_to_file = ('https://' if self.modules.config.get("flask.https") else 'http://') + \
+						self.modules.config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
 	def warn_unmappable_item(self, item_count, processor=None, error_message=None, warn_admins=True):

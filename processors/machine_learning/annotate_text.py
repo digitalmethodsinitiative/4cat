@@ -12,7 +12,6 @@ from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerE
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding, sniff_csv_dialect
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -95,20 +94,20 @@ class TextClassifier(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
         These are dynamic for this processor: the 'column names' option is
         populated with the column names from the parent dataset, if available.
 
+        :param config:
         :param DataSet parent_dataset:  Parent dataset
-        :param user:  Flask User to which the options are shown, if applicable
         :return dict:  Processor options
         """
         options = cls.options
 
-        models = config.get("dmi-service-manager.stormtrooper_models", user=user).split(",")
+        models = config.get("dmi-service-manager.stormtrooper_models", "").split(",")
         options["model"]["options"] = {m: m for m in models}
 
         if parent_dataset is None:
@@ -126,12 +125,12 @@ class TextClassifier(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on datasets with columns (from which a prompt can be retrieved)
         """
-        return config.get("dmi-service-manager.stormtrooper_enabled", False, user=user) and \
-            config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.stormtrooper_enabled", False) and \
+            config.get("dmi-service-manager.ab_server_address", False) and \
             module.get_columns()
 
     def process(self):
@@ -281,7 +280,7 @@ class TextClassifier(BasicProcessor):
         self.dataset.finish(len(annotations))
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate input for a dataset query on the 4chan data source.
 
@@ -291,7 +290,7 @@ class TextClassifier(BasicProcessor):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
 

@@ -9,7 +9,6 @@ import abc
 from common.lib.queue import JobQueue
 from common.lib.database import Database
 from common.lib.exceptions import WorkerInterruptedException, ProcessorException
-from common.config_manager import config, ConfigDummy
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -86,7 +85,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.manager = manager
 		self.job = job
 		self.init_time = int(time.time())
-		self.config = ConfigDummy()
+		self.config = modules.config
 
 		# ModuleCollector cannot be easily imported into a worker because it itself
 		# imports all workers, so you get a recursive import that Python (rightly) blocks
@@ -95,7 +94,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
 		database_appname = "%s-%s" % (self.type, self.job.data["id"])
 		self.db = Database(logger=self.log, appname=database_appname,
-						   dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
+						   dbname=self.config.DB_NAME, user=self.config.DB_USER, password=self.config.DB_PASSWORD, host=self.config.DB_HOST, port=self.config.DB_PORT)
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
 	def run(self):

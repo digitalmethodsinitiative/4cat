@@ -11,7 +11,6 @@ import re
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
-from common.config_manager import config
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 
@@ -147,7 +146,7 @@ class SearchWithTwitterAPIv2(Search):
 
         tweets = 0
         for query in queries:
-            if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
+            if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
                 params['ids'] = query
             else:
                 params['query'] = query
@@ -455,7 +454,7 @@ class SearchWithTwitterAPIv2(Search):
         return modified_tweet
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get Twitter data source options
 
@@ -463,12 +462,12 @@ class SearchWithTwitterAPIv2(Search):
         may not need to provide their own API key, and may or may not be able
         to enter a list of tweet IDs as their query. Hence the method.
 
+        :param config:
         :param parent_dataset:  Should always be None
-        :param user:  User to provide options for
         :return dict:  Data source options
         """
-        have_api_key = config.get("twitterv2-search.academic_api_key", user=user)
-        max_tweets = config.get("twitterv2-search.max_tweets", user=user)
+        have_api_key = config.get("twitterv2-search.academic_api_key")
+        max_tweets = config.get("twitterv2-search.max_tweets")
 
         if have_api_key:
             intro_text = ("This data source uses the full-archive search endpoint of the X API (v2) to retrieve "
@@ -515,7 +514,7 @@ class SearchWithTwitterAPIv2(Search):
                 },
             })
 
-        if config.get("twitterv2.id_lookup", user=user):
+        if config.get("twitterv2.id_lookup"):
             options.update({
                 "query_type": {
                     "type": UserInput.OPTION_CHOICE,
@@ -559,7 +558,7 @@ class SearchWithTwitterAPIv2(Search):
         return options
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate input for a dataset query on the Twitter data source.
 
@@ -573,11 +572,11 @@ class SearchWithTwitterAPIv2(Search):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
-        have_api_key = config.get("twitterv2-search.academic_api_key", user=user)
-        max_tweets = config.get("twitterv2-search.max_tweets", 10_000_000, user=user)
+        have_api_key = config.get("twitterv2-search.academic_api_key")
+        max_tweets = config.get("twitterv2-search.max_tweets", 10_000_000)
 
         # this is the bare minimum, else we can't narrow down the full data set
         if not query.get("query", None):
@@ -590,7 +589,7 @@ class SearchWithTwitterAPIv2(Search):
         if len(query.get("query")) > 1024 and query.get("query_type", "query") != "id_lookup":
             raise QueryParametersException("X API queries cannot be longer than 1024 characters.")
 
-        if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup", user=user):
+        if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
             # reformat queries to be a comma-separated list with no wrapping
             # whitespace
             whitespace = re.compile(r"\s+")
