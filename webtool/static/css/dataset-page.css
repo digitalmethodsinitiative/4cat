@@ -749,36 +749,94 @@ body.image-preview {
 }
 
 #annotation-fields-editor-controls {
+
 }
 
-#annotation-fields-editor-controls li {
+#annotation-fields-editor-controls li.annotation-field {
+    background-color: white;
     position: relative;
-    background: white;
+    padding: 12px 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 60px;
+    box-sizing: border-box;
 }
 
-#annotation-fields-editor-controls li:not(:last-child) {
-  border-bottom: 1px dotted var(--contrast-dark);
+#annotation-fields-editor-controls li.annotation-field:not(:last-child) {
+    border-bottom: 1px dotted var(--contrast-dark);
 }
 
-.annotation-field > span, .annotation-field > i, .annotation-field > select {
-    vertical-align: top;
+.annotation-field > .handle {
+    flex-shrink: 0;
+    padding-top: 2px;
+    cursor: move;
 }
 
-.annotation-field > i {
-    padding-top: 10px;
+.annotation-field-input {
+    flex-shrink: 0;
+    min-width: 120px;
+    margin-right: 1em;
 }
 
-.option-fields {
+.annotation-field-input input {
+    width: 100%;
+    min-width: 120px;
+}
+
+.annotation-field > span:has(.annotation-field-type) {
+    flex-shrink: 0;
+    min-width: 120px;
+}
+
+.annotation-field-type {
+    width: 100%;
+    padding: 0.35em;
+}
+
+.annotation-field .dataset-annotation-field {
+    flex: 1;
+    min-width: 0; /* Allow shrinking */
+}
+
+.annotation-field .dataset-annotation-field h4 {
+    margin: 0 0 8px 0;
+    display: inline;
+}
+
+.annotation-field .dataset-annotation-field .parameters {
+    margin-top: 8px;
+}
+
+.annotation-field .dataset-annotation-field ul {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.annotation-field .dataset-annotation-field ul li {
+    display: inline-flex;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+.annotation-field .parameters .property-badge {
+    border: none;
+    background: var(--gray, #f0f0f0);
     display: inline-block;
-    max-width: 250px;
+    margin: 0;
+    white-space: nowrap;
 }
 
-.option-field {
-    display: inline-block;
+a.button-like-small.delete-input {
+    margin-left: auto;
 }
 
 #edit-annotation-fields #input-warning {
-    color: var(--accent-error);
+    color: var(--accent-warning)
 }
 
 /* Remove all styles for Explorer posts */
@@ -800,7 +858,6 @@ body.image-preview {
 
 .post-annotations {
     height: 0;
-    overflow: hidden;
     box-sizing: border-box;
     border-width: 0;
 }

@@ -2029,23 +2029,18 @@ class DataSet(FourcatModule):
 			if "type" not in annotation_field:
 				raise AnnotationException("Can't save annotation fields: all fields must have a type" % field_id)
 
-			# Keep track of whether existing fields have changed; if so, we're going to
-			# update the annotations table.
-			if field_id in old_fields:
-				# Keep `from_dataset`, `editable`)
-				for k, v in [key for key in old_fields[field_id].items() if key not in annotation_field.keys()]:
-					if k in ("editable", "from_dataset"):
-						annotation_field[k] = v
-					new_fields[field_id] = annotation_field
-				# Make sure we re-save annotation fields if things have changed
-				if old_fields[field_id] != annotation_field:
-					changes = True
-		print(old_fields)
 		# Check if fields are removed
 		if not add:
 			for field_id in old_fields.keys():
 				if field_id not in new_fields:
 					changes = True
+
+		# Make sure to do nothing to processor-generated annotations; these must remain 'traceable' to their origin
+		# dataset
+		for field_id in new_fields.keys():
+			if field_id in old_fields and old_fields[field_id].get("from_dataset"):
+				old_fields[field_id]["label"] = new_fields[field_id]["label"]  # Only labels could've been changed
+				new_fields[field_id] = old_fields[field_id]
 
 		# If we're just adding fields, add them to the old fields.
 		# If the field already exists, overwrite the old field.

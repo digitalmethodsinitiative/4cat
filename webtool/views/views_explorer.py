@@ -146,6 +146,7 @@ def explorer_dataset(dataset_key: str, page=1):
 		posts=posts,
 		annotation_fields=annotation_fields,
 		annotations=post_annotations,
+		processors=fourcat_modules.processors,
 		from_datasets=from_datasets,
 		template=template,
 		posts_css=posts_css,
