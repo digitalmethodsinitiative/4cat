@@ -20,7 +20,7 @@ if result.returncode != 0:
 # the following are imported *after* the first-run stuff because they may rely
 # on things set up in there - or should not run unless first-run completes
 # successfully!
-from flask import Flask, g, request  # noqa: E402
+from flask import Flask, g, request, current_app  # noqa: E402
 from flask_login import LoginManager, current_user  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
@@ -137,10 +137,11 @@ with app.app_context():
     # gets populated before `before_request`), but can read from current_app
     # instead. Note that where possible g.config should always be preferred
     # over app.fourcat_config because the former is not user-aware!
-    app.openapi = OpenAPICollector(app)
+    app.openapi = OpenAPICollector(app, config)
     app.log = log
     app.db = db
     app.fourcat_config = config
+    app.fourcat_modules = ModuleCollector(app.fourcat_config)
 
     # import all views; these can only be imported here because they rely on
     # current_app for initialisation
@@ -177,8 +178,8 @@ with app.app_context():
         g.queue = queue
         g.db = db
         g.log = log
-        g.modules = ModuleCollector()
         g.config = ConfigWrapper(g.base_config, user=current_user, request=request)
+        g.modules = current_app.fourcat_modules
 
     # import custom jinja2 template filters
     # these also benefit from current_app

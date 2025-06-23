@@ -16,7 +16,6 @@ from urllib.parse import urlparse
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
@@ -58,11 +57,10 @@ class VideoDownloaderPlus(BasicProcessor):
 
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
-    if config.get("video-downloader.allow-indirect"):
-        references = [
-            "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
-            "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
-        ]
+    references = [
+        "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
+        "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
+    ]
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 
@@ -153,15 +151,16 @@ class VideoDownloaderPlus(BasicProcessor):
         self.last_post_process_status = None
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Updating columns with actual columns and setting max_number_videos per
         the max number of images allowed.
+        :param config:
         """
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_videos = int(config.get('video-downloader.max', 100, user=user))
+        max_number_videos = int(config.get('video-downloader.max', 100))
         if max_number_videos == 0:
             options['amount']['help'] = "No. of videos"
             options["amount"]["tooltip"] = "Use 0 to download all videos"
@@ -170,7 +169,7 @@ class VideoDownloaderPlus(BasicProcessor):
             options['amount']['help'] = f"No. of videos (max {max_number_videos:,})"
 
         # And update the max size and help from config
-        max_video_size = int(config.get('video-downloader.max-size', 100, user=user))
+        max_video_size = int(config.get('video-downloader.max-size', 100))
         if max_video_size == 0:
             # Allow video of any size
             options["max_video_size"]["tooltip"] = "Set to 0 if all sizes are to be downloaded."
@@ -196,7 +195,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # these two options are likely to be unwanted on instances with many
         # users, so they are behind an admin config options
-        if config.get("video-downloader.allow-indirect", user=user):
+        if config.get("video-downloader.allow-indirect"):
             options["use_yt_dlp"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Also attempt to download non-direct video links (such YouTube and other video hosting sites)",
@@ -213,7 +212,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 "requires": "use_yt_dlp=true"
             }
 
-        if config.get("video-downloader.allow-multiple", user=user):
+        if config.get("video-downloader.allow-multiple"):
             options["channel_videos"] = {
                                             "type": UserInput.OPTION_TEXT,
                                             "help": "Download multiple videos per link?",
@@ -234,7 +233,7 @@ class VideoDownloaderPlus(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -243,6 +242,7 @@ class VideoDownloaderPlus(BasicProcessor):
         dataset anyway.
 
         :param module:  Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         return ((module.type.endswith("-search") or module.is_from_collector())

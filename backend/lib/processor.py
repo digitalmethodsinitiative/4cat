@@ -7,7 +7,6 @@ import zipfile
 import typing
 import shutil
 import json
-import time
 import abc
 import csv
 import os
@@ -20,7 +19,7 @@ from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
                                    DataSetException, MapItemException)
-from common.config_manager import config, ConfigWrapper
+from common.config_manager import ConfigWrapper
 from common.lib.user import User
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -37,14 +36,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     useful is another question).
 
     To determine whether a processor can process a given dataset, you can
-    define a `is_compatible_with(FourcatModule module=None, str user=None):) -> bool` class
+    define a `is_compatible_with(FourcatModule module=None, config=None):) -> bool` class
     method which takes a dataset as argument and returns a bool that determines
     if this processor is considered compatible with that dataset. For example:
 
     .. code-block:: python
 
         @classmethod
-        def is_compatible_with(cls, module=None, user=None):
+        def is_compatible_with(cls, module=None, config=None):
             return module.type == "linguistic-features"
 
 
@@ -109,11 +108,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             self.job.finish()
             return
 
-        # set up config reader using the worker's DB connection and the dataset
-        # creator. This ensures that if a value has been overriden for the owner,
-        # the overridden value is used instead.
-        config.with_db(self.db)
-        self.config = ConfigWrapper(config=config, user=User.get_by_name(self.db, self.owner))
+        # set up config reader wrapping the worker's config manager, which is
+        # in turn the one passed to it by the WorkerManager, which is the one
+        # originally loaded in bootstrap
+        self.config = ConfigWrapper(config=self.config, user=User.get_by_name(self.db, self.owner))
 
         if self.dataset.data.get("key_parent", None):
             # search workers never have parents (for now), so we don't need to
@@ -170,7 +168,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # get parameters
         # if possible, fill defaults where parameters are not provided
         given_parameters = self.dataset.parameters.copy()
-        all_parameters = self.get_options(self.dataset)
+        all_parameters = self.get_options(self.dataset, config=self.config)
         self.parameters = {
             param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
             for param in [*all_parameters.keys(), *given_parameters.keys()]
@@ -179,7 +177,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # now the parameters have been loaded into memory, clear any sensitive
         # ones. This has a side-effect that a processor may not run again
         # without starting from scratch, but this is the price of progress
-        options = self.get_options(self.dataset.get_parent())
+        options = self.get_options(self.dataset.get_parent(), config=self.config)
         for option, option_settings in options.items():
             if option_settings.get("sensitive"):
                 self.dataset.delete_parameter(option)
@@ -242,18 +240,30 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             next_parameters = next.get("parameters", {})
             next_type = next.get("type", "")
             try:
-                available_processors = self.dataset.get_available_processors(user=self.dataset.creator)
+                available_processors = self.dataset.get_available_processors(config=self.config)
             except ValueError:
                 self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
                 break
+
+        # see if we have anything else lined up to run next
+        for next in self.parameters.get("next", []):
+            can_run_next = True
+            next_parameters = next.get("parameters", {})
+            next_type = next.get("type", "")
+            try:
+                available_processors = self.dataset.get_available_processors(config=self.config)
+            except ValueError:
+                self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
+                break
+
 
             # run it only if the post-processor is actually available for this query
             if self.dataset.data["num_rows"] <= 0:
                 can_run_next = False
                 self.log.info(
                     "Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (
-                    next_type, self.dataset.key))
-
+                        next_type, self.dataset.key))
+                
             elif next_type in available_processors:
                 next_analysis = DataSet(
                     parameters=next_parameters,
@@ -338,7 +348,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         self.job.finish()
 
-        if config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+        if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
+            owner = self.dataset.get_parameters().get("email-complete", False)
+            # Check that username is email address
+            if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+                from smtplib import SMTPException
+                import socket
+                import html2text
+
+        if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
             owner = self.dataset.get_parameters().get("email-complete", False)
             # Check that username is email address
             if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
@@ -349,21 +369,20 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 import html2text
 
                 self.log.debug("Sending email to %s" % owner)
-                dataset_url = ('https://' if config.get('flask.https') else 'http://') + config.get(
-                    'flask.server_name') + '/results/' + self.dataset.key
-                sender = config.get('mail.noreply')
+                dataset_url = ('https://' if self.config.get('flask.https') else 'http://') + self.config.get('flask.server_name') + '/results/' + self.dataset.key
+                sender = self.config.get('mail.noreply')
                 message = MIMEMultipart("alternative")
                 message["From"] = sender
                 message["To"] = owner
                 message["Subject"] = "4CAT dataset completed: %s - %s" % (self.dataset.type, self.dataset.get_label())
                 mail = """
-					<p>Hello %s,</p>
-					<p>4CAT has finished collecting your %s dataset labeled: %s</p>
-					<p>You can view your dataset via the following link:</p>
-					<p><a href="%s">%s</a></p> 
-					<p>Sincerely,</p>
-					<p>Your friendly neighborhood 4CAT admin</p>
-					""" % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
+                    <p>Hello %s,</p>
+                    <p>4CAT has finished collecting your %s dataset labeled: %s</p>
+                    <p>You can view your dataset via the following link:</p>
+                    <p><a href="%s">%s</a></p> 
+                    <p>Sincerely,</p>
+                    <p>Your friendly neighborhood 4CAT admin</p>
+                    """ % (owner, self.dataset.type, self.dataset.get_label(), dataset_url, dataset_url)
                 html_parser = html2text.HTML2Text()
                 message.attach(MIMEText(html_parser.handle(mail), "plain"))
                 message.attach(MIMEText(mail, "html"))
@@ -412,10 +431,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         TODO: could be improved by accepting different types of data depending on csv or ndjson.
 
-        :param str field_name: 	Name of the desired new field
-        :param List new_data: 	List of data to be added to parent dataset
-        :param DataSet which_parent: 	DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
-        :param bool update_existing: 	False (default) will raise an error if the field_name already exists
+        :param str field_name:     name of the desired
+        :param List new_data:     List of data to be added to parent dataset
+        :param DataSet which_parent:     DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
+        :param bool update_existing:     False (default) will raise an error if the field_name already exists
                                         True will allow updating existing data
         """
         if len(new_data) < 1:
@@ -430,9 +449,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         parent_path = which_parent.get_results_path()
 
         if len(new_data) != which_parent.num_rows:
-            raise ProcessorException(
-                'Must have new data point for each record: parent dataset: %i, new data points: %i' % (
-                which_parent.num_rows, len(new_data)))
+            raise ProcessorException('Must have new data point for each record: parent dataset: %i, new data points: %i' % (which_parent.num_rows, len(new_data)))
 
         self.dataset.update_status("Adding new field %s to the source file" % field_name)
 
@@ -492,89 +509,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         self.dataset.update_status("Parent dataset updated.")
 
-    def iterate_proxied_requests(self, urls, preserve_order=True, **kwargs):
-        """
-        Request an iterable of URLs and return results
-
-        This method takes an iterable yielding URLs and yields the result for
-        a GET request for that URL in return. This is done through the worker
-        manager's DelegatedRequestHandler, which can run multiple requests in
-        parallel and divide them over the proxies configured in 4CAT (if any).
-        Proxy cooloff and queueing is shared with other processors, so that a
-        processor will never accidentally request from the same site as another
-        processor, potentially triggering rate limits.
-
-        :param urls:  Something that can be iterated over and yields URLs
-        :param kwargs:  Other keyword arguments are passed on to `add_urls`
-        and eventually to `requests.get()`.
-        :param bool preserve_order:  Return items in the original order. Use
-        `False` to potentially speed up processing, if order is not important.
-        :return:  A generator yielding request results, i.e. tuples of a
-        URL and a `requests` response objects
-        """
-        queue_name = self._proxy_queue_name()
-        delegator = self.manager.proxy_delegator
-
-        # 50 is an arbitrary batch size - but we top up every 0.05s, so
-        # that should be sufficient
-        batch_size = 50
-
-        # we need an iterable, so we can use next() and StopIteration
-        urls = iter(urls)
-
-        have_urls = True
-        while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
-            if queue_length < batch_size and have_urls:
-                batch = []
-                while len(batch) < (batch_size - queue_length):
-                    try:
-                        batch.append(next(urls))
-                    except StopIteration:
-                        have_urls = False
-                        break
-
-                delegator.add_urls(batch, queue_name, **kwargs)
-
-            time.sleep(0.05)  # arbitrary...
-            for url, result in delegator.get_results(queue_name, preserve_order=preserve_order):
-                # result may also be a FailedProxiedRequest!
-                # up to the processor to decide how to deal with it
-                yield url, result
-
-    def push_proxied_request(self, url, position=-1, **kwargs):
-        """
-        Add a single URL to the proxied requests queue
-
-        :param str url:  URL to add
-        :param position:  Position to add to queue; can be used to add priority
-        requests, adds to end of queue by default
-        :param kwargs:
-        """
-        self.manager.proxy_delegator.add_urls([url], self._proxy_queue_name(), position=position, **kwargs)
-
-    def flush_proxied_requests(self):
-        """
-        Get rid of remaining proxied requests
-
-        Can be used if enough results are available and any remaining ones need
-        to be stopped ASAP and are otherwise unneeded.
-
-        Blocking!
-        """
-        self.manager.proxy_delegator.halt_and_wait(self._proxy_queue_name())
-
-
-    def _proxy_queue_name(self):
-        """
-        Get proxy queue name
-
-        For internal use.
-
-        :return str:
-        """
-        return f"{self.type}-{self.dataset.key}"
-
-
     def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
         """
         A generator that iterates through files in an archive
@@ -585,7 +519,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         Files are temporarily unzipped and deleted after use.
 
-        :param Path path: 	Path to zip file to read
+        :param Path path:     Path to zip file to read
         :param Path staging_area:  Where to store the files while they're
           being worked with. If omitted, a temporary folder is created and
           deleted after use
@@ -638,7 +572,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         Files are unzipped to a staging area. The staging area is *not*
         cleaned up automatically.
 
-        :param Path path: 	Path to zip file to read
+        :param Path path:     Path to zip file to read
         :param Path staging_area:  Where to store the files while they're
           being worked with. If omitted, a temporary folder is created and
           deleted after use
@@ -707,10 +641,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         :param data: A list or tuple of dictionaries, all with the same keys
         """
-        if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data,
-                                                                                                                 str):
-            raise TypeError(
-                "write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
+        if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data, str):
+            raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
 
         if not data:
             raise ValueError("write_csv_items requires a dictionary with at least one item")
@@ -818,67 +750,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         return standalone
 
-    def save_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
-        """
-        Saves annotations made by this processor on the basis of another dataset.
-        Also adds some data regarding this processor: set `author` and `label` to processor name,
-        and add parameters to `metadata` (unless explicitly indicated).
-
-        :param annotations:		List of dictionaries with annotation items. Must have `item_id` and `value`.
-                                E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
-        :param source_dataset:	The dataset that these annotations will be saved on. If None, will use the top parent.
-        :param bool overwrite:	Whether to overwrite annotations if the label is already present
-                                for the dataset. If this is False and the label is already present,
-                                we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
-                                Else we'll just replace the old data.
-
-        :returns int:			How many annotations were saved.
-
-        """
-
-        if not annotations:
-            return 0
-
-        # Default to parent dataset
-        if not source_dataset:
-            source_dataset = self.source_dataset.top_parent()
-
-        # Check if this dataset already has annotation fields
-        existing_labels = source_dataset.get_annotation_field_labels()
-
-        # Set some values
-        for annotation in annotations:
-
-            if not annotation.get("label"):
-                # If there's no label, set the default label to this processor's name
-                label = self.name
-            else:
-                # If we have a custom label, use that
-                label = annotation["label"]
-                # Shorten if necessary
-                if len(label) > 100:
-                    label = label[:100]
-
-            # If the processor has already generated annotation fields,
-            # or if we have a custom label that already exists
-            # add a number suffix to differentiate
-            if not overwrite and label in existing_labels:
-                label += "-" + str(
-                    len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
-            # Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
-            annotation["label"] = label
-
-            # Set the author to this processor's name
-            if not annotation.get("author"):
-                annotation["author"] = self.name
-            if not annotation.get("author_original"):
-                annotation["author_original"] = self.name
-
-            annotation["by_processor"] = True
-
-        annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
-        return annotations_saved
-
     @classmethod
     def map_item_method_available(cls, dataset):
         """
@@ -890,9 +761,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         data is in the right format to be mapped, so `False` is returned in
         that case even if a map_item() method is available.
 
-        :param BasicProcessor processor:	The BasicProcessor subclass object
+        :param BasicProcessor processor:    The BasicProcessor subclass object
         with which to use map_item
-        :param DataSet dataset:				The DataSet object with which to
+        :param DataSet dataset:                The DataSet object with which to
         use map_item
         """
         # only run item mapper if extension of processor == extension of
@@ -941,7 +812,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -950,12 +821,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         fine-grained options, e.g. in cases where the availability of options
         is partially determined by the parent dataset's parameters.
 
+        :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
           the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-          case they are requested for display in the 4CAT web interface. This can
-          be used to show some options only to privileges users.
         """
+
         return cls.options if hasattr(cls, "options") else {}
 
     @classmethod
@@ -963,7 +833,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         Get processor status
 
-        :return list:	Statuses of this processor
+        :return list:    Statuses of this processor
         """
         return cls.status if hasattr(cls, "status") else None
 

@@ -26,11 +26,12 @@ class ThreadMetadata(BasicProcessor):
 	followups = []
 
 	@staticmethod
-	def is_compatible_with(module=None, user=None):
+	def is_compatible_with(module=None, config=None):
 		"""
         Determine compatibility
 
         :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")

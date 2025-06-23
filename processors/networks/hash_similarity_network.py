@@ -49,9 +49,10 @@ class HashSimilarityNetworker(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Update column option with actual columns
+        :param config:
         """
         options = cls.options
 
@@ -69,7 +70,7 @@ class HashSimilarityNetworker(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Currently only allowed on video-hashes, but technically any row of bit hashes will work. Could check for "hash"
         in columns, but... how to make that a check as a classmethod?

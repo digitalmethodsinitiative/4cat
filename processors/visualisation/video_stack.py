@@ -12,7 +12,6 @@ import oslex
 
 from packaging import version
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -80,11 +79,12 @@ class VideoStack(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
         :param DataSet module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         if not (module.get_media_type() == "video" or module.type.startswith("video-downloader")):
@@ -93,7 +93,7 @@ class VideoStack(BasicProcessor):
             # Only check these if we have a video dataset
             # also need ffprobe to determine video lengths
             # is usually installed in same place as ffmpeg
-            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path", user=user))
+            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
             ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
             return ffmpeg_path and ffprobe_path
 
@@ -115,7 +115,7 @@ class VideoStack(BasicProcessor):
 
         # To figure out the length of a video we use ffprobe, if available
         with_errors = False
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
+        ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack

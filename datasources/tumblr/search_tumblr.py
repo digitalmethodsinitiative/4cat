@@ -16,7 +16,6 @@ import json
 from requests.exceptions import ConnectionError
 from datetime import datetime
 
-from common.config_manager import config
 from backend.lib.search import Search
 from common.lib.helpers import UserInput, strip_tags
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ConfigException
@@ -89,9 +88,10 @@ class SearchTumblr(Search):
 	references = ["[Tumblr API documentation](https://www.tumblr.com/docs/en/api/v2)"]
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		"""
-		Check if Tumblr keys configured and if not, requests from User
+		Check is Tumbler keys configured and if not, requests from User
+		:param config:
 		"""
 		options = {
 			"intro": {
@@ -148,7 +148,7 @@ class SearchTumblr(Search):
 		}
 
 		try:
-			SearchTumblr.get_tumblr_keys(user)
+			SearchTumblr.get_tumblr_keys(config)
 		except ConfigException:
 			# No 4CAT set keys for user; let user input their own
 			options["key-info"] = {
@@ -303,7 +303,7 @@ class SearchTumblr(Search):
 				# Used for getting tagged posts, which uses requests instead.
 				api_key = self.parameters.get("consumer_key")
 				if not api_key:
-					api_key = SearchTumblr.get_tumblr_keys(self.owner)[0]
+					api_key = SearchTumblr.get_tumblr_keys(self.config)[0]
 
 				new_results = self.get_posts_by_tag(query, max_date=max_date, min_date=min_date, api_key=api_key)
 
@@ -893,12 +893,12 @@ class SearchTumblr(Search):
 		return post_notes
 
 	@staticmethod
-	def get_tumblr_keys(user):
+	def get_tumblr_keys(config):
 		config_keys = [
-			config.get("api.tumblr.consumer_key", user=user),
-			config.get("api.tumblr.consumer_secret", user=user),
-			config.get("api.tumblr.key", user=user),
-			config.get("api.tumblr.secret_key", user=user)]
+			config.get("api.tumblr.consumer_key"),
+			config.get("api.tumblr.consumer_secret"),
+			config.get("api.tumblr.key"),
+			config.get("api.tumblr.secret_key")]
 		if not all(config_keys):
 			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
 		return config_keys
@@ -915,7 +915,7 @@ class SearchTumblr(Search):
 					   self.parameters.get("secret_key")]
 		if not all(config_keys):
 			# No user input keys; attempt to use 4CAT config keys
-			config_keys = self.get_tumblr_keys(self.owner)
+			config_keys = self.get_tumblr_keys(self.config)
 
 		self.client = pytumblr.TumblrRestClient(*config_keys)
 
@@ -931,7 +931,7 @@ class SearchTumblr(Search):
 
 		return self.client
 
-	def validate_query(query, request, user):
+	def validate_query(query, request, config):
 		"""
 		Validate custom data input
 
@@ -940,7 +940,7 @@ class SearchTumblr(Search):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  	Flask request
-		:param User user:  	User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		:return dict:  		Safe query parameters
 		"""
 

@@ -34,7 +34,6 @@ import common.lib.config_definition as config_definition
 
 component = Blueprint("admin", __name__)
 
-
 @component.route("/admin/")
 @login_required
 def frontpage():
@@ -128,7 +127,7 @@ def list_users(page):
     distinct_users = [u["name"] for u in g.db.fetchall("SELECT DISTINCT name FROM users")]
 
     pagination = Pagination(page, page_size, num_users, "admin.list_users")
-    return render_template("controlpanel/users.html", users=[User(g.db, user) for user in users],
+    return render_template("controlpanel/users.html", users=[User(g.db, user, config=g.config) for user in users],
                            filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
@@ -268,6 +267,7 @@ def add_user():
                                      "timestamp_created": int(time.time())})
 
             user = User.get_by_name(g.db, username)
+            user.with_config(g.config)
             if user is None:
                 response = {**response, **{"message": "User was created but could not be instantiated properly."}}
             else:
@@ -293,6 +293,7 @@ def add_user():
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
                 user = User.get_by_name(g.db, username)
+                user.with_config(g.config)
                 g.db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
@@ -390,6 +391,7 @@ def delete_user():
     """
     username = request.form.get("name")
     user = User.get_by_name(db=g.db, name=username)
+    user.with_config(g.config)
     if not username:
         return render_template("error.html", message=f"User {username} does not exist.",
                                title="User not found"), 404
@@ -427,6 +429,7 @@ def manipulate_user(mode):
     if user is None:
         return error(404, message="User not found")
 
+    user.with_config(g.config)
     incomplete = []
     if request.method == "POST":
         if not request.form.get("name", request.args.get("name")):
@@ -479,6 +482,7 @@ def manipulate_user(mode):
                     incomplete.append("name")
                     g.db.rollback()
 
+            user.with_config(g.config)
             if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
                 if not autodelete:
@@ -914,6 +918,7 @@ def user_bulk():
                 # the object
                 g.db.insert("users", {"name": user["name"], "timestamp_created": int(time.time())})
                 user_obj = User.get_by_name(g.db, user["name"])
+                user_obj.with_config(g.config)
 
                 if user.get("expires"):
                     try:
