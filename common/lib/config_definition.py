@@ -413,14 +413,17 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-listed hostnames",
-        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and "
+                   "Server Name. Front-end needs to be restarted for changed to apply.",
         "global": True
     },
     "flask.autologin.api": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-list for API",
-        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. "
+                   "Docker should include localhost and Server Name.  Front-end needs to be restarted for changed to "
+                   "apply.",
         "global": True
     },
     "flask.https": {
