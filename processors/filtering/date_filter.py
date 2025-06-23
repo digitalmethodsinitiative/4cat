@@ -31,7 +31,16 @@ class DateFilter(BaseFilter):
     }   
     
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
+
+        Offer available columns in a nice dropdown, when possible
+
+        :param DataSet parent_dataset:  Parent dataset
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Processor options
+        """
         options = cls.options
         if not parent_dataset:
             return options

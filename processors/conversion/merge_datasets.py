@@ -85,7 +85,7 @@ class DatasetMerger(BasicProcessor):
         return DataSet(key=source_key, db=db, modules=modules)
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -93,7 +93,7 @@ class DatasetMerger(BasicProcessor):
         dataset's current name.
 
         :param DataSet parent_dataset:  Parent dataset
-        :param user:  User (passed by Flask in webtool context)
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Processor options
         """
         options = cls.options
