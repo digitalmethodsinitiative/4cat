@@ -1,5 +1,6 @@
 import logging.handlers
 import subprocess
+from collections import namedtuple
 import sys
 import os
 
@@ -127,6 +128,12 @@ app.login_manager.login_view = "user.show_login"
 # initialize rate limiter
 app.limiter = Limiter(app=app, key_func=get_remote_address)
 
+# read these once, because we need them for each request but they will never
+# change without a restart
+app.autologin = namedtuple("AutologinSettings", ("hostnames", "api"))
+app.autologin.hostnames = config.get("flask.autologin.hostnames")
+app.autologin.api = config.get("flask.autologin.api")
+
 # now create an app context to import Blueprints into
 # the app context allows us to pass some values for use inside the Blueprints
 # which they can access via `current_app` - this eliminates the need for
@@ -173,14 +180,25 @@ with app.app_context():
         request's active user, so these are registered in the global `g`
         contextual namespace.
         """
+        if request.path.startswith("/static/") or request.path.endswith("favicon.ico"):
+            # in contexts where we're serving static files through slack, save
+            # some overhead
+            return
+        else:
+            print(request.path)
+
         g.base_config = config
         g.queue = queue
         g.db = db
         g.log = log
         g.config = ConfigWrapper(g.base_config, user=current_user, request=request)
+        g.config.config.url = request.url
         g.modules = current_app.fourcat_modules
 
+        current_user.with_config(g.config)
+
     # import custom jinja2 template filters
+
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402
 
