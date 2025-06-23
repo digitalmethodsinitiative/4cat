@@ -62,9 +62,18 @@ def run(as_daemon=True, log_level="INFO"):
 	db.commit()
 	queue.release_all()
 
+	# test memcache and clear upon backend restart
+	if config.get("MEMCACHE_SERVER"):
+		if config.memcache:
+			log.debug("Memcache connection initialized - clearing")
+			config.clear_cache()
+		else:
+			log.warning("Memcache server address configured, but connection could not be initialized. Configuration cache inactive.")
+			
 	# ensure database consistency for settings table
 	config.with_db(db)
 	config.ensure_database()
+
 
 	# make it happen
 	# this is blocking until the back-end is shut down
