@@ -4,6 +4,7 @@
 import re
 import csv
 import json
+import logging
 import markdown
 import traceback
 
@@ -42,11 +43,15 @@ def log_exception(e):
     if not status_code or status_code >= 500:
         # Capture the correct frame and log
         tb = traceback.extract_tb(cause.__traceback__)
+        location = "→".join([f"{t.filename.split('/')[-1]}:{t.lineno}" for t in tb])
 
         # Get the request URL
         request_url = request.url
 
-        current_app.log.error(f"{type(cause).__name__}{(' ('+request_url+')') if request_url else ''}: {cause} at {tb}", frame=tb if tb else None)
+        msg = f"{type(cause).__name__}{(' ('+request_url+')') if request_url else ''}: {cause}"
+        current_app.log.error(msg, frame=tb if tb else None)
+        logging.error(msg + f" at {location}")
+
         return error(status_code if status_code else 500, message="An internal error occurred while processing your request.", status="error")
     else:
         # Should be just 4xx errors; return and allow Flask to handle them
