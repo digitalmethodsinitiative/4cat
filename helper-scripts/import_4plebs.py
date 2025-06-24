@@ -7,7 +7,6 @@ import json
 import time
 import sys
 import csv
-import json
 import re
 import os
 

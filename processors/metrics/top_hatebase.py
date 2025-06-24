@@ -26,12 +26,15 @@ class HatebaseRanker(BasicProcessor):
 	description = "Count frequencies for hateful words and phrases found in the dataset and rank the results (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on previous Hatebase analyses
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "hatebase-data"
 
@@ -80,9 +83,6 @@ class HatebaseRanker(BasicProcessor):
 		scope = self.parameters.get("scope")
 		rank_style = self.parameters.get("top-style")
 		cutoff = convert_to_int(self.parameters.get("top"), 15)
-
-		# This is needed to check for URLs in the "domain" and "url" columns for Reddit submissions
-		datasource = self.source_dataset.parameters.get("datasource")
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")

@@ -8,11 +8,10 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from packaging import version
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_ffmpeg_version
@@ -35,6 +34,8 @@ class VideoSceneFrames(BasicProcessor):
     description = "For each scene identified, extracts the first frame."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
+    followups = ["video-timelines"]
+
     options = {
         "frame_size": {
             "type": UserInput.OPTION_CHOICE,
@@ -49,10 +50,8 @@ class VideoSceneFrames(BasicProcessor):
         },
     }
 
-    followups = ["video-timelines"]
-
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -80,7 +79,10 @@ class VideoSceneFrames(BasicProcessor):
         frame_size = self.parameters.get("frame_size", "no_modify")
 
         # unpack source videos to get frames from
-        video_dataset = self.source_dataset.nearest("video-downloader*")
+        video_dataset = None
+        for video_dataset_type in ["video-downloader*", "media-import-search"]:
+            if video_dataset is None:
+                video_dataset = self.source_dataset.nearest(video_dataset_type)
         if not video_dataset:
             self.log.error(
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
@@ -124,14 +126,14 @@ class VideoSceneFrames(BasicProcessor):
 
             command = [
                 ffmpeg_path,
-                "-i", shlex.quote(str(video)),
+                "-i", oslex.quote(str(video)),
                 "-vf", f"select='{vf_param}'",
                 fps_command, "passthrough",
-                shlex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
+                oslex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
             ]
 
             if frame_size != "no_modify":
-                command += ["-s", shlex.quote(frame_size)]
+                command += ["-s", oslex.quote(frame_size)]
 
             result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)

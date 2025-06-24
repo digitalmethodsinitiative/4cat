@@ -33,6 +33,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
                   "requests will be credited by Clarifai to the owner of the API token you provide!"  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    followups = ["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"]
+
     references = [
         "[Clarifai](https://www.clarifai.com/)",
         "[Clarifai API Pricing & Free Usage Limits](https://www.clarifai.com/pricing)",
@@ -40,13 +42,14 @@ class ClarifaiAPIFetcher(BasicProcessor):
     ]
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on image sets
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.type.startswith("image-downloader") or module.type == "video-frames"
+        return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
     options = {
         "amount": {

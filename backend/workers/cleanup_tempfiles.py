@@ -3,10 +3,10 @@ Delete old datasets
 """
 import shutil
 import re
-
+import json
+from datetime import datetime
 from pathlib import Path
 
-from common.config_manager import config
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.exceptions import WorkerInterruptedException, DataSetException
@@ -27,20 +27,30 @@ class TempFileCleaner(BasicWorker):
 
     ensure_job = {"remote_id": "localhost", "interval": 10800}
 
+    # Use tracking file to delay deletion of files that may still be in use
+    days_to_keep = 7
+
     def work(self):
         """
         Go through result files, and for each one check if it should still
         exist
         :return:
         """
+        # Load tracking file
+        tracking_file = self.config.get('PATH_DATA').joinpath(".temp_file_cleaner")
+        if not tracking_file.exists():
+            tracked_files = {}
+        else:
+            tracked_files = json.loads(tracking_file.read_text())
 
-        result_files = Path(config.get('PATH_DATA')).glob("*")
+        result_files = Path(self.config.get('PATH_DATA')).glob("*")
         for file in result_files:
             if file.stem.startswith("."):
                 # skip hidden files
                 continue
 
             if self.interrupted:
+                tracking_file.write_text(json.dumps(tracked_files))
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
 
             # the key of the dataset files belong to can be extracted from the
@@ -59,20 +69,28 @@ class TempFileCleaner(BasicWorker):
             except DataSetException:
                 # the dataset has been deleted since, but the result file still
                 # exists - should be safe to clean up
-                self.log.info("No matching dataset with key %s for file %s, deleting file" % (key, str(file)))
-                if file.is_dir():
-                    try:
-                        shutil.rmtree(file)
-                    except PermissionError:
-                        self.log.info(f"Folder {file} does not belong to a dataset but cannot be deleted (no "
-                                      f"permissions), skipping")
+                if file.name not in tracked_files:
+                    self.log.info(f"No matching dataset with key {key} for file {file}; marking for deletion")
+                    tracked_files[file.name] = datetime.now().timestamp() + (self.days_to_keep * 86400)
+                elif tracked_files[file.name] < datetime.now().timestamp():
+                    self.log.info(f"File {file} marked for deletion since {datetime.fromtimestamp(tracked_files[file.name]).strftime('%Y-%m-%d %H:%M:%S')}, deleting file")
+                    if file.is_dir():
+                        try:
+                            shutil.rmtree(file)
+                        except PermissionError:
+                            self.log.info(f"Folder {file} does not belong to a dataset but cannot be deleted (no "
+                                          f"permissions), skipping")
 
-                else:
-                    try:
-                        file.unlink()
-                    except FileNotFoundError:
-                        # the file has been deleted since
-                        pass
+                    else:
+                        try:
+                            file.unlink()
+                        except FileNotFoundError:
+                            # the file has been deleted since
+                            pass
+
+                    # Remove from tracking
+                    del tracked_files[file.name]
+
                 continue
 
             if file.is_dir() and "-staging" in file.stem and dataset.is_finished():
@@ -80,8 +98,14 @@ class TempFileCleaner(BasicWorker):
                 # if the dataset is finished, the staging area should have been
                 # compressed into a zip file, or deleted, so this is also safe
                 # to clean up
-                self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
-                dataset.key, str(file)))
-                shutil.rmtree(file)
+                if file.name not in tracked_files:
+                    self.log.info("Dataset %s is finished, but staging area remains at %s, marking for deletion" % (dataset.key, str(file)))
+                    tracked_files[file.name] = datetime.now().timestamp() + (self.days_to_keep * 86400)
+                elif tracked_files[file.name] < datetime.now().timestamp():
+                    self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (dataset.key, str(file)))
+                    shutil.rmtree(file)
+
+        # Update tracked files
+        tracking_file.write_text(json.dumps(tracked_files))
 
         self.job.finish()

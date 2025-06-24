@@ -23,14 +23,12 @@ It exports most data as-is, but also makes some changes.
 
 import argparse
 import json
-import time
 import csv
 import sys
 import os
 import re
 
-from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
@@ -93,11 +91,6 @@ logger = Logger()
 db = Database(logger=logger, appname="4chan-export", dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 
 print("Exporting to %s" % args.output)
-
-# Correct sticky threads for /pol/
-if "pol" in boards:
-	print("Updating sticky threads for /pol/.")
-	db.execute("UPDATE threads_4chan SET is_sticky = TRUE WHERE board = 'pol' AND id IN (385738122,383677565,431579660,375779341,374650701,421675128,438918345,401602799,430140262,406826265,376776209,393208524,419662044,415923186,422028606,406251049,415653885,431856910)")
 
 # Get min and max thread IDs to query in batches and know when we're done
 print("Getting upper and lower boundaries of thread IDs.")
@@ -163,11 +156,11 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 
 				# Set required OP data
 				post = {
-					"sub": row["subject"] if row["subject"] != None else "", 
+					"sub": row["subject"] if row["subject"] is not None else "",
 					"replies": 0,
 					"images": 0,
 					"op": True,
-					"semantic_url": row["semantic_url"] if row["semantic_url"] != None else ""
+					"semantic_url": row["semantic_url"] if row["semantic_url"] is not None else ""
 				}
 
 				# Set optional OP data
@@ -205,7 +198,8 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 			deleted = True if (row["timestamp_deleted"] and row["timestamp_deleted"] > 0) and not post.get("op") else False
 			if (deleted or thread_deleted) and row["id"] != row["thread_id"]:
 				post["deleted"] = True
-				post["deleted_on"] = row["timestamp_deleted"] if (row["timestamp_deleted"] and row["timestamp_deleted"] > 0) else thread_data[0]["deleted_on"]
+				if not skip_deleted: # Deleted OP data might have been skipped, so we maybe can't get data from `thread_data`
+					post["deleted_on"] = row["timestamp_deleted"] if (row["timestamp_deleted"] and row["timestamp_deleted"] > 0) else thread_data[0]["deleted_on"]
 
 			# Skip deleted posts, if indicated
 			if skip_deleted and post.get("deleted"):
@@ -215,7 +209,7 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 			post["num"] = row["id"]
 			post["resto"] = row["thread_id"]
 			post["board"] = row["board"]
-			post["com"] = row["body"] if row["body"] != None else ""
+			post["com"] = row["body"] if row["body"] is not None else ""
 			post["time"] = row["timestamp"]
 			post["time_utc"] = datetime.strftime(datetime.utcfromtimestamp(row["timestamp"]), "%Y-%m-%d %H:%M:%S")
 			post["name"] = row.get("author", "")

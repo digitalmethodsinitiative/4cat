@@ -90,7 +90,7 @@ class DatasetItem(dict):
         DatasetItem init
 
         :param callable mapper:  Mapper for this item. Currently unused, could
-        be used for abovementioned just-in-time mapping.
+        be used for above-mentioned just-in-time mapping.
         :param dict original:  Original item, e.g. from the csv or ndjson
         :param MappedItem mapped_object:  Mapped item, before resolving any
         potential missing data
@@ -100,6 +100,10 @@ class DatasetItem(dict):
         self._mapper = mapper
         self._original = original
         self._mapped_object = mapped_object
+
+        if hasattr(mapped_object, "get_missing_fields"):
+            self.missing_fields = mapped_object.get_missing_fields()
+            self["missing_fields"] = ", ".join(self.missing_fields)
 
     @property
     def original(self):

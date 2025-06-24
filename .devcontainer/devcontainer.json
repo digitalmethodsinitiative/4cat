@@ -1,0 +1,17 @@
+{
+  "name": "4cat-container",
+  "dockerComposeFile": "../docker-compose_build.yml",
+  "service": "frontend",
+  "workspaceFolder": "/usr/src/app",
+  "settings": {
+    "python.pythonPath": "/usr/local/bin/python",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true
+  },
+  "extensions": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-azuretools.vscode-docker"
+  ],
+  "postCreateCommand": "pip install -r requirements.txt"
+}

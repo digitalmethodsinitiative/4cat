@@ -31,6 +31,8 @@ class TfIdf(BasicProcessor):
 	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["wordcloud"]
+
 	options = {
 		"library": {
 			"type": UserInput.OPTION_CHOICE,
@@ -89,11 +91,12 @@ class TfIdf(BasicProcessor):
 	]
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token sets
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "tokenise-posts"
 
@@ -206,12 +209,6 @@ class TfIdf(BasicProcessor):
 
 		# Retrieve the words and their tf-idf weights.
 		vector = tfidf_model[corpus]
-
-		data = []
-		row = []
-		col = []
-		vocab = []
-
 		results = []
 
 		self.dataset.update_status("Extracting results")
@@ -254,14 +251,12 @@ class TfIdf(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		feature_array = np.array(tfidf_vectorizer.get_feature_names_out())
-		tfidf_sorting = np.argsort(tfidf_matrix.toarray()).flatten()[::-1]
+		np.array(tfidf_vectorizer.get_feature_names_out())
 
 		# Print and store top n highest scoring tf-idf scores
-		top_words = feature_array[tfidf_sorting[:top_n]]
 		weights = np.asarray(tfidf_matrix.mean(axis=0)).ravel().tolist()
 		df_weights = pd.DataFrame({"term": tfidf_vectorizer.get_feature_names_out(), "weight": weights})
-		df_weights = df_weights.sort_values(by="weight", ascending=False).head(100)
+		df_weights.sort_values(by="weight", ascending=False).head(100)
 
 		self.dataset.update_status("Writing tf-idf vector to csv")
 		df_matrix = pd.DataFrame(tfidf_matrix.toarray(), columns=tfidf_vectorizer.get_feature_names_out())
@@ -287,3 +282,12 @@ class TfIdf(BasicProcessor):
 				results.append(result)
 
 		return results
+
+	@classmethod
+	def exclude_followup_processors(cls, processor_type):
+		"""
+		Exclude followups if they are not compatible with the module
+		"""
+		if processor_type in ["consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts", "image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter"]:
+			return True
+		return False

@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA, TruncatedSVD
 from gensim.models import KeyedVectors
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
+from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas, convert_to_float
 from common.lib.exceptions import ProcessorInterruptedException
 
 from svgwrite.container import SVG
@@ -94,11 +94,12 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on token sets
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "generate-embeddings"
 
@@ -111,11 +112,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             return
 
         input_words = input_words.split(",")
-
-        try:
-            threshold = float(self.parameters.get("threshold"))
-        except ValueError:
-            threshold = float(self.get_options()["threshold"]["default"])
+        threshold = convert_to_float(self.parameters.get("threshold"))
 
         threshold = max(-1.0, min(1.0, threshold))
         num_words = convert_to_int(self.parameters.get("num-words"))
@@ -155,7 +152,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # this should make filtering for common words a bit faster further down
         self.dataset.update_status("Sorting vocabulary")
         common_vocab = list(common_vocab)
-        common_vocab.sort(key=lambda w: sum([model.get_vecattr(w, "count") for model in models.values()]), reverse=True)
+
+        # this trips Flake8 for some reason, can ignore
+        common_vocab.sort(key=lambda w: sum([model.get_vecattr(w, "count") for model in models.values()]), reverse=True)  # noqa: F821
 
         # initial boundaries of 2D space (to be adjusted later based on t-sne
         # outcome)
@@ -243,6 +242,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 vectors = tsne.fit_transform(vectors)
             except ValueError:
                 self.dataset.finish_with_error("Insufficient data to reduce to 2D. The word embeddings model may be too small to visualise properly.")
+                return
         elif reduction_method == "TruncatedSVD":
             # standard sklearn parameters made explicit
             svd = TruncatedSVD(n_components=2, algorithm="randomized", n_iter=5, random_state=0)

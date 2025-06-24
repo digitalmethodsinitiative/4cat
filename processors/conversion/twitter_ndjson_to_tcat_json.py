@@ -20,8 +20,10 @@ class ConvertNDJSONToJSON(BasicProcessor):
     description = "Convert a Twitter dataset to a TCAT-compatible format. This file can then be uploaded to TCAT."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
+    followups = ["tcat-auto-upload"]
+
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
@@ -215,7 +217,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         """
         new_list = []
         for media in tweet_media:
-            if type(media) == dict:
+            if type(media) is dict:
                 new_list.append({
                     'id_str' : media.get('media_key'),
                     'url' : media.get('url') if media.get('url') else media.get('preview_image_url'),

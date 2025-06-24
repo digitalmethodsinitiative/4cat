@@ -37,11 +37,12 @@ class ViewMetadata(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Determine if processor is compatible with dataset
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type.startswith("video-downloader") or module.type.startswith("image-downloader")
 
@@ -75,7 +76,7 @@ class ViewMetadata(BasicProcessor):
 		include_failed = self.parameters.get("include_failed", False)
 		rows = []
 		num_posts = 0
-		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+		with self.dataset.get_results_path().open("w", encoding="utf-8", newline=""):
 			for key, value in metadata_file.items():
 				if not include_failed and not value.get("success", True):
 					continue

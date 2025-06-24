@@ -13,7 +13,6 @@ import os
 from datetime import datetime, time, timezone
 
 from backend.lib.worker import BasicWorker
-from common.config_manager import config
 
 
 class DatasourceMetrics(BasicWorker):
@@ -52,9 +51,9 @@ class DatasourceMetrics(BasicWorker):
         this worker instead of on demand.
         """
         metrics = {
-            "size_data": DatasourceMetrics.folder_size(config.get("PATH_DATA")),
-            "size_logs": DatasourceMetrics.folder_size(config.get("PATH_LOGS")),
-            "size_db": self.db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
+            "size_data": DatasourceMetrics.folder_size(self.config.get("PATH_DATA")),
+            "size_logs": DatasourceMetrics.folder_size(self.config.get("PATH_LOGS")),
+            "size_db": self.db.fetchone("SELECT pg_database_size(%s) AS num", (self.config.get("DB_NAME"),))["num"]
         }
 
         for metric, value in metrics.items():
@@ -95,13 +94,13 @@ class DatasourceMetrics(BasicWorker):
 			""")
 
         added_datasources = [row["datasource"] for row in self.db.fetchall("SELECT DISTINCT(datasource) FROM metrics")]
-        enabled_datasources = config.get("datasources.enabled", {})
+        enabled_datasources = self.config.get("datasources.enabled", {})
 
-        for datasource_id in self.all_modules.datasources:
+        for datasource_id in self.modules.datasources:
             if datasource_id not in enabled_datasources:
                 continue
 
-            datasource = self.all_modules.workers.get(datasource_id + "-search")
+            datasource = self.modules.workers.get(datasource_id + "-search")
             if not datasource:
                 continue
 
@@ -121,7 +120,7 @@ class DatasourceMetrics(BasicWorker):
                 elif datasource_id == "8chan":
                     settings_id = "eightchan"
 
-                boards = [b for b in config.get(settings_id + "-search.boards", [])]
+                boards = [b for b in self.config.get(settings_id + "-search.boards", [])]
 
                 # If a datasource is static (so not updated) and it
                 # is already present in the metrics table, we don't

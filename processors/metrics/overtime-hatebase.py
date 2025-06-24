@@ -7,7 +7,6 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -18,172 +17,203 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 
 class OvertimeHatefulAnalysis(BasicProcessor):
-	"""
-	Show overall activity levels for Telegram datasets
-	"""
-	type = "overtime-hateful"  # job type ID
-	category = "Post metrics"  # category
-	title = "Over-time offensivess trend"  # title displayed in UI
-	description = "Extracts offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset. Also includes engagement metrics."  # description displayed in UI
-	extension = "csv"  # extension of result file, used internally and in UI
+    """
+    Show overall activity levels for Telegram datasets
+    """
+    type = "overtime-hateful"  # job type ID
+    category = "Post metrics"  # category
+    title = "Over-time offensivess trend"  # title displayed in UI
+    description = "Extracts offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset. Also includes engagement metrics."  # description displayed in UI
+    extension = "csv"  # extension of result file, used internally and in UI
 
-	references = [
-		"[Hatebase.org](https://hatebase.org)",
-		"[Rogers, Richard. 2020. \"Deplatforming: Following extreme Internet celebrities to Telegram and alternative social media.\" European Journal of Culture, vol. 35, no . 3: 213-229.](https://journals.sagepub.com/doi/pdf/10.1177/0267323120922066)"
-	]
+    followups = []
 
-	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
-		"""
-		Allow processor on Telegram, Instagram and Reddit datasets
+    references = [
+        "[Hatebase.org](https://hatebase.org)",
+        "[Rogers, Richard. 2020. \"Deplatforming: Following extreme Internet celebrities to Telegram and alternative social media.\" European Journal of Culture, vol. 35, no . 3: 213-229.](https://journals.sagepub.com/doi/pdf/10.1177/0267323120922066)"
+    ]
 
-		Don't quite remember why these three...
+    @classmethod
+    def is_compatible_with(cls, module=None, config=None):
+        """
+        Allow processor on Telegram, Instagram and Reddit datasets
 
-		:param module: Module to determine compatibility with
-		"""
-		return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
+        Don't quite remember why these three...
 
-	# the following determines the options available to the user via the 4CAT
-	# interface.
-	options = {
-		"language": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "en",
-			"options": {
-				"en": "English",
-				"it": "Italian"
-			},
-			"help": "Language"
-		},
-		"timeframe": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-			"help": "Count frequencies per"
-		},
-		"scope": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
-			"options": {
-				"all": "Ambigous and unambiguous hate terms",
-				"ambiguous": "Ambiguous hate terms only",
-				"unambiguous": "Unambiguous hate terms only"
-			},
-			"help": "Hatebase-listed terms to consider"
-		},
-		"hatefulness-score": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"help": "Minimum 'offensiveness score' (0-100) for Hatebase terms",
-			"min": 0,
-			"max": 100
-		}
-	}
+        :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        """
+        return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
 
-	def process(self):
-		"""
-		Reads a CSV file, counts occurences of chosen values over all posts,
-		and aggregates the results per chosen time frame
-		"""
+    # the following determines the options available to the user via the 4CAT
+    # interface.
+    options = {
+        "language": {
+            "type": UserInput.OPTION_CHOICE,
+            "default": "en",
+            "options": {
+                "en": "English",
+                "it": "Italian"
+            },
+            "help": "Language"
+        },
+        "timeframe": {
+            "type": UserInput.OPTION_CHOICE,
+            "default": "all",
+            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+            "help": "Count frequencies per"
+        },
+        "scope": {
+            "type": UserInput.OPTION_CHOICE,
+            "default": "all",
+            "options": {
+                "all": "Ambigous and unambiguous hate terms",
+                "ambiguous": "Ambiguous hate terms only",
+                "unambiguous": "Unambiguous hate terms only"
+            },
+            "help": "Hatebase-listed terms to consider"
+        },
+        "hatefulness-score": {
+            "type": UserInput.OPTION_TEXT,
+            "default": 0,
+            "help": "Minimum 'offensiveness score' (0-100) for Hatebase terms",
+            "min": 0,
+            "max": 100
+        }
+    }
 
-		# convenience variables
-		timeframe = self.parameters.get("timeframe")
-		scope = self.parameters.get("scope")
-		min_offensive = self.parameters.get("hatefulness-score")
+    def process(self):
+        """
+        Reads a CSV file, counts occurences of chosen values over all posts,
+        and aggregates the results per chosen time frame
+        """
 
-		# determine what vocabulary to use
-		language = self.parameters.get("language")
+        # convenience variables
+        timeframe = self.parameters.get("timeframe")
+        scope = self.parameters.get("scope")
+        min_offensive = self.parameters.get("hatefulness-score")
 
-		# now for the real deal
-		self.dataset.update_status("Reading source file")
-		activity = {}
-		hateful = {}
-		views = {}
-		intervals = set()
+        # determine what vocabulary to use
+        language = self.parameters.get("language")
 
-		fieldnames = self.source_dataset.get_item_keys(self)
-		if "views" in fieldnames:
-			engagement_field = "views"
-		elif "score" in fieldnames:
-			engagement_field = "score"
-		elif "likes" in fieldnames:
-			engagement_field = "likes"
-		else:
-			self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
-			self.dataset.finish(0)
-			return
+        # now for the real deal
+        self.dataset.update_status("Reading source file")
+        activity = {}
+        hateful = {}
+        views = {}
+        intervals = set()
 
-		with config.get('PATH_ROOT').joinpath(f"common/assets/hatebase/hatebase-{language}.json").open() as hatebasedata:
-			hatebase = json.loads(hatebasedata.read())
+        fieldnames = self.source_dataset.get_columns()
+        if "views" in fieldnames:
+            engagement_field = "views"
+        elif "score" in fieldnames:
+            engagement_field = "score"
+        elif "likes" in fieldnames:
+            engagement_field = "likes"
+        else:
+            self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
+            self.dataset.finish(0)
+            return
+            
+        # now for the real deal
+        self.dataset.update_status("Reading source file")
+        activity = {}
+        hateful = {}
+        views = {}
+        intervals = set()
+        unknown_dates = 0
 
-		hatebase = {term.lower(): hatebase[term] for term in hatebase}
-		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase if not min_offensive or (hatebase[term]["average_offensiveness"] and hatebase[term]["average_offensiveness"] > min_offensive)]) + r")\b")
+        fieldnames = self.source_dataset.get_columns()
+        if "views" in fieldnames:
+            engagement_field = "views"
+        elif "score" in fieldnames:
+            engagement_field = "score"
+        elif "likes" in fieldnames:
+            engagement_field = "likes"
+        else:
+            engagement_field = None
 
-		for post in self.source_dataset.iterate_items(self):
-			try:
-				time_unit = get_interval_descriptor(post, timeframe)
-			except ValueError as e:
-				self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
-				self.dataset.update_status(0)
-				return
+        with self.config.get('PATH_ROOT').joinpath(
+                f"common/assets/hatebase/hatebase-{language}.json").open() as hatebasedata:
+            hatebase = json.loads(hatebasedata.read())
 
-			# determine where to put this data
-			if time_unit not in activity:
-				activity[time_unit] = 0
+        hatebase = {term.lower(): hatebase[term] for term in hatebase}
+        hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase if not min_offensive or (
+                    hatebase[term]["average_offensiveness"] and hatebase[term][
+                "average_offensiveness"] > min_offensive)]) + r")\b")
 
-			if time_unit not in hateful:
-				hateful[time_unit] = 0
+        for post in self.source_dataset.iterate_items(self):
+            # Ensure the post has a date
+            if timeframe != "all" and not post.get("timestamp"):
+                time_unit = "unknown_date"
+                unknown_dates += 1
+            else:
+                try:
+                    time_unit = get_interval_descriptor(post, timeframe)
+                except ValueError as e:
+                    self.dataset.update_status("%s, cannot count items per %s" % (str(e), timeframe), is_final=True)
+                    self.dataset.update_status(0)
+                    return
 
-			if time_unit not in views:
-				views[time_unit] = 0
+            # determine where to put this data
+            if time_unit not in activity:
+                activity[time_unit] = 0
 
-			intervals.add(time_unit)
+            if time_unit not in hateful:
+                hateful[time_unit] = 0
 
-			activity[time_unit] += 1
-			try:
-				views[time_unit] += int(post[engagement_field])
-			except (ValueError, TypeError):
-				pass
+            if time_unit not in views:
+                views[time_unit] = 0
 
-			terms = []
-			for term in hatebase_regex.findall(post["body"].lower()):
-				if not term:
-					continue
-				if "plural_of" in hatebase[term] and hatebase[term]["plural_of"]:
-					if hatebase[term]["plural_of"] in terms:
-						continue
-					elif hatebase[term]["plural_of"] in hatebase:
-						term = hatebase[term]["plural_of"]
+            intervals.add(time_unit)
 
-					if scope == "ambiguous" and not hatebase[term]["is_unambiguous"]:
-						terms.append(term)
-					elif scope == "unambiguous" and hatebase[term]["is_unambiguous"]:
-						terms.append(term)
-					elif scope == "all":
-						terms.append(term)
+            activity[time_unit] += 1
+            if engagement_field:
+                try:
+                    views[time_unit] += int(post[engagement_field])
+                except (ValueError, TypeError):
+                    pass
 
-			hateful[time_unit] += len(terms)
+            terms = []
+            for term in hatebase_regex.findall(post["body"].lower()):
+                if not term:
+                    continue
+                if "plural_of" in hatebase[term] and hatebase[term]["plural_of"]:
+                    if hatebase[term]["plural_of"] in terms:
+                        continue
+                    elif hatebase[term]["plural_of"] in hatebase:
+                        term = hatebase[term]["plural_of"]
 
-		rows = []
-		for interval in sorted(intervals):
-			rows.append({
-				"date": interval,
-				"item": "offensive language",
-				"value": hateful[interval]
-			})
-			rows.append({
-				"date": interval,
-				"item": "messages",
-				"value": activity[interval]
-			})
-			rows.append({
-				"date": interval,
-				"item": engagement_field,
-				"value": views[interval]
-			})
+                    if scope == "ambiguous" and not hatebase[term]["is_unambiguous"]:
+                        terms.append(term)
+                    elif scope == "unambiguous" and hatebase[term]["is_unambiguous"]:
+                        terms.append(term)
+                    elif scope == "all":
+                        terms.append(term)
 
-		# write as csv
-		if rows:
-			self.write_csv_items_and_finish(rows)
-		else:
-			self.dataset.finish(0)
+            hateful[time_unit] += len(terms)
+
+        rows = []
+        for interval in sorted(intervals):
+            rows.append({
+                "date": interval,
+                "item": "offensive language",
+                "value": hateful[interval]
+            })
+            rows.append({
+                "date": interval,
+                "item": "messages",
+                "value": activity[interval]
+            })
+            if engagement_field:
+                rows.append({
+                    "date": interval,
+                    "item": engagement_field,
+                    "value": views[interval]
+                })
+
+        # write as csv
+        if rows:
+            self.write_csv_items_and_finish(rows)
+        else:
+            self.dataset.finish(0)

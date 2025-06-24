@@ -23,6 +23,19 @@ class ThreadMetadata(BasicProcessor):
 				  "that this extracted only on the basis of the items present this dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = []
+
+	@staticmethod
+	def is_compatible_with(module=None, config=None):
+		"""
+        Determine compatibility
+
+        :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return bool:
+        """
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -32,6 +45,7 @@ class ThreadMetadata(BasicProcessor):
 		threads = {}
 
 		self.dataset.update_status("Reading source file")
+		progress = 0
 		for post in self.source_dataset.iterate_items(self):
 			if post["thread_id"] not in threads:
 				threads[post["thread_id"]] = {
@@ -64,6 +78,12 @@ class ThreadMetadata(BasicProcessor):
 			threads[post["thread_id"]]["last_post"] = max(timestamp, threads[post["thread_id"]]["last_post"])
 			threads[post["thread_id"]]["count"] += 1
 
+			progress += 1
+			if progress % 500 == 0:
+				self.dataset.update_status(f"Iterated through {progress:,} of {self.source_dataset.num_rows:,} items")
+				self.dataset.update_progress(progress / self.source_dataset.num_rows)
+
+
 		results = [{
 			"thread_id": thread_id,
 			"timestamp": datetime.datetime.utcfromtimestamp(threads[thread_id]["first_post"]).strftime(
@@ -77,7 +97,7 @@ class ThreadMetadata(BasicProcessor):
 			"op_body": threads[thread_id]["op_body"],
 			"num_posts": threads[thread_id]["count"],
 			"thread_age": (threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
-			"thread_age_friendly": self.timify(threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
+			"thread_age_friendly": self.timify_secs(threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
 			**(
 				{
 					"num_images": threads[thread_id]["images"],
@@ -92,7 +112,7 @@ class ThreadMetadata(BasicProcessor):
 
 		self.write_csv_items_and_finish(results)
 
-	def timify(self, number):
+	def timify_secs(self, number):
 		"""
 		For the non-geniuses, convert an amount of seconds to a more readable
 		approximation like '4h 5m'

@@ -24,6 +24,8 @@ class VectorRanker(BasicProcessor):
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	followups = ["wordcloud"]
+
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
@@ -40,11 +42,12 @@ class VectorRanker(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token vectors
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "vectorise-tokens"
 

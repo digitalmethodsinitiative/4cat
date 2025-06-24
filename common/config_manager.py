@@ -8,7 +8,6 @@ from common.lib.database import Database
 
 from common.lib.exceptions import ConfigException
 from common.lib.config_definition import config_definition
-from common.lib.user_input import UserInput
 
 import configparser
 import os
@@ -40,9 +39,14 @@ class ConfigManager:
 
         :param db:  Database object. If None, initialise it using the core config
         """
-        self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
+        if db or not self.db:
+            # Replace w/ db if provided else only initialise if not already
+            self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
-                                         port=self.get("DB_PORT"), appname="config-reader") if not db else db
+                                         port=self.get("DB_PORT"), appname="config-reader")
+        else:
+            # self.db already initialized and no db provided
+            pass
 
     def load_user_settings(self):
         """
@@ -83,7 +87,7 @@ class ConfigManager:
                                            "preventing this. Shame on them!")
 
                     self.config_definition.update(module_config)
-            except (ValueError, TypeError) as e:
+            except (ValueError, TypeError):
                 pass
 
     def load_core_settings(self):
@@ -141,33 +145,19 @@ class ConfigManager:
         """
         self.with_db()
 
-        # delete unknown keys
-        known_keys = tuple([names for names, settings in config.config_definition.items() if settings.get("type") not in UserInput.OPTIONS_COSMETIC])
-        unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
-
-        if unknown_keys:
-            self.db.log.info(f"Deleting unknown settings from database: {', '.join([key['name'] for key in unknown_keys])}")
-            self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
-
-        self.db.commit()
-
         # create global values for known keys with the default
         known_settings = self.get_all()
         for setting, parameters in self.config_definition.items():
             if setting in known_settings:
                 continue
 
+            self.db.log.debug(f"Creating setting: {setting} with default value {parameters.get('default', '')}")
             self.set(setting, parameters.get("default", ""))
 
         # make sure settings and user table are in sync
         user_tags = list(set(itertools.chain(*[u["tags"] for u in self.db.fetchall("SELECT DISTINCT tags FROM users")])))
         known_tags = [t["tag"] for t in self.db.fetchall("SELECT DISTINCT tag FROM settings")]
         tag_order = self.get("flask.tag_order")
-
-        for tag in tag_order:
-            # don't include tags not used by users in the tag order
-            if tag not in user_tags:
-                tag_order.remove(tag)
 
         for tag in known_tags:
             # add tags used by a setting to tag order
@@ -278,17 +268,22 @@ class ConfigManager:
 
             if not is_json and value is not None:
                 value = json.loads(value)
-            elif default is not None:
-                value = default
+            # TODO: Which default should have priority? The provided default feels like it should be the highest priority, but I think that is an old implementation and perhaps should be removed. - Dale
             elif value is None and setting_name in self.config_definition and "default" in self.config_definition[setting_name]:
                 value = self.config_definition[setting_name]["default"]
+            elif value is None and default is not None:
+                value = default
 
             final_settings[setting_name] = value
 
-        if len(final_settings) == 1:
+        if attribute_name is not None and len(attribute_name) == 1:
+            # Single attribute requests; provide only the highest priority result
+            # this works because attribute_name is converted to a tuple (else already returned)
+            # if attribute_name is None, return all settings
             # print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
             return list(final_settings.values())[0]
         else:
+            # All settings requested (via get_all)
             return final_settings
 
     def get_active_tags(self, user=None, tags=None):
@@ -314,10 +309,15 @@ class ConfigManager:
 
         # can provide either a string or user object
         if type(user) is not str:
+            if type(user).__name__ == "LocalProxy":
+                # passed on from Flask
+                user = user._get_current_object()
+
             if hasattr(user, "get_id"):
                 user = user.get_id()
-            elif user is not None:
-                raise TypeError("get() expects None, a User object or a string for argument 'user'")
+            elif user != None:  # noqa: E711
+                # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
+                raise TypeError(f"get() expects None, a User object or a string for argument 'user', {type(user).__name__} given")
 
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups
@@ -372,6 +372,7 @@ class ConfigManager:
 
         self.db.execute(query, (attribute_name, value, tag))
         updated_rows = self.db.cursor.rowcount
+        self.db.log.debug(f"Updated setting for {attribute_name}: {value} (tag: {tag})")
 
         return updated_rows
 
@@ -425,10 +426,22 @@ class ConfigWrapper:
         serve 4CAT with a different configuration based on the proxy server
         used.
         """
-        self.config = config
-        self.user = user
-        self.tags = tags
-        self.request = request
+        if type(config) is ConfigWrapper:
+            # let's not do nested wrappers, but copy properties unless
+            # provided explicitly
+            self.user = user if user else config.user
+            self.tags = tags if tags else config.tags
+            self.request = request if request else config.request
+            self.config = config.config
+        else:
+            self.config = config
+            self.user = user
+            self.tags = tags
+            self.request = request
+
+        # this ensures the user object in turn reads from the wrapper
+        if self.user:
+            self.user.with_config(self, rewrap=False)
 
 
     def set(self, *args, **kwargs):
@@ -440,7 +453,6 @@ class ConfigWrapper:
         :return:
         """
         if "tag" not in kwargs and self.tags:
-            tag = self.tags if type(self.tags) is str else self.tags[0]
             kwargs["tag"] = self.tags
 
         return self.config.set(*args, **kwargs)

@@ -6,7 +6,8 @@ Several of these are downloadable here: https://archive.org/details/archivedmoe_
 For /v/, make sure to download this one: https://archive.org/download/archivedmoe_db_201908/v.csv.bz2
 
 """
-
+# flake8: noqa
+# currently broken, kept for historic/future utility purposes
 import argparse
 import json
 import time
@@ -15,13 +16,12 @@ import sys
 import os
 import re
 
-from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.config_manager import config
-from chan_flags import get_country_name, get_troll_names
+from chan_flags import get_country_name
 
 
 def commit(posts, post_fields, db, datasource, fast=False):

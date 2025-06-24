@@ -11,7 +11,7 @@ from ural import urls_from_text
 
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -190,16 +190,19 @@ class ExtractURLs(BasicProcessor):
     )
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         All processor on CSV and NDJSON datasets
+
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.get_extension() in ["csv", "ndjson"]
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Update "columns" option with parent dataset columns
+        :param config:
         """
         options = cls.options
         # Get the columns for the select columns option
@@ -223,14 +226,14 @@ class ExtractURLs(BasicProcessor):
 
         # Get match column parameters
         columns = self.parameters.get("columns", [])
-        if type(columns) == str:
+        if type(columns) is str:
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
         return_matches_only = self.parameters.get("return_matches_only", True)
         correct_croudtangle = self.parameters.get("correct_croudtangle", False)
 
         # Create fieldnames
-        fieldnames = self.source_dataset.get_item_keys(self) + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
+        fieldnames = self.source_dataset.get_columns() + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
@@ -255,7 +258,7 @@ class ExtractURLs(BasicProcessor):
                     value = item.get(column)
                     if not value:
                         continue
-                    if type(value) != str:
+                    if type(value) is not str:
                         self.dataset.update_status(f"Column \"{column}\" is not text and will be ignored.")
                         # Remove from future
                         columns.remove(column)
@@ -336,7 +339,7 @@ class ExtractURLs(BasicProcessor):
         try:
             time.sleep(0.1)
             head_request = requests.head(url, timeout=5)
-        except (requests.RequestException, ConnectionError, ValueError, TimeoutError) as e:
+        except (requests.RequestException, ConnectionError, ValueError, TimeoutError):
             return url
 
         # if the returned page's status code is in the 'valid request'
@@ -361,7 +364,7 @@ class ExtractURLs(BasicProcessor):
         :return list:  	            list of identified URLs
         """
         if split_comma:
-            texts = text.split(",")
+            texts = split_urls(text)
         else:
             texts = [text]
 

@@ -53,7 +53,7 @@ try:
     connection = psycopg2.connect(dbname=old_config.DB_NAME, user=old_config.DB_USER, password=old_config.DB_PASSWORD, host=old_config.DB_HOST, port=old_config.DB_PORT, application_name="4cat-migrate")
     transfer_settings = True
     print("  ...Yes, prexisting settings exist.")
-except (SyntaxError, ImportError, AttributeError) as e:
+except (SyntaxError, ImportError, AttributeError):
     from common.config_manager import config
     connection = psycopg2.connect(dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), application_name="4cat-migrate")
     print("  ...No prexisting settings exist.")

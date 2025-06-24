@@ -5,7 +5,7 @@ import shutil
 
 from gensim.models import KeyedVectors
 
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int, convert_to_float
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -24,6 +24,9 @@ class SimilarWord2VecWords(BasicProcessor):
 	title = "Extract similar words"  # title displayed in UI
 	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+
+	followups = ["wordcloud"]
 
 	flawless = True
 
@@ -55,11 +58,12 @@ class SimilarWord2VecWords(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on word embedding models
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "generate-embeddings"
 
@@ -80,10 +84,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		input_words = input_words.split(",")
 
 		num_words = convert_to_int(self.parameters.get("num-words", 10))
-		try:
-			threshold = float(self.parameters.get("threshold", 0.25))
-		except ValueError:
-			threshold = float(self.get_options()["threshold"]["default"])
+		threshold = convert_to_float(self.parameters.get("threshold", 0.25), 0.25)
 
 		threshold = max(-1.0, min(1.0, threshold))
 

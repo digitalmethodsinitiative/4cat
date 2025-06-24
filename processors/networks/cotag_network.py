@@ -29,19 +29,28 @@ class CoTaggerPreset(ProcessorPreset):
             "default": True,
             "help": "Convert tags to lowercase",
             "tooltip": "Merges tags with varying cases"
+        },
+        "ignore-tags": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "",
+            "help": "Tags to ignore",
+            "tooltip": "Separate with commas if you want to ignore multiple tags. Do not include the '#' "
+                       "character."
         }
     }
 
+    possible_tag_columns = {"tags", "hashtags", "groups"}
+
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on datasets containing a tags column
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        usable_columns = {"tags", "hashtags", "groups"}
         columns = module.get_columns()
-        return bool(set(columns) & usable_columns) if columns else False
+        return bool(set(columns) & cls.possible_tag_columns) if columns else False
 
     def get_processor_pipeline(self):
         """
@@ -60,7 +69,8 @@ class CoTaggerPreset(ProcessorPreset):
             # same for tumblr's tags
             tag_column = "tags"
         else:
-            tag_column = "hashtags"
+            columns = self.source_dataset.get_columns()
+            tag_column = next((col for col in columns if col in self.possible_tag_columns), None)
 
         pipeline = [
             {
@@ -72,6 +82,7 @@ class CoTaggerPreset(ProcessorPreset):
                     "split-comma": True,
                     "categorise": True,
                     "allow-loops": False,
+                    "ignore-nodes": self.parameters.get("ignore-tags", ""),
                     "to-lowercase": self.parameters.get("to-lowercase", True)
                 }
             }

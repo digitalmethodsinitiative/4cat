@@ -13,7 +13,6 @@ from pathlib import Path
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -48,17 +47,18 @@ class ImageWallGenerator(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token sets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
-		return module.type.startswith("image-downloader") or module.type == "video-frames"
+		return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		max_number_images = int(config.get("image-visuals.max_images", 1000, user=user))
+	def get_options(cls, parent_dataset=None, config=None):
+		max_number_images = int(config.get("image-visuals.max_images", 1000))
 		options = {
 			"amount": {
 				"type": UserInput.OPTION_TEXT,
@@ -75,7 +75,7 @@ class ImageWallGenerator(BasicProcessor):
 					"average": "Average image in set",
 					"fit-height": "Fit height"
 				},
-				"default": "square",
+				"default": "fit-height",
 				"help": "Image tile size",
 				"tooltip": "'Fit height' retains image ratios but makes them have the same height"
 			},
@@ -128,7 +128,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		# 0 = use as many images as in the archive, up to the max
 		if max_images == 0:
-			max_images = self.get_options()["amount"]["max"]
+			max_images = self.config.get("image-visuals.max_images", 1000)
 
 		# we loop through the images twice - once to reduce them to a value
 		# that can be sorted, and another time to actually copy them to the
@@ -167,7 +167,11 @@ class ImageWallGenerator(BasicProcessor):
 			if sort_mode not in ("", "random") and (picture.height > sample_max or picture.width > sample_max):
 				sample_width = int(sample_max * picture.width / max(picture.width, picture.height))
 				sample_height = int(sample_max * picture.height / max(picture.width, picture.height))
-				picture = ImageOps.fit(picture, (sample_width, sample_height))
+				try:
+					picture = ImageOps.fit(picture, (sample_width, sample_height))
+				except ValueError:
+					# Default of BICUBIC may fail
+					picture = ImageOps.fit(picture, (sample_width, sample_height), method=Image.NEAREST)
 
 			if sort_mode not in ("", "random"):
 				# ensure we get RGB values for pixels
@@ -354,9 +358,14 @@ class ImageWallGenerator(BasicProcessor):
 
 			if tile_x == -1:
 				picture_x = max(1, int(picture.width * (tile_y / picture.height)))
-				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.BILINEAR)
 			else:
-				picture = ImageOps.fit(picture, (tile_x, tile_y), method=Image.BILINEAR)
+				picture_x = tile_x
+
+			try:
+				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.BILINEAR)
+			except ValueError:
+				# BILINEAR may also fail
+				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.NEAREST)
 
 			# simply put them side by side until the right edge is reached,
 			# then move to a new row

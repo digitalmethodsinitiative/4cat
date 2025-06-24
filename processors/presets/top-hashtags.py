@@ -3,6 +3,7 @@ Find most-used hashtags in a dataset
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
+from processors.networks.cotag_network import CoTaggerPreset
 
 
 class TopHashtags(ProcessorPreset):
@@ -32,16 +33,16 @@ class TopHashtags(ProcessorPreset):
     })
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Check if dataset has a hashtag attribute
 
         :param module:  Dataset to check
-        :param user:  User trying to run the processor
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         columns = module.get_columns()
-        return columns and "hashtags" in module.get_columns()
+        return columns and any([tag in columns for tag in CoTaggerPreset.possible_tag_columns])	
 
     def get_processor_pipeline(self):
         """
@@ -49,12 +50,14 @@ class TopHashtags(ProcessorPreset):
         """
         timeframe = self.parameters.get("timeframe")
         top = self.parameters.get("top")
+        columns = self.source_dataset.get_columns()
+        tag_column = next((col for col in columns if col in CoTaggerPreset.possible_tag_columns), None)
 
         pipeline = [
             {
                 "type": "attribute-frequencies",
                 "parameters": {
-                    "columns": ["hashtags"],
+                    "columns": [tag_column],
                     "split-comma": True,
                     "extract": "none",  # *not* 'hashtags', because they may not start with #
                     "timeframe": timeframe,
@@ -62,7 +65,8 @@ class TopHashtags(ProcessorPreset):
                     "top-style": "per-item",
                     "filter": "",
                     "weigh": "",
-                    "to-lowercase": True
+                    "to-lowercase": True,
+                    "count_missing": False
                 }
             },
         ]

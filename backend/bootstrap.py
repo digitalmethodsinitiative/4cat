@@ -8,12 +8,13 @@ from pathlib import Path
 
 from common.lib.queue import JobQueue
 from common.lib.database import Database
+from common.lib.module_loader import ModuleCollector
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
 
 from common.config_manager import config
 
-def run(as_daemon=True):
+def run(as_daemon=True, log_level="INFO"):
 	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
 
 	if as_daemon:
@@ -49,9 +50,9 @@ def run(as_daemon=True):
 	if config.get("USING_DOCKER"):
 		as_daemon = True
 		# Rename log if Docker setup
-		log = Logger(output=True, filename='backend_4cat.log')
+		log = Logger(output=True, filename='backend_4cat.log', log_level=log_level)
 	else:
-		log = Logger(output=not as_daemon)
+		log = Logger(output=not as_daemon, filename='4cat.log', log_level=log_level)
 
 	log.info("4CAT Backend started, logger initialised")
 	db = Database(logger=log, appname="main",
@@ -66,9 +67,12 @@ def run(as_daemon=True):
 	config.with_db(db)
 	config.ensure_database()
 
+	# load 4CAT modules and cache the results
+	modules = ModuleCollector(config=config, write_cache=True)
+
 	# make it happen
 	# this is blocking until the back-end is shut down
-	WorkerManager(logger=log, database=db, queue=queue, as_daemon=as_daemon)
+	WorkerManager(logger=log, database=db, queue=queue, modules=modules, as_daemon=as_daemon)
 
 	# clean up pidfile, if running as daemon
 	if as_daemon:

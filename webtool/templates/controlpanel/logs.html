@@ -9,15 +9,22 @@
         <section>
             <h2><span>Backend log</span></h2>
             <p>Displaying last 250 lines of the log file.</p>
-            <pre id="upgrade-log" class="content-container" data-source="{{ url_for("get_log", logfile="backend") }}" data-interval="3">
+            <pre id="upgrade-log" class="content-container" data-source="{{ url_for("admin.get_log", logfile="backend") }}" data-interval="3">
                 Loading log file...
             </pre>
         </section>
 
         <section>
             <h2><span>stderr of backend daemon</span></h2>
-            <pre id="upgrade-log" class="content-container" data-source="{{ url_for("get_log", logfile="stderr") }}" data-interval="3">
+            <pre id="upgrade-log" class="content-container" data-source="{{ url_for("admin.get_log", logfile="stderr") }}" data-interval="3">
                 Loading log file...
+            </pre>
+        </section>
+
+        <section>
+            <h2><span>HTTP request headers</span></h2>
+            <pre id="http-log" class="content-container">
+{{ headers }}
             </pre>
         </section>
     </article>

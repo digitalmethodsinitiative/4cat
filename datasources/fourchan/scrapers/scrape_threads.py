@@ -20,20 +20,15 @@ Flow:
          -> queue_image(): if an image was attached, queue a job to scrape it
    -> update_thread(): update thread data
 """
-import requests
 import psycopg2
 import hashlib
 import base64
-import flag
 import json
 import time
 import six
 
 from backend.lib.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
-from common.lib.helpers import strip_tags
-from common.config_manager import config
-from common.lib.user_input import UserInput
 
 
 class ThreadScraper4chan(BasicJSONScraper):
@@ -116,7 +111,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# disappear from 4chan after 1000 replies, but 4CAT
 		# considers these as organic activity)
 		deleted = set()
-		if thread["is_sticky"] != True:
+		if not thread["is_sticky"]:
 			deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
 			for post_id in deleted:
 				self.db.upsert("posts_%s_deleted" % self.prefix, data={"id_seq": post_id_map[post_id], "timestamp_deleted": self.init_time}, constraints=["id_seq"], commit=False)
@@ -220,7 +215,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
 
 		# Download images (exclude .webm files)
-		if "filename" in post and post["ext"] != ".webm" and config.get("fourchan-search.save_images"):
+		if "filename" in post and post["ext"] != ".webm" and self.config.get("fourchan-search.save_images"):
 			self.queue_image(post, thread)
 
 		return return_value
@@ -241,11 +236,11 @@ class ThreadScraper4chan(BasicJSONScraper):
 		md5 = hashlib.md5()
 		md5.update(base64.b64decode(post["md5"]))
 
-		image_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_IMAGES'))
+		image_folder = self.config.get('PATH_ROOT').joinpath(self.config.get('PATH_IMAGES'))
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
-		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
-			claimtime = int(time.time()) + int(config.get("fourchan-search.image_interval"))
+		if self.config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
+			claimtime = int(time.time()) + int(self.config.get("fourchan-search.image_interval"))
 
 			try:
 				self.queue.add_job("fourchan-image", remote_id=post["md5"], claim_after=claimtime, details={

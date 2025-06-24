@@ -3,7 +3,6 @@ Create scene-by-scene timelines
 """
 import shutil
 
-from common.config_manager import config
 from backend.lib.preset import ProcessorPreset
 
 
@@ -20,18 +19,18 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     extension = "svg"
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
         Compatible with downloaded videos, and not really anything else!
         Additionally ffmpeg needs to be available.
 
-        :param str module:  Module ID to determine compatibility with
+        :param DataSet module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type.startswith("video-downloader") and \
-               config.get("video-downloader.ffmpeg_path", user=user) and \
+        return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
+               config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_pipeline(self):

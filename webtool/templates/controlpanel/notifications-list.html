@@ -21,7 +21,7 @@
                         {% endif %}
                         <span class="has-more" data-max-length="75">{{ notification.notification|markdown|safe }}</span>
                     </td>
-                    <td><a class="button-like" href="{{ url_for("delete_notification", notification_id=notification.id) }}"><i
+                    <td><a class="button-like" href="{{ url_for("admin.delete_notification", notification_id=notification.id) }}"><i
                                     class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete notification</span></a>
                 </tr>
             {% endfor %}

@@ -2,7 +2,8 @@
 Update vote data for Reddit datasets
 """
 import shutil
-import praw, praw.exceptions
+import praw
+import praw.exceptions
 import csv
 
 from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
@@ -10,7 +11,6 @@ from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -46,13 +46,14 @@ class RedditVoteChecker(BasicProcessor):
 		}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor if dataset is a Reddit dataset
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
-		if config.get('api.reddit.client_id', False, user=user) and config.get('api.reddit.secret', False, user=user):
+		if config.get('api.reddit.client_id', False) and config.get('api.reddit.secret', False):
 			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
 		return False
 
@@ -120,7 +121,7 @@ class RedditVoteChecker(BasicProcessor):
 
 		# now write a new CSV with the updated scores
 		# get field names
-		fieldnames = [*self.source_dataset.get_item_keys(self)]
+		fieldnames = [*self.source_dataset.get_columns()]
 		if "score" not in fieldnames:
 			fieldnames.append("score")
 

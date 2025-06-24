@@ -27,11 +27,12 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Determine if processor is compatible with dataset
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.get_extension() == "ndjson"
 
@@ -44,7 +45,7 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 		# We first collect all possible columns for the csv file, then
 		# for each item make sure there is a value for all the columns (in the
 		# second step)
-		all_keys = self.source_dataset.get_item_keys()
+		all_keys = self.source_dataset.get_columns()
 
 		self.dataset.update_status("Converting file")
 		staging_area = self.dataset.get_staging_area()

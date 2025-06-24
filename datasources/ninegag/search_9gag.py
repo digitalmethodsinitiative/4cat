@@ -19,7 +19,7 @@ class SearchNineGag(Search):
     title = "Import scraped 9gag data"  # title displayed in UI
     description = "Import 9gag data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -40,7 +40,7 @@ class SearchNineGag(Search):
     def map_item(post):
         post_timestamp = datetime.fromtimestamp(post["creationTs"])
 
-        image = sorted([v for v in post["images"].values() if not "hasAudio" in v], key=lambda image: image["width"] * image["height"], reverse=True)[0]
+        image = sorted([v for v in post["images"].values() if "hasAudio" not in v], key=lambda image: image["width"] * image["height"], reverse=True)[0]
         video = sorted([v for v in post["images"].values() if "hasAudio" in v], key=lambda image: image["width"] * image["height"], reverse=True)
 
         video_url = ""

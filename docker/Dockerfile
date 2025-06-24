@@ -1,39 +1,10 @@
-FROM python:3.8-slim AS compile-image
+FROM python:3.11-slim
 
 RUN apt-get update && apt install -y \
     # General requirements:
     libpq-dev \
     python3-dev \
-    python3-pip
-
-# Set working directory
-WORKDIR /usr/src/app
-
-# Make and use virtual environment
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install dependencies
-RUN pip3 install --upgrade pip
-COPY ./requirements.txt /usr/src/app/requirements.txt
-COPY ./setup.py /usr/src/app/setup.py
-COPY ./VERSION /usr/src/app/VERSION
-COPY ./README.md /usr/src/app/README.md
-RUN mkdir /usr/src/app/backend
-RUN mkdir /usr/src/app/webtool
-RUN mkdir /usr/src/app/datasources
-RUN pip3 install -r requirements.txt
-
-# Install frontend Docker requirements
-RUN pip3 install gunicorn
-
-# Build image from compile-image
-FROM python:3.8-slim AS build-image
-COPY --from=compile-image /opt/venv /opt/venv
-# Make virtual env available
-ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1
-
-RUN apt-get update && apt install -y \
+    python3-pip \
     # Called in docker-entrypoint.sh:
     curl \
     netcat-traditional \
@@ -42,10 +13,28 @@ RUN apt-get update && apt install -y \
     # Called by 4CAT:
     git \
     # Needed for video processing only (and only technically on backend)
-    ffmpeg
+    ffmpeg \
+    # Clean up after apt-get:
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /usr/src/app
+
+# Ensure that Python outputs everything that's printed inside to containers
+ENV PYTHONUNBUFFERED=1
+
+# Set up environment for Python setup.py
+COPY ./requirements.txt /usr/src/app/requirements.txt
+COPY ./extensions /usr/src/app/extensions
+COPY ./setup.py /usr/src/app/setup.py
+COPY ./VERSION /usr/src/app/VERSION
+COPY ./README.md /usr/src/app/README.md
+RUN mkdir /usr/src/app/backend
+RUN mkdir /usr/src/app/webtool
+RUN mkdir /usr/src/app/datasources
+# Install python dependencies; gunicorn is needed for 4cat_frontend
+RUN python3 -m pip install --upgrade pip && python3 -m pip install --no-cache-dir setuptools==78.1.0 wheel==0.46.1 && python3 -m pip install -r requirements.txt && python3 -m pip install gunicorn
 
 # Copy project
 COPY . /usr/src/app/

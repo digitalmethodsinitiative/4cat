@@ -1,8 +1,8 @@
 <li{% if inline %} class="inline"{% endif %}>
-    <form action="{{ url_for('show_results') }}/{{ dataset.key }}/processors/queue/{{ processor.type }}/" data-async-action="{{ url_for('queue_processor') }}" method="POST" class="processor-child-wrapper child-wrapper">
+    <form action="{{ url_for('dataset.show_results') }}/{{ dataset.key }}/processors/queue/{{ processor.type }}/" data-async-action="{{ url_for('toolapi.queue_processor') }}" method="POST" class="processor-child-wrapper child-wrapper">
 
     {# The button for this processor #}
-    {% set processor_options = processor.get_options(dataset, current_user) %}
+    {% set processor_options = processor.get_options(dataset, __config) %}
     <div class="button-wrap processor-result-indicator">
         <button class="processor-queue-button {{processor.type}}-button" {% if processor_options %}aria-controls="processor-options-{{ dataset.key }}-{{ processor.type }}"{% endif %}>
             <span class="headline">
@@ -42,13 +42,7 @@
             </span>
             {% endif %}
 
-            {% if not inline %}
                 <p>{{ processor.description }}</p>
-            {% endif %}
-            {% if inline %}
-                <button class="property-badge tooltip-trigger" aria-controls="tooltip-processor-{{ dataset.key }}-{{ processor.type }}" aria-label="Post-processor details">?</button>
-                <p role="tooltip" id="tooltip-processor-{{ dataset.key }}-{{ processor.type }}">{{ processor.description }}</p>
-            {% endif %}
         </header>
 
         <input type="hidden" name="key" value="{{ dataset.key }}">

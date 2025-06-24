@@ -6,7 +6,8 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
-import json, pickle
+import json
+import pickle
 import shutil
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -29,6 +30,8 @@ class TopicModeler(BasicProcessor):
                   "For a given number of topics, tokens are assigned a relevance weight per topic, " \
                   "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+
+    followups = ["document_count", "document_topic_matrix", "topic-model-words"]
 
     options = {
         "vectoriser": {
@@ -73,11 +76,12 @@ class TopicModeler(BasicProcessor):
     ]
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on token sets
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "tokenise-posts"
 

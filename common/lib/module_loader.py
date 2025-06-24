@@ -7,8 +7,7 @@ import inspect
 import pickle
 import sys
 import re
-
-from common.config_manager import config
+import os
 
 
 class ModuleCollector:
@@ -27,6 +26,7 @@ class ModuleCollector:
     ignore = []
     missing_modules = {}
     log_buffer = None
+    config = None
 
     PROCESSOR = 1
     WORKER = 2
@@ -35,15 +35,20 @@ class ModuleCollector:
     processors = {}
     datasources = {}
 
-    def __init__(self):
+    def __init__(self, config, write_cache=False):
         """
         Load data sources and workers
 
         Datasources are loaded first so that the datasource folders may be
         scanned for workers subsequently.
+
+        :param config:  Configuration manager, shared with the rest of the
+        context
+        :param bool write_cache:  Write modules to cache file?
         """
         # this can be flushed later once the logger is available
         self.log_buffer = ""
+        self.config = config
 
         self.load_datasources()
         self.load_modules()
@@ -53,30 +58,28 @@ class ModuleCollector:
         self.expand_datasources()
 
         # cache module-defined config options for use by the config manager
-        module_config = {}
-        for worker in self.workers.values():
-            if hasattr(worker, "config") and type(worker.config) is dict:
-                module_config.update(worker.config)
+        if write_cache:
+            module_config = {}
+            for worker in self.workers.values():
+                if hasattr(worker, "config") and type(worker.config) is dict:
+                    module_config.update(worker.config)
 
-        with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
-            pickle.dump(module_config, outfile)
+            with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+                pickle.dump(module_config, outfile)
 
         # load from cache
-        config.load_user_settings()
+        self.config.load_user_settings()
 
     @staticmethod
     def is_4cat_class(object, only_processors=False):
         """
         Determine if a module member is a worker class we can use
         """
-        # it would be super cool to just use issubclass() here!
-        # but that requires importing the classes themselves, which leads to
-        # circular imports
         if inspect.isclass(object):
             if object.__name__ in("BasicProcessor", "BasicWorker") or inspect.isabstract(object):
                 # ignore abstract and base classes
                 return False
-                
+
             if hasattr(object, "is_4cat_class"):
                 if only_processors:
                     if hasattr(object, "is_4cat_processor"):
@@ -85,7 +88,7 @@ class ModuleCollector:
                         return False
                 else:
                     return object.is_4cat_class()
-        
+
         return False
 
     def load_modules(self):
@@ -99,14 +102,19 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        paths = [Path(config.get('PATH_ROOT'), "processors"), Path(config.get('PATH_ROOT'), "backend", "workers"),
-                 *[self.datasources[datasource]["path"] for datasource in self.datasources]]
+        extension_path = Path(self.config.get('PATH_ROOT'), "extensions")
 
-        root_match = re.compile(r"^%s" % re.escape(str(config.get('PATH_ROOT'))))
-        root_path = Path(config.get('PATH_ROOT'))
+        paths = [Path(self.config.get('PATH_ROOT'), "processors"),
+                 Path(self.config.get('PATH_ROOT'), "backend", "workers"),
+                 extension_path,
+                 *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
+
+        root_match = re.compile(r"^%s" % re.escape(str(self.config.get('PATH_ROOT'))))
+        root_path = Path(self.config.get('PATH_ROOT'))
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
+            is_extension = extension_path in folder.parents or folder == extension_path
             for file in folder.rglob("*.py"):
                 # determine module name for file
                 # reduce path to be relative to 4CAT root
@@ -147,6 +155,7 @@ class ModuleCollector:
 
                     self.workers[component[1].type] = component[1]
                     self.workers[component[1].type].filepath = relative_path
+                    self.workers[component[1].type].is_extension = is_extension
 
                     # we can't use issubclass() because for that we would need
                     # to import BasicProcessor, which would lead to a circular
@@ -169,8 +178,7 @@ class ModuleCollector:
             for missing_module, processor_list in self.missing_modules.items():
                 warning += "\t%s (for %s)\n" % (missing_module, ", ".join(processor_list))
 
-            self.log_buffer = warning
-
+            self.log_buffer += warning
 
         self.processors = categorised_processors
 
@@ -183,30 +191,45 @@ class ModuleCollector:
         `DATASOURCE` constant. The latter is taken as the ID for this
         datasource.
         """
-        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
-            # folder name, also the name used in config.py
-            folder_name = subdirectory.parts[-1]
-
-            # determine module name
-            module_name = "datasources." + folder_name
+        def _load_datasource(subdirectory):
+            """
+            Load a single datasource
+            """
+            # determine module name (path relative to 4CAT root w/ periods)
+            module_name = ".".join(subdirectory.relative_to(Path(self.config.get("PATH_ROOT"))).parts)
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
-                continue
+                self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
+                return
 
             if not hasattr(datasource, "init_datasource") or not hasattr(datasource, "DATASOURCE"):
-                continue
+                self.log_buffer += "Could not load datasource %s: missing init_datasource or DATASOURCE\n" % subdirectory
+                return
 
             datasource_id = datasource.DATASOURCE
 
             self.datasources[datasource_id] = {
-                "expire-datasets": config.get("datasources.expiration", {}).get(datasource_id, None),
+                "expire-datasets": self.config.get("datasources.expiration", {}).get(datasource_id, None),
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
                 "config": {} if not hasattr(datasource, "config") else datasource.config
             }
+
+        # Load 4CAT core datasources
+        for subdirectory in Path(self.config.get('PATH_ROOT'), "datasources").iterdir():
+            if subdirectory.is_dir():
+                _load_datasource(subdirectory)
+
+        # Load extension datasources
+        # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
+        for root, dirs, files in os.walk(Path(self.config.get('PATH_ROOT'), "extensions"), followlinks=True):
+            if "datasources" in dirs:
+                for subdirectory in Path(root, "datasources").iterdir():
+                    if subdirectory.is_dir():
+                        _load_datasource(subdirectory)
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in
                               sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}
@@ -224,8 +247,10 @@ class ModuleCollector:
             worker = self.workers.get("%s-search" % datasource_id)
             self.datasources[datasource_id]["has_worker"] = bool(worker)
             self.datasources[datasource_id]["has_options"] = self.datasources[datasource_id]["has_worker"] and \
-                                                             bool(self.workers["%s-search" % datasource_id].get_options())
-            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_extension") and worker.is_from_extension
+                                                             bool(self.workers[
+                                                                      "%s-search" % datasource_id].get_options(
+                                                                 config=self.config))
+            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
 
     def load_worker_class(self, worker):
         """
