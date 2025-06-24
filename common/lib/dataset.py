@@ -45,6 +45,7 @@ class DataSet(FourcatModule):
 	preset_parent = None
 	parameters = None
 	modules = None
+	annotation_fields = None
 
 	owners = None
 	tagged_owners = None
@@ -58,7 +59,7 @@ class DataSet(FourcatModule):
 	_queue_position = None
 
 	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
-				 type=None, is_private=True, owner="anonymous", modules=None):
+				 type=None, is_private=True, owner="anonymous", modules=None, annotation_fields=None):
 		"""
 		Create new dataset object
 
@@ -128,6 +129,7 @@ class DataSet(FourcatModule):
 		if current:
 			self.data = current
 			self.parameters = json.loads(self.data["parameters"])
+			self.annotation_fields = json.loads(self.data["annotation_fields"]) if self.data["annotation_fields"] else {}
 			self.is_new = False
 		else:
 			self.data = {"type": type}  # get_own_processor needs this
@@ -149,7 +151,8 @@ class DataSet(FourcatModule):
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
-				"key_parent": parent
+				"key_parent": parent,
+				"annotation_fields": json.dumps(annotation_fields)
 			}
 			self.parameters = parameters
 
@@ -1874,9 +1877,7 @@ class DataSet(FourcatModule):
 		Returns True if there's annotation fields saved tot the dataset table
 		"""
 
-		annotation_fields = self.get_annotation_fields()
-
-		return True if annotation_fields else False
+		return True if self.annotation_fields else False
 
 	def get_annotation_fields(self) -> dict:
 		"""
@@ -1886,12 +1887,7 @@ class DataSet(FourcatModule):
 		:return dict: The saved annotation fields.
 		"""
 
-		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.key,))
-
-		if annotation_fields and annotation_fields.get("annotation_fields"):
-			annotation_fields = json.loads(annotation_fields["annotation_fields"])
-		else:
-			annotation_fields = {}
+		annotation_fields = self.annotation_fields
 
 		return annotation_fields
 
@@ -1930,7 +1926,7 @@ class DataSet(FourcatModule):
 			return 0
 
 		count = 0
-		annotation_fields = self.get_annotation_fields()
+		annotation_fields = self.annotation_fields
 		annotation_labels = self.get_annotation_field_labels()
 
 		field_id = ""
