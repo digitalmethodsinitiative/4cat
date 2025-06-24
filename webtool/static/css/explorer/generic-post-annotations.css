@@ -33,7 +33,7 @@
     font-weight: 600;
     line-height: 1.4;
     word-wrap: break-word;
-    color: #2c3e50;
+    color: black;
     margin: 0;
     padding-top: 6px; /* Align with input fields */
 }
@@ -41,11 +41,11 @@
 /* Link styling for processor-generated labels */
 .post-annotation a.from-dataset-link {
     display: block;
+    color: black;
+    text-decoration: underline;
 }
 
 .post-annotation .from-dataset-link:hover .annotation-label {
-    color: #215bc6;
-    text-decoration: underline;
 }
 
 /* Input container */
@@ -79,6 +79,7 @@
 .post-annotation-input.from-dataset {
     background: transparent;
     border: none;
+    padding: 0;
 }
 
 /* Textarea specific styling */
