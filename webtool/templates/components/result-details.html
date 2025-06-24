@@ -129,7 +129,7 @@
                         <dd>{% include 'components/result-metadata.html' %}</dd>
                     </div>
 
-                    {% set annotation_fields = dataset.get_annotation_fields() %}
+                    {% set annotation_fields = dataset.annotation_fields %}
                     {% if annotation_fields %}
                     <div class="fullwidth annotation-fields-list">
                         <dt>Annotations</dt>
