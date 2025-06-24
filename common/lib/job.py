@@ -6,8 +6,6 @@ import time
 import json
 import math
 from common.lib.exceptions import JobClaimedException, JobNotFoundException
-from common.lib.helpers import timify
-
 
 class Job:
 	"""
