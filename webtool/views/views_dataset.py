@@ -128,7 +128,7 @@ def show_results(page):
     # then get the current page of results
     replacements.append(page_size)
     replacements.append(offset)
-    query = "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s"
+    query = "SELECT * FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s"
 
     datasets = g.db.fetchall(query, tuple(replacements))
 
@@ -137,7 +137,7 @@ def show_results(page):
 
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
-    filtered = [DataSet(key=dataset["key"], db=g.db, modules=g.modules) for dataset in datasets]
+    filtered = [DataSet(data=dataset, db=g.db, modules=g.modules) for dataset in datasets]
 
     favourites = [row["key"] for row in
                   g.db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
