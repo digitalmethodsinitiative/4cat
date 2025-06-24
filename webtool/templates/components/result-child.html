@@ -122,7 +122,7 @@
                 {% if processor_options[option].type == "toggle" %}
                     {% if item.parameters[option] %}<li><span class="property-badge">{{ option }}</span></li>{% endif %}
                 {% else %}
-                    <li><span class="property-badge">{{ option }}=<!--
+                    <li><span class="property-badge copy-to-clipboard tooltip-trigger" data-clipboard-value="{{ item.parameters[option] }}" aria-controls="tooltip-clipboard">{{ option }}=<!--
                         {% set str_param = item.parameters[option]|string %}
                         {% if str_param|length < 15 %}
                         -->{{ item.parameters[option] }}

@@ -1843,9 +1843,10 @@ const ui_helpers = {
             // non-HTTPS context
             return;
         }
-        let copyable = e.target.getAttribute('data-clipboard-value');
+        const target = find_parent(e.target, '.copy-to-clipboard', true);
+        let copyable = target.getAttribute('data-clipboard-value');
         if(!copyable) {
-            copyable = e.target.innerText;
+            copyable = target.innerText;
         }
         await navigator.clipboard.writeText(copyable);
         e.target.classList.add('flash-once');
@@ -2032,12 +2033,13 @@ function hsv2hsl(h, s, v) {
     return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
 }
 
-function find_parent(element, selector) {
+function find_parent(element, selector, start_self=false) {
     while(element.parentNode) {
-        element = element.parentNode;
+        if(!start_self) { element = element.parentNode; }
         if(element.matches(selector)) {
             return element;
         }
+        if(start_self) { element = element.parentNode; }
     }
 
     return null;
