@@ -509,6 +509,87 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         self.dataset.update_status("Parent dataset updated.")
 
+    def iterate_proxied_requests(self, urls, preserve_order=True, **kwargs):
+        """
+        Request an iterable of URLs and return results
+
+        This method takes an iterable yielding URLs and yields the result for
+        a GET request for that URL in return. This is done through the worker
+        manager's DelegatedRequestHandler, which can run multiple requests in
+        parallel and divide them over the proxies configured in 4CAT (if any).
+        Proxy cooloff and queueing is shared with other processors, so that a
+        processor will never accidentally request from the same site as another
+        processor, potentially triggering rate limits.
+
+        :param urls:  Something that can be iterated over and yields URLs
+        :param kwargs:  Other keyword arguments are passed on to `add_urls`
+        and eventually to `requests.get()`.
+        :param bool preserve_order:  Return items in the original order. Use
+        `False` to potentially speed up processing, if order is not important.
+        :return:  A generator yielding request results, i.e. tuples of a
+        URL and a `requests` response objects
+        """
+        queue_name = self._proxy_queue_name()
+        delegator = self.manager.proxy_delegator
+
+        # 50 is an arbitrary batch size - but we top up every 0.05s, so
+        # that should be sufficient
+        batch_size = 50
+
+        # we need an iterable, so we can use next() and StopIteration
+        urls = iter(urls)
+
+        have_urls = True
+        while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
+            if queue_length < batch_size and have_urls:
+                batch = []
+                while len(batch) < (batch_size - queue_length):
+                    try:
+                        batch.append(next(urls))
+                    except StopIteration:
+                        have_urls = False
+                        break
+
+                delegator.add_urls(batch, queue_name, **kwargs)
+
+            time.sleep(0.05)  # arbitrary...
+            for url, result in delegator.get_results(queue_name, preserve_order=preserve_order):
+                # result may also be a FailedProxiedRequest!
+                # up to the processor to decide how to deal with it
+                yield url, result
+
+    def push_proxied_request(self, url, position=-1, **kwargs):
+        """
+        Add a single URL to the proxied requests queue
+
+        :param str url:  URL to add
+        :param position:  Position to add to queue; can be used to add priority
+        requests, adds to end of queue by default
+        :param kwargs:
+        """
+        self.manager.proxy_delegator.add_urls([url], self._proxy_queue_name(), position=position, **kwargs)
+
+    def flush_proxied_requests(self):
+        """
+        Get rid of remaining proxied requests
+
+        Can be used if enough results are available and any remaining ones need
+        to be stopped ASAP and are otherwise unneeded.
+
+        Blocking!
+        """
+        self.manager.proxy_delegator.halt_and_wait(self._proxy_queue_name())
+
+    def _proxy_queue_name(self):
+        """
+        Get proxy queue name
+
+        For internal use.
+
+        :return str:
+        """
+        return f"{self.type}-{self.dataset.key}"
+
     def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
         """
         A generator that iterates through files in an archive
@@ -749,6 +830,67 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         shutil.copy(self.dataset.get_log_path(), standalone.get_log_path())
 
         return standalone
+
+    def save_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
+        """
+        Saves annotations made by this processor on the basis of another dataset.
+        Also adds some data regarding this processor: set `author` and `label` to processor name,
+        and add parameters to `metadata` (unless explicitly indicated).
+
+        :param annotations:		List of dictionaries with annotation items. Must have `item_id` and `value`.
+                                E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
+        :param source_dataset:	The dataset that these annotations will be saved on. If None, will use the top parent.
+        :param bool overwrite:	Whether to overwrite annotations if the label is already present
+                                for the dataset. If this is False and the label is already present,
+                                we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
+                                Else we'll just replace the old data.
+
+        :returns int:			How many annotations were saved.
+
+        """
+
+        if not annotations:
+            return 0
+
+        # Default to parent dataset
+        if not source_dataset:
+            source_dataset = self.source_dataset.top_parent()
+
+        # Check if this dataset already has annotation fields
+        existing_labels = source_dataset.get_annotation_field_labels()
+
+        # Set some values
+        for annotation in annotations:
+
+            if not annotation.get("label"):
+                # If there's no label, set the default label to this processor's name
+                label = self.name
+            else:
+                # If we have a custom label, use that
+                label = annotation["label"]
+                # Shorten if necessary
+                if len(label) > 100:
+                    label = label[:100]
+
+            # If the processor has already generated annotation fields,
+            # or if we have a custom label that already exists
+            # add a number suffix to differentiate
+            if not overwrite and label in existing_labels:
+                label += "-" + str(
+                    len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
+            # Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
+            annotation["label"] = label
+
+            # Set the author to this processor's name
+            if not annotation.get("author"):
+                annotation["author"] = self.name
+            if not annotation.get("author_original"):
+                annotation["author_original"] = self.name
+
+            annotation["by_processor"] = True
+
+        annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+        return annotations_saved
 
     @classmethod
     def map_item_method_available(cls, dataset):
