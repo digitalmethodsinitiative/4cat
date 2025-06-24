@@ -460,6 +460,12 @@ nav > ul.flat > li:not(:last-child)::after {
     text-align: center;
 }
 
+/** --------------------- *
+  Utility classes -> Clipboard
+  * --------------------- */
+.copy-to-clipboard, .property-badge.copy-to-clipboard {
+    cursor: grab;
+}
 
 
 /** --------------------- *

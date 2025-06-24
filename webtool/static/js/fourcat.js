@@ -1515,6 +1515,15 @@ const ui_helpers = {
         //table controls
         $(document).on('input', '.copy-from', ui_helpers.table_control);
 
+        //copy value to clipboard
+        if(navigator.hasOwnProperty('clipboard')) {
+            $(document).on('click', '.copy-to-clipboard', ui_helpers.clipboard_copy);
+        } else {
+            // clipboard access not available
+            document.querySelector('#tooltip-clipboard').remove();
+            document.querySelectorAll('.copy-to-clipboard').forEach(e => e.classList.remove('copy-to-clipboard'));
+        }
+
         //mighty morphing web forms
         $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select, #query-form input, #query-form select', ui_helpers.conditional_form.manage);
         ui_helpers.conditional_form.init();
@@ -1827,6 +1836,20 @@ const ui_helpers = {
                 element.value = value;
             }
         })
+    },
+
+    clipboard_copy: async function(e) {
+        if(!navigator.hasOwnProperty('clipboard')) {
+            // non-HTTPS context
+            return;
+        }
+        let copyable = e.target.getAttribute('data-clipboard-value');
+        if(!copyable) {
+            copyable = e.target.innerText;
+        }
+        //await navigator.clipboard.writeText(copyable);
+        e.target.classList.add('flash-once');
+        setTimeout(() => e.target.classList.remove('flash-once'), 250);
     },
 
     conditional_form: {
