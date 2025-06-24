@@ -675,9 +675,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
 		:param source_dataset:			The dataset that these annotations will be saved on. If None, will use the
 										top parent.
-		:param bool hide_in_explorer:	Whether this annotation is hidden in the Explorer (still shows in
-										`iterate_items()`).
-
+		:param bool hide_in_explorer:	Whether this annotation is included in the Explorer. 'Hidden' annotations
+										are still shown in `iterate_items()`).
 
 		:returns int:					How many annotations were saved.
 
@@ -734,8 +733,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# Add field ID to the annotation
 			annotation["field_id"] = field_id
 
-		print(annotations)
-		print(annotation_fields)
 		annotations_saved = source_dataset.save_annotations(annotations)
 		source_dataset.save_annotation_fields(annotation_fields)
 
