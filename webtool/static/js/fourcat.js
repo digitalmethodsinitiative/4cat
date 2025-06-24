@@ -1516,7 +1516,7 @@ const ui_helpers = {
         $(document).on('input', '.copy-from', ui_helpers.table_control);
 
         //copy value to clipboard
-        if(navigator.hasOwnProperty('clipboard')) {
+        if(navigator.clipboard) {
             $(document).on('click', '.copy-to-clipboard', ui_helpers.clipboard_copy);
         } else {
             // clipboard access not available
@@ -1839,7 +1839,7 @@ const ui_helpers = {
     },
 
     clipboard_copy: async function(e) {
-        if(!navigator.hasOwnProperty('clipboard')) {
+        if(!navigator.clipboard) {
             // non-HTTPS context
             return;
         }
@@ -1847,7 +1847,7 @@ const ui_helpers = {
         if(!copyable) {
             copyable = e.target.innerText;
         }
-        //await navigator.clipboard.writeText(copyable);
+        await navigator.clipboard.writeText(copyable);
         e.target.classList.add('flash-once');
         setTimeout(() => e.target.classList.remove('flash-once'), 250);
     },
