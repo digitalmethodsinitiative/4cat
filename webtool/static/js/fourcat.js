@@ -1849,8 +1849,8 @@ const ui_helpers = {
             copyable = target.innerText;
         }
         await navigator.clipboard.writeText(copyable);
-        e.target.classList.add('flash-once');
-        setTimeout(() => e.target.classList.remove('flash-once'), 250);
+        target.classList.add('flash-once');
+        setTimeout(() => target.classList.remove('flash-once'), 250);
     },
 
     conditional_form: {
