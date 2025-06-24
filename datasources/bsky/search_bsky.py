@@ -14,7 +14,7 @@ from atproto_client.exceptions import UnauthorizedError, BadRequestError, Invoke
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException, \
     ProcessorInterruptedException
-from common.lib.helpers import timify_long
+from common.lib.helpers import timify
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
@@ -164,7 +164,7 @@ class SearchBluesky(Search):
             expected_tweets = query.get("max_posts", 100) * len(sanitized_query)
             # Warn if process may take more than ~1 hours
             if expected_tweets > (posts_per_second * 3600):
-                expected_time = timify_long(expected_tweets / posts_per_second)
+                expected_time = timify(expected_tweets / posts_per_second)
                 raise QueryNeedsExplicitConfirmationException(f"This query matches approximately {expected_tweets} tweets and may take {expected_time} to complete. Do you want to continue?")
             elif max_posts == 0 and not min_date:
                 raise QueryNeedsExplicitConfirmationException("No maximum number of posts set! This query has no minimum date and thus may take a very, very long time to complete. Do you want to continue?")

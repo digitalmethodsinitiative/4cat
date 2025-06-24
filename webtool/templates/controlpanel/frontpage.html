@@ -60,13 +60,6 @@
 
         {% if __user_config("privileges.admin.can_view_status") %}
         <aside>
-            <h2><span>Manage workers</span></h2>
-            <nav class="user-controls">
-                <div>
-                    <a href="{{ url_for("admin.list_jobs") }}" class="button-like"><i class="fa fa-user-plus" aria-hidden="true"></i> View Jobs</a>
-                </div>
-            </nav>
-
             <h2><span>Active workers</span></h2>
             <div class="content-container" data-source="{{ url_for('admin.get_worker_status') }}" data-interval="5">
                 <p class="content-placeholder">Loading worker status...</p>
@@ -76,6 +69,11 @@
             <div class="content-container" data-source="{{ url_for('admin.get_queue_status') }}" data-interval="5">
                 <p class="content-placeholder">Loading worker status...</p>
             </div>
+            <nav class="user-controls">
+                <div>
+                    <a href="{{ url_for("admin.list_jobs") }}" class="button-like"><i class="fa fa-hammer" aria-hidden="true"></i> Manage jobs</a>
+                </div>
+            </nav>
         </aside>
         {% endif %}
     </article>

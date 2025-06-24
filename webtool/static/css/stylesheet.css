@@ -487,9 +487,6 @@ nav > ul.flat > li:not(:last-child)::after {
 
 button.tooltip-trigger {
     max-height: 1.75em;
-}
-
-button.tooltip-trigger {
 	font-size: 0.8em;
 	position: relative;
 	top: -0.1em;

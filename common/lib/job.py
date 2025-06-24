@@ -6,7 +6,7 @@ import time
 import json
 import math
 from common.lib.exceptions import JobClaimedException, JobNotFoundException
-from common.lib.helpers import timify_long
+from common.lib.helpers import timify
 
 
 class Job:
@@ -151,33 +151,6 @@ class Job:
 		:return bool: If the job is not claimed yet and also isn't finished.
 		"""
 		return not self.is_claimed and not self.is_finished
-	
-	def get_status(self, with_details=False):
-		"""
-		Get the status of this job
-
-		:return str: Status of the job
-		"""
-		# TODO: add error/crash status
-		if self.is_finished:
-			return "Finished"
-		elif self.is_claimed:
-			if with_details:
-				elapsed = int(time.time()) - self.data["timestamp_claimed"]
-				return f"Running ({timify_long(elapsed)})"
-			return "Running"
-		elif self.data["timestamp_after"] > 0 and self.data["timestamp_after"] > int(time.time()):
-			if with_details:
-				wait_time = self.data["timestamp_after"] - int(time.time())
-				return f"Scheduled (in {timify_long(wait_time)})"
-			return "Scheduled"
-		elif self.data["interval"] > 0 and (self.data["timestamp_lastclaimed"] + self.data["interval"]) > int(time.time()):
-			if with_details:
-				interval_time = (self.data["timestamp_lastclaimed"] + self.data["interval"]) - int(time.time())
-				return f"Scheduled (interval) (in {timify_long(interval_time)})"
-			return "Scheduled (interval)"
-		else:
-			return "Queued"
 
 	def get_place_in_queue(self):
 		"""

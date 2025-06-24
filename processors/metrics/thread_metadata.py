@@ -97,7 +97,7 @@ class ThreadMetadata(BasicProcessor):
 			"op_body": threads[thread_id]["op_body"],
 			"num_posts": threads[thread_id]["count"],
 			"thread_age": (threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
-			"thread_age_friendly": self.timify(threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
+			"thread_age_friendly": self.timify_secs(threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
 			**(
 				{
 					"num_images": threads[thread_id]["images"],
@@ -112,7 +112,7 @@ class ThreadMetadata(BasicProcessor):
 
 		self.write_csv_items_and_finish(results)
 
-	def timify(self, number):
+	def timify_secs(self, number):
 		"""
 		For the non-geniuses, convert an amount of seconds to a more readable
 		approximation like '4h 5m'

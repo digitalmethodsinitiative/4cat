@@ -386,7 +386,7 @@ def convert_to_float(value, default=0) -> float:
         return default
 
 
-def timify_long(number):
+def timify(number, short=False):
     """
     Make a number look like an indication of time
 
@@ -403,31 +403,31 @@ def timify_long(number):
     month_length = 30.42 * 86400
     months = math.floor(number / month_length)
     if months:
-        components.append("%i month%s" % (months, "s" if months != 1 else ""))
+        components.append(f"{months}{'mt' if short else ' month'}{'s' if months != 1 and not short else ''}")
         number -= (months * month_length)
 
     week_length = 7 * 86400
     weeks = math.floor(number / week_length)
     if weeks:
-        components.append("%i week%s" % (weeks, "s" if weeks != 1 else ""))
+        components.append(f"{weeks}{'w' if short else ' week'}{'s' if weeks != 1 and not short else ''}")
         number -= (weeks * week_length)
 
     day_length = 86400
     days = math.floor(number / day_length)
     if days:
-        components.append("%i day%s" % (days, "s" if days != 1 else ""))
+        components.append(f"{days}{'d' if short else ' day'}{'s' if days != 1 and not short else ''}")
         number -= (days * day_length)
 
     hour_length = 3600
     hours = math.floor(number / hour_length)
     if hours:
-        components.append("%i hour%s" % (hours, "s" if hours != 1 else ""))
+        components.append(f"{hours}{'h' if short else ' hour'}{'s' if hours != 1 and not short else ''}")
         number -= (hours * hour_length)
 
     minute_length = 60
     minutes = math.floor(number / minute_length)
     if minutes:
-        components.append("%i minute%s" % (minutes, "s" if minutes != 1 else ""))
+        components.append(f"{minutes}{'m' if short else ' minute'}{'s' if minutes != 1 and not short else ''}")
 
     if not components:
         components.append("less than a minute")

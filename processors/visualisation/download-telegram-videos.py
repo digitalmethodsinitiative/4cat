@@ -13,7 +13,7 @@ from telethon.errors import FloodError, BadRequestError
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from processors.visualisation.download_videos import VideoDownloaderPlus
-from common.lib.helpers import UserInput, timify_long
+from common.lib.helpers import UserInput, timify
 from common.lib.dataset import DataSet
 
 __author__ = "Stijn Peeters"
@@ -215,7 +215,7 @@ class TelegramVideoDownloader(BasicProcessor):
             except FloodError as e:
                 later = "later"
                 if hasattr(e, "seconds"):
-                    later = f"in {timify_long(e.seconds)}"
+                    later = f"in {timify(e.seconds)}"
                 self.dataset.update_status(f"Rate-limited by Telegram after downloading {media_done-1:,} image(s); "
                                            f"halting download process. Try again {later}.", is_final=True)
                 self.flawless = False
