@@ -26,7 +26,7 @@ class AnnotationMetadata(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 
-		return module.is_dataset() and module.has_annotations()
+		return module.is_dataset() and module.get_annotation_fields()
 
 	def process(self):
 
