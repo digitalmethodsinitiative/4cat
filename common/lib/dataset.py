@@ -1465,10 +1465,12 @@ class DataSet(FourcatModule):
 		"""
 		if self.genealogy:
 			return ",".join([dataset.key for dataset in self.genealogy])
+		elif not self.key_parent:
+			return self.key
 		else:
-			# Collect keys only
-			key_parent = self.key  # Start at the bottom
-			genealogy = []
+			# Collect keys only, start at the bottom
+			genealogy = [self.key_parent]
+			key_parent = genealogy[-1]
 
 			while key_parent:
 				try:
