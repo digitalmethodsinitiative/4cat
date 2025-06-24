@@ -1829,7 +1829,7 @@ class DataSet(FourcatModule):
 		Whether this dataset has annotations
 		"""
 
-		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s LIMIT 1", (self.key,))
 
 		return True if annotation else False
 
