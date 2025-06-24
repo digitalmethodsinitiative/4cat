@@ -2029,7 +2029,6 @@ class DataSet(FourcatModule):
 
 		# Get existing annotation fields to see if stuff changed.
 		old_fields = self.get_annotation_fields()
-		print(old_fields)
 		changes = False
 
 		# Do some validation
