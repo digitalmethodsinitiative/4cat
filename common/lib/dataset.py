@@ -59,7 +59,7 @@ class DataSet(FourcatModule):
 	_queue_position = None
 
 	def __init__(self, parameters=None, key=None, job=None, data=None, db=None, parent='', extension=None,
-				 type=None, is_private=True, owner="anonymous", modules=None, annotation_fields=None):
+				 type=None, is_private=True, owner="anonymous", modules=None):
 		"""
 		Create new dataset object
 
@@ -96,7 +96,6 @@ class DataSet(FourcatModule):
 		self.genealogy = []
 		self.staging_areas = []
 		self.modules = modules
-		self.annotation_fields = {}
 
 		if key is not None:
 			self.key = key
@@ -154,9 +153,10 @@ class DataSet(FourcatModule):
 				"num_rows": 0,
 				"progress": 0.0,
 				"key_parent": parent,
-				"annotation_fields": json.dumps({})
+				"annotation_fields": "{}"
 			}
 			self.parameters = parameters
+			self.annotation_fields = {}
 
 			self.db.insert("datasets", data=self.data)
 			self.refresh_owners()
@@ -1881,18 +1881,6 @@ class DataSet(FourcatModule):
 
 		return True if self.annotation_fields else False
 
-	def get_annotation_fields(self) -> dict:
-		"""
-		Retrieves the saved annotation fields for this dataset.
-		These are stored in the annotations table.
-
-		:return dict: The saved annotation fields.
-		"""
-
-		annotation_fields = self.annotation_fields
-
-		return annotation_fields
-
 	def get_annotation_field_labels(self) -> list:
 		"""
 		Retrieves the saved annotation field labels for this dataset.
@@ -1901,7 +1889,7 @@ class DataSet(FourcatModule):
 		:return list: List of annotation field labels.
 		"""
 
-		annotation_fields = self.get_annotation_fields()
+		annotation_fields = self.annotation_fields
 
 		if not annotation_fields:
 			return []
@@ -1984,7 +1972,7 @@ class DataSet(FourcatModule):
 			count += 1
 
 		# Save annotation fields if things changed
-		if annotation_fields != self.get_annotation_fields():
+		if annotation_fields != self.annotation_fields:
 			self.save_annotation_fields(annotation_fields)
 
 		# columns may have changed if there are new annotations
@@ -2028,7 +2016,7 @@ class DataSet(FourcatModule):
 		"""
 
 		# Get existing annotation fields to see if stuff changed.
-		old_fields = self.get_annotation_fields()
+		old_fields = self.annotation_fields
 		changes = False
 
 		# Do some validation
@@ -2077,7 +2065,8 @@ class DataSet(FourcatModule):
 
 		# We're saving the new annotation fields as-is.
 		# Ordering of fields is preserved this way.
-		self.annotation_fields = json.dumps(new_fields)
+		self.db.update("datasets", where={"key": self.key}, data={"annotation_fields": json.dumps(new_fields)})
+		self.annotation_fields = new_fields
 
 		# If anything changed with the annotation fields, possibly update
 		# existing annotations (e.g. to delete them or change their labels).
