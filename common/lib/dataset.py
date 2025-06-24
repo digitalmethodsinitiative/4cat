@@ -96,6 +96,7 @@ class DataSet(FourcatModule):
 		self.genealogy = []
 		self.staging_areas = []
 		self.modules = modules
+		self.annotation_fields = {}
 
 		if key is not None:
 			self.key = key
@@ -129,7 +130,8 @@ class DataSet(FourcatModule):
 		if current:
 			self.data = current
 			self.parameters = json.loads(self.data["parameters"])
-			self.annotation_fields = json.loads(self.data["annotation_fields"]) if self.data["annotation_fields"] else {}
+			self.annotation_fields = json.loads(self.data["annotation_fields"]) \
+				if self.data.get("annotation_fields") else {}
 			self.is_new = False
 		else:
 			self.data = {"type": type}  # get_own_processor needs this
@@ -152,7 +154,7 @@ class DataSet(FourcatModule):
 				"num_rows": 0,
 				"progress": 0.0,
 				"key_parent": parent,
-				"annotation_fields": json.dumps(annotation_fields)
+				"annotation_fields": json.dumps({})
 			}
 			self.parameters = parameters
 
@@ -2027,6 +2029,7 @@ class DataSet(FourcatModule):
 
 		# Get existing annotation fields to see if stuff changed.
 		old_fields = self.get_annotation_fields()
+		print(old_fields)
 		changes = False
 
 		# Do some validation
@@ -2075,7 +2078,6 @@ class DataSet(FourcatModule):
 
 		# We're saving the new annotation fields as-is.
 		# Ordering of fields is preserved this way.
-		#self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
 		self.annotation_fields = json.dumps(new_fields)
 
 		# If anything changed with the annotation fields, possibly update
