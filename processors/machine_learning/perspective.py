@@ -135,7 +135,7 @@ class Perspective(BasicProcessor):
 
 		# Write annotations
 		if save_annotations:
-			self.save_annotations(annotations, overwrite=True)
+			self.save_annotations(annotations)
 
 		# Write to file
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:

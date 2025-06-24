@@ -229,7 +229,7 @@ def explorer_save_annotations(dataset_key: str):
 		return error(404, error="Dataset not found.")
 
 	try:
-		annotations_saved = dataset.save_annotations(annotations, overwrite=True)
+		annotations_saved = dataset.save_annotations(annotations)
 	except AnnotationException as e:
 		# If anything went wrong with the annotation field saving, return an error.
 		return jsonify(error=str(e)), 400

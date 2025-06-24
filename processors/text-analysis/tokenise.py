@@ -488,14 +488,14 @@ class Tokenise(BasicProcessor):
 							"value": ",".join(post_tokens)
 						})
 						if processed % 1000 == 0:
-							self.save_annotations(annotations, overwrite=False)
+							self.save_annotations(annotations)
 							annotations = []
 
                     output_files[output_path] += 1
 
 		# Safe leftover annotations
 		if annotations:
-			self.save_annotations(annotations, overwrite=False)
+			self.save_annotations(annotations)
 
 		if output_file_handle:
 			output_file_handle.close()

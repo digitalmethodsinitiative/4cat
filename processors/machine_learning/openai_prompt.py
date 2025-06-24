@@ -272,7 +272,7 @@ class OpenAI(BasicProcessor):
 
 		# Write annotations
 		if save_annotations:
-			self.save_annotations(annotations, overwrite=False)
+			self.save_annotations(annotations)
 
 		# Write to csv file
 		self.write_csv_items_and_finish(results)
