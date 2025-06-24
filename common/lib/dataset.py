@@ -359,8 +359,8 @@ class DataSet(FourcatModule):
 			item_mapper = True
 
 		# Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
-		annotation_labels = self.get_annotation_field_labels()
-		num_annotations = 0 if not annotation_labels else self.num_annotations()
+		annotation_fields = self.get_annotation_fields()
+		num_annotations = 0 if not annotation_fields else self.num_annotations()
 		all_annotations = None
 		# If this dataset has less than n annotations, just retrieve them all before iterating
 		if num_annotations <= 500:
@@ -413,7 +413,7 @@ class DataSet(FourcatModule):
 				mapped_item = original_item
 
 			# Add possible annotation values
-			if annotation_labels:
+			if annotation_fields:
 
 				# We're always handling annotated data as a MappedItem object,
 				# even if no map_item() function is available for the data source.
@@ -427,22 +427,29 @@ class DataSet(FourcatModule):
 				else:
 					item_annotations = self.get_annotations_for_item(mapped_item.data["id"])
 
-				# Loop through annotation field labels
-				for annotation_label in annotation_labels:
+				# Loop through annotation fields
+				label_count = 0
+				for annotation_field_id, annotation_field_items in annotation_fields.items():
 					# Set default value to an empty string
 					value = ""
 					# Set value if this item has annotations
 					if item_annotations:
 						# Items can have multiple annotations
 						for annotation in item_annotations:
-							if annotation.label == annotation_label:
+							if annotation.field_id == annotation_field_id:
 								value = annotation.value
 							if isinstance(value, list):
 								value = ",".join(value)
 
+					# Make sure labels are unique when iterating through items
+					column_name = annotation_field_items["label"]
+					while column_name in mapped_item.data:
+						label_count += 1
+						column_name = annotation_field_items["label"] + "_" + str(label_count)
+
 					# We're always adding an annotation value
 					# as an empty string, even if it's absent.
-					mapped_item.data[annotation_label] = value
+					mapped_item.data[column_name] = value
 
 			# yield a DatasetItem, which is a dict with some special properties
 			yield DatasetItem(mapper=item_mapper, original=original_item, mapped_object=mapped_item, **(mapped_item.get_item_data() if type(mapped_item) is MappedItem else mapped_item))
@@ -1938,21 +1945,19 @@ class DataSet(FourcatModule):
 
 		return labels
 
-	def save_annotations(self, annotations: list, overwrite=True, from_dataset="", editable=True,
-						 hide_in_explorer=False) -> int:
+	def save_annotations(self, annotations: list) -> int:
 		"""
 		Takes a list of annotations and saves them to the annotations table.
 		If a field is not yet present in the `annotation_fields` column in
 		the datasets table, it also adds it there.
 
-		:param list annotations:		List of dictionaries with annotation items. Must have `item_id` and `label`.
-										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
-		:param bool overwrite:			Whether to overwrite the annotation if it is already present.
-		:param str from_dataset:		Dataset key from where this annotation has been generated from. Only relevant
-										for processor-generated annotations.
-		:param bool editable:			Whether the annotation can be edited in the Explorer.
-		:param bool hide_in_explorer:	Whether to hide this annotation in the Explorer (still shows through
-										`iterate_items()`).
+		:param list annotations:		List of dictionaries with annotation items. Must have `item_id`, `field_id`,
+		 								and `label`.
+		 								`item_id` is for the specific item being annotated (e.g. a social media post)
+		 								`field_id` refers to the annotation field.
+		 								`label` is a human-readable description of this annotation.
+		 								E.g.: [{"item_id": "12345", "label": "Valid", "field_id": "123asd",
+		 								 "value": "Yes"}]
 
 		:returns int:					How many annotations were saved.
 
@@ -1962,7 +1967,6 @@ class DataSet(FourcatModule):
 			return 0
 
 		count = 0
-		annotation_labels = self.get_annotation_field_labels()
 
 		# Add some dataset data to annotations, if not present
 		for annotation_data in annotations:
@@ -1971,12 +1975,12 @@ class DataSet(FourcatModule):
 			if "item_id" not in annotation_data:
 				raise AnnotationException("Can't save annotations; annotation must have an `item_id` referencing "
 										  "the item it annotated, got %s" % annotation_data)
+			if "field_id" not in annotation_data:
+				raise AnnotationException("Can't save annotations; annotation must have a `field_id` field, "
+										  "got %s" % annotation_data)
 			if "label" not in annotation_data or not isinstance(annotation_data["label"], str):
 				raise AnnotationException("Can't save annotations; annotation must have a `label` field, "
 										  "got %s" % annotation_data)
-			if not overwrite and annotation_data["label"] in annotation_labels:
-				raise AnnotationException("Can't save annotations; annotation field with label %s "
-										  "already exists" % annotation_data["label"])
 
 			# Set dataset key
 			if not annotation_data.get("dataset"):
@@ -1986,17 +1990,6 @@ class DataSet(FourcatModule):
 			# If this annotation is made by a processor, it will have the processor name
 			if not annotation_data.get("author"):
 				annotation_data["author"] = self.get_owners()[0]
-
-			# The field ID can already exist for the same dataset/key combo if a previous label has been renamed.
-			# In this case create a new key with `from_dataset`.
-			if not annotation_data.get("field_id"):
-				if not overwrite:
-					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"] +
-										   annotation_data.get("from_dataset", ""))
-				else:
-					field_id = hash_to_md5(annotation_data["dataset"] + annotation_data["label"])
-
-				annotation_data["field_id"] = field_id
 
 			# Create Annotation object, which also saves it to the database
 			# If this dataset/item ID/label combination already exists, this retrieves the

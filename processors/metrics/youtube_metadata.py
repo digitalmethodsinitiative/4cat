@@ -212,7 +212,7 @@ class YouTubeMetadata(BasicProcessor):
 						}
 						annotations.append(annotation)
 
-			self.save_annotations(annotations, overwrite=True)
+			self.save_annotations(annotations)
 
 		self.dataset.update_status("Writing results to csv.")
 		self.write_csv_items_and_finish(youtube_items)

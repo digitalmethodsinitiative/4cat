@@ -51,7 +51,7 @@ class Annotation:
         :param db:              Database connection object
         """
 
-        required_fields = ["label", "item_id", "dataset"]
+        required_fields = ["field_id", "item_id", "dataset"]
 
         # Must have an ID or data
         if (annotation_id is None and data is None) or (data is not None and not isinstance(data, dict)):
@@ -84,7 +84,7 @@ class Annotation:
                     raise AnnotationException("Annotation() requires a %s field" % required_field)
 
             # Check if this annotation already exists, based on dataset key, item id, and label.
-            current = self.get_by_field(data["dataset"], data["item_id"], data["label"])
+            current = self.get_by_field(data["dataset"], data["item_id"], data["field_id"])
 
         # If we were able to retrieve an annotation from the db, it already exists
         if current:
@@ -110,8 +110,7 @@ class Annotation:
             new_data = {
                 "dataset": data["dataset"],
                 "item_id": data["item_id"],
-                "field_id": data["field_id"]
-                if data.get("field_id") else self.set_field_id(data["dataset"], data["label"]),
+                "field_id": data["field_id"],
                 "timestamp": created_timestamp,
                 "timestamp_created": created_timestamp,
                 "label": data["label"],
@@ -174,20 +173,20 @@ class Annotation:
 
         return data
 
-    def get_by_field(self, dataset_key: str, item_id: str, label: str) -> dict:
+    def get_by_field(self, dataset_key: str, item_id: str, field_id: str) -> dict:
         """
         Get the annotation information via its dataset key, item ID, and field_id.
         This is always a unique combination.
 
         :param dataset_key:     The key of the dataset this annotation was made for.
         :param item_id:         The ID of the item this annotation was made for.
-        :param label:           The label of the annotation.
+        :param field_id:        The field ID of the annotation.
 
         :return data: A dict with data of the retrieved annotation, or an empty dict if it doesn't exist.
         """
 
-        data = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND label = %s",
-                                (dataset_key, str(item_id), label))
+        data = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s AND item_id = %s AND field_id = %s",
+                                (dataset_key, str(item_id), field_id))
         if not data:
             return {}
 
@@ -196,20 +195,6 @@ class Annotation:
         data["metadata"] = json.loads(data["metadata"])
 
         return data
-
-    def set_field_id(self, dataset_key: str, label: str) -> str:
-        """
-        Sets a `field_id` based on the dataset key and label.
-        This combination should be unique.
-
-        :param dataset_key: The dataset key
-        :param label:       The label of the dataset.
-        """
-
-        base_field_id = dataset_key + label
-        field_id = hash_to_md5(base_field_id)
-        self.field_id = field_id
-        return self.field_id
 
     def write_to_db(self):
         """
@@ -223,7 +208,7 @@ class Annotation:
         if db_data["type"] == "checkbox":
             db_data["value"] = ",".join(db_data["value"])
 
-        return self.db.upsert("annotations", data=db_data, constraints=["label", "dataset", "item_id"])
+        return self.db.upsert("annotations", data=db_data, constraints=["field_id", "dataset", "item_id"])
 
     def delete(self):
         """

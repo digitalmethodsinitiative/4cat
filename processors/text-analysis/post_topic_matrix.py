@@ -243,7 +243,7 @@ class TopicModelWordExtractor(BasicProcessor):
                         index += 1
 
         if save_annotations:
-            self.save_annotations(annotations, overwrite=True)
+            self.save_annotations(annotations)
 
         self.dataset.update_status("Results saved")
         self.dataset.finish(index)

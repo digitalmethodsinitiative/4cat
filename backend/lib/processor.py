@@ -636,8 +636,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		return standalone
 
-	def save_annotations(self, annotations: list, source_dataset=None, overwrite=False, editable=False,
-						 hide_in_explorer=False) -> int:
+	def save_annotations(self, annotations: list, source_dataset=None, hide_in_explorer=False) -> int:
 		"""
 		Saves annotations made by this processor on the basis of another dataset.
 		Also adds some data regarding this processor: set `author` and `label` to processor name,
@@ -647,11 +646,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 										E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
 		:param source_dataset:			The dataset that these annotations will be saved on. If None, will use the
 										top parent.
-		:param bool overwrite:			Whether to overwrite annotations if the label is already present
-										for the dataset. If this is False and the label is already present,
-										we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
-										Else we'll just replace the old data.
-		:param bool editable:			Whether the annotation can be edited in the Explorer.
 		:param bool hide_in_explorer:	Whether this annotation is hidden in the Explorer (still shows in
 										`iterate_items()`).
 
@@ -669,11 +663,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		# Check if this dataset already has annotation fields, and if so, store some values to use per annotation.
 		annotation_fields = source_dataset.get_annotation_fields()
-		annotation_labels = source_dataset.get_annotation_field_labels()
 
-		# Set some values
-		seen_fields = set((a["from_dataset"], a["label"]) for a in annotation_fields.values() if "from_dataset" in a)
+		# Keep track of what fields we've already seen, so we don't need to hash every time.
+		seen_fields = {(field_items["from_dataset"], field_items["label"]): field_id
+					   for field_id, field_items in annotation_fields.items() if "from_dataset" in field_items}
+
+		# Loop through all annotations. This may be batched.
 		for annotation in annotations:
+
 			# Keep track of what dataset generated this annotation
 			annotation["from_dataset"] = self.dataset.key
 			# Set the author to this processor's name
@@ -686,23 +683,31 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# Only use a default label if no custom one is given
 			if not annotation.get("label"):
 				annotation["label"] = self.name
-			# If this specific processor instance has not already generated annotations (e.g. when done in batches),
-			# and if we're not overwriting, add the from_dataset key as suffix.
-			if not overwrite and annotation["label"] in annotation_labels:
-				annotation["label"] += "-" + self.dataset.key
 
-			# Store annotation field if this dataset -> label combo hasn't been seen yet
+			# Store info on the annotation field if this from_dataset/label combo hasn't been seen yet.
+			# We need to do this within this loop because this function may be called in batches and with different
+			# annotation types.
 			if (annotation["from_dataset"], annotation["label"]) not in seen_fields:
-				seen_fields.add((annotation["from_dataset"], annotation["label"]))
+				# Generating a unique field ID based on the source dataset's key, the label, and this dataset's key.
+				# This should create unique fields, even if there's multiple annotation types for one processor.
 				field_id = hash_to_md5(self.source_dataset.key + annotation["label"] + annotation["from_dataset"])
+				seen_fields[(annotation["from_dataset"], annotation["label"])] = field_id
 				annotation_fields[field_id] = {
 					"label": annotation["label"],
-					"type": annotation["type"] if annotation.get("type") else "textarea",
-					"editable": editable,
-					"from_dataset": annotation["from_dataset"]
+					"type": annotation["type"] if annotation.get("type") else "text",
+					"from_dataset": annotation["from_dataset"],
+					"hide_in_explorer": hide_in_explorer
 				}
+			else:
+				# Else just get the field ID
+				field_id = seen_fields[(annotation["from_dataset"], annotation["label"])]
 
-		annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+			# Add field ID to the annotation
+			annotation["field_id"] = field_id
+
+		print(annotations)
+		print(annotation_fields)
+		annotations_saved = source_dataset.save_annotations(annotations)
 		source_dataset.save_annotation_fields(annotation_fields)
 
 		return annotations_saved

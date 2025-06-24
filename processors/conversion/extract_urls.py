@@ -318,14 +318,14 @@ class ExtractURLs(BasicProcessor):
                     self.dataset.update_status(f"Processed {processed_items}/{total_items} items; {url_matches_found} items with url(s)")
                     self.dataset.update_progress(processed_items / total_items)
                 if annotations and processed_items % 1000 == 0:
-                    self.save_annotations(annotations, overwrite=False)
+                    self.save_annotations(annotations)
                     annotations = []
 
         if cache:
             self.dataset.log(f"Expanded {len(cache)} URLs in dataset")
 
         if save_annotations and annotations:
-            self.save_annotations(annotations, overwrite=False)
+            self.save_annotations(annotations)
             self.dataset.log(f"URLs written as annotations to top dataset")
 
         self.dataset.finish(url_matches_found)

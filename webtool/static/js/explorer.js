@@ -215,11 +215,6 @@ function init() {
 					label_field.addClass("invalid");
 					warning  = "Field labels can't be empty";
 				}
-				// Make sure the labels can't be duplicates
-				else if (labels_added.includes(label)) {
-					warning = "Field labels must be unique";
-					label_field.addClass("invalid");
-				}
 
 				// We can't add field labels that are also existing column names
 				else if (original_columns.includes(label)) {
@@ -256,7 +251,7 @@ function init() {
 						}
 						// Input fields must have a unique label.
 						else if (option_labels.includes(option_label)) {
-							warning = "Fields must be unique";
+							warning = "Option names must be unique";
 							$(this).find("input").addClass("invalid");
 						}
 						// Fields for dropdowns and checkboxes may be emtpy.
@@ -321,7 +316,7 @@ function init() {
 			}
 
 			// Create an annotation object and add them to the array.
-			let annotation = {
+			return {
 				"field_id": field_id,
 				"item_id": item_id,
 				"label": label,
@@ -331,8 +326,7 @@ function init() {
 				"by_processor": false, // Explorer annotations are human-made!
 				"timestamp": timestamp,
 				"options": options,
-			}
-			return annotation;
+			};
 		},
 
 		applyAnnotationFields: function (e){

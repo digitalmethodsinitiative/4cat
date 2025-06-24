@@ -337,7 +337,7 @@ class VideoHasher(BasicProcessor):
 
 		if save_annotations and annotations:
 			self.dataset.update_status("Saving hashes as annotations to top dataset")
-			self.save_annotations(annotations, overwrite=True)
+			self.save_annotations(annotations)
 
 		# Finish up
 		self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')

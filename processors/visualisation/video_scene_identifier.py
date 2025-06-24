@@ -298,7 +298,7 @@ class VideoSceneDetector(BasicProcessor):
 									annotations.append(annotation)
 
 		if save_annotations and annotations:
-			self.save_annotations(annotations, overwrite=True)
+			self.save_annotations(annotations)
 
 		if rows:
 			self.dataset.update_status(

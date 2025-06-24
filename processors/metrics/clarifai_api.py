@@ -251,12 +251,12 @@ class ClarifaiAPIFetcher(BasicProcessor):
                                 # Save in batches so we don't memory hog
                                 annotated += 1
                                 if annotated % 1000 == 0:
-                                    self.save_annotations(fourcat_annotations, overwrite=True)
+                                    self.save_annotations(fourcat_annotations)
                                     fourcat_annotations = []
 
         # Write leftover annotations
         if save_annotations and fourcat_annotations:
-            self.save_annotations(fourcat_annotations, overwrite=True)
+            self.save_annotations(fourcat_annotations)
             self.dataset.update_status(f"Saved {annotated + len(fourcat_annotations)} labels as annotations")
 
         if errors:

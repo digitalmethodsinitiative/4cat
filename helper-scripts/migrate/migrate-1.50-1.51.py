@@ -23,7 +23,7 @@ db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"]
 
 print("  Adding `from_dataset` column to annotations table...")
 # Original annotations table had columns 'key' and 'annotations', new annotations has 'dataset' among others
-has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'annotations' AND column_name = 'from_Dataset'")
+has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'annotations' AND column_name = 'from_dataset'")
 
 # Ensure we do not attempt to update the annotations table if it has already been updated
 # This will drop the annotations table and create a new one losing all annotations
@@ -34,4 +34,20 @@ else:
     print("    Annotations table needs to be updated")
     db.execute("ALTER TABLE annotations ADD from_dataset TEXT")
 
-    print("  - done!")
+
+print("    Creating indexes for `from_dataset` and unique fields for the annotations table...")
+db.execute("""
+CREATE INDEX IF NOT EXISTS annotations_from_dataset
+ON annotations (
+    from_dataset
+);
+DROP INDEX IF EXISTS annotation_unique;
+CREATE UNIQUE INDEX annotation_unique
+ON annotations (
+    dataset,
+    item_id,
+    field_id
+);
+""")
+
+print("  - done!")

@@ -402,7 +402,7 @@ class AudioToText(BasicProcessor):
                     processed += 1
 
         if save_annotations:
-            self.save_annotations(annotations, overwrite=False)
+            self.save_annotations(annotations)
 
         self.dataset.update_status(f"Detected speech in {processed} of {total_audio_files} audio files")
         self.dataset.finish(processed)
