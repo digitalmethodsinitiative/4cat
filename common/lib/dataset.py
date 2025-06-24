@@ -1877,13 +1877,17 @@ class DataSet(FourcatModule):
 		Retrieves a specific annotation if it exists.
 
 		:param data:		A dictionary with which to get the annotations from.
-							To get specific annotations, include either an `id` field or `field_id` and `label` fields.
+							To get specific annotations, include either an `id` field or
+							`field_id` and `item_id` fields.
 
 		return Annotation:	Annotation object.
 		"""
 
-		if "id" not in data or ("field_id" not in data and "label" not in data):
+		if "id" not in data or ("field_id" not in data and "item_id" not in data):
 			return None
+
+		if "dataset" not in data:
+			data["dataset"] = self.key
 
 		return Annotation(data=data, db=self.db)
 

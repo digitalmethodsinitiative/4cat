@@ -485,14 +485,14 @@ class Tokenise(BasicProcessor):
 							"value": ",".join(post_tokens)
 						})
 						if processed % 1000 == 0:
-							self.save_annotations(annotations)
+							self.save_annotations(annotations, hide_in_explorer=True)
 							annotations = []
 
 					output_files[output_path] += 1
 
 		# Safe leftover annotations
 		if annotations:
-			self.save_annotations(annotations)
+			self.save_annotations(annotations, hide_in_explorer=True)
 
 		if output_file_handle:
 			output_file_handle.close()
@@ -514,6 +514,7 @@ class Tokenise(BasicProcessor):
 			self.dataset.update_status(f"Finished tokenizing; Unable to group by sentence ({language} not supported), instead grouped by item.", is_final=True)
 
 		end = time.time()
+
 		# create zip of archive and delete temporary files and folder
 		print(f"FINISHED TOKENIZING IN {end - start}")
 		self.write_archive_and_finish(staging_area)
