@@ -185,16 +185,6 @@ def explorer_save_annotation_fields(dataset_key: str):
 	# Save it!
 	annotation_fields = request.get_json()
 
-	# Field IDs are not immediately set in the front end.
-	# We're going to do this based on the hash of the
-	# dataset key and the input label (should be unique)
-	field_keys = list(annotation_fields.keys())
-	for field_id in field_keys:
-		if "tohash" in field_id:
-			new_field_id = hash_to_md5(dataset_key + annotation_fields[field_id]["label"])
-			annotation_fields[new_field_id] = annotation_fields[field_id]
-			del annotation_fields[field_id]
-
 	try:
 		fields_saved = dataset.save_annotation_fields(annotation_fields)
 	except AnnotationException as e:

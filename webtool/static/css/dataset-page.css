@@ -831,9 +831,14 @@ body.image-preview {
     white-space: nowrap;
 }
 
-a.button-like-small.delete-input {
+.annotation-field .field-controls {
     margin-left: auto;
 }
+
+.annotation-field .field-controls a {
+    margin: 0.1em;
+}
+
 
 #edit-annotation-fields #input-warning {
     color: var(--accent-warning)
@@ -867,7 +872,7 @@ a.button-like-small.delete-input {
 }
 
 .annotation-field-label.invalid, .option-field > input.invalid {
-    border: 1px solid red;
+    border: 1px solid var(--accent-warning);
 }
 
 #edit-annotation-fields {
