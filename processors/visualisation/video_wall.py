@@ -355,7 +355,7 @@ class VideoWallGenerator(BasicProcessor):
                 else:
                     cropscale += f"scale={tile_w}:-1,"
 
-                cropscale += f"crop={tile_w}:{tile_h}:exact=1,format=rgba"
+                cropscale += f"crop={tile_w}:{tile_h}:exact=1"
                 # exact=1 and format=rgba prevents shenanigans when merging
 
             elif sizing_mode == "average":
