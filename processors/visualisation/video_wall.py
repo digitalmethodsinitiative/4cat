@@ -4,7 +4,7 @@ Create a collage of videos playing side by side
 import random
 import shutil
 import math
-import shlex
+import oslex
 import subprocess
 
 from operator import mul
@@ -137,7 +137,7 @@ class VideoWallGenerator(BasicProcessor):
             if video.name == '.metadata.json':
                 continue
 
-            video_path = shlex.quote(str(video))
+            video_path = oslex.quote(str(video))
 
             # determine length if needed
             probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
@@ -343,7 +343,7 @@ class VideoWallGenerator(BasicProcessor):
         if padding:
             filter_chain += ";".join(padding) + ";"
         filter_chain += "".join([f"[stack{i}]" for i in range(0, len(rows))]) + f"vstack=inputs={len(rows)}[final]"
-        ffmpeg_filter = shlex.quote(filter_chain)[1:-1]
+        ffmpeg_filter = oslex.quote(filter_chain)[1:-1]
         command += [fps_command, "cfr", "-filter_complex", ffmpeg_filter]
 
         # ensure mixed audio
@@ -356,7 +356,7 @@ class VideoWallGenerator(BasicProcessor):
         command += ["-map", "[final]"]
 
         # set output file
-        command.append(shlex.quote(str(self.dataset.get_results_path())))
+        command.append(oslex.quote(str(self.dataset.get_results_path())))
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
 
         if self.interrupted:
