@@ -50,7 +50,10 @@
                         </div>
                     {% endif %}
                     </span>
-                    <a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>
+                    <div class="field-controls">
+                        <a id="hide-field-{{ field }}" class="tooltip-trigger button-like-small hide-field shown" aria-controls="tooltip-hide-field"><i class="fas fa-eye"></i></a>
+                        <a id="delete-field-{{ field }}" class="tooltip-trigger button-like-small delete-field" aria-controls="tooltip-delete-field"><i class="fas fa-trash"></i></a>
+                    </div>
                 </li>
             {% endif %}
         {% endfor %}
@@ -58,7 +61,9 @@
     </ol>
     <div id="edit-annotation-fields">
         <a class="button-like-small" id="new-annotation-field"><i class="fas fa-plus"></i> New field</a>
-        <a class="button-like-small" id="apply-annotation-fields"><i class="fa-solid fa-check"></i> Apply</a>
+        <a class="button-like-small" id="apply-annotation-fields"><i class="fa-solid fa-check"></i> Update fields</a>
         <br><span class="hidden" id="input-warning"></span>
     </div>
 </div>
+<p role="tooltip" class="multiple" id="tooltip-hide-field" aria-hidden="true">Hide annotations of this type.</p>
+<p role="tooltip" class="multiple" id="tooltip-delete-field" aria-hidden="true">Delete this annotation field and all its annotations.</p>

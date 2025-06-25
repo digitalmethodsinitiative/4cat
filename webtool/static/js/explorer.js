@@ -7,7 +7,7 @@ $(init);
  */
 
 // Timer variable to start/reset saving annotations.
-var save_timer = null;
+let save_timer = null;
 
 function init() {
 
@@ -44,7 +44,18 @@ function init() {
 				}
 			});
 
-			// Show and hide annotations
+			// Show and hide an annotation field
+			editor_controls.on("click", ".annotation-field > .field-controls > .hide-field", function(){
+				const field_id = $(this).attr("id").replace("hide-field-", "");
+				if ($(this).hasClass("shown")) {
+					annotations.hideAnnotationField(field_id);
+				}
+				else {
+					annotations.showAnnotationField(field_id);
+				}
+			});
+
+			// Show and hide annotations container
 			$("#toggle-annotations").on("click", function(){
 				if (!$(this).hasClass("disabled")) {
 					if ($(this).hasClass("shown")) {
@@ -57,10 +68,17 @@ function init() {
 			});
 
 			// Delete an entire annotation input
-			// We're in a grid of threes, so this involves three divs
-			editor_controls.on("click", ".annotation-field > .delete-input", function(){
-				let parent_div = $(this).parent();
-				parent_div.remove();
+			editor_controls.on("click", ".annotation-field > .field-controls > .delete-field", function(){
+				const field_to_delete = $(this).attr("id").replace("delete-field-", "");
+				// If this field isn't in the annotations yet, we can simply remove the container.
+				if (!annotation_fields || !(field_to_delete in annotation_fields)) {
+					let parent_div = $(this).parent().parent();
+					parent_div.remove();
+				}
+				// Else we're removing this field ID from the new annotations and update
+				else {
+					annotations.applyAnnotationFields(delete_field=field_to_delete);
+				}
 			});
 
 			// Make saving available when annotation fields are changed
@@ -123,7 +141,7 @@ function init() {
 			}
 			else if (type === "dropdown" || type === "checkbox") {
 				if (options.children().length === 0) {
-					options.append(annotations.getInputField());
+					options.append(annotations.getOptionField());
 				}
 			}
 		},
@@ -329,22 +347,24 @@ function init() {
 			};
 		},
 
-		applyAnnotationFields: function (e){
+		applyAnnotationFields: function (delete_field=""){
 			// Applies the annotation fields to each post on this page.
 
 			// First we collect the annotation information from the editor
+			let new_annotation_fields = annotations.parseAnnotationFields();
 
-			let new_annotation_fields = annotations.parseAnnotationFields(e);
-
+			// Potentially delete a field
+			if (delete_field) {
+				delete new_annotation_fields[delete_field];
+			}
 			// Show an error message if the annotation fields were not valid.
 			if (typeof new_annotation_fields == "string") {
 				annotations.warnEditor(new_annotation_fields);
 			}
 
-				// If everything is ok, we're going to add
+			// If everything is ok, we're going to add
 			// the annotation fields to each post on the page.
 			else {
-
 
 				// Remove warnings
 				annotations.warnEditor("")
@@ -557,6 +577,9 @@ function init() {
 			toggle_fields.html("<i class='fas fa-edit'></i> Edit fields");
 			toggle_fields.removeClass("shown");
 			editor.animate({"height": 0}, 250);
+			let queryParams = new URLSearchParams(window.location.search);
+			queryParams.delete("show_editor");
+			history.replaceState(null, null, "?"+queryParams.toString());
 		},
 
 		showEditor: function() {
@@ -570,9 +593,103 @@ function init() {
 			editor.height(current_height).animate({"height": auto_height}, 250, function(){
 				editor.height("auto");
 			});
+			let queryParams = new URLSearchParams(window.location.search);
+			queryParams.set("show_editor", "true");
+			history.replaceState(null, null, "?"+queryParams.toString());
+		},
+
+		hideAnnotationField: function(field_id) {
+			/*
+			* Hide annotation field in items
+			* */
+
+			// Nothing to show when there's no annotations
+			if (!annotations.fieldsExist() || !field_id) { return null }
+
+			// Store state in URL params
+			let queryParams = new URLSearchParams(window.location.search);
+			let hide_fields = queryParams.get("hide_fields");
+			if (hide_fields) {
+				hide_fields = hide_fields.split(",")
+				if (!(hide_fields.includes(field_id))) { hide_fields.push(field_id) }
+				queryParams.set("hide_fields", hide_fields.join(","));
+			} else {
+				queryParams.set("hide_fields", field_id);
+			}
+			history.replaceState(null, null, "?"+queryParams.toString());
+
+			let hide_button = $("#hide-field-" + field_id);
+			hide_button.removeClass("shown");
+			hide_button.html("<i class='fas fa-eye-slash'></i>");
+			$(".field-" + field_id).hide();
+
+			// If no fields are shown, also hide the container.
+			if ($("#annotation-fields-editor-controls").find(".hide-field.shown").length === 0) {
+				annotations.hideAnnotations();
+				$("#toggle-annotations").addClass("disabled");
+			}
+		},
+
+		showAnnotationField: function(field_id) {
+			/*
+			* Show annotation field in items
+			* */
+
+			// Nothing to show when there's no annotations
+			if (!annotations.fieldsExist() || !field_id) { return null }
+
+			$("#toggle-annotations").removeClass("disabled")
+			const fields_shown = $("#annotation-fields-editor-controls").find(".hide-field.shown").length
+
+			// Change button
+			let hide_button = $("#hide-field-" + field_id);
+			hide_button.addClass("shown");
+			hide_button.html("<i class='fas fa-eye'></i>");
+
+			// Store state in URL params
+			let queryParams = new URLSearchParams(window.location.search);
+			let hide_fields = queryParams.get("hide_fields");
+			if (hide_fields) {
+				hide_fields = hide_fields.split(",")
+				hide_fields = hide_fields.filter(hide_field => hide_field !== field_id).join(",")
+				if (!hide_fields) {
+					queryParams.delete("hide_fields");
+				} else {
+					queryParams.set("hide_fields", hide_fields);
+				}
+			}
+
+			history.replaceState(null, null, "?"+queryParams.toString());
+
+			$(".field-" + field_id).show();
+
+			// If just one field is shown if all were hidden before, show the container.
+			if (fields_shown === 0 && $("#annotation-fields-editor-controls").find(".hide-field.shown").length === 1) {
+				annotations.showAnnotations();
+			}
+		},
+
+		hideAnnotations: function() {
+			/*
+			* Hide annotations container
+			* */
+
+			// Store state in URL params
+			let queryParams = new URLSearchParams(window.location.search);
+			queryParams.delete("show");
+			history.replaceState(null, null, "?"+queryParams.toString());
+
+			let ta = $("#toggle-annotations");
+			ta.removeClass("shown");
+			ta.html("<i class='fas fa-eye'></i> Show annotations");
+			let pa = $(".post-annotations");
+			pa.animate({"height": 0}, 250);
 		},
 
 		showAnnotations: function() {
+			/*
+			* Show annotations container
+			* */
 
 			// Nothing to show when there's no annotations
 			if (!annotations.fieldsExist()) {
@@ -598,28 +715,16 @@ function init() {
 			});
 		},
 
-		hideAnnotations: function() {
-
-			// Store state in URL params
-			let queryParams = new URLSearchParams(window.location.search);
-			queryParams.delete("show");
-			history.replaceState(null, null, "?"+queryParams.toString());
-
-			let ta = $("#toggle-annotations");
-			ta.removeClass("shown");
-			ta.html("<i class='fas fa-eye'></i> Show annotations");
-			let pa = $(".post-annotations");
-			pa.animate({"height": 0}, 250);
-		},
-
 		addAnnotationField: function(){
 			/*
             Adds an annotation field input element;
             these have no IDs yet, we'll add a hashed database-label string when saving.
             */
 
-			let annotation_field = `
-			<li class="annotation-field" id="field-tohashrandomint">
+			const field_id = annotations.getFieldId();
+
+			const annotation_field = `
+			<li class="annotation-field" id="field-${field_id}">
 				<i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
 				 <span class="annotation-field-input">
 					<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Label">
@@ -633,18 +738,26 @@ function init() {
 					</select>
 				</span>
 				<span class="option-fields"></span>
-				<a class="button-like-small delete-input"><i class="fas fa-trash"></i></a>			
+				<div class="field-controls">
+					<a id="hide-field-${field_id}" class="tooltip-trigger button-like-small hide-field shown" aria-controls="tooltip-hide-field" id="hide-field-${field_id}"><i class='fas fa-eye'></i></a>
+					<a id="delete-field-${field_id}" class="tooltip-trigger button-like-small delete-field" aria-controls="tooltip-delete-field"><i class='fas fa-trash'></i></a>
+				</div>
             </li>
 			`.replace("randomint", Math.floor(Math.random() * 100000000).toString());
 			$("#annotation-field-settings").append(annotation_field);
 		},
 
-		getInputField: function(id){
-			// Returns an option field element with a pseudo-random ID, if none is provided.
-			if (id === undefined || id === 0) {
-				id = Math.floor(Math.random() * 100000000).toString();
+		getFieldId: function() {
+			let chars = 'abcdef0123456789';
+			let field_id = '';
+			for (let i = 0; i < 32; i++) {
+				field_id += chars[Math.floor(Math.random() * chars.length)];
 			}
-			return "<span class='option-field'><input type='text' id='option-" + id + "' placeholder='New option'></span>";
+			return field_id;
+		},
+
+		getOptionField: function(id){
+			return "<span class='option-field'><input type='text' id='option-" + annotations.getFieldId + "' placeholder='New option'></span>";
 		},
 
 		markChanges: function(el) {
@@ -708,9 +821,24 @@ const page_functions = {
 			window.location.href = getRelativeURL("results/" + dataset_key + "/explorer/?" + queryParams.toString());
 		});
 
-		// Show annotations if it's in the URL params,
-		// and change the dropdown sort option based on the sort parameter.
+		// Update state based on url parameters
 		let searchParams = new URLSearchParams(window.location.search)
+
+		// Hide annotations fields if it's in the url parameters
+		let hide_annotation_fields = searchParams.get("hide_fields");
+		hide_annotation_fields = hide_annotation_fields ? hide_annotation_fields.split(",") : [];
+		hide_annotation_fields.forEach(hide_annotation_field => {
+			annotations.hideAnnotationField(hide_annotation_field);
+		});
+
+		// Show annotations field editor if it's in the url parameters
+		let show_editor = searchParams.get("show_editor")
+		if (show_editor) {
+			annotations.showEditor();
+		}
+
+		// Show annotations if it's in the url parameters,
+		// and change the dropdown sort option based on the sort parameter.
 		let show_annotations = searchParams.get("show");
 		let show_edit_field = searchParams.get("edit");
 
