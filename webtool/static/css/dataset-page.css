@@ -743,6 +743,14 @@ body.image-preview {
 }
 
 /* EXPLORER VIEW */
+#explorer-controls .metadata-wrapper dd {
+    padding: 0
+}
+
+#explorer-controls .metadata-wrapper dd .padding {
+    padding: 0.5em;
+}
+
 #annotation-fields-editor {
     height: 0;
     overflow-y: hidden;
@@ -765,6 +773,17 @@ body.image-preview {
 
 #annotation-fields-editor-controls li.annotation-field:not(:last-child) {
     border-bottom: 1px dotted var(--contrast-dark);
+}
+
+#explorer-controls .info-row {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    padding: 0;
+    margin: 0;
+}
+
+#explorer-controls .info-row > #tutorial-cell {
+    border-left: 1px solid var(--gray);
 }
 
 .annotation-field > .handle {
