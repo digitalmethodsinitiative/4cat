@@ -506,7 +506,6 @@ def request_password():
 
         # is it also a valid username? that is not a 'special' user (like autologin)?
         resetting_user = User.get_by_name(g.db, username)
-        resetting_user.with_config(g.config)
 
         if resetting_user is None or resetting_user.is_special:
             incomplete.append("username")
@@ -520,6 +519,7 @@ def request_password():
                 "You have recently requested a password reset and an e-mail has been sent to you containing a reset link. It could take a while to arrive; also, don't forget to check your spam folder.")
         else:
             # okay, send an e-mail
+            resetting_user.with_config(g.config)
             try:
                 resetting_user.email_token(new=False)
                 return render_template("error.html", title="Success",
