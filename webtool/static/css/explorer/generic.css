@@ -41,7 +41,7 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 
 .posts li.post {
     position: relative;
-    background: #d1e2ff;
+    background: var(--gray-light);
     padding: 1em;
     min-width: 640px;
     max-width: 960px;
@@ -78,11 +78,11 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 .tags,
 .metrics,
 .external-url {
-    color: #3b4f9d;
+
 }
 
 .posts li.post .post-content a {
-    color: #215bc6;
+
 }
 
 .posts .external-url {
