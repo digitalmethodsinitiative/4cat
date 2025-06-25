@@ -117,19 +117,14 @@
                         <dd>{% include 'components/result-metadata.html' %}</dd>
                     </div>
 
-                    {% set annotation_fields = dataset.get_annotation_fields() %}
-                    {% if annotation_fields %}
+                    {% if dataset.get_annotation_fields() %}
                     <div class="fullwidth annotation-fields-list">
                         <dt>Annotations</dt>
                         <dd>
                             <ul>
-                            {% set annotations = dataset.get_annotations() %}
-                            {% if annotations %}
-                                <li>{{ annotations|length|numberify }} annotation{% if annotations|length > 1 %}s{% endif %}</li>
-                            {% endif %}
-                            {% for annotation_field in annotation_fields.items() %}
-                                <li><span class="property-badge">{{ annotation_field[1].label }}</span></li>
-                            {% endfor %}
+                                {% for annotation_field in dataset.get_annotation_fields().items() %}
+                                <li><span class="property-badge"><i class="fa-solid fa-tag"></i> {{ annotation_field[1].label }}</span></li>
+                                {% endfor %}
                             </ul>
                             <a class="button-like-small" id="edit-annotation-fields" href="{{ url_for('explorer_dataset', dataset_key=dataset.key) }}?edit=true"><i class="fas fa-edit" aria-hidden="true"></i> Edit fields</a>
                         </dd>
