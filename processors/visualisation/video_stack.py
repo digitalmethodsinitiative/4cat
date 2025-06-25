@@ -75,6 +75,16 @@ class VideoStack(BasicProcessor):
                 "none": "Remove audio"
             },
             "default": "longest"
+        },
+        "max-length": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Cut video after",
+            "default": 60,
+            "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
+                       "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
+                       "processor run times and is not recommended.",
+            "coerce_type": int,
+            "min": 0
         }
     }
 
@@ -112,6 +122,7 @@ class VideoStack(BasicProcessor):
         eof = self.parameters.get("eof-action")
         sound = self.parameters.get("audio")
         amount = self.parameters.get("amount")
+        video_length = self.parameters.get("max-length")
 
         # To figure out the length of a video we use ffprobe, if available
         with_errors = False
@@ -190,6 +201,11 @@ class VideoStack(BasicProcessor):
         num_videos = len(videos)
         self.dataset.log(f"Collected {num_videos} videos to stack")
 
+        # longest video in set may be shorter than requested length
+        if video_length:
+            video_length = min(max(lengths.values()), video_length)
+            command.extend(["-t", str(video_length)])
+
         # loop again, this time to construct the ffmpeg command
         last_index = num_videos - 1
         for video in videos:
@@ -234,6 +250,8 @@ class VideoStack(BasicProcessor):
         command += ["-map", "[final]", *fps_params]
 
         # output file
+        if video_length:
+            command.extend(["-t", str(video_length)])
         command.append(oslex.quote(str(self.dataset.get_results_path())))
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
 
