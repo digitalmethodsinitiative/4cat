@@ -187,6 +187,10 @@ class VideoWallGenerator(BasicProcessor):
             videos = sliced_videos
             lengths = {k: v for k, v in lengths.items() if k in [videos[p].name for p in videos]}
 
+        # longest video in set may be shorter than requested length
+        if video_length:
+            video_length = min(max(lengths.values()), video_length)
+
         # see which of the videos is the longest, after sorting
         # used to determine which audio stream to use
         max_length = max(lengths.values())
