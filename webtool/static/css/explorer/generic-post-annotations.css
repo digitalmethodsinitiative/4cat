@@ -4,7 +4,7 @@
  * --------------------- */
 
 .post-annotations {
-    background-color: #bed4f9;
+    background-color: var(--gray);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -27,21 +27,20 @@
 }
 
 .post-annotation .annotation-label {
+    font-size: 14px;
     flex-shrink: 0;
     width: 150px;
     text-align: right;
-    font-weight: 600;
     line-height: 1.4;
     word-wrap: break-word;
-    color: black;
+    color: var(--accent);
     margin: 0;
-    padding-top: 6px; /* Align with input fields */
 }
 
 /* Link styling for processor-generated labels */
 .post-annotation a.from-dataset-link {
     display: block;
-    color: black;
+    color: var(--accent);
     text-decoration: underline;
 }
 
@@ -57,17 +56,19 @@
     gap: 8px;
 }
 
-/* Input field styling */
-.post-annotation-input {
+.post-annotation-value {
     flex: 1;
-    padding: 8px 12px;
-    border: 1px solid #b8c6db;
-    background: white;
     font-size: 14px;
     line-height: 1.4;
     transition: border-color 0.2s, box-shadow 0.2s;
     font-family: inherit;
-    word-break: break-all;
+    word-break: break-word;
+}
+
+/* Input field styling */
+.post-annotation-input {
+    background: white;
+    border: 1px solid #b8c6db;
 }
 
 .post-annotation-input:focus {
@@ -80,6 +81,19 @@
     background: transparent;
     border: none;
     padding: 0;
+}
+
+.post-annotation-parameters {
+    margin-top: 10px;
+}
+
+.post-annotation-parameters ul li {
+    display: inline-block;
+    background-color: transparent;
+    padding: 0;
+}
+.post-annotation-parameters ul li .property-badge {
+
 }
 
 /* Textarea specific styling */
