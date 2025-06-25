@@ -44,7 +44,7 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     background: var(--gray-light);
     padding: 1em;
     min-width: 640px;
-    max-width: 960px;
+    max-width: 860px;
     margin: 0 auto 1em auto;
 }
 
@@ -87,7 +87,7 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 
 .posts .external-url {
     position: absolute;
-    bottom: 0;
+    top: 0;
     right: 0;
     padding: 10px;
 }
