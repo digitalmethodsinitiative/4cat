@@ -7,9 +7,7 @@ import math
 import oslex
 import subprocess
 
-from operator import mul
 from packaging import version
-from functools import reduce
 
 from common.lib.helpers import UserInput, get_ffmpeg_version
 from backend.lib.processor import BasicProcessor
@@ -72,6 +70,16 @@ class VideoWallGenerator(BasicProcessor):
                 "none": "Remove audio"
             },
             "default": "longest"
+        },
+        "max-length": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Cut video after",
+            "default": 60,
+            "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
+                       "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
+                       "processor run times and is not recommended.",
+            "coerce_type": int,
+            "min": 0
         }
     }
 
@@ -86,6 +94,7 @@ class VideoWallGenerator(BasicProcessor):
         Determine compatibility
 
         :param str module:  Module ID to determine compatibility with
+        :param ConfigWrapper config:  Configuration reader
         :return bool:
         """
         if module.is_dataset() and module.num_rows > 50:
@@ -109,7 +118,9 @@ class VideoWallGenerator(BasicProcessor):
         """
         sizing_mode = self.parameters.get("tile-size")
         sort_mode = self.parameters.get("sort-mode")
+        amount = self.parameters.get("amount")
         sound = self.parameters.get("audio")
+        video_length = self.parameters.get("max-length")
 
         ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
@@ -148,6 +159,7 @@ class VideoWallGenerator(BasicProcessor):
                 shutil.rmtree(video_staging_area, ignore_errors=True)
                 return self.dataset.finish_with_error(f"Cannot determine dimensions of video {video.name}. Cannot tile "
                                                       "videos without knowing the video dimensions.")
+                # ...or should we just skip it instead?
             else:
                 bits = probe_output.split(",")
                 dimensions[video.name] = (int(bits[0]), int(bits[1]))
@@ -155,11 +167,25 @@ class VideoWallGenerator(BasicProcessor):
 
             videos[video.name] = video
 
+            # if not sorting, we don't need to probe everything and can stop
+            # when we have as many as we need
+            if not sort_mode and amount and len(videos) == amount:
+                break
+
         if sort_mode in ("longest", "shortest"):
             videos = {k: videos[k] for k in
-                      sorted(videos, key=lambda k: reduce(mul, dimensions[k]), reverse=(sort_mode == "longest"))}
+                      sorted(videos, key=lambda k: lengths[k], reverse=(sort_mode == "longest"))}
         elif sort_mode == "random":
             videos = {k: videos[k] for k in sorted(videos, key=lambda k: random.random())}
+
+        # limit amount *after* sorting
+        if amount:
+            sliced_videos = {}
+            video_keys = list(videos.keys())
+            for i in range(0, amount):
+                sliced_videos[video_keys[i]] = videos[video_keys[i]]
+            videos = sliced_videos
+            lengths = {k: v for k, v in lengths.items() if k in [videos[p].name for p in videos]}
 
         # see which of the videos is the longest, after sorting
         # used to determine which audio stream to use
@@ -250,7 +276,7 @@ class VideoWallGenerator(BasicProcessor):
         else:
             raise NotImplementedError("Sizing mode '%s' not implemented" % sizing_mode)
 
-        # round up to avoid annoying issues and because we don't need subpixels
+        # round to avoid annoying issues and because we don't need subpixels
         tile_h = round(tile_h)
         tile_w = round(tile_w)
 
@@ -258,6 +284,9 @@ class VideoWallGenerator(BasicProcessor):
 
         # now we are ready to render the video wall
         command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
+        if video_length:
+            command.extend(["-t", str(video_length)]) # limit read length
+
         # construct an ffmpeg filter for this
         # basically, stack videos horizontally until the max width is reached
         # then stack those horizontal stacks vertically
@@ -283,6 +312,7 @@ class VideoWallGenerator(BasicProcessor):
             except IndexError:
                 looping = False
 
+            # determine expected width of video when added to row
             if tile_w < 0:
                 video_width = round(dimensions[video][0] * (tile_h / dimensions[video][1])) if looping else 0
             else:
@@ -309,19 +339,35 @@ class VideoWallGenerator(BasicProcessor):
             # make into tile - with resizing (if proportional) or cropping (if not)
             row_width += video_width
 
+            # prepare filter to transform video into wall tile
+            cropscale = ""
+
             if sizing_mode == "fit-height":
-                resize.append(f"scale={video_width}:{tile_h}[scaled{index}]")
-            elif sizing_mode in ("square", "average"):
+                cropscale += f"scale={video_width}:{tile_h}"
+
+            elif sizing_mode == "square":
                 if dimensions[video][0] > dimensions[video][1]:
-                    cropscale = f"scale={dimensions[video][0] * (tile_h / dimensions[video][1])}:{tile_h},"
+                    cropscale += f"scale=-1:{tile_h},"
                 else:
-                    cropscale = f"scale={tile_w}:{dimensions[video][1] * (tile_w / dimensions[video][0])},"
+                    cropscale += f"scale={tile_w}:-1,"
 
                 cropscale += f"crop={tile_w}:{tile_h}:exact=1,format=rgba"
                 # exact=1 and format=rgba prevents shenanigans when merging
-                resize.append(f"{cropscale}[scaled{index}]")
+
+            elif sizing_mode == "average":
+                scale_w = dimensions[video][0] * (tile_h / dimensions[video][1])
+                if scale_w < tile_w:
+                    cropscale += f"scale={tile_w}:-1,"
+                else:
+                    cropscale += f"scale=-1:{tile_h},"
+
+                cropscale += f"crop={tile_w}:{tile_h}:exact=1,format=rgba"
+
             else:
                 raise NotImplementedError(f"Unknown sizing mode {sizing_mode}")
+
+            cropscale += f"[scaled{index}]"
+            resize.append(cropscale)
 
             command += ["-i", str(path)]
             row.append(f"[scaled{index}]")
@@ -337,16 +383,40 @@ class VideoWallGenerator(BasicProcessor):
 
         # now create the ffmpeg filter from this
         filter_chain = ""
+
+        # start by resizing all input streams to the required tile dimensions
         if resize:
             filter_chain += ";".join(resize) + ";"
         filter_chain += ";".join(rows) + ";"
+
+        # then pad the horizontal rows of video tiles so they all have the
+        # same width
         if padding:
             filter_chain += ";".join(padding) + ";"
-        filter_chain += "".join([f"[stack{i}]" for i in range(0, len(rows))]) + f"vstack=inputs={len(rows)}[final]"
+
+        # finally stack horizontal rows, vertically
+        if len(rows) > 1:
+            filter_chain += "".join([f"[stack{i}]" for i in range(0, len(rows))]) + f"vstack=inputs={len(rows)}[final];"
+        else:
+            filter_chain += "[stack0]null[final];"
+
+        # output video dimensions need to be divisible by 2 for x264 encoding
+        # choose the relevant filter based on which dimensions do not conform
+        # pad is faster, but can only be used if both dimensions increase
+        output_w = max(row_widths)
+        output_h = tile_h * len(row_widths)
+        if output_w % 2 != 0 and output_h % 2 != 0:
+            filter_chain += f"[final]pad={output_w+1}:{output_h+1}[final]"
+        elif output_w % 2 != 0:
+            filter_chain += f"color=size={output_w+1}x{output_h}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
+        elif output_h % 2 != 0:
+            filter_chain += f"color=size={output_w}x{output_h+1}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
+
+        # add filter to ffmpeg command, plus a parameter to control output FPS
         ffmpeg_filter = oslex.quote(filter_chain)[1:-1]
         command += [fps_command, "cfr", "-filter_complex", ffmpeg_filter]
 
-        # ensure mixed audio
+        # ensure mixed audio: use no sound, or the longest audio stream
         if sound == "none":
             command += ["-an"]
         elif sound == "longest":
@@ -355,16 +425,20 @@ class VideoWallGenerator(BasicProcessor):
         # use tiled video stream
         command += ["-map", "[final]"]
 
+        # limit output video length
+        if video_length:
+            command.extend(["-t", str(video_length)])
+
         # set output file
         command.append(oslex.quote(str(self.dataset.get_results_path())))
+
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
+        self.dataset.update_status("Merging video files with ffmpeg (this can take a while)")
+        result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if self.interrupted:
             shutil.rmtree(video_staging_area, ignore_errors=True)
-            return ProcessorInterruptedException("Interrupted while tiling videos")
-
-        self.dataset.update_status("Merging video files with ffmpeg (this can take a while)")
-        result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            return ProcessorInterruptedException("Interrupted while running ffmpeg")
 
         # Capture logs
         ffmpeg_output = result.stdout.decode("utf-8")
