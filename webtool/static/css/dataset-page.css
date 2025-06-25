@@ -387,7 +387,6 @@ article.result > section:first-child {
 }
 
 .child-list .property-badge.permalink {
-    text-indent: -0.4em;
     color: var(--accent);
 }
 
@@ -542,7 +541,7 @@ article.result > section:first-child {
 
 .processor-option-wrap > label {
     display: flex;
-    align-items: center;
+    align-items: baseline;
 }
 
 .processor-option-wrap > label.option-type-toggle {
@@ -550,12 +549,12 @@ article.result > section:first-child {
 }
 
 .processor-option-wrap > *:not(label) {
-    margin-left: 0.5em;
+
 }
 
 .processor-option-wrap button.tooltip-trigger {
-    margin-top: 0.5em;
-    margin-left: 0.5em;
+    margin-top: 0.2em;
+    margin-left: auto;
 }
 
 .processor-options textarea {
@@ -618,6 +617,18 @@ article.result > section:first-child {
     margin-right: 1px;
     cursor: pointer;
     user-select: none;
+}
+
+.processor-option-wrap .property-badge.annotation-label {
+    margin-left: 0.3em;
+    margin-right: 0.3em;
+}
+
+.processor-option-wrap .annotation-explainer {
+    font-size: 0.8em;
+    margin-left: 1.5em;
+    flex-basis: 100%;
+    line-height: 1em;
 }
 
 @keyframes child-blink {

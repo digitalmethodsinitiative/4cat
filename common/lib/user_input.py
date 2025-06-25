@@ -35,7 +35,9 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
-    OPTION_DATASOURCES_TABLE = "datasources_table" # a table with settings per data source
+    OPTION_DATASOURCES_TABLE = "datasources_table"  # a table with settings per data source
+    OPTION_ANNOTATION = "annotation"  # checkbox for whether to an annotation
+    OPTION_ANNOTATIONS = "annotations"  # table for whether to write multiple annotations
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
@@ -119,7 +121,7 @@ class UserInput:
                 except RequirementsNotMetException:
                     pass
 
-            elif settings.get("type") == UserInput.OPTION_TOGGLE:
+            elif settings.get("type") in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
                 # special case too, since if a checkbox is unchecked, it simply
                 # does not show up in the input
                 try:
@@ -158,6 +160,20 @@ class UserInput:
                         table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
 
                 parsed_input[option] = table_input
+
+            elif settings.get("type") == UserInput.OPTION_ANNOTATION:
+                print("AAAAAAAAAA")
+                # special case too, since if a checkbox is unchecked, it simply
+                # does not show up in the input
+                try:
+                    if option in input:
+                        # Toggle needs to be parsed
+                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
+                    else:
+                        # Toggle was left blank
+                        parsed_input[option] = False
+                except RequirementsNotMetException:
+                    pass
 
             elif option not in input:
                 # not provided? use default
