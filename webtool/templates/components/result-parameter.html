@@ -7,8 +7,8 @@
             {% if str_param|length < 15 %}
             -->{{ item.parameters[option] }}
             {% else %}
-            --><span class="tooltip-trigger" aria-controls="tooltip-parameter-{{ item.key }}-{{ option }}">{{ str_param[:14] }}<span class="ellipsis" aria-label="Parameter truncated">...</span></span>
-            <p role="tooltip" id="tooltip-parameter-{{ item.key }}-{{ option }}">{{ item.parameters[option] }}</p>
+            --><span class="tooltip-trigger" aria-controls="tooltip-parameter-{{ item.key }}-{{ option }}{{ extra_tooltip_id }}">{{ str_param[:14] }}<span class="ellipsis" aria-label="Parameter truncated">...</span></span>
+            <p role="tooltip" id="tooltip-parameter-{{ item.key }}-{{ option }}{{ extra_tooltip_id }}">{{ item.parameters[option] }}</p>
             {% endif %}
         </span></li>
     {% endif %}
