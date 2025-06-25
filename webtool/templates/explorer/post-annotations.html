@@ -44,6 +44,7 @@
                                     <ul>
                                     {% for option in item.parameters %}
                                         {% if option != 'save_annotations' %}
+                                            {% set extra_tooltip_id =  annotation.id %}
                                             {% include 'components/result-parameter.html' %}
                                         {% endif %}
                                     {% endfor %}
