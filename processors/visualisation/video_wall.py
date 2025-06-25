@@ -298,10 +298,9 @@ class VideoWallGenerator(BasicProcessor):
                     # use hstack to tile the videos in the row horizontally
                     rows.append("".join(row) + f"hstack=inputs={len(row)}[stack{len(rows)}]")
                 else:
-                    # hstack needs more than one video as input, but we need
-                    # *something* to rename the stream to stack[whatever]
-                    # so just scale it to the size it already is
-                    rows.append(row[0] + f"scale=iw:ih[stack{len(rows)}]")
+                    # hstack needs more than one video as input, so for a
+                    # single video just rename the stream
+                    rows.append(row[0] + f"null[stack{len(rows)}]")
                 row = []
                 row_widths.append(row_width)
                 row_width = 0
@@ -317,11 +316,12 @@ class VideoWallGenerator(BasicProcessor):
                 resize.append(f"scale={video_width}:{tile_h}[scaled{index}]")
             elif sizing_mode in ("square", "average"):
                 if dimensions[video][0] > dimensions[video][1]:
-                    cropscale = f"scale={dimensions[video][0] * (tile_h / dimensions[video][1])}:{tile_h}[cropped{index}]"
+                    cropscale = f"scale={dimensions[video][0] * (tile_h / dimensions[video][1])}:{tile_h},"
                 else:
-                    cropscale = f"scale={tile_w}:{dimensions[video][1] * (tile_w / dimensions[video][0])}[cropped{index}]"
+                    cropscale = f"scale={tile_w}:{dimensions[video][1] * (tile_w / dimensions[video][0])},"
 
-                cropscale += f";[cropped{index}]crop={tile_w}:{tile_h}"
+                cropscale += f"crop={tile_w}:{tile_h}:exact=1,format=rgba"
+                # exact=1 and format=rgba prevents shenanigans when merging
                 resize.append(f"{cropscale}[scaled{index}]")
             else:
                 raise NotImplementedError(f"Unknown sizing mode {sizing_mode}")
@@ -333,7 +333,10 @@ class VideoWallGenerator(BasicProcessor):
         for row, width in enumerate(row_widths):
             if width != max(row_widths):
                 # pad so that each row is the same width
-                padding.append(f"[stack{row}]pad={max(row_widths) + 1}:ih:0:0[stack{row}]")
+                # we cannot use the pad filter since that requires that we
+                # increase the height as well, but we just want to increase
+                # width - so overlay on a correctly sized black canvas
+                padding.append(f"color=size={max(row_widths)}x{tile_h}:color=black[bg{row}];[bg{row}][stack{row}]overlay=0:0[stack{row}]")
 
         # now create the ffmpeg filter from this
         filter_chain = ""
