@@ -10,9 +10,7 @@ import subprocess
 from operator import mul
 from packaging import version
 from functools import reduce
-from random import random
 
-from common.config_manager import config
 from common.lib.helpers import UserInput, get_ffmpeg_version
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -113,7 +111,7 @@ class VideoWallGenerator(BasicProcessor):
         sort_mode = self.parameters.get("sort-mode")
         sound = self.parameters.get("audio")
 
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
+        ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack
@@ -124,7 +122,6 @@ class VideoWallGenerator(BasicProcessor):
         lengths = {}
         dimensions = {}
         videos = {}
-        longest_index = 0
 
         # unpack videos and determine length of the video (for sorting)
         for video in self.iterate_archive_contents(video_dataset.get_results_path(), staging_area=video_staging_area,
