@@ -292,17 +292,13 @@ class ExtractURLs(BasicProcessor):
                             cache=cache) for url in identified_urls]
 
                     # Add identified links
-                    items["content_"+column] = row[column]
+                    items["content_"+column] = row[column] if type(row[column]) not in [list, set] else ",".join(row[column])
                     items["extracted_urls"] |= set(identified_urls)
 
-                if identified_urls:
-                    items["number_unique_urls"] = len(items["extracted_urls"])
-                    # Edit list/sets
-                    for column in fieldnames:
-                        if column in row.keys() and type(row[column]) in [list, set]:
-                            row[column] = ','.join(row[column])
+                if items["extracted_urls"]:
 
                     items["id"] = row.get("id", "")
+                    items["number_unique_urls"] = len(items["extracted_urls"])
                     items["extracted_urls"] = ",".join(items["extracted_urls"])
 
                     writer.writerow(items)
