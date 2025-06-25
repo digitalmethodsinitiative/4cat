@@ -65,9 +65,10 @@ class ExtractURLs(BasicProcessor):
             "tooltip": "CrowdTangle text contains resolved links using :=: symbols; these are extracted directly",
         },
         "save_annotations": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Add extracted URLs to top dataset",
-            "default": False
+            "type": UserInput.OPTION_ANNOTATION,
+            "label": "Extracted URLs",
+            "default": False,
+            "tooltip": "URLs will be saved as a comma-separated string"
         }
     }
 

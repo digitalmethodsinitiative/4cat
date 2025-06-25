@@ -74,11 +74,45 @@ class YouTubeMetadata(BasicProcessor):
 						   "Use the Extract URLs processor if you need to extract URLs from text columns."
 			},
 			"save_annotations": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add YouTube links to top dataset",
-				"default": False
+				"type": UserInput.OPTION_ANNOTATIONS,
+				"options": {
+						"url": "YouTube URL",
+						"type": "Type (video, channel, playlist)",
+						"video_id": "Video ID",
+						"video_title": "Video title",
+						"upload_time": "Video creation date",
+						"video_view_count": "Video views",
+						"video_likes_count": "Video like count",
+						"video_comment_count": "Video comment count",
+						"video_duration": "Video duration",
+						"video_tags": "Video tags",
+						"video_category_id": "Video category ID",
+						"video_topic_ids": "Video topic IDs",
+						"channel_id": "Channel ID",
+						"channel_title": "Channel title",
+						"channel_handle": "Channel handle",
+						"channel_description": "Channel description",
+						"channel_start": "Channel creation date",
+						"channel_subscribercount": "Channel subscriber count",
+						"channel_videocount": "Channel video count",
+						"channel_commentcount": "Channel comment count",
+						"channel_viewcount": "Channel view count",
+						"channel_topic_ids": "Channel topic IDs",
+						"channel_topic_categories": "Channel topic categories",
+						"channel_branding_keywords": "Channel branding keywords",
+						"channel_country": "Channel country",
+						"channel_default_language": "Channel language",
+						"playlist_id": "Playlist ID",
+						"playlist_title": "Playlist title",
+						"playlist_description": "Playlist description",
+						"playlist_thumbnail": "Playlist thumbnail URL",
+						"playlist_video_count": "Playlist video count",
+						"playlist_status": "Playlist status"
+					},
+					"default": "",
+		            "tooltip": "Every type of YouTube data will get its own annotation"
+				}
 			}
-		}
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():

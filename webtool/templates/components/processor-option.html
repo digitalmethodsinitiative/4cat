@@ -1,11 +1,14 @@
 {% set option_settings = processor.get_options(dataset, current_user)[option] %}
 <div class="processor-option-wrap"{% if option_settings.requires %} data-requires="{{ option_settings.requires }}"{% endif %}>
     <label class="option-type-{{ option_settings.type }}">
-        {% if option_settings.type == "toggle" %}
+        {% if option_settings.type in ("toggle", "annotation") %}
             <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>
         {% endif %}
         {% if option_settings.help %}
             {{ option_settings.help|markdown|safe }}
+        {% elif option_settings.type == "annotation" %}
+            Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ option_settings.label }}</span>
+            as annotation to the {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset
         {% endif %}
     </label>
 
@@ -48,6 +51,8 @@
             <input name="option-{{ option }}-min" type="hidden" value="-1">
             <input name="option-{{ option }}-max" type="hidden" value="-1">
         </div>
+{#    {% elif option_settings.type == "annotation" %}#}
+{#        <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>#}
     {% endif %}
     {% if "tooltip" in option_settings %}
         {% set pid = uniqid() %}
@@ -55,5 +60,8 @@
     	<p role="tooltip" id="tooltip-option-{{ pid }}">
             {{ option_settings.tooltip }}
         </p>
+    {% endif %}
+    {% if option_settings.type in ("annotation", "annotations") %}
+        <div class="annotation-explainer"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets" target="__blank">What are annotations?</a></div>
     {% endif %}
 </div>
