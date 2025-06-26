@@ -21,6 +21,7 @@ __email__ = "4cat@oilab.eu"
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+
 class YouTubeMetadata(BasicProcessor):
 	"""
 	
@@ -31,7 +32,7 @@ class YouTubeMetadata(BasicProcessor):
 	"""
 
 	type = "youtube-metadata"  # job type ID
-	category = "Post metrics" # category
+	category = "Post metrics"  # category
 	title = "Extract metadata from YouTube URLs"  # title displayed in UI
 	description = "Collect metadata from YouTube videos, channels, and playlists with the YouTube API"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
@@ -67,7 +68,7 @@ class YouTubeMetadata(BasicProcessor):
 		options = {
 			"columns": {
 				"type": UserInput.OPTION_TEXT,
-				"help": "Columns with YouTube URLs.",
+				"help": "Columns with YouTube URLs",
 				"default": "url",
 				"inline": True,
 				"tooltip": "These should be valid YouTube URLs. Separate by comma. "
@@ -76,43 +77,43 @@ class YouTubeMetadata(BasicProcessor):
 			"save_annotations": {
 				"type": UserInput.OPTION_ANNOTATIONS,
 				"options": {
-						"url": "YouTube URL",
-						"type": "Type (video, channel, playlist)",
-						"video_id": "Video ID",
-						"video_title": "Video title",
-						"upload_time": "Video creation date",
-						"video_view_count": "Video views",
-						"video_likes_count": "Video like count",
-						"video_comment_count": "Video comment count",
-						"video_duration": "Video duration",
-						"video_tags": "Video tags",
-						"video_category_id": "Video category ID",
-						"video_topic_ids": "Video topic IDs",
-						"channel_id": "Channel ID",
-						"channel_title": "Channel title",
-						"channel_handle": "Channel handle",
-						"channel_description": "Channel description",
-						"channel_start": "Channel creation date",
-						"channel_subscribercount": "Channel subscriber count",
-						"channel_videocount": "Channel video count",
-						"channel_commentcount": "Channel comment count",
-						"channel_viewcount": "Channel view count",
-						"channel_topic_ids": "Channel topic IDs",
-						"channel_topic_categories": "Channel topic categories",
-						"channel_branding_keywords": "Channel branding keywords",
-						"channel_country": "Channel country",
-						"channel_default_language": "Channel language",
-						"playlist_id": "Playlist ID",
-						"playlist_title": "Playlist title",
-						"playlist_description": "Playlist description",
-						"playlist_thumbnail": "Playlist thumbnail URL",
-						"playlist_video_count": "Playlist video count",
-						"playlist_status": "Playlist status"
-					},
-					"default": "",
-		            "tooltip": "Every type of YouTube data will get its own annotation"
-				}
+					"url": "YouTube URL",
+					"type": "Type (video, channel, playlist)",
+					"video_id": "Video ID",
+					"video_title": "Video title",
+					"upload_time": "Video creation date",
+					"video_view_count": "Video views",
+					"video_likes_count": "Video like count",
+					"video_comment_count": "Video comment count",
+					"video_duration": "Video duration",
+					"video_tags": "Video tags",
+					"video_category_id": "Video category ID",
+					"video_topic_ids": "Video topic IDs",
+					"channel_id": "Channel ID",
+					"channel_title": "Channel title",
+					"channel_handle": "Channel handle",
+					"channel_description": "Channel description",
+					"channel_start": "Channel creation date",
+					"channel_subscribercount": "Channel subscriber count",
+					"channel_videocount": "Channel video count",
+					"channel_commentcount": "Channel comment count",
+					"channel_viewcount": "Channel view count",
+					"channel_topic_ids": "Channel topic IDs",
+					"channel_topic_categories": "Channel topic categories",
+					"channel_branding_keywords": "Channel branding keywords",
+					"channel_country": "Channel country",
+					"channel_default_language": "Channel language",
+					"playlist_id": "Playlist ID",
+					"playlist_title": "Playlist title",
+					"playlist_description": "Playlist description",
+					"playlist_thumbnail": "Playlist thumbnail URL",
+					"playlist_video_count": "Playlist video count",
+					"playlist_status": "Playlist status"
+				},
+				"default": "",
+				"tooltip": "Every type of YouTube data will get its own annotation"
 			}
+		}
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():
@@ -120,7 +121,8 @@ class YouTubeMetadata(BasicProcessor):
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
 			options["columns"]["default"] = "extracted_urls" if "extracted_urls" in columns else sorted(columns,
-																					key=lambda k: "text" in k).pop()
+																										key=lambda
+																											k: "text" in k).pop()
 		api_key = config.get("api.youtube.key", user=user)
 		if not api_key:
 			options["key"] = {
@@ -165,8 +167,7 @@ class YouTubeMetadata(BasicProcessor):
 			columns = [columns]
 
 		# Are we writing annotations?
-		save_annotations = self.parameters.get("save_annotations", False)
-		annotations = []
+		annotations_to_save = self.parameters.get("save_annotations")
 
 		# First thing to do is to extract IDs from YouTube links.
 		# These can be video IDs (including shorts), channel IDs, channel names, or playlists
@@ -232,19 +233,19 @@ class YouTubeMetadata(BasicProcessor):
 			self.dataset.finish_with_error("No items retrieved from the YouTube API")
 			return
 
-		# Possibly add to top-level dataset
-		if save_annotations:
+		# Possibly add values as annotations to top-level dataset
+		if annotations_to_save:
 			annotations = []
 			for youtube_item in youtube_items:
 				if "retrieved_from_id" in youtube_item:
 					for retrieved_from_id in youtube_item["retrieved_from_id"].split(","):
-						annotation = {
-							"item_id": retrieved_from_id,
-							"type": "textarea",
-							"label": "youtube_urls",
-							"value": youtube_item["url"]
-						}
-						annotations.append(annotation)
+						for annotation_to_save in annotations_to_save:
+							if youtube_item.get(annotation_to_save):
+								annotations.append({
+									"item_id": retrieved_from_id,
+									"label": annotation_to_save,
+									"value": youtube_item[annotation_to_save]
+								})
 
 			self.save_annotations(annotations)
 
@@ -295,7 +296,7 @@ class YouTubeMetadata(BasicProcessor):
 								part='snippet,contentDetails,statistics',
 								id=ids_string,
 								maxResults=50
-								).execute()
+							).execute()
 						elif yt_type == "channel":
 							response = self.client.channels().list(
 								part="snippet,topicDetails,statistics,brandingSettings",
@@ -329,24 +330,25 @@ class YouTubeMetadata(BasicProcessor):
 
 						status_code = e.resp.status
 
-						if status_code == 403: # "Forbidden", what Google returns with rate limits
+						if status_code == 403:  # "Forbidden", what Google returns with rate limits
 							retries += 1
 							self.api_limit_reached = True
 							self.dataset.update_status(f"API quota limit likely exceeded (http {status_code}, sleeping "
 													   f"for {self.sleep_time} seconds")
-							time.sleep(self.sleep_time) # Wait a bit before trying again
+							time.sleep(self.sleep_time)  # Wait a bit before trying again
 							pass
 
 						else:
 							retries += 1
 							self.dataset.update_status(f"API error encountered (http {status_code}), "
-														f"sleeping for {self.sleep_time}")
+													   f"sleeping for {self.sleep_time}")
 							time.sleep(self.sleep_time)  # Wait a bit before trying again
 							pass
 
 				# Do nothing with the results if the requests failed after retries
 				if retries >= self.max_retries:
-					self.dataset.update_status(f"Failed to get metadata from {yt_type}s after {retries} attempts (ids {ids_string}).")
+					self.dataset.update_status(
+						f"Failed to get metadata from {yt_type}s after {retries} attempts (ids {ids_string}).")
 					if self.api_limit_reached:
 						self.dataset.update_status("Daily YouTube API requests exceeded.")
 
@@ -362,72 +364,74 @@ class YouTubeMetadata(BasicProcessor):
 							result["youtube_id"] = id_string
 							result["type"] = yt_type
 							result["retrieved"] = False
-							results.append(result)
-						continue
 
 					# Get and return results for each video
-					for metadata in response["items"]:
+					else:
+						for metadata in response["items"]:
 
-						result = {"retrieved": True}
+							result = {"retrieved": True}
 
-						if yt_type == "video":
-							video_id = metadata["id"]
-							result["retrieved_from_id"] = ",".join(original_items[video_id])
-							result["type"] = "video"
-							result["url"] = f"https://youtube.com/watch?v=" + metadata["id"]
-							result["video_id"] = video_id
-							result["upload_time"] = metadata["snippet"].get("publishedAt")
-							result["channel_id"] = metadata["snippet"].get("channelId")
-							result["channel_title"] = metadata["snippet"].get("channelTitle")
-							result["video_title"] = metadata["snippet"].get("title")
-							result["video_duration"] = metadata.get("contentDetails").get("duration")
-							result["video_view_count"] = metadata["statistics"].get("viewCount")
-							result["video_comment_count"] = metadata["statistics"].get("commentCount")
-							result["video_likes_count"] = metadata["statistics"].get("likeCount")
-							result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
-							result["video_topic_ids"] = metadata.get("topicDetails")
-							result["video_category_id"] = metadata["snippet"].get("categoryId")
-							result["video_tags"] = metadata["snippet"].get("tags")
+							if yt_type == "video":
+								video_id = metadata["id"]
+								result["retrieved_from_id"] = ",".join(original_items[video_id])
+								result["type"] = "video"
+								result["url"] = f"https://youtube.com/watch?v=" + metadata["id"]
+								result["video_id"] = video_id
+								result["upload_time"] = metadata["snippet"].get("publishedAt")
+								result["channel_id"] = metadata["snippet"].get("channelId")
+								result["channel_title"] = metadata["snippet"].get("channelTitle")
+								result["video_title"] = metadata["snippet"].get("title")
+								result["video_duration"] = metadata.get("contentDetails").get("duration")
+								result["video_view_count"] = metadata["statistics"].get("viewCount")
+								result["video_comment_count"] = metadata["statistics"].get("commentCount")
+								result["video_likes_count"] = metadata["statistics"].get("likeCount")
+								result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
+								result["video_topic_ids"] = metadata.get("topicDetails")
+								result["video_category_id"] = metadata["snippet"].get("categoryId")
+								result["video_tags"] = metadata["snippet"].get("tags")
 
-						elif yt_type.startswith("channel"):
-							channel_id = metadata["snippet"].get("channelId", "")
-							channel_handle = metadata["snippet"].get("customUrl", "")
-							result["retrieved_from_id"] = ",".join(
-								original_items.get(channel_id, []) + original_items.get(channel_handle, []))
-							result["type"] = "channel"
-							result["url"] = f"https://youtube.com/channel/" + channel_id
-							result["channel_id"] = channel_id
-							result["channel_handle"] = channel_handle
-							result["channel_title"] = metadata["snippet"].get("title", "")
-							result["channel_description"] = metadata["snippet"].get("description", "")
-							result["channel_start"] = metadata["snippet"].get("publishedAt", "")
-							result["channel_default_language"] = metadata["snippet"].get("defaultLanguage", "")
-							result["channel_country"] = metadata["snippet"].get("country", "")
-							result["channel_viewcount"] = metadata["statistics"].get("viewCount", "")
-							result["channel_commentcount"] = metadata["statistics"].get("commentCount", "")
-							result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount", "")
-							result["channel_videocount"] = metadata["statistics"].get("videoCount", "")
-							# This one sometimes fails for some reason
-							if "topicDetails" in metadata:
-								result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
-								result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
-							result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
+							elif yt_type.startswith("channel"):
+								channel_id = metadata["snippet"].get("channelId", "")
+								channel_handle = metadata["snippet"].get("customUrl", "")
+								result["retrieved_from_id"] = ",".join(
+									original_items.get(channel_id, []) + original_items.get(channel_handle, []))
+								result["type"] = "channel"
+								result["url"] = f"https://youtube.com/channel/" + channel_id
+								result["channel_id"] = channel_id
+								result["channel_handle"] = channel_handle
+								result["channel_title"] = metadata["snippet"].get("title", "")
+								result["channel_description"] = metadata["snippet"].get("description", "")
+								result["channel_start"] = metadata["snippet"].get("publishedAt", "")
+								result["channel_default_language"] = metadata["snippet"].get("defaultLanguage", "")
+								result["channel_country"] = metadata["snippet"].get("country", "")
+								result["channel_viewcount"] = metadata["statistics"].get("viewCount", "")
+								result["channel_commentcount"] = metadata["statistics"].get("commentCount", "")
+								result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount", "")
+								result["channel_videocount"] = metadata["statistics"].get("videoCount", "")
+								# This one sometimes fails for some reason
+								if "topicDetails" in metadata:
+									result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
+									result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
+								result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get(
+									"keywords")
 
-						elif yt_type == "playlist":
-							result["retrieved_from_id"] = ",".join(original_items[metadata["id"]])
-							result["type"] = "playlist"
-							result["url"] = f"https://youtube.com/playlist?list=" + metadata["id"]
-							result["channel_id"] = metadata["snippet"].get("channelId", "")
-							result["channel_title"] = metadata["snippet"].get("channelTitle", "")
-							result["playlist_id"] = metadata["id"]
-							result["playlist_title"] = metadata["snippet"].get("title", "")
-							result["playlist_description"] = metadata["snippet"].get("channelTitle", "")
-							result["playlist_thumbnail"] = metadata["snippet"].get("thumbnails", {}).get("high", {}).get("url", "")
-							result["playlist_video_count"] = metadata["contentDetails"].get("itemCount", ""),
-							result["playlist_status"] = metadata["status"].get("privacyStatus", "")
+							elif yt_type == "playlist":
+								result["retrieved_from_id"] = ",".join(original_items[metadata["id"]])
+								result["type"] = "playlist"
+								result["url"] = f"https://youtube.com/playlist?list=" + metadata["id"]
+								result["channel_id"] = metadata["snippet"].get("channelId", "")
+								result["channel_title"] = metadata["snippet"].get("channelTitle", "")
+								result["playlist_id"] = metadata["id"]
+								result["playlist_title"] = metadata["snippet"].get("title", "")
+								result["playlist_description"] = metadata["snippet"].get("channelTitle", "")
+								result["playlist_thumbnail"] = metadata["snippet"].get("thumbnails", {}).get("high",
+																											 {}).get("url",
+																													 "")
+								result["playlist_video_count"] = metadata["contentDetails"].get("itemCount", ""),
+								result["playlist_status"] = metadata["status"].get("privacyStatus", "")
 
-						results.append(result)
-						keys |= set(result.keys())
+					results.append(result)
+					keys |= set(result.keys())
 
 				# Update status per response item
 				self.dataset.update_status(f"Got metadata for {i * 50}/{len(ids)} {yt_type} objects")
@@ -536,10 +540,10 @@ class YouTubeMetadata(BasicProcessor):
 		super().after_process()
 		if self.api_limit_reached:
 			self.dataset.update_status("YouTube API quota limit exceeded. Saving the results retreived thus far. "
-										"To get all data, use your own API key, or try to split up the dataset and get "
-										"the YouTube data over the course of a few days.")
+									   "To get all data, use your own API key, or try to split up the dataset and get "
+									   "the YouTube data over the course of a few days.")
 		elif self.invalid_api_key:
 			self.dataset.update_status("Invalid API key. Extracted YouTube links but did not retreive any video "
-										"information.")
+									   "information.")
 		else:
 			self.dataset.update_status("Dataset saved.")
