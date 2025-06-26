@@ -680,7 +680,7 @@ function init() {
 			ta.removeClass("shown");
 			ta.html("<i class='fas fa-eye'></i> Show annotations");
 			let pa = $(".post-annotations");
-			pa.animate({"height": 0}, 250);
+			pa.hide();
 		},
 
 		showAnnotations: function() {
@@ -703,13 +703,9 @@ function init() {
 			queryParams.set("show", "true");
 			history.replaceState(null, null, "?"+queryParams.toString());
 
-			// Show/hide annotations div. Bit convoluted, but necessary to have auto height.
+			// Show/hide annotations div
 			let pa = $(".post-annotations");
-			let current_height = pa.height();
-			let auto_height = pa.css("height", "auto").height();
-			pa.height(current_height).animate({"height": auto_height}, 250, function(){
-				pa.height("auto");
-			});
+			pa.show();
 		},
 
 		addAnnotationField: function(){

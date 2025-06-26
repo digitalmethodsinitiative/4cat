@@ -926,7 +926,6 @@ body.image-preview {
 }
 
 .post-annotations {
-    height: 0;
     box-sizing: border-box;
     border-width: 0;
 }
