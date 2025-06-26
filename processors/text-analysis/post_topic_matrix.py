@@ -45,11 +45,12 @@ class TopicModelWordExtractor(BasicProcessor):
             "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always "
                        "included."
         },
-		"save_annotations": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Add topic weights to top dataset",
-			"default": False
-		}
+        "save_annotations": {
+            "type": UserInput.OPTION_ANNOTATION,
+            "tooltip": "Outputs weights for each topic",
+            "label": "topic weights",
+            "default": False
+        }
     }
 
     @classmethod
