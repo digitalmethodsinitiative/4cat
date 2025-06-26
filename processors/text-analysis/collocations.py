@@ -12,6 +12,7 @@ from nltk.collocations import *
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 
+
 class GetCollocations(BasicProcessor):
 	"""
 	Generates word collocations from input tokens
@@ -78,8 +79,8 @@ class GetCollocations(BasicProcessor):
 			"default": False,
 			"help": "Sort co-word pairs",
 			"tooltip": "Sorts co-word pairs alphabetically. This means \"quick fox\" will be shuffled to \"fox quick\". " \
-			"If a required word or words are given, these are put in first so their co-words can be easily extracted. " \
-			"Word order can be relevant, so this is turned off by default."
+					   "If a required word or words are given, these are put in first so their co-words can be easily extracted. " \
+					   "Word order can be relevant, so this is turned off by default."
 		},
 		"min_frequency": {
 			"type": UserInput.OPTION_TEXT,
@@ -92,9 +93,11 @@ class GetCollocations(BasicProcessor):
 			"help": "Maximum number of top co-words to extract (0 = all)"
 		},
 		"save_annotations": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Add all co-words per item to top dataset",
-			"default": False
+			"type": UserInput.OPTION_ANNOTATION,
+			"label": "cowords",
+			"default": False,
+			"hide_in_explorer": True,
+			"tooltip": "Co-words are written as a string containing a lists of tuples"
 		}
 	}
 
@@ -144,7 +147,6 @@ class GetCollocations(BasicProcessor):
 		unique = self.parameters.get("unique", True)
 		sort_words = self.parameters.get("sort_words", False)
 
-
 		# Get token sets
 		self.dataset.update_status("Processing token sets")
 		dirname = Path(self.dataset.get_results_path().parent, self.dataset.get_results_path().name.replace(".", ""))
@@ -182,7 +184,8 @@ class GetCollocations(BasicProcessor):
 
 			# The tokens are separated per posts, so we get collocations per post.
 			for post_tokens in tokens:
-				post_collocations = self.get_collocations(post_tokens, window_size, n_size, query_string=query_string, forbidden_words=forbidden_words, unique=unique)
+				post_collocations = self.get_collocations(post_tokens, window_size, n_size, query_string=query_string,
+														  forbidden_words=forbidden_words, unique=unique)
 				collocations += post_collocations
 
 				if save_annotations:
@@ -318,7 +321,8 @@ class GetCollocations(BasicProcessor):
 
 			# Filter out forbidden words
 			if forbidden_words:
-				forbidden_words_filter = word_filter = lambda w1, w2, w3: any(string in (w1, w2, w3) for string in forbidden_words)
+				forbidden_words_filter = word_filter = lambda w1, w2, w3: any(
+					string in (w1, w2, w3) for string in forbidden_words)
 				finder.apply_ngram_filter(word_filter)
 
 		else:
