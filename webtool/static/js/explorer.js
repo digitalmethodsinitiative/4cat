@@ -798,10 +798,9 @@ const page_functions = {
 		$('#annotation-field-settings').sortable({
             cursor: "s-resize",
             handle: ".handle",
-            items: "li",
+            items: "li.annotation-field",
             axis: "y",
 			change: function() {
-
 			}
         });
 
