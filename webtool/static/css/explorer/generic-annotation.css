@@ -16,7 +16,7 @@
 
 .post-annotation {
     display: flex;
-    align-items: flex-start;
+    align-items: baseline;
     gap: 12px;
     padding: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.3);

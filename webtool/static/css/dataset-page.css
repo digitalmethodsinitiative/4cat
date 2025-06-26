@@ -532,6 +532,7 @@ article.result > section:first-child {
     padding: 0.5em;
     display: flex;
     flex-wrap: wrap;
+    align-items: baseline;
     border-bottom: 1px var(--gray-darker) dotted;
 }
 
@@ -548,13 +549,24 @@ article.result > section:first-child {
     min-width: auto;
 }
 
+.processor-option-wrap > label.option-type-toggle {
+    min-width: auto;
+}
+
+.processor-option-wrap > label.option-type-toggle > input[type="checkbox"] {
+    margin-top: 0.2em;
+}
+
 .processor-option-wrap > *:not(label) {
 
 }
 
-.processor-option-wrap button.tooltip-trigger {
-    margin-top: 0.2em;
+.processor-option-wrap > .processor-tooltip {
     margin-left: auto;
+}
+
+.processor-option-wrap button.tooltip-trigger {
+
 }
 
 .processor-options textarea {

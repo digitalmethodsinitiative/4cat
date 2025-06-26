@@ -166,7 +166,7 @@ function init() {
 			});
 			// Add a new field if there's no empty ones
 			if (no_empty_fields) {
-				$(el).parent().after(annotations.getInputField);
+				$(el).parent().after(annotations.getOptionField());
 			}
 
 			// Make sure that you can't delete the last remaining field.
@@ -725,7 +725,10 @@ function init() {
 
 			const annotation_field = `
 			<li class="annotation-field" id="field-${field_id}">
-				<i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
+				<div class="annotation-field-icons">
+					<i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
+					<i class="fa-solid fa-tag"></i>
+				</div>
 				 <span class="annotation-field-input">
 					<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Label">
 				</span>
@@ -757,7 +760,7 @@ function init() {
 		},
 
 		getOptionField: function(id){
-			return "<span class='option-field'><input type='text' id='option-" + annotations.getFieldId + "' placeholder='New option'></span>";
+			return "<div class='option-field'><input type='text' id='option-" + annotations.getFieldId() + "' placeholder='New option'></div>";
 		},
 
 		markChanges: function(el) {
