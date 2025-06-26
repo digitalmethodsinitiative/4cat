@@ -272,7 +272,7 @@ class GetCollocations(BasicProcessor):
 						annotations[time_data["interval"]][doc_line]["item_id"] = item_id
 						doc_no += 1
 			annotations = [ann for ann_list in list(annotations.values()) for ann in ann_list]
-			self.save_annotations(annotations)
+			self.save_annotations(annotations, hide_in_explorer=True)
 
 		# Generate csv and finish
 		self.dataset.update_status("Writing to csv and finishing")
