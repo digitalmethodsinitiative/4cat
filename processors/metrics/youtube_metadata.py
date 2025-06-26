@@ -12,7 +12,6 @@ from googleapiclient.errors import HttpError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -63,7 +62,7 @@ class YouTubeMetadata(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None) -> dict:
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
 
 		options = {
 			"columns": {
@@ -123,7 +122,7 @@ class YouTubeMetadata(BasicProcessor):
 			options["columns"]["default"] = "extracted_urls" if "extracted_urls" in columns else sorted(columns,
 																										key=lambda
 																											k: "text" in k).pop()
-		api_key = config.get("api.youtube.key", user=user)
+		api_key = config.get("api.youtube.key")
 		if not api_key:
 			options["key"] = {
 				"type": UserInput.OPTION_TEXT,
@@ -155,7 +154,7 @@ class YouTubeMetadata(BasicProcessor):
 
 		api_key = self.parameters.get("key")
 		if not api_key:
-			api_key = config.get("api.youtube.key", user=self.owner)
+			api_key = self.config.get("api.youtube.key")
 		if not api_key:
 			self.dataset.finish_with_error("You need to provide a valid API key")
 			return
