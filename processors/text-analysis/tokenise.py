@@ -188,8 +188,10 @@ class Tokenise(BasicProcessor):
 						   "filter out spam."
 			},
 			"save_annotations": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add tokens to top dataset",
+				"type": UserInput.OPTION_ANNOTATION,
+				"tooltip": "Outputs a comma-separated string of tokens",
+				"label": "tokens",
+				"hide_in_explorer": True,
 				"default": False
 			}
 		}
@@ -483,7 +485,7 @@ class Tokenise(BasicProcessor):
 					# Possibly save tokens as annotations, in batches of 1000 to prevent memory hog
 					if save_annotations:
 						annotations.append({
-							"label": "tokens",
+							"label": annotation_label,
 							"item_id": post_id,
 							"value": ",".join(post_tokens)
 						})

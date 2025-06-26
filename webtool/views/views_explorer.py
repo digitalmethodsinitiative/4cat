@@ -44,6 +44,9 @@ def explorer_dataset(dataset_key: str, page=1):
 	datasource = parameters["datasource"]
 	post_count = int(dataset.data["num_rows"])
 	annotation_fields = dataset.annotation_fields
+	# Don't pass fields hidden in explorer
+	annotation_fields = {field_id: field_items for field_id, field_items in annotation_fields.items()
+						 if not field_items.get("hide_in_explorer")}
 	warning = ""
 
 	# See if we can actually serve this page
@@ -184,6 +187,12 @@ def explorer_save_annotation_fields(dataset_key: str):
 
 	# Save it!
 	annotation_fields = request.get_json()
+
+	# Potentially re-add annotation fields that were hidden in the Explorer
+	if dataset.get_annotation_fields():
+		for annotation_field_id, annotation_field in annotation_fields.items():
+			if annotation_field.get("hide_in_explorer"):
+				annotation_fields[annotation_field_id] = annotation_field
 
 	try:
 		fields_saved = dataset.save_annotation_fields(annotation_fields)
