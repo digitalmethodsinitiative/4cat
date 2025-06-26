@@ -111,8 +111,8 @@ function init() {
 				function(){
 
 					let parent = $(this).parent();
-					// Navigate one level up if it's a checkbox or dropdown input
-					if (parent.hasClass("post-annotation-options")) {
+					// Navigate one level up until we found the container
+					while (!parent.hasClass("post-annotation")) {
 						parent = parent.parent();
 					}
 					annotations.markChanges(parent);
@@ -488,13 +488,10 @@ function init() {
 			let dataset_key = $("#dataset-key").text();
 
 			$(".posts > li").each(function(){
-
 				let post_annotations = $(this).find(".post-annotations");
 
 				if (post_annotations.length > 0) {
-
 					post_annotations.find(".post-annotation").each(function(){
-
 						// Extract annotation object from edited elements
 						if ($(this).hasClass("edited")) {
 							let annotation = annotations.parseAnnotation($(this));
