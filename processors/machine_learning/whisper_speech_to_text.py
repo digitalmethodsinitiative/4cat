@@ -155,8 +155,9 @@ class AudioToText(BasicProcessor):
                 "requires": "model_host==local"
             },
             "save_annotations": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Add transcriptions to top dataset",
+                "type": UserInput.OPTION_ANNOTATION,
+                "label": "Audio transcription",
+                "tooltip": "Add transcriptions to top dataset",
                 "default": False
             }
         }
@@ -394,10 +395,9 @@ class AudioToText(BasicProcessor):
                 if save_annotations:
                     for item_id in audio_metadata.get("post_ids", []):
                         annotations.append({
-                            "label": "audio transcription",
+                            "label": "Audio transcription",
                             "item_id": item_id,
-                            "value": result_data.get("text", ""),
-                            "type": "textarea"
+                            "value": result_data.get("text", "")
                         })
                     #annotated += 1
                     processed += 1
