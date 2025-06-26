@@ -35,7 +35,7 @@
                                 <div class="post-annotation-input from-dataset">{{ annotation.value | add_ahref | safe }}</div>
                                 {% set item = from_datasets[annotation.from_dataset] %}
                                 {% if item.type in processors %}
-                                    {% set processor_options = processors[item.type].get_options() %}
+                                    {% set processor_options = processors[item.type].get_options(config=config) %}
                                 {% endif %}
                                 <div class="post-annotation-parameters">
                                     <ul>
