@@ -79,6 +79,34 @@ class SearchTwitterViaZeeschuimer(Search):
         # check if the quote tweet is available or not
         quote_withheld = True if (quote_tweet and "tombstone" in quote_tweet["result"]) else False
 
+        # extract media from tweet; if video, add thumbnail to images and video link to videos
+        images = set()
+        videos = set()
+        
+        # Process media from extended_entities for videos and photos
+        for media in tweet["legacy"].get("extended_entities", {}).get("media", []):
+            if media["type"] == "photo":
+                images.add(media["media_url_https"])
+            elif media["type"] == "video":
+                # Add video thumbnail to images
+                images.add(media["media_url_https"])
+                # Add actual video URL to videos if available
+                if media.get("video_info", {}).get("variants"):
+                    # Filter variants to get video files (not streaming playlists)
+                    video_variants = [
+                        variant for variant in media["video_info"]["variants"]
+                        if variant.get("content_type", "").startswith("video/")
+                    ]
+                    if video_variants:
+                        # Sort by bitrate (highest first) to get best quality
+                        video_variants.sort(key=lambda x: x.get("bitrate", 0), reverse=True)
+                        videos.add(video_variants[0]["url"])
+        
+        # Also check entities.media for any additional photos not in extended_entities
+        for media in tweet["legacy"]["entities"].get("media", []):
+            if media["type"] == "photo":
+                images.add(media["media_url_https"])
+
         return {
             "id": tweet["rest_id"],
             "thread_id": tweet["legacy"]["conversation_id_str"],
@@ -119,10 +147,8 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_withheld": "yes" if withheld else "no",
             "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
             "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"]["urls"]]),
-            "images": ",".join([media["media_url_https"] for media in tweet["legacy"]["entities"].get("media", []) if
-                                media["type"] == "photo"]),
-            "videos": ",".join([media["media_url_https"] for media in tweet["legacy"]["entities"].get("media", []) if
-                                media["type"] == "video"]),
+            "images": ",".join(images),
+            "videos": ",".join(videos),
             "mentions": ",".join([media["screen_name"] for media in tweet["legacy"]["entities"]["user_mentions"]]),
             "long_lat": SearchTwitterViaZeeschuimer.get_centroid(
                 tweet["legacy"]["place"]["bounding_box"]["coordinates"]) if tweet["legacy"].get("place") else "",
