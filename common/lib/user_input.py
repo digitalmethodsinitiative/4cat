@@ -62,7 +62,7 @@ class UserInput:
 
         :return dict:  Sanitised form input
         """
-        print("INPUT", input)
+
         from common.lib.helpers import convert_to_int
         parsed_input = {}
 
@@ -157,7 +157,7 @@ class UserInput:
                     for column in columns:
 
                         choice = input.get(option + "-" + datasource + "-" + column, False)
-                        column_settings = settings["columns"][column] # sub-settings per column
+                        column_settings = settings["columns"][column]  # sub-settings per column
                         table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
 
                 parsed_input[option] = table_input
@@ -269,7 +269,7 @@ class UserInput:
             finally:
                 return value
 
-        elif input_type == UserInput.OPTION_MULTI:
+        elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS):
             # any number of values out of a list of possible values
             # comma-separated during input, returned as a list of valid options
             if not choice:
