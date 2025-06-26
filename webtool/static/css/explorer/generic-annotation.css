@@ -7,7 +7,6 @@
 .post-annotations {
     background-color: var(--gray);
     gap: 10px;
-    overflow: hidden;
 }
 
 .post-annotations:empty {

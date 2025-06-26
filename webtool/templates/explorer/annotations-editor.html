@@ -11,7 +11,10 @@
                 {% set annotation_type = annotation_field["type"] %}
                 {% set label = annotation_field["label"] %}
                 <li class="annotation-field" id="field-{{ field }}">
-                    <i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
+                    <div class="annotation-field-icons">
+                        <i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
+                        <i class="fa-solid fa-tag"></i>
+                    </div>
                     <span class="annotation-field-input">
                         <input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Label" value="{{ label }}">
                     </span>

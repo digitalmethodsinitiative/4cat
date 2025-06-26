@@ -815,9 +815,12 @@ body.image-preview {
     border-left: 1px solid var(--gray);
 }
 
-.annotation-field > .handle {
+.annotation-field > .annotation-field-icons {
+    margin-top: 0.4em;
+}
+
+.annotation-field > .annotation-field-icons > .handle {
     flex-shrink: 0;
-    padding-top: 2px;
     cursor: move;
 }
 
