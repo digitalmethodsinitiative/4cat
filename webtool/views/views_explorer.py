@@ -40,7 +40,7 @@ def explorer_dataset(dataset_key: str, page=1):
 		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
-	
+
 	# Load some variables
 	parameters = dataset.get_parameters()
 	datasource = parameters["datasource"]
@@ -49,10 +49,12 @@ def explorer_dataset(dataset_key: str, page=1):
 	# Don't pass fields hidden in explorer
 	annotation_fields = {field_id: field_items for field_id, field_items in annotation_fields.items()
 						 if not field_items.get("hide_in_explorer")}
+
 	warning = ""
 
 	# See if we can actually serve this page
-	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
+	if dataset.is_private and not (
+			config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:
@@ -163,6 +165,7 @@ def explorer_dataset(dataset_key: str, page=1):
 		warning=warning
 	)
 
+
 @app.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
@@ -205,6 +208,7 @@ def explorer_save_annotation_fields(dataset_key: str):
 	# Else return the amount of fields saved.
 	return str(fields_saved)
 
+
 @app.route("/explorer/save_annotations/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
@@ -237,6 +241,7 @@ def explorer_save_annotations(dataset_key: str):
 
 	# Else return the amount of fields saved.
 	return str(annotations_saved)
+
 
 def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 	"""
@@ -273,7 +278,8 @@ def has_datasource_template(datasource: str) -> bool:
 	:returns: bool, Whether the required files are present.
 	"""
 	css_exists = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css").exists()
-	html_exists = Path(config.get('PATH_ROOT'), "webtool/templates/explorer/datasource-templates/" + datasource + ".html").exists()
+	html_exists = Path(config.get('PATH_ROOT'),
+					   "webtool/templates/explorer/datasource-templates/" + datasource + ".html").exists()
 
 	if css_exists and html_exists:
 		return True
