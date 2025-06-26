@@ -1134,6 +1134,94 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
 
     return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
 
+def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255):
+        """
+        Determine filenames for saved files
+
+        Prefer the original filename (extracted from the URL), but this may not
+        always be possible or be an actual filename. Also, avoid using the same
+        filename multiple times. Ensures filenames don't exceed max_bytes.
+
+        :param str url:  URLs to determine filenames for
+        :param Path staging_area:  Path to the staging area where files are saved
+        (to avoid collisions); if None, no collision avoidance is done.
+        :param str default_name:  Default name to use if no filename can be
+        extracted from the URL
+        :param str default_ext:  Default extension to use if no filename can be
+        extracted from the URL
+        :param int max_bytes:  Maximum number of bytes for the filename
+        :return str:  Suitable file name
+        """
+        clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
+        if re.match(r"[^.]+\.[a-zA-Z0-9]{1,10}", clean_filename):
+            base_filename = clean_filename
+        else:
+            base_filename = default_name + default_ext
+
+        # Split base filename into name and extension
+        if '.' in base_filename:
+            name_part, ext_part = base_filename.rsplit('.', 1)
+            ext_part = '.' + ext_part
+        else:
+            name_part = base_filename
+            ext_part = ''
+
+        # Truncate base filename if it exceeds max_bytes
+        if len(base_filename.encode('utf-8')) > max_bytes:
+            # Reserve space for extension
+            available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+            if available_bytes <= 0:
+                # If extension is too long, use minimal name
+                name_part = default_name
+                ext_part = default_ext
+                available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+            
+            # Truncate name part to fit
+            name_bytes = name_part.encode('utf-8')
+            if len(name_bytes) > available_bytes:
+                # Truncate byte by byte to ensure valid UTF-8
+                while len(name_bytes) > available_bytes:
+                    name_part = name_part[:-1]
+                    name_bytes = name_part.encode('utf-8')
+            
+            base_filename = name_part + ext_part
+
+        filename = base_filename
+
+        if staging_area:
+            # Ensure the filename is unique in the staging area
+            file_path = staging_area.joinpath(filename)
+            file_index = 1
+            
+            while file_path.exists():
+                # Calculate space needed for index suffix
+                index_suffix = f"-{file_index}"
+                
+                # Check if filename with index would exceed max_bytes
+                test_filename = name_part + index_suffix + ext_part
+                if len(test_filename.encode('utf-8')) > max_bytes:
+                    # Need to truncate name_part to make room for index
+                    available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
+                    if available_bytes <= 0:
+                        # Extreme case - use minimal name
+                        truncated_name = "f"
+                    else:
+                        # Truncate name_part to fit
+                        truncated_name = name_part
+                        name_bytes = truncated_name.encode('utf-8')
+                        while len(name_bytes) > available_bytes:
+                            truncated_name = truncated_name[:-1]
+                            name_bytes = truncated_name.encode('utf-8')
+                    
+                    filename = truncated_name + index_suffix + ext_part
+                else:
+                    filename = test_filename
+                
+                file_index += 1
+                file_path = staging_area.joinpath(filename)
+
+        return filename
+
 
 def split_urls(url_string, allowed_schemes=None):
     """
