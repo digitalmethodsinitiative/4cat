@@ -76,12 +76,6 @@ class ImageTextDetector(BasicProcessor):
         #     },
         #     "help": "See references for additional information about models and their utility"
         # },
-        "save_annotations": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Add detected text to top dataset",
-            "default": False,
-            "tooltip": "If enabled, the original dataset will be modified to include a 'detected_text' column."
-        }
     }
 
     @classmethod
@@ -260,21 +254,6 @@ class ImageTextDetector(BasicProcessor):
                     outfile.write(json.dumps(data) + "\n")
 
                     processed += 1
-
-                    if save_annotations:
-                        # We need an entry for each row/item in the original dataset necessitating we loop through it
-                        detected_text_column = []
-                        for post in self.dataset.top_parent().iterate_items(self):
-                            detected_text_column.append('\n'.join(post_id_to_results.get(post.get('id'), [])))
-
-                            annotations.append({
-                                "label": "4CAT_detected_text",
-                                "value": detected_text_column
-                            })
-
-
-        self.dataset.update_status("Annotations retrieved for %i images" % processed)
-
 
         detected_message = f"Detected text in {processed} of {total_image_files} images.{(' Skipped ' + str(skipped_images) + ' images; see log for details.') if skipped_images else ''}"
         if self.parameters.get("save_annotations", False) and not save_annotations:
