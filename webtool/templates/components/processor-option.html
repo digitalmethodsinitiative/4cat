@@ -29,7 +29,7 @@
         <div class="multichoice-wrapper{% if option_settings.inline or option_settings.type == "annotations" %} inline{% endif %}" style="flex-basis: 100%;">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
-                <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] | truncate(30, True, "...", 0) }}</option>
+                <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{% if option_settings.inline %}{{ option_settings.options[choice] | truncate(30, True, "...", 0) }}{% else %}{{option_settings.options[choice]}}{% endif %}</option>
             {% endfor %}
             </select>
         </div>

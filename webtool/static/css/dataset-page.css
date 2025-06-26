@@ -654,7 +654,7 @@ article.result > section:first-child {
 .processor-option-wrap .annotation-explainer {
     font-size: 0.8em;
     margin-left: 1.5em;
-    flex-basis: 50%;
+    flex-basis: 70%;
     line-height: 1em;
 }
 
