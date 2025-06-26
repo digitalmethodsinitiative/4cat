@@ -135,7 +135,7 @@
                         <dt>Annotations</dt>
                         <dd>
                             <ul>
-                                {% for annotation_field in dataset.get_annotation_fields().items() %}
+                                {% for annotation_field in dataset.annotation_fields.items() %}
                                 <li><span class="property-badge"><i class="fa-solid fa-tag"></i> {{ annotation_field[1].label }}</span></li>
                                 {% endfor %}
                             </ul>
