@@ -354,7 +354,7 @@ class DataSet(FourcatModule):
             raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
     def iterate_items(
-        self, processor=None, warn_unmappable=True, map_missing="default"
+        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True
     ):
         """
         Generate mapped dataset items
@@ -396,7 +396,8 @@ class DataSet(FourcatModule):
           first argument and the name of the missing field as the second.
         - a dictionary with a key for each possible missing field: replace missing
           field with a strategy for that field ('default', 'abort', or a callback)
-
+        :param get_annotations: Whether to also fetch annotations from the database.
+          This can be disabled to help speed up iteration.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = False
@@ -407,15 +408,16 @@ class DataSet(FourcatModule):
             item_mapper = True
 
         # Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
-        annotation_fields = self.get_annotation_fields()
-        num_annotations = 0 if not annotation_fields else self.num_annotations()
-        all_annotations = None
-        # If this dataset has less than n annotations, just retrieve them all before iterating
-        if num_annotations <= 500:
-            # Convert to dict for faster lookup when iterating over items
-            all_annotations = collections.defaultdict(list)
-            for annotation in self.get_annotations():
-                all_annotations[annotation.item_id].append(annotation)
+        if get_annotations:
+            annotation_fields = self.annotation_fields
+            num_annotations = 0 if not annotation_fields else self.num_annotations()
+            all_annotations = None
+            # If this dataset has less than n annotations, just retrieve them all before iterating
+            if num_annotations <= 500:
+                # Convert to dict for faster lookup when iterating over items
+                all_annotations = collections.defaultdict(list)
+                for annotation in self.get_annotations():
+                    all_annotations[annotation.item_id].append(annotation)
 
         # missing field strategy can be for all fields at once, or per field
         # if it is per field, it is a dictionary with field names and their strategy
@@ -471,7 +473,7 @@ class DataSet(FourcatModule):
                 mapped_item = original_item
 
             # Add possible annotation values
-            if annotation_fields:
+            if get_annotations and annotation_fields:
                 # We're always handling annotated data as a MappedItem object,
                 # even if no map_item() function is available for the data source.
                 if not isinstance(mapped_item, MappedItem):
