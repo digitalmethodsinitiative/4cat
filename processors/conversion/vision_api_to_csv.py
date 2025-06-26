@@ -31,9 +31,10 @@ class ConvertVisionOutputToCSV(BasicProcessor):
 
     options = {
         "save_annotations": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Add features as annotations to the original dataset.",
-            "default": False
+            "type": UserInput.OPTION_ANNOTATION,
+            "label": "image features",
+            "default": False,
+            "tooltip": "Every feature will receive its own annotation"
         }
     }
 
@@ -119,8 +120,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                         parent_annotations.append({
                             "item_id": item_id,
                             "label": label,
-                            "value": value,
-                            "type": "textarea"
+                            "value": value
                         })
 
         # Write Vision annotations to source dataset
