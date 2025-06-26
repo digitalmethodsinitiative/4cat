@@ -369,7 +369,7 @@ class Tokenise(BasicProcessor):
         processed = 0
         annotations = []
 
-        for post in self.source_dataset.iterate_items(self):
+        for post in self.source_dataset.iterate_items(self, get_annotations=False):
             # determine what output unit this post belongs to
             if docs_per != "thread":
                 try:
