@@ -151,11 +151,11 @@ def autologin_whitelist():
     # request only if the hostname or IP matches the whitelist
     if any([fnmatch.filter(filterables, hostmask) for hostmask in current_app.fourcat_config.get("flask.autologin.hostnames", [])]):
         autologin_user = User.get_by_name(current_app.db, "autologin")
-        autologin_user.with_config(ConfigWrapper(current_app.fourcat_config, user=None, request=request))
         if not autologin_user:
             # this user should exist by default
             abort(500)
         autologin_user.authenticate()
+        autologin_user.with_config(ConfigWrapper(current_app.fourcat_config, user=autologin_user, request=request))
         login_user(autologin_user, remember=False)
 
 
