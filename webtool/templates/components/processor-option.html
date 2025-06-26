@@ -7,8 +7,7 @@
         {% if option_settings.help %}
             {{ option_settings.help|markdown|safe }}
         {% elif option_settings.type == "annotation" %}
-            Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ option_settings.label }}</span>
-            as annotation to the {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset
+            Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ option_settings.label }}</span> as annotation to the {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset{% if option_settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (data for computational processing, hidden in the Explorer)</span>{% endif %}
         {% endif %}
     </label>
 
