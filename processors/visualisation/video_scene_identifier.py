@@ -139,8 +139,10 @@ class VideoSceneDetector(BasicProcessor):
 			"max": 1.0,
 		},
 		"save_annotations": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Add amount of scenes per video to top dataset",
+			"type": UserInput.OPTION_ANNOTATION,
+			"label": "scene data",
+			"hidden_in_explorer": True,
+			"tooltip": "Add amount of scenes per video to top dataset",
 			"default": False
 		}
 	}
