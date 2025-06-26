@@ -213,7 +213,7 @@ class TikTokImageDownloader(BasicProcessor):
         if max_number_images == 0:
             options['amount']['tooltip'] = "'0' will use all available images"
             options['amount'].pop('max') if 'max' in options['amount'] else None
-            options['amount']['help'] = f"No. of images"
+            options['amount']['help'] = "No. of images"
         else:
             options['amount']['help'] = f"No. of images (max {max_number_images:,})"
             options['amount']['max'] = max_number_images
