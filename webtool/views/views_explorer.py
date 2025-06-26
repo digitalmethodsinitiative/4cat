@@ -67,7 +67,7 @@ def explorer_dataset(dataset_key: str, page=1):
 		if annotation_field.get("from_dataset"):
 			key = annotation_field["from_dataset"]
 			try:
-				from_datasets[key] = DataSet(key=key, db=db, modules=fourcat_modules)
+				from_datasets[key] = DataSet(key=key, db=g.db, modules=g.modules)
 			except DataSetException:
 				return error(404, error="Dataset not found.")
 
@@ -150,7 +150,7 @@ def explorer_dataset(dataset_key: str, page=1):
 		posts=posts,
 		annotation_fields=annotation_fields,
 		annotations=post_annotations,
-		processors=fourcat_modules.processors,
+		processors=current_app.fourcat_modules.processors,
 		from_datasets=from_datasets,
 		template=template,
 		posts_css=posts_css,
@@ -190,7 +190,7 @@ def explorer_save_annotation_fields(dataset_key: str):
 	annotation_fields = request.get_json()
 
 	# Potentially re-add annotation fields that were hidden in the Explorer
-	if dataset.get_annotation_fields():
+	if dataset.annotation_fields:
 		for annotation_field_id, annotation_field in annotation_fields.items():
 			if annotation_field.get("hide_in_explorer"):
 				annotation_fields[annotation_field_id] = annotation_field
