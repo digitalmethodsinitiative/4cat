@@ -81,120 +81,120 @@ class Tokenise(BasicProcessor):
         with config.get("PATH_ROOT").joinpath("common/assets/stopwords-languages.json").open() as infile:
             stopwords = json.load(infile)
 
-		options = {
-			"columns": {
-				"type": UserInput.OPTION_MULTI,
-				"help": "Column(s) to tokenise",
-				"tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
-			},
-			"docs_per": {
-				"type": UserInput.OPTION_CHOICE,
-				"default": "all",
-				"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "thread": "Thread"},
-				"help": "Produce token sets per",
-				"tooltip": "This determines the periodisation of follow-up analyses; e.g. if you want to produce topic "
-							"models per month as the next step, you need to choose 'Month' here."
-			},
-			"language": {
-				"type": UserInput.OPTION_CHOICE,
-				"options": {
-					**{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
-					"other": "Other (stemming, lemmatizing and sentence splitting will most likely not produce "
-							 "accurate results)"
-				},
-				"default": "english",
-				"help": "Language",
-				"tooltip": "This affects stemming, tokenisation, stopword filtering, and sentence splitting, unless "
-						   "overridden via the options below"
-			},
-			"tokenizer_type": {
-				"type": UserInput.OPTION_CHOICE,
-				"default": "twitter",
-				"options": {
-					"twitter": "nltk TweetTokenizer (use general language setting, optimised for social media)",
-					"regular": "nltk word_tokenize (use general language setting)",
-					"razdel": "razdel (for Russian text)",
-					"jieba-cut": "jieba (for Chinese text; accurate mode)",
-					"jieba-cut-all": "jieba (for Chinese text; full mode)",
-					"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
-				},
-				"help": "Tokeniser",
-				"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
-			},
-			"grouping-per": {
-				"type": UserInput.OPTION_CHOICE,
-				"default": "item",
-				"help": "Group tokens per",
-				"options": {
-					"item": "Item",
-					"sentence": "Sentence in item"
-				},
-				"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what "
-						   "to choose, choose 'item'."
-			},
-			"stem": {
-				"type": UserInput.OPTION_TOGGLE,
-				"default": False,
-				"help": "Stem tokens (with SnowballStemmer)",
-				"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes "
-						   "'bicycl', etc.",
-				"requires": "language!=other"
-			},
-			"lemmatise": {
-				"type": UserInput.OPTION_TOGGLE,
-				"default": False,
-				"help": "Lemmatise tokens (English only)",
-				"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', "
-						   "'bicycles' becomes 'bicycle', 'better' becomes 'good'.",
-				"requires": "language==english"
-			},
-			"filter": {
-				"type": UserInput.OPTION_MULTI_SELECT,
-				"default": ["copy-language"],
-				"options": {
-					"copy-language": "Stop words for language chosen above",
-					**{
-						f"stopwords-iso-{code}": f"{language} stop words (stopwords-iso)"
-						for code, language in stopwords.items()
-					},
-					"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top "
-													"unigrams)",
-					"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. "
-												 "Warning: computationally heavy)",
-					"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)"
-				},
-				"help": "Tokens to exclude",
-				"tooltip": "See the references for information on the word lists' provenance. It is highly recommended "
-						   "to exclude stop words. Choosing more word lists increases processing time."
-			},
-			"accept_words": {
-				"type": UserInput.OPTION_TEXT,
-				"default": "",
-				"help": "Always allow these tokens",
-				"tooltip": "These won't be deleted as stop words and will never be stemmed or lemmatised. Separate "
-						   "with commas."
-			},
-			"reject_words": {
-				"type": UserInput.OPTION_TEXT,
-				"default": "",
-				"help": "Always delete these tokens",
-				"tooltip": "These will be ignored and excluded from the corpus. Separate with commas."
-			},
-			"only_unique": {
-				"type": UserInput.OPTION_TOGGLE,
-				"default": False,
-				"help": "Only keep unique tokens per item",
-				"tooltip": "If a token occurs multiple times in the same item, only process once. Can be useful to "
-						   "filter out spam."
-			},
-			"save_annotations": {
-				"type": UserInput.OPTION_ANNOTATION,
-				"tooltip": "Outputs a comma-separated string of tokens",
-				"label": "tokens",
-				"hide_in_explorer": True,
-				"default": False
-			}
-		}
+        options = {
+            "columns": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Column(s) to tokenise",
+                "tooltip": "Each enabled column will be treated as a separate item to tokenise. Columns must contain text."
+            },
+            "docs_per": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "all",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "thread": "Thread"},
+                "help": "Produce token sets per",
+                "tooltip": "This determines the periodisation of follow-up analyses; e.g. if you want to produce topic "
+                            "models per month as the next step, you need to choose 'Month' here."
+            },
+            "language": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    **{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+                    "other": "Other (stemming, lemmatizing and sentence splitting will most likely not produce "
+                             "accurate results)"
+                },
+                "default": "english",
+                "help": "Language",
+                "tooltip": "This affects stemming, tokenisation, stopword filtering, and sentence splitting, unless "
+                           "overridden via the options below"
+            },
+            "tokenizer_type": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "twitter",
+                "options": {
+                    "twitter": "nltk TweetTokenizer (use general language setting, optimised for social media)",
+                    "regular": "nltk word_tokenize (use general language setting)",
+                    "razdel": "razdel (for Russian text)",
+                    "jieba-cut": "jieba (for Chinese text; accurate mode)",
+                    "jieba-cut-all": "jieba (for Chinese text; full mode)",
+                    "jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+                },
+                "help": "Tokeniser",
+                "tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
+            },
+            "grouping-per": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "item",
+                "help": "Group tokens per",
+                "options": {
+                    "item": "Item",
+                    "sentence": "Sentence in item"
+                },
+                "tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what "
+                           "to choose, choose 'item'."
+            },
+            "stem": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Stem tokens (with SnowballStemmer)",
+                "tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes "
+                           "'bicycl', etc.",
+                "requires": "language!=other"
+            },
+            "lemmatise": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Lemmatise tokens (English only)",
+                "tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', "
+                           "'bicycles' becomes 'bicycle', 'better' becomes 'good'.",
+                "requires": "language==english"
+            },
+            "filter": {
+                "type": UserInput.OPTION_MULTI_SELECT,
+                "default": ["copy-language"],
+                "options": {
+                    "copy-language": "Stop words for language chosen above",
+                    **{
+                        f"stopwords-iso-{code}": f"{language} stop words (stopwords-iso)"
+                        for code, language in stopwords.items()
+                    },
+                    "wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top "
+                                                    "unigrams)",
+                    "wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. "
+                                                 "Warning: computationally heavy)",
+                    "wordlist-opentaal-dutch": "Dutch word list (OpenTaal)"
+                },
+                "help": "Tokens to exclude",
+                "tooltip": "See the references for information on the word lists' provenance. It is highly recommended "
+                           "to exclude stop words. Choosing more word lists increases processing time."
+            },
+            "accept_words": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Always allow these tokens",
+                "tooltip": "These won't be deleted as stop words and will never be stemmed or lemmatised. Separate "
+                           "with commas."
+            },
+            "reject_words": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Always delete these tokens",
+                "tooltip": "These will be ignored and excluded from the corpus. Separate with commas."
+            },
+            "only_unique": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Only keep unique tokens per item",
+                "tooltip": "If a token occurs multiple times in the same item, only process once. Can be useful to "
+                           "filter out spam."
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "tooltip": "Outputs a comma-separated string of tokens",
+                "label": "tokens",
+                "hide_in_explorer": True,
+                "default": False
+            }
+        }
 
         if parent_dataset and parent_dataset.get_columns():
             columns = parent_dataset.get_columns()
@@ -247,9 +247,9 @@ class Tokenise(BasicProcessor):
         if type(columns) is not list:
             columns = [columns]
 
-		save_annotations = self.parameters.get("save_annotations", False)
+        save_annotations = self.parameters.get("save_annotations", False)
 
-		self.dataset.update_status("Building filtering automaton")
+        self.dataset.update_status("Building filtering automaton")
 
         link_regex = re.compile(r"https?://[^\s]+")
         symbol = re.compile(r"[" + re.escape(string.punctuation) + "’‘“”" + "]")
@@ -364,22 +364,22 @@ class Tokenise(BasicProcessor):
         # Get sentence tokenizer
         sentence_method, sentence_error = self.get_sentence_method(language=language, grouping=grouping, dataset=self.dataset)
 
-		# Collect metadata
-		metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'language':language, 'intervals':set()}}
-		processed = 0
-		annotations = []
+        # Collect metadata
+        metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'language':language, 'intervals':set()}}
+        processed = 0
+        annotations = []
 
-		for post in self.source_dataset.iterate_items(self):
-			# determine what output unit this post belongs to
-			if docs_per != "thread":
-				try:
-					document_descriptor = get_interval_descriptor(post, docs_per)
-				except ValueError as e:
-					self.dataset.update_status("%s, cannot count items per %s" % (str(e), docs_per), is_final=True)
-					self.dataset.update_status(0)
-					return
-			else:
-				document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
+        for post in self.source_dataset.iterate_items(self):
+            # determine what output unit this post belongs to
+            if docs_per != "thread":
+                try:
+                    document_descriptor = get_interval_descriptor(post, docs_per)
+                except ValueError as e:
+                    self.dataset.update_status("%s, cannot count items per %s" % (str(e), docs_per), is_final=True)
+                    self.dataset.update_status(0)
+                    return
+            else:
+                document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
 
             # Prep metadata
             # document_numbers lists the indexes for documents found in filename relating to this post/item
@@ -482,25 +482,25 @@ class Tokenise(BasicProcessor):
                         # However, why someone would want to predict topics for different parts of a post seems unclear
                         metadata[post_id][document_descriptor]['multiple_docs'] = True
 
-					# Possibly save tokens as annotations, in batches of 1000 to prevent memory hog
-					if save_annotations:
-						annotations.append({
-							"label": annotation_label,
-							"item_id": post_id,
-							"value": ",".join(post_tokens)
-						})
-						if processed % 1000 == 0:
-							self.save_annotations(annotations, hide_in_explorer=True)
-							annotations = []
+                    # Possibly save tokens as annotations, in batches of 1000 to prevent memory hog
+                    if save_annotations:
+                        annotations.append({
+                            "label": "tokens",
+                            "item_id": post_id,
+                            "value": ",".join(post_tokens)
+                        })
+                        if processed % 1000 == 0:
+                            self.save_annotations(annotations, hide_in_explorer=True)
+                            annotations = []
 
                     output_files[output_path] += 1
 
-		# Safe leftover annotations
-		if annotations:
-			self.save_annotations(annotations, hide_in_explorer=True)
+        # Safe leftover annotations
+        if annotations:
+            self.save_annotations(annotations, hide_in_explorer=True)
 
-		if output_file_handle:
-			output_file_handle.close()
+        if output_file_handle:
+            output_file_handle.close()
 
         # close all json lists
         # we do this now because only here do we know all files have been

@@ -272,7 +272,7 @@ class ImageTextDetector(BasicProcessor):
                                 "value": detected_text_column
                             })
 
-                        if annotations
+
         self.dataset.update_status("Annotations retrieved for %i images" % processed)
 
 

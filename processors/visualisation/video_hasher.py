@@ -38,36 +38,36 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         return {
-			"amount": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "No. of videos",
-				"default": 100,
-				"min": 0,
-				"tooltip": "Increasing this can easily lead to very long-running processors. '0; allows as many videos as available."
-			},
-			"frame_interval": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "Number of frames extracted per second to extract from video",
-				"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision when creating hashes (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
-				"coerce_type": float,
-				"default": 1,
-				"min": 0,
-				"max": 5,
-			},
-			"percent": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "Percent similar for video hash network",
-				"tooltip": "A network edge is created between two videos if the hashes representing the collage of frames are at least this percent similar.",
-				"default": 95,
-				"min": 0,
-				"max": 100
-			},
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of videos",
+                "default": 100,
+                "min": 0,
+                "tooltip": "Increasing this can easily lead to very long-running processors. '0; allows as many videos as available."
+            },
+            "frame_interval": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Number of frames extracted per second to extract from video",
+                "tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision when creating hashes (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
+                "coerce_type": float,
+                "default": 1,
+                "min": 0,
+                "max": 5,
+            },
+            "percent": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Percent similar for video hash network",
+                "tooltip": "A network edge is created between two videos if the hashes representing the collage of frames are at least this percent similar.",
+                "default": 95,
+                "min": 0,
+                "max": 100
+            },
             "save_annotations": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add hashes to top dataset",
-				"default": False
-			}
-		}
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Add hashes to top dataset",
+                "default": False
+            }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -94,28 +94,28 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
             # first, create colleges (and hashes) with the default settings
             {
                 "type": "video-hasher-1",
-				"parameters": {
-					"frame_interval": self.parameters.get("frame_interval", 1),
-					"amount": self.parameters.get("amount", 100),
-					"save_annotations": self.parameters.get("save_annotations", False),
-					"next": [
-						# then create hash similarity network
-						{
-							"type": "video-hash-network",
-							"parameters": {
-								"percent": self.parameters.get("percent", 90),
-								"attach_to": attach_to
-							},
-						},
-						# and create hash similarity matrix
-						{
-							"type": "video-hash-similarity-matrix",
-							"parameters": {
-								"percent": self.parameters.get("percent", 90),
-							}
-						}
-					]
-				}
+                "parameters": {
+                    "frame_interval": self.parameters.get("frame_interval", 1),
+                    "amount": self.parameters.get("amount", 100),
+                    "save_annotations": self.parameters.get("save_annotations", False),
+                    "next": [
+                        # then create hash similarity network
+                        {
+                            "type": "video-hash-network",
+                            "parameters": {
+                                "percent": self.parameters.get("percent", 90),
+                                "attach_to": attach_to
+                            },
+                        },
+                        # and create hash similarity matrix
+                        {
+                            "type": "video-hash-similarity-matrix",
+                            "parameters": {
+                                "percent": self.parameters.get("percent", 90),
+                            }
+                        }
+                    ]
+                }
             }
         ]
 
@@ -131,46 +131,46 @@ class VideoHasher(BasicProcessor):
     dominant color. The collage being divided into 64 "images" or "pixels" and ultimately defined by those two aspects
     (one "image"/"pixel" per bit).
 
-	Increasing the frames per second has proven necessary for short videos (if there are ultimately less than 64 frames,
-	there will essentially be black frames that will be shared with every other video with less than 64 frames). It also
-	seems necessary to collect the same frames per second for comparison between videos as variation in this will cause
-	different frames to be collected per video (more testing needs to be done here). Additionally, short videos often
-	do not have much differentiating information particularly if there is little difference between frames (i.e. no
-	"scene" changes) and have lead to unwanted collision in tests.
-	"""
-	type = "video-hasher-1"  # job type ID
-	category = "Visual"  # category
-	title = "Create video collages"  # title displayed in UI
-	description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
-	extension = "zip"  # extension of result file, used internally and in UI
-	media_type = "image" # media type of the result
+    Increasing the frames per second has proven necessary for short videos (if there are ultimately less than 64 frames,
+    there will essentially be black frames that will be shared with every other video with less than 64 frames). It also
+    seems necessary to collect the same frames per second for comparison between videos as variation in this will cause
+    different frames to be collected per video (more testing needs to be done here). Additionally, short videos often
+    do not have much differentiating information particularly if there is little difference between frames (i.e. no
+    "scene" changes) and have lead to unwanted collision in tests.
+    """
+    type = "video-hasher-1"  # job type ID
+    category = "Visual"  # category
+    title = "Create video collages"  # title displayed in UI
+    description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
+    extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image" # media type of the result
 
     followups = ["video-hash-network", "video-hash-similarity-matrix"]
 
-	@classmethod
-	def get_options(cls, parent_dataset=None, config=None):
-		"""
-		Options for the processor
-		:param config:
-		"""
-		options = {
-			"amount": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "No. of videos",
-				"default": 100,
-				"min": 0,
-				"tooltip": "Increasing this can easily lead to very long-running processors. '0; allows as many videos as available."
-			},
-			"frame_interval": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "Number of frames extracted per second to extract from video",
-				"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision when creating hashes (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
-				"coerce_type": float,
-				"default": 1,
-				"min": 0,
-				"max": 5,
-			}
-		}
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None):
+        """
+        Options for the processor
+        :param config:
+        """
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of videos",
+                "default": 100,
+                "min": 0,
+                "tooltip": "Increasing this can easily lead to very long-running processors. '0; allows as many videos as available."
+            },
+            "frame_interval": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Number of frames extracted per second to extract from video",
+                "tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision when creating hashes (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
+                "coerce_type": float,
+                "default": 1,
+                "min": 0,
+                "max": 5,
+            }
+        }
 
         return options
 
@@ -192,11 +192,11 @@ class VideoHasher(BasicProcessor):
             self.dataset.finish(0)
             return
 
-		# Collect parameters
-		frame_interval = self.parameters.get("frame_interval", 1)
-		max_videos = self.parameters.get("amount", 100)
-		self.dataset.log('Frames per seconds: %f' % frame_interval)
-		save_annotations = self.parameters.get("save_annotations", False)
+        # Collect parameters
+        frame_interval = self.parameters.get("frame_interval", 1)
+        max_videos = self.parameters.get("amount", 100)
+        self.dataset.log('Frames per seconds: %f' % frame_interval)
+        save_annotations = self.parameters.get("save_annotations", False)
 
         # Prepare staging area for videos and video tracking
         # VideoHash creates various files that may not be cleaned up on error so we use an output directory
@@ -225,23 +225,23 @@ class VideoHasher(BasicProcessor):
                 # yt-dlp file
                 continue
 
-			try:
-				videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
-			except FFmpegNotFound:
-				self.log.error('ffmpeg must be installed for video_hash.py processor to be used.')
-				self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
-				self.dataset.finish(0)
-				return
-			except FileNotFoundError:
-				self.dataset.update_status(f"Unable to find file {path.name}")
-				continue
-			except FFmpegFailedToExtractFrames as e:
-				self.dataset.update_status(f"Unable to extract frame for {path.name} (see log for details)")
-				self.dataset.log(f"Unable to extract frame for {str(path)}: {e}")
-				continue
-			except OSError:
-				self.dataset.finish_with_error("4CAT does not have the right privileges to access the video files.")
-				return
+            try:
+                videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
+            except FFmpegNotFound:
+                self.log.error('ffmpeg must be installed for video_hash.py processor to be used.')
+                self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
+                self.dataset.finish(0)
+                return
+            except FileNotFoundError:
+                self.dataset.update_status(f"Unable to find file {path.name}")
+                continue
+            except FFmpegFailedToExtractFrames as e:
+                self.dataset.update_status(f"Unable to extract frame for {path.name} (see log for details)")
+                self.dataset.log(f"Unable to extract frame for {str(path)}: {e}")
+                continue
+            except OSError:
+                self.dataset.finish_with_error("4CAT does not have the right privileges to access the video files.")
+                return
 
             video_hashes[path.name] = {'videohash': videohash}
 
@@ -258,20 +258,20 @@ class VideoHasher(BasicProcessor):
             self.dataset.finish_with_error("Unable to create video hashes for any videos")
             return
 
-		# Write hash file
-		# This file is held here and then copied as its own dataset via VideoHasherTwo
-		num_posts = 0
-		rows = []
-		annotations = []
-		if video_metadata is None:
-			# Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
-			try:
-				metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, output_dir)
-			except FileNotFoundError:
-				metadata_path = None
-			if metadata_path:
-				with open(metadata_path) as file:
-					video_metadata = json.load(file)
+        # Write hash file
+        # This file is held here and then copied as its own dataset via VideoHasherTwo
+        num_posts = 0
+        rows = []
+        annotations = []
+        if video_metadata is None:
+            # Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
+            try:
+                metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, output_dir)
+            except FileNotFoundError:
+                metadata_path = None
+            if metadata_path:
+                with open(metadata_path) as file:
+                    video_metadata = json.load(file)
 
         if video_metadata is None:
             self.dataset.log(
@@ -300,50 +300,50 @@ class VideoHasher(BasicProcessor):
                     self.dataset.log(f"Metadata Error: {url} with {data}")
                     continue
 
-				for file in files:
-					if not file.get("success"):
-						continue
-					if file.get('filename') not in video_hashes:
-						self.dataset.log(f"Metadata Error: {file.get('filename')} with {url} - {data}")
-						continue
-					video_hash = video_hashes[file.get('filename')].get('videohash')
-					rows.append({
-						'id': file.get('filename'),  # best if all datasets have unique identifier
-						'url': url,
-						"from_dataset": data.get("from_dataset"),
-						'video_hash': video_hash.hash,
-						'video_duration': video_hash.video_duration,
-						'video_count': len(data.get('post_ids', [])),
-						"post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
-						'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
-					})
-					if save_annotations:
-						for item_id in data.get("post_ids", []):
-							annotations.append({
-								"label": "video-hash",
-								"value": video_hash.hash,
-								"item_id": item_id
-							})
+                for file in files:
+                    if not file.get("success"):
+                        continue
+                    if file.get('filename') not in video_hashes:
+                        self.dataset.log(f"Metadata Error: {file.get('filename')} with {url} - {data}")
+                        continue
+                    video_hash = video_hashes[file.get('filename')].get('videohash')
+                    rows.append({
+                        'id': file.get('filename'),  # best if all datasets have unique identifier
+                        'url': url,
+                        "from_dataset": data.get("from_dataset"),
+                        'video_hash': video_hash.hash,
+                        'video_duration': video_hash.video_duration,
+                        'video_count': len(data.get('post_ids', [])),
+                        "post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
+                        'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
+                    })
+                    if save_annotations:
+                        for item_id in data.get("post_ids", []):
+                            annotations.append({
+                                "label": "video-hash",
+                                "value": video_hash.hash,
+                                "item_id": item_id
+                            })
 
-					num_posts += 1
+                    num_posts += 1
 
 
-		writer = None
-		with output_dir.joinpath("video_hashes.csv").open("w", encoding="utf-8", newline="") as outfile:
-			for row in rows:
-				if not writer:
-					writer = csv.DictWriter(outfile, fieldnames=row.keys())
-					writer.writeheader()
-				writer.writerow(row)
-				num_posts += 1
+        writer = None
+        with output_dir.joinpath("video_hashes.csv").open("w", encoding="utf-8", newline="") as outfile:
+            for row in rows:
+                if not writer:
+                    writer = csv.DictWriter(outfile, fieldnames=row.keys())
+                    writer.writeheader()
+                writer.writerow(row)
+                num_posts += 1
 
-		if save_annotations and annotations:
-			self.dataset.update_status("Saving hashes as annotations to top dataset")
-			self.save_annotations(annotations)
+        if save_annotations and annotations:
+            self.dataset.update_status("Saving hashes as annotations to top dataset")
+            self.save_annotations(annotations)
 
-		# Finish up
-		self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')
-		self.write_archive_and_finish(output_dir, num_items=processed_videos)
+        # Finish up
+        self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')
+        self.write_archive_and_finish(output_dir, num_items=processed_videos)
 
 
 class VideoHashNetwork(BasicProcessor):

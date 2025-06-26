@@ -12,7 +12,6 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
-
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
@@ -32,9 +31,6 @@ class AudioToText(BasicProcessor):
 
     followups = []
 
-    local_whisper = True if (config.get("dmi-service-manager.bc_whisper_enabled", False) and
-                    config.get("dmi-service-manager.ab_server_address", False)) else False
-
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
         "[OpenAI speech to text](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper"
@@ -42,7 +38,7 @@ class AudioToText(BasicProcessor):
         "[Whisper paper: Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356)",
         "[OpenAI Whisper statistics & code](https://github.com/openai/whisper#whisper)",
         "[How to use prompts](https://platform.openai.com/docs/guides/speech-to-text/prompting)",
-        ]
+    ]
 
     config = {
         "dmi-service-manager.bb_whisper-intro-1": {
@@ -159,15 +155,17 @@ class AudioToText(BasicProcessor):
                 "requires": "model_host==local"
             },
             "save_annotations": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add transcriptions to top dataset",
-				"default": False
-			}
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Add transcriptions to top dataset",
+                "default": False
+            }
         }
 
-        if cls.local_whisper:
+        local_whisper = True if (config.get("dmi-service-manager.bc_whisper_enabled", False) and
+                                 config.get("dmi-service-manager.ab_server_address", False)) else False
+        if local_whisper:
             # Update the amount max and help from config
-            max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100, user=user))
+            max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100))
             if max_number_audio_files == 0:  # Unlimited allowed
                 options["amount"]["help"] = "Number of audio files"
                 options["amount"]["default"] = 100
@@ -182,7 +180,7 @@ class AudioToText(BasicProcessor):
             options["model_host"]["options"] = {"external": "External (OpenAI API)"}
             options["model_host"]["default"] = "external"
 
-        api_key = config.get("api.openai.api_key", user=user)
+        api_key = config.get("api.openai.api_key")
         if not api_key:
             options["api_key"] = {
                 "type": UserInput.OPTION_TEXT,
@@ -213,9 +211,8 @@ class AudioToText(BasicProcessor):
             return
 
         api_key = self.parameters.get("api_key")
+
         if not api_key and model_host == "external":
-            api_key = config.get("api.openai.api_key", user=self.owner)
-        elif model_host == "external":
             self.dataset.finish_with_error("You need to provide a valid API key when using an external model")
             return
 
@@ -264,7 +261,8 @@ class AudioToText(BasicProcessor):
                 return
 
             if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
-                self.dataset.finish_with_error("DMI Service Manager currently busy; no GPU memory available. Please try again later.")
+                self.dataset.finish_with_error(
+                    "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
                 return
 
             # Provide audio files to DMI Service Manager
@@ -273,7 +271,9 @@ class AudioToText(BasicProcessor):
             # Files can be based on the parent dataset (to avoid uploading the same files multiple times)
             file_collection_name = dmi_service_manager.get_folder_name(self.source_dataset)
 
-            path_to_files, path_to_results = dmi_service_manager.process_files(staging_area, audio_filenames, output_dir, file_collection_name, results_folder_name)
+            path_to_files, path_to_results = dmi_service_manager.process_files(staging_area, audio_filenames,
+                                                                               output_dir, file_collection_name,
+                                                                               results_folder_name)
 
             # Whisper args
             whisper_endpoint = "whisper"
@@ -291,7 +291,9 @@ class AudioToText(BasicProcessor):
                     setting = setting if setting[:2] == "--" else "--" + setting.lstrip("-")
                     data["args"].extend([setting, str(value)])
             # Finally, add audio files to args
-            data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in audio_filenames])
+            data["args"].extend(
+                [f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in
+                 audio_filenames])
 
             # Send request to DMI Service Manager
             self.dataset.update_status(f"Requesting service from DMI Service Manager...")
@@ -397,7 +399,7 @@ class AudioToText(BasicProcessor):
                             "value": result_data.get("text", ""),
                             "type": "textarea"
                         })
-                        #annotated += 1
+                    #annotated += 1
                     processed += 1
 
         if save_annotations:
@@ -406,20 +408,19 @@ class AudioToText(BasicProcessor):
         self.dataset.update_status(f"Detected speech in {processed} of {total_audio_files} audio files")
         self.dataset.finish(processed)
 
-
     def get_openai_api_transcription(self, input_file, client, model="gpt-4o-mini-transcribe", language="", prompt=""):
         """
-		Gets a transcription from the OpenAI API.
-		:param input_file:      Location of input audio file.
-		:param client:          OpenAI API client.
-		:param model:           OpenAI model. Can be gpt-4o-mini-transcribe, gpt-4o-transcribe, or whisper-1.
-		:param language:        Indicated language. Can help with performance.
-		:param prompt:          Prompt text. Can help with performance.
+        Gets a transcription from the OpenAI API.
+        :param input_file:      Location of input audio file.
+        :param client:          OpenAI API client.
+        :param model:           OpenAI model. Can be gpt-4o-mini-transcribe, gpt-4o-transcribe, or whisper-1.
+        :param language:        Indicated language. Can help with performance.
+        :param prompt:          Prompt text. Can help with performance.
 
-		see https://platform.openai.com/docs/api-reference/audio/createTranscription
+        see https://platform.openai.com/docs/api-reference/audio/createTranscription
 
-		returns: response
-		"""
+        returns: response
+        """
         try:
             # Get response
             response = client.audio.transcriptions.create(
@@ -449,7 +450,7 @@ class AudioToText(BasicProcessor):
         return response
 
     def get_openai_api_translation(self, input_file, client, language="",
-                                     prompt=""):
+                                   prompt=""):
         """
         Gets a transcription from the OpenAI API.
         :param input_file:      Location of input audio file.

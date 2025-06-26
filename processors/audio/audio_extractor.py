@@ -23,13 +23,13 @@ class AudioExtractor(BasicProcessor):
     """
     Audio from video Extractor
 
-	Uses ffmpeg to extract audio from videos and saves them in an archive.
-	"""
-	type = "audio-extractor"  # job type ID
-	category = "Audio"  # category
-	title = "Extract audio from videos"  # title displayed in UI
-	description = "Create audio files per video"  # description displayed in UI
-	extension = "zip"  # extension of result file, used internally and in UI
+    Uses ffmpeg to extract audio from videos and saves them in an archive.
+    """
+    type = "audio-extractor"  # job type ID
+    category = "Audio"  # category
+    title = "Extract audio from videos"  # title displayed in UI
+    description = "Create audio files per video"  # description displayed in UI
+    extension = "zip"  # extension of result file, used internally and in UI
 
     followups = ["audio-to-text"]
 

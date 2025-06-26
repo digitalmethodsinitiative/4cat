@@ -17,7 +17,7 @@ from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, conv
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-								   MapItemException, MappedItemIncompleteException, AnnotationException)
+                                   MapItemException, MappedItemIncompleteException, AnnotationException)
 
 
 class DataSet(FourcatModule):
@@ -39,14 +39,14 @@ class DataSet(FourcatModule):
     data = None
     key = ""
 
-	_children = None
-	_cached_columns = None
-	available_processors = None
-	genealogy = None
-	preset_parent = None
-	parameters = None
-	modules = None
-	annotation_fields = None
+    _children = None
+    _cached_columns = None
+    available_processors = None
+    genealogy = None
+    preset_parent = None
+    parameters = None
+    modules = None
+    annotation_fields = None
 
     owners = None
     tagged_owners = None
@@ -78,37 +78,37 @@ class DataSet(FourcatModule):
 
         If the dataset is not in the database yet, it is added.
 
-		:param dict parameters:  Only when creating a new dataset. Dataset
-		parameters, free-form dictionary.
-		:param str key: Dataset key. If given, dataset with this key is loaded.
-		:param int job: Job ID. If given, dataset corresponding to job is
-		loaded.
-		:param dict data: Dataset data, corresponding to a row in the datasets
-		database table. If not given, retrieved from database depending on key.
-		:param db:  Database connection
-		:param str parent:  Only when creating a new dataset. Parent dataset
-		key to which the one being created is a child.
-		:param str extension: Only when creating a new dataset. Extension of
-		dataset result file.
-		:param str type: Only when creating a new dataset. Type of the dataset,
-		corresponding to the type property of a processor class.
-		:param bool is_private: Only when creating a new dataset. Whether the
-		dataset is private or public.
-		:param str owner: Only when creating a new dataset. The user name of
-		the dataset's creator.
-		:param modules: Module cache. If not given, will be loaded when needed
-		(expensive). Used to figure out what processors are compatible with
-		this dataset.
-		"""
-		self.db = db
+        :param dict parameters:  Only when creating a new dataset. Dataset
+        parameters, free-form dictionary.
+        :param str key: Dataset key. If given, dataset with this key is loaded.
+        :param int job: Job ID. If given, dataset corresponding to job is
+        loaded.
+        :param dict data: Dataset data, corresponding to a row in the datasets
+        database table. If not given, retrieved from database depending on key.
+        :param db:  Database connection
+        :param str parent:  Only when creating a new dataset. Parent dataset
+        key to which the one being created is a child.
+        :param str extension: Only when creating a new dataset. Extension of
+        dataset result file.
+        :param str type: Only when creating a new dataset. Type of the dataset,
+        corresponding to the type property of a processor class.
+        :param bool is_private: Only when creating a new dataset. Whether the
+        dataset is private or public.
+        :param str owner: Only when creating a new dataset. The user name of
+        the dataset's creator.
+        :param modules: Module cache. If not given, will be loaded when needed
+        (expensive). Used to figure out what processors are compatible with
+        this dataset.
+        """
+        self.db = db
 
-		# Ensure mutable attributes are set in __init__ as they are unique to each DataSet
-		self.data = {}
-		self.parameters = {}
-		self.available_processors = {}
-		self.genealogy = []
-		self.staging_areas = []
-		self.modules = modules
+        # Ensure mutable attributes are set in __init__ as they are unique to each DataSet
+        self.data = {}
+        self.parameters = {}
+        self.available_processors = {}
+        self.genealogy = []
+        self.staging_areas = []
+        self.modules = modules
 
         if key is not None:
             self.key = key
@@ -121,10 +121,10 @@ class DataSet(FourcatModule):
                     % key
                 )
 
-		elif job is not None:
-			current = self.db.fetchone("SELECT * FROM datasets WHERE (parameters::json->>'job')::text = %s", (str(job),))
-			if not current:
-				raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
+        elif job is not None:
+            current = self.db.fetchone("SELECT * FROM datasets WHERE (parameters::json->>'job')::text = %s", (str(job),))
+            if not current:
+                raise DataSetNotFoundException("DataSet() requires a valid job ID for its 'job' argument")
 
             self.key = current["key"]
         elif data is not None:
@@ -156,37 +156,37 @@ class DataSet(FourcatModule):
                 (self.key, query),
             )
 
-		if current:
-			self.data = current
-			self.parameters = json.loads(self.data["parameters"])
-			self.annotation_fields = json.loads(self.data["annotation_fields"]) \
-				if self.data.get("annotation_fields") else {}
-			self.is_new = False
-		else:
-			self.data = {"type": type}  # get_own_processor needs this
-			own_processor = self.get_own_processor()
-			version = get_software_commit(own_processor)
-			self.data = {
-				"key": self.key,
-				"query": self.get_label(parameters, default=type),
-				"parameters": json.dumps(parameters),
-				"result_file": "",
-				"creator": owner,
-				"status": "",
-				"type": type,
-				"timestamp": int(time.time()),
-				"is_finished": False,
-				"is_private": is_private,
-				"software_version": version[0],
-				"software_source": version[1],
-				"software_file": "",
-				"num_rows": 0,
-				"progress": 0.0,
-				"key_parent": parent,
-				"annotation_fields": "{}"
-			}
-			self.parameters = parameters
-			self.annotation_fields = {}
+        if current:
+            self.data = current
+            self.parameters = json.loads(self.data["parameters"])
+            self.annotation_fields = json.loads(self.data["annotation_fields"]) \
+                if self.data.get("annotation_fields") else {}
+            self.is_new = False
+        else:
+            self.data = {"type": type}  # get_own_processor needs this
+            own_processor = self.get_own_processor()
+            version = get_software_commit(own_processor)
+            self.data = {
+                "key": self.key,
+                "query": self.get_label(parameters, default=type),
+                "parameters": json.dumps(parameters),
+                "result_file": "",
+                "creator": owner,
+                "status": "",
+                "type": type,
+                "timestamp": int(time.time()),
+                "is_finished": False,
+                "is_private": is_private,
+                "software_version": version[0],
+                "software_source": version[1],
+                "software_file": "",
+                "num_rows": 0,
+                "progress": 0.0,
+                "key_parent": parent,
+                "annotation_fields": "{}"
+            }
+            self.parameters = parameters
+            self.annotation_fields = {}
 
             self.db.insert("datasets", data=self.data)
             self.refresh_owners()
@@ -218,14 +218,14 @@ class DataSet(FourcatModule):
         method returns a path, a file with the complete results for this dataset
         will exist at that location.
 
-		:return: A path to the results file, 'empty_file', or `None`
-		"""
-		if self.data["is_finished"] and self.data["num_rows"] > 0:
-			return self.get_results_path()
-		elif self.data["is_finished"] and self.data["num_rows"] == 0:
-			return 'empty'
-		else:
-			return None
+        :return: A path to the results file, 'empty_file', or `None`
+        """
+        if self.data["is_finished"] and self.data["num_rows"] > 0:
+            return self.get_results_path()
+        elif self.data["is_finished"] and self.data["num_rows"] == 0:
+            return 'empty'
+        else:
+            return None
 
     def get_results_path(self):
         """
@@ -235,12 +235,12 @@ class DataSet(FourcatModule):
         data, but may not do so yet. Use this to get the location to write
         generated results to.
 
-		:return Path:  A path to the results file
-		"""
-		# alas we need to instantiate a config reader here - no way around it
-		if not self.folder:
-			self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
-		return self.folder.joinpath(self.data["result_file"])
+        :return Path:  A path to the results file
+        """
+        # alas we need to instantiate a config reader here - no way around it
+        if not self.folder:
+            self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+        return self.folder.joinpath(self.data["result_file"])
 
     def get_results_folder_path(self):
         """
@@ -248,9 +248,9 @@ class DataSet(FourcatModule):
 
         Returns a path that may not yet be created
 
-		:return Path:  A path to the results file
-		"""
-		return self.get_results_path().parent.joinpath("folder_" + self.key)
+        :return Path:  A path to the results file
+        """
+        return self.get_results_path().parent.joinpath("folder_" + self.key)
 
     def get_log_path(self):
         """
@@ -920,12 +920,12 @@ class DataSet(FourcatModule):
 
             child.update_children(**kwargs)
 
-	def is_finished(self):
-		"""
-		Check if dataset is finished
-		:return bool:
-		"""
-		return bool(self.data["is_finished"])
+    def is_finished(self):
+        """
+        Check if dataset is finished
+        :return bool:
+        """
+        return bool(self.data["is_finished"])
 
     def is_rankable(self, multiple_items=True):
         """
@@ -1336,15 +1336,15 @@ class DataSet(FourcatModule):
             file = query_bit + "-" + self.data["key"]
             file = re.sub(r"[-]+", "-", file)
 
-		self.data["result_file"] = file + "." + extension.lower()
-		index = 1
-		while self.get_results_path().is_file():
-			self.data["result_file"] = file + "-" + str(index) + "." + extension.lower()
-			index += 1
+        self.data["result_file"] = file + "." + extension.lower()
+        index = 1
+        while self.get_results_path().is_file():
+            self.data["result_file"] = file + "-" + str(index) + "." + extension.lower()
+            index += 1
 
-		updated = self.db.update("datasets", where={"query": self.data["query"], "key": self.data["key"]},
-								 data={"result_file": self.data["result_file"]})
-		return updated > 0
+        updated = self.db.update("datasets", where={"query": self.data["query"], "key": self.data["key"]},
+                                 data={"result_file": self.data["result_file"]})
+        return updated > 0
 
     def get_key(self, query, parameters, parent="", time_offset=0):
         """
@@ -1703,16 +1703,16 @@ class DataSet(FourcatModule):
         Returns a string representing this dataset's genealogy that may be used
         to uniquely identify it.
 
-		:return str: Nav link
-		"""
-		if self.genealogy:
-			return ",".join([dataset.key for dataset in self.genealogy])
-		elif not self.key_parent:
-			return self.key
-		else:
-			# Collect keys only, start at the bottom
-			genealogy = [self.key_parent]
-			key_parent = genealogy[-1]
+        :return str: Nav link
+        """
+        if self.genealogy:
+            return ",".join([dataset.key for dataset in self.genealogy])
+        elif not self.key_parent:
+            return self.key
+        else:
+            # Collect keys only, start at the bottom
+            genealogy = [self.key_parent]
+            key_parent = genealogy[-1]
 
             while key_parent:
                 try:
@@ -1734,22 +1734,22 @@ class DataSet(FourcatModule):
             genealogy.append(self.key)
             return ",".join(genealogy)
 
-	def get_compatible_processors(self, config=None):
-		"""
-		Get list of processors compatible with this dataset
+    def get_compatible_processors(self, config=None):
+        """
+        Get list of processors compatible with this dataset
 
         Checks whether this dataset type is one that is listed as being accepted
         by the processor, for each known type: if the processor does not
         specify accepted types (via the `is_compatible_with` method), it is
         assumed it accepts any top-level datasets
 
-		:param ConfigManager|None config:  Configuration reader to determine
-		compatibility through. This may not be the same reader the dataset was
-		instantiated with, e.g. when checking whether some other user should
-		be able to run processors on this dataset.
-		:return dict:  Compatible processors, `name => class` mapping
-		"""
-		processors = self.modules.processors
+        :param ConfigManager|None config:  Configuration reader to determine
+        compatibility through. This may not be the same reader the dataset was
+        instantiated with, e.g. when checking whether some other user should
+        be able to run processors on this dataset.
+        :return dict:  Compatible processors, `name => class` mapping
+        """
+        processors = self.modules.processors
 
         available = {}
         for processor_type, processor in processors.items():
@@ -1762,12 +1762,12 @@ class DataSet(FourcatModule):
             ):
                 continue
 
-			# consider a processor compatible if its is_compatible_with
-			# method returns True *or* if it has no explicit compatibility
-			# check and this dataset is top-level (i.e. has no parent)
-			if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
-					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, config=config)):
-				available[processor_type] = processor
+            # consider a processor compatible if its is_compatible_with
+            # method returns True *or* if it has no explicit compatibility
+            # check and this dataset is top-level (i.e. has no parent)
+            if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
+                    or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, config=config)):
+                available[processor_type] = processor
 
         return available
 
@@ -1799,9 +1799,9 @@ class DataSet(FourcatModule):
 
             return self._queue_position
 
-	def get_own_processor(self):
-		"""
-		Get the processor class that produced this dataset
+    def get_own_processor(self):
+        """
+        Get the processor class that produced this dataset
 
         :return:  Processor class, or `None` if not available.
         """
@@ -1809,21 +1809,21 @@ class DataSet(FourcatModule):
 
         return self.modules.processors.get(processor_type)
 
-	def get_available_processors(self, config=None, exclude_hidden=False):
-		"""
-		Get list of processors that may be run for this dataset
+    def get_available_processors(self, config=None, exclude_hidden=False):
+        """
+        Get list of processors that may be run for this dataset
 
         Returns all compatible processors except for those that are already
         queued or finished and have no options. Processors that have been
         run but have options are included so they may be run again with a
         different configuration
 
-		:param ConfigManager|None config:  Configuration reader to determine
-		compatibility through. This may not be the same reader the dataset was
-		instantiated with, e.g. when checking whether some other user should
-		be able to run processors on this dataset.
-		:param bool exclude_hidden:  Exclude processors that should be displayed
-		in the UI? If `False`, all processors are returned.
+        :param ConfigManager|None config:  Configuration reader to determine
+        compatibility through. This may not be the same reader the dataset was
+        instantiated with, e.g. when checking whether some other user should
+        be able to run processors on this dataset.
+        :param bool exclude_hidden:  Exclude processors that should be displayed
+        in the UI? If `False`, all processors are returned.
 
         :return dict:  Available processors, `name => properties` mapping
         """
@@ -1836,16 +1836,16 @@ class DataSet(FourcatModule):
                 if not exclude_hidden or not processor.is_hidden
             }
 
-		processors = self.get_compatible_processors(config=config)
+        processors = self.get_compatible_processors(config=config)
 
         for analysis in self.get_children(update=True):
             if analysis.type not in processors:
                 continue
 
-			if not processors[analysis.type].get_options(config=config):
-				# No variable options; this processor has been run so remove
-				del processors[analysis.type]
-				continue
+            if not processors[analysis.type].get_options(config=config):
+                # No variable options; this processor has been run so remove
+                del processors[analysis.type]
+                continue
 
             if exclude_hidden and processors[analysis.type].is_hidden:
                 del processors[analysis.type]
@@ -1865,11 +1865,11 @@ class DataSet(FourcatModule):
 
         :param Job job:  The job that will run this dataset
 
-		:todo: If the job column ever gets used, make sure it always contains
-		       a valid value, rather than silently failing this method.
-		"""
-		if type(job) is not Job:
-			raise TypeError("link_job requires a Job object as its argument")
+        :todo: If the job column ever gets used, make sure it always contains
+               a valid value, rather than silently failing this method.
+        """
+        if type(job) is not Job:
+            raise TypeError("link_job requires a Job object as its argument")
 
         if "id" not in job.data:
             try:
@@ -1927,28 +1927,28 @@ class DataSet(FourcatModule):
             return False
         return True
 
-	def is_expiring(self, config):
-		"""
-		Determine if dataset is set to expire
+    def is_expiring(self, config):
+        """
+        Determine if dataset is set to expire
 
         Similar to `is_expired`, but checks if the dataset will be deleted in
         the future, not if it should be deleted right now.
 
         :param ConfigManager config:  Configuration reader (context-aware)
-		:return bool|int:  `False`, or the expiration date as a Unix timestamp.
-		"""
-		# has someone opted out of deleting this?
-		if self.parameters.get("keep"):
-			return False
+        :return bool|int:  `False`, or the expiration date as a Unix timestamp.
+        """
+        # has someone opted out of deleting this?
+        if self.parameters.get("keep"):
+            return False
 
         # is this dataset explicitly marked as expiring after a certain time?
         if self.parameters.get("expires-after"):
             return self.parameters.get("expires-after")
 
-		# is the data source configured to have its datasets expire?
-		expiration = config.get("datasources.expiration", {})
-		if not expiration.get(self.parameters.get("datasource")):
-			return False
+        # is the data source configured to have its datasets expire?
+        expiration = config.get("datasources.expiration", {})
+        if not expiration.get(self.parameters.get("datasource")):
+            return False
 
         # is there a timeout for this data source?
         if expiration.get(self.parameters.get("datasource")).get("timeout"):
@@ -1958,19 +1958,19 @@ class DataSet(FourcatModule):
 
         return False
 
-	def is_expired(self, config):
-		"""
-		Determine if dataset should be deleted
+    def is_expired(self, config):
+        """
+        Determine if dataset should be deleted
 
         Datasets can be set to expire, but when they should be deleted depends
         on a number of factor. This checks them all.
 
         :param ConfigManager config:  Configuration reader (context-aware)
-		:return bool:
-		"""
-		# has someone opted out of deleting this?
-		if not self.is_expiring(config):
-			return False
+        :return bool:
+        """
+        # has someone opted out of deleting this?
+        if not self.is_expiring(config):
+            return False
 
         # is this dataset explicitly marked as expiring after a certain time?
         future = (
@@ -1982,10 +1982,10 @@ class DataSet(FourcatModule):
         ):
             return True
 
-		# is the data source configured to have its datasets expire?
-		expiration = config.get("datasources.expiration", {})
-		if not expiration.get(self.parameters.get("datasource")):
-			return False
+        # is the data source configured to have its datasets expire?
+        expiration = config.get("datasources.expiration", {})
+        if not expiration.get(self.parameters.get("datasource")):
+            return False
 
         # is the dataset older than the set timeout?
         if expiration.get(self.parameters.get("datasource")).get("timeout"):
@@ -2058,17 +2058,17 @@ class DataSet(FourcatModule):
         """
         Gets the 4CAT frontend URL of a dataset file.
 
-		Uses the FlaskConfig attributes (i.e., SERVER_NAME and
-		SERVER_HTTPS) plus hardcoded '/result/'.
-		TODO: create more dynamic method of obtaining url.
-		"""
-		filename = self.get_results_path().name
+        Uses the FlaskConfig attributes (i.e., SERVER_NAME and
+        SERVER_HTTPS) plus hardcoded '/result/'.
+        TODO: create more dynamic method of obtaining url.
+        """
+        filename = self.get_results_path().name
 
-		# we cheat a little here by using the modules' config reader, but these
-		# will never be context-dependent values anyway
-		url_to_file = ('https://' if self.modules.config.get("flask.https") else 'http://') + \
-						self.modules.config.get("flask.server_name") + '/result/' + filename
-		return url_to_file
+        # we cheat a little here by using the modules' config reader, but these
+        # will never be context-dependent values anyway
+        url_to_file = ('https://' if self.modules.config.get("flask.https") else 'http://') + \
+                        self.modules.config.get("flask.server_name") + '/result/' + filename
+        return url_to_file
 
     def warn_unmappable_item(
         self, item_count, processor=None, error_message=None, warn_admins=True
@@ -2112,7 +2112,7 @@ class DataSet(FourcatModule):
         Whether this dataset has annotations
         """
 
-		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s LIMIT 1", (self.key,))
+        annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s LIMIT 1", (self.key,))
 
         return True if annotation else False
 
@@ -2166,7 +2166,7 @@ class DataSet(FourcatModule):
         Annotation fields are metadata that describe a type of annotation (with info on `id`, `type`, etc.).
         """
 
-		return True if self.annotation_fields else False
+        return True if self.annotation_fields else False
 
     def get_annotation_field_labels(self) -> list:
         """
@@ -2176,7 +2176,7 @@ class DataSet(FourcatModule):
         :return list: List of annotation field labels.
         """
 
-		annotation_fields = self.annotation_fields
+        annotation_fields = self.annotation_fields
 
         if not annotation_fields:
             return []
@@ -2206,9 +2206,9 @@ class DataSet(FourcatModule):
         if not annotations:
             return 0
 
-		count = 0
-		annotation_fields = self.annotation_fields
-		annotation_labels = self.get_annotation_field_labels()
+        count = 0
+        annotation_fields = self.annotation_fields
+        annotation_labels = self.get_annotation_field_labels()
 
         # Add some dataset data to annotations, if not present
         for annotation_data in annotations:
@@ -2246,13 +2246,13 @@ class DataSet(FourcatModule):
             Annotation(data=annotation_data, db=self.db)
             count += 1
 
-		# Save annotation fields if things changed
-		if annotation_fields != self.annotation_fields:
-			self.save_annotation_fields(annotation_fields)
+        # Save annotation fields if things changed
+        if annotation_fields != self.annotation_fields:
+            self.save_annotation_fields(annotation_fields)
 
-		# columns may have changed if there are new annotations
-		self._cached_columns = None
-		return count
+        # columns may have changed if there are new annotations
+        self._cached_columns = None
+        return count
 
     def save_annotation_fields(self, new_fields: dict, add=False) -> int:
         """
@@ -2270,9 +2270,9 @@ class DataSet(FourcatModule):
 
         """
 
-		# Get existing annotation fields to see if stuff changed.
-		old_fields = self.annotation_fields
-		changes = False
+        # Get existing annotation fields to see if stuff changed.
+        old_fields = self.annotation_fields
+        changes = False
 
         # Do some validation
         # Annotation field must be valid JSON.
@@ -2330,10 +2330,10 @@ class DataSet(FourcatModule):
                 all_fields[field_id] = annotation_field
             new_fields = all_fields
 
-		# We're saving the new annotation fields as-is.
-		# Ordering of fields is preserved this way.
-		self.db.update("datasets", where={"key": self.key}, data={"annotation_fields": json.dumps(new_fields)})
-		self.annotation_fields = new_fields
+        # We're saving the new annotation fields as-is.
+        # Ordering of fields is preserved this way.
+        self.db.update("datasets", where={"key": self.key}, data={"annotation_fields": json.dumps(new_fields)})
+        self.annotation_fields = new_fields
 
         # If anything changed with the annotation fields, possibly update
         # existing annotations (e.g. to delete them or change their labels).
