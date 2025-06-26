@@ -504,6 +504,10 @@ article.result > section:first-child {
     min-width: 13em;
 }
 
+.processor-options .multichoice-wrapper.inline label {
+    min-width: 17em;
+}
+
 .processor-options .multichoice-wrapper label {
     display: block;
     margin-left: 1em;
@@ -514,6 +518,11 @@ article.result > section:first-child {
     content: '\2022';
     position: absolute;
     left: -.75em;
+}
+
+.processor-options .multichoice-wrapper.inline {
+    margin-top: .2em;
+    margin-bottom: .2em;
 }
 
 .processor-options .multichoice-wrapper.inline label {
@@ -645,8 +654,12 @@ article.result > section:first-child {
 .processor-option-wrap .annotation-explainer {
     font-size: 0.8em;
     margin-left: 1.5em;
-    flex-basis: 100%;
+    flex-basis: 50%;
     line-height: 1em;
+}
+
+.processor-option-wrap .annotation-explainer.after-multi {
+    margin: 0.2em 0 0em 0;
 }
 
 @keyframes child-blink {

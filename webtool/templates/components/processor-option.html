@@ -4,12 +4,15 @@
         {% if option_settings.type in ("toggle", "annotation") %}
             <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>
         {% endif %}
-        {% if option_settings.help %}
+        {% if option_settings.help and option_settings.type not in ("annotation", "annotations") %}
             {{ option_settings.help|markdown|safe }}
+        {% elif option_settings.type in ("annotation", "annotations") %}
+            {% if option_settings.type == "annotation" %}Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ option_settings.label }}</span> as annotations{% elif option_settings.type == "annotations" %} Add the following values as <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> annotations</span>{% endif %} to the {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset{% if option_settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (hidden in the Explorer, data for computational processing)</span>{% endif %}
         {% elif option_settings.type == "annotation" %}
-            Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ option_settings.label }}</span> as annotations to the {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset{% if option_settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (hidden in the Explorer, data for computational processing)</span>{% endif %}
+            {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset{% if option_settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (hidden in the Explorer, data for computational processing)</span>{% endif %}
         {% endif %}
     </label>
+    {% if option_settings.type in ("multi", "annotations") and "tooltip" in option_settings %}{% include 'components/processor-tooltip.html' %}{% endif %}
 
     {% if option_settings.type == "string" %}
         <input{% if option_settings.min or option_settings.max %} class="numeric"{% endif %} name="option-{{ option }}" value="{{ option_settings.default }}">
@@ -22,11 +25,11 @@
             <option value="{{ choice }}"{% if choice == option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
         {% endfor %}
         </select>
-    {% elif option_settings.type == "multi" %}
-        <div class="multichoice-wrapper{% if option_settings.inline %} inline{% endif %}" style="flex-basis: 100%;">
+    {% elif option_settings.type in ("multi", "annotations") %}
+        <div class="multichoice-wrapper{% if option_settings.inline or option_settings.type == "annotations" %} inline{% endif %}" style="flex-basis: 100%;">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
-                <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+                <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] | truncate(30, True, "...", 0) }}</option>
             {% endfor %}
             </select>
         </div>
@@ -50,16 +53,9 @@
             <input name="option-{{ option }}-max" type="hidden" value="-1">
         </div>
     {% endif %}
-    {% if "tooltip" in option_settings %}
-        {% set pid = uniqid() %}
-        <div class="processor-tooltip">
-            <button class="tooltip-trigger" aria-controls="tooltip-option-{{ pid }}" aria-label="Post-processor option details">?</button>
-            <p role="tooltip" id="tooltip-option-{{ pid }}">
-                {{ option_settings.tooltip }}
-            </p>
-        </div>
-    {% endif %}
+    {% if "tooltip" in option_settings and option_settings.type not in ("multi", "annotations") %}{% include 'components/processor-tooltip.html' %}{% endif %}
     {% if option_settings.type in ("annotation", "annotations") %}
-        <div class="annotation-explainer"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets" target="__blank">What are annotations?</a></div>
+        <div class="annotation-explainer {% if option_settings.type == "annotations" %}after-multi{% endif %}"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets" target="__blank">What are annotations?</a></div>
     {% endif %}
+
 </div>

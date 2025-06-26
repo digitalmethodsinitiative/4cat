@@ -1,5 +1,5 @@
 {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
-    {% if processor_options[option].type == "toggle" %}
+    {% if processor_options[option].type in ("toggle", "annotation") %}
         {% if item.parameters[option] %}<li><span class="property-badge">{{ option }}</span></li>{% endif %}
     {% else %}
         <li><span class="property-badge">{{ option }}=<!--
