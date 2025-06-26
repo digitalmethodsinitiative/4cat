@@ -876,7 +876,7 @@ class DataSet(FourcatModule):
         # delete annotation fields from other datasets that were created as part of this dataset
         for parent_dataset in self.get_genealogy():
             field_deleted = False
-            annotation_fields = parent_dataset.get_annotation_fields()
+            annotation_fields = parent_dataset.annotation_fields
             if annotation_fields:
                 for field_id in list(annotation_fields.keys()):
                     if annotation_fields[field_id].get("from_dataset", "") == self.key:
