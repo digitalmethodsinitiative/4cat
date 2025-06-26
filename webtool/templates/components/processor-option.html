@@ -55,7 +55,7 @@
     {% endif %}
     {% if "tooltip" in option_settings and option_settings.type not in ("multi", "annotations") %}{% include 'components/processor-tooltip.html' %}{% endif %}
     {% if option_settings.type in ("annotation", "annotations") %}
-        <div class="annotation-explainer {% if option_settings.type == "annotations" %}after-multi{% endif %}"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets" target="__blank">What are annotations?</a></div>
+        <div class="annotation-explainer {% if option_settings.type == "annotations" %}after-multi{% endif %}"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets#annotations" target="__blank">What are annotations?</a></div>
     {% endif %}
 
 </div>
