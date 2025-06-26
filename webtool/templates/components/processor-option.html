@@ -7,7 +7,7 @@
         {% if option_settings.help %}
             {{ option_settings.help|markdown|safe }}
         {% elif option_settings.type == "annotation" %}
-            Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ option_settings.label }}</span> as annotation to the {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset{% if option_settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (data for computational processing, hidden in the Explorer)</span>{% endif %}
+            Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ option_settings.label }}</span> as annotations to the {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset{% if option_settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (hidden in the Explorer, data for computational processing)</span>{% endif %}
         {% endif %}
     </label>
 
@@ -46,19 +46,18 @@
                    placeholder="dd-mm-yyyy"> to
             <input name="option-{{ option }}-max_proxy" class="input-time" type="date"
                    placeholder="dd-mm-yyyy"> <span class="red"></span>
-
             <input name="option-{{ option }}-min" type="hidden" value="-1">
             <input name="option-{{ option }}-max" type="hidden" value="-1">
         </div>
-{#    {% elif option_settings.type == "annotation" %}#}
-{#        <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>#}
     {% endif %}
     {% if "tooltip" in option_settings %}
         {% set pid = uniqid() %}
-        <button class="tooltip-trigger" aria-controls="tooltip-option-{{ pid }}" aria-label="Post-processor option details">?</button>
-    	<p role="tooltip" id="tooltip-option-{{ pid }}">
-            {{ option_settings.tooltip }}
-        </p>
+        <div class="processor-tooltip">
+            <button class="tooltip-trigger" aria-controls="tooltip-option-{{ pid }}" aria-label="Post-processor option details">?</button>
+            <p role="tooltip" id="tooltip-option-{{ pid }}">
+                {{ option_settings.tooltip }}
+            </p>
+        </div>
     {% endif %}
     {% if option_settings.type in ("annotation", "annotations") %}
         <div class="annotation-explainer"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets" target="__blank">What are annotations?</a></div>
