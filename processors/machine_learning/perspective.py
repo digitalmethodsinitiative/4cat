@@ -39,7 +39,7 @@ class Perspective(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, config=None):
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
 		options = {
 			"attributes": {
 				"type": UserInput.OPTION_MULTI,
@@ -55,9 +55,10 @@ class Perspective(BasicProcessor):
 				"default": ["TOXICITY"]
 			},
 			"save_annotations": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add attribute scores as annotations to the parent dataset.",
-				"default": True
+				"type": UserInput.OPTION_ANNOTATION,
+				"label": "toxicity scores",
+				"tooltip": "Add attribute scores as annotations to the parent dataset.",
+				"default": False
 			}
 		}
 
@@ -76,9 +77,8 @@ class Perspective(BasicProcessor):
 	def process(self):
 
 		api_key = self.parameters.get("api_key")
-
 		if not api_key:
-			api_key = config.get("api.google.api_key", user=self.owner)
+			api_key = self.config.get("api.google.api_key")
 		if not api_key:
 			self.dataset.finish_with_error("You need to provide a valid API key")
 			return
