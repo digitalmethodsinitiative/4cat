@@ -624,6 +624,12 @@ article.result > section:first-child {
     margin-right: 0.3em;
 }
 
+.processor-option-wrap .hidden-annotation-notice {
+    font-size: 0.8em;
+    margin-left: 0.3em;
+    color: var(--gray-darker);
+}
+
 .processor-option-wrap .annotation-explainer {
     font-size: 0.8em;
     margin-left: 1.5em;
