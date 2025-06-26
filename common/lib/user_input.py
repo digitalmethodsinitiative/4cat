@@ -62,6 +62,7 @@ class UserInput:
 
         :return dict:  Sanitised form input
         """
+        print("INPUT", input)
         from common.lib.helpers import convert_to_int
         parsed_input = {}
 
@@ -161,20 +162,6 @@ class UserInput:
 
                 parsed_input[option] = table_input
 
-            elif settings.get("type") == UserInput.OPTION_ANNOTATION:
-                print("AAAAAAAAAA")
-                # special case too, since if a checkbox is unchecked, it simply
-                # does not show up in the input
-                try:
-                    if option in input:
-                        # Toggle needs to be parsed
-                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
-                    else:
-                        # Toggle was left blank
-                        parsed_input[option] = False
-                except RequirementsNotMetException:
-                    pass
-
             elif option not in input:
                 # not provided? use default
                 parsed_input[option] = settings.get("default", None)
@@ -256,7 +243,7 @@ class UserInput:
             # these are structural form elements and can never return a value
             return None
 
-        elif input_type == UserInput.OPTION_TOGGLE:
+        elif input_type in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
             # simple boolean toggle
             if type(choice) is bool:
                 return choice
