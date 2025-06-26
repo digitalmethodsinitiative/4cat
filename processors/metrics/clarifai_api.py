@@ -27,7 +27,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
     """
     type = "clarifai-api"  # job type ID
     category = "Post metrics"  # category
-    title = "Clarifai API Analysis"  # title displayed in UI
+    title = "Clarifai API analysis"  # title displayed in UI
     description = "Use the Clarifai API to annotate images with tags and labels identified via machine learning. " \
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \
                   "requests will be credited by Clarifai to the owner of the API token you provide!"  # description displayed in UI
@@ -73,7 +73,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                        "See the model browser in processor references for more details on each model.",
             "options": {
                 "general-image-recognition": "General Concept Recognition (general-image-recognition)",
-                "apparel-recognition": "Clothing & Apparal (apparel-recognition)",
+                "apparel-recognition": "Clothing & Apparel (apparel-recognition)",
                 "color-recognition": "Dominant color recognition (color-recognition)",
                 "celebrity-face-detection": "Celebrity faces (celebrity-face-detection)",
                 "food-item-recognition": "Food items (food-item-recognition)",
@@ -84,9 +84,10 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "default": ["general-image-recognition"]
         },
         "save_annotations": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Add labels to top dataset",
-            "default": False
+            "type": UserInput.OPTION_ANNOTATION,
+            "label": "labels",
+            "default": False,
+            "tooltip": "Every label will receive its own annotation"
         },
         "annotation_threshold": {
             "type": UserInput.OPTION_TEXT,
@@ -109,10 +110,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
         for the image, and one with the amount of times the image was used
         """
         api_key = self.parameters.get("api_key")
-        #application_id = self.parameters.get("application_id")
         save_annotations = self.parameters.get("save_annotations", False)
         annotation_threshold = float(self.parameters.get("annotation_threshold", 0))
-
 
         models = self.parameters.get("models")
         if type(models) is str:
