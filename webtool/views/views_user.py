@@ -149,9 +149,9 @@ def autologin_whitelist():
 
     # autologin is a special user that is automatically logged in for this
     # request only if the hostname or IP matches the whitelist
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.hostnames", [])]):
-        autologin_user = User.get_by_name(g.db, "autologin")
-        autologin_user.with_config(g.config)
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in current_app.fourcat_config.get("flask.autologin.hostnames", [])]):
+        autologin_user = User.get_by_name(current_app.db, "autologin")
+        autologin_user.with_config(ConfigWrapper(current_app.fourcat_config, user=None, request=request))
         if not autologin_user:
             # this user should exist by default
             abort(500)
@@ -180,7 +180,7 @@ def exempt_from_limit():
     except (socket.herror, socket.timeout):
         pass  # no hostname for this address
 
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.api", [])]):
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in current_app.fourcat_config.get("flask.autologin.api", [])]):
         return True
 
     return False
