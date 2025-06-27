@@ -284,7 +284,8 @@ if args.release or args.branch:
 	if fetch.returncode != 0:
 		if "fatal: could not read Username" in fetch.stderr:
 			# git requiring login
-			from common.config_manager import config
+			from common.config_manager import CoreConfigManager
+			config = CoreConfigManager()
 			if config.get("USING_DOCKER"):
 				# update git config setting
 				unset_authorization = subprocess.run(oslex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
@@ -371,7 +372,8 @@ else:
 # ---------------------------------------------
 
 try:
-	from common.config_manager import config
+	from common.config_manager import CoreConfigManager
+	config = CoreConfigManager()
 except ImportError:
 	config = None
 

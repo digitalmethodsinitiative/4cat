@@ -9,7 +9,6 @@ import time
 import csv
 import re
 
-from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
 
@@ -205,7 +204,7 @@ class DataSet(FourcatModule):
 		"""
 		# alas we need to instantiate a config reader here - no way around it
 		if not self.folder:
-			self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+			self.folder = self.modules.config.get('PATH_ROOT').joinpath(self.modules.config.get('PATH_DATA'))
 		return self.folder.joinpath(self.data["result_file"])
 
 	def get_results_folder_path(self):

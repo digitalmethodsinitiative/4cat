@@ -29,11 +29,13 @@ from calendar import monthrange
 from packaging import version
 from PIL import Image
 
-from common.config_manager import config
+from common.config_manager import CoreConfigManager
 from common.lib.user_input import UserInput
 __all__ = ("UserInput",)
 
-def init_datasource(database, logger, queue, name):
+core_config = CoreConfigManager()
+
+def init_datasource(database, logger, queue, name, config):
     """
     Initialize data source
 
@@ -44,6 +46,7 @@ def init_datasource(database, logger, queue, name):
     :param Logger logger:  Log handler
     :param JobQueue queue:  Job Queue instance
     :param string name:  ID of datasource that is being initialised
+    :param config:  Configuration reader
     """
     pass
 
@@ -147,7 +150,7 @@ def get_git_branch():
     repository or git is not installed an empty string is returned.
     """
     try:
-        root_dir = str(config.get('PATH_ROOT').resolve())
+        root_dir = str(core_config.get('PATH_ROOT').resolve())
         branch = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
@@ -196,16 +199,16 @@ def get_software_commit(worker=None):
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
             relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
-            working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
+            working_dir = str(core_config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
             git_cmd = f"git -C {oslex.quote(working_dir)} rev-parse --show-toplevel"
             repo_level = subprocess.run(oslex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
+            if Path(repo_level.stdout.decode("utf-8")) == core_config.get("PATH_ROOT"):
                 # not its own repository
                 return ("", "")
 
         else:
-            working_dir = str(config.get("PATH_ROOT").resolve())
+            working_dir = str(core_config.get("PATH_ROOT").resolve())
 
         show = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if show.returncode != 0:
@@ -236,7 +239,7 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = config.get("PATH_ROOT").joinpath("config/.current-version")
+    current_version_file = core_config.get("PATH_ROOT").joinpath("config/.current-version")
     if not current_version_file.exists():
         return ""
 
@@ -300,7 +303,7 @@ def find_extensions():
     :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
     dictionary, and a list of (str) errors encountered while loading
     """
-    extension_path = config.get("PATH_ROOT").joinpath("extensions")
+    extension_path = core_config.get("PATH_ROOT").joinpath("extensions")
     errors = []
     if not extension_path.exists() or not extension_path.is_dir():
         return [], None
@@ -620,6 +623,7 @@ def call_api(action, payload=None, wait_for_response=True):
     """
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
+    config = CoreConfigManager()
     try:
         connection.connect((config.get('API_HOST'), config.get('API_PORT')))
     except ConnectionRefusedError:

@@ -38,7 +38,7 @@ class WorkerManager:
 		self.db = database
 		self.log = logger
 		self.modules = modules
-		self.proxy_delegator = DelegatedRequestHandler(self.log)
+		self.proxy_delegator = DelegatedRequestHandler(self.log, self.modules.config)
 
 		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)
@@ -175,7 +175,7 @@ class WorkerManager:
 			if datasource + "-search" not in self.modules.workers and datasource + "-import" not in self.modules.workers:
 				self.log.error("No search worker defined for datasource %s or its modules are missing. Search queries will not be executed." % datasource)
 
-			self.modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource)
+			self.modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource, self.modules.config)
 
 	def abort(self, signal=None, stack=None):
 		"""

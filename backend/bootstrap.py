@@ -11,9 +11,12 @@ from common.lib.database import Database
 from common.lib.module_loader import ModuleCollector
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
+from common.config_manager import ConfigManager
 
 def run(as_daemon=True, log_level="INFO"):
-	from common.config_manager import config
+	# initialise configuration reader
+	config = ConfigManager()
+
 	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
 
 	if as_daemon:
@@ -63,6 +66,10 @@ def run(as_daemon=True, log_level="INFO"):
 	db.commit()
 	queue.release_all()
 
+	# ensure database consistency for settings table
+	config.with_db(db)
+	config.ensure_database()
+
 	# test memcache and clear upon backend restart
 	if config.get("MEMCACHE_SERVER"):
 		if config.memcache:
@@ -72,9 +79,6 @@ def run(as_daemon=True, log_level="INFO"):
 			log.warning("Memcache server address configured, but connection could not be initialized. Configuration cache inactive.")
 
 	log.load_webhook(config)
-	# ensure database consistency for settings table
-	config.with_db(db)
-	config.ensure_database()
 
 	# load 4CAT modules and cache the results
 	modules = ModuleCollector(config=config, write_cache=True)

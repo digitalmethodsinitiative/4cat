@@ -20,8 +20,10 @@ import re
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
-from common.config_manager import config
+from common.config_manager import CoreConfigManager
 from chan_flags import get_country_name
+
+config = CoreConfigManager()
 
 
 def commit(posts, post_fields, db, datasource, fast=False):

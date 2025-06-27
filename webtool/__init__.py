@@ -27,7 +27,7 @@ from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
 from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
 
-from common.config_manager import config, ConfigWrapper  # noqa: E402
+from common.config_manager import ConfigManager, ConfigWrapper  # noqa: E402
 from common.lib.database import Database  # noqa: E402
 from common.lib.logger import Logger  # noqa: E402
 from common.lib.queue import JobQueue  # noqa: E402
@@ -39,6 +39,7 @@ from webtool.lib.openapi_collector import OpenAPICollector  # noqa: E402
 
 # make a web app!
 app = Flask(__name__)
+config = ConfigManager()
 
 # this ensures that HTTPS is properly applied to built URLs even if the app
 # is running behind a proxy

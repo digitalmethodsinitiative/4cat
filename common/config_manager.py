@@ -174,7 +174,6 @@ class ConfigManager:
 
         return None
 
-
     def ensure_database(self):
         """
         Ensure the database is in sync with the config definition
@@ -697,4 +696,16 @@ class ConfigWrapper:
             raise AttributeError(f"'{self.__name__}' object has no attribute '{item}'")
 
 
-config = ConfigManager()
+class CoreConfigManager(ConfigManager):
+    """
+    A configuration reader that can only read from core settings
+
+    Can be used in thread-unsafe context and when no database is present.
+    """
+    def with_db(self, db=None):
+        """
+        Raise a RuntimeError when trying to link a database connection
+
+        :param db:
+        """
+        raise RuntimeError("Trying to read non-core configuration value from a CoreConfigManager")

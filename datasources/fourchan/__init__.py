@@ -7,7 +7,6 @@ Initialize 4chan data source
 # backend helpers library.
 from common.lib.helpers import init_datasource as base_init_datasource
 
-from common.config_manager import config
 # Internal identifier for this data source
 #
 # This name is to be used whenever referring to the data source or a property
@@ -19,7 +18,7 @@ from common.config_manager import config
 DATASOURCE = "fourchan"
 NAME = "4chan"
 
-def init_datasource(database, logger, queue, name):
+def init_datasource(database, logger, queue, name, config):
 	"""
 	Initialise datasource
 

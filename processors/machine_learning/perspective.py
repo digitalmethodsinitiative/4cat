@@ -9,7 +9,6 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from googleapiclient import discovery
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 class Perspective(BasicProcessor):
 	"""
@@ -77,7 +76,7 @@ class Perspective(BasicProcessor):
 		api_key = self.parameters.get("api_key")
 		self.dataset.delete_parameter("api_key")  # sensitive, delete after use
 		if not api_key:
-			api_key = config.get("api.google.api_key", user=self.owner)
+			api_key = self.config.get("api.google.api_key")
 		if not api_key:
 			self.dataset.finish_with_error("You need to provide a valid API key")
 			return

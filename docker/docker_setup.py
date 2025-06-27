@@ -89,8 +89,10 @@ if __name__ == "__main__":
         print('Created config/config.ini file')
 
         # Ensure filepaths exist
-        from common.config_manager import config
+        from common.config_manager import ConfigManager()
         from common.lib.database import Database
+
+        config = ConfigManager()
         config.with_db(Database(logger=None, appname="docker-setup",
 				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
 

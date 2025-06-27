@@ -16,7 +16,6 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-from common.config_manager import config
 from common.lib.helpers import UserInput
 from common.lib.dataset import DataSet
 from backend.lib.processor import BasicProcessor
@@ -78,7 +77,7 @@ class ImageDownloader(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		"""
 		Get processor options
 
@@ -89,14 +88,12 @@ class ImageDownloader(BasicProcessor):
 
 		:param DataSet parent_dataset:  An object representing the dataset that
 		the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
+		:param config:  Configuration reader
 		"""
 		options = cls.options
 
 		# Update the amount max and help from config
-		max_number_images = int(config.get('image-downloader.max', 1000, user=user))
+		max_number_images = int(config.get('image-downloader.max', 1000))
 		if max_number_images != 0:
 			options['amount']['help'] = f"No. of images (max {max_number_images})"
 			options['amount']['max'] = max_number_images
@@ -245,7 +242,7 @@ class ImageDownloader(BasicProcessor):
 				md5.update(base64.b64decode(item["image_md5"]))
 				extension = item["image_file"].split(".")[-1]
 
-				local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
+				local_path = Path(self.config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
 				if local_path.exists():
 					local_path = str(local_path.absolute())
 					item_urls.add(local_path)
@@ -546,8 +543,8 @@ class ImageDownloader(BasicProcessor):
 		time.sleep(rate_limit)
 
 		# cache the image for later, if configured so
-		if config.get('PATH_IMAGES'):
-			local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
+		if self.config.get('PATH_IMAGES'):
+			local_path = Path(self.config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
 			with open(local_path, 'wb') as outfile:
 				for chunk in image.iter_content(1024):
 					outfile.write(chunk)
