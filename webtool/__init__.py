@@ -47,12 +47,15 @@ proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
 app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
 # set up logger for error logging etc
+log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
 if config.get("USING_DOCKER"):
     # in Docker it is useful to have two separate files - since 4CAT is also
     # in two separate containers
-    log = Logger(logger_name='4cat-frontend', filename='frontend_4cat.log')
+    log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("frontend_4cat.log"))
 else:
-    log = Logger(logger_name='4cat-frontend')
+    log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("4cat.log"))
+
+logger.load_webhook(config)
 
 # set up logging for Gunicorn
 # this redirects Gunicorn log messages to the logger instantiated above - more

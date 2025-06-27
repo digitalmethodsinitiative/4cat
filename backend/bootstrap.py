@@ -47,13 +47,15 @@ def run(as_daemon=True, log_level="INFO"):
 		print(indent + "+---------------------------------------------------------------+\n\n")
 
 	# load everything
+	log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
 	if config.get("USING_DOCKER"):
 		as_daemon = True
 		# Rename log if Docker setup
-		log = Logger(output=True, filename='backend_4cat.log', log_level=log_level)
+		log = Logger(output=True, log_path=log_folder.joinpath("backend_4cat.log"), log_level=log_level)
 	else:
-		log = Logger(output=not as_daemon, filename='4cat.log', log_level=log_level)
+		log = Logger(output=not as_daemon, log_path=log_folder.joinpath("backend_4cat.log"), log_level=log_level)
 
+	log.load_webhook(config)
 	log.info("4CAT Backend started, logger initialised")
 	db = Database(logger=log, appname="main",
 				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
