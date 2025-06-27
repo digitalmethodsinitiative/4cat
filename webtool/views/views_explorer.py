@@ -70,7 +70,7 @@ def explorer_dataset(dataset_key: str, page=1):
 			try:
 				from_datasets[key] = DataSet(key=key, db=g.db, modules=g.modules)
 			except DataSetException:
-				return error(404, error="Dataset not found.")
+				return error(404, error="Processor-generated dataset not found.")
 
 	# The amount of posts to show on a page
 	posts_per_page = g.config.get("explorer.posts_per_page", 50)
