@@ -243,17 +243,17 @@ def get_software_version():
     with current_version_file.open() as infile:
         return infile.readline().strip()
 
-def get_github_version(timeout=5):
+def get_github_version(repo_url, timeout=5):
     """
     Get latest release tag version from GitHub
 
     Will raise a ValueError if it cannot retrieve information from GitHub.
 
+    :param str repo_url:  GitHub repository URL
     :param int timeout:  Timeout in seconds for HTTP request
 
     :return tuple:  Version, e.g. `1.26`, and release URL.
     """
-    repo_url = config.get("4cat.github_url")
     if not repo_url.endswith("/"):
         repo_url += "/"
 
@@ -1020,7 +1020,7 @@ def add_notification(db, user, notification, expires=None, allow_dismiss=True):
     }, safe=True)
 
 
-def send_email(recipient, message):
+def send_email(recipient, message, mail_config):
     """
     Send an e-mail using the configured SMTP settings
 
@@ -1029,28 +1029,29 @@ def send_email(recipient, message):
 
     :param list recipient:  Recipient e-mail addresses
     :param MIMEMultipart message:  Message to send
+    :param mail_config:  Configuration reader
     """
     # Create a secure SSL context
     context = ssl.create_default_context()
 
     # Decide which connection type
-    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get(
-            'mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'),
-                                                   port=config.get('mail.port', 0)) as server:
-        if config.get('mail.ssl') == 'tls':
+    with smtplib.SMTP_SSL(mail_config.get('mail.server'), port=mail_config.get('mail.port', 0), context=context) if mail_config.get(
+            'mail.ssl') == 'ssl' else smtplib.SMTP(mail_config.get('mail.server'),
+                                                   port=mail_config.get('mail.port', 0)) as server:
+        if mail_config.get('mail.ssl') == 'tls':
             # smtplib.SMTP adds TLS context here
             server.starttls(context=context)
 
         # Log in
-        if config.get('mail.username') and config.get('mail.password'):
+        if mail_config.get('mail.username') and mail_config.get('mail.password'):
             server.ehlo()
-            server.login(config.get('mail.username'), config.get('mail.password'))
+            server.login(mail_config.get('mail.username'), mail_config.get('mail.password'))
 
         # Send message
         if type(message) is str:
-            server.sendmail(config.get('mail.noreply'), recipient, message)
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message)
         else:
-            server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message.as_string())
 
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):

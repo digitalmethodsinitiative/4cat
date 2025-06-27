@@ -371,7 +371,7 @@ def reject_user():
     message.attach(MIMEText(html_message, "html"))
 
     try:
-        send_email([email_address], message)
+        send_email([email_address], message, g.config)
     except (smtplib.SMTPException, ConnectionRefusedError) as e:
         return render_template("error.html", message="Could not send e-mail to %s: %s" % (email_address, e),
                                title="Error sending rejection")

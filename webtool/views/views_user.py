@@ -419,7 +419,7 @@ def request_access():
             message.attach(MIMEText(mail, "html"))
 
             try:
-                send_email(g.config.get('mail.admin_email'), message)
+                send_email(g.config.get('mail.admin_email'), message, g.config)
                 return render_template("error.html", title="Thank you",
                                        message="Your request has been submitted; we'll try to answer it as soon as possible.")
             except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout):

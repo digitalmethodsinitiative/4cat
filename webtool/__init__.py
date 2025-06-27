@@ -55,7 +55,7 @@ if config.get("USING_DOCKER"):
 else:
     log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("4cat.log"))
 
-logger.load_webhook(config)
+log.load_webhook(config)
 
 # set up logging for Gunicorn
 # this redirects Gunicorn log messages to the logger instantiated above - more

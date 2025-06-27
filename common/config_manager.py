@@ -287,6 +287,8 @@ class ConfigManager:
             raise TypeError(f"attribute_name must be a str, {attribute_name.__class__.__name__} given")
 
         if attribute_name in self.core_settings:
+            # we never get to the database or memcache part of this method if
+            # this is a core setting we already know
             return self.core_settings[attribute_name]
 
         # short-circuit via memcache if appropriate
