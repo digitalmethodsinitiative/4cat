@@ -326,7 +326,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if "attach_to" in self.parameters:
             try:
                 # copy metadata and results to the surrogate
-                surrogate = DataSet(key=self.parameters["attach_to"], db=self.db)
+                surrogate = DataSet(key=self.parameters["attach_to"], db=self.db, modules=self.modules)
 
                 if self.dataset.get_results_path().exists():
                     # Update the surrogate's results file suffix to match this dataset's suffix
