@@ -7,7 +7,6 @@ import time
 import json
 
 from common.lib.database import Database
-from common.lib.helpers import hash_to_md5
 from common.lib.exceptions import AnnotationException
 
 

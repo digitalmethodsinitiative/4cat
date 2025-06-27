@@ -326,7 +326,7 @@ class ExtractURLs(BasicProcessor):
 
         if save_annotations and annotations:
             self.save_annotations(annotations)
-            self.dataset.log(f"URLs written as annotations to top dataset")
+            self.dataset.log("URLs written as annotations to top dataset")
 
         self.dataset.finish(url_matches_found)
 

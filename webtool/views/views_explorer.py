@@ -9,7 +9,6 @@ from flask import Blueprint, current_app, request, render_template, jsonify, g
 from flask_login import login_required, current_user
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
-from common.lib.helpers import hash_to_md5
 from common.lib.exceptions import DataSetException, AnnotationException
 
 component = Blueprint("explorer", __name__)

@@ -8,7 +8,6 @@ import jieba
 import json
 import re
 import os
-import time
 
 import nltk
 from nltk.stem.snowball import SnowballStemmer
@@ -18,7 +17,6 @@ from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
-from common.config_manager import config
 
 __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]

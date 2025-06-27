@@ -6,7 +6,6 @@ import re
 import csv
 import urllib.request
 
-from typing import List, Iterator
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -162,7 +161,7 @@ class YouTubeMetadata(BasicProcessor):
 
 		# Get column parameters
 		columns = self.parameters.get("columns", [])
-		if type(columns) == str:
+		if isinstance(columns, str):
 			columns = [columns]
 
 		# Are we writing annotations?
@@ -374,7 +373,7 @@ class YouTubeMetadata(BasicProcessor):
 								video_id = metadata["id"]
 								result["retrieved_from_id"] = ",".join(original_items[video_id])
 								result["type"] = "video"
-								result["url"] = f"https://youtube.com/watch?v=" + metadata["id"]
+								result["url"] = "https://youtube.com/watch?v=" + metadata["id"]
 								result["video_id"] = video_id
 								result["upload_time"] = metadata["snippet"].get("publishedAt")
 								result["channel_id"] = metadata["snippet"].get("channelId")
@@ -395,7 +394,7 @@ class YouTubeMetadata(BasicProcessor):
 								result["retrieved_from_id"] = ",".join(
 									original_items.get(channel_id, []) + original_items.get(channel_handle, []))
 								result["type"] = "channel"
-								result["url"] = f"https://youtube.com/channel/" + channel_id
+								result["url"] = "https://youtube.com/channel/" + channel_id
 								result["channel_id"] = channel_id
 								result["channel_handle"] = channel_handle
 								result["channel_title"] = metadata["snippet"].get("title", "")
@@ -417,7 +416,7 @@ class YouTubeMetadata(BasicProcessor):
 							elif yt_type == "playlist":
 								result["retrieved_from_id"] = ",".join(original_items[metadata["id"]])
 								result["type"] = "playlist"
-								result["url"] = f"https://youtube.com/playlist?list=" + metadata["id"]
+								result["url"] = "https://youtube.com/playlist?list=" + metadata["id"]
 								result["channel_id"] = metadata["snippet"].get("channelId", "")
 								result["channel_title"] = metadata["snippet"].get("channelTitle", "")
 								result["playlist_id"] = metadata["id"]

@@ -9,7 +9,6 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from googleapiclient import discovery
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 class Perspective(BasicProcessor):
 	"""

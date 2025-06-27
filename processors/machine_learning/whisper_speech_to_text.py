@@ -124,7 +124,7 @@ class AudioToText(BasicProcessor):
             },
             "external_model": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": f"Model",
+                "help": "Model",
                 "default": "gpt-4o-mini-transcribe",
                 "tooltip": "GPT-4o generally outperforms Whisper",
                 "options": {
@@ -265,7 +265,7 @@ class AudioToText(BasicProcessor):
                     gpu_response = None
                 else:
                     return self.dataset.finish_with_error(str(e))
-            except ConnectionError as e:
+            except ConnectionError:
                 self.dataset.finish_with_error("Can't reach DMI Service Manager.")
                 return
 
@@ -305,7 +305,7 @@ class AudioToText(BasicProcessor):
                  audio_filenames])
 
             # Send request to DMI Service Manager
-            self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+            self.dataset.update_status("Requesting service from DMI Service Manager...")
             try:
                 dmi_service_manager.send_request_and_wait_for_results(whisper_endpoint, data, wait_period=30)
             except DsmOutOfMemory:

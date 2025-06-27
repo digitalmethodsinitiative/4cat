@@ -2210,7 +2210,6 @@ class DataSet(FourcatModule):
 
         count = 0
         annotation_fields = self.annotation_fields
-        annotation_labels = self.get_annotation_field_labels()
 
         # Add some dataset data to annotations, if not present
         for annotation_data in annotations:

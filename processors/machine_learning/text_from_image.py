@@ -11,7 +11,7 @@ import os
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException, DsmConnectionError
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
@@ -222,7 +222,6 @@ class ImageTextDetector(BasicProcessor):
 
         # Save files as NDJSON, then use map_item for 4CAT to interact
         processed = 0
-        annotations = []
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
             for result_filename in os.listdir(output_dir):
                 if self.interrupted:
