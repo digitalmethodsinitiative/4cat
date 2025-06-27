@@ -39,4 +39,4 @@ def init_datasource(database, logger, queue, name, config):
 			else:
 				queue.add_job(name + "-board", {}, board, 0, interval)
 
-	base_init_datasource(database, logger, queue, name)
+	base_init_datasource(database, logger, queue, name, config)

@@ -89,7 +89,7 @@ if __name__ == "__main__":
         print('Created config/config.ini file')
 
         # Ensure filepaths exist
-        from common.config_manager import ConfigManager()
+        from common.config_manager import ConfigManager
         from common.lib.database import Database
 
         config = ConfigManager()
