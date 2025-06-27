@@ -40,6 +40,7 @@ ON annotations (
     from_dataset
 );
 DROP INDEX IF EXISTS annotation_unique;
+DROP INDEX IF EXISTS annotation_value;
 CREATE UNIQUE INDEX annotation_unique
 ON annotations (
     dataset,
