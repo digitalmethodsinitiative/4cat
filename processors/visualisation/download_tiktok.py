@@ -201,16 +201,23 @@ class TikTokImageDownloader(BasicProcessor):
         is partially determined by the parent dataset's parameters.
 
         :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on can be used to show some options only to
-        privileged users.
-        :param ConfigManager config:  Configuration reader (context-aware)
+        the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+        case they are requested for display in the 4CAT web interface. This can
+        be used to show some options only to privileges users.
         """
         options = cls.options
 
-        # Update the amount max and help from config
+        # Update the amount max, min, tooltip, and help from config
         max_number_images = int(config.get("image-downloader.max", 1000))
-        options['amount']['max'] = max_number_images
-        options['amount']['help'] = f"No. of images (max {max_number_images:,})"
+        if max_number_images == 0:
+            options['amount']['tooltip'] = "'0' will use all available images"
+            options['amount'].pop('max') if 'max' in options['amount'] else None
+            options['amount']['help'] = "No. of images"
+        else:
+            options['amount']['help'] = f"No. of images (max {max_number_images:,})"
+            options['amount']['max'] = max_number_images
+            options["amount"]["min"] = 1
 
         return options
 

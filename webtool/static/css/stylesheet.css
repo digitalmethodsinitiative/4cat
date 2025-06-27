@@ -460,6 +460,12 @@ nav > ul.flat > li:not(:last-child)::after {
     text-align: center;
 }
 
+/** --------------------- *
+  Utility classes -> Clipboard
+  * --------------------- */
+.copy-to-clipboard, .property-badge.copy-to-clipboard {
+    cursor: grab;
+}
 
 
 /** --------------------- *
@@ -487,9 +493,6 @@ nav > ul.flat > li:not(:last-child)::after {
 
 button.tooltip-trigger {
     max-height: 1.75em;
-}
-
-button.tooltip-trigger {
 	font-size: 0.8em;
 	position: relative;
 	top: -0.1em;

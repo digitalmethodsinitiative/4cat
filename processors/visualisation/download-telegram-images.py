@@ -13,7 +13,7 @@ from telethon.errors import TimedOutError, BadRequestError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput, timify_long
+from common.lib.helpers import UserInput, timify
 from common.lib.dataset import DataSet
 from processors.visualisation.download_images import ImageDownloader
 
@@ -246,7 +246,7 @@ class TelegramImageDownloader(BasicProcessor):
             except telethon.errors.FloodError as e:
                 later = "later"
                 if hasattr(e, "seconds"):
-                    later = f"in {timify_long(e.seconds)}"
+                    later = f"in {timify(e.seconds)}"
                 self.dataset.update_status(f"Rate-limited by Telegram after downloading {media_done-1:,} image(s); "
                                            f"halting download process. Try again {later}.", is_final=True)
                 self.flawless = False

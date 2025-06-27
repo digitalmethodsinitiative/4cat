@@ -137,7 +137,7 @@ def list_users(page):
 def get_worker_status():
     api_response = call_api("worker-status")
     if api_response["status"] != "success":
-        return """<p class="content-placeholder">Backend unavailable; View logs</p>""", 200, {"Content-Type": "text/html"}
+        return """<p class="content-placeholder">4CAT backend unavailable - check logs for errors</p>""", 200, {"Content-Type": "text/html"}
     workers = [
         {
             **worker,
@@ -154,7 +154,7 @@ def get_worker_status():
 def get_queue_status():
     api_response = call_api("worker-status")
     if api_response["status"] != "success":
-        return """<p class="content-placeholder">Backend unavailable; View logs</p>""", 200, {"Content-Type": "text/html"}
+        return """<p class="content-placeholder">4CAT backend unavailable - check logs for errors</p>""", 200, {"Content-Type": "text/html"}
 
     queue = api_response["response"]["queued"]
     return render_template("controlpanel/queue-status.html", queue=queue, worker_types=g.modules.workers,
@@ -186,7 +186,7 @@ def list_jobs(page):
     pagination = Pagination(page, page_size, num_users, "admin.list_jobs")
     return render_template("controlpanel/jobs.html", jobs=jobs,
                            filter={"jobtype": filter_jobtype, "sort": order}, pagination=pagination,
-                           flashes=get_flashed_messages(), all_jobs=distinct_jobs, now= time.time())
+                           flashes=get_flashed_messages(), all_jobs=distinct_jobs, now= time.time(), workers=g.modules.workers)
 
 @component.route("/admin/delete-job/", methods=["POST"])
 @login_required
@@ -220,14 +220,14 @@ def delete_job():
 
     # Tell backend to cancel job if running
     try:
-        call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["type"], "level": BasicWorker.INTERRUPT_CANCEL})
+        call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["jobtype"], "level": BasicWorker.INTERRUPT_CANCEL})
     except ConnectionRefusedError:
         return error(500,
                         message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
     
     # Delete the job
     job.finish(delete=True)
-    message =  f"Job {job.data['id']} {'and associated dataset' if dataset else ''}deleted successfully."
+    message =  f"Job {job.data['jobtype']} #{job.data['id']} {'and associated dataset ' if dataset else ''}deleted successfully."
     if redirect_to_page:
         flash(message)
         return redirect(request.referrer or url_for("admin.list_jobs", page=1))

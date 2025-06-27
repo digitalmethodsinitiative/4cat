@@ -11,7 +11,7 @@ import regex
 
 from urllib.parse import urlencode, urlparse
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify_long, ellipsiate
+from common.lib.helpers import timify, ellipsiate
 
 from flask import current_app, g
 from flask_login import current_user
@@ -101,7 +101,7 @@ def _jinja2_filter_timify_long(number):
 	UNIX timestamp, decrease by that amount
 	:return str: A nice, string, for example `1 month, 3 weeks, 4 hours and 2 minutes`
 	"""
-	return timify_long(number)
+	return timify(number)
 
 @current_app.template_filter("fromjson")
 def _jinja2_filter_fromjson(data):

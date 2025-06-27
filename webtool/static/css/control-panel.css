@@ -44,6 +44,7 @@ table.cp-table td {
 table.cp-table .actions {
     width: 12em;
     vertical-align: middle;
+    text-align: center;
 }
 
 table td[colspan] {

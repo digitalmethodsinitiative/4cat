@@ -1515,6 +1515,15 @@ const ui_helpers = {
         //table controls
         $(document).on('input', '.copy-from', ui_helpers.table_control);
 
+        //copy value to clipboard
+        if(navigator.clipboard) {
+            $(document).on('click', '.copy-to-clipboard', ui_helpers.clipboard_copy);
+        } else {
+            // clipboard access not available
+            document.querySelector('#tooltip-clipboard').remove();
+            document.querySelectorAll('.copy-to-clipboard').forEach(e => e.classList.remove('copy-to-clipboard'));
+        }
+
         //mighty morphing web forms
         $(document).on('input', 'form.processor-child-wrapper input, form.processor-child-wrapper select, #query-form input, #query-form select', ui_helpers.conditional_form.manage);
         ui_helpers.conditional_form.init();
@@ -1829,6 +1838,21 @@ const ui_helpers = {
         })
     },
 
+    clipboard_copy: async function(e) {
+        if(!navigator.clipboard) {
+            // non-HTTPS context
+            return;
+        }
+        const target = find_parent(e.target, '.copy-to-clipboard', true);
+        let copyable = target.getAttribute('data-clipboard-value');
+        if(!copyable) {
+            copyable = target.innerText;
+        }
+        await navigator.clipboard.writeText(copyable);
+        target.classList.add('flash-once');
+        setTimeout(() => target.classList.remove('flash-once'), 250);
+    },
+
     conditional_form: {
         /**
          * Set visibility of form elements when they are loaded
@@ -2009,12 +2033,13 @@ function hsv2hsl(h, s, v) {
     return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
 }
 
-function find_parent(element, selector) {
+function find_parent(element, selector, start_self=false) {
     while(element.parentNode) {
-        element = element.parentNode;
+        if(!start_self) { element = element.parentNode; }
         if(element.matches(selector)) {
             return element;
         }
+        if(start_self) { element = element.parentNode; }
     }
 
     return null;

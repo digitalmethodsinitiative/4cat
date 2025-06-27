@@ -45,6 +45,7 @@ class DataSet(FourcatModule):
 	preset_parent = None
 	parameters = None
 	modules = None
+	annotation_fields = None
 
 	owners = None
 	tagged_owners = None
@@ -128,6 +129,8 @@ class DataSet(FourcatModule):
 		if current:
 			self.data = current
 			self.parameters = json.loads(self.data["parameters"])
+			self.annotation_fields = json.loads(self.data["annotation_fields"]) \
+				if self.data.get("annotation_fields") else {}
 			self.is_new = False
 		else:
 			self.data = {"type": type}  # get_own_processor needs this
@@ -149,9 +152,11 @@ class DataSet(FourcatModule):
 				"software_file": "",
 				"num_rows": 0,
 				"progress": 0.0,
-				"key_parent": parent
+				"key_parent": parent,
+				"annotation_fields": "{}"
 			}
 			self.parameters = parameters
+			self.annotation_fields = {}
 
 			self.db.insert("datasets", data=self.data)
 			self.refresh_owners()
@@ -1465,10 +1470,12 @@ class DataSet(FourcatModule):
 		"""
 		if self.genealogy:
 			return ",".join([dataset.key for dataset in self.genealogy])
+		elif not self.key_parent:
+			return self.key
 		else:
-			# Collect keys only
-			key_parent = self.key  # Start at the bottom
-			genealogy = []
+			# Collect keys only, start at the bottom
+			genealogy = [self.key_parent]
+			key_parent = genealogy[-1]
 
 			while key_parent:
 				try:
@@ -1827,7 +1834,7 @@ class DataSet(FourcatModule):
 		Whether this dataset has annotations
 		"""
 
-		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s;", (self.key,))
+		annotation = self.db.fetchone("SELECT * FROM annotations WHERE dataset = %s LIMIT 1", (self.key,))
 
 		return True if annotation else False
 
@@ -1872,26 +1879,7 @@ class DataSet(FourcatModule):
 		Returns True if there's annotation fields saved tot the dataset table
 		"""
 
-		annotation_fields = self.get_annotation_fields()
-
-		return True if annotation_fields else False
-
-	def get_annotation_fields(self) -> dict:
-		"""
-		Retrieves the saved annotation fields for this dataset.
-		These are stored in the annotations table.
-
-		:return dict: The saved annotation fields.
-		"""
-
-		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.key,))
-
-		if annotation_fields and annotation_fields.get("annotation_fields"):
-			annotation_fields = json.loads(annotation_fields["annotation_fields"])
-		else:
-			annotation_fields = {}
-
-		return annotation_fields
+		return True if self.annotation_fields else False
 
 	def get_annotation_field_labels(self) -> list:
 		"""
@@ -1901,7 +1889,7 @@ class DataSet(FourcatModule):
 		:return list: List of annotation field labels.
 		"""
 
-		annotation_fields = self.get_annotation_fields()
+		annotation_fields = self.annotation_fields
 
 		if not annotation_fields:
 			return []
@@ -1928,7 +1916,7 @@ class DataSet(FourcatModule):
 			return 0
 
 		count = 0
-		annotation_fields = self.get_annotation_fields()
+		annotation_fields = self.annotation_fields
 		annotation_labels = self.get_annotation_field_labels()
 
 		field_id = ""
@@ -1984,7 +1972,7 @@ class DataSet(FourcatModule):
 			count += 1
 
 		# Save annotation fields if things changed
-		if annotation_fields != self.get_annotation_fields():
+		if annotation_fields != self.annotation_fields:
 			self.save_annotation_fields(annotation_fields)
 
 		# columns may have changed if there are new annotations
@@ -2028,7 +2016,7 @@ class DataSet(FourcatModule):
 		"""
 
 		# Get existing annotation fields to see if stuff changed.
-		old_fields = self.get_annotation_fields()
+		old_fields = self.annotation_fields
 		changes = False
 
 		# Do some validation
@@ -2077,8 +2065,8 @@ class DataSet(FourcatModule):
 
 		# We're saving the new annotation fields as-is.
 		# Ordering of fields is preserved this way.
-		#self.db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), self.key))
-		self.annotation_fields = json.dumps(new_fields)
+		self.db.update("datasets", where={"key": self.key}, data={"annotation_fields": json.dumps(new_fields)})
+		self.annotation_fields = new_fields
 
 		# If anything changed with the annotation fields, possibly update
 		# existing annotations (e.g. to delete them or change their labels).

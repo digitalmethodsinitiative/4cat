@@ -10,7 +10,7 @@ import re
 
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
-from common.lib.helpers import convert_to_int, UserInput, timify_long
+from common.lib.helpers import convert_to_int, UserInput, timify
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 
@@ -691,7 +691,7 @@ class SearchWithTwitterAPIv2(Search):
                     real_expected_tweets = expected_tweets
 
                 expected_seconds = int(real_expected_tweets / 30)  # seems to be about this
-                expected_time = timify_long(expected_seconds)
+                expected_time = timify(expected_seconds)
                 params["expected-tweets"] = expected_tweets
 
                 if expected_seconds > 900:

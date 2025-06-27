@@ -10,7 +10,7 @@ import re
 from PIL import Image, UnidentifiedImageError
 from requests.structures import CaseInsensitiveDict
 
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, url_to_filename
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
@@ -263,7 +263,7 @@ class ImageDownloader(BasicProcessor):
         self.url_redirects = {}
 
         for url in urls:
-            self.filenames[url] = self.make_filename(url)
+            self.filenames[url] = url_to_filename(url, staging_area=self.staging_area, default_name="file", default_ext=".png")
 
         for url, response in self.iterate_proxied_requests(
             urls,
@@ -344,7 +344,7 @@ class ImageDownloader(BasicProcessor):
 
                             image_url = self.clean_url(image_url)
                             self.url_redirects[url] = image_url
-                            self.filenames[image_url] = self.make_filename(image_url)
+                            self.filenames[image_url] = url_to_filename(image_url, staging_area=self.staging_area, default_name="file", default_ext=".png")
                             self.push_proxied_request(image_url, 0)
                             item_map[image_url] = item_map[url]
                             del self.filenames[url], item_map[url]
@@ -540,36 +540,6 @@ class ImageDownloader(BasicProcessor):
                     # in that case
                     pass
 
-    def make_filename(self, url):
-        """
-        Determine filenames for saved files
-
-        Prefer the original filename (extracted from the URL), but this may not
-        always be possible or be an actual filename. Also, avoid using the same
-        filename multiple times.
-
-        Note that this is done before any files are downloaded; thus not all
-        filenames are guaranteed to actually exist when processing finishes,
-        if some URLs cannot be downloaded.
-
-        :param str url:  URLs to determine filenames for
-        :return str:  Suitable file name
-        """
-        clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
-        if re.match(r"[^.]+\.[a-zA-Z]{3,4}", clean_filename):
-            base_filename = clean_filename
-        else:
-            base_filename = "file.png"
-
-        filename = base_filename
-        file_path = self.staging_area.joinpath(filename)
-        file_index = 1
-        while file_path.exists():
-            filename = f"{base_filename.split('.')[0]}-{file_index}.{base_filename.split('.')[1]}"
-            file_index += 1
-            file_path = self.staging_area.joinpath(filename)
-
-        return filename
 
     def resolve_url(self, url):
         """
