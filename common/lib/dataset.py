@@ -571,22 +571,20 @@ class DataSet(FourcatModule):
                     # empty string to 0.
                     yield from sorted(
                         items_to_sort,
-                        key=lambda x: convert_to_float(x.get(sort_key, "")),
+                        key=lambda x: convert_to_float(x.get(sort_key, ""), force=True),
                         reverse=reverse,
                     )
 
         if self.num_rows < chunk_size:
             try:
-                yield from sort_items(self.iterate_items(**kwargs), sort, reverse)
-            except TypeError:
-                # Dataset fields can contain integers and empty strings.
-                # Since these cannot be compared, we will convert every
-                # empty string to 0.
+                # First try to force-sort float values. If this doesn't work, it'll be alphabetical.
+                yield from sort_items(self.iterate_items(**kwargs), sort, reverse, convert_sort_to_float=True)
+            except (TypeError, ValueError):
                 yield from sort_items(
                     self.iterate_items(**kwargs),
                     sort,
                     reverse,
-                    convert_sort_to_float=True,
+                    convert_sort_to_float=False,
                 )
 
         else:
@@ -594,7 +592,7 @@ class DataSet(FourcatModule):
             staging_area = self.get_staging_area()
             buffer = []
             chunk_files = []
-            convert_sort_to_float = False
+            convert_sort_to_float = True
             fieldnames = self.get_columns()
 
             def write_chunk(buffer, chunk_index):
@@ -618,15 +616,12 @@ class DataSet(FourcatModule):
                 if len(buffer) >= chunk_size:
                     try:
                         buffer = list(
-                            sort_items(buffer, sort, reverse, convert_sort_to_float)
+                            sort_items(buffer, sort, reverse, convert_sort_to_float=convert_sort_to_float)
                         )
-                    except TypeError:
-                        # Dataset fields can contain integers and empty strings.
-                        # Since these cannot be compared, we will convert every
-                        # empty string to 0.
-                        convert_sort_to_float = True
+                    except (TypeError, ValueError):
+                        convert_sort_to_float = False
                         buffer = list(
-                            sort_items(buffer, sort, reverse, convert_sort_to_float)
+                            sort_items(buffer, sort, reverse, convert_sort_to_float=convert_sort_to_float)
                         )
 
                     chunk_files.append(write_chunk(buffer, len(chunk_files)))

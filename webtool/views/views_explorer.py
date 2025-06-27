@@ -7,6 +7,8 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, request, render_template, jsonify, g
 from flask_login import login_required, current_user
+
+from common.lib.helpers import convert_to_float
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, AnnotationException
