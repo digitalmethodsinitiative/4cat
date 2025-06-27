@@ -194,11 +194,10 @@ with app.app_context():
             app.fourcat_config.memcache = config.load_memcache()
             app._memcache_initialized = True
 
-        g.base_config = config
         g.queue = queue
         g.db = db
         g.log = log
-        g.config = ConfigWrapper(g.base_config, user=current_user, request=request)
+        g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request, memcache=app.fourcat_config.memcache)
         g.modules = current_app.fourcat_modules
 
         current_user.with_config(g.config)
