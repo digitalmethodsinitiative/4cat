@@ -408,11 +408,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         Abort dataset creation and clean up so it may be attempted again later
         """
+
+        # delete annotations that have been generated as part of this processor
+        self.db.delete("annotations", where={"from_dataset": self.dataset.key}, commit=True)
         # remove any result files that have been created so far
         self.remove_files()
-        # delete annotations that have been generated as part of this processor
-        if self.dataset.annotation_fields:
-            self.db.delete("annotations", where={"from_dataset": self.dataset.key}, commit=True)
 
         # we release instead of finish, since interrupting is just that - the
         # job should resume at a later point. Delay resuming by 10 seconds to
