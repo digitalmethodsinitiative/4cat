@@ -17,6 +17,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from common.lib.user import User
 from webtool.lib.helpers import error, generate_css_colours, setting_required
 from common.lib.helpers import send_email, get_software_commit
+from common.config_manager import ConfigWrapper
 
 from pathlib import Path
 
