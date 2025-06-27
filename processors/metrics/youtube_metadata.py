@@ -79,6 +79,7 @@ class YouTubeMetadata(BasicProcessor):
 					"type": "Type (video, channel, playlist)",
 					"video_id": "Video ID",
 					"video_title": "Video title",
+					"video_description": "Video description",
 					"upload_time": "Video creation date",
 					"video_view_count": "Video views",
 					"video_likes_count": "Video like count",
@@ -173,6 +174,7 @@ class YouTubeMetadata(BasicProcessor):
 		youtube_urls = set()
 		youtube_ids = []
 		items_to_retrieve = []
+		failed_ids = 0
 
 		# Loop through initial datasets to extract IDs
 		for row in self.source_dataset.iterate_items(self):
@@ -207,6 +209,11 @@ class YouTubeMetadata(BasicProcessor):
 						yt_id = self.get_yt_id(url, original_id=row.get("id", ""))
 					except ValueError:
 						self.dataset.update_status("Could not extract YouTube ID from " + url)
+						continue
+
+					if not yt_id:
+						self.dataset.update_status(f"Could not parse ID from URL {url}")
+						failed_ids += 1
 						continue
 
 					# Already seen
@@ -247,6 +254,8 @@ class YouTubeMetadata(BasicProcessor):
 
 			self.save_annotations(annotations)
 
+		if failed_ids:
+			self.dataset.update_status(f"Could not parse IDs from {failed_ids} URLs.")
 		self.dataset.update_status("Writing results to csv.")
 		self.write_csv_items_and_finish(youtube_items)
 
@@ -354,7 +363,6 @@ class YouTubeMetadata(BasicProcessor):
 
 				# Sometimes there's no results and "response" won't have an item key.
 				elif response is not None:
-
 					result = {}
 
 					if "items" not in response:
@@ -379,6 +387,7 @@ class YouTubeMetadata(BasicProcessor):
 								result["channel_id"] = metadata["snippet"].get("channelId")
 								result["channel_title"] = metadata["snippet"].get("channelTitle")
 								result["video_title"] = metadata["snippet"].get("title")
+								result["video_description"] = metadata["snippet"].get("description")
 								result["video_duration"] = metadata.get("contentDetails").get("duration")
 								result["video_view_count"] = metadata["statistics"].get("viewCount")
 								result["video_comment_count"] = metadata["statistics"].get("commentCount")
@@ -428,8 +437,8 @@ class YouTubeMetadata(BasicProcessor):
 								result["playlist_video_count"] = metadata["contentDetails"].get("itemCount", ""),
 								result["playlist_status"] = metadata["status"].get("privacyStatus", "")
 
-					results.append(result)
-					keys |= set(result.keys())
+							results.append(result)
+							keys |= set(result.keys())
 
 				# Update status per response item
 				self.dataset.update_status(f"Got metadata for {i * 50}/{len(ids)} {yt_type} objects")
@@ -443,11 +452,11 @@ class YouTubeMetadata(BasicProcessor):
 		return results
 
 	@staticmethod
-	def get_yt_id(url: str, original_id="") -> tuple[str, str, str]:
+	def get_yt_id(url: str, original_id="") -> tuple[str, str, str] | None:
 		"""
 		Extracts IDs from YouTube URLs.
 		Supports videos, channel IDs, channel names, and playlist IDs.
-		Returns a tuple with the ID and type of object (`video`, `channel`, `playlist`).
+		Returns a tuple with the extracted ID, the type of object (`video`, `channel`, `playlist`), and the row id.
 		"""
 
 		yt_type = ""
@@ -504,6 +513,10 @@ class YouTubeMetadata(BasicProcessor):
 		# Assume we're dealing with videos
 		if yt_id and not yt_type:
 			yt_type = "video"
+
+		# Check if a video ID has the right length
+		if not yt_type or (yt_type == "video" and len(yt_id) != 11):
+			return None
 
 		return yt_id, yt_type, original_id
 
