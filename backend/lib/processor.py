@@ -5,8 +5,6 @@ import traceback
 import zipfile
 import typing
 import shutil
-import json
-import time
 import abc
 import csv
 import os
@@ -412,6 +410,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         # remove any result files that have been created so far
         self.remove_files()
+        # delete annotations that have been generated as part of this processor
+        if self.dataset.annotation_fields:
+            self.db.delete("annotations", where={"from_dataset": self.dataset.key}, commit=True)
 
         # we release instead of finish, since interrupting is just that - the
         # job should resume at a later point. Delay resuming by 10 seconds to
