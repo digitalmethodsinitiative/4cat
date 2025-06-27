@@ -35,6 +35,16 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     config_parser['DATABASE']['db_password'] = os.environ['POSTGRES_PASSWORD']
     config_parser['DATABASE']['db_host_auth'] = os.environ['POSTGRES_HOST_AUTH_METHOD']
 
+    # Memcached settings
+    if 'MEMCACHED_HOST' in os.environ and 'MEMCACHED_PORT' in os.environ:
+        if "MEMCACHE" not in config_parser:
+            config_parser.add_section('MEMCACHE')
+        config_parser['MEMCACHE']['memcache_host'] = os.environ['MEMCACHED_HOST'] + f":{os.environ['MEMCACHED_PORT']}"
+    else:
+        # If not set, remove the section if it exists
+        if 'MEMCACHE' in config_parser:
+            config_parser.remove_section('MEMCACHE')
+
     # Save config file
     with open(CONFIG_FILE, 'w') as configfile:
         config_parser.write(configfile)
@@ -128,8 +138,9 @@ if __name__ == "__main__":
         update_config_from_environment(CONFIG_FILE, config_parser)
 
         # Check to see if flask.server_name needs to be updated
-        from common.config_manager import config
+        from common.config_manager import ConfigManager
         from common.lib.database import Database
+        config = ConfigManager()
         config.with_db(Database(logger=None, appname="docker-setup",
 				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
         
