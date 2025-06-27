@@ -4,6 +4,8 @@ Create a collage of videos playing side by side
 import random
 import shutil
 import math
+import statistics
+
 import oslex
 import subprocess
 
@@ -34,10 +36,10 @@ class VideoWallGenerator(BasicProcessor):
     options = {
         "amount": {
             "type": UserInput.OPTION_TEXT,
-            "help": "No. of videos (max 100)",
+            "help": "No. of videos (max 500)",
             "default": 25,
             "min": 0,
-            "max": 100,
+            "max": 500,
             "tooltip": "'0' uses as many videos as available in the archive (up to 100)"
         },
         "tile-size": {
@@ -45,9 +47,10 @@ class VideoWallGenerator(BasicProcessor):
             "options": {
                 "square": "Square",
                 "average": "Average video in set",
+                "median": "Median video in set",
                 "fit-height": "Fit height"
             },
-            "default": "square",
+            "default": "median",
             "help": "Video tile size",
             "tooltip": "'Fit height' retains width/height ratios but makes videos have the same height"
         },
@@ -61,6 +64,18 @@ class VideoWallGenerator(BasicProcessor):
                 "longest": "Length (longest first)"
             },
             "default": "shortest"
+        },
+        "aspect-ratio": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Wall aspect ratio",
+            "options": {
+                "4:3": "4:3 (Oldschool)",
+                "16:9": "16:9 (Widescreen)",
+                "16:10": "16:10 (Golden ratio)",
+                "1:1": "1:1 (Square)"
+            },
+            "default": "16:10",
+            "tooltip": "Approximation. Final aspect ratio will depend on size of input videos."
         },
         "audio": {
             "type": UserInput.OPTION_CHOICE,
@@ -85,6 +100,12 @@ class VideoWallGenerator(BasicProcessor):
 
     # videos will be arranged and resized to fit these image wall dimensions
     # note that video aspect ratio may not allow for a precise fit
+    TARGET_DIMENSIONS = {
+        "1:1": (2220, 2220),
+        "4:3": (2560, 1920),
+        "16:9": (2560, 1440),
+        "16:10": (2560, 1600)
+    }
     TARGET_WIDTH = 2560
     TARGET_HEIGHT = 1440
 
@@ -93,22 +114,19 @@ class VideoWallGenerator(BasicProcessor):
         """
         Determine compatibility
 
-        :param str module:  Module ID to determine compatibility with
-        :param ConfigWrapper config:  Configuration reader
+        :param DataSet module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        if module.is_dataset() and module.num_rows > 50:
-            # this processor doesn't work well with large datasets
+        if not (module.get_media_type() == "video" or module.type.startswith("video-downloader")):
             return False
-
-        # also need ffprobe to determine video lengths
-        # is usually installed in same place as ffmpeg
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
-        ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
-
-        return module.type.startswith("video-downloader") and \
-            ffmpeg_path and \
-            ffprobe_path
+        else:
+            # Only check these if we have a video dataset
+            # also need ffprobe to determine video lengths
+            # is usually installed in same place as ffmpeg
+            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
+            ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
+            return ffmpeg_path and ffprobe_path
 
     def process(self):
         """
@@ -121,6 +139,7 @@ class VideoWallGenerator(BasicProcessor):
         amount = self.parameters.get("amount")
         sound = self.parameters.get("audio")
         video_length = self.parameters.get("max-length")
+        aspect_ratio = self.parameters.get("aspect-ratio")
 
         ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
@@ -135,6 +154,7 @@ class VideoWallGenerator(BasicProcessor):
         videos = {}
 
         # unpack videos and determine length of the video (for sorting)
+        self.dataset.update_status("Unpacking videos and reading metadata")
         for video in self.iterate_archive_contents(video_dataset.get_results_path(), staging_area=video_staging_area,
                                                    immediately_delete=False):
             if self.interrupted:
@@ -185,6 +205,7 @@ class VideoWallGenerator(BasicProcessor):
             for i in range(0, amount):
                 sliced_videos[video_keys[i]] = videos[video_keys[i]]
             videos = sliced_videos
+            dimensions = {k: v for k, v in dimensions.items() if k in [videos[p].name for p in videos]}
             lengths = {k: v for k, v in lengths.items() if k in [videos[p].name for p in videos]}
 
         # longest video in set may be shorter than requested length
@@ -201,9 +222,8 @@ class VideoWallGenerator(BasicProcessor):
 
             longest_index += 1
 
-        average_size = (
-            sum([k[0] for k in dimensions.values()]) / len(dimensions),
-            sum([k[1] for k in dimensions.values()]) / len(dimensions))
+        avg = statistics.mean if sizing_mode == "average" else statistics.median
+        average_size = (avg([k[0] for k in dimensions.values()]), avg([k[1] for k in dimensions.values()]))
 
         self.dataset.update_status("Determining canvas and tile sizes")
 
@@ -214,7 +234,10 @@ class VideoWallGenerator(BasicProcessor):
         # calculate 'tile sizes' (a tile is an image) and also the size of the
         # canvas we will need to fit them all. The canvas can never be larger than
         # this:
-        max_pixels = self.TARGET_WIDTH * self.TARGET_HEIGHT
+        resolution = self.TARGET_DIMENSIONS[aspect_ratio]
+        aspect_ratio = resolution[0] / resolution[1]
+        aspect_ratio_inverse = resolution[1] / resolution[0]
+        max_pixels = resolution[0] * resolution[1]
 
         if sizing_mode == "fit-height":
             # assuming every image has the overall average height, how wide would
@@ -234,19 +257,16 @@ class VideoWallGenerator(BasicProcessor):
                 tile_h = int(tile_h * math.sqrt(area_ratio))
                 fitted_pixels = max_pixels
 
-            # find the canvas size that can fit this amount of pixels at the
-            # required proportions, provided that y = multiple of avg height
-            ideal_height = math.sqrt(fitted_pixels / (self.TARGET_WIDTH / self.TARGET_HEIGHT))
-            size_y = math.ceil(ideal_height / tile_h) * tile_h
-            size_x = fitted_pixels / size_y
-
-            tile_w = -1  # varies
+            ideal_width = math.sqrt(fitted_pixels / aspect_ratio_inverse)
+            item_widths = [int(dimensions[k][0] * (tile_h / dimensions[k][1])) for k in videos]
+            tile_w = -1  # variable
 
         elif sizing_mode == "square":
             # assuming each image is square, find a canvas with the right
             # proportions that would fit all of them
             # assume the average dimensions
             tile_size = int(sum(average_size) / 2)
+            tile_h = tile_size
 
             # this is how many pixels we need
             fitted_pixels = tile_size * tile_size * len(videos)
@@ -256,13 +276,10 @@ class VideoWallGenerator(BasicProcessor):
                 tile_size = math.floor(math.sqrt(max_pixels / len(videos)))
                 fitted_pixels = tile_size * tile_size * len(videos)
 
-            ideal_width = math.sqrt(fitted_pixels / (self.TARGET_HEIGHT / self.TARGET_WIDTH))
-            size_x = math.ceil(ideal_width / tile_size) * tile_size
-            size_y = math.ceil(fitted_pixels / size_x / tile_size) * tile_size
+            ideal_width = math.sqrt(fitted_pixels / aspect_ratio_inverse)
+            item_widths = [tile_h for _ in videos]
 
-            tile_w = tile_h = tile_size
-
-        elif sizing_mode == "average":
+        elif sizing_mode in ("median", "average"):
             tile_w = int(average_size[0])
             tile_h = int(average_size[1])
 
@@ -273,18 +290,47 @@ class VideoWallGenerator(BasicProcessor):
                 tile_h = int(tile_h * math.sqrt(area_ratio))
                 fitted_pixels = tile_w * tile_h * len(videos)
 
-            ideal_width = math.sqrt(fitted_pixels / (self.TARGET_HEIGHT / self.TARGET_WIDTH))
-            size_x = math.ceil(ideal_width / tile_w) * tile_w
-            size_y = math.ceil(fitted_pixels / size_x / tile_h) * tile_h
+            ideal_width = math.sqrt(fitted_pixels / aspect_ratio_inverse)
+            item_widths = [tile_w for _ in videos]
 
         else:
             raise NotImplementedError("Sizing mode '%s' not implemented" % sizing_mode)
 
-        # round to avoid annoying issues and because we don't need subpixels
+        # now we simulate all possible distributions of the items and pick the
+        # one closest to our required aspect ratio - this is brute force, but
+        # with the relatively low amount of items, it's fast enough
+        # add 1 to the item width to account for rounding differences later
+        item_widths = [w + 1 for w in item_widths]
+        row_ratios = {}
+        for row_width in range(0, int(ideal_width * 1.5), min(item_widths)):
+            rows = []
+            row = []
+            for video_w in item_widths:
+                if sum(row) + video_w > row_width:
+                    rows.append(row)
+                    row = []
+                row.append(video_w)
+            else:
+                if row:
+                    rows.append(row)
+
+            actual_width = max([sum(row) for row in rows])
+            row_ratios[actual_width] = actual_width / (len(rows) * tile_h)
+
+        # now select the width closest to the optimal ratio...
+        min_deviation = None
+        for actual_width, ratio in row_ratios.items():
+            deviation = abs(ratio - aspect_ratio)
+            if not min_deviation or deviation < min_deviation:
+                size_x = actual_width
+                min_deviation = deviation
+
+        # finalise dimensions
+        size_y = round(size_x / row_ratios[size_x])
         tile_h = round(tile_h)
         tile_w = round(tile_w)
-
-        self.dataset.log("Canvas size is %ix%i" % (size_x, size_y))
+        self.dataset.log(f"Projected canvas size is {size_x}x{size_y} (aspect ratio {row_ratios[size_x]}; {aspect_ratio} preferred)")
+        self.dataset.log(f"Aiming for {round(size_y / tile_h)} rows of videos")
 
         # now we are ready to render the video wall
         command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
@@ -305,6 +351,7 @@ class VideoWallGenerator(BasicProcessor):
         row_widths = []
 
         # todo: periodically check if we still need to support ffmpeg < 5.1
+        have_old_ffmpeg_version = get_ffmpeg_version(ffmpeg_path) < version.parse("7.1")
         fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
 
         # go through each video and transform as needed
@@ -318,7 +365,8 @@ class VideoWallGenerator(BasicProcessor):
 
             # determine expected width of video when added to row
             if tile_w < 0:
-                video_width = round(dimensions[video][0] * (tile_h / dimensions[video][1])) if looping else 0
+                # 'fit height' - width varies per video
+                video_width = math.ceil(dimensions[video][0] * (tile_h / dimensions[video][1])) if looping else 0
             else:
                 video_width = tile_w
 
@@ -347,7 +395,11 @@ class VideoWallGenerator(BasicProcessor):
             cropscale = ""
 
             if sizing_mode == "fit-height":
-                cropscale += f"scale={video_width}:{tile_h}"
+                # the scale filter does not guarantee exact pixel dimensions
+                # unfortunately this leads to us being off by one pixel on the
+                # row width sometimes. So sacrifice one pixel by cropping,
+                # which does guarantee exact sizes
+                cropscale += f"scale={video_width+1}:{tile_h+1},crop={video_width}:{tile_h}:exact=1"
 
             elif sizing_mode == "square":
                 if dimensions[video][0] > dimensions[video][1]:
@@ -358,14 +410,14 @@ class VideoWallGenerator(BasicProcessor):
                 cropscale += f"crop={tile_w}:{tile_h}:exact=1"
                 # exact=1 and format=rgba prevents shenanigans when merging
 
-            elif sizing_mode == "average":
+            elif sizing_mode in ("median", "average"):
                 scale_w = dimensions[video][0] * (tile_h / dimensions[video][1])
                 if scale_w < tile_w:
                     cropscale += f"scale={tile_w}:-1,"
                 else:
                     cropscale += f"scale=-1:{tile_h},"
 
-                cropscale += f"crop={tile_w}:{tile_h}:exact=1,format=rgba"
+                cropscale += f"crop={tile_w}:{tile_h}:exact=1"
 
             else:
                 raise NotImplementedError(f"Unknown sizing mode {sizing_mode}")
@@ -400,9 +452,9 @@ class VideoWallGenerator(BasicProcessor):
 
         # finally stack horizontal rows, vertically
         if len(rows) > 1:
-            filter_chain += "".join([f"[stack{i}]" for i in range(0, len(rows))]) + f"vstack=inputs={len(rows)}[final];"
+            filter_chain += "".join([f"[stack{i}]" for i in range(0, len(rows))]) + f"vstack=inputs={len(rows)}[final]"
         else:
-            filter_chain += "[stack0]null[final];"
+            filter_chain += "[stack0]null[final]"
 
         # output video dimensions need to be divisible by 2 for x264 encoding
         # choose the relevant filter based on which dimensions do not conform
@@ -410,14 +462,19 @@ class VideoWallGenerator(BasicProcessor):
         output_w = max(row_widths)
         output_h = tile_h * len(row_widths)
         if output_w % 2 != 0 and output_h % 2 != 0:
-            filter_chain += f"[final]pad={output_w+1}:{output_h+1}[final]"
+            filter_chain += f";[final]pad={output_w+1}:{output_h+1}[final]"
         elif output_w % 2 != 0:
-            filter_chain += f"color=size={output_w+1}x{output_h}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
+            filter_chain += f";color=size={output_w+1}x{output_h}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
         elif output_h % 2 != 0:
-            filter_chain += f"color=size={output_w}x{output_h+1}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
+            filter_chain += f";color=size={output_w}x{output_h+1}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
+
+        # force 30 fps because we don't know what the source videos did and
+        # they could be using different fpss
+        filter_chain += ";[final]fps=30[final]"
 
         # add filter to ffmpeg command, plus a parameter to control output FPS
         ffmpeg_filter = oslex.quote(filter_chain)[1:-1]
+
         command += [fps_command, "cfr", "-filter_complex", ffmpeg_filter]
 
         # ensure mixed audio: use no sound, or the longest audio stream
@@ -457,6 +514,9 @@ class VideoWallGenerator(BasicProcessor):
             self.dataset.log("ffmpeg returned the following errors:")
             for line in ffmpeg_error.split("\n"):
                 self.dataset.log("  " + line)
+
+            if have_old_ffmpeg_version:
+                self.dataset.log("You may be able to prevent this error by updating to a newer version of ffmpeg.")
 
         shutil.rmtree(video_staging_area, ignore_errors=True)
 
