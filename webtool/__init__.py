@@ -192,13 +192,13 @@ with app.app_context():
         
          # Initialize memcache once per worker
         if not app._memcache_initialized:
-            app.fourcat_config.memcache = config.load_memcache()
+            app.fourcat_config.memcache = app.fourcat_config.load_memcache()
             app._memcache_initialized = True
 
         g.queue = queue
         g.db = db
         g.log = log
-        g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request, memcache=app.fourcat_config.memcache)
+        g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request)
         g.modules = current_app.fourcat_modules
 
         current_user.with_config(g.config)

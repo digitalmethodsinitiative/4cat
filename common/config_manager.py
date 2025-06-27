@@ -525,7 +525,7 @@ class ConfigWrapper:
     to `get()` are done for those tags or that user. Can also adjust tags based
     on the HTTP request, if used in a Flask context.
     """
-    def __init__(self, config, user=None, tags=None, request=None, memcache=None):
+    def __init__(self, config, user=None, tags=None, request=None):
         """
         Initialise config wrapper
 
@@ -554,10 +554,7 @@ class ConfigWrapper:
             # this ensures we use our own memcache client, important in threaded
             # contexts because pymemcache is not thread-safe. Unless we get a
             # prepared connection...
-            if memcache:
-                self.memcache = memcache
-            else:
-                self.memcache = self.config.load_memcache()
+            self.memcache = self.config.load_memcache()
 
         # this ensures the user object in turn reads from the wrapper
         if self.user:
