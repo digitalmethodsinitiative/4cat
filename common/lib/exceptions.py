@@ -156,3 +156,9 @@ class DatabaseQueryInterruptedException(WorkerInterruptedException):
     Raise when interrupting a DB query before it has finished
     """
     pass
+
+class MediaSignatureException(FourcatException):
+    """
+    Raise in media processors when the media cannot be read
+    """
+    pass
