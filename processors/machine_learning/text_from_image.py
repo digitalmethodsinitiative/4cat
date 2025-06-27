@@ -11,7 +11,7 @@ import os
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException, DsmConnectionError
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
@@ -25,7 +25,7 @@ class ImageTextDetector(BasicProcessor):
     """
     type = "text-from-images"  # job type ID
     category = "Conversion"  # category
-    title = "Extract Text from Images"  # title displayed in UI
+    title = "Extract text from images"  # title displayed in UI
     description = """
     Uses optical character recognition (OCR) to extract text from images via machine learning.
 
@@ -76,12 +76,6 @@ class ImageTextDetector(BasicProcessor):
         #     },
         #     "help": "See references for additional information about models and their utility"
         # },
-        "update_original": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Update original dataset with detected text",
-            "default": False,
-            "tooltip": "If enabled, the original dataset will be modified to include a 'detected_text' column otherwise a seperate dataset will be created"
-        }
     }
 
     @classmethod
@@ -213,17 +207,17 @@ class ImageTextDetector(BasicProcessor):
                         image_metadata[data['filename']] = data
 
         # Check if we need to collect data for updating the original dataset
-        update_original = self.parameters.get("update_original", False)
-        if update_original:
+        save_annotations = self.parameters.get("save_annotations", False)
+        if save_annotations:
             if not metadata_exists:
-                self.dataset.update_status("No metadata file found, cannot update original dataset")
-                update_original = False
+                self.dataset.update_status("No metadata file found, cannot write to original dataset")
+                save_annotations = False
             else:
                 # Create filename to post id mapping
                 filename_to_post_id = {}
                 for url, data in image_data.items():
-                    if data.get('success'):
-                        filename_to_post_id[data.get('filename')] = data.get('post_ids')
+                    if data.get("success"):
+                        filename_to_post_id[data.get("filename")] = data.get("post_ids")
                 post_id_to_results = {}
 
         # Save files as NDJSON, then use map_item for 4CAT to interact
@@ -239,7 +233,7 @@ class ImageTextDetector(BasicProcessor):
                     image_name = result_data.get("filename")
 
                     # Collect annotations for updating the original dataset
-                    if update_original:
+                    if save_annotations:
                         # Need to include filename as there may be many images to a single post
                         detected_text = '%s:"""%s"""' % (image_name, result_data.get('simplified_text', {}).get('raw_text', ''))
 
@@ -259,26 +253,9 @@ class ImageTextDetector(BasicProcessor):
                     outfile.write(json.dumps(data) + "\n")
 
                     processed += 1
-        self.dataset.update_status("Annotations retrieved for %i images" % processed)
-
-        # Update the original dataset with the detected text if requested
-        if update_original:
-            self.dataset.update_status("Updating original dataset with annotations")
-
-            # We need an entry for each row/item in the original dataset necitating we loop through it
-            detected_text_column = []
-            for post in self.dataset.top_parent().iterate_items(self):
-                detected_text_column.append('\n'.join(post_id_to_results.get(post.get('id'), [])))
-
-            try:
-                self.add_field_to_parent(field_name='4CAT_detexted_text',
-                                         new_data=detected_text_column,
-                                         which_parent=self.dataset.top_parent())
-            except ProcessorException as e:
-                self.dataset.update_status("Error updating parent dataset: %s" % e)
 
         detected_message = f"Detected text in {processed} of {total_image_files} images.{(' Skipped ' + str(skipped_images) + ' images; see log for details.') if skipped_images else ''}"
-        if self.parameters.get("update_original", False) and not update_original:
+        if self.parameters.get("save_annotations", False) and not save_annotations:
             self.dataset.update_status(f"{detected_message} No metadata file found, unable to update original dataset.", is_final=True)
         else:
             self.dataset.update_status(detected_message)
