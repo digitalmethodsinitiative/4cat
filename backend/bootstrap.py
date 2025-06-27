@@ -12,9 +12,8 @@ from common.lib.module_loader import ModuleCollector
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
 
-from common.config_manager import config
-
 def run(as_daemon=True, log_level="INFO"):
+	from common.config_manager import config
 	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
 
 	if as_daemon:
@@ -55,7 +54,6 @@ def run(as_daemon=True, log_level="INFO"):
 	else:
 		log = Logger(output=not as_daemon, log_path=log_folder.joinpath("backend_4cat.log"), log_level=log_level)
 
-	log.load_webhook(config)
 	log.info("4CAT Backend started, logger initialised")
 	db = Database(logger=log, appname="main",
 				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
@@ -72,7 +70,8 @@ def run(as_daemon=True, log_level="INFO"):
 			config.clear_cache()
 		else:
 			log.warning("Memcache server address configured, but connection could not be initialized. Configuration cache inactive.")
-			
+
+	log.load_webhook(config)
 	# ensure database consistency for settings table
 	config.with_db(db)
 	config.ensure_database()
