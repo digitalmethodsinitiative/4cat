@@ -19,25 +19,12 @@ from yt_dlp.utils import ExistingVideoReached
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
-from common.lib.helpers import UserInput, sets_to_lists
+from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
-
-
-def url_to_filename(url, extension, directory):
-    # Create filename
-    filename = re.sub(r"[^0-9a-z]+", "_", url.lower())[:100]  # [:100] is to avoid folder length shenanigans
-    save_location = directory.joinpath(Path(filename + "." + extension))
-    filename_index = 0
-    while save_location.exists():
-        save_location = directory.joinpath(
-            filename + "-" + str(filename_index) + save_location.suffix.lower())
-        filename_index += 1
-
-    return save_location
 
 
 class VideoDownloaderPlus(BasicProcessor):
@@ -189,7 +176,7 @@ class VideoDownloaderPlus(BasicProcessor):
             options["columns"]["options"] = {v: v for v in columns}
 
             # Figure out default column
-            priority = ["video_url", "video_link", "media_url", "media_link", "final_url", "url", "link", "video", "body"]
+            priority = ["video_url", "video_link", "video", "media_url", "media_link", "media", "final_url", "url", "link", "body"]
             columns.sort(key=lambda col: next((i for i, p in enumerate(priority) if p in col.lower()), len(priority)))
             options["columns"]["default"] = [columns.pop(0)]
 
@@ -643,7 +630,8 @@ class VideoDownloaderPlus(BasicProcessor):
                                      f"Content-Type for url {url}: {response.headers['Content-Type']}")
 
                 # Ensure unique filename
-                save_location = url_to_filename(url, extension, results_path)
+                unique_filename = url_to_filename(url, staging_area=results_path, default_ext="."+extension)
+                save_location = results_path.joinpath(unique_filename)
 
                 # Check video size (after ensuring it is actually a video above)
                 if not max_video_size == 0:

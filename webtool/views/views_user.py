@@ -149,13 +149,13 @@ def autologin_whitelist():
 
     # autologin is a special user that is automatically logged in for this
     # request only if the hostname or IP matches the whitelist
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.hostnames", [])]):
-        autologin_user = User.get_by_name(g.db, "autologin")
-        autologin_user.with_config(g.config)
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in current_app.fourcat_config.get("flask.autologin.hostnames", [])]):
+        autologin_user = User.get_by_name(current_app.db, "autologin")
         if not autologin_user:
             # this user should exist by default
             abort(500)
         autologin_user.authenticate()
+        autologin_user.with_config(ConfigWrapper(current_app.fourcat_config, user=autologin_user, request=request))
         login_user(autologin_user, remember=False)
 
 
@@ -180,7 +180,7 @@ def exempt_from_limit():
     except (socket.herror, socket.timeout):
         pass  # no hostname for this address
 
-    if any([fnmatch.filter(filterables, hostmask) for hostmask in g.config.get("flask.autologin.api", [])]):
+    if any([fnmatch.filter(filterables, hostmask) for hostmask in current_app.fourcat_config.get("flask.autologin.api", [])]):
         return True
 
     return False
@@ -506,7 +506,6 @@ def request_password():
 
         # is it also a valid username? that is not a 'special' user (like autologin)?
         resetting_user = User.get_by_name(g.db, username)
-        resetting_user.with_config(g.config)
 
         if resetting_user is None or resetting_user.is_special:
             incomplete.append("username")
@@ -520,6 +519,7 @@ def request_password():
                 "You have recently requested a password reset and an e-mail has been sent to you containing a reset link. It could take a while to arrive; also, don't forget to check your spam folder.")
         else:
             # okay, send an e-mail
+            resetting_user.with_config(g.config)
             try:
                 resetting_user.email_token(new=False)
                 return render_template("error.html", title="Success",

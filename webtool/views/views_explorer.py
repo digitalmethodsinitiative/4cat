@@ -43,7 +43,7 @@ def explorer_dataset(dataset_key: str, page=1):
 	parameters = dataset.get_parameters()
 	datasource = parameters["datasource"]
 	post_count = int(dataset.data["num_rows"])
-	annotation_fields = dataset.get_annotation_fields()
+	annotation_fields = dataset.annotation_fields
 	warning = ""
 
 	# See if we can actually serve this page

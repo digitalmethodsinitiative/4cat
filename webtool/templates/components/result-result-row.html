@@ -17,7 +17,7 @@
     </div>
   {% if dataset.is_finished() and dataset.num_rows > 0 %}
     <ul class="dataset-actions">
-    {% if dataset.get_own_processor().map_item or dataset.get_annotation_fields() %}
+    {% if dataset.get_own_processor().map_item or dataset.annotation_fields %}
         <li>
             <a href="{{ url_for('dataset.get_mapped_result', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-get-mapped-result-{{ dataset.key }}" >
                 <i class="fas fa-download" aria-hidden="true"></i>
