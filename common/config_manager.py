@@ -162,7 +162,7 @@ class ConfigManager:
             try:
                 # do one test fetch to test if connection is valid
                 memcache = MemcacheClient(self.get("MEMCACHE_SERVER"), serde=serde.pickle_serde, key_prefix=b"4cat-config")
-                memcache.get("4cat-dummy-fail-expected")
+                memcache.set("4cat-init-dummy", time.time())
                 memcache.init_thread_id = threading.get_ident()
                 return memcache
             except (SystemError, ValueError, MemcacheError):
