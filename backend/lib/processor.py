@@ -9,6 +9,7 @@ import abc
 import csv
 import os
 import re
+import time
 
 from pathlib import PurePath
 
@@ -424,6 +425,87 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         elif self.interrupted == self.INTERRUPT_CANCEL:
             # cancel job
             self.job.finish()
+
+    def iterate_proxied_requests(self, urls, preserve_order=True, **kwargs):
+        """
+        Request an iterable of URLs and return results
+
+        This method takes an iterable yielding URLs and yields the result for
+        a GET request for that URL in return. This is done through the worker
+        manager's DelegatedRequestHandler, which can run multiple requests in
+        parallel and divide them over the proxies configured in 4CAT (if any).
+        Proxy cooloff and queueing is shared with other processors, so that a
+        processor will never accidentally request from the same site as another
+        processor, potentially triggering rate limits.
+
+        :param urls:  Something that can be iterated over and yields URLs
+        :param kwargs:  Other keyword arguments are passed on to `add_urls`
+        and eventually to `requests.get()`.
+        :param bool preserve_order:  Return items in the original order. Use
+        `False` to potentially speed up processing, if order is not important.
+        :return:  A generator yielding request results, i.e. tuples of a
+        URL and a `requests` response objects
+        """
+        queue_name = self._proxy_queue_name()
+        delegator = self.manager.proxy_delegator
+
+        # 50 is an arbitrary batch size - but we top up every 0.05s, so
+        # that should be sufficient
+        batch_size = 50
+
+        # we need an iterable, so we can use next() and StopIteration
+        urls = iter(urls)
+
+        have_urls = True
+        while (queue_length := delegator.get_queue_length(queue_name)) > 0 or have_urls:
+            if queue_length < batch_size and have_urls:
+                batch = []
+                while len(batch) < (batch_size - queue_length):
+                    try:
+                        batch.append(next(urls))
+                    except StopIteration:
+                        have_urls = False
+                        break
+
+                delegator.add_urls(batch, queue_name, **kwargs)
+
+            time.sleep(0.05)  # arbitrary...
+            for url, result in delegator.get_results(queue_name, preserve_order=preserve_order):
+                # result may also be a FailedProxiedRequest!
+                # up to the processor to decide how to deal with it
+                yield url, result
+
+    def push_proxied_request(self, url, position=-1, **kwargs):
+        """
+        Add a single URL to the proxied requests queue
+
+        :param str url:  URL to add
+        :param position:  Position to add to queue; can be used to add priority
+        requests, adds to end of queue by default
+        :param kwargs:
+        """
+        self.manager.proxy_delegator.add_urls([url], self._proxy_queue_name(), position=position, **kwargs)
+
+    def flush_proxied_requests(self):
+        """
+        Get rid of remaining proxied requests
+
+        Can be used if enough results are available and any remaining ones need
+        to be stopped ASAP and are otherwise unneeded.
+
+        Blocking!
+        """
+        self.manager.proxy_delegator.halt_and_wait(self._proxy_queue_name())
+
+    def _proxy_queue_name(self):
+        """
+        Get proxy queue name
+
+        For internal use.
+
+        :return str:
+        """
+        return f"{self.type}-{self.dataset.key}"
 
     def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
         """
