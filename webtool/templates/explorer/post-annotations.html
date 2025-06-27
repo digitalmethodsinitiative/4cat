@@ -5,81 +5,100 @@
 			{% set post_annotations = annotations[post.id] %}
 		{% endif %}
 		{% for field in annotation_fields %}
+            {% if not annotation_fields[field].hide_in_explorer %}
+                {% set type = annotation_fields[field]["type"] %}
+                {% set label = annotation_fields[field]["label"] %}
+                {% set from_dataset = annotation_fields[field].get("from_dataset", "") %}
 
-            {% set type = annotation_fields[field]["type"] %}
-			{% set label = annotation_fields[field]["label"] %}
-
-            {# Loop through annotations for this post and
-            retrieve the data from the one matching this annotation field id #}
-            {% set an = namespace(an={}) %}
-			{% for post_annotation in post_annotations %}
-				{% if post_annotation.field_id  == field %}
-                    {% set an.an = post_annotation %}
-    			{% endif %}
-            {% endfor %}
-            {% set annotation = an.an %}
-
-			<div class="post-annotation field-{{ field }} type-{{ type }} item-id-{{ post.id }}">
-                <label class="annotation-label">{{ label }}</label>
-			{% if type == "text" %}
-				<input type="text" class="post-annotation-input" value="{{ annotation.value }}">
-
-			{% elif type == "textarea" %}
-				<textarea class="post-annotation-input">{{ annotation.value }}</textarea>
-
-			{% elif type == "dropdown" %}
-				<select class="post-annotation-input">
-				    <option class="post-annotation-option" value=""></option>
-
-				{% for option_id, option_label in annotation_fields[field]["options"].items() %}
-
-					<option class="post-annotation-option option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == annotation.value %}selected{% endif %}>{{ option_label }}</option>
-				{% endfor %}
-				</select>
-
-			{% elif type == "checkbox" %}
-				<div class="post-annotation-options">
-				{% for option_id, option_label in annotation_fields[field]["options"].items() %}
-					{% set checked = "checked" if option_label in annotation.value else "" %}
-					<input type="checkbox" class="post-annotation-input option-{{ option_id }}" id="option-{{ post.id }}-{{ option_id }}" value="{{ option_label }}" {{ checked }}><label for="option-{{ post.id }}-{{ option_id }}">{{ option_label }}</label>
-				{% endfor %}
-				</div>
-			{% endif %}
-
-            {# Tooltip with metadata on the annotation #}
-            {% if annotation.author or annotation.author_original or annotation.timestamp or annotation.metadata %}
-                <button class="tooltip-trigger" aria-controls="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}">?</button>
-                <p role="tooltip" id="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}" aria-hidden="true">
-                {% if annotation.author_original %}
-                    <span class="tooltip-line">Created by {% if annotation.by_processor %} processor{% endif %} {% if annotation.author_original %}<strong>{{ annotation.author_original }}</strong>{% endif %}
-                    {% if annotation.timestamp_created %}
-                        on <span class="timestamp-created timestamp-to-convert">{{ annotation.timestamp_created }}</span>
-                    {% endif %}</span>
-                {% endif %}
-                {% if annotation.author != annotation.author_original or annotation.timestamp != annotation.timestamp_created %}
-                    <span class="tooltip-line">Edited by{% if annotation.by_processor %} processor{% endif %} {% if annotation.author %}<strong><span class="annotation-author">{{ annotation.author }}</span></strong>{% endif %}{% if annotation.timestamp %} on <span class="timestamp-edited timestamp-to-convert">{{ annotation.timestamp }}</span>{% endif %}
-                {% endif %}</span>
-                {# Extra stuff we may want to display #}
-                {% if annotation.metadata %}
-                    {% set metadata = annotation.metadata | fromjson %}
-                    {% if metadata.get("processor-parameters") %}
-                        <span class="tooltip-line">
-                        {% for parameter, input_value in metadata["processor-parameters"].items() %}
-                            <span class="property-badge">{{ parameter }}={{ input_value }}</span>
-                        {% endfor %}
-                        </span>
+                {# Loop through annotations for this post and
+                retrieve the data from the one matching this annotation field id #}
+                {% set an = namespace(an={}) %}
+                {% for post_annotation in post_annotations %}
+                    {% if post_annotation.field_id  == field %}
+                        {% set an.an = post_annotation %}
                     {% endif %}
-                {% endif %}
-                </p>
-            {% endif %}
+                {% endfor %}
+                {% set annotation = an.an %}
+                {# Show empty values for human-made annotations, not for processor-made ones #}
+                {% if not (from_dataset and not annotation.value) %}
+                    <div class="post-annotation field-{{ field }} type-{{ type }} item-id-{{ post.id }}">
+                        {# If generated by a processor, link to the dataset and simply output the text; it can't be edited '#}
+                        {% if from_dataset %}
+                            <label class="annotation-label"><a href="{{ url_for('dataset.show_result', key=from_dataset)}}" target="_blank" class="from-dataset-link"><i class="fa-solid fa-tag"></i> {{ label }}</a></label>
+                        {% else %}
+                            <label class="annotation-label"><i class="fa-solid fa-tag"></i> {{ label }}</label>
+                        {% endif %}
 
-                {# Store some invisible data here to we can retrieve in with JS #}
-                <div class="annotation-data" style="display: none;">
-                    <span class="epoch-timestamp-edited">{{ annotation.timestamp }}</span>
-                    <span class="annotation-author">{{ annotation.author }}</span>
-                    <span class="annotation-options">{{ annotation_fields[field].get("options", {}).values() | join(",") }}</span>
-                </div>
-			</div>
+                        {# If generated by a processor, just output the generated text #}
+                        <div class="post-annotation-value">
+                            {% if from_dataset %}
+                                <div class="post-annotation-input from-dataset">{{ annotation.value | add_ahref | safe }}</div>
+                                {% set item = from_datasets[annotation.from_dataset] %}
+                                {% if item.type in processors %}
+                                    {% set processor_options = processors[item.type].get_options(config=config) %}
+                                {% endif %}
+                                <div class="post-annotation-parameters">
+                                    <ul>
+                                    {% for option in item.parameters %}
+                                        {% if processor_options[option].type not in ("annotation", "annotations") %}
+                                            {% set extra_tooltip_id =  annotation.id %}
+                                            {% include 'components/result-parameter.html' %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    </ul>
+                                </div>
+                            {% elif type == "text" %}
+                                <input type="text" class="post-annotation-input" value="{{ annotation.value }}">
+
+                            {% elif type == "textarea" %}
+                                <textarea class="post-annotation-input">{{ annotation.value }}</textarea>
+
+                            {% elif type == "dropdown" %}
+                                <select class="post-annotation-input">
+                                    <option class="post-annotation-option" value=""></option>
+
+                                {% for option_id, option_label in annotation_fields[field]["options"].items() %}
+                                    <option class="post-annotation-option option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == annotation.value %}selected{% endif %}>{{ option_label }}</option>
+                                {% endfor %}
+                                </select>
+
+                            {% elif type == "checkbox" %}
+                                <div class="post-annotation-options">
+                                {% for option_id, option_label in annotation_fields[field]["options"].items() %}
+                                    <div class="post-annotation-checkbox-container">
+                                        {% set checked = "checked" if option_label in annotation.value else "" %}
+                                        <input type="checkbox" class="post-annotation-input option-{{ option_id }}" id="option-{{ post.id }}-{{ option_id }}" value="{{ option_label }}" {{ checked }}><label for="option-{{ post.id }}-{{ option_id }}">{{ option_label }}</label>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        {# Tooltip with metadata on the annotation #}
+                        {% if annotation.author or annotation.author_original or annotation.timestamp or annotation.metadata %}
+                            <button class="tooltip-trigger" aria-controls="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}">?</button>
+                            <p role="tooltip" id="tooltip-annotation-metadata-{{ post.id }}-{{ annotation.field_id }}" aria-hidden="true">
+                            {% if annotation.author_original %}
+                                <span class="tooltip-line">Created by {% if annotation.by_processor %} processor{% endif %} {% if annotation.author_original %}<strong>{{ annotation.author_original }}</strong>{% endif %}
+                                {% if annotation.timestamp_created %}
+                                    on <span class="timestamp-created timestamp-to-convert">{{ annotation.timestamp_created }}</span>
+                                {% endif %}</span>
+                            {% endif %}
+                            {% if annotation.author != annotation.author_original or annotation.timestamp != annotation.timestamp_created %}
+                                <span class="tooltip-line">Edited by{% if annotation.by_processor %} processor{% endif %} {% if annotation.author %}<strong><span class="annotation-author">{{ annotation.author }}</span></strong>{% endif %}{% if annotation.timestamp %} on <span class="timestamp-edited timestamp-to-convert">{{ annotation.timestamp }}</span>{% endif %}
+                            {% endif %}</span>
+                            </p>
+                        {% endif %}
+
+                        {# Store some invisible data here to we can retrieve in with JS #}
+                        <div class="annotation-data" style="display: none;">
+                            <span class="epoch-timestamp-edited">{{ annotation.timestamp }}</span>
+                            <span class="annotation-author">{{ annotation.author }}</span>
+                            <span class="annotation-options">{{ annotation_fields[field].get("options", {}).values() | join(",") }}</span>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
 		{% endfor %}
 	{% endif %}
 </div>

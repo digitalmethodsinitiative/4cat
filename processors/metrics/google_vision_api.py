@@ -81,6 +81,11 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 "OBJECT_LOCALIZATION": "Object Localization"
             },
             "default": ["LABEL_DETECTION"]
+        },
+        "annotation_info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "The output can be made human-readable through the following `Convert Vision results to CSV` "
+                    "processor. This also lets you write the labels as annotations to the original dataset."
         }
     }
 
@@ -127,9 +132,9 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 if image_file.name == ".metadata.json":
                     img_metadata = json.load(image_file.open())
                     if img_metadata:
-                        img_metadata = [v for v in img_metadata.values()]
-
-                self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
+                        img_metadata = {v["filename"]: v.get("post_ids", []) for v in img_metadata.values()}
+                else:
+                    self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
                 continue
 
             try:
@@ -138,13 +143,12 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 # cannot continue fetching, e.g. when API key is invalid
                 break
 
-            processed += 1
             if not annotations:
                 continue
 
             annotations = {
                 "file_name": image_file.name,
-                "post_ids": img_metadata[processed - 1].get("post_ids", []),
+                "post_ids": img_metadata[image_file.name],
                 **annotations}
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:

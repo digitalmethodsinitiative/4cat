@@ -74,6 +74,7 @@ CREATE INDEX datasets_owners_key ON datasets_owners (key);
 CREATE TABLE IF NOT EXISTS annotations (
   id                SERIAL PRIMARY KEY,
   dataset           TEXT,
+  from_dataset      TEXT,
   field_id          TEXT,
   item_id           TEXT,
   timestamp         INT DEFAULT 0,
@@ -96,11 +97,15 @@ CREATE INDEX IF NOT EXISTS annotations_dataset
 ON annotations (
     dataset
 );
+CREATE INDEX IF NOT EXISTS annotations_from_dataset
+ON annotations (
+    from_dataset
+);
 CREATE UNIQUE INDEX IF NOT EXISTS annotation_unique
 ON annotations (
     dataset,
     item_id,
-    label
+    field_id
 );
 CREATE INDEX IF NOT EXISTS annotation_dataset
 ON annotations (

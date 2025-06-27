@@ -31,7 +31,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     """
     type = "preset-video-hashes"  # job type ID
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
+    title = "Create video hashes to identify near duplicate videos"  # title displayed in UI
     description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
     extension = "gexf"
 
@@ -61,6 +61,11 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
                 "default": 95,
                 "min": 0,
                 "max": 100
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Add hashes to top dataset",
+                "default": False
             }
         }
 
@@ -78,7 +83,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
         return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
                config.get("video-downloader.ffmpeg_path") and \
                shutil.which(config.get("video-downloader.ffmpeg_path"))
-        
+
     def get_processor_advanced_pipeline(self, attach_to=None):
         """
         This queues a series of post-processors to visualise videos.
@@ -92,6 +97,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
                 "parameters": {
                     "frame_interval": self.parameters.get("frame_interval", 1),
                     "amount": self.parameters.get("amount", 100),
+                    "save_annotations": self.parameters.get("save_annotations", False),
                     "next": [
                         # then create hash similarity network
                         {
@@ -112,7 +118,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
                 }
             }
         ]
-    
+
 class VideoHasher(BasicProcessor):
     """
     Video Hasher
@@ -134,10 +140,10 @@ class VideoHasher(BasicProcessor):
     """
     type = "video-hasher-1"  # job type ID
     category = "Visual"  # category
-    title = "Create Video collages"  # title displayed in UI
+    title = "Create video collages"  # title displayed in UI
     description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
-    media_type = "image"  # media type of the result
+    media_type = "image" # media type of the result
 
     followups = ["video-hash-network", "video-hash-similarity-matrix"]
 
@@ -163,7 +169,7 @@ class VideoHasher(BasicProcessor):
                 "default": 1,
                 "min": 0,
                 "max": 5,
-            },
+            }
         }
 
         return options
@@ -190,6 +196,7 @@ class VideoHasher(BasicProcessor):
         frame_interval = self.parameters.get("frame_interval", 1)
         max_videos = self.parameters.get("amount", 100)
         self.dataset.log('Frames per seconds: %f' % frame_interval)
+        save_annotations = self.parameters.get("save_annotations", False)
 
         # Prepare staging area for videos and video tracking
         # VideoHash creates various files that may not be cleaned up on error so we use an output directory
@@ -232,6 +239,9 @@ class VideoHasher(BasicProcessor):
                 self.dataset.update_status(f"Unable to extract frame for {path.name} (see log for details)")
                 self.dataset.log(f"Unable to extract frame for {str(path)}: {e}")
                 continue
+            except OSError:
+                self.dataset.finish_with_error("4CAT does not have the right privileges to access the video files.")
+                return
 
             video_hashes[path.name] = {'videohash': videohash}
 
@@ -252,6 +262,7 @@ class VideoHasher(BasicProcessor):
         # This file is held here and then copied as its own dataset via VideoHasherTwo
         num_posts = 0
         rows = []
+        annotations = []
         if video_metadata is None:
             # Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
             try:
@@ -306,7 +317,16 @@ class VideoHasher(BasicProcessor):
                         "post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
                         'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
                     })
+                    if save_annotations:
+                        for item_id in data.get("post_ids", []):
+                            annotations.append({
+                                "label": "video-hash",
+                                "value": video_hash.hash,
+                                "item_id": item_id
+                            })
+
                     num_posts += 1
+
 
         writer = None
         with output_dir.joinpath("video_hashes.csv").open("w", encoding="utf-8", newline="") as outfile:
@@ -316,6 +336,10 @@ class VideoHasher(BasicProcessor):
                     writer.writeheader()
                 writer.writerow(row)
                 num_posts += 1
+
+        if save_annotations and annotations:
+            self.dataset.update_status("Saving hashes as annotations to top dataset")
+            self.save_annotations(annotations)
 
         # Finish up
         self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')

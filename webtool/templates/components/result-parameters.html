@@ -1,0 +1,55 @@
+<div class="parameters">
+    <ul>
+        {% if item.get_extension() in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp") or item.get_own_processor().map_item %}
+            <li>
+                <a href="{{ url_for('dataset.preview_items', key=item.key) }}"
+                   data-load-from="{{ url_for('dataset.preview_items', key=item.key) }}"
+                   class="property-badge permalink popup-trigger tooltip-trigger"
+                   aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}"><i
+                        class="fa fa-fw fa-search"></i> Preview<span class="sr-only"> this dataset</span></a>
+                <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
+                <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
+            </li>
+            {% endif %}
+            {% if item.get_log_path().exists() and current_user.is_authenticated %}
+            <li>
+                <a href="{{ url_for('dataset.view_log', key=item.key) }}"
+                   data-load-from="{{ url_for('dataset.view_log', key=item.key) }}"
+                   class="property-badge permalink popup-trigger tooltip-trigger"
+                   aria-controls="tooltip-log-{{ item.key }} popup-log-{{ item.key }}"><i
+                        class="fa fa-fw fa-clipboard-list"></i> <span class="sr-only">View dataset log file</span></a>
+                <div role="dialog" id="popup-log-{{ dataset.key }}"></div>
+                <p role="tooltip" id="tooltip-log-{{ item.key }}" aria-hidden="true">View the log file for this dataset</p>
+            </li>
+            {% endif %}
+            <li rel="external">
+                <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-permalink-{{ item.key }}" href="{{ url_for('dataset.show_result', key=parent_key) }}#nav={{ item.get_breadcrumbs() }}" target="_blank"><i class="fa fa-fw fa-hashtag" aria-hidden="true"></i> <span class="sr-only">Permalink to this result (with context)</span></a>
+                <p role="tooltip" id="tooltip-permalink-{{ item.key }}" aria-hidden="true">Permanent link to this analysis (with context)</p>
+            </li>
+            {% if item.type in processors %}
+            {% if processors[item.type]["references"] %}
+            <li>
+                {% set ref_name = processors[item.type].title %}{% set ref_refs = processors[item.type]["references"] %}{% set ref_id = item.key %}{% include "components/processor-references.html" %}
+            </li>
+            {% endif %}
+            {% if item.get_version_url("backend/processors/" + processors[item.type].filepath) %}
+            <li rel="external">
+                <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-code-{{ item.key }}" href="{{ item.get_version_url("backend/processors/" + processors[item.type].filepath) }}" rel="external" target="_blank"><i class="fab fa-fw fa-github" aria-hidden="true"></i> <span class="sr-only">Review the code that generated this result</span></a>
+                <p role="tooltip" id="tooltip-code-{{ item.key }}" aria-hidden="true">Review the code that generated this result</p>
+            </li>
+            {% endif %}
+            {% endif %}
+            {% if current_user.is_authenticated and (dataset.is_accessible_by(current_user, "owner") or __user_config("privileges.admin.can_manipulate_all_datasets") or item.is_accessible_by(current_user, "owner")) %}
+            <li>
+                <a class="property-badge delete-link tooltip-trigger" href="{{ url_for('toolapi.delete_dataset', key=item.key) }}?redirect" data-confirm-action="delete this dataset"><i class="fa fa-fw fa-times" aria-hidden="true"></i> <span class="sr-only">Delete this analysis</span></a>
+                <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished() %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
+            </li>
+            {% endif %}
+        {% if item.type in processors %}{% set processor_options = processors[item.type].get_options(config=__config) %}{% endif %}
+        {% for option in item.parameters %}
+            {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
+                {% include 'components/result-parameter.html' %}
+        {% endif %}
+        {% endfor %}
+    </ul>
+</div>

@@ -1,0 +1,15 @@
+{% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
+    {% if processor_options[option].type in ("toggle", "annotation") %}
+        {% if item.parameters[option] %}<li><span class="property-badge">{{ option }}</span></li>{% endif %}
+    {% else %}
+        <li><span class="property-badge copy-to-clipboard tooltip-trigger" data-clipboard-value="{{ item.parameters[option] }}" aria-controls="tooltip-clipboard">{{ option }}=<!--
+            {% set str_param = item.parameters[option]|string %}
+            {% if str_param|length < 15 %}
+            -->{{ item.parameters[option] }}
+            {% else %}
+            --><span class="tooltip-trigger" aria-controls="tooltip-parameter-{{ item.key }}-{{ option }}{{ extra_tooltip_id }}">{{ str_param[:14] }}<span class="ellipsis" aria-label="Parameter truncated">...</span></span>
+            <p role="tooltip" id="tooltip-parameter-{{ item.key }}-{{ option }}{{ extra_tooltip_id }}">{{ item.parameters[option] }}</p>
+            {% endif %}
+        </span></li>
+    {% endif %}
+{% endif %}

@@ -11,6 +11,7 @@ from nltk.collocations import TrigramCollocationFinder, BigramCollocationFinder
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 
+
 class GetCollocations(BasicProcessor):
 	"""
 	Generates word collocations from input tokens
@@ -78,8 +79,8 @@ class GetCollocations(BasicProcessor):
 			"default": False,
 			"help": "Sort co-word pairs",
 			"tooltip": "Sorts co-word pairs alphabetically. This means \"quick fox\" will be shuffled to \"fox quick\". " \
-			"If a required word or words are given, these are put in first so their co-words can be easily extracted. " \
-			"Word order can be relevant, so this is turned off by default."
+					   "If a required word or words are given, these are put in first so their co-words can be easily extracted. " \
+					   "Word order can be relevant, so this is turned off by default."
 		},
 		"min_frequency": {
 			"type": UserInput.OPTION_TEXT,
@@ -90,6 +91,13 @@ class GetCollocations(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
 			"help": "Maximum number of top co-words to extract (0 = all)"
+		},
+		"save_annotations": {
+			"type": UserInput.OPTION_ANNOTATION,
+			"label": "cowords",
+			"default": False,
+			"hide_in_explorer": True,
+			"tooltip": "Co-words are written as a string containing a lists of tuples"
 		}
 	}
 
@@ -122,6 +130,8 @@ class GetCollocations(BasicProcessor):
 
 		query_string = self.parameters.get("query_string", "").replace(" ", "")
 
+		save_annotations = self.parameters.get("save_annotations", False)
+
 		# n_size smaller than window_size does not make sense
 		n_size = min(n_size, window_size)
 
@@ -142,11 +152,19 @@ class GetCollocations(BasicProcessor):
 
 		# Dictionary to save queries from
 		results = []
+		annotations = {}
 
 		# Go through all archived token sets and generate collocations for each
 		for token_file in self.iterate_archive_contents(self.source_file):
+
 			if token_file.name == '.token_metadata.json':
-				# Skip metadata
+
+				# Get metadata if we write annotations
+				if save_annotations:
+					with token_file.open("rb") as metadata_file:
+						metadata = json.load(metadata_file)
+
+				# Don't get co-words from metadata
 				continue
 			# we support both pickle and json dumps of vectors
 			token_unpacker = pickle if token_file.suffix == "pb" else json
@@ -165,8 +183,20 @@ class GetCollocations(BasicProcessor):
 
 			# The tokens are separated per posts, so we get collocations per post.
 			for post_tokens in tokens:
-				post_collocations = self.get_collocations(post_tokens, window_size, n_size, query_string=query_string, forbidden_words=forbidden_words, unique=unique)
+				post_collocations = self.get_collocations(post_tokens, window_size, n_size, query_string=query_string,
+														  forbidden_words=forbidden_words, unique=unique)
 				collocations += post_collocations
+
+				if save_annotations:
+					if date_string not in annotations:
+						annotations[date_string] = []
+					annotation_value = ""
+					if post_collocations:
+						annotation_value = ",".join([f"{c[0]} {c[1]}" for c in post_collocations])
+					annotations[date_string].append({
+						"label": "co-words",
+						"value": annotation_value
+					})
 
 			# Loop through the collocation per post, merge, and store in the results list
 			tokenset_results = {}
@@ -230,6 +260,19 @@ class GetCollocations(BasicProcessor):
 		if not results:
 			return
 
+		# Save annotations; match item IDs with time-sorted token sets, using the metadata file.
+		if save_annotations and annotations:
+			doc_no = 0
+			for item_id, item_data in metadata.items():
+				if item_id == "parameters":
+					continue
+				for time_grouping, time_data in item_data.items():
+					for doc_line in time_data["document_numbers"]:
+						annotations[time_data["interval"]][doc_line]["item_id"] = item_id
+						doc_no += 1
+			annotations = [ann for ann_list in list(annotations.values()) for ann in ann_list]
+			self.save_annotations(annotations, hide_in_explorer=True)
+
 		# Generate csv and finish
 		self.dataset.update_status("Writing to csv and finishing")
 		self.write_csv_items_and_finish(results)
@@ -277,7 +320,8 @@ class GetCollocations(BasicProcessor):
 
 			# Filter out forbidden words
 			if forbidden_words:
-				forbidden_words_filter = word_filter = lambda w1, w2, w3: any(string in (w1, w2, w3) for string in forbidden_words)
+				forbidden_words_filter = word_filter = lambda w1, w2, w3: any(
+					string in (w1, w2, w3) for string in forbidden_words)
 				finder.apply_ngram_filter(word_filter)
 
 		else:
