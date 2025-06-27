@@ -150,6 +150,7 @@ with app.app_context():
     app.log = log
     app.db = db
     app.fourcat_config = config
+    app._memcache_initialized = False  # flag to check if memcache was initialized
     app.fourcat_modules = ModuleCollector(app.fourcat_config)
 
     # import all views; these can only be imported here because they rely on
@@ -187,6 +188,11 @@ with app.app_context():
             # in contexts where we're serving static files through slack, save
             # some overhead
             return
+        
+         # Initialize memcache once per worker
+        if not app._memcache_initialized:
+            app.fourcat_config.memcache = config.load_memcache()
+            app._memcache_initialized = True
 
         g.base_config = config
         g.queue = queue
