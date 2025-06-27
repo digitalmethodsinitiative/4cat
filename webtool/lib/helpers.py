@@ -14,7 +14,6 @@ from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
 from pathlib import Path
 
-from common.config_manager import config
 csv.field_size_limit(1024 * 1024 * 1024)
 
 class Pagination(object):
@@ -242,15 +241,15 @@ def generate_css_colours(force=False):
 	:param bool force:  Create colour definition file even if it exists already
 	:return:
 	"""
-	interface_hue = config.get("4cat.layout_hue") / 360  # colorsys expects 0-1 values
-	secondary_hue = config.get("4cat.layout_hue_secondary") / 360
+	interface_hue = g.config.get("4cat.layout_hue") / 360  # colorsys expects 0-1 values
+	secondary_hue = g.config.get("4cat.layout_hue_secondary") / 360
 	main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
 	accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
 	# get opposite by adjusting the hue by 50%
 	opposite_colour = colorsys.hsv_to_rgb(secondary_hue, 0.87, 0.9)
 
-	template_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
-	colour_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")
+	template_file = g.config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
+	colour_file = g.config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")
 
 	if colour_file.exists() and not force:
 		# exists already, don't overwrite
@@ -269,8 +268,8 @@ def generate_css_colours(force=False):
 	# Update the favicon
 	new_favicon_color(
 		color=tuple([int(bit*255) for bit in main_colour]),
-		input_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon-bw.ico"),
-		output_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon.ico")
+		input_filepath=g.config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon-bw.ico"),
+		output_filepath=g.config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon.ico")
 	)
 
 
@@ -298,7 +297,7 @@ def check_restart_request():
 	file. This ensures a restart is in progress and the request belongs to that
 	specific restart.
 	"""
-	lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+	lock_file = Path(g.config.get("PATH_ROOT"), "config/restart.lock")
 	if not lock_file.exists():
 		return False
 

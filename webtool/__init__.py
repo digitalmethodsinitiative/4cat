@@ -202,10 +202,10 @@ with app.app_context():
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402
 
-# ensure that colour definition CSS file is present - the CSS colours can be
-# changed by the admin so we need to regenerate the CSS file to make sure it
-# is up to date. Might want to use e.g. SCSS in the future...
-generate_css_colours()
+    # ensure that colour definition CSS file is present - the CSS colours can be
+    # changed by the admin so we need to regenerate the CSS file to make sure it
+    # is up to date. Might want to use e.g. SCSS in the future...
+    generate_css_colours()
 
 # run it (when called directly)
 if __name__ == "__main__":
