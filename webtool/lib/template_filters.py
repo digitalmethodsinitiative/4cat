@@ -10,7 +10,6 @@ import requests
 import regex
 
 from urllib.parse import urlencode, urlparse
-from webtool import config
 from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify, ellipsiate
 
@@ -179,7 +178,7 @@ def _jinja2_filter_json(data):
 @current_app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
 	try:
-		return config.get("flask." + property, user=current_user)
+		return g.config.get("flask." + property, user=current_user)
 	except AttributeError:
 		return data
 
@@ -427,7 +426,7 @@ def inject_now():
 		"__notifications": current_user.get_notifications(),
 		"__user_config": lambda setting: g.config.get(setting),
 		"__config": g.config,
-		"__user_cp_access": any([g.config.get(p) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
+		"__user_cp_access": any([g.config.get(p) for p in g.config.config_definition.keys() if p.startswith("privileges.admin")]),
 		"__version": version,
 		"uniqid": uniqid
 	}

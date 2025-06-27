@@ -33,7 +33,7 @@ class UpdateChecker(BasicWorker):
 
         timeout = 15
         try:
-            (latest_tag, release_url) = get_github_version(timeout)
+            (latest_tag, release_url) = get_github_version(self.config.get("4cat.github_url"), timeout)
             if latest_tag == "unknown":
                 raise ValueError()
         except ValueError:

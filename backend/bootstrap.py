@@ -12,9 +12,8 @@ from common.lib.module_loader import ModuleCollector
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
 
-from common.config_manager import config
-
 def run(as_daemon=True, log_level="INFO"):
+	from common.config_manager import config
 	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
 
 	if as_daemon:
@@ -47,12 +46,13 @@ def run(as_daemon=True, log_level="INFO"):
 		print(indent + "+---------------------------------------------------------------+\n\n")
 
 	# load everything
+	log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
 	if config.get("USING_DOCKER"):
 		as_daemon = True
 		# Rename log if Docker setup
-		log = Logger(output=True, filename='backend_4cat.log', log_level=log_level)
+		log = Logger(output=True, log_path=log_folder.joinpath("backend_4cat.log"), log_level=log_level)
 	else:
-		log = Logger(output=not as_daemon, filename='4cat.log', log_level=log_level)
+		log = Logger(output=not as_daemon, log_path=log_folder.joinpath("backend_4cat.log"), log_level=log_level)
 
 	log.info("4CAT Backend started, logger initialised")
 	db = Database(logger=log, appname="main",
@@ -63,6 +63,15 @@ def run(as_daemon=True, log_level="INFO"):
 	db.commit()
 	queue.release_all()
 
+	# test memcache and clear upon backend restart
+	if config.get("MEMCACHE_SERVER"):
+		if config.memcache:
+			log.debug("Memcache connection initialized - clearing")
+			config.clear_cache()
+		else:
+			log.warning("Memcache server address configured, but connection could not be initialized. Configuration cache inactive.")
+
+	log.load_webhook(config)
 	# ensure database consistency for settings table
 	config.with_db(db)
 	config.ensure_database()

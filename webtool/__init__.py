@@ -1,5 +1,6 @@
 import logging.handlers
 import subprocess
+from collections import namedtuple
 import sys
 import os
 
@@ -46,12 +47,15 @@ proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
 app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
 # set up logger for error logging etc
+log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
 if config.get("USING_DOCKER"):
     # in Docker it is useful to have two separate files - since 4CAT is also
     # in two separate containers
-    log = Logger(logger_name='4cat-frontend', filename='frontend_4cat.log')
+    log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("frontend_4cat.log"))
 else:
-    log = Logger(logger_name='4cat-frontend')
+    log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("4cat.log"))
+
+log.load_webhook(config)
 
 # set up logging for Gunicorn
 # this redirects Gunicorn log messages to the logger instantiated above - more
@@ -127,6 +131,11 @@ app.login_manager.login_view = "user.show_login"
 # initialize rate limiter
 app.limiter = Limiter(app=app, key_func=get_remote_address)
 
+# read these once, because we need them for each request but they will never
+# change without a restart
+app.autologin = namedtuple("AutologinSettings", ("hostnames", "api"))
+app.autologin.hostnames = config.get("flask.autologin.hostnames")
+app.autologin.api = config.get("flask.autologin.api")
 
 # now create an app context to import Blueprints into
 # the app context allows us to pass some values for use inside the Blueprints
@@ -141,6 +150,7 @@ with app.app_context():
     app.log = log
     app.db = db
     app.fourcat_config = config
+    app._memcache_initialized = False  # flag to check if memcache was initialized
     app.fourcat_modules = ModuleCollector(app.fourcat_config)
 
     # import all views; these can only be imported here because they rely on
@@ -174,21 +184,33 @@ with app.app_context():
         request's active user, so these are registered in the global `g`
         contextual namespace.
         """
-        g.base_config = config
+        if request.path.startswith("/static/") or request.path.endswith("favicon.ico"):
+            # in contexts where we're serving static files through slack, save
+            # some overhead
+            return
+        
+         # Initialize memcache once per worker
+        if not app._memcache_initialized:
+            app.fourcat_config.memcache = config.load_memcache()
+            app._memcache_initialized = True
+
         g.queue = queue
         g.db = db
         g.log = log
-        g.config = ConfigWrapper(g.base_config, user=current_user, request=request)
+        g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request, memcache=app.fourcat_config.memcache)
         g.modules = current_app.fourcat_modules
 
+        current_user.with_config(g.config)
+
     # import custom jinja2 template filters
+
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402
 
-# ensure that colour definition CSS file is present - the CSS colours can be
-# changed by the admin so we need to regenerate the CSS file to make sure it
-# is up to date. Might want to use e.g. SCSS in the future...
-generate_css_colours()
+    # ensure that colour definition CSS file is present - the CSS colours can be
+    # changed by the admin so we need to regenerate the CSS file to make sure it
+    # is up to date. Might want to use e.g. SCSS in the future...
+    generate_css_colours()
 
 # run it (when called directly)
 if __name__ == "__main__":

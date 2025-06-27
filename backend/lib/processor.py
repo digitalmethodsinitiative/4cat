@@ -387,7 +387,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 message.attach(MIMEText(html_parser.handle(mail), "plain"))
                 message.attach(MIMEText(mail, "html"))
                 try:
-                    send_email([owner], message)
+                    send_email([owner], message, self.config)
                 except (SMTPException, ConnectionRefusedError, socket.timeout):
                     self.log.error("Error sending email to %s" % owner)
 

@@ -1,8 +1,12 @@
 import itertools
+import threading
 import pickle
 import time
 import json
 
+from pymemcache.client.base import Client as MemcacheClient
+from pymemcache.exceptions import MemcacheError
+from pymemcache import serde
 from pathlib import Path
 from common.lib.database import Database
 
@@ -12,23 +16,31 @@ from common.lib.config_definition import config_definition
 import configparser
 import os
 
+class CacheMiss:
+    """
+    Helper class to distinguish memcache misses from true `None` values
+    """
+    pass
+
 
 class ConfigManager:
     db = None
     dbconn = None
     cache = {}
+    memcache = None
 
     core_settings = {}
     config_definition = {}
-    tag_context = []  # todo
 
     def __init__(self, db=None):
         # ensure core settings (including database config) are loaded
         self.load_core_settings()
         self.load_user_settings()
+        self.memcache = self.load_memcache()
 
         # establish database connection if none available
-        self.db = db
+        if db:
+            self.with_db(db)
 
     def with_db(self, db=None):
         """
@@ -124,6 +136,8 @@ class ConfigManager:
             "API_HOST": config_reader["API"].get("api_host"),
             "API_PORT": config_reader["API"].getint("api_port"),
 
+            "MEMCACHE_SERVER": config_reader.get("MEMCACHE", option="memcache_host", fallback={}),
+
             "PATH_ROOT": Path(os.path.abspath(os.path.dirname(__file__))).joinpath(
                 "..").resolve(),  # better don"t change this
             "PATH_LOGS": Path(config_reader["PATHS"].get("path_logs", "")),
@@ -136,6 +150,31 @@ class ConfigManager:
             "SECRET_KEY": config_reader["GENERATE"].get("secret_key")
         })
 
+
+    def load_memcache(self):
+        """
+        Initialise memcache client
+
+        The config reader can optionally use Memcache to keep fetched values in
+        memory.
+        """
+        if self.get("MEMCACHE_SERVER"):
+            try:
+                # do one test fetch to test if connection is valid
+                memcache = MemcacheClient(self.get("MEMCACHE_SERVER"), serde=serde.pickle_serde, key_prefix=b"4cat-config")
+                memcache.set("4cat-init-dummy", time.time())
+                memcache.init_thread_id = threading.get_ident()
+                return memcache
+            except (SystemError, ValueError, MemcacheError):
+                # we have no access to the logger here so we simply pass
+                # later we can detect elsewhere that a memcache address is
+                # configured but no connection is there - then we can log
+                # config reader still works without memcache
+                pass
+
+        return None
+
+
     def ensure_database(self):
         """
         Ensure the database is in sync with the config definition
@@ -146,7 +185,7 @@ class ConfigManager:
         self.with_db()
 
         # create global values for known keys with the default
-        known_settings = self.get_all()
+        known_settings = self.get_all_setting_names()
         for setting, parameters in self.config_definition.items():
             if setting in known_settings:
                 continue
@@ -178,9 +217,30 @@ class ConfigManager:
         self.set("flask.tag_order", tag_order)
         self.db.commit()
 
-    def get_all(self, is_json=False, user=None, tags=None):
+    def get_all_setting_names(self):
+        """
+        Get names of all settings
+
+        For when the value doesn't matter!
+
+        :return list:  List of setting names known by the database and core settings
+        """
+        # attempt to initialise the database connection so we can include
+        # user settings
+        if not self.db:
+            self.with_db()
+
+        settings = list(self.core_settings.keys())
+        settings.extend([s["name"] for s in self.db.fetchall("SELECT DISTINCT name FROM settings")])
+
+        return settings
+
+    def get_all(self, is_json=False, user=None, tags=None, memcache=None):
         """
         Get all known settings
+
+        This is *not optimised* but used rarely enough that that doesn't
+        matter so much.
 
         :param bool is_json:  if True, the value is returned as stored and not
         interpreted as JSON if it comes from the database
@@ -190,21 +250,23 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
+        :param MemcacheClient memcache:  Memcache client. If `None` and
+        `self.memcache` exists, use that instead.
 
         :return dict: Setting value, as a dictionary with setting names as keys
         and setting values as values.
         """
-        return self.get(attribute_name=None, default=None, is_json=is_json, user=user, tags=tags)
+        for setting in self.get_all_setting_names():
+            yield setting, self.get(setting, None, is_json, user, tags, memcache=memcache)
 
-    def get(self, attribute_name, default=None, is_json=False, user=None, tags=None):
+
+    def get(self, attribute_name, default=None, is_json=False, user=None, tags=None, memcache=None):
         """
         Get a setting's value from the database
 
         If the setting does not exist, the provided fallback value is returned.
 
-        :param str|list|None attribute_name:  Setting to return. If a string,
-        return that setting's value. If a list, return a dictionary of values.
-        If none, return a dictionary with all settings.
+        :param str attribute_name:  Setting to return.
         :param default:  Value to return if setting does not exist
         :param bool is_json:  if True, the value is returned as stored and not
         interpreted as JSON if it comes from the database
@@ -214,17 +276,37 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
+        :param MemcacheClient memcache:  Memcache client. If `None` and
+        `self.memcache` exists, use that instead.
 
         :return:  Setting value, or the provided fallback, or `None`.
         """
         # core settings are not from the database
-        if type(attribute_name) is str:
-            if attribute_name in self.core_settings:
-                return self.core_settings[attribute_name]
-            else:
-                attribute_name = (attribute_name,)
-        elif type(attribute_name) in (set, str):
-            attribute_name = tuple(attribute_name)
+        # they are therefore also not memcached - too little gain
+        if type(attribute_name) is not str:
+            raise TypeError(f"attribute_name must be a str, {attribute_name.__class__.__name__} given")
+
+        if attribute_name in self.core_settings:
+            # we never get to the database or memcache part of this method if
+            # this is a core setting we already know
+            return self.core_settings[attribute_name]
+
+        # short-circuit via memcache if appropriate
+        if not memcache and self.memcache:
+            memcache = self.memcache
+
+        if memcache:
+            memcache_id = self._get_memcache_id(attribute_name, user, tags)
+            if threading.get_ident() != memcache.init_thread_id:
+                raise RuntimeError("Thread-unsafe use of memcache! Please fix your code.")
+
+            try:
+                v = memcache.get(memcache_id, default=CacheMiss)
+                if v is not CacheMiss:
+                    return v
+            except KeyError:
+                # cache miss, it's fine
+                pass
 
         # if trying to access a setting that's not a core setting, attempt to
         # initialise the database connection
@@ -236,55 +318,33 @@ class ConfigManager:
 
         # query database for any values within the required tags
         tags.append("")  # empty tag = default value
-        if attribute_name:
-            query = "SELECT * FROM settings WHERE name IN %s AND tag IN %s"
-            replacements = (tuple(attribute_name), tuple(tags))
+        query = "SELECT * FROM settings WHERE name = %s AND tag IN %s"
+        replacements = (attribute_name, tuple(tags))
+
+        tagged_settings = {setting["tag"]: setting["value"] for setting in self.db.fetchall(query, replacements)}
+
+        for tag in tags:
+            if tag in tagged_settings:
+                value = tagged_settings[tag]
+                break
         else:
-            query = "SELECT * FROM settings WHERE tag IN %s"
-            replacements = (tuple(tags), )
+            if "" in tagged_settings:
+                value = tagged_settings[""]
+            else:
+                value = default if default else None
 
-        settings = {setting: {} for setting in attribute_name} if attribute_name else {}
+        if not is_json and value is not None:
+            value = json.loads(value)
+        # TODO: Which default should have priority? The provided default feels like it should be the highest priority, but I think that is an old implementation and perhaps should be removed. - Dale
+        elif value is None and attribute_name in self.config_definition and "default" in self.config_definition[attribute_name]:
+            value = self.config_definition[attribute_name]["default"]
+        elif value is None and default is not None:
+            value = default
 
-        for setting in self.db.fetchall(query, replacements):
-            if setting["name"] not in settings:
-                settings[setting["name"]] = {}
+        if memcache:
+            memcache.set(memcache_id, value)
 
-            settings[setting["name"]][setting["tag"]] = setting["value"]
-
-        final_settings = {}
-        for setting_name, setting in settings.items():
-            # return first matching setting with a required tag, in the order the
-            # tags were provided
-            value = None
-            if setting:
-                for tag in tags:
-                    if tag in setting:
-                        value = setting[tag]
-                        break
-
-            # no matching tags? try empty tag
-            if value is None and "" in setting:
-                value = setting[""]
-
-            if not is_json and value is not None:
-                value = json.loads(value)
-            # TODO: Which default should have priority? The provided default feels like it should be the highest priority, but I think that is an old implementation and perhaps should be removed. - Dale
-            elif value is None and setting_name in self.config_definition and "default" in self.config_definition[setting_name]:
-                value = self.config_definition[setting_name]["default"]
-            elif value is None and default is not None:
-                value = default
-
-            final_settings[setting_name] = value
-
-        if attribute_name is not None and len(attribute_name) == 1:
-            # Single attribute requests; provide only the highest priority result
-            # this works because attribute_name is converted to a tuple (else already returned)
-            # if attribute_name is None, return all settings
-            # print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
-            return list(final_settings.values())[0]
-        else:
-            # All settings requested (via get_all)
-            return final_settings
+        return value
 
     def get_active_tags(self, user=None, tags=None):
         """
@@ -334,7 +394,7 @@ class ConfigManager:
 
         return tags
 
-    def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True):
+    def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True, memcache=None):
         """
         Insert OR set value for a setting
 
@@ -347,6 +407,8 @@ class ConfigManager:
                           be serialised into a JSON string
         :param bool overwrite_existing: True will overwrite existing setting, False will do nothing if setting exists
         :param str tag:  Tag to write setting for
+        :param MemcacheClient memcache:  Memcache client. If `None` and
+        `self.memcache` exists, use that instead.
 
         :return int: number of updated rows
         """
@@ -374,6 +436,14 @@ class ConfigManager:
         updated_rows = self.db.cursor.rowcount
         self.db.log.debug(f"Updated setting for {attribute_name}: {value} (tag: {tag})")
 
+        if not memcache and self.memcache:
+            memcache = self.memcache
+
+        if memcache:
+            # invalidate any cached value for this settings
+            memcache_id = self._get_memcache_id(attribute_name, None, tag)
+            memcache.delete(memcache_id)
+
         return updated_rows
 
     def delete_for_tag(self, attribute_name, tag):
@@ -388,6 +458,48 @@ class ConfigManager:
         updated_rows = self.db.cursor.rowcount
 
         return updated_rows
+
+    def clear_cache(self):
+        """
+        Clear cached configuration values
+
+        Called when the backend restarts - helps start with a blank slate.
+        """
+        if not self.memcache:
+            return
+
+        self.memcache.flush_all()
+
+    def _get_memcache_id(self, attribute_name, user=None, tags=None):
+        """
+        Generate a memcache key for a config setting request
+
+        This includes the relevant user name/tags because the value may be
+        different depending on the value of these parameters.
+
+        :param str attribute_name:
+        :param str|User user:
+        :param str|list tags:
+        :return str:
+        """
+        if tags and isinstance(tags, str):
+            tags = [tags]
+
+        tag_bit = []
+        if tags:
+            tag_bit.append("|".join(tags))
+
+        if user:
+            if type(user) is not str:
+                user = user.name
+
+            tag_bit.append(f"{user}:{tag_bit}")
+
+        memcache_id = attribute_name
+        if tag_bit:
+            memcache_id += f"-{'-'.join(tag_bit)}"
+
+        return memcache_id.encode("ascii")
 
     def __getattr__(self, attr):
         """
@@ -414,7 +526,7 @@ class ConfigWrapper:
     to `get()` are done for those tags or that user. Can also adjust tags based
     on the HTTP request, if used in a Flask context.
     """
-    def __init__(self, config, user=None, tags=None, request=None):
+    def __init__(self, config, user=None, tags=None, request=None, memcache=None):
         """
         Initialise config wrapper
 
@@ -433,11 +545,20 @@ class ConfigWrapper:
             self.tags = tags if tags else config.tags
             self.request = request if request else config.request
             self.config = config.config
+            self.memcache = config.memcache
         else:
             self.config = config
             self.user = user
             self.tags = tags
             self.request = request
+
+            # this ensures we use our own memcache client, important in threaded
+            # contexts because pymemcache is not thread-safe. Unless we get a
+            # prepared connection...
+            if memcache:
+                self.memcache = memcache
+            else:
+                self.memcache = self.config.load_memcache()
 
         # this ensures the user object in turn reads from the wrapper
         if self.user:
@@ -454,6 +575,8 @@ class ConfigWrapper:
         """
         if "tag" not in kwargs and self.tags:
             kwargs["tag"] = self.tags
+
+        kwargs["memcache"] = self.memcache
 
         return self.config.set(*args, **kwargs)
 
@@ -476,6 +599,8 @@ class ConfigWrapper:
             kwargs["tags"] = self.tags if self.tags else []
             kwargs["tags"] = self.request_override(kwargs["tags"])
 
+        kwargs["memcache"] = self.memcache
+
         return self.config.get_all(*args, **kwargs)
 
     def get(self, *args, **kwargs):
@@ -496,6 +621,8 @@ class ConfigWrapper:
         if "tags" not in kwargs:
             kwargs["tags"] = self.tags if self.tags else []
             kwargs["tags"] = self.request_override(kwargs["tags"])
+
+        kwargs["memcache"] = self.memcache
 
         return self.config.get(*args, **kwargs)
 
@@ -552,6 +679,7 @@ class ConfigWrapper:
 
         return tags
 
+
     def __getattr__(self, item):
         """
         Generic wrapper
@@ -567,25 +695,6 @@ class ConfigWrapper:
             return getattr(self, item)
         else:
             raise AttributeError(f"'{self.__name__}' object has no attribute '{item}'")
-
-class ConfigDummy:
-    """
-    Dummy class to use as initial value for class-based configs
-
-    The config manager in processor objects takes the owner of the dataset of
-    the processor into account. This is only available after the object has
-    been inititated, so until then use this dummy wrapper that throws an error
-    when used to access config variables
-    """
-    def __getattribute__(self, item):
-        """
-        Access class attribute
-
-        :param item:
-        :raises NotImplementedError:
-        """
-        raise NotImplementedError("Cannot call processor config object in a class or static method - call global "
-                                  "configuration manager instead.")
 
 
 config = ConfigManager()

@@ -45,6 +45,7 @@ packages = set([
 	"psutil~=5.0",
 	"psycopg2~=2.9.0",
 	"pyahocorasick~=1.4.0",
+	"pymemcache",
 	"PyMySQL~=1.0",
 	"pytest",
 	"pytest-dependency",
