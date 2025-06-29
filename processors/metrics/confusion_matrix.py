@@ -99,7 +99,7 @@ class ConfusionMatrix(BasicProcessor):
                 self.dataset.update_status(f"Skipping row {count} (no values in both columns)")
                 continue
             elif not skip_empty and (not val_pred or not val_true):
-                self.dataset.finish_with_error(f"Make sure that both columns have values in every row")
+                self.dataset.finish_with_error("Make sure that both columns have values in every row")
                 return
 
             y_true.append(val_true)
