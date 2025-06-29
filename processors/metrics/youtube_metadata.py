@@ -452,7 +452,7 @@ class YouTubeMetadata(BasicProcessor):
 		return results
 
 	@staticmethod
-	def get_yt_id(url: str, original_id="") -> tuple[str, str, str] | None:
+	def get_yt_id(url: str, original_id="") -> tuple[str, str, str]:
 		"""
 		Extracts IDs from YouTube URLs.
 		Supports videos, channel IDs, channel names, and playlist IDs.
