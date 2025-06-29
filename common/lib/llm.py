@@ -38,11 +38,14 @@ class LLMAdapter:
 
     def _load_llm(self) -> BaseChatModel:
         if self.provider == "openai":
+            kwargs = {}
+            if "o3" not in self.model:
+                kwargs["temperature"] = self.temperature # temperature not supported for all models
             return ChatOpenAI(
                 model=self.model,
-                temperature=self.temperature,
-                api_key=self.api_key,
-                base_url=self.base_url or "https://api.openai.com/v1"
+                api_key=SecretStr(self.api_key),
+                base_url=self.base_url or "https://api.openai.com/v1",
+                **kwargs
             )
         elif self.provider == "google":
             return ChatGoogleGenerativeAI(
@@ -62,7 +65,7 @@ class LLMAdapter:
             return ChatMistralAI(
                 model_name=self.model,
                 temperature=self.temperature,
-                api_key=self.api_key,
+                api_key=SecretStr(self.api_key),
                 base_url=self.base_url  # Optional override
             )
         elif self.provider == "ollama":
@@ -80,7 +83,7 @@ class LLMAdapter:
             return ChatOpenAI(
                 model=self.model,
                 temperature=self.temperature,
-                api_key=self.api_key,
+                api_key=SecretStr(self.api_key),
                 base_url=self.base_url
             )
         else:

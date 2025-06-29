@@ -3,6 +3,8 @@ Prompt LLMs.
 """
 
 import re
+import time
+from datetime import datetime
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
@@ -27,15 +29,6 @@ class LLMPrompter(BasicProcessor):
         "(https://arxiv.org/abs/2309.14379)",
     ]
 
-    config = {
-        "api.openai.api_key": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "OpenAI API key",
-            "tooltip": "Can be created on platform.openapi.com",
-        }
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         options = {
@@ -55,7 +48,7 @@ class LLMPrompter(BasicProcessor):
                 "help": "Local or API",
                 "options": {"api": "API", "local": "Local"},
                 "default": "api",
-                "tooltip": "You can use 'local' models through Ollama, LM Studio, and VLLM as long as you have a valid "
+                "tooltip": "You can use 'local' models through Ollama and LM Studio as long as you have a valid "
                 "and accessible URL through which the model can be reached.",
             },
             "api_model": {
@@ -90,8 +83,9 @@ class LLMPrompter(BasicProcessor):
             "local_info": {
                 "type": UserInput.OPTION_INFO,
                 "requires": "api_or_local==local",
-                "help": "You can use local LLMs with different applications. 4CAT currently supports LM Studio, "
-                "Ollama, and VLLM. Note that you will need to load and unload models yourself.",
+                "help": "You can use local LLMs with various applications. 4CAT currently supports LM Studio and Ollama. "
+                        "These applications need to be reachable by this 4CAT server, e.g. by running them "
+                        "locally on the same machine.",
             },
             "local_provider": {
                 "type": UserInput.OPTION_CHOICE,
@@ -99,8 +93,7 @@ class LLMPrompter(BasicProcessor):
                 "options": {
                     "none": "",
                     "lmstudio": "LM Studio",
-                    "ollama": "Ollama",
-                    "vllm": "VLLM",
+                    "ollama": "Ollama"
                 },
                 "default": "none",
                 "help": "Local LLM provider",
@@ -132,7 +125,8 @@ class LLMPrompter(BasicProcessor):
                 "requires": "api_or_local==local",
                 "default": "",
                 "help": "Base URL for local models",
-                "tooltip": "Leaving this empty will use default values (e.g. http://localhost:1234/v1 for LM Studio)",
+                "tooltip": "Leaving this empty will use default values (http://localhost:1234/v1 for LM Studio, "
+                           "http://localhost:11434 for Ollama)",
             },
             "ollama_model": {
                 "type": UserInput.OPTION_TEXT,
@@ -179,17 +173,6 @@ class LLMPrompter(BasicProcessor):
                 "default": False,
             },
         }
-
-        api_key = config.get("api.openai.api_key")
-        if not api_key:
-            options["api_key"] = {
-                "type": UserInput.OPTION_TEXT,
-                "default": "",
-                "help": "OpenAI API key",
-                "tooltip": "Can be created on platform.openapi.com",
-                "requires": "model!=local-lmstudio",
-                "sensitive": True,
-            }
 
         return options
 
@@ -317,13 +300,6 @@ class LLMPrompter(BasicProcessor):
                     self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
                     return
 
-            # print(
-            #     "provider: " + provider,
-            #     "model: " + model,
-            #     "api_key: " + api_key,
-            #     "base_url: " + base_url,
-            #     "prompt: " + prompt,
-            # )
             try:
                 response = llm.text_generation(prompt)
             except Exception as e:
@@ -337,13 +313,16 @@ class LLMPrompter(BasicProcessor):
             else:
                 item_id = str(i)
 
+            time_created = time.time()
             results.append({
                 "id": item_id,
                 "prompt": prompt,
                 model + " output": response,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                "model": model
+                "model": model,
+                "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
+                "time_created_utc": time_created
             })
 
             if save_annotations:
