@@ -134,7 +134,7 @@ class LLMAdapter:
 
         with (
             config.get("PATH_ROOT")
-            .joinpath(f"common/assets/llms.json")
+            .joinpath("common/assets/llms.json")
             .open() as available_models
         ):
             available_models = json.loads(available_models.read())
