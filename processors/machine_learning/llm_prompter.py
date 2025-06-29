@@ -339,6 +339,10 @@ class LLMPrompter(BasicProcessor):
             )
             i += 1
 
+            # Rate limits for different providers
+            if provider == "mistral":
+                time.sleep(1)
+
         # Write annotations
         if save_annotations:
             self.save_annotations(annotations)
