@@ -30,7 +30,7 @@ class YouTubeMetadata(BasicProcessor):
 	"""
 
 	type = "youtube-metadata"  # job type ID
-	category = "Post metrics"  # category
+	category = "Metrics"  # category
 	title = "Extract metadata from YouTube URLs"  # title displayed in UI
 	description = "Collect metadata from YouTube videos, channels, and playlists with the YouTube API"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI

@@ -97,6 +97,7 @@
 
 textarea.post-annotation-input {
     min-height: 80px;
+    width: 100%;
     resize: vertical;
     font-family: inherit;
 }

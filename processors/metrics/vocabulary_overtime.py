@@ -17,7 +17,7 @@ class OvertimeAnalysis(BasicProcessor):
     Show overall activity levels for Telegram datasets
     """
     type = "overtime-vocabulary"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Over-time word counts"  # title displayed in UI
     description = "Determines the counts over time of particular set of words or phrases."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI

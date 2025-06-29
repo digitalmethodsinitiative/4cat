@@ -12,10 +12,10 @@ __email__ = "4cat@oilab.eu"
 
 class CountPosts(BasicProcessor):
 	"""
-	Merge post body into one long string
+	Count items in a dataset
 	"""
 	type = "count-posts"  # job type ID
-	category = "Post metrics" # category
+	category = "Metrics" # category
 	title = "Count items"  # title displayed in UI
 	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
