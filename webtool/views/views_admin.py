@@ -470,6 +470,7 @@ def manipulate_user(mode):
                 try:
                     g.db.insert("users", user_data)
                     user = User.get_by_name(g.db, user_data["name"])
+                    user.with_config(g.config)
 
                     if request.form.get("password"):
                         user.set_password(request.form.get("password"))
