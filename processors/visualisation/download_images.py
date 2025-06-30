@@ -262,8 +262,13 @@ class ImageDownloader(BasicProcessor):
         self.filenames = CaseInsensitiveDict()
         self.url_redirects = {}
 
+        url_filenames = []
         for url in urls:
-            self.filenames[url] = url_to_filename(url, staging_area=self.staging_area, default_name="file", default_ext=".png")
+            url_filename = url_to_filename(url, staging_area=self.staging_area, default_name="file", default_ext=".png", existing_filenames=url_filenames)
+            self.filenames[url] = url_filename
+            url_filenames.append(url_filename)
+
+        print(url_filenames)
 
         for url, response in self.iterate_proxied_requests(
             urls,
