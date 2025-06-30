@@ -268,8 +268,6 @@ class ImageDownloader(BasicProcessor):
             self.filenames[url] = url_filename
             url_filenames.append(url_filename)
 
-        print(url_filenames)
-
         for url, response in self.iterate_proxied_requests(
             urls,
             preserve_order=False,
