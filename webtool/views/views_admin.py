@@ -425,11 +425,15 @@ def manipulate_user(mode):
     if user_email in ("anonymous", "autologin"):
         return error(403, message="System users cannot be edited")
 
-    user = User.get_by_name(g.db, request.args.get("name")) if mode == "edit" else {}
-    if user is None:
-        return error(404, message="User not found")
+    if mode == "edit":
+        user = User.get_by_name(g.db, request.args.get("name")) 
+        if user is None:
+            # user does not exist, so we cannot edit them
+            return error(404, message="User not found")
+        user.with_config(g.config)
+    else:
+        user = {}
 
-    user.with_config(g.config)
     incomplete = []
     if request.method == "POST":
         if not request.form.get("name", request.args.get("name")):
@@ -460,6 +464,7 @@ def manipulate_user(mode):
             if mode == "edit":
                 g.db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
                 user = User.get_by_name(g.db, user_data["name"])  # ensure updated data
+                user.with_config(g.config)
 
             else:
                 try:
@@ -482,7 +487,6 @@ def manipulate_user(mode):
                     incomplete.append("name")
                     g.db.rollback()
 
-            user.with_config(g.config)
             if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
                 if not autodelete:
