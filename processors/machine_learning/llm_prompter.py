@@ -238,7 +238,7 @@ class LLMPrompter(BasicProcessor):
                 api_key = "lm-studio"
             if not base_url:
                 if provider == "lmstudio":
-                    base_url = "http://127.0.0.1:1234"
+                    base_url = "http://127.0.0.1:1234/v1"
                 elif provider == "ollama":
                     base_url = "http://localhost:11434"
 
