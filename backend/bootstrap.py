@@ -66,10 +66,6 @@ def run(as_daemon=True, log_level="INFO"):
 	db.commit()
 	queue.release_all()
 
-	# ensure database consistency for settings table
-	config.with_db(db)
-	config.ensure_database()
-
 	# test memcache and clear upon backend restart
 	if config.get("MEMCACHE_SERVER"):
 		if config.memcache:
@@ -77,6 +73,10 @@ def run(as_daemon=True, log_level="INFO"):
 			config.clear_cache()
 		else:
 			log.warning("Memcache server address configured, but connection could not be initialized. Configuration cache inactive.")
+
+	# ensure database consistency for settings table
+	config.with_db(db)
+	config.ensure_database()
 
 	log.load_webhook(config)
 
