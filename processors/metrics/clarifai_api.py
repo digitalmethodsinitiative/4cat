@@ -26,7 +26,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
     Request tags and labels from the Clarifai API for a given set of images
     """
     type = "clarifai-api"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Clarifai API analysis"  # title displayed in UI
     description = "Use the Clarifai API to annotate images with tags and labels identified via machine learning. " \
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \

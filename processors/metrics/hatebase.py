@@ -22,7 +22,7 @@ class HatebaseAnalyser(BasicProcessor):
     Identify hatebase-listed words in posts
     """
     type = "hatebase-data"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Hatebase analysis"  # title displayed in UI
     description = "Assign scores for 'offensiveness' and hate speech propability to each post by using Hatebase."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI

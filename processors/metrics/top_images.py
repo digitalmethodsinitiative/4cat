@@ -23,7 +23,7 @@ class TopImageCounter(BasicProcessor):
     Collects all images used in a data set, and sorts by most-used.
     """
     type = "top-images"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Rank image URLs"  # title displayed in UI
     description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI

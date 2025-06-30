@@ -17,7 +17,7 @@ class ThreadMetadata(BasicProcessor):
 	Extracts metadata on threads from the dataset.
 	"""
 	type = "thread-metadata"  # job type ID
-	category = "Post metrics"  # category
+	category = "Metrics"  # category
 	title = "Thread metadata"  # title displayed in UI
 	description = "Extract various metadata on the threads in the dataset, including time data and post counts. Note " \
 				  "that this extracted only on the basis of the items present this dataset."  # description displayed in UI

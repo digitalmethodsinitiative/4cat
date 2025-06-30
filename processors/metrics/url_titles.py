@@ -25,7 +25,7 @@ class URLFetcher(BasicProcessor):
     Retrieve HTML title (and other metadata) for URLs
     """
     type = "url-metadata"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Fetch URL metadata"  # title displayed in UI
     description = ("Fetches the page title and other metadata for URLs referenced in the dataset. Makes a request to "
                    "each URL, optionally following HTTP redirects.")  # description displayed in UI
