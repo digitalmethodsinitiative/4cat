@@ -290,48 +290,79 @@ class ConfigManager:
             # this is a core setting we already know
             return self.core_settings[attribute_name]
 
-        # short-circuit via memcache if appropriate
-        if not memcache and self.memcache:
-            memcache = self.memcache
-
-        if memcache:
-            memcache_id = self._get_memcache_id(attribute_name, user, tags)
-            if threading.get_ident() != memcache.init_thread_id:
-                raise RuntimeError("Thread-unsafe use of memcache! Please fix your code.")
-
-            try:
-                v = memcache.get(memcache_id, default=CacheMiss)
-                if v is not CacheMiss:
-                    return v
-            except KeyError:
-                # cache miss, it's fine
-                pass
-
         # if trying to access a setting that's not a core setting, attempt to
         # initialise the database connection
         if not self.db:
             self.with_db()
 
         # get tags to look for
-        tags = self.get_active_tags(user, tags)
+        tags = self.get_active_tags(user, tags, memcache)
 
-        # query database for any values within the required tags
-        tags.append("")  # empty tag = default value
-        query = "SELECT * FROM settings WHERE name = %s AND tag IN %s"
-        replacements = (attribute_name, tuple(tags))
+        # now we have all tags - get the config values for each (if available)
+        # and then return the first matching one. Add the 'empty' tag at the
+        # end to fall back to the global value if no specific one exists.
+        tags.append("")
 
-        tagged_settings = {setting["tag"]: setting["value"] for setting in self.db.fetchall(query, replacements)}
+        # short-circuit via memcache if appropriate
+        if not memcache and self.memcache:
+            memcache = self.memcache
 
+        # first check if we have all the values in memcache, in which case we
+        # do not need a database query
+        if memcache:
+            if threading.get_ident() != memcache.init_thread_id:
+                raise RuntimeError("Thread-unsafe use of memcache! Please make sure you are using a configuration "
+                                   "wrapper to read with a thread-local memcache connection.")
+
+            cached_values = {tag: memcache.get(self._get_memcache_id(attribute_name, tag), default=CacheMiss) for tag in tags}
+
+        else:
+            cached_values = {t: CacheMiss for t in tags}
+
+        # for the tags we could not get from memcache, run a database query
+        # (and save to cache if possible)
+        missing_tags = [t for t in cached_values if cached_values[t] is CacheMiss]
+        if missing_tags:
+            # query database for any values within the required tags
+            query = "SELECT * FROM settings WHERE name = %s AND tag IN %s"
+            replacements = (attribute_name, tuple(missing_tags))
+            queried_settings = {setting["tag"]: setting["value"] for setting in self.db.fetchall(query, replacements)}
+
+            if memcache:
+                for tag, value in queried_settings.items():
+                    memcache.set(self._get_memcache_id(attribute_name, tag), value)
+
+            cached_values.update(queried_settings)
+
+        # there may be some tags for which we still do not have a value at
+        # this point. these simply do not have a tag-specific value but that in
+        # itself is worth caching, otherwise we're going to query for a
+        # non-existent value each time.
+        # so: cache a magic value for such setting/tag combinations, and
+        # replace the magic value with a CacheMiss in the dict that will be
+        # parsed
+        unconfigured_magic = "__unconfigured__"
+        if memcache:
+            for tag in [t for t in cached_values if cached_values[t] is CacheMiss]:
+                # should this be more magic?
+                memcache.set(self._get_memcache_id(attribute_name, tag), unconfigured_magic)
+
+            for tag in [t for t in cached_values if cached_values[t] == unconfigured_magic]:
+                cached_values[tag] = CacheMiss
+
+        # now we may still have some CacheMisses in the values dict, if there
+        # was no setting in the database with that tag. So, find the first
+        # value that is not a CacheMiss. If nothing matches, try the global tag
+        # and if even that does not match (no setting saved at all) return the
+        # default
         for tag in tags:
-            if tag in tagged_settings:
-                value = tagged_settings[tag]
+            if tag in cached_values and cached_values.get(tag) is not CacheMiss:
+                value = cached_values[tag]
                 break
         else:
-            if "" in tagged_settings:
-                value = tagged_settings[""]
-            else:
-                value = default if default else None
+            value = default if default else None
 
+        # parse some values...
         if not is_json and value is not None:
             value = json.loads(value)
         # TODO: Which default should have priority? The provided default feels like it should be the highest priority, but I think that is an old implementation and perhaps should be removed. - Dale
@@ -340,12 +371,9 @@ class ConfigManager:
         elif value is None and default is not None:
             value = default
 
-        if memcache:
-            memcache.set(memcache_id, value)
-
         return value
 
-    def get_active_tags(self, user=None, tags=None):
+    def get_active_tags(self, user=None, tags=None, memcache=None):
         """
         Get active tags for given user/tag list
 
@@ -358,6 +386,8 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
+        :param MemcacheClient memcache:  Memcache client. If `None` and
+        `self.memcache` exists, use that instead.
         :return list:  List of tags
         """
         # be flexible about the input types here
@@ -378,6 +408,15 @@ class ConfigManager:
                 # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
                 raise TypeError(f"get() expects None, a User object or a string for argument 'user', {type(user).__name__} given")
 
+        if not memcache and self.memcache:
+            memcache = self.memcache
+
+        if memcache:
+            memcache_id = f"_usertags-{user}"
+            v = memcache.get(memcache_id, default=CacheMiss)
+            if v is not CacheMiss:
+                return v
+
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups
         if user:
@@ -390,6 +429,9 @@ class ConfigManager:
                     pass
 
             tags.insert(0, f"user:{user}")
+
+        if memcache:
+            memcache.set(memcache_id, tags)
 
         return tags
 
@@ -439,8 +481,8 @@ class ConfigManager:
             memcache = self.memcache
 
         if memcache:
-            # invalidate any cached value for this settings
-            memcache_id = self._get_memcache_id(attribute_name, None, tag)
+            # invalidate any cached value for this setting
+            memcache_id = self._get_memcache_id(attribute_name, tag)
             memcache.delete(memcache_id)
 
         return updated_rows
@@ -456,6 +498,9 @@ class ConfigManager:
         self.db.delete("settings", where={"name": attribute_name, "tag": tag})
         updated_rows = self.db.cursor.rowcount
 
+        if self.memcache:
+            self.memcache.delete(self._get_memcache_id(attribute_name, tag))
+
         return updated_rows
 
     def clear_cache(self):
@@ -469,7 +514,7 @@ class ConfigManager:
 
         self.memcache.flush_all()
 
-    def _get_memcache_id(self, attribute_name, user=None, tags=None):
+    def _get_memcache_id(self, attribute_name, tags=None):
         """
         Generate a memcache key for a config setting request
 
@@ -477,7 +522,6 @@ class ConfigManager:
         different depending on the value of these parameters.
 
         :param str attribute_name:
-        :param str|User user:
         :param str|list tags:
         :return str:
         """
@@ -487,12 +531,6 @@ class ConfigManager:
         tag_bit = []
         if tags:
             tag_bit.append("|".join(tags))
-
-        if user:
-            if type(user) is not str:
-                user = user.name
-
-            tag_bit.append(f"{user}:{tag_bit}")
 
         memcache_id = attribute_name
         if tag_bit:
