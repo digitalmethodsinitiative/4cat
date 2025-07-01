@@ -35,6 +35,7 @@ def mock_basic_config(tmp_path, mock_database):
     mocked_basic_config = mocked_config()
     mocked_basic_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
             "PATH_ROOT": PATH_ROOT,
+            "PATH_DATA": PATH_ROOT,
             "PATH_LOGS": PATH_ROOT / "logs",
         }.get(key, default))
     mocked_basic_config.load_user_settings = MagicMock()
