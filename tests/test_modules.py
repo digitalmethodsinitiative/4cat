@@ -33,14 +33,14 @@ def mock_basic_config(tmp_path, mock_database):
         pass
 
     mocked_basic_config = mocked_config()
-    mock_basic_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
+    mocked_basic_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
             "PATH_ROOT": PATH_ROOT,
             "PATH_LOGS": PATH_ROOT / "logs",
         }.get(key, default))
-    mock_basic_config.load_user_settings = MagicMock()
+    mocked_basic_config.load_user_settings = MagicMock()
     # Create necessary directories
     (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
-    yield mock_basic_config
+    yield mocked_basic_config
        
 @pytest.fixture
 def logger(mock_basic_config):
