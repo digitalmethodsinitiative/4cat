@@ -58,6 +58,18 @@ else:
 
 log.load_webhook(config)
 
+# test memcache
+# this is also done in the backend, but the frontend may not be able to connect
+# while the backend is, for example
+if config.get("MEMCACHE_SERVER"):
+    if config.memcache:
+        log.debug("Memcache connection initialized")
+    else:
+        log.warning(
+            f"Memcache server address configured, but connection could not be initialized at "
+            f"{config.get('MEMCACHE_SERVER')}. Front-end configuration cache inactive."
+        )
+
 # set up logging for Gunicorn
 # this redirects Gunicorn log messages to the logger instantiated above - more
 # sensible than having yet another separate log file

@@ -73,7 +73,7 @@ def run(as_daemon=True, log_level="INFO"):
 			config.clear_cache()
 		else:
 			log.warning(f"Memcache server address configured, but connection could not be initialized at "
-						f"{config.get('MEMCACHE_SERVER')}. Configuration cache inactive.")
+						f"{config.get('MEMCACHE_SERVER')}. Back-end configuration cache inactive.")
 
 	# ensure database consistency for settings table
 	config.with_db(db)
