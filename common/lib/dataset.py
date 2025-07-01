@@ -412,7 +412,7 @@ class DataSet(FourcatModule):
             num_annotations = 0 if not annotation_fields else self.num_annotations()
             all_annotations = None
             # If this dataset has less than n annotations, just retrieve them all before iterating
-            if num_annotations <= 500:
+            if 0 < num_annotations <= 500:
                 # Convert to dict for faster lookup when iterating over items
                 all_annotations = collections.defaultdict(list)
                 for annotation in self.get_annotations():
