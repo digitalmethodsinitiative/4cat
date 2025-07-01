@@ -1177,7 +1177,7 @@ class DataSet(FourcatModule):
         except json.JSONDecodeError:
             return {}
 
-    def get_columns(self, with_annotations=True):
+    def get_columns(self):
         """
         Returns the dataset columns.
 
@@ -1188,7 +1188,6 @@ class DataSet(FourcatModule):
         that uses the 'column' names, so for consistency this function acts as
         if no column can be parsed if no `map_item` function exists.
 
-        :param bool with_annotations:  If True, add columns for annotations
         :return list:  List of dataset columns; empty list if unable to parse
         """
         if not self.get_results_path().exists():
@@ -1201,9 +1200,12 @@ class DataSet(FourcatModule):
                 and self.get_own_processor() is not None
                 and self.get_own_processor().map_item_method_available(dataset=self)
             ):
-                items = self.iterate_items(warn_unmappable=False, get_annotations=with_annotations)
+                items = self.iterate_items(warn_unmappable=False, get_annotations=False)
                 try:
                     keys = list(items.__next__().keys())
+                    if self.annotation_fields:
+                        keys.extend(self.annotation_fields.keys())
+                        
                     self._cached_columns = keys
                 except (StopIteration, NotImplementedError):
                     # No items or otherwise unable to iterate
