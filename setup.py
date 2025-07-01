@@ -51,7 +51,7 @@ packages = set([
 	"psycopg2~=2.9.0",
 	"pyahocorasick~=1.4.0",
 	"pydantic",
-	"pymmecache",
+	"pymemcache",
 	"PyMySQL~=1.0",
 	"pytest",
 	"pytest-dependency",
