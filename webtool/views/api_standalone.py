@@ -75,7 +75,7 @@ def get_standalone_processors():
 			"""
 			return "text"
 		
-		def get_columns(self, with_annotations=False):
+		def get_columns(self):
 			"""
 			Return columns expected by /api/process/<processor>/
 			"""
