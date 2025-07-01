@@ -62,7 +62,7 @@ packages = set([
 	"ruff",
 	"scenedetect[opencv]",
 	"scikit-learn",
-	#"scipy",
+	"scipy~=1.13",
 	"shapely",
 	"svgwrite~=1.4.0",
 	"tailer",
