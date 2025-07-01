@@ -35,7 +35,7 @@ packages = set([
 	"langchain_ollama",
 	"langchain_openai",
 	"langchain_mistralai",
-	"lxml~=4.9.0",
+	"lxml",
 	"markdown==3.0.1",
 	"markdown2==2.4.2",
 	"nltk~=3.9.1",
