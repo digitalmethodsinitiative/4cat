@@ -221,6 +221,7 @@ class ModuleCollector:
         expiration = self.config.get("datasources.expiration", {})
 
         # Load 4CAT core datasources
+        expiration = self.config.get("datasources.expiration", {})
         for subdirectory in Path(self.config.get('PATH_ROOT'), "datasources").iterdir():
             if subdirectory.is_dir():
                 _load_datasource(subdirectory, expiration)

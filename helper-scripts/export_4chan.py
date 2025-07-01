@@ -33,7 +33,9 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
-from common.config_manager import config
+from common.config_manager import CoreConfigManager
+
+config = CoreConfigManager()
 
 valid_boards = ("a","b","c","d","e","f","g","gif","h","hr","k","m","o","p","r","s","t",
 			"u","v","vg","vm","vmg","vr","vrpg","vst","w","wg","i","ic","r9k","s4s",

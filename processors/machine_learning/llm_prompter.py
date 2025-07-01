@@ -54,7 +54,7 @@ class LLMPrompter(BasicProcessor):
             "api_model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Model",
-                "options": LLMAdapter.get_model_options(),
+                "options": LLMAdapter.get_model_options(config),
                 "default": "mistral-small-2503",
                 "requires": "api_or_local==api",
             },
@@ -243,7 +243,7 @@ class LLMPrompter(BasicProcessor):
                     base_url = "http://localhost:11434"
 
         else:
-            provider = LLMAdapter.get_models()[api_model]["provider"]
+            provider = LLMAdapter.get_models(self.config)[api_model]["provider"]
             model = api_model
             api_key = self.parameters.get("api_key", "")
             if not api_key:

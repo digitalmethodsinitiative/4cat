@@ -9,7 +9,6 @@ import time
 import csv
 import re
 
-from common.config_manager import config
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
 
@@ -42,7 +41,7 @@ class DataSet(FourcatModule):
     _children = None
     _cached_columns = None
     available_processors = None
-    genealogy = None
+    _genealogy = None
     preset_parent = None
     parameters = None
     modules = None
@@ -106,7 +105,7 @@ class DataSet(FourcatModule):
         self.data = {}
         self.parameters = {}
         self.available_processors = {}
-        self.genealogy = []
+        self._genealogy = []
         self.staging_areas = []
         self.modules = modules
 
@@ -239,7 +238,7 @@ class DataSet(FourcatModule):
         """
         # alas we need to instantiate a config reader here - no way around it
         if not self.folder:
-            self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
+            self.folder = self.modules.config.get('PATH_ROOT').joinpath(self.modules.config.get('PATH_DATA'))
         return self.folder.joinpath(self.data["result_file"])
 
     def get_results_folder_path(self):
@@ -314,6 +313,7 @@ class DataSet(FourcatModule):
         """
         path = self.get_results_path()
 
+
         # Yield through items one by one
         if path.suffix.lower() == ".csv":
             with path.open("rb") as infile:
@@ -336,7 +336,7 @@ class DataSet(FourcatModule):
                         raise ProcessorInterruptedException(
                             "Processor interrupted while iterating through CSV file"
                         )
-
+                    
                     yield item
 
         elif path.suffix.lower() == ".ndjson":
@@ -347,14 +347,14 @@ class DataSet(FourcatModule):
                         raise ProcessorInterruptedException(
                             "Processor interrupted while iterating through NDJSON file"
                         )
-
+                    
                     yield json.loads(line)
 
         else:
             raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
     def iterate_items(
-        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True
+        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None
     ):
         """
         Generate mapped dataset items
@@ -387,6 +387,8 @@ class DataSet(FourcatModule):
         iterating the dataset.
         :param bool warn_unmappable:  If an item is not mappable, skip the item
         and log a warning
+        :param max_unmappable:  Skip at most this many unmappable items; if
+        more are encountered, stop iterating. `None` to never stop.
         :param map_missing: Indicates what to do with mapped items for which
         some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
         - 'default': fill missing fields with the default passed by map_item
@@ -400,7 +402,7 @@ class DataSet(FourcatModule):
           This can be disabled to help speed up iteration.
         :return generator:  A generator that yields DatasetItems
         """
-        unmapped_items = False
+        unmapped_items = 0
         # Collect item_mapper for use with filter
         item_mapper = False
         own_processor = self.get_own_processor()
@@ -413,7 +415,7 @@ class DataSet(FourcatModule):
             num_annotations = 0 if not annotation_fields else self.num_annotations()
             all_annotations = None
             # If this dataset has less than n annotations, just retrieve them all before iterating
-            if num_annotations <= 500:
+            if 0 < num_annotations <= 500:
                 # Convert to dict for faster lookup when iterating over items
                 all_annotations = collections.defaultdict(list)
                 for annotation in self.get_annotations():
@@ -441,8 +443,12 @@ class DataSet(FourcatModule):
                         self.warn_unmappable_item(
                             i, processor, e, warn_admins=unmapped_items is False
                         )
-                        unmapped_items = True
-                    continue
+                        
+                    unmapped_items += 1
+                    if max_unmappable and unmapped_items > max_unmappable:
+                        break
+                    else:
+                        continue
 
                 # check if fields have been marked as 'missing' in the
                 # underlying data, and treat according to the chosen strategy
@@ -1201,9 +1207,12 @@ class DataSet(FourcatModule):
                 and self.get_own_processor() is not None
                 and self.get_own_processor().map_item_method_available(dataset=self)
             ):
-                items = self.iterate_items(warn_unmappable=False)
+                items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
                 try:
-                    keys = list(items.__next__().keys())
+                    keys = list(next(items).keys())
+                    if self.annotation_fields:
+                        keys.extend(self.annotation_fields.keys())
+                        
                     self._cached_columns = keys
                 except (StopIteration, NotImplementedError):
                     # No items or otherwise unable to iterate
@@ -1603,7 +1612,7 @@ class DataSet(FourcatModule):
         genealogy = self.get_genealogy()
         return genealogy[0]
 
-    def get_genealogy(self, inclusive=False):
+    def get_genealogy(self):
         """
         Get genealogy of this dataset
 
@@ -1613,29 +1622,29 @@ class DataSet(FourcatModule):
 
         :return list:  Dataset genealogy, oldest dataset first
         """
-        if self.genealogy and not inclusive:
-            return self.genealogy
+        if not self._genealogy:
+            key_parent = self.key_parent
+            genealogy = []
 
-        key_parent = self.key_parent
-        genealogy = []
+            while key_parent:
+                try:
+                    parent = DataSet(key=key_parent, db=self.db, modules=self.modules)
+                except DataSetException:
+                    break
 
-        while key_parent:
-            try:
-                parent = DataSet(key=key_parent, db=self.db, modules=self.modules)
-            except DataSetException:
-                break
+                genealogy.append(parent)
+                if parent.key_parent:
+                    key_parent = parent.key_parent
+                else:
+                    break
 
-            genealogy.append(parent)
-            if parent.key_parent:
-                key_parent = parent.key_parent
-            else:
-                break
+            genealogy.reverse()
+            self._genealogy = genealogy
 
-        genealogy.reverse()
+        genealogy = self._genealogy
         genealogy.append(self)
 
-        self.genealogy = genealogy
-        return self.genealogy
+        return genealogy
 
     def get_children(self, update=False):
         """
@@ -1686,7 +1695,7 @@ class DataSet(FourcatModule):
         using `fnmatch.fnmatch`.
         :return:  Earliest matching dataset, or `None` if none match.
         """
-        genealogy = self.get_genealogy(inclusive=True)
+        genealogy = self.get_genealogy()
         for dataset in reversed(genealogy):
             if fnmatch.fnmatch(dataset.type, type_filter):
                 return dataset
@@ -1702,34 +1711,11 @@ class DataSet(FourcatModule):
 
         :return str: Nav link
         """
-        if self.genealogy:
-            return ",".join([dataset.key for dataset in self.genealogy])
-        elif not self.key_parent:
+        if not self.key_parent:
             return self.key
-        else:
-            # Collect keys only, start at the bottom
-            genealogy = [self.key_parent]
-            key_parent = genealogy[-1]
 
-            while key_parent:
-                try:
-                    parent = self.db.fetchone(
-                        "SELECT key_parent FROM datasets WHERE key = %s", (key_parent,)
-                    )
-                    if not parent:
-                        break
-                except TypeError:
-                    break
-
-                key_parent = parent["key_parent"]
-                if key_parent:
-                    genealogy.append(key_parent)
-                else:
-                    break
-
-            genealogy.reverse()
-            genealogy.append(self.key)
-            return ",".join(genealogy)
+        genealogy = self.get_genealogy()
+        return ",".join([d.key for d in genealogy])
 
     def get_compatible_processors(self, config=None):
         """
