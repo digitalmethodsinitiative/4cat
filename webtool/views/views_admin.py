@@ -502,7 +502,7 @@ def manipulate_user(mode):
 
             if not incomplete:
                 user.sort_user_tags()
-                g.config.clear_user_tags(user)
+                g.config.uncache_user_tags([user])
                 flash("User data saved")
         else:
             flash("Pleasure ensure all fields contain a valid value.")
