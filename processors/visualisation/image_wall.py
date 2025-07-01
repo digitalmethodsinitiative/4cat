@@ -5,6 +5,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.cluster import KMeans
 from common.lib.helpers import UserInput
 import colorsys
+import copy
 
 from processors.visualisation.video_wall import VideoWallGenerator
 from common.lib.exceptions import MediaSignatureException
@@ -38,12 +39,11 @@ class ImageWallGenerator(VideoWallGenerator):
         """
         return module.get_media_type() in ("video", "image") \
                or module.type.startswith("image-downloader") \
-               or module.type.startswith("video-downloader") \
                or module.type == "video-frames"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
-        options = cls.options.copy()
+        options = copy.deepcopy(cls.options)
         max_number_images = int(config.get("image-visuals.max_images", 1000))
         options["amount"] = {
             "type": UserInput.OPTION_TEXT,
@@ -141,7 +141,7 @@ class ImageWallGenerator(VideoWallGenerator):
             value = (0, 0, 0)
 
         # converted to HSV, because RGB does not sort nicely
-        colorsys.rgb_to_hsv(*value)
+        return colorsys.rgb_to_hsv(*value)
 
     @staticmethod
     def numpy_to_rgb(numpy_array):
