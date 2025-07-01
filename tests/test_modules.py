@@ -25,36 +25,39 @@ def mock_database():
         yield mock_database_instance
 
 @pytest.fixture
-def mock_logger_config(tmp_path, mock_database):
+def mock_basic_config(tmp_path, mock_database):
     """
     Set up a config reader without connecting it to the database
     """
+    class mocked_config:
+        pass
 
-    with patch("common.lib.logger.config") as mock_logger_config:
-        mock_logger_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
+    mocked_basic_config = mocked_config()
+    mock_basic_config.get = MagicMock(side_effect=lambda key, default=None, is_json=False, user=None, tags=None: {
             "PATH_ROOT": PATH_ROOT,
             "PATH_LOGS": PATH_ROOT / "logs",
         }.get(key, default))
-        # Create necessary directories
-        (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
-        yield mock_logger_config
+    mock_basic_config.load_user_settings = MagicMock()
+    # Create necessary directories
+    (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
+    yield mock_basic_config
        
 @pytest.fixture
-def logger(mock_logger_config):
+def logger(mock_basic_config):
     """
     Initialize the Logger and return it.
 
     This also allows us to use our Logger for testing.
     """
     from common.lib.logger import Logger
-    return Logger(logger_name="pytest", output=True, filename='test.log', log_level='DEBUG')
+    return Logger(logger_name="pytest", output=True, log_path=mock_basic_config.get("PATH_LOGS").joinpath("test.log"), log_level='DEBUG')
 
-def test_logger(logger, mock_logger_config):
+def test_logger(logger, mock_basic_config):
     # Initialize the logger
     log = logger
 
     # Verify that mock_config.get was called
-    mock_logger_config.get.assert_any_call("PATH_LOGS")
+    mock_basic_config.get.assert_any_call("PATH_LOGS")
     
     # Check if the logger is initialized correctly
     assert log is not None
@@ -65,16 +68,16 @@ def test_logger(logger, mock_logger_config):
     log.info("This is a test log message.")
     
     # Check if the message was logged (you would need to check the log file in a real test)
-    log_file_path = mock_logger_config.get("PATH_LOGS") / 'test.log'
+    log_file_path = mock_basic_config.get("PATH_LOGS") / 'test.log'
     with open(log_file_path, 'r') as f:
         logs = f.read()
         assert "This is a test log message." in logs
 
 @pytest.fixture
-def fourcat_modules(mock_logger_config):
+def fourcat_modules(mock_basic_config):
     from common.lib.module_loader import ModuleCollector
     # Initialize the ModuleCollector and return it
-    return ModuleCollector(config=mock_logger_config)
+    return ModuleCollector(config=mock_basic_config)
 
 @pytest.mark.dependency()
 def test_module_collector(logger, fourcat_modules):
@@ -178,7 +181,7 @@ def mock_dataset(mock_dataset_database, fourcat_modules):
 
 
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_logger_config):
+def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
     """
     Test all processors separately ensuring they are valid and can be instantiated and report all failures at the end.
     """
@@ -208,7 +211,7 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
 
             # Test get_options with mock_dataset
             try:
-                processor_class.get_options(parent_dataset=mock_dataset, config=mock_logger_config)
+                processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
             except Exception as e:
                 # Log the failure and add it to the failures list
                 logger.error(f"Processor {processor_name} failed in get_options: {e}")
