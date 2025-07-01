@@ -15,7 +15,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 from datetime import datetime
 from telethon import TelegramClient
@@ -871,7 +871,7 @@ class SearchTelegram(Search):
             "author_name": fullname,
             "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
-            "body_markdown": message["message_markdown"],
+            "body_markdown": message.get("message_markdown", MissingMappedField("")),
             "is_reply": is_reply,
             "reply_to": reply_to,
             "views": message["views"] if message["views"] else "",
