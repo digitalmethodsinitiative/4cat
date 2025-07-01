@@ -247,6 +247,7 @@ class VideoWallGenerator(BasicProcessor):
             # proportions that would fit all of them
             tile_size = int(sum(average_size) / 2)
             tile_h = tile_size
+            tile_w = tile_h
 
             # this is how many pixels we need
             fitted_pixels = tile_size * tile_size * len(included_media)
@@ -254,6 +255,7 @@ class VideoWallGenerator(BasicProcessor):
             # does that fit our canvas?
             if fitted_pixels > max_pixels:
                 tile_size = math.floor(math.sqrt(max_pixels / len(included_media)))
+                tile_w = tile_h = tile_size
                 fitted_pixels = tile_size * tile_size * len(included_media)
 
             ideal_width = math.sqrt(fitted_pixels / aspect_ratio_inverse)
@@ -411,7 +413,7 @@ class VideoWallGenerator(BasicProcessor):
             row_width += item_width
 
             # prepare filter to transform item into wall tile
-            cropscale = "select=eq(n\,0)," if have_only_images else ""
+            cropscale = "select=eq(n\\,0)," if have_only_images else ""
 
             if sizing_mode == "fit-height":
                 # the scale filter does not guarantee exact pixel dimensions
@@ -575,15 +577,19 @@ class VideoWallGenerator(BasicProcessor):
             raise MediaSignatureException()
 
         bits = probe_output.split(",")
-        length = (float(bits[-1]) if bits[-1] != "N/A" else 0)
+        length = (float(bits[-1]) if bits[-1].strip() != "N/A" else 0)
+        try:
+            dimensions = (int(bits[0]), int(bits[1]))
+        except ValueError:
+            raise MediaSignatureException()
 
         if sort_mode == "random":
             sort_value = random.random()
         elif sort_mode in ("shortest", "longest"):
             sort_value = length
         elif hasattr(self, "sort_file"):
-            sort_value = self.sort_file(file_path, sort_mode)
+            sort_value = self.sort_file(file_path, sort_mode, ffprobe_path)
         else:
             sort_value = 0
 
-        return (bits[0], bits[1]), length, sort_value
+        return dimensions, length, sort_value
