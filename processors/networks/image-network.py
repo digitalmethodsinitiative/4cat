@@ -94,7 +94,7 @@ class ImageGrapher(BasicProcessor):
         if not dataset:
             return None
         for parent in reversed(dataset.get_genealogy()):
-            if parent.get_columns(with_annotations=False):
+            if parent.get_columns():
                 return parent
         return None
 
