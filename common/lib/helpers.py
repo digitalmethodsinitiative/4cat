@@ -735,7 +735,10 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     :return:
     """
     missing = 0
-    test_key = list(intervals.keys())[0]
+    try:
+        test_key = list(intervals.keys())[0]
+    except IndexError:
+        return 0, {}
 
     # first determine the boundaries of the interval
     # these may be passed as parameters, or they can be inferred from the
