@@ -218,6 +218,8 @@ class ModuleCollector:
                 "config": {} if not hasattr(datasource, "config") else datasource.config
             }
 
+        expiration = self.config.get("datasources.expiration", {})
+
         # Load 4CAT core datasources
         expiration = self.config.get("datasources.expiration", {})
         for subdirectory in Path(self.config.get('PATH_ROOT'), "datasources").iterdir():

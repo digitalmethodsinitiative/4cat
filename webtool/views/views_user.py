@@ -72,9 +72,9 @@ def load_user_from_request(request):
         return None
     else:
         current_app.db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
-        user = User.get_by_name(g.db, user["user"])
-        user.with_config(g.config)
+        user = User.get_by_name(current_app.db, user["user"])
         user.authenticate()
+        user.with_config(ConfigWrapper(current_app.fourcat_config, user=user, request=request))
         return user
 
 @current_app.login_manager.unauthorized_handler

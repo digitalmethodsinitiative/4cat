@@ -6,33 +6,32 @@
 		<span style="display: none" id="dataset-key">{{ key }}</span>
 
 		<div class="card-content">
+            <div class="fullwidth notice">
+                <a href="/results/{{ key }}"><i class="fas fa-arrow-left"></i> Return to dataset overview and processors</a>
+            </div>
+            {% if warning %}
+            <div class="fullwidth notice">{{ warning }}</div>
+            {% endif %}
+            {% if key and post_count > max_posts %}
+            <div class="fullwidth notice">Large dataset - only showing the first {{ max_posts }} posts. Use filter processors to limit the dataset.</div>
+            {% set post_count = max_posts %}
+            {% endif %}
+            <nav class="dataset-toolbox" aria-label="Annotation controls">
+                <ul>
+                    <li class="annotation-control-button">
+                        <a class="button-like-small" id="toggle-annotation-fields"><i class="fas fa-edit"></i> Edit fields</a>
+                    </li>
+                    <li class="annotation-control-button"><a class="button-like-small{% if not annotation_fields %} disabled{% endif %}" id="toggle-annotations"><i class="fas fa-eye"></i> Show annotations</a></li>
+                    <li class="annotation-control-button"><a class="button-like-small {% if not annotation_fields %} disabled{% endif %}" id="save-annotations"><i class="fas fa-save"></i> Save annotations</a>
+                    <button class="tooltip-trigger" aria-controls="tooltip-save-annotations">?</button>
+                    <p role="tooltip" id="tooltip-save-annotations" aria-hidden="true">
+                        Annotations are saved automatically. Use <strong><i class="fas fa-download"></i>Download csv</strong> on the dataset overview page to download this dataset with annotations.
+                    </p>
+                    </li>
+                </ul>
+            </nav>
+
 			<dl class="metadata-wrapper">
-				<div class="fullwidth notice">
-					<a href="/results/{{ key }}"><i class="fas fa-arrow-left"></i> Return to dataset overview</a>
-				</div>
-				{% if warning %}
-				<div class="fullwidth notice">{{ warning }}</div>
-				{% endif %}
-				{% if key and post_count > max_posts %}
-				<div class="fullwidth notice">Large dataset - only showing the first {{ max_posts }} posts. Use filter processors to limit the dataset.</div>
-				{% set post_count = max_posts %}
-				{% endif %}
-				<div class="fullwidth dataset-toolbox">
-					<dt>Annotations</dt>
-					<ul>
-						<li class="annotation-control-button">
-							<a class="button-like-small" id="toggle-annotation-fields"><i class="fas fa-edit"></i> Edit fields</a>
-						</li>
-						<li class="annotation-control-button"><a class="button-like-small{% if not annotation_fields %} disabled{% endif %}" id="toggle-annotations"><i class="fas fa-eye"></i> Show annotations</a></li>
-						<li class="annotation-control-button"><a class="button-like-small {% if not annotation_fields %} disabled{% endif %}" id="save-annotations"><i class="fas fa-save"></i> Save annotations</a>
-						<button class="tooltip-trigger" aria-controls="tooltip-save-annotations">?</button>
-						<p role="tooltip" id="tooltip-save-annotations" aria-hidden="true">
-							Annotations are saved automatically. Use <strong><i class="fas fa-download"></i>Download csv</strong> on the dataset overview page to download this dataset with annotations.
-						</p>
-						</li>
-					</ul>
-				</div>
-				
 				<div class="fullwidth" id ="annotation-fields-editor">
 					<dt>Edit annotation fields</dt>	
 					{% include "explorer/annotations-editor.html" %}
@@ -40,33 +39,38 @@
 				<div class="fullwidth" id="sort-options">
 					<dt>Sort posts by</dt>
 					<dd>
-                        {% set sorting_disabled = True if dataset.num_rows > max_posts else False %}
-						<select class="sort-select" id="column-sort-select" name="sort-select" {% if sorting_disabled %}disabled{% endif %}>
-							<option class="sort-option" value="dataset-order">Dataset order</option>
-							<option disabled value>dataset columns:</option>
-							{% for column in dataset.get_columns() %}
-							<option class="sort-option" value="{{ column }}">{{ column }}</option>
-							{% endfor %}
-						</select>
-						<select class="sort-select" id="column-sort-order" name="sort-select" {% if sorting_disabled %}disabled{% endif %}>
-							<option class="sort-option" value="regular" {% if reverse != true %}selected{% endif %}>Low to high</option>
-							<option class="sort-option" value="reverse" {% if reverse == true %}selected{% endif %}>High to low</option>
-						</select>
-                        {% if sorting_disabled %}
-						<span class="notice">Disabled for datasets exceeding {{ max_posts }} items.</span>
-                        {% endif %}
+                        <div class="padding">
+                            {% set sorting_disabled = True if dataset.num_rows > max_posts else False %}
+                            <select class="sort-select" id="column-sort-select" name="sort-select" {% if sorting_disabled %}disabled{% endif %}>
+                                <option class="sort-option" value="dataset-order">Dataset order</option>
+                                <option disabled value>dataset columns:</option>
+                                {% for column in dataset.get_columns() %}
+                                <option class="sort-option" value="{{ column }}">{{ column }}</option>
+                                {% endfor %}
+                            </select>
+                            <select class="sort-select" id="column-sort-order" name="sort-select" {% if sorting_disabled %}disabled{% endif %}>
+                                <option class="sort-option" value="regular" {% if reverse != true %}selected{% endif %}>Low to high</option>
+                                <option class="sort-option" value="reverse" {% if reverse == true %}selected{% endif %}>High to low</option>
+                            </select>
+                            {% if sorting_disabled %}
+                            <span class="notice">Disabled for datasets exceeding {{ max_posts }} items.</span>
+                            {% endif %}
+                        </div>
 					</dd>
 				</div>
-				<div class="fullwidth">
-					<dt>Now showing</dt>
-					<dd>
-					{% if not key and has_database %}
-						{{ post_count }} posts from {{ datasource }}.
-					{% else %}
-						Posts {{ offset + 1 }}—{{ post_count if (offset + posts_per_page) > post_count else (offset + posts_per_page) }} ({{ post_count }} total).
-					{% endif %}
-					</dd>
-				</div>
+                <div class="fullwidth">
+                    <dt>Now showing</dt>
+                    <dd>
+                        <div class="info-row">
+                            <div class="padding">
+                                Posts {{ offset + 1 }}—{{ post_count if (offset + posts_per_page) > post_count else (offset + posts_per_page) }} ({{ post_count }} total).
+                            </div>
+                            <div id="tutorial-cell" class="padding">
+                                <a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets#annotations" target="_blank"><span><i class="fa-solid fa-graduation-cap"></i> How to annotate datasets</span></a>
+                            </div>
+                        </div>
+                    </dd>
+                </div>
 			</dl>
 		</div>
 	</div>

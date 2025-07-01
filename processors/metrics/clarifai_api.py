@@ -26,8 +26,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
     Request tags and labels from the Clarifai API for a given set of images
     """
     type = "clarifai-api"  # job type ID
-    category = "Post metrics"  # category
-    title = "Clarifai API Analysis"  # title displayed in UI
+    category = "Metrics"  # category
+    title = "Clarifai API analysis"  # title displayed in UI
     description = "Use the Clarifai API to annotate images with tags and labels identified via machine learning. " \
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \
                   "requests will be credited by Clarifai to the owner of the API token you provide!"  # description displayed in UI
@@ -64,8 +64,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "help": "API Key",
             "cache": True,
             "sensitive": True,
-            "tooltip": "The API Key for the Clarifai account you want to query with. You can generate and find this"
-                       "key on the API dashboard."
+            "tooltip": "The API key for your Clarifai account. You'll need to go to clarifai.com and create a new "
+                       "project to generate a key."
         },
         "models": {
             "type": UserInput.OPTION_MULTI,
@@ -74,7 +74,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                        "See the model browser in processor references for more details on each model.",
             "options": {
                 "general-image-recognition": "General Concept Recognition (general-image-recognition)",
-                "apparel-recognition": "Clothing & Apparal (apparel-recognition)",
+                "apparel-recognition": "Clothing & Apparel (apparel-recognition)",
                 "color-recognition": "Dominant color recognition (color-recognition)",
                 "celebrity-face-detection": "Celebrity faces (celebrity-face-detection)",
                 "food-item-recognition": "Food items (food-item-recognition)",
@@ -83,6 +83,24 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 "texture-recognition": "Materials & textures (texture-recognition)"
             },
             "default": ["general-image-recognition"]
+        },
+        "save_annotations": {
+            "type": UserInput.OPTION_ANNOTATION,
+            "label": "labels",
+            "default": False,
+            "tooltip": "Every label will receive its own annotation"
+        },
+        "annotation_threshold": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Only add labels above this confidence",
+            "default": "0.95",
+            "coerce_type": "float",
+            "requires": "save_annotations==true"
+        },
+        "csv_info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "The output can be made human-readable through the following 'Convert Clarifai results to CSV' "
+                    "processor."
         }
     }
 
@@ -93,7 +111,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
         for the image, and one with the amount of times the image was used
         """
         api_key = self.parameters.get("api_key")
-        #application_id = self.parameters.get("application_id")
+        save_annotations = self.parameters.get("save_annotations", False)
+        annotation_threshold = float(self.parameters.get("annotation_threshold", 0))
 
         models = self.parameters.get("models")
         if type(models) is str:
@@ -135,8 +154,11 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     send_batch = True
 
                 if image:
-                    if image.name.startswith(".") or image.suffix in (".json", ".log"):
-                        # .metadata.json
+                    if image.name == ".metadata.json":
+                        # Metadata, we keep this for writing annotations
+                        image_metadata = json.load(open(image, "r"))
+
+                    if image.suffix in (".json", ".log"):
                         continue
 
                     # we can attach the image as a binary file
@@ -172,7 +194,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     elif response.status.code != status_code_pb2.SUCCESS:
                         # this is bad!
                         self.dataset.log(f"Error fetching {model_id} annotations from Clarifai annotated ({response.status.code}"
-                                                   f"/{response.status.description})")
+                                         f"/{response.status.description})")
                         return self.dataset.finish_with_error(f"Error connecting to Clarifai ({response.status.description}), stopping.")
 
                     # collect annotated concepts
@@ -194,6 +216,12 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     images_names = {}
                     batch = []
 
+        # Get original post IDs for annotations
+        fourcat_annotations = []
+        annotated = 0
+        if save_annotations:
+            filename_and_post_ids = {v["filename"]: v["post_ids"] for v in image_metadata.values()}
+
         # save the buffered results (we do this only now so we can also store
         # combined annotations)
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
@@ -208,6 +236,28 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     "combined": all_annotations
                 }
                 outfile.write(json.dumps(item) + "\n")
+
+                # Potentially write all labels above a threshold as annotations
+                if save_annotations:
+                    for label, confidence in all_annotations.items():
+                        if confidence > annotation_threshold:
+                            for item_id in filename_and_post_ids[image]:
+                                fourcat_annotations.append({
+                                    "label": "clarifai_" + label,
+                                    "value": confidence,
+                                    "item_id": item_id
+                                })
+
+                                # Save in batches so we don't memory hog
+                                annotated += 1
+                                if annotated % 1000 == 0:
+                                    self.save_annotations(fourcat_annotations)
+                                    fourcat_annotations = []
+
+        # Write leftover annotations
+        if save_annotations and fourcat_annotations:
+            self.save_annotations(fourcat_annotations)
+            self.dataset.update_status(f"Saved {annotated + len(fourcat_annotations)} labels as annotations")
 
         if errors:
             self.dataset.update_status(f"Collected {annotated} annotations, {errors} skipped - see dataset log for details",

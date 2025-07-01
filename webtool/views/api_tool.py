@@ -163,7 +163,7 @@ def datasource_form(datasource_id):
 		"datasource": datasource_id,
 		"type": labels,
 		"html": html,
-		"options": worker_options
+		# "options": worker_options
 	})
 
 

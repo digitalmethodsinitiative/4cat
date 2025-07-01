@@ -371,7 +371,7 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
-def convert_to_float(value, default=0) -> float:
+def convert_to_float(value, default=0, force=False) -> float:
     """
     Convert a value to a floating point, with a fallback
 
@@ -381,8 +381,11 @@ def convert_to_float(value, default=0) -> float:
 
     :param value:  Value to convert
     :param int default:  Default value, if conversion not possible
+    :param force:   Whether to force the value into a float if it is not empty or None.
     :return float:  Converted value
     """
+    if force:
+        return float(value) if value else default
     try:
         return float(value)
     except (ValueError, TypeError):
@@ -1139,7 +1142,7 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
 
     return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
 
-def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255):
+def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
         Determine filenames for saved files
 
@@ -1162,6 +1165,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
             base_filename = clean_filename
         else:
             base_filename = default_name + default_ext
+
+        if not existing_filenames:
+            existing_filenames = []
 
         # Split base filename into name and extension
         if '.' in base_filename:
@@ -1198,7 +1204,7 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
             file_path = staging_area.joinpath(filename)
             file_index = 1
             
-            while file_path.exists():
+            while file_path.exists() or filename in existing_filenames:
                 # Calculate space needed for index suffix
                 index_suffix = f"-{file_index}"
                 

@@ -5,19 +5,18 @@ import traceback
 import zipfile
 import typing
 import shutil
-import json
-import time
 import abc
 import csv
 import os
 import re
+import time
 
 from pathlib import PurePath
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_commit, remove_nuls, send_email
+from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
                                    DataSetException, MapItemException)
 from common.config_manager import ConfigWrapper
@@ -264,7 +263,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 self.log.info(
                     "Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (
                         next_type, self.dataset.key))
-                
+
             elif next_type in available_processors:
                 next_analysis = DataSet(
                     parameters=next_parameters,
@@ -410,6 +409,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         Abort dataset creation and clean up so it may be attempted again later
         """
+
+        # delete annotations that have been generated as part of this processor
+        self.db.delete("annotations", where={"from_dataset": self.dataset.key}, commit=True)
         # remove any result files that have been created so far
         self.remove_files()
 
@@ -423,92 +425,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         elif self.interrupted == self.INTERRUPT_CANCEL:
             # cancel job
             self.job.finish()
-
-    def add_field_to_parent(self, field_name, new_data, which_parent=source_dataset, update_existing=False):
-        """
-        This function adds a new field to the parent dataset. Expects a list of data points, one for each item
-        in the parent dataset. Processes csv and ndjson. If update_existing is set to True, this can be used
-        to overwrite an existing field.
-
-        TODO: could be improved by accepting different types of data depending on csv or ndjson.
-
-        :param str field_name:     name of the desired
-        :param List new_data:     List of data to be added to parent dataset
-        :param DataSet which_parent:     DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
-        :param bool update_existing:     False (default) will raise an error if the field_name already exists
-                                        True will allow updating existing data
-        """
-        if len(new_data) < 1:
-            # no data
-            raise ProcessorException('No data provided')
-
-        if not hasattr(self, "source_dataset") and which_parent is not None:
-            # no source to update
-            raise ProcessorException('No source dataset to update')
-
-        # Get the source file data path
-        parent_path = which_parent.get_results_path()
-
-        if len(new_data) != which_parent.num_rows:
-            raise ProcessorException('Must have new data point for each record: parent dataset: %i, new data points: %i' % (which_parent.num_rows, len(new_data)))
-
-        self.dataset.update_status("Adding new field %s to the source file" % field_name)
-
-        # Get a temporary path where we can store the data
-        tmp_path = self.dataset.get_staging_area()
-        tmp_file_path = tmp_path.joinpath(parent_path.name)
-
-        # go through items one by one, optionally mapping them
-        if parent_path.suffix.lower() == ".csv":
-            # Get field names
-            fieldnames = which_parent.get_columns()
-            if not update_existing and field_name in fieldnames:
-                raise ProcessorException('field_name %s already exists!' % field_name)
-            fieldnames.append(field_name)
-
-            # Iterate through the original dataset and add values to a new column
-            self.dataset.update_status("Writing new source file with %s." % field_name)
-            with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-                writer = csv.DictWriter(output, fieldnames=fieldnames)
-                writer.writeheader()
-
-                for count, post in enumerate(which_parent.iterate_items(self)):
-                    # stop processing if worker has been asked to stop
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while writing CSV file")
-
-                    post.original[field_name] = new_data[count]
-                    writer.writerow(post.original)
-
-        elif parent_path.suffix.lower() == ".ndjson":
-            # JSON cannot encode sets
-            if type(new_data[0]) is set:
-                # could check each if type(datapoint) is set, but that could be extensive...
-                new_data = [list(datapoint) for datapoint in new_data]
-
-            with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-                for count, post in enumerate(which_parent.iterate_items(self)):
-                    # stop processing if worker has been asked to stop
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
-
-                    if not update_existing and field_name in post.original.keys():
-                        raise ProcessorException('field_name %s already exists!' % field_name)
-
-                    # Update data
-                    post.original[field_name] = new_data[count]
-
-                    output.write(json.dumps(post.original) + "\n")
-        else:
-            raise NotImplementedError("Cannot iterate through %s file" % parent_path.suffix)
-
-        # Replace the source file path with the new file
-        shutil.copy(str(tmp_file_path), str(parent_path))
-
-        # delete temporary files and folder
-        shutil.rmtree(tmp_path)
-
-        self.dataset.update_status("Parent dataset updated.")
 
     def iterate_proxied_requests(self, urls, preserve_order=True, **kwargs):
         """
@@ -832,21 +748,20 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         return standalone
 
-    def save_annotations(self, annotations: list, source_dataset=None, overwrite=False) -> int:
+    def save_annotations(self, annotations: list, source_dataset=None, hide_in_explorer=False) -> int:
         """
         Saves annotations made by this processor on the basis of another dataset.
         Also adds some data regarding this processor: set `author` and `label` to processor name,
         and add parameters to `metadata` (unless explicitly indicated).
 
-        :param annotations:		List of dictionaries with annotation items. Must have `item_id` and `value`.
-                                E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
-        :param source_dataset:	The dataset that these annotations will be saved on. If None, will use the top parent.
-        :param bool overwrite:	Whether to overwrite annotations if the label is already present
-                                for the dataset. If this is False and the label is already present,
-                                we'll add a number to the label to differentiate it (e.g. `count-posts-1`).
-                                Else we'll just replace the old data.
+        :param annotations:				List of dictionaries with annotation items. Must have `item_id` and `value`.
+                                        E.g. [{"item_id": "12345", "label": "Valid", "value": "Yes"}]
+        :param source_dataset:			The dataset that these annotations will be saved on. If None, will use the
+                                        top parent.
+        :param bool hide_in_explorer:	Whether this annotation is included in the Explorer. 'Hidden' annotations
+                                        are still shown in `iterate_items()`).
 
-        :returns int:			How many annotations were saved.
+        :returns int:					How many annotations were saved.
 
         """
 
@@ -857,40 +772,53 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if not source_dataset:
             source_dataset = self.source_dataset.top_parent()
 
-        # Check if this dataset already has annotation fields
-        existing_labels = source_dataset.get_annotation_field_labels()
+        # Check if this dataset already has annotation fields, and if so, store some values to use per annotation.
+        annotation_fields = source_dataset.annotation_fields
 
-        # Set some values
+        # Keep track of what fields we've already seen, so we don't need to hash every time.
+        seen_fields = {(field_items["from_dataset"], field_items["label"]): field_id
+                       for field_id, field_items in annotation_fields.items() if "from_dataset" in field_items}
+
+        # Loop through all annotations. This may be batched.
         for annotation in annotations:
 
-            if not annotation.get("label"):
-                # If there's no label, set the default label to this processor's name
-                label = self.name
-            else:
-                # If we have a custom label, use that
-                label = annotation["label"]
-                # Shorten if necessary
-                if len(label) > 100:
-                    label = label[:100]
-
-            # If the processor has already generated annotation fields,
-            # or if we have a custom label that already exists
-            # add a number suffix to differentiate
-            if not overwrite and label in existing_labels:
-                label += "-" + str(
-                    len([existing_label for existing_label in existing_labels if existing_label.startswith(label)]))
-            # Otherwise we're just going to save the data as-is, i.e., potentially overwrite.
-            annotation["label"] = label
-
+            # Keep track of what dataset generated this annotation
+            annotation["from_dataset"] = self.dataset.key
             # Set the author to this processor's name
             if not annotation.get("author"):
                 annotation["author"] = self.name
             if not annotation.get("author_original"):
                 annotation["author_original"] = self.name
-
             annotation["by_processor"] = True
 
-        annotations_saved = source_dataset.save_annotations(annotations, overwrite=overwrite)
+            # Only use a default label if no custom one is given
+            if not annotation.get("label"):
+                annotation["label"] = self.name
+
+            # Store info on the annotation field if this from_dataset/label combo hasn't been seen yet.
+            # We need to do this within this loop because this function may be called in batches and with different
+            # annotation types.
+            if (annotation["from_dataset"], annotation["label"]) not in seen_fields:
+                # Generating a unique field ID based on the source dataset's key, the label, and this dataset's key.
+                # This should create unique fields, even if there's multiple annotation types for one processor.
+                field_id = hash_to_md5(self.source_dataset.key + annotation["label"] + annotation["from_dataset"])
+                seen_fields[(annotation["from_dataset"], annotation["label"])] = field_id
+                annotation_fields[field_id] = {
+                    "label": annotation["label"],
+                    "type": annotation["type"] if annotation.get("type") else "text",
+                    "from_dataset": annotation["from_dataset"],
+                    "hide_in_explorer": hide_in_explorer
+                }
+            else:
+                # Else just get the field ID
+                field_id = seen_fields[(annotation["from_dataset"], annotation["label"])]
+
+            # Add field ID to the annotation
+            annotation["field_id"] = field_id
+
+        annotations_saved = source_dataset.save_annotations(annotations)
+        source_dataset.save_annotation_fields(annotation_fields)
+
         return annotations_saved
 
     @classmethod

@@ -87,11 +87,10 @@ class Tokenise(BasicProcessor):
             "docs_per": {
                 "type": UserInput.OPTION_CHOICE,
                 "default": "all",
-                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                            "thread": "Thread"},
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "thread": "Thread"},
                 "help": "Produce token sets per",
                 "tooltip": "This determines the periodisation of follow-up analyses; e.g. if you want to produce topic "
-                           "models per month as the next step, you need to choose 'Month' here."
+                            "models per month as the next step, you need to choose 'Month' here."
             },
             "language": {
                 "type": UserInput.OPTION_CHOICE,
@@ -184,6 +183,13 @@ class Tokenise(BasicProcessor):
                 "help": "Only keep unique tokens per item",
                 "tooltip": "If a token occurs multiple times in the same item, only process once. Can be useful to "
                            "filter out spam."
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "tooltip": "Outputs a comma-separated string of tokens",
+                "label": "tokens",
+                "hide_in_explorer": True,
+                "default": False
             }
         }
 
@@ -237,6 +243,8 @@ class Tokenise(BasicProcessor):
 
         if type(columns) is not list:
             columns = [columns]
+
+        save_annotations = self.parameters.get("save_annotations", False)
 
         self.dataset.update_status("Building filtering automaton")
 
@@ -356,7 +364,9 @@ class Tokenise(BasicProcessor):
         # Collect metadata
         metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'language':language, 'intervals':set()}}
         processed = 0
-        for post in self.source_dataset.iterate_items(self):
+        annotations = []
+
+        for post in self.source_dataset.iterate_items(self, get_annotations=False):
             # determine what output unit this post belongs to
             if docs_per != "thread":
                 try:
@@ -469,7 +479,22 @@ class Tokenise(BasicProcessor):
                         # However, why someone would want to predict topics for different parts of a post seems unclear
                         metadata[post_id][document_descriptor]['multiple_docs'] = True
 
+                    # Possibly save tokens as annotations, in batches of 1000 to prevent memory hog
+                    if save_annotations:
+                        annotations.append({
+                            "label": "tokens",
+                            "item_id": post_id,
+                            "value": ",".join(post_tokens)
+                        })
+                        if processed % 1000 == 0:
+                            self.save_annotations(annotations, hide_in_explorer=True)
+                            annotations = []
+
                     output_files[output_path] += 1
+
+        # Safe leftover annotations
+        if annotations:
+            self.save_annotations(annotations, hide_in_explorer=True)
 
         if output_file_handle:
             output_file_handle.close()

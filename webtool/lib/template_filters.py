@@ -294,6 +294,9 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
 	if not datasource:
 		return body
 
+	if not body:
+		return body
+
 	# Base URLs after which tags and @-mentions follow, per platform
 	base_urls = {
 		"twitter": {
@@ -328,6 +331,8 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
 
 	# Supported data sources
 	known_datasources = list(base_urls.keys())
+	datasource = datasource.replace("-search", "").replace("-import", "")
+
 	if datasource not in known_datasources:
 		return body
 

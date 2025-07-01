@@ -25,7 +25,7 @@ class AttributeRanker(BasicProcessor):
     most-occurring country codes per month; overall top host names, etc
     """
     type = "attribute-frequencies"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Count values"  # title displayed in UI
     description = "Count values in a dataset column, like URLs or hashtags (overall or per timeframe)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI

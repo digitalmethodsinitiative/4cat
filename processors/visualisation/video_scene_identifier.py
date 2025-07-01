@@ -2,6 +2,7 @@
 Detect scenes in videos
 """
 import json
+import os
 from scenedetect import open_video, SceneManager, VideoOpenFailure
 
 from backend.lib.processor import BasicProcessor
@@ -137,6 +138,13 @@ class VideoSceneDetector(BasicProcessor):
 			"min": -1.0,
 			"max": 1.0,
 		},
+		"save_annotations": {
+			"type": UserInput.OPTION_ANNOTATION,
+			"label": "scene data",
+			"hidden_in_explorer": True,
+			"tooltip": "Add amount of scenes per video to top dataset",
+			"default": False
+		}
 	}
 
 	@classmethod
@@ -151,19 +159,25 @@ class VideoSceneDetector(BasicProcessor):
 		This takes a zipped set of videos, uses https://github.com/Breakthrough/PySceneDetect to detect scene breaks in
 		videos
 		"""
-		# Check processor able to run
-		if self.source_dataset.num_rows <= 1:
+		# Check processor able to run; metadata files are seen in Windows, not in UNIX
+		if (os.name != "nt" and self.source_dataset.num_rows <= 1 or
+				os.name == "nt" and self.source_dataset.num_rows < 1):
 			# 1 because there is always a metadata file
 			self.dataset.update_status("No videos from which to extract scenes.", is_final=True)
 			self.dataset.finish(0)
 			return
+		deduct_metadata = 0
+		if os.name == "nt":
+			deduct_metadata = 1
+
+		save_annotations = self.parameters.get("save_annotations", False)
 
 		self.dataset.update_status("Detecting video scenes")
-		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = self.source_dataset.num_rows - deduct_metadata  # exclude metadata file on UNIX
 		processed_videos = 0
 		video_metadata = None
 		collected_scenes = {}
-		for path in self.iterate_archive_contents(self.source_file):
+		for path in self.iterate_archive_contents(self.source_file, immediately_delete=False):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 
@@ -186,6 +200,7 @@ class VideoSceneDetector(BasicProcessor):
 			except VideoOpenFailure as e:
 				self.dataset.update_status(f'Skipping video; Unable to open {str(path.name)}: {str(e)}')
 				continue
+
 			total_frames = video.duration.get_frames()
 			total_duration = video.duration.get_timecode()
 
@@ -226,6 +241,7 @@ class VideoSceneDetector(BasicProcessor):
 					'total_video_duration': total_duration,
 				})
 
+
 			processed_videos += 1
 			self.dataset.update_status(
 				"Detected scenes for %i of %i videos" % (processed_videos, total_possible_videos))
@@ -235,6 +251,7 @@ class VideoSceneDetector(BasicProcessor):
 		self.dataset.update_status("Format data for output file")
 		num_posts = 0
 		rows = []
+		annotations = []
 		if video_metadata is None:
 			# Not good, but let's store the scenes and note the error
 			self.dataset.log("No metadata file found")
@@ -257,7 +274,8 @@ class VideoSceneDetector(BasicProcessor):
 							
 						# List types are not super fun for CSV
 						if 'post_ids' in video_data:
-							video_data['post_ids'] = ','.join([str(i) for i in video_data['post_ids']])
+							video_data['post_ids'] = ','.join(video_data['post_ids'])
+
 
 						for i, scene in enumerate(collected_scenes[file.get('filename')]):
 							rows.append({
@@ -268,6 +286,21 @@ class VideoSceneDetector(BasicProcessor):
 								"post_ids": ','.join(video_data.get("post_ids", [])),
 							})
 							num_posts += 1
+
+							# Write amount of scenes for first scene detected
+							if save_annotations and i == 0:
+								item_ids = video_data.get("post_ids", [])
+								item_ids = [item_ids] if isinstance(item_ids, str) else item_ids
+								for item_id in item_ids:
+									annotation = {
+										"label": "scene_amount",
+										"value": scene.get("num_scenes_detected", ""),
+										"item_id": item_id
+									}
+									annotations.append(annotation)
+
+		if save_annotations and annotations:
+			self.save_annotations(annotations)
 
 		if rows:
 			self.dataset.update_status(

@@ -3,7 +3,7 @@
 [![DOI: 10.5117/CCR2022.2.007.HAGE](https://zenodo.org/badge/DOI/10.5117/ccr2022.2.007.hage.svg)](https://doi.org/10.5117/CCR2022.2.007.HAGE)
 [![DOI: 10.5281/zenodo.4742622](https://zenodo.org/badge/DOI/10.5281/zenodo.4742622.svg)](https://doi.org/10.5281/zenodo.4742622)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
-[![Requires Python 3.8](https://img.shields.io/badge/py-v3.8-blue)](https://www.python.org/)
+[![Requires Python 3.11](https://img.shields.io/badge/py-v3.11-blue)](https://www.python.org/)
 [![Docker image status](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml)
 
 <p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>

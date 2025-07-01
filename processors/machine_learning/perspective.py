@@ -38,7 +38,7 @@ class Perspective(BasicProcessor):
 	}
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, config=None):
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
 		options = {
 			"attributes": {
 				"type": UserInput.OPTION_MULTI,
@@ -53,10 +53,11 @@ class Perspective(BasicProcessor):
 				},
 				"default": ["TOXICITY"]
 			},
-			"write_annotations": {
-				"type": UserInput.OPTION_TOGGLE,
-				"help": "Add attribute scores as annotations to the parent dataset.",
-				"default": True
+			"save_annotations": {
+				"type": UserInput.OPTION_ANNOTATION,
+				"label": "toxicity scores",
+				"tooltip": "Add attribute scores as annotations to the parent dataset.",
+				"default": False
 			}
 		}
 
@@ -66,7 +67,8 @@ class Perspective(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": "",
 				"help": "Google API key",
-				"tooltip": "Can be created on console.cloud.google.com"
+				"tooltip": "Can be created on console.cloud.google.com",
+				"sensitive": True
 			}
 
 		return options
@@ -74,7 +76,6 @@ class Perspective(BasicProcessor):
 	def process(self):
 
 		api_key = self.parameters.get("api_key")
-		self.dataset.delete_parameter("api_key")  # sensitive, delete after use
 		if not api_key:
 			api_key = self.config.get("api.google.api_key")
 		if not api_key:
@@ -85,7 +86,7 @@ class Perspective(BasicProcessor):
 			self.dataset.finish_with_error("You need to provide a at least one attribute to score")
 			return
 
-		write_annotations = self.parameters.get("api_key", True)
+		save_annotations = self.parameters.get("save_annotations", False)
 
 		try:
 			client = discovery.build(
@@ -103,7 +104,7 @@ class Perspective(BasicProcessor):
 		annotations = []
 		api_attributes = {attribute: {} for attribute in self.parameters["attributes"]}
 
-		for item in self.source_dataset.iterate_items(self.source_file):
+		for item in self.source_dataset.iterate_items(self):
 
 			if item["body"]:
 
@@ -122,7 +123,7 @@ class Perspective(BasicProcessor):
 				response["body"] = item["body"]
 				results.append(response)
 
-				if write_annotations:
+				if save_annotations:
 					for attribute in self.parameters["attributes"]:
 						annotation = {
 							"label": attribute,
@@ -132,8 +133,8 @@ class Perspective(BasicProcessor):
 						annotations.append(annotation)
 
 		# Write annotations
-		if write_annotations:
-			self.save_annotations(annotations, overwrite=False)
+		if save_annotations:
+			self.save_annotations(annotations)
 
 		# Write to file
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:

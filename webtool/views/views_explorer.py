@@ -7,9 +7,9 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, request, render_template, jsonify, g
 from flask_login import login_required, current_user
+
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
-from common.lib.helpers import hash_to_md5
 from common.lib.exceptions import DataSetException, AnnotationException
 
 component = Blueprint("explorer", __name__)
@@ -38,12 +38,16 @@ def explorer_dataset(dataset_key: str, page=1):
 		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
-	
+
 	# Load some variables
 	parameters = dataset.get_parameters()
 	datasource = parameters["datasource"]
 	post_count = int(dataset.data["num_rows"])
 	annotation_fields = dataset.annotation_fields
+	# Don't pass fields hidden in explorer
+	annotation_fields = {field_id: field_items for field_id, field_items in annotation_fields.items()
+						 if not field_items.get("hide_in_explorer")}
+
 	warning = ""
 
 	# See if we can actually serve this page
@@ -57,6 +61,16 @@ def explorer_dataset(dataset_key: str, page=1):
 	if not results_path:
 		return error(404, error="This dataset didn't finish executing.")
 
+	# Get the datasets that generated annotations
+	from_datasets = {}
+	for annotation_field in annotation_fields.values():
+		if annotation_field.get("from_dataset"):
+			key = annotation_field["from_dataset"]
+			try:
+				from_datasets[key] = DataSet(key=key, db=g.db, modules=g.modules)
+			except DataSetException:
+				return error(404, error="Processor-generated dataset not found.")
+
 	# The amount of posts to show on a page
 	posts_per_page = g.config.get("explorer.posts_per_page", 50)
 
@@ -65,10 +79,6 @@ def explorer_dataset(dataset_key: str, page=1):
 
 	# The offset for posts depending on the current page
 	offset = ((int(page) - 1) * posts_per_page) if page else 0
-
-	# If the dataset is generated from an API-accessible database, we can add 
-	# extra features like the ability to navigate across posts.
-	has_database = False # todo: integrate
 
 	# Check if we have to sort the data.
 	sort = request.args.get("sort")
@@ -137,10 +147,11 @@ def explorer_dataset(dataset_key: str, page=1):
 		"explorer/explorer.html",
 		dataset=dataset,
 		datasource=datasource,
-		has_database=has_database,
 		posts=posts,
 		annotation_fields=annotation_fields,
 		annotations=post_annotations,
+		processors=current_app.fourcat_modules.processors,
+		from_datasets=from_datasets,
 		template=template,
 		posts_css=posts_css,
 		page=page,
@@ -178,15 +189,11 @@ def explorer_save_annotation_fields(dataset_key: str):
 	# Save it!
 	annotation_fields = request.get_json()
 
-	# Field IDs are not immediately set in the front end.
-	# We're going to do this based on the hash of the
-	# dataset key and the input label (should be unique)
-	field_keys = list(annotation_fields.keys())
-	for field_id in field_keys:
-		if "tohash" in field_id:
-			new_field_id = hash_to_md5(dataset_key + annotation_fields[field_id]["label"])
-			annotation_fields[new_field_id] = annotation_fields[field_id]
-			del annotation_fields[field_id]
+	# Potentially re-add annotation fields that were hidden in the Explorer
+	if dataset.annotation_fields:
+		for annotation_field_id, annotation_field in annotation_fields.items():
+			if annotation_field.get("hide_in_explorer"):
+				annotation_fields[annotation_field_id] = annotation_field
 
 	try:
 		fields_saved = dataset.save_annotation_fields(annotation_fields)
@@ -222,13 +229,14 @@ def explorer_save_annotations(dataset_key: str):
 		return error(404, error="Dataset not found.")
 
 	try:
-		annotations_saved = dataset.save_annotations(annotations, overwrite=True)
+		annotations_saved = dataset.save_annotations(annotations)
 	except AnnotationException as e:
 		# If anything went wrong with the annotation field saving, return an error.
 		return jsonify(error=str(e)), 400
 
 	# Else return the amount of fields saved.
 	return str(annotations_saved)
+
 
 def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 	"""
