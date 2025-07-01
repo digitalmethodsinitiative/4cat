@@ -36,7 +36,6 @@ packages = set([
 	"langchain_openai",
 	"langchain_mistralai",
 	"lxml",
-	"markdown==3.0.1",
 	"markdown2==2.4.2",
 	"nltk~=3.9.1",
 	"networkx~=2.8.0",
