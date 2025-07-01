@@ -38,10 +38,9 @@ component = Blueprint("admin", __name__)
 @login_required
 def frontpage():
     # can be viewed if user has any admin privileges
-    admin_privileges = g.config.get(
-        [key for key in g.config.config_definition.keys() if key.startswith("privileges.admin")])
+    has_admin_privileges = any([g.config.get(key) for key in g.config.config_definition.keys() if key.startswith("privileges.admin")])
 
-    if not any(admin_privileges.values()):
+    if not has_admin_privileges:
         return render_template("error.html", message="You cannot view this page."), 403
 
     # collect some stats
@@ -372,7 +371,7 @@ def reject_user():
     message.attach(MIMEText(html_message, "html"))
 
     try:
-        send_email([email_address], message)
+        send_email([email_address], message, g.config)
     except (smtplib.SMTPException, ConnectionRefusedError) as e:
         return render_template("error.html", message="Could not send e-mail to %s: %s" % (email_address, e),
                                title="Error sending rejection")
@@ -425,11 +424,15 @@ def manipulate_user(mode):
     if user_email in ("anonymous", "autologin"):
         return error(403, message="System users cannot be edited")
 
-    user = User.get_by_name(g.db, request.args.get("name")) if mode == "edit" else {}
-    if user is None:
-        return error(404, message="User not found")
+    if mode == "edit":
+        user = User.get_by_name(g.db, request.args.get("name")) 
+        if user is None:
+            # user does not exist, so we cannot edit them
+            return error(404, message="User not found")
+        user.with_config(g.config)
+    else:
+        user = {}
 
-    user.with_config(g.config)
     incomplete = []
     if request.method == "POST":
         if not request.form.get("name", request.args.get("name")):
@@ -460,11 +463,13 @@ def manipulate_user(mode):
             if mode == "edit":
                 g.db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
                 user = User.get_by_name(g.db, user_data["name"])  # ensure updated data
+                user.with_config(g.config)
 
             else:
                 try:
                     g.db.insert("users", user_data)
                     user = User.get_by_name(g.db, user_data["name"])
+                    user.with_config(g.config)
 
                     if request.form.get("password"):
                         user.set_password(request.form.get("password"))
@@ -482,7 +487,6 @@ def manipulate_user(mode):
                     incomplete.append("name")
                     g.db.rollback()
 
-            user.with_config(g.config)
             if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
                 if not autodelete:
@@ -503,6 +507,7 @@ def manipulate_user(mode):
 
             if not incomplete:
                 user.sort_user_tags()
+                g.config.uncache_user_tags([user])
                 flash("User data saved")
         else:
             flash("Pleasure ensure all fields contain a valid value.")
@@ -573,6 +578,7 @@ def manipulate_tags():
 
         # save global order, too
         g.config.set("flask.tag_order", order, tag="")
+        g.config.uncache_user_tags(tagged_users)
 
         # always async
         return jsonify({"success": True})
@@ -599,7 +605,7 @@ def manipulate_settings():
            g.modules.processors.values()}
     }
 
-    global_settings = g.config.get_all(user=None, tags=None)
+    global_settings = dict(g.config.get_all(user=None, tags=None))
     update_css = False
 
     if request.method == "POST":
@@ -651,10 +657,8 @@ def manipulate_settings():
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
-    all_settings = g.config.get_all(user=None, tags=[tag])
-
+    all_settings = dict(g.config.get_all(user=None, tags=[tag]))
     options = {}
-
     changed_categories = set()
 
     for option in {*all_settings.keys(), *definition.keys()}:

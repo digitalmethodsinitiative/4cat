@@ -7,8 +7,6 @@ import ural
 import requests
 from collections import namedtuple
 
-from common.config_manager import config
-
 
 class FailedProxiedRequest:
     """
@@ -194,6 +192,7 @@ class DelegatedRequestHandler:
     proxy_pool = {}
     halted = set()
     log = None
+    config = None
     index = 0
 
     # some magic values
@@ -202,10 +201,11 @@ class DelegatedRequestHandler:
     REQUEST_STATUS_WAITING_FOR_YIELD = 2
     PROXY_LOCALHOST = "__localhost__"
 
-    def __init__(self, log):
+    def __init__(self, log, config):
         pool = ThreadPoolExecutor()
         self.session = FuturesSession(executor=pool)
         self.log = log
+        self.config = config
 
     def add_urls(self, urls, queue_name="_", position=-1, **kwargs):
         """
@@ -268,7 +268,7 @@ class DelegatedRequestHandler:
         if not self.proxy_pool:
             # this will trigger the first time this method is called
             # build a proxy pool with some information per available proxy
-            proxies = config.get("proxies.urls")
+            proxies = self.config.get("proxies.urls")
             for proxy_url in proxies:
                 self.proxy_pool[proxy_url] = namedtuple(
                     "ProxyEntry", ("proxy", "last_used")
@@ -276,9 +276,9 @@ class DelegatedRequestHandler:
                 self.proxy_pool[proxy_url].proxy = SophisticatedFuturesProxy(
                     proxy_url,
                     self.log,
-                    config.get("proxies.cooloff"),
-                    config.get("proxies.concurrent-overall"),
-                    config.get("proxies.concurrent-host"),
+                    self.config.get("proxies.cooloff"),
+                    self.config.get("proxies.concurrent-overall"),
+                    self.config.get("proxies.concurrent-host"),
                 )
                 self.proxy_pool[proxy_url].last_used = 0
 

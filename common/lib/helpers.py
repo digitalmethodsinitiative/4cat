@@ -29,11 +29,13 @@ from calendar import monthrange
 from packaging import version
 from PIL import Image
 
-from common.config_manager import config
+from common.config_manager import CoreConfigManager
 from common.lib.user_input import UserInput
 __all__ = ("UserInput",)
 
-def init_datasource(database, logger, queue, name):
+core_config = CoreConfigManager()
+
+def init_datasource(database, logger, queue, name, config):
     """
     Initialize data source
 
@@ -44,6 +46,7 @@ def init_datasource(database, logger, queue, name):
     :param Logger logger:  Log handler
     :param JobQueue queue:  Job Queue instance
     :param string name:  ID of datasource that is being initialised
+    :param config:  Configuration reader
     """
     pass
 
@@ -147,7 +150,7 @@ def get_git_branch():
     repository or git is not installed an empty string is returned.
     """
     try:
-        root_dir = str(config.get('PATH_ROOT').resolve())
+        root_dir = str(core_config.get('PATH_ROOT').resolve())
         branch = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
@@ -196,16 +199,16 @@ def get_software_commit(worker=None):
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
             relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
-            working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
+            working_dir = str(core_config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
             git_cmd = f"git -C {oslex.quote(working_dir)} rev-parse --show-toplevel"
             repo_level = subprocess.run(oslex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
+            if Path(repo_level.stdout.decode("utf-8")) == core_config.get("PATH_ROOT"):
                 # not its own repository
                 return ("", "")
 
         else:
-            working_dir = str(config.get("PATH_ROOT").resolve())
+            working_dir = str(core_config.get("PATH_ROOT").resolve())
 
         show = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if show.returncode != 0:
@@ -236,24 +239,24 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = config.get("PATH_ROOT").joinpath("config/.current-version")
+    current_version_file = core_config.get("PATH_ROOT").joinpath("config/.current-version")
     if not current_version_file.exists():
         return ""
 
     with current_version_file.open() as infile:
         return infile.readline().strip()
 
-def get_github_version(timeout=5):
+def get_github_version(repo_url, timeout=5):
     """
     Get latest release tag version from GitHub
 
     Will raise a ValueError if it cannot retrieve information from GitHub.
 
+    :param str repo_url:  GitHub repository URL
     :param int timeout:  Timeout in seconds for HTTP request
 
     :return tuple:  Version, e.g. `1.26`, and release URL.
     """
-    repo_url = config.get("4cat.github_url")
     if not repo_url.endswith("/"):
         repo_url += "/"
 
@@ -300,7 +303,7 @@ def find_extensions():
     :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
     dictionary, and a list of (str) errors encountered while loading
     """
-    extension_path = config.get("PATH_ROOT").joinpath("extensions")
+    extension_path = core_config.get("PATH_ROOT").joinpath("extensions")
     errors = []
     if not extension_path.exists() or not extension_path.is_dir():
         return [], None
@@ -368,7 +371,7 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
-def convert_to_float(value, default=0) -> float:
+def convert_to_float(value, default=0, force=False) -> float:
     """
     Convert a value to a floating point, with a fallback
 
@@ -378,8 +381,11 @@ def convert_to_float(value, default=0) -> float:
 
     :param value:  Value to convert
     :param int default:  Default value, if conversion not possible
+    :param force:   Whether to force the value into a float if it is not empty or None.
     :return float:  Converted value
     """
+    if force:
+        return float(value) if value else default
     try:
         return float(value)
     except (ValueError, TypeError):
@@ -620,6 +626,7 @@ def call_api(action, payload=None, wait_for_response=True):
     """
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
+    config = CoreConfigManager()
     try:
         connection.connect((config.get('API_HOST'), config.get('API_PORT')))
     except ConnectionRefusedError:
@@ -728,7 +735,10 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     :return:
     """
     missing = 0
-    test_key = list(intervals.keys())[0]
+    try:
+        test_key = list(intervals.keys())[0]
+    except IndexError:
+        return 0, {}
 
     # first determine the boundaries of the interval
     # these may be passed as parameters, or they can be inferred from the
@@ -1020,7 +1030,7 @@ def add_notification(db, user, notification, expires=None, allow_dismiss=True):
     }, safe=True)
 
 
-def send_email(recipient, message):
+def send_email(recipient, message, mail_config):
     """
     Send an e-mail using the configured SMTP settings
 
@@ -1029,28 +1039,29 @@ def send_email(recipient, message):
 
     :param list recipient:  Recipient e-mail addresses
     :param MIMEMultipart message:  Message to send
+    :param mail_config:  Configuration reader
     """
     # Create a secure SSL context
     context = ssl.create_default_context()
 
     # Decide which connection type
-    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get(
-            'mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'),
-                                                   port=config.get('mail.port', 0)) as server:
-        if config.get('mail.ssl') == 'tls':
+    with smtplib.SMTP_SSL(mail_config.get('mail.server'), port=mail_config.get('mail.port', 0), context=context) if mail_config.get(
+            'mail.ssl') == 'ssl' else smtplib.SMTP(mail_config.get('mail.server'),
+                                                   port=mail_config.get('mail.port', 0)) as server:
+        if mail_config.get('mail.ssl') == 'tls':
             # smtplib.SMTP adds TLS context here
             server.starttls(context=context)
 
         # Log in
-        if config.get('mail.username') and config.get('mail.password'):
+        if mail_config.get('mail.username') and mail_config.get('mail.password'):
             server.ehlo()
-            server.login(config.get('mail.username'), config.get('mail.password'))
+            server.login(mail_config.get('mail.username'), mail_config.get('mail.password'))
 
         # Send message
         if type(message) is str:
-            server.sendmail(config.get('mail.noreply'), recipient, message)
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message)
         else:
-            server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message.as_string())
 
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
@@ -1134,7 +1145,7 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
 
     return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
 
-def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255):
+def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
         Determine filenames for saved files
 
@@ -1157,6 +1168,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
             base_filename = clean_filename
         else:
             base_filename = default_name + default_ext
+
+        if not existing_filenames:
+            existing_filenames = []
 
         # Split base filename into name and extension
         if '.' in base_filename:
@@ -1193,7 +1207,7 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
             file_path = staging_area.joinpath(filename)
             file_index = 1
             
-            while file_path.exists():
+            while file_path.exists() or filename in existing_filenames:
                 # Calculate space needed for index suffix
                 index_suffix = f"-{file_index}"
                 

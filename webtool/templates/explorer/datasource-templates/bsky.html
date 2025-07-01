@@ -11,9 +11,9 @@
                 {% endif %}
             {% endif %}
             {% if not pseudonymised %}
-            <img src="{{ post.get('author_avatar') }}" alt="bsky avatar">
+                <img src="{{ post.get('author_avatar') }}" alt="bsky avatar">
 			{% else %}
-			<div title="Pseudonymous author" class="pseudonymous-author"></div>
+			    <div title="Pseudonymous author" class="pseudonymous-author"></div>
 			{% endif %}
 		</div>
 		<div class="post-content">

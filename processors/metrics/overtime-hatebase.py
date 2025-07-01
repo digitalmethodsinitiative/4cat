@@ -21,7 +21,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
     Show overall activity levels for Telegram datasets
     """
     type = "overtime-hateful"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Over-time offensivess trend"  # title displayed in UI
     description = "Extracts offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset. Also includes engagement metrics."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI

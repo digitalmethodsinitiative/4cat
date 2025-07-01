@@ -21,7 +21,7 @@ class HatebaseRanker(BasicProcessor):
 	most-occurring country codes per month; overall top host names, etc
 	"""
 	type = "hatebase-frequencies"  # job type ID
-	category = "Post metrics"  # category
+	category = "Metrics"  # category
 	title = "Extract top hateful phrases"  # title displayed in UI
 	description = "Count frequencies for hateful words and phrases found in the dataset and rank the results (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI

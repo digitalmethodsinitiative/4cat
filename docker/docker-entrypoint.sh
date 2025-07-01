@@ -32,6 +32,14 @@ while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do
 done
 echo "PostgreSQL started"
 
+if [ -n "$MEMCACHED_HOST" ] || [ -n "$MEMCACHED_PORT" ]; then
+  echo "Waiting for memcached..."
+  while ! nc -z ${MEMCACHED_HOST:-memcached} ${MEMCACHED_PORT:-11211}; do
+    sleep 0.1
+  done
+  echo "Memcached started"
+fi
+
 # Create Database if it does not already exist
 if [ `psql --host=$POSTGRES_HOST --port=$POSTGRES_PORT --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]; then
   # Table already exists

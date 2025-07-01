@@ -30,7 +30,7 @@ class YouTubeMetadata(BasicProcessor):
 	"""
 
 	type = "youtube-metadata"  # job type ID
-	category = "Post metrics"  # category
+	category = "Metrics"  # category
 	title = "Extract metadata from YouTube URLs"  # title displayed in UI
 	description = "Collect metadata from YouTube videos, channels, and playlists with the YouTube API"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
@@ -452,7 +452,7 @@ class YouTubeMetadata(BasicProcessor):
 		return results
 
 	@staticmethod
-	def get_yt_id(url: str, original_id="") -> tuple[str, str, str] | None:
+	def get_yt_id(url: str, original_id="") -> tuple[str, str, str]:
 		"""
 		Extracts IDs from YouTube URLs.
 		Supports videos, channel IDs, channel names, and playlist IDs.

@@ -18,7 +18,7 @@ class VectorRanker(BasicProcessor):
 	Rank vectors over time
 	"""
 	type = "vector-ranker"  # job type ID
-	category = "Post metrics" # category
+	category = "Metrics" # category
 	title = "Extract top words"  # title displayed in UI
 	description = "Ranks most used tokens per tokenset (overall or per timeframe). " \
 				  "Limited to 100 most-used tokens."  # description displayed in UI

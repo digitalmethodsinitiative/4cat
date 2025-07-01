@@ -113,6 +113,10 @@ span.hashtag {
     overflow-x: hidden;
 }
 
+.post-annotation > .annotation-label, .post-annotation > .annotation-label > a {
+	color: black;
+}
+
 .post-annotation.checkbox > .post-annotation-options {
     display: inline-block;
 }

@@ -12,10 +12,10 @@ __email__ = "4cat@oilab.eu"
 
 class CountPosts(BasicProcessor):
 	"""
-	Merge post body into one long string
+	Count items in a dataset
 	"""
 	type = "count-posts"  # job type ID
-	category = "Post metrics" # category
+	category = "Metrics" # category
 	title = "Count items"  # title displayed in UI
 	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
@@ -101,11 +101,11 @@ class CountPosts(BasicProcessor):
 			# visualised as a histogram, for example
 			if self.parameters.get("pad") and timeframe != "all":
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
-
-				# Convert 0 values to dict
-				for k, v in intervals.items():
-					if isinstance(v, int):
-						intervals[k] = {"absolute": v}
+				if intervals:
+					# Convert 0 values to dict
+					for k, v in intervals.items():
+						if isinstance(v, int):
+							intervals[k] = {"absolute": v}
 
 			# Add relative counts, if needed
 			if add_relative:
@@ -175,7 +175,10 @@ class CountPosts(BasicProcessor):
 					row["value_relative"] = intervals[interval]["relative"]
 				rows.append(row)
 
-		self.write_csv_items_and_finish(rows)
+		if rows:
+			self.write_csv_items_and_finish(rows)
+		else:
+			return self.dataset.finish_with_error("No items could be counted. See dataset log for details")
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None):

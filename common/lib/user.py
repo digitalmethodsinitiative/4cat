@@ -336,7 +336,7 @@ class User:
 
         # try to send it
         try:
-            send_email([username], message)
+            send_email([username], message, self.config)
             return url
         except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout, socket.gaierror) as e:
             raise RuntimeError("Could not send password reset e-mail: %s" % e)

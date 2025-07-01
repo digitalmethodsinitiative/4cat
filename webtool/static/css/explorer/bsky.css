@@ -148,6 +148,10 @@ span.hashtag {
     word-break: break-all;
 }
 
+.post-annotation > .annotation-label, .post-annotation a {
+	color: white;
+}
+
 .post-annotation.checkbox > .post-annotation-options {
     display: inline-block;
 }

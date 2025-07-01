@@ -191,7 +191,7 @@ class ModuleCollector:
         `DATASOURCE` constant. The latter is taken as the ID for this
         datasource.
         """
-        def _load_datasource(subdirectory):
+        def _load_datasource(subdirectory, expiration):
             """
             Load a single datasource
             """
@@ -210,7 +210,7 @@ class ModuleCollector:
             datasource_id = datasource.DATASOURCE
 
             self.datasources[datasource_id] = {
-                "expire-datasets": self.config.get("datasources.expiration", {}).get(datasource_id, None),
+                "expire-datasets": expiration.get(datasource_id, None),
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
@@ -218,10 +218,13 @@ class ModuleCollector:
                 "config": {} if not hasattr(datasource, "config") else datasource.config
             }
 
+        expiration = self.config.get("datasources.expiration", {})
+
         # Load 4CAT core datasources
+        expiration = self.config.get("datasources.expiration", {})
         for subdirectory in Path(self.config.get('PATH_ROOT'), "datasources").iterdir():
             if subdirectory.is_dir():
-                _load_datasource(subdirectory)
+                _load_datasource(subdirectory, expiration)
 
         # Load extension datasources
         # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
@@ -229,7 +232,7 @@ class ModuleCollector:
             if "datasources" in dirs:
                 for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():
-                        _load_datasource(subdirectory)
+                        _load_datasource(subdirectory, expiration)
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in
                               sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}

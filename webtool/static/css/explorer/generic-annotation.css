@@ -38,7 +38,7 @@
 
 /* Link styling for processor-generated labels */
 .post-annotation a.from-dataset-link {
-    display: block;
+    display: inline-block;
     color: var(--accent);
     text-decoration: underline;
 }
@@ -97,6 +97,7 @@
 
 textarea.post-annotation-input {
     min-height: 80px;
+    width: 100%;
     resize: vertical;
     font-family: inherit;
 }

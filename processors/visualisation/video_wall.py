@@ -170,6 +170,7 @@ class VideoWallGenerator(BasicProcessor):
         dimensions = {}
         sort_values = {}
         media = {}
+        skipped = 0
 
         # unpack items and determine length of the item (for sorting)
         self.dataset.update_status("Unpacking files and reading metadata")
@@ -189,6 +190,7 @@ class VideoWallGenerator(BasicProcessor):
                     self.get_signature(item, sort_mode, ffprobe_path)
             except MediaSignatureException as e:
                 self.dataset.log(f"Cannot read dimensions of file {item.name}, skipping ({e})")
+                skipped += 1
                 continue
 
             media[item.name] = item
@@ -539,8 +541,11 @@ class VideoWallGenerator(BasicProcessor):
             return self.dataset.finish_with_error(
                 f"Could not make collage (error {result.returncode}); check the dataset log for details.")
 
-        self.dataset.update_status("Rendering finished.")
-        self.dataset.finish(1)
+        if skipped:
+             self.dataset.update_status(f"Rendering finished. {skipped} item(s) were skipped; see dataset log for details.", is_final=True)
+        else:
+             self.dataset.update_status("Rendering finished.")
+             self.dataset.finish(1)
 
     def get_signature(self, file_path, sort_mode, ffprobe_path):
         """
