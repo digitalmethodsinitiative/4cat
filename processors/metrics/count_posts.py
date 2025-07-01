@@ -178,7 +178,7 @@ class CountPosts(BasicProcessor):
 		if rows:
 			self.write_csv_items_and_finish(rows)
 		else:
-			return self.dataset.finish_with_error("No items could be counted. See dataset log for details", is_final=True)
+			return self.dataset.finish_with_error("No items could be counted. See dataset log for details")
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None):
