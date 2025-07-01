@@ -256,7 +256,7 @@ class ConfigManager:
         and setting values as values.
         """
         for setting in self.get_all_setting_names():
-            yield setting, self.get(setting, None, is_json, user, tags, memcache=memcache)
+            yield setting, self.get(setting, None, is_json, user, tags, memcache)
 
 
     def get(self, attribute_name, default=None, is_json=False, user=None, tags=None, memcache=None):
@@ -296,6 +296,10 @@ class ConfigManager:
             self.with_db()
 
         # get tags to look for
+        # copy() because else we keep adding onto the same list, which
+        # interacts badly with get_all()
+        if tags:
+            tags = tags.copy()
         tags = self.get_active_tags(user, tags, memcache)
 
         # now we have all tags - get the config values for each (if available)
@@ -408,19 +412,25 @@ class ConfigManager:
                 # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
                 raise TypeError(f"get() expects None, a User object or a string for argument 'user', {type(user).__name__} given")
 
-        if not memcache and self.memcache:
-            memcache = self.memcache
-
-        if memcache:
-            memcache_id = f"_usertags-{user}"
-            v = memcache.get(memcache_id, default=CacheMiss)
-            if v is not CacheMiss:
-                return v
-
         # user-specific settings are just a special type of tag (which takes
-        # precedence), same goes for user groups
+        # precedence), same goes for user groups. so if a user was passed, get
+        # that user's tags (including the 'special' user: tag) and add them
+        # to the list
         if user:
-            user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
+            user_tags = CacheMiss
+            
+            if not memcache and self.memcache:
+                memcache = self.memcache
+                
+            if memcache:
+                memcache_id = f"_usertags-{user}"
+                user_tags = memcache.get(memcache_id, default=CacheMiss)
+
+            if user_tags is CacheMiss:
+                user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
+                if user_tags and memcache:
+                    memcache.set(memcache_id, user_tags)
+
             if user_tags:
                 try:
                     tags.extend(user_tags["tags"])
@@ -429,9 +439,6 @@ class ConfigManager:
                     pass
 
             tags.insert(0, f"user:{user}")
-
-        if memcache:
-            memcache.set(memcache_id, tags)
 
         return tags
 

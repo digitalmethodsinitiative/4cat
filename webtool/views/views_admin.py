@@ -651,9 +651,7 @@ def manipulate_settings():
             flash("Invalid settings: %s" % str(e))
 
     all_settings = dict(g.config.get_all(user=None, tags=[tag]))
-
     options = {}
-
     changed_categories = set()
 
     for option in {*all_settings.keys(), *definition.keys()}:
