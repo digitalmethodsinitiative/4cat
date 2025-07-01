@@ -161,6 +161,7 @@ class VideoWallGenerator(BasicProcessor):
         lengths = {}
         dimensions = {}
         videos = {}
+        skipped = 0
 
         # unpack videos and determine length of the video (for sorting)
         self.dataset.update_status("Unpacking videos and reading metadata")
@@ -186,10 +187,9 @@ class VideoWallGenerator(BasicProcessor):
             probe_output = probe.stdout.decode("utf-8")
             probe_error = probe.stderr.decode("utf-8")
             if probe_error:
-                shutil.rmtree(video_staging_area, ignore_errors=True)
-                return self.dataset.finish_with_error(f"Cannot determine dimensions of video {video.name}. Cannot tile "
-                                                      "videos without knowing the video dimensions.")
-                # ...or should we just skip it instead?
+                self.dataset.log(f"Cannot determine dimensions of video {video.name}. Excluding from wall.")
+                skipped += 1
+                continue
             else:
                 bits = probe_output.split(",")
                 dimensions[video.name] = (int(bits[0]), int(bits[1]))
@@ -543,5 +543,9 @@ class VideoWallGenerator(BasicProcessor):
             return self.dataset.finish_with_error(
                 f"Could not make video wall (error {result.returncode}); check the dataset log for details.")
 
-        self.dataset.update_status("Video wall rendering finished.")
+        if skipped:
+            self.dataset.update_status(f"Video wall rendering finished. {skipped} video(s) were skipped; see dataset log for details.", is_final=True)
+        else:
+            self.dataset.update_status("Video wall rendering finished.")
+            
         self.dataset.finish(1)
