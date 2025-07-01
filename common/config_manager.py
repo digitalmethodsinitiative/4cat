@@ -165,7 +165,7 @@ class ConfigManager:
                 memcache.set("4cat-init-dummy", time.time())
                 memcache.init_thread_id = threading.get_ident()
                 return memcache
-            except (SystemError, ValueError, MemcacheError):
+            except (SystemError, ValueError, MemcacheError, ConnectionError):
                 # we have no access to the logger here so we simply pass
                 # later we can detect elsewhere that a memcache address is
                 # configured but no connection is there - then we can log
