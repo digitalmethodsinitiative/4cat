@@ -1,6 +1,5 @@
 import collections
 import itertools
-import traceback
 import datetime
 import fnmatch
 import random
@@ -348,11 +347,6 @@ class DataSet(FourcatModule):
                         raise ProcessorInterruptedException(
                             "Processor interrupted while iterating through NDJSON file"
                         )
-
-                    tb = traceback.extract_stack()
-                    location = "→".join(
-                        [f"{t.filename.split('/')[-1]}:{t.lineno}" for t in tb]
-                    )
                     
                     yield json.loads(line)
 
