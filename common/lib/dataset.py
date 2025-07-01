@@ -41,7 +41,7 @@ class DataSet(FourcatModule):
     _children = None
     _cached_columns = None
     available_processors = None
-    genealogy = None
+    _genealogy = None
     preset_parent = None
     parameters = None
     modules = None
@@ -105,7 +105,7 @@ class DataSet(FourcatModule):
         self.data = {}
         self.parameters = {}
         self.available_processors = {}
-        self.genealogy = []
+        self._genealogy = []
         self.staging_areas = []
         self.modules = modules
 
@@ -1613,7 +1613,7 @@ class DataSet(FourcatModule):
 
         :return list:  Dataset genealogy, oldest dataset first
         """
-        if not self.genealogy:
+        if not self._genealogy:
             key_parent = self.key_parent
             genealogy = []
 
@@ -1630,9 +1630,9 @@ class DataSet(FourcatModule):
                     break
 
             genealogy.reverse()
-            self.genealogy = genealogy
+            self._genealogy = genealogy
 
-        genealogy = self.genealogy
+        genealogy = self._genealogy
         genealogy.append(self)
 
         return genealogy
@@ -1706,7 +1706,7 @@ class DataSet(FourcatModule):
             return self.key
 
         genealogy = self.get_genealogy()
-        return ",".join(genealogy)
+        return ",".join([d.key for d in genealogy])
 
     def get_compatible_processors(self, config=None):
         """
