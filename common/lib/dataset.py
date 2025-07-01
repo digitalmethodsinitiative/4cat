@@ -1603,7 +1603,7 @@ class DataSet(FourcatModule):
         genealogy = self.get_genealogy()
         return genealogy[0]
 
-    def get_genealogy(self, inclusive=False):
+    def get_genealogy(self):
         """
         Get genealogy of this dataset
 
@@ -1613,29 +1613,29 @@ class DataSet(FourcatModule):
 
         :return list:  Dataset genealogy, oldest dataset first
         """
-        if self.genealogy and not inclusive:
-            return self.genealogy
+        if not self.genealogy:
+            key_parent = self.key_parent
+            genealogy = []
 
-        key_parent = self.key_parent
-        genealogy = []
+            while key_parent:
+                try:
+                    parent = DataSet(key=key_parent, db=self.db, modules=self.modules)
+                except DataSetException:
+                    break
 
-        while key_parent:
-            try:
-                parent = DataSet(key=key_parent, db=self.db, modules=self.modules)
-            except DataSetException:
-                break
+                genealogy.append(parent)
+                if parent.key_parent:
+                    key_parent = parent.key_parent
+                else:
+                    break
 
-            genealogy.append(parent)
-            if parent.key_parent:
-                key_parent = parent.key_parent
-            else:
-                break
+            genealogy.reverse()
+            self.genealogy = genealogy
 
-        genealogy.reverse()
+        genealogy = self.genealogy
         genealogy.append(self)
 
-        self.genealogy = genealogy
-        return self.genealogy
+        return genealogy
 
     def get_children(self, update=False):
         """
@@ -1686,7 +1686,7 @@ class DataSet(FourcatModule):
         using `fnmatch.fnmatch`.
         :return:  Earliest matching dataset, or `None` if none match.
         """
-        genealogy = self.get_genealogy(inclusive=True)
+        genealogy = self.get_genealogy()
         for dataset in reversed(genealogy):
             if fnmatch.fnmatch(dataset.type, type_filter):
                 return dataset
@@ -1702,34 +1702,11 @@ class DataSet(FourcatModule):
 
         :return str: Nav link
         """
-        if self.genealogy:
-            return ",".join([dataset.key for dataset in self.genealogy])
-        elif not self.key_parent:
+        if not self.key_parent:
             return self.key
-        else:
-            # Collect keys only, start at the bottom
-            genealogy = [self.key_parent]
-            key_parent = genealogy[-1]
 
-            while key_parent:
-                try:
-                    parent = self.db.fetchone(
-                        "SELECT key_parent FROM datasets WHERE key = %s", (key_parent,)
-                    )
-                    if not parent:
-                        break
-                except TypeError:
-                    break
-
-                key_parent = parent["key_parent"]
-                if key_parent:
-                    genealogy.append(key_parent)
-                else:
-                    break
-
-            genealogy.reverse()
-            genealogy.append(self.key)
-            return ",".join(genealogy)
+        genealogy = self.get_genealogy()
+        return ",".join(genealogy)
 
     def get_compatible_processors(self, config=None):
         """
