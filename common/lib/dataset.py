@@ -1,5 +1,6 @@
 import collections
 import itertools
+import traceback
 import datetime
 import fnmatch
 import random
@@ -313,6 +314,7 @@ class DataSet(FourcatModule):
         """
         path = self.get_results_path()
 
+
         # Yield through items one by one
         if path.suffix.lower() == ".csv":
             with path.open("rb") as infile:
@@ -335,7 +337,7 @@ class DataSet(FourcatModule):
                         raise ProcessorInterruptedException(
                             "Processor interrupted while iterating through CSV file"
                         )
-
+                    
                     yield item
 
         elif path.suffix.lower() == ".ndjson":
@@ -347,13 +349,18 @@ class DataSet(FourcatModule):
                             "Processor interrupted while iterating through NDJSON file"
                         )
 
+                    tb = traceback.extract_stack()
+                    location = "→".join(
+                        [f"{t.filename.split('/')[-1]}:{t.lineno}" for t in tb]
+                    )
+                    
                     yield json.loads(line)
 
         else:
             raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
     def iterate_items(
-        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True
+        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None
     ):
         """
         Generate mapped dataset items
@@ -386,6 +393,8 @@ class DataSet(FourcatModule):
         iterating the dataset.
         :param bool warn_unmappable:  If an item is not mappable, skip the item
         and log a warning
+        :param max_unmappable:  Skip at most this many unmappable items; if
+        more are encountered, stop iterating. `None` to never stop.
         :param map_missing: Indicates what to do with mapped items for which
         some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
         - 'default': fill missing fields with the default passed by map_item
@@ -399,7 +408,7 @@ class DataSet(FourcatModule):
           This can be disabled to help speed up iteration.
         :return generator:  A generator that yields DatasetItems
         """
-        unmapped_items = False
+        unmapped_items = 0
         # Collect item_mapper for use with filter
         item_mapper = False
         own_processor = self.get_own_processor()
@@ -440,8 +449,12 @@ class DataSet(FourcatModule):
                         self.warn_unmappable_item(
                             i, processor, e, warn_admins=unmapped_items is False
                         )
-                        unmapped_items = True
-                    continue
+                        
+                    unmapped_items += 1
+                    if max_unmappable and unmapped_items > max_unmappable:
+                        break
+                    else:
+                        continue
 
                 # check if fields have been marked as 'missing' in the
                 # underlying data, and treat according to the chosen strategy
@@ -1200,9 +1213,9 @@ class DataSet(FourcatModule):
                 and self.get_own_processor() is not None
                 and self.get_own_processor().map_item_method_available(dataset=self)
             ):
-                items = self.iterate_items(warn_unmappable=False, get_annotations=False)
+                items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
                 try:
-                    keys = list(items.__next__().keys())
+                    keys = list(next(items).keys())
                     if self.annotation_fields:
                         keys.extend(self.annotation_fields.keys())
                         
