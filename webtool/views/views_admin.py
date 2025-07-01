@@ -502,6 +502,7 @@ def manipulate_user(mode):
 
             if not incomplete:
                 user.sort_user_tags()
+                g.config.clear_user_tags(user)
                 flash("User data saved")
         else:
             flash("Pleasure ensure all fields contain a valid value.")
@@ -572,6 +573,7 @@ def manipulate_tags():
 
         # save global order, too
         g.config.set("flask.tag_order", order, tag="")
+        g.config.uncache_user_tags(tagged_users)
 
         # always async
         return jsonify({"success": True})

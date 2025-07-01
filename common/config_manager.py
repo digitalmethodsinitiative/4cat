@@ -400,17 +400,7 @@ class ConfigManager:
         elif type(tags) is str:
             tags = [tags]
 
-        # can provide either a string or user object
-        if type(user) is not str:
-            if type(user).__name__ == "LocalProxy":
-                # passed on from Flask
-                user = user._get_current_object()
-
-            if hasattr(user, "get_id"):
-                user = user.get_id()
-            elif user != None:  # noqa: E711
-                # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
-                raise TypeError(f"get() expects None, a User object or a string for argument 'user', {type(user).__name__} given")
+        user = self._normalise_user(user)
 
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups. so if a user was passed, get
@@ -520,6 +510,49 @@ class ConfigManager:
             return
 
         self.memcache.flush_all()
+
+    def uncache_user_tags(self, users):
+        """
+        Clear cached user tags
+
+        User tags are cached with memcache if possible to avoid unnecessary
+        database roundtrips. This method clears the cached user tags, in case
+        a tag is added/deleted from a user.
+
+        :param list users:  List of users, as usernames or User objects
+        """
+        if self.memcache:
+            for user in users:
+                user = self._normalise_user(user)
+                self.memcache.delete(f"_usertags-{user}")
+
+    def _normalise_user(self, user):
+        """
+        Normalise user object
+
+        Users may be passed as a username, a user object, or a proxy of such an
+        object. This method normalises this to a string (the username), or
+        `None` if no user is provided.
+
+        :param user:  User value to normalise
+        :return str|None:  Normalised value
+        """
+
+        # can provide either a string or user object
+        if type(user) is not str:
+            if type(user).__name__ == "LocalProxy":
+                # passed on from Flask
+                user = user._get_current_object()
+
+            if hasattr(user, "get_id"):
+                user = user.get_id()
+            elif user != None:  # noqa: E711
+                # werkzeug.local.LocalProxy (e.g., user not yet logged in) wraps None; use '!=' instead of 'is not'
+                raise TypeError(
+                    f"_normalise_user() expects None, a User object or a string for argument 'user', {type(user).__name__} given"
+                )
+
+        return user
 
     def _get_memcache_id(self, attribute_name, tags=None):
         """
