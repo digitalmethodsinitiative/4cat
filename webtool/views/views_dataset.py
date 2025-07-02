@@ -282,8 +282,8 @@ def preview_items(key):
                        hostname.endswith(".localhost")
         return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
 
-    elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp"):
-        # image file
+    elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp", "mp4"):
+        # image or video file
         # just show image in an empty page
         return render_template("preview/image.html", dataset=dataset)
 

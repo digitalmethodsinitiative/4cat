@@ -1,19 +1,18 @@
 """
-Create a collage of videos playing side by side
+Create a collage of items in a grid
 """
+import statistics
+import subprocess
 import random
 import shutil
-import math
-import statistics
-
 import oslex
-import subprocess
+import math
 
 from packaging import version
 
 from common.lib.helpers import UserInput, get_ffmpeg_version
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MediaSignatureException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -23,9 +22,11 @@ __email__ = "4cat@oilab.eu"
 
 class VideoWallGenerator(BasicProcessor):
     """
-    Image wall generator
+    Video wall generator
 
-    Create an image wall from the top images in the dataset
+    Make a collage of videos or images. This class is set up for videos, but
+    can easily be subclassed to make a processor that makes an image collage
+    or a collage of images and videos combined.
     """
     type = "video-wall"  # job type ID
     category = "Visual"  # category
@@ -36,34 +37,34 @@ class VideoWallGenerator(BasicProcessor):
     options = {
         "amount": {
             "type": UserInput.OPTION_TEXT,
-            "help": "No. of videos (max 500)",
+            "help": "No. of items (max 500)",
             "default": 25,
             "min": 0,
             "max": 500,
-            "tooltip": "'0' uses as many videos as available in the archive (up to 500)"
+            "tooltip": "'0' uses as many files as available in the archive (up to 500)"
         },
         "backfill": {
             "type": UserInput.OPTION_TOGGLE,
-            "help": "Add more videos if there is room",
+            "help": "Add more items if there is room",
             "default": True,
-            "tooltip": "If there are more videos than the given number and "
+            "tooltip": "If there are more items than the given number and "
                        "there is space left to add them to the wall, do so"
         },
         "tile-size": {
             "type": UserInput.OPTION_CHOICE,
             "options": {
                 "square": "Square",
-                "average": "Average video in set",
-                "median": "Median video in set",
+                "average": "Average item in set",
+                "median": "Median item in set",
                 "fit-height": "Fit height"
             },
             "default": "median",
-            "help": "Video tile size",
-            "tooltip": "'Fit height' retains width/height ratios but makes videos have the same height"
+            "help": "Tile size",
+            "tooltip": "'Fit height' retains width/height ratios but makes all tiles have the same height"
         },
         "sort-mode": {
             "type": UserInput.OPTION_CHOICE,
-            "help": "Sort videos by",
+            "help": "Sort by",
             "options": {
                 "": "Do not sort",
                 "random": "Random",
@@ -82,8 +83,10 @@ class VideoWallGenerator(BasicProcessor):
                 "1:1": "1:1 (Square)"
             },
             "default": "16:10",
-            "tooltip": "Approximation. Final aspect ratio will depend on size of input videos."
+            "tooltip": "Approximation. Final aspect ratio will depend on the size of each item."
         },
+
+        # the next two are video-specific (not applicable to images)
         "audio": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Audio handling",
@@ -113,8 +116,6 @@ class VideoWallGenerator(BasicProcessor):
         "16:9": (2560, 1440),
         "16:10": (2560, 1600)
     }
-    TARGET_WIDTH = 2560
-    TARGET_HEIGHT = 1440
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -137,91 +138,82 @@ class VideoWallGenerator(BasicProcessor):
 
     def process(self):
         """
-        This takes a 4CAT results file as input, and outputs a new CSV file
-        with one column with image hashes, one with the first file name used
-        for the image, and one with the amount of times the image was used
+        Go through media files, determine dimensions, sort according to the
+        preferred method, determine canvas dimensions, then use ffmpeg to
+        render files to canvas
+
+        This processor can work with both images and videos.
         """
         sizing_mode = self.parameters.get("tile-size")
         sort_mode = self.parameters.get("sort-mode")
         amount = self.parameters.get("amount")
-        amount = amount if amount else 500
-        sound = self.parameters.get("audio")
-        video_length = self.parameters.get("max-length")
+        amount = amount if amount else self.get_options()["amount"].get("max", 500)
+        sound = self.parameters.get("audio", "longest")
+        max_length = self.parameters.get("max-length", 60)
         aspect_ratio = self.parameters.get("aspect-ratio")
         backfill = self.parameters.get("backfill")
 
         ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
-        # unpack source videos to stack
-        # a staging area to store the videos we're reading from
-        video_dataset = self.source_dataset.nearest("video-downloader*")
-        video_staging_area = video_dataset.get_staging_area()
+        # unpack source items to stack
+        # a staging area to store the items we're reading from
+        # we look for images first, because images may be made from videos, but
+        # not the other way around (in 4CAT)
+        try_types = ["image-downloader", "video-frames", "video-downloader"]
+        base_dataset = None
+        while try_types and not base_dataset:
+            base_dataset = self.source_dataset.nearest(f"{try_types.pop(0)}*")
+        collage_staging_area = base_dataset.get_staging_area()
 
         lengths = {}
         dimensions = {}
-        videos = {}
+        sort_values = {}
+        media = {}
         skipped = 0
 
-        # unpack videos and determine length of the video (for sorting)
-        self.dataset.update_status("Unpacking videos and reading metadata")
-        for video in self.iterate_archive_contents(video_dataset.get_results_path(), staging_area=video_staging_area,
+        # unpack items and determine length of the item (for sorting)
+        self.dataset.update_status("Unpacking files and reading metadata")
+        for item in self.iterate_archive_contents(base_dataset.get_results_path(), staging_area=collage_staging_area,
                                                    immediately_delete=False):
             if self.interrupted:
-                shutil.rmtree(video_staging_area, ignore_errors=True)
-                return ProcessorInterruptedException("Interrupted while unpacking videos")
+                shutil.rmtree(collage_staging_area, ignore_errors=True)
+                return ProcessorInterruptedException("Interrupted while unpacking files")
 
-            # skip JSON
-            if video.name == '.metadata.json':
+            # skip metadata and log files
+            self.dataset.update_status(f"Read {len(media):,} of {self.source_dataset.num_rows:,} file(s)")
+            if item.suffix.lower() in (".json", ".log"):
                 continue
 
-            self.dataset.update_status(f"Read {len(videos):,} of {self.source_dataset.num_rows:,} video(s)")
-            video_path = oslex.quote(str(video))
-
-            # determine length if needed
-            probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
-                             "stream=width,height,duration", "-of", "csv=p=0", video_path]
-            probe = subprocess.run(probe_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-
-            probe_output = probe.stdout.decode("utf-8")
-            probe_error = probe.stderr.decode("utf-8")
-            if probe_error:
-                self.dataset.log(f"Cannot determine dimensions of video {video.name}. Excluding from wall.")
+            try:
+                dimensions[item.name], lengths[item.name], sort_values[item.name] = \
+                    self.get_signature(item, sort_mode, ffprobe_path)
+            except MediaSignatureException as e:
+                self.dataset.log(f"Cannot read dimensions of file {item.name}, skipping ({e})")
                 skipped += 1
                 continue
-            else:
-                bits = probe_output.split(",")
-                dimensions[video.name] = (int(bits[0]), int(bits[1]))
-                lengths[video.name] = float(bits[-1])
 
-            videos[video.name] = video
+            media[item.name] = item
 
             # if not sorting, we don't need to probe everything and can stop
             # when we have as many as we need
-            if not sort_mode and len(videos) == amount:
+            if not sort_mode and len(media) == amount:
                 break
 
-        if sort_mode in ("longest", "shortest"):
-            videos = {k: videos[k] for k in
-                      sorted(videos, key=lambda k: lengths[k], reverse=(sort_mode == "longest"))}
-        elif sort_mode == "random":
-            videos = {k: videos[k] for k in sorted(videos, key=lambda k: random.random())}
+        if sort_mode:
+            media = {k: media[k] for k in sorted(media, key=lambda k: sort_values[k])}
 
         # limit amount *after* sorting
-        included_videos = []
-        excluded_videos = []
-        for key, video in videos.items():
-            if len(included_videos) < amount:
-                included_videos.append(key)
-            else:
-                excluded_videos.append(key)
+        media_keys = list(media.keys())
+        included_media = media_keys[:amount]
+        excluded_media = media_keys[amount:]
 
+        # overall average dimensions will be useful for some of the sizing modes
         avg = statistics.mean if sizing_mode == "average" else statistics.median
-        included_dimensions = {k: dimensions[k] for k in included_videos}
+        included_dimensions = {k: dimensions[k] for k in included_media}
         average_size = (avg([k[0] for k in included_dimensions.values()]), avg([k[1] for k in included_dimensions.values()]))
 
-        # calculate 'tile sizes' (a tile is a video) and also the size of the
+        # calculate 'tile sizes' (a tile is a file) and also the size of the
         # canvas we will need to fit them all.
         self.dataset.update_status("Determining canvas and tile sizes")
         resolution = self.TARGET_DIMENSIONS[aspect_ratio]
@@ -247,40 +239,43 @@ class VideoWallGenerator(BasicProcessor):
                 fitted_pixels = max_pixels
 
             ideal_width = math.sqrt(fitted_pixels / aspect_ratio_inverse)
-            item_widths = [int(dimensions[k][0] * (tile_h / dimensions[k][1])) for k in included_videos]
+            item_widths = [int(dimensions[k][0] * (tile_h / dimensions[k][1])) for k in included_media]
             tile_w = -1  # variable
 
         elif sizing_mode == "square":
             # assuming each image is square, find a canvas with the right
             # proportions that would fit all of them
-            # assume the average dimensions
             tile_size = int(sum(average_size) / 2)
             tile_h = tile_size
+            tile_w = tile_h
 
             # this is how many pixels we need
-            fitted_pixels = tile_size * tile_size * len(included_videos)
+            fitted_pixels = tile_size * tile_size * len(included_media)
 
             # does that fit our canvas?
             if fitted_pixels > max_pixels:
-                tile_size = math.floor(math.sqrt(max_pixels / len(included_videos)))
-                fitted_pixels = tile_size * tile_size * len(included_videos)
+                tile_size = math.floor(math.sqrt(max_pixels / len(included_media)))
+                tile_w = tile_h = tile_size
+                fitted_pixels = tile_size * tile_size * len(included_media)
 
             ideal_width = math.sqrt(fitted_pixels / aspect_ratio_inverse)
-            item_widths = [tile_h for _ in included_videos]
+            item_widths = [tile_h for _ in included_media]
 
         elif sizing_mode in ("median", "average"):
+            # uniform size, so similar to square, just a little bit more
+            # complicated
             tile_w = int(average_size[0])
             tile_h = int(average_size[1])
 
-            fitted_pixels = tile_w * tile_h * len(included_videos)
+            fitted_pixels = tile_w * tile_h * len(included_media)
             if fitted_pixels > max_pixels:
                 area_ratio = max_pixels / fitted_pixels
                 tile_w = int(tile_w * math.sqrt(area_ratio))
                 tile_h = int(tile_h * math.sqrt(area_ratio))
-                fitted_pixels = tile_w * tile_h * len(included_videos)
+                fitted_pixels = tile_w * tile_h * len(included_media)
 
             ideal_width = math.sqrt(fitted_pixels / aspect_ratio_inverse)
-            item_widths = [tile_w for _ in included_videos]
+            item_widths = [tile_w for _ in included_media]
 
         else:
             raise NotImplementedError("Sizing mode '%s' not implemented" % sizing_mode)
@@ -296,11 +291,11 @@ class VideoWallGenerator(BasicProcessor):
         for row_width in range(0, int(ideal_width * 1.5), min(item_widths)):
             rows = []
             row = []
-            for video_w in item_widths:
-                if sum(row) + video_w > row_width:
+            for media_w in item_widths:
+                if sum(row) + media_w > row_width:
                     rows.append(row)
                     row = []
-                row.append(video_w)
+                row.append(media_w)
             else:
                 if row:
                     rows.append(row)
@@ -317,48 +312,55 @@ class VideoWallGenerator(BasicProcessor):
                 size_x = actual_width
                 min_deviation = deviation
 
-        # if there is room left, add more videos until the canvas is as full as
+        # if there is room left, add more files until the canvas is as full as
         # possible
         last_row_width = last_row_widths[size_x]
         if backfill and last_row_width < size_x:
-            while excluded_videos:
-                video = excluded_videos.pop(0)
-                video_w = dimensions[video][0] * (tile_h / dimensions[video][1])
-                if last_row_width + video_w < size_x:
-                    included_videos.append(video)
-                    last_row_width += video_w
+            while excluded_media:
+                item = excluded_media.pop(0)
+                media_w = dimensions[item][0] * (tile_h / dimensions[item][1])
+                if last_row_width + media_w < size_x:
+                    included_media.append(item)
+                    last_row_width += media_w
 
-        # see which of the videos is the longest, after sorting
-        # used to determine which audio stream to use
-        max_length = 0
-        longest_index = 0
-        for i, video in enumerate(included_videos):
-            if lengths[video] > max_length:
-                longest_index = i
-                max_length = lengths[video]
+
+        # if we have *only* images, we can simply output an image with no audio
+        # when finished rendering
+        # same if we're running as the image wall generator
+        have_only_images = sum([lengths[m] for m in included_media]) == 0 or self.extension == "png"
+
+        if not have_only_images:
+            # see which of the files is the longest, after sorting
+            # used to determine which audio stream to use (if relevant)
+            longest_duration = 0
+            longest_index = 0
+            for i, key in enumerate(included_media):
+                if lengths[key] > longest_duration:
+                    longest_index = i
+                    longest_duration = lengths[key]
+
+            # longest item in set may be shorter than requested length
+            if max_length:
+                max_length = min(max([lengths[v] for v in included_media]), max_length)
 
         # finalise dimensions
         size_y = round(size_x / row_ratios[size_x])
         tile_h = round(tile_h)
         tile_w = round(tile_w)
-        self.dataset.log(f"Projected canvas size is {size_x}x{size_y} (aspect ratio {row_ratios[size_x]}; {aspect_ratio} preferred)")
-        self.dataset.log(f"Aiming for {round(size_y / tile_h)} rows of videos")
+        self.dataset.log(f"Projected canvas size is {size_x}x{size_y} (aspect ratio {row_ratios[size_x]}; closest to {aspect_ratio})")
+        self.dataset.log(f"Aiming for {round(size_y / tile_h)} vertical rows")
 
-        # longest video in set may be shorter than requested length
-        if video_length:
-            video_length = min(max([lengths[v] for v in included_videos]), video_length)
-
-        # now we are ready to render the video wall
+        # now we are ready to render the collage
         command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
-        if video_length:
-            command.extend(["-t", str(video_length)]) # limit read length
+        if not have_only_images and max_length:
+            command.extend(["-t", str(max_length)]) # limit read length
 
         # construct an ffmpeg filter for this
-        # basically, stack videos horizontally until the max width is reached
+        # basically, stack items horizontally until the max width is reached
         # then stack those horizontal stacks vertically
-        # resize the videos first
+        # resize the items first
         index = 0
-        resize = []  # resize filters to make tiles from videos
+        resize = []  # resize filters to make tiles from items
         padding = []  # padding filters to make all rows the same width
 
         row = []
@@ -366,38 +368,38 @@ class VideoWallGenerator(BasicProcessor):
         row_width = 0
         row_widths = []
 
-        # todo: periodically check if we still need to support ffmpeg < 5.1
+        # todo: periodically check if we still need to support ffmpeg < 5.1...
         have_old_ffmpeg_version = get_ffmpeg_version(ffmpeg_path) < version.parse("7.1")
         fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
 
-        # go through each video and transform as needed
+        # go through each item and transform as needed
         # why not use the xstack filter that ffmpeg has for this purpose?
-        # the xstack filter does not cope well with videos of different sizes,
+        # the xstack filter does not cope well with items of variable size,
         # which are often abundant in 4CAT datasets
         looping = True
         while True:
             try:
-                video = included_videos.pop(0)
-                path = videos[video]
+                item = included_media.pop(0)
+                path = media[item]
             except IndexError:
                 looping = False
 
-            # determine expected width of video when added to row
+            # determine expected width of item when added to row
             if tile_w < 0:
-                # 'fit height' - width varies per video
-                video_width = math.ceil(dimensions[video][0] * (tile_h / dimensions[video][1])) if looping else 0
+                # 'fit height' - width varies per item
+                item_width = math.ceil(dimensions[item][0] * (tile_h / dimensions[item][1])) if looping else 0
             else:
-                video_width = tile_w
+                item_width = tile_w
 
-            if row and (not looping or (row_width + video_width) >= size_x):
-                # adding this video would make the row too wide
+            if row and (not looping or (row_width + item_width) >= size_x):
+                # adding this item would make the row too wide
                 # so add current row to buffer and start a new one
                 if len(row) > 1:
-                    # use hstack to tile the videos in the row horizontally
+                    # use hstack to tile the items in the row horizontally
                     rows.append("".join(row) + f"hstack=inputs={len(row)}[stack{len(rows)}]")
                 else:
-                    # hstack needs more than one video as input, so for a
-                    # single video just rename the stream
+                    # hstack needs more than one item as input, so for a
+                    # single item just rename the stream
                     rows.append(row[0] + f"null[stack{len(rows)}]")
                 row = []
                 row_widths.append(row_width)
@@ -406,22 +408,22 @@ class VideoWallGenerator(BasicProcessor):
             if not looping:
                 break
 
-            # if we have a video, continue filling the grid
+            # if we have an item, continue filling the grid
             # make into tile - with resizing (if proportional) or cropping (if not)
-            row_width += video_width
+            row_width += item_width
 
-            # prepare filter to transform video into wall tile
-            cropscale = ""
+            # prepare filter to transform item into wall tile
+            cropscale = "select=eq(n\\,0)," if have_only_images else ""
 
             if sizing_mode == "fit-height":
                 # the scale filter does not guarantee exact pixel dimensions
                 # unfortunately this leads to us being off by one pixel on the
                 # row width sometimes. So sacrifice one pixel by cropping,
                 # which does guarantee exact sizes
-                cropscale += f"scale={video_width+1}:{tile_h+1},crop={video_width}:{tile_h}:exact=1"
+                cropscale += f"scale={item_width+1}:{tile_h+1},crop={item_width}:{tile_h}:exact=1"
 
             elif sizing_mode == "square":
-                if dimensions[video][0] > dimensions[video][1]:
+                if dimensions[item][0] > dimensions[item][1]:
                     cropscale += f"scale=-1:{tile_h},"
                 else:
                     cropscale += f"scale={tile_w}:-1,"
@@ -430,7 +432,7 @@ class VideoWallGenerator(BasicProcessor):
                 # exact=1 and format=rgba prevents shenanigans when merging
 
             elif sizing_mode in ("median", "average"):
-                scale_w = dimensions[video][0] * (tile_h / dimensions[video][1])
+                scale_w = dimensions[item][0] * (tile_h / dimensions[item][1])
                 if scale_w < tile_w:
                     cropscale += f"scale={tile_w}:-1,"
                 else:
@@ -464,7 +466,7 @@ class VideoWallGenerator(BasicProcessor):
             filter_chain += ";".join(resize) + ";"
         filter_chain += ";".join(rows) + ";"
 
-        # then pad the horizontal rows of video tiles so they all have the
+        # then pad the horizontal rows of item tiles so they all have the
         # same width
         if padding:
             filter_chain += ";".join(padding) + ";"
@@ -473,9 +475,9 @@ class VideoWallGenerator(BasicProcessor):
         if len(rows) > 1:
             filter_chain += "".join([f"[stack{i}]" for i in range(0, len(rows))]) + f"vstack=inputs={len(rows)}[final]"
         else:
-            filter_chain += "[stack0]null[final]"
+            filter_chain += "[stack0]null[final]"  # we need a stream named final, anyhow
 
-        # output video dimensions need to be divisible by 2 for x264 encoding
+        # output item dimensions need to be divisible by 2 for x264 encoding
         # choose the relevant filter based on which dimensions do not conform
         # pad is faster, but can only be used if both dimensions increase
         output_w = max(row_widths)
@@ -488,46 +490,44 @@ class VideoWallGenerator(BasicProcessor):
             filter_chain += f";color=size={output_w}x{output_h+1}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
 
         # force 30 fps because we don't know what the source videos did and
-        # they could be using different fpss
-        filter_chain += ";[final]fps=30[final]"
+        # they could be using different fps
+        if not have_only_images:
+            filter_chain += ";[final]fps=30[final]"
 
         # add filter to ffmpeg command, plus a parameter to control output FPS
         ffmpeg_filter = oslex.quote(filter_chain)[1:-1]
 
         command += [fps_command, "cfr", "-filter_complex", ffmpeg_filter]
+        if have_only_images:
+            command += ["-frames:v", "1", "-update", "true"] # we need only one output frame!
 
         # ensure mixed audio: use no sound, or the longest audio stream
-        if sound == "none":
+        if have_only_images or sound == "none":
             command += ["-an"]
         elif sound == "longest":
             command += ["-map", f"{longest_index}:a"]
 
-        # use tiled video stream
+        # use final stream for output
         command += ["-map", "[final]"]
 
         # limit output video length
-        if video_length:
-            command.extend(["-t", str(video_length)])
+        if max_length and not have_only_images:
+            command.extend(["-t", str(max_length)])
 
         # set output file
-        command.append(oslex.quote(str(self.dataset.get_results_path())))
+        output_file = self.dataset.get_results_path()
+        command.append(oslex.quote(str(output_file)))
 
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
-        self.dataset.update_status("Merging video files with ffmpeg (this can take a while)")
+        self.dataset.update_status("Creating collage with ffmpeg (this may take a while)")
         result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if self.interrupted:
-            shutil.rmtree(video_staging_area, ignore_errors=True)
+            shutil.rmtree(collage_staging_area, ignore_errors=True)
             return ProcessorInterruptedException("Interrupted while running ffmpeg")
 
         # Capture logs
-        ffmpeg_output = result.stdout.decode("utf-8")
         ffmpeg_error = result.stderr.decode("utf-8")
-
-        if ffmpeg_output:
-            self.dataset.log("ffmpeg returned the following output:")
-            for line in ffmpeg_output.split("\n"):
-                self.dataset.log("  " + line)
 
         if ffmpeg_error:
             self.dataset.log("ffmpeg returned the following errors:")
@@ -537,15 +537,59 @@ class VideoWallGenerator(BasicProcessor):
             if have_old_ffmpeg_version:
                 self.dataset.log("You may be able to prevent this error by updating to a newer version of ffmpeg.")
 
-        shutil.rmtree(video_staging_area, ignore_errors=True)
+        shutil.rmtree(collage_staging_area, ignore_errors=True)
 
         if result.returncode != 0:
             return self.dataset.finish_with_error(
-                f"Could not make video wall (error {result.returncode}); check the dataset log for details.")
+                f"Could not make collage (error {result.returncode}); check the dataset log for details.")
 
         if skipped:
-            self.dataset.update_status(f"Video wall rendering finished. {skipped} video(s) were skipped; see dataset log for details.", is_final=True)
+             self.dataset.update_status(f"Rendering finished. {skipped} item(s) were skipped; see dataset log for details.", is_final=True)
         else:
-            self.dataset.update_status("Video wall rendering finished.")
-            
-        self.dataset.finish(1)
+             self.dataset.update_status("Rendering finished.")
+             self.dataset.finish(1)
+
+    def get_signature(self, file_path, sort_mode, ffprobe_path):
+        """
+        Get file signature
+
+        Child classes can define a method `sort_file`, with the same signature
+        as this method, that will be called if an otherwise unknown sort mode
+        is used. The return value will be used as the third element of the
+        tuple returned by this method.
+
+        :param Path file_path:  Path to file to get signature of
+        :param str sort_mode:  Sorting mode, defaults to (video) length
+        :param str ffprobe_path:  Path to the ffprobe executable
+        :return tuple:  A tuple with three values: (width, height), length,
+        and a value to sort by (e.g. length or colour). For images, length is
+        0.
+        """
+        probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
+                         "stream=width,height,duration", "-of", "csv=p=0", oslex.quote(str(file_path))]
+        probe = subprocess.run(probe_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+
+        probe_output = probe.stdout.decode("utf-8")
+        probe_error = probe.stderr.decode("utf-8")
+
+        if probe_error:
+            raise MediaSignatureException()
+
+        bits = probe_output.split(",")
+        length = (float(bits[-1]) if bits[-1].strip() != "N/A" else 0)
+        try:
+            dimensions = (int(bits[0]), int(bits[1]))
+        except ValueError:
+            raise MediaSignatureException()
+
+        if sort_mode == "random":
+            sort_value = random.random()
+        elif sort_mode in ("shortest", "longest"):
+            sort_value = length
+        elif hasattr(self, "sort_file"):
+            sort_value = self.sort_file(file_path, sort_mode, ffprobe_path)
+        else:
+            sort_value = 0
+
+        return dimensions, length, sort_value
