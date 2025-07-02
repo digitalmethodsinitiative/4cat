@@ -64,7 +64,6 @@ packages = set([
 	"scipy~=1.13",
 	"shapely",
 	"svgwrite~=1.4.0",
-	"tailer",
 	"Telethon~=1.36.0",
 	"ural~=1.3",
 	"unidecode~=1.3",

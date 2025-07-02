@@ -6,7 +6,6 @@ import markdown2
 import datetime
 import psycopg2
 import psycopg2.errors
-import tailer
 import smtplib
 import time
 import json
@@ -857,8 +856,23 @@ def get_log(logfile):
 
     log_file = g.config.get("PATH_ROOT").joinpath(g.config.get("PATH_LOGS")).joinpath(filename)
     if log_file.exists():
-        with log_file.open() as infile:
-            return "\n".join(tailer.tail(infile, 250))
+        with log_file.open("rb") as infile:
+            infile.seek(0, 2)  # end of file
+            lines = 0
+            # look for newlines starting from the end and working backwards,
+            # then read everything once enough have been encountered
+            while infile.tell():
+                infile.seek(-1, 1)
+                byte = infile.read(1)
+                if byte == "" or lines >= 250:
+                    break
+
+                infile.seek(-1, 1)
+                if ord(byte) == 10:
+                    lines += 1
+
+            return infile.read().decode("utf-8")
+                
     else:
         return ""
 
