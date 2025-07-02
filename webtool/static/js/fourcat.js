@@ -1328,12 +1328,13 @@ const dynamic_container = {
             container.attr('data-last-call', Math.floor(Date.now() / 1000));
             fetch(url, {
                 method: 'GET'
-            }).then(response => {
+            }).then(async (response) => {
                 if (response.ok) {
-                    if (response.text() === container.html()) {
+                    text = await response.text();
+                    if (text === container.html()) {
                         return;
                     }
-                    container.html(response);
+                    container.html(text);
                 }
             });
         });
