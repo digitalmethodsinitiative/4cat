@@ -141,8 +141,12 @@ app.login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonym
 app.login_manager.init_app(app)
 app.login_manager.login_view = "user.show_login"
 
-# initialize rate limiter
-app.limiter = Limiter(app=app, key_func=get_remote_address)
+# initialize rate limiter - memcache can serve as the storage backend, if not
+# available, direct memory storage will be used
+if config.memcache:
+    app.limiter = Limiter(app=app, key_func=get_remote_address, storage_uri=f"memcached://{config.get('MEMCACHE_SERVER')}")
+else:
+    app.limiter = Limiter(app=app, key_func=get_remote_address)
 
 # read these once, because we need them for each request but they will never
 # change without a restart

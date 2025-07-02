@@ -5,7 +5,7 @@ import re
 import csv
 import json
 import logging
-import markdown
+import markdown2
 import traceback
 
 from pathlib import Path
@@ -246,7 +246,7 @@ def show_page(page):
 
     with page_path.open(encoding="utf-8") as file:
         page_raw = file.read()
-        page_parsed = markdown.markdown(page_raw)
+        page_parsed = markdown2.markdown(page_raw)
         page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
 
         if g.config.get("mail.admin_email"):

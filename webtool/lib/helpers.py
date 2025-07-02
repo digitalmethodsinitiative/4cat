@@ -1,7 +1,7 @@
 """
 General helper functions for Flask templating and 4CAT views
 """
-import markdown
+import markdown2
 import colorsys
 import csv
 import re
@@ -335,7 +335,7 @@ def setting_required(setting, required_value=True):
 
 
 def parse_markdown(text, trim_container=False):
-	val = markdown.markdown(text)
+	val = markdown2.markdown(text)
 	if trim_container:
 		val = re.sub(r"^<p>", "", val)
 		val = re.sub(r"</p>$", "", val)
