@@ -712,7 +712,7 @@ class ConfigWrapper:
         :param tags:
         :return list:
         """
-        active_tags = self.config.get_active_tags(user, tags)
+        active_tags = self.config.get_active_tags(user, tags, self.memcache)
         if not tags:
             active_tags = self.request_override(active_tags)
 
@@ -736,9 +736,11 @@ class ConfigWrapper:
         if type(tags) is str:
             tags = [tags]
 
+        # use self.config.get here, not self.config.get, because else we get
+        # infinite recursion (since self.get can call this method)
         if self.request and self.request.headers.get("X-4Cat-Config-Tag") and \
-            self.config.get("flask.proxy_secret") and \
-            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
+            self.config.get("flask.proxy_secret", memcache=self.memcache) and \
+            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret", memcache=self.memcache):
             # need to ensure not just anyone can add this header to their
             # request!
             # to this end, the second header must be set to the secret value;
