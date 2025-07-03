@@ -736,8 +736,8 @@ class ConfigWrapper:
         if type(tags) is str:
             tags = [tags]
 
-        # use self.config.get here, not self.config.get, because else we get
-        # infinite recursion (since self.get can call this method)
+        # use self.config.get here, not self.get, because else we get infinite
+        # recursion (since self.get can call this method)
         if self.request and self.request.headers.get("X-4Cat-Config-Tag") and \
             self.config.get("flask.proxy_secret", memcache=self.memcache) and \
             self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret", memcache=self.memcache):
