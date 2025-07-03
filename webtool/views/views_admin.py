@@ -650,7 +650,7 @@ def manipulate_settings():
                     update_css = True
 
             if update_css:
-                generate_css_colours(force=True)
+                generate_css_colours(config=g.config, force=True)
 
             flash("Settings saved")
         except QueryParametersException as e:

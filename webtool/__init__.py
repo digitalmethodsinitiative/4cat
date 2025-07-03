@@ -227,7 +227,7 @@ with app.app_context():
     # ensure that colour definition CSS file is present - the CSS colours can be
     # changed by the admin so we need to regenerate the CSS file to make sure it
     # is up to date. Might want to use e.g. SCSS in the future...
-    generate_css_colours()
+    generate_css_colours(config)
 
 # run it (when called directly)
 if __name__ == "__main__":
