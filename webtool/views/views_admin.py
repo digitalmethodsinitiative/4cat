@@ -656,7 +656,7 @@ def manipulate_settings():
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
-    all_settings = dict(g.config.get_all(user=None, tags=[tag]))
+    all_settings = dict(g.config.get_all(user=None, tags=[tag], with_core=False))
     options = {}
     changed_categories = set()
 

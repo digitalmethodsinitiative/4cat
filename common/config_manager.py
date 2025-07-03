@@ -216,12 +216,13 @@ class ConfigManager:
         self.set("flask.tag_order", tag_order)
         self.db.commit()
 
-    def get_all_setting_names(self):
+    def get_all_setting_names(self, with_core=True):
         """
         Get names of all settings
 
         For when the value doesn't matter!
 
+        :param bool with_core:  Also include core (i.e. config.ini) settings
         :return list:  List of setting names known by the database and core settings
         """
         # attempt to initialise the database connection so we can include
@@ -229,12 +230,12 @@ class ConfigManager:
         if not self.db:
             self.with_db()
 
-        settings = list(self.core_settings.keys())
+        settings = list(self.core_settings.keys()) if with_core else []
         settings.extend([s["name"] for s in self.db.fetchall("SELECT DISTINCT name FROM settings")])
 
         return settings
 
-    def get_all(self, is_json=False, user=None, tags=None, memcache=None):
+    def get_all(self, is_json=False, user=None, tags=None, with_core=True, memcache=None):
         """
         Get all known settings
 
@@ -249,13 +250,14 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
+        :param bool with_core:  Also include core (i.e. config.ini) settings
         :param MemcacheClient memcache:  Memcache client. If `None` and
         `self.memcache` exists, use that instead.
 
         :return dict: Setting value, as a dictionary with setting names as keys
         and setting values as values.
         """
-        for setting in self.get_all_setting_names():
+        for setting in self.get_all_setting_names(with_core=with_core):
             yield setting, self.get(setting, None, is_json, user, tags, memcache)
 
 
