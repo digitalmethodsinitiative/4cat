@@ -7,17 +7,13 @@
 {% block body %}
     <article class="with-aside">
         <section class="result-list">
-            <h2><span>Workers</span></h2>
+            <h2><span>Jobs</span></h2>
             <div class="user-panel">
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice|safe }}</p>
                 {% endfor %}
-                <!-- <nav class="view-controls block">
-                    Sort by
-                    <a class="button-like" href="{{ url_for("list_users") }}?sort=name"><i class="fa fa-arrow-down-a-z" aria-hidden="true"></i> Name</a>
-                    <a class="button-like" href="{{ url_for("list_users") }}?sort=age"><i class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Age</a>
-                    <a class="button-like" href="{{ url_for("list_users") }}?sort=status"><i class="fa fa-user-shield" aria-hidden="true"></i> Status</a>
-                </nav> -->
+                <p>Note: cancelling a job will interrupt a running worker. Jobs can only be cancelled properly if the
+                    4CAT backend is running.</p>
                 <table class="fullwidth user-table cp-table">
                     <colgroup>
                         <col class="id">
@@ -40,22 +36,35 @@
                             </td>
                             <td>
                                 <div class="job-type">
-                                    {{ job.data["jobtype"] }}
+                                    {% if job.data["jobtype"] in workers and workers[job.data["jobtype"]].title %}
+                                        <span title="{{ job.data["jobtype"] }}">{{ workers[job.data["jobtype"]].title }}</span>
+                                    {% else %}
+                                        {{ job.data["jobtype"] }}
+                                    {% endif %}
                                 </div>
                             </td>
                             <td>
                                 <div class="job-status">
-                                    {{ job.get_status(with_details=True) }}
+                                    {% if job.is_finished %}
+                                        Finished
+                                    {% elif job.is_claimed %}
+                                        Claimed since {{ (now - job.data.timestamp_lastclaimed)|timify }}
+                                    {% elif job.data.interval > 0 and (job.data.timestamp_after > now or (job.data.interval + job.data.timestamp_lastclaimed) > now) %}
+                                        Scheduled (interval; next in {{ (([(job.data.timestamp_lastclaimed + job.data.interval), job.data.timestamp_after]|max) - now)|timify }})
+                                    {% elif job.data.timestamp_after > now %}
+                                        Scheduled (in {{ (job.data.timestamp_after - now)|timify }})
+                                    {% else %}
+                                        Queued since {{ (now - [job.data.timestamp, job.data.timestamp_lastclaimed]|max)|timify }}
+                                    {% endif %}
                                 </div>
                             </td>
                             <td class="actions">
                                 <!-- Could add other types e.g. (clean-temp-files, check-for-updates, datasource-metrics, expire-datasets) -->
                                 {% if job.data["jobtype"] not in ("api") %} 
-                                    <form class="inline" action="{{ url_for("delete_job") }}" method="POST">
+                                    <form class="inline" action="{{ url_for("admin.delete_job") }}" method="POST">
                                         <input type="hidden" name="job_id" value="{{ job.data["id"] }}">
                                         <input type="hidden" name="redirect_to_page" value="true">
-                                        <button class="confirm-first"><i class="fa fa-times"
-                                                                         aria-hidden="true"></i><span class="sr-only">Delete job</span>
+                                        <button class="confirm-first"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete job</span>
                                         </button>
                                     </form>
                                 {% endif %}
@@ -77,7 +86,7 @@
             
             <nav class="user-controls">
                 <hr>
-                <form action="{{ url_for("list_jobs") }}" method="GET">
+                <form action="{{ url_for("admin.list_jobs") }}" method="GET">
                     <input aria-label="Job Type filter" placeholder="Search by job type" name="name"
                            value="{{ filter.jobtype }}" list="all-jobs">
 
@@ -89,7 +98,7 @@
                 </datalist>
                 {% if filter.jobtype %}
                     <hr>
-                    <form action="{{ url_for("list_users") }}" method="GET">
+                    <form action="{{ url_for("admin.list_users") }}" method="GET">
                         <button><i class="fa fa-times" aria-hidden="true"></i> Clear filter</button>
                     </form>
                 {% endif %}

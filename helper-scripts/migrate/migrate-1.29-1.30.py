@@ -20,7 +20,6 @@ from common.lib.helpers import add_notification
 
 log = Logger(output=True)
 
-import configparser
 ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
 db_config = ini["DATABASE"]
@@ -97,7 +96,7 @@ if type(datasources) is dict:
                 print(f"  - Migrating setting {platform}.{setting}...")
                 config_set(platform + "." + setting, datasources[platform][setting])
 
-    print(f"  - Migrating data source-specific expiration settings...")
+    print("  - Migrating data source-specific expiration settings...")
     expiration = {datasource: {"timeout": info["expire-datasets"], "allow_optout": False} for datasource, info in
                   datasources.items() if "expire-datasets" in info}
     config_set("expire.datasources", expiration)

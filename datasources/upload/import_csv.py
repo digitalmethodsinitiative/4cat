@@ -93,7 +93,7 @@ class SearchCustom(BasicProcessor):
             # With validated csvs, save as is but make sure the raw file is sorted
             infile.seek(0)
             dialect = possible_dialects.pop() # Use the last dialect first
-            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect) if type(dialect) == csv.Dialect else dialect}")
+            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect) if type(dialect) is csv.Dialect else dialect}")
             reader = csv.DictReader(infile, dialect=dialect)
 
             if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
@@ -167,13 +167,13 @@ class SearchCustom(BasicProcessor):
                     temp_file.unlink()
                     return self.dataset.finish_with_error(str(e))
 
-                except UnicodeDecodeError as e:
+                except UnicodeDecodeError:
                     infile.close()
                     temp_file.unlink()
                     return self.dataset.finish_with_error("The uploaded file is not encoded with the UTF-8 character set. "
                                                           "Make sure the file is encoded properly and try again.")
 
-                except CsvDialectException as e:
+                except CsvDialectException:
                     self.dataset.log(f"Error with CSV dialect: {vars(dialect)}")
                     continue
 
@@ -201,7 +201,7 @@ class SearchCustom(BasicProcessor):
         else:
             self.dataset.finish(done)
 
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate custom data input
 
@@ -210,7 +210,7 @@ class SearchCustom(BasicProcessor):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # do we have an uploaded file?
@@ -257,7 +257,7 @@ class SearchCustom(BasicProcessor):
             for prop in tool_format.get("csv_dialect", {}):
                 setattr(dialect, prop, tool_format["csv_dialect"][prop])
 
-        except UnicodeDecodeError as e:
+        except UnicodeDecodeError:
             raise QueryParametersException("The uploaded file does not seem to be a CSV file encoded with UTF-8. "
                                            "Save the file in the proper format and try again.")
         except csv.Error:

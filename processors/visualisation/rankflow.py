@@ -93,11 +93,12 @@ class RankFlowRenderer(BasicProcessor):
 			   [0.179, 1.0, 0.475], [0.108, 0.502, 0.914], [0.096, 1.0, 0.502], [0.123, 1.0, 0.69]]
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.is_rankable()
 
@@ -470,7 +471,7 @@ class RankFlowRenderer(BasicProcessor):
 		y = (0.2126 * r1) + (0.7152 * g1) + (0.0722 * b1)
 
 		# calculate perceived lightness
-		l = (y * 903.3) if y <= 0.008856 else (pow(y, 1 / 3) * 116 - 16)
+		l = (y * 903.3) if y <= 0.008856 else (pow(y, 1 / 3) * 116 - 16)  # noqa: E741
 
 		return "black" if l > 50 else "white"
 

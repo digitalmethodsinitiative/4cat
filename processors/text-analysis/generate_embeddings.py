@@ -7,7 +7,6 @@ import json
 
 from gensim.models import Word2Vec, FastText
 from gensim.models.phrases import Phrases, Phraser
-from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
@@ -105,11 +104,12 @@ class GenerateWordEmbeddings(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token sets
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "tokenise-posts"
 

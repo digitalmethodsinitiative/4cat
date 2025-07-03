@@ -3,6 +3,8 @@
 Script to set all the flags in the correct manner for a /pol/ dataset.
 
 """
+# flake8: noqa
+# currently broken, kept for historic/future utility purposes
 import sys
 import os
 

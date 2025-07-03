@@ -30,19 +30,21 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
-        "write_annotations": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Add features as annotations to the original dataset.",
-            "default": False
+        "save_annotations": {
+            "type": UserInput.OPTION_ANNOTATION,
+            "label": "image features",
+            "default": False,
+            "tooltip": "Every feature will receive its own annotation"
         }
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "google-vision-api"
 
@@ -61,7 +63,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
             return
 
         # Write annotations to original file?
-        write_annotations = self.parameters.get("write_annotations", False)
+        save_annotations = self.parameters.get("save_annotations", False)
         parent_annotations = []
 
         # recreate CSV file with the new dialect
@@ -70,7 +72,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
 
             # special case format
             if "webDetection" in annotations and annotations["webDetection"]:
-                file_result["labelGuess"] = [l["label"] for l in annotations["webDetection"].get("bestGuessLabels", [])]
+                file_result["labelGuess"] = [i["label"] for i in annotations["webDetection"].get("bestGuessLabels", [])]
                 file_result["webEntities"] = [e["description"] for e in annotations["webDetection"].get("webEntities", []) if "description" in e]
                 file_result["urlsPagesWithMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("pagesWithMatchingImages", [])]
                 file_result["urlsMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("fullMatchingImages", [])]
@@ -112,20 +114,18 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                 self.dataset.update_progress(done / self.source_dataset.num_rows)
 
             # Get annotation data for source dataset
-            if write_annotations:
+            if save_annotations:
                 for item_id in annotations.get("post_ids", []):
                     for label, value in file_result.items():
                         parent_annotations.append({
                             "item_id": item_id,
                             "label": label,
-                            "value": value,
-                            "type": "textarea"
+                            "value": value
                         })
 
         # Write Vision annotations to source dataset
-        if write_annotations:
-            self.save_annotations(parent_annotations, source_dataset=self.source_dataset.top_parent(),
-                                  overwrite=False)
+        if save_annotations:
+            self.save_annotations(parent_annotations)
 
         for index, value in enumerate(result):
             result[index] = {**{annotation_type: "" for annotation_type in annotation_types}, **value}

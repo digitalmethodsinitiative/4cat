@@ -11,9 +11,6 @@ from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, HTTPHandler
 
-from common.config_manager import config
-
-
 class WebHookLogHandler(HTTPHandler):
     """
     Basic HTTPHandler for webhooks via standard log handling
@@ -45,7 +42,7 @@ class WebHookLogHandler(HTTPHandler):
         :param logging.LogRecord record:  Log record to send
         """
         try:
-            import http.client, urllib.parse
+            import http.client
             host = self.host
             if self.secure:
                 h = http.client.HTTPSConnection(host, context=self.context)
@@ -167,22 +164,28 @@ class Logger:
     }
     alert_level = "FATAL"
 
-    def __init__(self, logger_name='4cat-backend', output=False, filename='4cat.log', log_level="INFO"):
+    def __init__(self, log_path="4cat.log", logger_name='4cat', output=False, log_level="INFO"):
         """
         Set up log handler
 
+        :param str|Path filename:  File path that will be written to
+        :param str logger_name:  Identifier for logging context
         :param bool output:  Whether to print logs to output
+        :param str log_level:  Messages at this level or below will be logged
         """
         if self.logger:
             return
         log_level = self.levels.get(log_level, logging.INFO)
 
         self.print_logs = output
-        log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
-        if not log_folder.exists():
-            log_folder.mkdir(parents=True)
 
-        self.log_path = log_folder.joinpath(filename)
+        if type(log_path) is str:
+            log_path = Path(__file__).parent.parent.parent.joinpath("logs").joinpath(log_path)
+
+        if not log_path.parent.exists():
+            log_path.parent.mkdir(parents=True)
+
+        self.log_path = log_path
         self.previous_report = time.time()
 
         self.logger = logging.getLogger(logger_name)
@@ -196,17 +199,22 @@ class Logger:
                                                    "%d-%m-%Y %H:%M:%S"))
             self.logger.addHandler(handler)
 
-            # the slack webhook has its own handler, and is only active if the
-            # webhook URL is set
-            try:
-                if config.get("logging.slack.webhook"):
-                    slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
-                    slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
-                    self.logger.addHandler(slack_handler)
-            except Exception:
-                # we *may* need the logger before the database is in working order
-                if config.db is not None:
-                    config.db.rollback()
+    def load_webhook(self, config):
+        """
+        Load webhook configuration
+
+        The webhook is configured in the database; but the logger may not
+        always have access to the database. So instead of setting it up at
+        init, this function must be called explicitly to enable it for this
+        logger instance.
+
+        :param config:  Configuration reader
+        :return:
+        """
+        if config.get("logging.slack.webhook"):
+            slack_handler = SlackLogHandler(config.get("logging.slack.webhook"))
+            slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
+            self.logger.addHandler(slack_handler)
 
     def log(self, message, level=logging.INFO, frame=None):
         """

@@ -1,7 +1,7 @@
-/* 
+/*
 
 See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
- 
+
  */
 
 @import url('colours.css');
@@ -33,27 +33,24 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 /** --------------------- *
      Posts
   * --------------------- */
-
 .post {
-    font-family: "Open Sans";
+    font-family: "Open Sans", sans-serif;
     list-style: none;
     padding: 0;
 }
 
 .posts li.post {
     position: relative;
-    background: #d1e2ff;
+    background: var(--gray-light);
     padding: 1em;
     min-width: 640px;
-    max-width: 960px;
-    margin: 0 auto;
-    margin-bottom: 1em;
-    overflow-x: hidden;
+    max-width: 860px;
+    margin: 0 auto 1em auto;
 }
 
 .posts header {
-    border-bottom: 1px solid #000;
     display: inline;
+    border-bottom: 1px solid #000;
     cursor: default;
 }
 
@@ -62,8 +59,7 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 }
 
 .posts article .post-content {
-    margin-top: 10px;
-    margin-bottom: 10px;
+    margin: 10px 0;
 }
 
 .posts header .author {
@@ -79,18 +75,19 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     margin-left: 0.5em;
 }
 
-.tags, .metrics, .external-url {
-    color: #3b4f9d;
+.tags,
+.metrics,
+.external-url {
+
 }
 
 .posts li.post .post-content a {
-    color: #215bc6;
-}
 
+}
 
 .posts .external-url {
     position: absolute;
-    bottom: 0;
+    top: 0;
     right: 0;
     padding: 10px;
 }
@@ -109,39 +106,4 @@ span.divider {
     font-size: 16px;
     color: var(--gray-darker);
     cursor: default;
-}
-
-/** --------------------- *
-     Annotation post elements
-  * --------------------- */
-.post-annotations {
-    background-color: #bed4f9;
-}
-
-.post-annotation {
-    padding: 15px;
-}
-
-.post-annotation > .annotation-label {
-    display: inline-block;
-    vertical-align: middle;
-    font-weight: bold;
-    text-align: right;
-    min-width: 150px;
-    margin-right: 5px;
-    line-height: 1.6em;
-    overflow-x: hidden;
-}
-
-.post-annotation.checkbox > .post-annotation-options {
-    display: inline-block;
-}
-
-.post-annotation-options {
-    display: inline-block;
-    vertical-align: top;
-}
-
-.post-annotation-options > input {
-    display: inline-block;
 }

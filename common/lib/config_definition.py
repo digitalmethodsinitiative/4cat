@@ -9,7 +9,6 @@ The order of th dictionary below determines the order of the settings in the int
 
 """
 from common.lib.user_input import UserInput
-import json
 
 config_definition = {
     "datasources.intro": {
@@ -407,14 +406,17 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-listed hostnames",
-        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and "
+                   "Server Name. Front-end needs to be restarted for changed to apply.",
         "global": True
     },
     "flask.autologin.api": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-list for API",
-        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. "
+                   "Docker should include localhost and Server Name.  Front-end needs to be restarted for changed to "
+                   "apply.",
         "global": True
     },
     "flask.https": {
@@ -503,7 +505,12 @@ config_definition = {
     # it is used by a number of processors
     "dmi-service-manager.aa_DSM-intro-1": {
             "type": UserInput.OPTION_INFO,
-            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager#start-dmi-service-manager) is a support tool used to run some advanced processors. These processors generally require high CPU usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also possible for multiple 4CAT instances to use the same service manager. Please see the link for instructions on setting up your own instance of the DMI Service Manager.",
+            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager) is a "
+                    "support tool used to run some advanced processors. These processors generally require high CPU "
+                    "usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also "
+                    "possible for multiple 4CAT instances to use the same service manager. Please see [this link]"
+                    "(https://github.com/digitalmethodsinitiative/dmi_service_manager?tab=readme-ov-file#installation) "
+                    "for instructions on setting up your own instance of the DMI Service Manager.",
         },
     "dmi-service-manager.ab_server_address": {
         "type": UserInput.OPTION_TEXT,

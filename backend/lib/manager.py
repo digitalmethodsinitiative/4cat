@@ -5,8 +5,6 @@ import signal
 import time
 
 from backend.lib.proxied_requests import DelegatedRequestHandler
-
-from common.lib.module_loader import ModuleCollector
 from common.lib.exceptions import JobClaimedException
 
 
@@ -26,20 +24,21 @@ class WorkerManager:
 	looping = True
 	unknown_jobs = set()
 
-	def __init__(self, queue, database, logger, as_daemon=True):
+	def __init__(self, queue, database, logger, modules, as_daemon=True):
 		"""
 		Initialize manager
 
 		:param queue:  Job queue
 		:param database:  Database handler
 		:param logger:  Logger object
+		:param modules:  Modules cache via ModuleLoader()
 		:param bool as_daemon:  Whether the manager is being run as a daemon
 		"""
 		self.queue = queue
 		self.db = database
 		self.log = logger
-		self.modules = ModuleCollector(write_config=True)
-		self.proxy_delegator = DelegatedRequestHandler(self.log)
+		self.modules = modules
+		self.proxy_delegator = DelegatedRequestHandler(self.log, self.modules.config)
 
 		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)
@@ -176,7 +175,7 @@ class WorkerManager:
 			if datasource + "-search" not in self.modules.workers and datasource + "-import" not in self.modules.workers:
 				self.log.error("No search worker defined for datasource %s or its modules are missing. Search queries will not be executed." % datasource)
 
-			self.modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource)
+			self.modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource, self.modules.config)
 
 	def abort(self, signal=None, stack=None):
 		"""

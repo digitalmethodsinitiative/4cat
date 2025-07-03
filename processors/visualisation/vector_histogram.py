@@ -3,12 +3,11 @@ Generate histogram of activity
 """
 import math
 
-from pathlib import Path
 from calendar import month_abbr
 
 from svgwrite.container import SVG
 from svgwrite.shapes import Line
-from svgwrite.path import Path
+from svgwrite.path import Path as SVGPath
 from svgwrite.text import Text
 
 from backend.lib.processor import BasicProcessor
@@ -39,11 +38,12 @@ class SVGHistogramRenderer(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.is_rankable(multiple_items=False)
 		
@@ -154,7 +154,7 @@ class SVGHistogramRenderer(BasicProcessor):
 				x += item_width
 				continue
 
-			bar = Path(fill="#000")
+			bar = SVGPath(fill="#000")
 			bar.push("M %f %f" % (x, bar_bottom))
 			bar.push("L %f %f" % (x, bar_top + (arc_adjust if bar_height > arc_adjust else 0)))
 			if bar_height > arc_adjust > 0:

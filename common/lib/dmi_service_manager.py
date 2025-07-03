@@ -186,7 +186,7 @@ class DmiServiceManager:
                     resp_json = resp.json()
                     if resp.status_code == 400 and 'key' in resp_json and 'error' in resp_json and resp_json['error'] == f"future_key {resp_json['key']} already exists":
                         # Request already exists; get DMI SM database key
-                        raise DmiServiceManagerException(f"Request already exists; check that DMI SM is up to date")
+                        raise DmiServiceManagerException("Request already exists; check that DMI SM is up to date")
                     elif resp.status_code == 404:
                         # Could be local vs remote not set correctly
                         raise DsmConnectionError(f"404: {resp.url} not found; DMI Service Manager may not be set up for this service")

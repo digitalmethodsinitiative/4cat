@@ -39,7 +39,7 @@ class MakeWordtree(BasicProcessor):
 	]
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		"""
 		Get processor options
 		"""
@@ -128,11 +128,12 @@ class MakeWordtree(BasicProcessor):
 		return options
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor to run on all csv and NDJSON datasets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 
 		return module.get_extension() in ("csv", "ndjson")
@@ -166,7 +167,6 @@ class MakeWordtree(BasicProcessor):
 		"""
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
 
 		# settings
 		column = self.parameters.get("column")
@@ -187,7 +187,6 @@ class MakeWordtree(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		window = min(window, self.get_options()["window"]["max"] + 1)
 		window = max(1, window)
 
 		# determine what tokenisation strategy to use
@@ -228,7 +227,7 @@ class MakeWordtree(BasicProcessor):
 				body = punkt_replace.sub("", body)
 
 			body = tokeniser(body, **tokeniser_args)
-			if type(body) != list:
+			if type(body) is not list:
 				# Convert generator to list
 				body = list(body)
 
@@ -317,7 +316,6 @@ class MakeWordtree(BasicProcessor):
 		# next step is to remove all root nodes that are not the main root.
 		# We cannot modify a list in-place, so make a new list with the
 		# relevant nodes
-		level_sizes = {}
 		filtered_tokens_right = []
 		for token in tokens_right:
 			if token.is_root and not token.is_top_root:

@@ -5,25 +5,23 @@ format and lets users annotate the data.
 
 from pathlib import Path
 
-from flask import request, render_template, jsonify
+from flask import Blueprint, current_app, request, render_template, jsonify, g
 from flask_login import login_required, current_user
-from webtool import app, db, openapi, limiter, config, fourcat_modules
+
 from webtool.lib.helpers import error, setting_required
 from common.lib.dataset import DataSet
-from common.lib.helpers import convert_to_float, hash_to_md5
 from common.lib.exceptions import DataSetException, AnnotationException
-from common.config_manager import ConfigWrapper
 
-config = ConfigWrapper(config, user=current_user, request=request)
-api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
+component = Blueprint("explorer", __name__)
+api_ratelimit = current_app.limiter.shared_limit("45 per minute", scope="api")
 
 
-@app.route("/results/<string:dataset_key>/explorer/", defaults={"page": 1})
-@app.route("/results/<string:dataset_key>/explorer/page/<int:page>")
+@component.route("/results/<string:dataset_key>/explorer/", defaults={"page": 1})
+@component.route("/results/<string:dataset_key>/explorer/page/<int:page>")
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
+@current_app.openapi.endpoint("explorer")
 def explorer_dataset(dataset_key: str, page=1):
 	"""
 	Show items from a dataset
@@ -37,19 +35,23 @@ def explorer_dataset(dataset_key: str, page=1):
 
 	# Get dataset info.
 	try:
-		dataset = DataSet(key=dataset_key, db=db, modules=fourcat_modules)
+		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
-	
+
 	# Load some variables
 	parameters = dataset.get_parameters()
 	datasource = parameters["datasource"]
 	post_count = int(dataset.data["num_rows"])
-	annotation_fields = dataset.get_annotation_fields()
+	annotation_fields = dataset.annotation_fields
+	# Don't pass fields hidden in explorer
+	annotation_fields = {field_id: field_items for field_id, field_items in annotation_fields.items()
+						 if not field_items.get("hide_in_explorer")}
+
 	warning = ""
 
 	# See if we can actually serve this page
-	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
+	if dataset.is_private and not (g.config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:
@@ -59,18 +61,24 @@ def explorer_dataset(dataset_key: str, page=1):
 	if not results_path:
 		return error(404, error="This dataset didn't finish executing.")
 
+	# Get the datasets that generated annotations
+	from_datasets = {}
+	for annotation_field in annotation_fields.values():
+		if annotation_field.get("from_dataset"):
+			key = annotation_field["from_dataset"]
+			try:
+				from_datasets[key] = DataSet(key=key, db=g.db, modules=g.modules)
+			except DataSetException:
+				return error(404, error="Processor-generated dataset not found.")
+
 	# The amount of posts to show on a page
-	posts_per_page = config.get("explorer.posts_per_page", 50)
+	posts_per_page = g.config.get("explorer.posts_per_page", 50)
 
 	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.get('explorer.max_posts', 500000)
+	max_posts = g.config.get('explorer.max_posts', 500000)
 
 	# The offset for posts depending on the current page
 	offset = ((int(page) - 1) * posts_per_page) if page else 0
-
-	# If the dataset is generated from an API-accessible database, we can add 
-	# extra features like the ability to navigate across posts.
-	has_database = False # todo: integrate
 
 	# Check if we have to sort the data.
 	sort = request.args.get("sort")
@@ -126,9 +134,9 @@ def explorer_dataset(dataset_key: str, page=1):
 	# We can use either a generic or a pre-made, data source-specific template.
 	template = "datasource" if has_datasource_template(datasource) else "generic"
 	if template == "generic":
-		posts_css = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/generic.css")
+		posts_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/generic.css")
 	else:
-		posts_css = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css")
+		posts_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css")
 
 	# Read CSS and pass as a string
 	with open(posts_css, "r", encoding="utf-8") as css:
@@ -139,10 +147,11 @@ def explorer_dataset(dataset_key: str, page=1):
 		"explorer/explorer.html",
 		dataset=dataset,
 		datasource=datasource,
-		has_database=has_database,
 		posts=posts,
 		annotation_fields=annotation_fields,
 		annotations=post_annotations,
+		processors=current_app.fourcat_modules.processors,
+		from_datasets=from_datasets,
 		template=template,
 		posts_css=posts_css,
 		page=page,
@@ -153,12 +162,12 @@ def explorer_dataset(dataset_key: str, page=1):
 		warning=warning
 	)
 
-@app.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
+@component.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
+@current_app.openapi.endpoint("explorer")
 def explorer_save_annotation_fields(dataset_key: str):
 	"""
 	Save the annotation fields of a dataset to the datasets table.
@@ -173,22 +182,18 @@ def explorer_save_annotation_fields(dataset_key: str):
 	if not dataset_key:
 		return error(404, error="No dataset key provided")
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=g.db)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
 	# Save it!
 	annotation_fields = request.get_json()
 
-	# Field IDs are not immediately set in the front end.
-	# We're going to do this based on the hash of the
-	# dataset key and the input label (should be unique)
-	field_keys = list(annotation_fields.keys())
-	for field_id in field_keys:
-		if "tohash" in field_id:
-			new_field_id = hash_to_md5(dataset_key + annotation_fields[field_id]["label"])
-			annotation_fields[new_field_id] = annotation_fields[field_id]
-			del annotation_fields[field_id]
+	# Potentially re-add annotation fields that were hidden in the Explorer
+	if dataset.annotation_fields:
+		for annotation_field_id, annotation_field in annotation_fields.items():
+			if annotation_field.get("hide_in_explorer"):
+				annotation_fields[annotation_field_id] = annotation_field
 
 	try:
 		fields_saved = dataset.save_annotation_fields(annotation_fields)
@@ -199,12 +204,12 @@ def explorer_save_annotation_fields(dataset_key: str):
 	# Else return the amount of fields saved.
 	return str(fields_saved)
 
-@app.route("/explorer/save_annotations/<string:dataset_key>", methods=["POST"])
+@component.route("/explorer/save_annotations/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
 @setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
+@current_app.openapi.endpoint("explorer")
 def explorer_save_annotations(dataset_key: str):
 	"""
 	Save the annotations of a dataset to the annotations table.
@@ -219,18 +224,19 @@ def explorer_save_annotations(dataset_key: str):
 	# Save it!
 	annotations = request.get_json()
 	try:
-		dataset = DataSet(key=dataset_key, db=db)
+		dataset = DataSet(key=dataset_key, db=g.db)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
 	try:
-		annotations_saved = dataset.save_annotations(annotations, overwrite=True)
+		annotations_saved = dataset.save_annotations(annotations)
 	except AnnotationException as e:
 		# If anything went wrong with the annotation field saving, return an error.
 		return jsonify(error=str(e)), 400
 
 	# Else return the amount of fields saved.
 	return str(annotations_saved)
+
 
 def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 	"""
@@ -246,7 +252,7 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 
 	# Resort to regular iteration if the dataset is larger than the maximum
 	# allowed posts for the Explorer.
-	if dataset.data["num_rows"] > config.get("explorer.max_posts", 500000):
+	if dataset.data["num_rows"] > g.config.get("explorer.max_posts", 500000):
 		yield from dataset.iterate_items(**kwargs)
 		return
 
@@ -266,110 +272,9 @@ def has_datasource_template(datasource: str) -> bool:
 
 	:returns: bool, Whether the required files are present.
 	"""
-	css_exists = Path(config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css").exists()
-	html_exists = Path(config.get('PATH_ROOT'), "webtool/templates/explorer/datasource-templates/" + datasource + ".html").exists()
+	css_exists = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css").exists()
+	html_exists = Path(g.config.get('PATH_ROOT'), "webtool/templates/explorer/datasource-templates/" + datasource + ".html").exists()
 
 	if css_exists and html_exists:
 		return True
 	return False
-
-def get_database_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
-	"""
-	todo: Integrate later
-	Retrieve posts by ID from a database-accessible data source.
-	"""
-
-	raise NotImplementedError
-
-	if not ids:
-		return None
-
-	if board:
-		board = " AND board = '" + board + "' "
-
-	id_field = "id" if not threads else "thread_id"
-	order_by = " ORDER BY " + ", ".join(order_by)
-	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	offset = " OFFSET %i" % int(offset)
-
-	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + board + order_by + " ASC" + limit + offset,
-						(ids,))
-	if not posts:
-		return False
-
-	return posts
-
-@app.route('/results/<datasource>/<string:thread_id>/explorer')
-@api_ratelimit
-@login_required
-@setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
-def explorer_api_thread(datasource, thread_id):
-	"""
-	todo: INTEGRATE LATER!
-
-	Show a thread from an API-accessible database.
-
-	:param str datasource:  Data source ID
-	:param str board:  Board name
-	:param int thread_id:  Thread ID
-
-	:return-error 404:  If the thread ID does not exist for the given data source.
-	"""
-	raise NotImplementedError
-
-	if not datasource:
-		return error(404, error="No datasource provided")
-	if datasource not in config.get('datasources.enabled'):
-		return error(404, error="Invalid data source")
-	if not thread_id:
-		return error(404, error="No thread ID provided")
-
-	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.get('explorer.max_posts', 500000)
-
-	# Get the posts with this thread ID.
-	#todo: define function get_api_posts
-	posts = get_api_posts(db, datasource, ids=tuple([thread_id]), threads=True, order_by=["id"])
-
-	if not posts:
-		return error(404, error="No posts available for this thread")
-
-	posts = [strip_html(post) for post in posts]
-	posts = [format(post, datasource=datasource) for post in posts]
-
-	return render_template("explorer/explorer.html", datasource=datasource, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
-
-@app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
-@api_ratelimit
-@login_required
-@setting_required("privileges.can_use_explorer")
-@openapi.endpoint("explorer")
-def explorer_api_posts(datasource, post_ids):
-	"""
-	todo: INTEGRATE LATER
-
-	Show posts from an API-accessible database.
-
-	:param str datasource:  Data source ID
-	:param str board:  Board name
-	:param int post_ids:  Post IDs
-
-	:return-error 404:  If the thread ID does not exist for the given data source.
-	"""
-	raise NotImplementedError
-
-	if not datasource:
-		return error(404, error="No datasource provided")
-	if datasource not in config.get('datasources.enabled'):
-		return error(404, error="Invalid data source")
-	if not post_ids:
-		return error(404, error="No thread ID provided")
-
-	# Get the posts with this thread ID.
-	posts = get_database_posts(db, datasource, board=board, ids=tuple([post_ids]), threads=True, order_by=["id"])
-
-	posts = [strip_html(post) for post in posts]
-	posts = [format(post) for post in posts]
-
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, datasource_config=datasource_config, posts_per_page=len(posts), post_count=len(posts))

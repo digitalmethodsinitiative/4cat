@@ -22,8 +22,6 @@ import inspect
 import json
 import re
 
-from common.config_manager import config
-
 class OpenAPICollector:
 	"""
 	Flask-compatible OpenAPI generator
@@ -33,7 +31,7 @@ class OpenAPICollector:
 	flask_app = None
 	type_map = {"int": "integer", "str": "string"}  # openapi is picky about type names
 
-	def __init__(self, app):
+	def __init__(self, app, config):
 		"""
 		Store a reference to the used Flask app
 
@@ -43,6 +41,7 @@ class OpenAPICollector:
 		:param app:  Flask app
 		"""
 		self.flask_app = app
+		self.config = config
 
 	def endpoint(self, api_id="all"):
 		"""
@@ -155,7 +154,7 @@ class OpenAPICollector:
 				result_schema = None
 
 			# store endpoint metadata for later use
-			self.endpoints[callback.__name__] = {
+			self.endpoints[api_id + "." + callback.__name__] = {
 				"method": "get",
 				"title": title,
 				"description": collapse_whitespace.sub(" ", description),
@@ -192,17 +191,18 @@ class OpenAPICollector:
 		:return dict: The OpenAPI-formatted specification, as a dictionary
 		              that can be (f.ex.) dumped as JSON for a usable spec.
 		"""
+
 		spec = {
 			"swagger": "2.0",
-			"host": config.get("flask.server_name"),
+			"host": self.config.get("flask.server_name"),
 			"info": {
-				"title": config.get("4cat.name_long") + " RESTful API",
-				"description": "This API allows interfacing with the " + config.get("4cat.name") + " Capture and Analysis"
+				"title": self.config.get("4cat.name_long") + " RESTful API",
+				"description": "This API allows interfacing with the " + self.config.get("4cat.name") + " Capture and Analysis"
 							   "Toolkit, offering endpoints through which one may query our corpora via "
 							   "keyword-based search, and run further analysis on the results.",
 				"version": "1.0.0",
 				"contact": {
-					"email": config.get("mail.admin_email", "")
+					"email": self.config.get("mail.admin_email", "")
 				}
 			},
 			"paths": {
@@ -216,12 +216,14 @@ class OpenAPICollector:
 			# check if this route is marked as an API endpoint
 			endpoint = rule.endpoint
 			rule_func = self.flask_app.view_functions[endpoint].__name__
-			if rule_func not in self.endpoints:
+			endpoint_id = api_id + "." + rule_func
+			if endpoint_id not in self.endpoints:
 				continue
 
-			if not api_id or api_id == "all" or self.endpoints[rule_func]["api_id"] == api_id:
-				pointspec = self.endpoints[rule_func]
+			if not api_id or api_id == "all" or self.endpoints[endpoint_id]["api_id"] == api_id:
+				pointspec = self.endpoints[endpoint_id]
 			else:
+				print(self.endpoints[endpoint_id])
 				continue
 
 			# find parameters in endpoint path
@@ -239,7 +241,7 @@ class OpenAPICollector:
 
 			# OpenAPI spec mandates { instead of < but otherwise identical to WZ routes
 			path = re.sub(r"<[^:>]+:([^>]+)>", r"<\1>", rule.rule).replace("<", "{").replace(">", "}")
-			pointspec = self.endpoints[endpoint]
+			pointspec = self.endpoints[endpoint_id]
 
 			# add paths to spec
 			spec["paths"][path] = {
@@ -292,5 +294,5 @@ class OpenAPICollector:
 		try:
 			schema = json.loads(quote.sub('"\\1"', schema.strip().replace("=", ":")))
 			return schema
-		except json.JSONDecodeError as e:
+		except json.JSONDecodeError:
 			return {"type": schema}

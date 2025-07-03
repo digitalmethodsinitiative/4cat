@@ -8,11 +8,9 @@ import json
 import re
 
 from PIL import Image, UnidentifiedImageError
-from urllib.parse import quote_plus
 from requests.structures import CaseInsensitiveDict
 
-from common.config_manager import config
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, url_to_filename
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
@@ -95,7 +93,7 @@ class ImageDownloader(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -113,14 +111,14 @@ class ImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
+        max_number_images = int(config.get("image-downloader.max", 1000))
         if max_number_images != 0:
             options["amount"]["help"] = f"No. of images (max {max_number_images})"
             options["amount"]["max"] = max_number_images
             options["amount"]["min"] = 1
         else:
             # 0 can download all images
-            options["amount"]["help"] = f"No. of images"
+            options["amount"]["help"] = "No. of images"
             options["amount"]["min"] = 0
             options["amount"]["tooltip"] = "Set to 0 to download all images"
 
@@ -143,12 +141,13 @@ class ImageDownloader(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on top image rankings, collectors, but not specific collectors with their own image
         collection methods
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return (
             (module.type == "top-images" or module.is_from_collector())
@@ -267,8 +266,11 @@ class ImageDownloader(BasicProcessor):
         self.filenames = CaseInsensitiveDict()
         self.url_redirects = {}
 
+        url_filenames = []
         for url in urls:
-            self.filenames[url] = self.make_filename(url)
+            url_filename = url_to_filename(url, staging_area=self.staging_area, default_name="file", default_ext=".png", existing_filenames=url_filenames)
+            self.filenames[url] = url_filename
+            url_filenames.append(url_filename)
 
         for url, response in self.iterate_proxied_requests(
             urls,
@@ -349,7 +351,7 @@ class ImageDownloader(BasicProcessor):
 
                             image_url = self.clean_url(image_url)
                             self.url_redirects[url] = image_url
-                            self.filenames[image_url] = self.make_filename(image_url)
+                            self.filenames[image_url] = url_to_filename(image_url, staging_area=self.staging_area, default_name="file", default_ext=".png")
                             self.push_proxied_request(image_url, 0)
                             item_map[image_url] = item_map[url]
                             del self.filenames[url], item_map[url]
@@ -385,14 +387,14 @@ class ImageDownloader(BasicProcessor):
                         failure = True
 
                 if not failure:
-                    if len(downloaded_files) < amount:
+                    if len(downloaded_files) < amount or amount == 0:
                         downloaded_files.add(url)
                         self.dataset.update_status(
                             f"Downloaded {len(downloaded_files):,} of {amount:,} file(s)"
                         )
                         self.dataset.update_progress(len(downloaded_files) / amount)
 
-                    if len(downloaded_files) >= amount:
+                    if len(downloaded_files) >= amount and amount != 0:
                         # parallel requests may still be running so halt these
                         # before ending the loop and wrapping up
                         self.complete = True
@@ -545,36 +547,6 @@ class ImageDownloader(BasicProcessor):
                     # in that case
                     pass
 
-    def make_filename(self, url):
-        """
-        Determine filenames for saved files
-
-        Prefer the original filename (extracted from the URL), but this may not
-        always be possible or be an actual filename. Also, avoid using the same
-        filename multiple times.
-
-        Note that this is done before any files are downloaded; thus not all
-        filenames are guaranteed to actually exist when processing finishes,
-        if some URLs cannot be downloaded.
-
-        :param str url:  URLs to determine filenames for
-        :return str:  Suitable file name
-        """
-        clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
-        if re.match(r"[^.]+\.[a-zA-Z]{3,4}", clean_filename):
-            base_filename = clean_filename
-        else:
-            base_filename = "file.png"
-
-        filename = base_filename
-        file_path = self.staging_area.joinpath(filename)
-        file_index = 1
-        while file_path.exists():
-            filename = f"{base_filename.split('.')[0]}-{file_index}.{base_filename.split('.')[1]}"
-            file_index += 1
-            file_path = self.staging_area.joinpath(filename)
-
-        return filename
 
     def resolve_url(self, url):
         """

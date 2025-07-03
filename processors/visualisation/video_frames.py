@@ -8,7 +8,6 @@ import shutil
 import subprocess
 import oslex
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -59,12 +58,14 @@ class VideoFrames(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on videos
+
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-			   config.get("video-downloader.ffmpeg_path", user=user) and \
+			   config.get("video-downloader.ffmpeg_path") and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):

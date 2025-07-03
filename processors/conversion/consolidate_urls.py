@@ -228,9 +228,10 @@ class ConsolidateURLs(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Update "columns" option with parent dataset columns
+        :param config:
         """
         options = cls.options
         # Get the columns for the select columns option
@@ -244,11 +245,12 @@ class ConsolidateURLs(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         This is meant to be inherited by other child classes
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.get_extension() in ["csv", "ndjson"]
 

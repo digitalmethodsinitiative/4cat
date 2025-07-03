@@ -12,22 +12,22 @@
             <nav>
                 <ul class="button-container">
                     <li><a class="button-like"
-                           href="{{ url_for("show_results") }}?user={{ user.name }}&amp;depth=all"><i
+                           href="{{ url_for("dataset.show_results") }}?user={{ user.name }}&amp;depth=all"><i
                             class="fa fa-database" aria-hidden="true"></i> View datasets</a></li>
                     <li>
-                        <form class="inline" action="{{ url_for("delete_user") }}" method="POST">
+                        <form class="inline" action="{{ url_for("admin.delete_user") }}" method="POST">
                             <input type="hidden" name="name" value="{{ user.name }}">
                             <button class="confirm-first"><i class="fa fa-times" aria-hidden="true"></i> Delete user
                             </button>
                         </form>
                     </li>
                     {% if not user.password %}
-                        <li><a href="{{ url_for("reset_password") }}?token={{ user.register_token }}"
+                        <li><a href="{{ url_for("user.reset_password") }}?token={{ user.register_token }}"
                                class="button-like"><i class="fa fa-link" aria-hidden="true"></i> Password (re)set
                             link</a></li>
                     {% endif %}
                     <li>
-                        <a href="{{ url_for("add_user") }}?force=1&amp;format=html&amp;email={{ user.name }}"
+                        <a href="{{ url_for("admin.add_user") }}?force=1&amp;format=html&amp;email={{ user.name }}"
                            class="button-like confirm-first tooltip-trigger" aria-controls="tooltip-resend-mail"
                            aria-label="Warning: this resets the user's password & re-generates their reset token">
                             <i class="fa fa-envelope" aria-hidden="true"></i> Send password link
@@ -37,7 +37,7 @@
                     </li>
 
                 {% if __user_config("privileges.admin.can_manage_settings") %}
-                    <li><a href="{{ url_for("manipulate_settings") }}?tag=user:{{ user.name }}"
+                    <li><a href="{{ url_for("admin.manipulate_settings") }}?tag=user:{{ user.name }}"
                                class="button-like"><i class="fa fa-user-gear" aria-hidden="true"></i> User settings</a></li>
                 {% endif %}
                 </ul>
@@ -53,7 +53,7 @@
                 <p><i class="fa fa-warning" aria-hidden="true"></i> This user has not yet completed their registration and set a password.</p>
             {% endif %}
 
-            <form action="{{ url_for('manipulate_user', mode=mode) }}{% if mode == "edit" %}?name={{ user.name }}{% endif %}" method="POST" class="wide">
+            <form action="{{ url_for('admin.manipulate_user', mode=mode) }}{% if mode == "edit" %}?name={{ user.name }}{% endif %}" method="POST" class="wide">
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice|safe }}</p>
                 {% endfor %}

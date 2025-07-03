@@ -2,7 +2,6 @@ import packaging.version
 import requests
 import json
 
-from common.config_manager import config
 from common.lib.helpers import add_notification, get_github_version
 from backend.lib.worker import BasicWorker
 from pathlib import Path
@@ -25,8 +24,8 @@ class UpdateChecker(BasicWorker):
     ensure_job = {"remote_id": "", "interval": 10800}
 
     def work(self):
-        versionfile = Path(config.get("PATH_ROOT"), "config/.current-version")
-        repo_url = config.get("4cat.github_url")
+        versionfile = Path(self.config.get("PATH_ROOT"), "config/.current-version")
+        repo_url = self.config.get("4cat.github_url")
 
         if not versionfile.exists() or not repo_url:
             # need something to compare against...
@@ -34,7 +33,7 @@ class UpdateChecker(BasicWorker):
 
         timeout = 15
         try:
-            (latest_tag, release_url) = get_github_version(timeout)
+            (latest_tag, release_url) = get_github_version(self.config.get("4cat.github_url"), timeout)
             if latest_tag == "unknown":
                 raise ValueError()
         except ValueError:

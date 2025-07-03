@@ -12,7 +12,7 @@ from math import sin, cos, tan, degrees, radians, copysign
 
 from svgwrite.container import SVG
 from svgwrite.shapes import Line
-from svgwrite.path import Path
+from svgwrite.path import Path as SVGPath
 from svgwrite.text import Text
 
 __author__ = "Stijn Peeters"
@@ -75,11 +75,12 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	colour_index = 0
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		if module.is_dataset():
 			return module.is_rankable(multiple_items=False)
@@ -171,7 +172,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 				max_limit = max(max_limit, abs(graphs[graph][interval]))
 
 		# order graphs by highest (or lowest) value)
-		limits = {limit: limits[limit] for limit in sorted(limits, key=lambda l: limits[l])}
+		limits = {limit: limits[limit] for limit in sorted(limits, key=lambda i: limits[i])}
 		graphs = {graph: graphs[graph] for graph in limits}
 
 		if not graphs:
@@ -315,7 +316,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			self.dataset.update_status("Rendering graph for '%s'" % graph)
 
 			# path starting at lower left corner of graph
-			area_graph = Path(fill=self.colours[self.colour_index])
+			area_graph = SVGPath(fill=self.colours[self.colour_index])
 			area_graph.push("M %f %f" % (graph_start_x, graph_start_y))
 			previous_value = None
 

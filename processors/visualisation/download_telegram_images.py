@@ -11,10 +11,9 @@ import telethon.errors
 from telethon import TelegramClient
 from telethon.errors import TimedOutError, BadRequestError
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput, timify_long
+from common.lib.helpers import UserInput, timify
 from common.lib.dataset import DataSet
 from processors.visualisation.download_images import ImageDownloader
 
@@ -46,14 +45,14 @@ class TelegramImageDownloader(BasicProcessor):
     config = {
         "image-downloader-telegram.max": {
             'type': UserInput.OPTION_TEXT,
-            'default' : "1000",
+            'default': "1000",
             'help': 'Max images',
             'tooltip': "Maxmimum number of Telegram images a user can download.",
-            },
-        }
+        },
+    }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -61,17 +60,16 @@ class TelegramImageDownloader(BasicProcessor):
         TCAT servers are configured. Otherwise, no options are given since
         there is nothing to choose.
 
+        :param config:
         :param DataSet parent_dataset:  Dataset that will be uploaded
-        :param User user:  User that will be uploading it
-        :return dict:  Option definition
         """
+
         # Get max number of images; if set to 0, there is no limit
-        max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
+        max_number_images = int(config.get('image-downloader-telegram.max', 1000))
 
         options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "No. of images" if max_number_images == 0 else f"No. of images (max {max_number_images})",
                 "help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
                 "default": 100,
                 "min": 0 if max_number_images == 0 else 1,
@@ -88,19 +86,20 @@ class TelegramImageDownloader(BasicProcessor):
                 "tooltip": "This includes e.g. thumbnails for linked YouTube videos"
             }
         }
-        if max_number_images == 0:
-            options['amount']['tooltip'] = "'0' will use all available images"
-        else:
+        
+        if max_number_images != 0:
+            # Only add max option if it is not set to 0 (unlimited)
             options["amount"]["max"] = max_number_images
 
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on Telegram datasets with required info
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         if type(module) is DataSet:
             # we need these to actually instantiate a telegram client and
@@ -142,7 +141,7 @@ class TelegramImageDownloader(BasicProcessor):
         query = self.source_dataset.top_parent().parameters
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
+        session_path = Path(self.config.get('PATH_ROOT')).joinpath(self.config.get('PATH_SESSIONS'), session_id + ".session")
         amount = self.parameters.get("amount")
         with_thumbnails = self.parameters.get("video-thumbnails")
         with_websites = self.parameters.get("website-thumbnails")
@@ -204,8 +203,8 @@ class TelegramImageDownloader(BasicProcessor):
 
                     if not message:
                         # message no longer exists
-                        self.dataset.log(f"Could not download image for message {msg_id} - message is unavailable (it "
-                                         f"may have been deleted)")
+                        self.dataset.log("Could not download image for message - message is unavailable (it "
+                                         "may have been deleted)")
                         self.flawless = False
                         break
 
@@ -247,7 +246,7 @@ class TelegramImageDownloader(BasicProcessor):
             except telethon.errors.FloodError as e:
                 later = "later"
                 if hasattr(e, "seconds"):
-                    later = f"in {timify_long(e.seconds)}"
+                    later = f"in {timify(e.seconds)}"
                 self.dataset.update_status(f"Rate-limited by Telegram after downloading {media_done-1:,} image(s); "
                                            f"halting download process. Try again {later}.", is_final=True)
                 self.flawless = False

@@ -11,21 +11,22 @@ class AnnotationMetadata(BasicProcessor):
 	Download annotation metadata from this dataset
 	"""
 	type = "annotation-metadata"  # job type ID
-	category = "Post metrics"  # category
+	category = "Metrics"  # category
 	title = "Annotation metadata"  # title displayed in UI
 	description = ("Download metadata about annotations for this dataset. "
 				   "Includes information like annotation author, timestamp, type, etc.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Only compatible with datasets that have annotations.
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 
-		return module.is_dataset() and module.has_annotations()
+		return module.is_dataset() and module.annotation_fields
 
 	def process(self):
 

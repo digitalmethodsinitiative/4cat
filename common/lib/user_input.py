@@ -35,7 +35,9 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
-    OPTION_DATASOURCES_TABLE = "datasources_table" # a table with settings per data source
+    OPTION_DATASOURCES_TABLE = "datasources_table"  # a table with settings per data source
+    OPTION_ANNOTATION = "annotation"  # checkbox for whether to an annotation
+    OPTION_ANNOTATIONS = "annotations"  # table for whether to write multiple annotations
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
@@ -60,6 +62,7 @@ class UserInput:
 
         :return dict:  Sanitised form input
         """
+
         from common.lib.helpers import convert_to_int
         parsed_input = {}
 
@@ -119,7 +122,7 @@ class UserInput:
                 except RequirementsNotMetException:
                     pass
 
-            elif settings.get("type") == UserInput.OPTION_TOGGLE:
+            elif settings.get("type") in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
                 # special case too, since if a checkbox is unchecked, it simply
                 # does not show up in the input
                 try:
@@ -154,7 +157,7 @@ class UserInput:
                     for column in columns:
 
                         choice = input.get(option + "-" + datasource + "-" + column, False)
-                        column_settings = settings["columns"][column] # sub-settings per column
+                        column_settings = settings["columns"][column]  # sub-settings per column
                         table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
 
                 parsed_input[option] = table_input
@@ -240,9 +243,9 @@ class UserInput:
             # these are structural form elements and can never return a value
             return None
 
-        elif input_type == UserInput.OPTION_TOGGLE:
+        elif input_type in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
             # simple boolean toggle
-            if type(choice) == bool:
+            if type(choice) is bool:
                 return choice
             elif choice in ['false', 'False']:
                 # Sanitized options passed back to Flask can be converted to strings as 'false'
@@ -266,7 +269,7 @@ class UserInput:
             finally:
                 return value
 
-        elif input_type == UserInput.OPTION_MULTI:
+        elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS):
             # any number of values out of a list of possible values
             # comma-separated during input, returned as a list of valid options
             if not choice:
@@ -304,7 +307,7 @@ class UserInput:
         elif input_type == UserInput.OPTION_TEXT_JSON:
             # verify that this is actually json
             try:
-                redumped_value = json.dumps(json.loads(choice))
+                json.dumps(json.loads(choice))
             except json.JSONDecodeError:
                 raise QueryParametersException("Invalid JSON value '%s'" % choice)
 
@@ -325,7 +328,7 @@ class UserInput:
             if "max" in settings:
                 try:
                     choice = min(settings["max"], value_type(choice))
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     if not silently_correct:
                         raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
 
@@ -334,7 +337,7 @@ class UserInput:
             if "min" in settings:
                 try:
                     choice = max(settings["min"], value_type(choice))
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     if not silently_correct:
                         raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
 

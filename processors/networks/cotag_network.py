@@ -42,11 +42,12 @@ class CoTaggerPreset(ProcessorPreset):
     possible_tag_columns = {"tags", "hashtags", "groups"}
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on datasets containing a tags column
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         columns = module.get_columns()
         return bool(set(columns) & cls.possible_tag_columns) if columns else False

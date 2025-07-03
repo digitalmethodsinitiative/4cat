@@ -12,10 +12,10 @@ __email__ = "4cat@oilab.eu"
 
 class CountPosts(BasicProcessor):
 	"""
-	Merge post body into one long string
+	Count items in a dataset
 	"""
 	type = "count-posts"  # job type ID
-	category = "Post metrics" # category
+	category = "Metrics" # category
 	title = "Count items"  # title displayed in UI
 	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
@@ -38,11 +38,12 @@ class CountPosts(BasicProcessor):
 	}
 
 	@staticmethod
-	def is_compatible_with(module=None, user=None):
+	def is_compatible_with(module=None, config=None):
 		"""
         Determine compatibility
 
         :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
@@ -64,7 +65,7 @@ class CountPosts(BasicProcessor):
 		last_interval = "0000"
 
 		self.dataset.update_status("Processing items")
-		with self.dataset.get_results_path().open("w") as results:
+		with self.dataset.get_results_path().open("w"):
 			counter = 0
 
 			for post in self.source_dataset.iterate_items(self):
@@ -100,11 +101,11 @@ class CountPosts(BasicProcessor):
 			# visualised as a histogram, for example
 			if self.parameters.get("pad") and timeframe != "all":
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
-
-				# Convert 0 values to dict
-				for k, v in intervals.items():
-					if isinstance(v, int):
-						intervals[k] = {"absolute": v}
+				if intervals:
+					# Convert 0 values to dict
+					for k, v in intervals.items():
+						if isinstance(v, int):
+							intervals[k] = {"absolute": v}
 
 			# Add relative counts, if needed
 			if add_relative:
@@ -174,10 +175,13 @@ class CountPosts(BasicProcessor):
 					row["value_relative"] = intervals[interval]["relative"]
 				rows.append(row)
 
-		self.write_csv_items_and_finish(rows)
+		if rows:
+			self.write_csv_items_and_finish(rows)
+		else:
+			return self.dataset.finish_with_error("No items could be counted. See dataset log for details")
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		
 		options = cls.options
 

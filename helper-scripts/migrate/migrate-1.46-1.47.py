@@ -1,5 +1,4 @@
 # Add timestamp_finished column to datasets table
-import json
 import sys
 import os
 import datetime
@@ -14,7 +13,7 @@ from common.lib.helpers import get_last_line
 
 log = Logger(output=True)
 
-import configparser
+import configparser  # noqa: E402
 
 ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))

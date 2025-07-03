@@ -31,7 +31,16 @@ class DateFilter(BaseFilter):
     }   
     
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
+
+        Offer available columns in a nice dropdown, when possible
+
+        :param DataSet parent_dataset:  Parent dataset
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Processor options
+        """
         options = cls.options
         if not parent_dataset:
             return options
@@ -49,11 +58,12 @@ class DateFilter(BaseFilter):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on NDJSON and CSV files
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 

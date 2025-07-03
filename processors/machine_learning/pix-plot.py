@@ -10,7 +10,6 @@ import os
 from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 
-from common.config_manager import config
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.helpers import UserInput, get_html_redirect_page, ellipsiate
 from backend.lib.processor import BasicProcessor
@@ -66,7 +65,7 @@ class PixPlotGenerator(BasicProcessor):
 
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         # Update the amount max and help from config
         options = {
             "amount": {
@@ -122,7 +121,7 @@ class PixPlotGenerator(BasicProcessor):
             },
         }
 
-        max_number_images = int(config.get("dmi-service-manager.dc_pixplot_num_files", 10000, user=user))
+        max_number_images = int(config.get("dmi-service-manager.dc_pixplot_num_files", 10000))
         if max_number_images == 0:
             options["amount"]["help"] = options["amount"]["help"] + " (max: all available)"
             options["amount"]["min"] = 0
@@ -135,15 +134,15 @@ class PixPlotGenerator(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on token sets;
         Checks if pix-plot.server_url set
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return config.get("dmi-service-manager.db_pixplot_enabled", False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.db_pixplot_enabled", False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):
@@ -212,7 +211,7 @@ class PixPlotGenerator(BasicProcessor):
         data['timeout'] = (86400 * 7)
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "pixplot"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30, check_process=False)
@@ -229,8 +228,8 @@ class PixPlotGenerator(BasicProcessor):
         dmi_service_manager.process_results(output_dir)
 
         # Results HTML file redirects to output_dir/index.html
-        plot_url = ('https://' if config.get("flask.https") else 'http://') + config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
-        html_file = get_html_redirect_page(plot_url)
+        plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
+        html_file = self.get_html_page(plot_url)
 
         # Write HTML file
         with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:
@@ -342,12 +341,12 @@ class PixPlotGenerator(BasicProcessor):
                     if image['tags']:
                         image['tags'] += '|'
                     if 'tags' in post.keys():
-                        if type(post['tags']) == list:
+                        if type(post['tags']) is list:
                             image['tags'] += '|'.join(post['tags'])
                         else:
                             image['tags'] += '|'.join(post['tags'].split(','))
                     elif 'hashtags' in post.keys():
-                        if type(post['hashtags']) == list:
+                        if type(post['hashtags']) is list:
                             image['tags'] += '|'.join(post['hashtags'])
                         else:
                             image['tags'] += '|'.join(post['hashtags'].split(','))
@@ -361,7 +360,7 @@ class PixPlotGenerator(BasicProcessor):
                             pass 
                         elif type(post['timestamp']) in [int, float]:
                             image['year'] = datetime.fromtimestamp(post['timestamp']).year
-                        elif type(post['timestamp']) == str:
+                        elif type(post['timestamp']) is str:
                             try:
                                 image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
                             except ValueError:
@@ -396,7 +395,8 @@ class PixPlotGenerator(BasicProcessor):
         """
         s = unquote(os.path.basename(s))
         invalid_chars = '<>:;,"/\\|?*[]'
-        for i in invalid_chars: s = s.replace(i, '')
+        for i in invalid_chars:
+            s = s.replace(i, '')
         return s
 
     def make_nice_link(self, content):

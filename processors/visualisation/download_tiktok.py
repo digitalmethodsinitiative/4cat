@@ -10,7 +10,6 @@ from PIL import Image, UnidentifiedImageError
 from urllib.parse import urlparse, parse_qs
 import requests
 
-from common.config_manager import config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
@@ -48,7 +47,7 @@ class TikTokVideoDownloader(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -57,16 +56,15 @@ class TikTokVideoDownloader(BasicProcessor):
         fine-grained options, e.g. in cases where the availability of options
         is partially determined by the parent dataset's parameters.
 
+        :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
-        be used to show some options only to privileges users.
+        the processor would be run on can be used to show some options only to
+        privileges users.
         """
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_videos = int(config.get('video-downloader.max', 1000, user=user))
+        max_number_videos = int(config.get('video-downloader.max', 1000))
         options['amount']['max'] = max_number_videos
         options['amount']['help'] = f"No. of videos (max {max_number_videos:,})"
 
@@ -82,11 +80,12 @@ class TikTokVideoDownloader(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor TikTok datasets
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type in ["tiktok-search", "tiktok-urls-search"] or (module.type == "upload-search" and "tiktok" in module.get_label().lower())
 
@@ -172,8 +171,28 @@ class TikTokImageDownloader(BasicProcessor):
 
     followups = ImageDownloader.followups
 
+    options = {
+        "amount": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "No. of items (max 1000)",
+            "default": 100,
+            "min": 0,
+            "max": 1000
+        },
+        "thumb_type": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Media type",
+            "options": {
+                "thumbnail": "Video Thumbnail",
+                "music": "Music Thumbnail",
+                "author_avatar": "User avatar"
+            },
+            "default": "thumbnail"
+        }
+    }
+
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -188,41 +207,28 @@ class TikTokImageDownloader(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        # Update the amount max and help from config
-        max_number_images = int(config.get("image-downloader.max", 1000, user=user))
+        options = cls.options
 
-        options = {
-            "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
-                "default": 100,
-                "min": 0 if max_number_images == 0 else 1,
-                "max": max_number_images
-            },
-            "thumb_type": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Media type",
-                "options": {
-                    "thumbnail": "Video Thumbnail",
-                    "music": "Music Thumbnail",
-                    "author_avatar": "User avatar"
-                },
-                "default": "thumbnail"
-            }
-        }
-
+        # Update the amount max, min, tooltip, and help from config
+        max_number_images = int(config.get("image-downloader.max", 1000))
         if max_number_images == 0:
             options['amount']['tooltip'] = "'0' will use all available images"
-            options['amount'].pop('max')
+            options['amount'].pop('max') if 'max' in options['amount'] else None
+            options['amount']['help'] = "No. of images"
+        else:
+            options['amount']['help'] = f"No. of images (max {max_number_images:,})"
+            options['amount']['max'] = max_number_images
+            options["amount"]["min"] = 1
 
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor TikTok datasets
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager config:  Configuration reader (context-aware)
         """
         return module.type in ["tiktok-search", "tiktok-urls-search"]
 

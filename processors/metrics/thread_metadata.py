@@ -17,7 +17,7 @@ class ThreadMetadata(BasicProcessor):
 	Extracts metadata on threads from the dataset.
 	"""
 	type = "thread-metadata"  # job type ID
-	category = "Post metrics"  # category
+	category = "Metrics"  # category
 	title = "Thread metadata"  # title displayed in UI
 	description = "Extract various metadata on the threads in the dataset, including time data and post counts. Note " \
 				  "that this extracted only on the basis of the items present this dataset."  # description displayed in UI
@@ -26,11 +26,12 @@ class ThreadMetadata(BasicProcessor):
 	followups = []
 
 	@staticmethod
-	def is_compatible_with(module=None, user=None):
+	def is_compatible_with(module=None, config=None):
 		"""
         Determine compatibility
 
         :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
@@ -96,7 +97,7 @@ class ThreadMetadata(BasicProcessor):
 			"op_body": threads[thread_id]["op_body"],
 			"num_posts": threads[thread_id]["count"],
 			"thread_age": (threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
-			"thread_age_friendly": self.timify(threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
+			"thread_age_friendly": self.timify_secs(threads[thread_id]["last_post"] - threads[thread_id]["first_post"]),
 			**(
 				{
 					"num_images": threads[thread_id]["images"],
@@ -111,7 +112,7 @@ class ThreadMetadata(BasicProcessor):
 
 		self.write_csv_items_and_finish(results)
 
-	def timify(self, number):
+	def timify_secs(self, number):
 		"""
 		For the non-geniuses, convert an amount of seconds to a more readable
 		approximation like '4h 5m'

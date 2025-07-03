@@ -5,8 +5,8 @@
     </div>
     {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
         <div class="result-log">
-            <a href="{{ url_for('view_log', key=dataset.key) }}"
-               data-load-from="{{ url_for('view_log', key=dataset.key) }}"
+            <a href="{{ url_for('dataset.view_log', key=dataset.key) }}"
+               data-load-from="{{ url_for('dataset.view_log', key=dataset.key) }}"
                class="tooltip-trigger popup-trigger" aria-controls="tooltip-log-{{ dataset.key }} popup-log-{{ dataset.key }}">
                 <i class="fa fa-clipboard-list" aria-hidden="true"></i> Log file
             </a>
@@ -17,9 +17,9 @@
     </div>
   {% if dataset.is_finished() and dataset.num_rows > 0 %}
     <ul class="dataset-actions">
-    {% if dataset.get_own_processor().map_item or dataset.get_annotation_fields() %}
+    {% if dataset.get_own_processor().map_item or dataset.annotation_fields %}
         <li>
-            <a href="{{ url_for('get_mapped_result', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-get-mapped-result-{{ dataset.key }}" >
+            <a href="{{ url_for('dataset.get_mapped_result', key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-get-mapped-result-{{ dataset.key }}" >
                 <i class="fas fa-download" aria-hidden="true"></i>
                 Download csv
             </a>
@@ -27,7 +27,7 @@
         </li>
     {% endif %}
     <li>
-        <a href="{{ url_for('get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
+        <a href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
             <i class="fas fa-download" aria-hidden="true"></i>
             Original {{ dataset.get_extension() }} ({{ dataset.get_results_path()|filesize }})
         </a>
@@ -35,8 +35,8 @@
     </li>
     {% if (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
         <li>
-            <a href="{{ url_for('preview_items', key=dataset.key) }}"
-               data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
+            <a href="{{ url_for('dataset.preview_items', key=dataset.key) }}"
+               data-load-from="{{ url_for('dataset.preview_items', key=dataset.key) }}" class="popup-trigger"
                aria-controls="popup-preview-{{ dataset.key }}">
                 <i class="fa fa-eye" aria-hidden="true"></i> Preview
             </a>
@@ -45,7 +45,7 @@
     {% endif %}
     <li>
     {% if __user_config("privileges.can_use_explorer") %}
-        <a href="{{ url_for('explorer_dataset', dataset_key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
+        <a href="{{ url_for('explorer.explorer_dataset', dataset_key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
             <i class="fa fa-binoculars" aria-hidden="true"></i> Explore & annotate
         </a>
         <p role="tooltip" id="tooltip-explore-items-{{ dataset.key }}" aria-hidden="true">Explore, sort, and add annotations to data interactively</p>

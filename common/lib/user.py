@@ -12,9 +12,10 @@ import os
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+from common.config_manager import ConfigWrapper
 from common.lib.helpers import send_email
 from common.lib.exceptions import DataSetException
-from common.config_manager import config as global_config
 
 
 class User:
@@ -108,8 +109,6 @@ class User:
         self.db = db
         self.data = data
 
-        self.config = config if config else global_config
-
         try:
             self.userdata = json.loads(self.data["userdata"])
         except (TypeError, json.JSONDecodeError):
@@ -126,6 +125,9 @@ class User:
 
         if not self.is_anonymous and self.is_authenticated:
             self.db.update("users", where={"name": self.data["name"]}, data={"timestamp_seen": int(time.time())})
+
+        if config:
+            self.with_config(config)
 
     def authenticate(self):
         """
@@ -153,7 +155,7 @@ class User:
         if self.data["name"] == "anonymous":
             return "Anonymous"
         elif self.data["name"] == "autologin":
-            return self.config.get("flask.autologin.name")
+            return self.config.get("flask.autologin.name") if self.config else "Autologin"
         else:
             return self.data["name"]
 
@@ -167,7 +169,7 @@ class User:
         """
         return self.generate_token(regenerate=False)
 
-    def with_config(self, config):
+    def with_config(self, config, rewrap=True):
         """
         Connect user to configuration manager
 
@@ -178,9 +180,13 @@ class User:
         the user to that config manager later when it is available.
 
         :param config:  Configuration manager object
+        :param bool rewrap:  Re-wrap with this user as the user context?
         :return:
         """
-        self.config = config
+        if rewrap:
+            self.config = ConfigWrapper(config, user=self)
+        else:
+            self.config = config
 
     def clear_token(self):
         """
@@ -243,7 +249,7 @@ class User:
         """
         try:
             return "admin" in self.data["tags"]
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             # invalid JSON?
             return False
 
@@ -275,6 +281,10 @@ class User:
                           account?
         :return str:  Link for the user to set their password with
         """
+        if not self.config:
+            raise ValueError("User not instantiated with a configuration reader. Provide a ConfigManager at "
+                             "instantiation or use with_config().")
+
         if not self.config.get('mail.server'):
             raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")
 
@@ -326,7 +336,7 @@ class User:
 
         # try to send it
         try:
-            send_email([username], message)
+            send_email([username], message, self.config)
             return url
         except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout, socket.gaierror) as e:
             raise RuntimeError("Could not send password reset e-mail: %s" % e)
@@ -437,7 +447,12 @@ class User:
 
         :return list:  Notifications, as a list of dictionaries
         """
-        tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.config.get_active_tags(self)]]
+        if not self.config:
+            # User not logged in; only view notifications for everyone
+            tag_recipients = ["!everyone"]
+        else:
+            tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.config.get_active_tags(self)]]
+
         if self.is_admin:
             # for backwards compatibility - used to be called '!admins' even if the tag is 'admin'
             tag_recipients.append("!admins")
@@ -483,6 +498,10 @@ class User:
         tags are stored in the database in the right order to begin with. This
         method ensures that.
         """
+        if not self.config:
+            raise ValueError("User not instantiated with a configuration reader. Provide a ConfigManager at "
+                             "instantiation or use with_config().")
+
         tags = self.data["tags"]
         sorted_tags = []
 

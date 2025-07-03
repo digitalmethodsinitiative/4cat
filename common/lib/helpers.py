@@ -6,7 +6,6 @@ import zipfile
 import imagehash
 import hashlib
 import requests
-import hashlib
 import datetime
 import smtplib
 import fnmatch
@@ -31,11 +30,13 @@ from calendar import monthrange
 from packaging import version
 from PIL import Image
 
+from common.config_manager import CoreConfigManager
 from common.lib.user_input import UserInput
-from common.config_manager import config
+__all__ = ("UserInput",)
 
+core_config = CoreConfigManager()
 
-def init_datasource(database, logger, queue, name):
+def init_datasource(database, logger, queue, name, config):
     """
     Initialize data source
 
@@ -46,6 +47,7 @@ def init_datasource(database, logger, queue, name):
     :param Logger logger:  Log handler
     :param JobQueue queue:  Job Queue instance
     :param string name:  ID of datasource that is being initialised
+    :param config:  Configuration reader
     """
     pass
 
@@ -105,7 +107,7 @@ def sniff_encoding(file):
     :param file:
     :return:
     """
-    if type(file) == bytearray:
+    if type(file) is bytearray:
         maybe_bom = file[:3]
     elif hasattr(file, "getbuffer"):
         buffer = file.getbuffer()
@@ -157,7 +159,7 @@ def get_git_branch():
     repository or git is not installed an empty string is returned.
     """
     try:
-        root_dir = str(config.get('PATH_ROOT').resolve())
+        root_dir = str(core_config.get('PATH_ROOT').resolve())
         branch = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
@@ -206,16 +208,16 @@ def get_software_commit(worker=None):
         # main 4CAT repository) and will return an empty value
         if worker and worker.is_extension:
             relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
-            working_dir = str(config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
+            working_dir = str(core_config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
             # check if we are in the extensions' own repo or 4CAT's
             git_cmd = f"git -C {oslex.quote(working_dir)} rev-parse --show-toplevel"
             repo_level = subprocess.run(oslex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            if Path(repo_level.stdout.decode("utf-8")) == config.get("PATH_ROOT"):
+            if Path(repo_level.stdout.decode("utf-8")) == core_config.get("PATH_ROOT"):
                 # not its own repository
                 return ("", "")
 
         else:
-            working_dir = str(config.get("PATH_ROOT").resolve())
+            working_dir = str(core_config.get("PATH_ROOT").resolve())
 
         show = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if show.returncode != 0:
@@ -230,7 +232,7 @@ def get_software_commit(worker=None):
         if repository.endswith(".git"):
             repository = repository[:-4]
 
-    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
+    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
         return ("", "")
 
     return (commit, repository)
@@ -246,24 +248,24 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = config.get("PATH_ROOT").joinpath("config/.current-version")
+    current_version_file = core_config.get("PATH_ROOT").joinpath("config/.current-version")
     if not current_version_file.exists():
         return ""
 
     with current_version_file.open() as infile:
         return infile.readline().strip()
 
-def get_github_version(timeout=5):
+def get_github_version(repo_url, timeout=5):
     """
     Get latest release tag version from GitHub
 
     Will raise a ValueError if it cannot retrieve information from GitHub.
 
+    :param str repo_url:  GitHub repository URL
     :param int timeout:  Timeout in seconds for HTTP request
 
     :return tuple:  Version, e.g. `1.26`, and release URL.
     """
-    repo_url = config.get("4cat.github_url")
     if not repo_url.endswith("/"):
         repo_url += "/"
 
@@ -310,7 +312,7 @@ def find_extensions():
     :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
     dictionary, and a list of (str) errors encountered while loading
     """
-    extension_path = config.get("PATH_ROOT").joinpath("extensions")
+    extension_path = core_config.get("PATH_ROOT").joinpath("extensions")
     errors = []
     if not extension_path.exists() or not extension_path.is_dir():
         return [], None
@@ -378,7 +380,7 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
-def convert_to_float(value, default=0) -> float:
+def convert_to_float(value, default=0, force=False) -> float:
     """
     Convert a value to a floating point, with a fallback
 
@@ -388,14 +390,18 @@ def convert_to_float(value, default=0) -> float:
 
     :param value:  Value to convert
     :param int default:  Default value, if conversion not possible
+    :param force:   Whether to force the value into a float if it is not empty or None.
     :return float:  Converted value
     """
+    if force:
+        return float(value) if value else default
     try:
         return float(value)
     except (ValueError, TypeError):
         return default
 
-def timify_long(number):
+
+def timify(number, short=False):
     """
     Make a number look like an indication of time
 
@@ -412,31 +418,31 @@ def timify_long(number):
     month_length = 30.42 * 86400
     months = math.floor(number / month_length)
     if months:
-        components.append("%i month%s" % (months, "s" if months != 1 else ""))
+        components.append(f"{months}{'mt' if short else ' month'}{'s' if months != 1 and not short else ''}")
         number -= (months * month_length)
 
     week_length = 7 * 86400
     weeks = math.floor(number / week_length)
     if weeks:
-        components.append("%i week%s" % (weeks, "s" if weeks != 1 else ""))
+        components.append(f"{weeks}{'w' if short else ' week'}{'s' if weeks != 1 and not short else ''}")
         number -= (weeks * week_length)
 
     day_length = 86400
     days = math.floor(number / day_length)
     if days:
-        components.append("%i day%s" % (days, "s" if days != 1 else ""))
+        components.append(f"{days}{'d' if short else ' day'}{'s' if days != 1 and not short else ''}")
         number -= (days * day_length)
 
     hour_length = 3600
     hours = math.floor(number / hour_length)
     if hours:
-        components.append("%i hour%s" % (hours, "s" if hours != 1 else ""))
+        components.append(f"{hours}{'h' if short else ' hour'}{'s' if hours != 1 and not short else ''}")
         number -= (hours * hour_length)
 
     minute_length = 60
     minutes = math.floor(number / minute_length)
     if minutes:
-        components.append("%i minute%s" % (minutes, "s" if minutes != 1 else ""))
+        components.append(f"{minutes}{'m' if short else ' minute'}{'s' if minutes != 1 and not short else ''}")
 
     if not components:
         components.append("less than a minute")
@@ -629,6 +635,7 @@ def call_api(action, payload=None, wait_for_response=True):
     """
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
+    config = CoreConfigManager()
     try:
         connection.connect((config.get('API_HOST'), config.get('API_PORT')))
     except ConnectionRefusedError:
@@ -700,12 +707,12 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
         timestamp = int(item[item_column])
         try:
             timestamp = datetime.datetime.fromtimestamp(timestamp)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
-    except:
+    except (TypeError, ValueError):
         try:
             timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
 
     if interval == "year":
@@ -737,7 +744,10 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     :return:
     """
     missing = 0
-    test_key = list(intervals.keys())[0]
+    try:
+        test_key = list(intervals.keys())[0]
+    except IndexError:
+        return 0, {}
 
     # first determine the boundaries of the interval
     # these may be passed as parameters, or they can be inferred from the
@@ -1029,7 +1039,7 @@ def add_notification(db, user, notification, expires=None, allow_dismiss=True):
     }, safe=True)
 
 
-def send_email(recipient, message):
+def send_email(recipient, message, mail_config):
     """
     Send an e-mail using the configured SMTP settings
 
@@ -1038,28 +1048,29 @@ def send_email(recipient, message):
 
     :param list recipient:  Recipient e-mail addresses
     :param MIMEMultipart message:  Message to send
+    :param mail_config:  Configuration reader
     """
     # Create a secure SSL context
     context = ssl.create_default_context()
 
     # Decide which connection type
-    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get(
-            'mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'),
-                                                   port=config.get('mail.port', 0)) as server:
-        if config.get('mail.ssl') == 'tls':
+    with smtplib.SMTP_SSL(mail_config.get('mail.server'), port=mail_config.get('mail.port', 0), context=context) if mail_config.get(
+            'mail.ssl') == 'ssl' else smtplib.SMTP(mail_config.get('mail.server'),
+                                                   port=mail_config.get('mail.port', 0)) as server:
+        if mail_config.get('mail.ssl') == 'tls':
             # smtplib.SMTP adds TLS context here
             server.starttls(context=context)
 
         # Log in
-        if config.get('mail.username') and config.get('mail.password'):
+        if mail_config.get('mail.username') and mail_config.get('mail.password'):
             server.ehlo()
-            server.login(config.get('mail.username'), config.get('mail.password'))
+            server.login(mail_config.get('mail.username'), mail_config.get('mail.password'))
 
         # Send message
-        if type(message) == str:
-            server.sendmail(config.get('mail.noreply'), recipient, message)
+        if type(message) is str:
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message)
         else:
-            server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message.as_string())
 
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
@@ -1097,9 +1108,9 @@ def sets_to_lists(d: MutableMapping):
     :return dict:  A new dictionary with the no nested sets
     """
 
-    def _check_list(l):
+    def _check_list(lst):
         return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (
-        set, list)) else item for item in l]
+        set, list)) else item for item in lst]
 
     def _sets_to_lists_gen(d):
         for k, v in d.items():
@@ -1142,6 +1153,97 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
         url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
 
     return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+
+def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
+        """
+        Determine filenames for saved files
+
+        Prefer the original filename (extracted from the URL), but this may not
+        always be possible or be an actual filename. Also, avoid using the same
+        filename multiple times. Ensures filenames don't exceed max_bytes.
+
+        :param str url:  URLs to determine filenames for
+        :param Path staging_area:  Path to the staging area where files are saved
+        (to avoid collisions); if None, no collision avoidance is done.
+        :param str default_name:  Default name to use if no filename can be
+        extracted from the URL
+        :param str default_ext:  Default extension to use if no filename can be
+        extracted from the URL
+        :param int max_bytes:  Maximum number of bytes for the filename
+        :return str:  Suitable file name
+        """
+        clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
+        if re.match(r"[^.]+\.[a-zA-Z0-9]{1,10}", clean_filename):
+            base_filename = clean_filename
+        else:
+            base_filename = default_name + default_ext
+
+        if not existing_filenames:
+            existing_filenames = []
+
+        # Split base filename into name and extension
+        if '.' in base_filename:
+            name_part, ext_part = base_filename.rsplit('.', 1)
+            ext_part = '.' + ext_part
+        else:
+            name_part = base_filename
+            ext_part = ''
+
+        # Truncate base filename if it exceeds max_bytes
+        if len(base_filename.encode('utf-8')) > max_bytes:
+            # Reserve space for extension
+            available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+            if available_bytes <= 0:
+                # If extension is too long, use minimal name
+                name_part = default_name
+                ext_part = default_ext
+                available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+            
+            # Truncate name part to fit
+            name_bytes = name_part.encode('utf-8')
+            if len(name_bytes) > available_bytes:
+                # Truncate byte by byte to ensure valid UTF-8
+                while len(name_bytes) > available_bytes:
+                    name_part = name_part[:-1]
+                    name_bytes = name_part.encode('utf-8')
+            
+            base_filename = name_part + ext_part
+
+        filename = base_filename
+
+        if staging_area:
+            # Ensure the filename is unique in the staging area
+            file_path = staging_area.joinpath(filename)
+            file_index = 1
+            
+            while file_path.exists() or filename in existing_filenames:
+                # Calculate space needed for index suffix
+                index_suffix = f"-{file_index}"
+                
+                # Check if filename with index would exceed max_bytes
+                test_filename = name_part + index_suffix + ext_part
+                if len(test_filename.encode('utf-8')) > max_bytes:
+                    # Need to truncate name_part to make room for index
+                    available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
+                    if available_bytes <= 0:
+                        # Extreme case - use minimal name
+                        truncated_name = "f"
+                    else:
+                        # Truncate name_part to fit
+                        truncated_name = name_part
+                        name_bytes = truncated_name.encode('utf-8')
+                        while len(name_bytes) > available_bytes:
+                            truncated_name = truncated_name[:-1]
+                            name_bytes = truncated_name.encode('utf-8')
+                    
+                    filename = truncated_name + index_suffix + ext_part
+                else:
+                    filename = test_filename
+                
+                file_index += 1
+                file_path = staging_area.joinpath(filename)
+
+        return filename
 
 
 def split_urls(url_string, allowed_schemes=None):

@@ -73,16 +73,17 @@ class ColumnFilter(BaseFilter):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on top datasets that are CSV or NDJSON.
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         
         options = cls.options
         if not parent_dataset:
@@ -175,7 +176,7 @@ class ColumnFilter(BaseFilter):
                         self.dataset.finish(0)
                         return
             elif match_style in ["exact", "exact-not", "contains", "contains-not"]:
-                if type(mapped_item.get(column)) == str:
+                if type(mapped_item.get(column)) is str:
                     # Text
                     column_value = mapped_item.get(column).lower() if force_lowercase else mapped_item.get(column)
                 elif mapped_item.get(column) is None:
@@ -260,11 +261,12 @@ class ColumnProcessorFilter(ColumnFilter):
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. "
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on child datasets and do not create a standalone dataset
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager config:  Configuration reader (context-aware)
         """
         return not module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
