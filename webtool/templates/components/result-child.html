@@ -17,7 +17,7 @@
             {% elif item.is_finished() and item.num_rows > 0 %}
                 {% if item.get_own_processor().map_item and item.get_extension() != "csv" %}<a href="{{ url_for('dataset.get_mapped_result', key=item.key) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> csv</a>
                 {% endif %}
-                <a href="{{ url_for('dataset.get_result', query_file=item.result_file) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ processors[item.type].extension if item.type in processors else "" }}, {{ item.get_results_path()|filesize_short }}</a>
+                <a href="{{ url_for('dataset.get_result', query_file=item.result_file, dataset_key=item.key) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ processors[item.type].extension if item.type in processors else "" }}, {{ item.get_results_path()|filesize_short }}</a>
             {% elif item.is_finished() %}
             <i class="fa fa-skull" aria-hidden="true"></i>
             {% elif "queued" in item.status|lower %}

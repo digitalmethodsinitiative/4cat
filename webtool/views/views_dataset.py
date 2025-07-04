@@ -152,17 +152,40 @@ def show_results(page):
 """
 Downloading results
 """
-
-
-@component.route('/result/<path:query_file>')
-def get_result(query_file):
+@component.route('/result/<string:dataset_key>/<path:query_file>')
+def get_result(query_file, dataset_key, dataset=None):
     """
     Get dataset result file
 
     :param str query_file:  name of the result file
+    :param str dataset_key:  dataset key
+    :param dataset:  Optional DataSet object, if already available
     :return:  Result file
-    :rmime: text/csv
     """
+    if dataset and type(dataset) is DataSet:
+        # dataset is already a DataSet object
+        if dataset.key != dataset_key:
+            return error(400, error="Dataset key does not match dataset provided.")
+    else:
+        # Check if dataset is valid key
+        try:
+            dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
+        except DataSetException:
+            return error(404, error="Dataset not found.")
+    
+    # Ensure dataset available to user
+    if dataset.is_private and not (
+            g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+        return error(403, error="This dataset is private.")
+    
+    # Check if query_file is a valid file in the dataset
+    if query_file == dataset.get_results_path().name:
+        if not dataset.get_results_path().exists():
+            return error(404, error="Result file not found.")
+    elif not query_file.startswith(dataset.get_results_folder_path().name + "/"):
+        return error(404, error="File not found in dataset.")
+
+    # Send related file
     return send_from_directory(directory=g.config.get('PATH_ROOT').joinpath(g.config.get('PATH_DATA')), path=query_file)
 
 

@@ -27,7 +27,7 @@
         </li>
     {% endif %}
     <li>
-        <a href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
+        <a href="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}" class=" tooltip-trigger" aria-controls="tooltip-get-result-{{ dataset.key }}">
             <i class="fas fa-download" aria-hidden="true"></i>
             Original {{ dataset.get_extension() }} ({{ dataset.get_results_path()|filesize }})
         </a>
