@@ -31,7 +31,7 @@ class CoordinateMap(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Currently can only be used by the sigma network visualizer; no 4CAT modules have the appropriate input
         """

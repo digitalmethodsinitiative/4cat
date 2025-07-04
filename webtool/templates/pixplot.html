@@ -14,8 +14,8 @@
     <!-- version: VERSION_NUMBER -->
     <!-- Variables used by tsne.js to locate assets -->
     <label for="assets_directory_url"></label><input value="{{ url_for("static", filename="pixplot_template/assets/") }}" type="text" hidden="hidden" id="assets_directory_url" />
-    <label for="dataset_directory_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_results_path().name) }}" type="text" hidden="hidden" id="dataset_directory_url" />
-    <label for="original_images_url"></label><input value="{{ url_for("get_result", query_file=dataset.get_parent().get_results_path().name) }}" type="text" hidden="hidden" id="original_images_url" />
+    <label for="dataset_directory_url"></label><input value="{{ url_for("dataset.get_result", query_file=dataset.get_results_path().name) }}" type="text" hidden="hidden" id="dataset_directory_url" />
+    <label for="original_images_url"></label><input value="{{ url_for("dataset.get_result", query_file=dataset.get_parent().get_results_path().name) }}" type="text" hidden="hidden" id="original_images_url" />
 
     <script type='x-shader/x-vertex' id='vertex-shader'>
     /**
@@ -368,7 +368,7 @@
         <a href='https://4cat.nl' target='_blank'>
           <img id='logo' src='{{ url_for("static", filename="/img/4cat-heads.svg") }}' alt='4CAT logo' />
         </a>
-        <a id='app-name-container' class='row align-center' href='{{ url_for("show_about") }}'>
+        <a id='app-name-container' class='row align-center' href='{{ url_for("dataset.show_result", key=dataset.key) }}'>
           <div id='app-name'>4CAT Images</div>
         </a>
         <div class='row align-center'>
@@ -508,7 +508,7 @@
         <div class='modal-top'>
           <div id='selected-image-container'>
             <div id='selected-image-target'></div>
-            <div class='icons' id='selected-image-icons'>
+            <div class='icons'>
               <a target='_blank' id='eye-icon' href='<%- meta.permalink || meta.src %>'>
                 <img src='{{ url_for("static", filename="pixplot_template/assets/images/icons/eye-icon.png") }}' alt='eye icon' />
               </a>
@@ -526,6 +526,9 @@
           <div class='modal-bottom-content'>
             <div class='modal-text-left'>
               <div id='image-title'><%- meta.filename ? decodeURIComponent(meta.filename) : decodeURIComponent(meta.src) %></div>
+              <span id='image-text'><%= meta.description ? decodeURIComponent(meta.description) : '' %></span>
+              <span id='image-date'><%- meta.date ? '(' + meta.date + ')' : '' %></span>
+            </div>
               <div class='modal-text-right'>
                 <% if (meta.category || meta.tags) { %>
                   <div id='meta-category-container'>
@@ -543,9 +546,6 @@
                   </div>
                 <% } %>
               </div>
-              <span id='image-text'><%= meta.description ? decodeURIComponent(meta.description) : '' %></span>
-              <span id='image-date'><%- meta.date ? '(' + meta.date + ')' : '' %></span>
-            </div>
           </div>
         </div>
       </div>
@@ -572,7 +572,6 @@
     </div>
     <div id='selected-images-modal'>
       <div class='modal-content'>
-        <div class='modal-x'>✕</div>
         <div class='modal-top'>
           <script type='text/html' id='selected-images-template'>
             <div class='modal-top-content'>
@@ -582,7 +581,7 @@
                 <% _.forEach(images, function(image, idx) { %>
                   <div class='selected-image'>
                     <div class='toggle-selection'>✕</div>
-                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("{{ url_for("get_result", query_file=dataset.get_results_path().name) }}/data/thumbs/<%- image %>");'></div>
+                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("{{ url_for("dataset.get_result", query_file=dataset.get_results_path().name) }}/data/thumbs/<%- image %>");'></div>
                   </div>
                 <% }); %>
               </div>

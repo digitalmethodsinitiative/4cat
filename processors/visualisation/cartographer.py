@@ -44,7 +44,7 @@ class ImagePlotGenerator(BasicProcessor):
     image_dates = None
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on image datasets
 
@@ -53,7 +53,7 @@ class ImagePlotGenerator(BasicProcessor):
         return any([module.type.startswith(type_prefixes) for type_prefixes in ["image-downloader", "video-hasher-1", "video-scene-frames"]])
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         # Update the amount max and help from config`
         options = {
             "amount": {

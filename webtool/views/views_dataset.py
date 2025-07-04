@@ -631,12 +631,12 @@ def keep_dataset(key):
 @login_required
 def view_image_plot(key):
     try:
-        dataset = DataSet(key=key, db=db, modules=fourcat_modules)
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
     except DataSetException:
         return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (
-            config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+            g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     if not dataset.type.startswith("image-downloader") and not dataset.type.startswith("custom-image-plot") and not dataset.type.startswith("pix-plot"):

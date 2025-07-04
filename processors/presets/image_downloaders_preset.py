@@ -18,17 +18,17 @@ class ImageDownloaderPreset(ProcessorPreset):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
         Allow processor on top image rankings
 
         :param module: Dataset or processor to determine compatibility with
         """
-		return ImageDownloader.is_compatible_with(module=module, user=user)
+		return ImageDownloader.is_compatible_with(module=module, config=config)
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		return ImageDownloader.get_options(parent_dataset=parent_dataset, user=user)
+	def get_options(cls, parent_dataset=None, config=None):
+		return ImageDownloader.get_options(parent_dataset=parent_dataset, config=config)
 
 	def get_processor_pipeline(self):
 		params = self.parameters
@@ -64,17 +64,17 @@ class TelegramImageDownloaderPreset(ProcessorPreset):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
         Allow processor on Telegram datasets with required info
 
         :param module: Dataset or processor to determine compatibility with
         """
-		return TelegramImageDownloader.is_compatible_with(module=module, user=user)
+		return TelegramImageDownloader.is_compatible_with(module=module, config=config)
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		return TelegramImageDownloader.get_options(parent_dataset=parent_dataset, user=user)
+	def get_options(cls, parent_dataset=None, config=None):
+		return TelegramImageDownloader.get_options(parent_dataset=parent_dataset, config=config)
 
 	def get_processor_pipeline(self):
 		params = self.parameters
@@ -108,17 +108,17 @@ class TikTokImageDownloaderPreset(ProcessorPreset):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
         Allow processor on Telegram datasets with required info
 
         :param module: Dataset or processor to determine compatibility with
         """
-		return TikTokImageDownloader.is_compatible_with(module=module, user=user)
+		return TikTokImageDownloader.is_compatible_with(module=module, config=config)
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		return TikTokImageDownloader.get_options(parent_dataset=parent_dataset, user=user)
+	def get_options(cls, parent_dataset=None, config=None):
+		return TikTokImageDownloader.get_options(parent_dataset=parent_dataset, config=config)
 
 	def get_processor_pipeline(self):
 		params = self.parameters
