@@ -228,7 +228,7 @@ class PixPlotGenerator(BasicProcessor):
         dmi_service_manager.process_results(output_dir)
 
         # Results HTML file redirects to output_dir/index.html
-        plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
+        plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get("flask.server_name") + '/result/' + f"{self.dataset.key}/{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
         html_file = self.get_html_page(plot_url)
 
         # Write HTML file
