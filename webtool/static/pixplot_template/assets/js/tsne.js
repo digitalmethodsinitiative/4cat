@@ -1850,7 +1850,7 @@ Lasso.prototype.addModalEventListeners = function() {
 
   // close the modal on click of wrapper
   this.elems.modalContainer.addEventListener('click', function(e) {
-    if (e.target.className == 'modal-top' || e.target.className == 'modal-right' || e.target.className == 'modal-x') {
+    if (e.target.className == 'modal-top' || e.target.className == 'modal-bottom' || e.target.className == 'modal-x') {
       this.elems.modalContainer.style.display = 'none';
       this.displayed = false;
     }
@@ -2277,7 +2277,7 @@ Picker.prototype.onMouseDown = function(e) {
 // on canvas click, show detailed modal with clicked image
 Picker.prototype.onMouseUp = function(e) {
   // if click hit background, close the modal
-  if (e.target.className == 'modal-right' ||
+  if (e.target.className == 'modal-bottom' ||
       e.target.className == 'modal-x') {
     // prevent another cell from displaying
     e.stopPropagation();
@@ -2646,7 +2646,7 @@ Modal.prototype.showCells = function(cellIndices, cellIdx) {
     target.style.display = 'block';
     // inject the loaded image into the DOM
     document.querySelector('#selected-image-target').appendChild(json.image);
-    var elem = document.querySelector('#selected-image-modal .modal-right');
+    var elem = document.querySelector('#selected-image-modal .modal-top');
     elem.style.opacity = 1;
   }
   // prepare the modal
@@ -2662,7 +2662,7 @@ Modal.prototype.showCells = function(cellIndices, cellIdx) {
 }
 
 Modal.prototype.close = function() {
-  var elem = document.querySelector('#selected-image-modal .modal-right');
+  var elem = document.querySelector('#selected-image-modal .modal-bottom');
   if (!elem) return;
   this.fadeOutContent();
   setTimeout(function() {
@@ -2674,7 +2674,7 @@ Modal.prototype.close = function() {
 }
 
 Modal.prototype.fadeOutContent = function() {
-  var elem = document.querySelector('#selected-image-modal .modal-right');
+  var elem = document.querySelector('#selected-image-modal .modal-bottom');
   elem.style.opacity = 0;
 }
 

@@ -1938,64 +1938,15 @@ input[type=text] {
   grid-template-columns: auto 30em;
 }
 
-#selected-image-modal .modal-left {
+#selected-image-modal .modal-top {
   height: calc(100vh - 50px);
-  overflow: hidden; /* Prevent overflow */
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-}
-
-#selected-image-container {
-  display: flex;
-  flex-direction: row; /* Changed from row to column */
-  align-items: center; /* Center horizontally */
-  justify-content: center; /* Center vertically */
-  max-height: 100%;
-  height: 100%; /* Take full height of parent */
-  position: relative;
-  transform: translateX(20px);
-  overflow: hidden; /* Prevent overflow */
-}
-#selected-image-target {
-  height: 100%;
-  width: 100%;
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  max-height: 100%; /* Ensure it doesn't exceed container */
-  overflow: hidden; /* Prevent overflow */
-}
-
-#selected-image {
-  max-height: calc(100vh - 100px); /* Account for padding and other elements */
-  max-width: 100%;
-  width: auto; /* Maintain aspect ratio */
-  height: auto; /* Maintain aspect ratio */
-  object-fit: contain; /* Ensure image fits within bounds */
-  box-sizing: border-box;
-  background-color: #222;
-  padding: 25px;
-  background-color: #333;
-  position: relative;
-  z-index: 100;
-}
-
-#selected-image-icons {
-  position: relative; /* Change from absolute to relative */
-  width: 40px;
-  white-space: initial;
-  align-items: left; 
-  justify-content: center;
-  padding-right: 10px;
 }
 
 #selected-image-modal #selected-image-meta {
   height: 100%;
 }
 
-#selected-image-modal .modal-right-content {
+#selected-image-modal .modal-bottom-content {
   display: block;
 }
 

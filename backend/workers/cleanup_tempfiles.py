@@ -66,6 +66,7 @@ class TempFileCleaner(BasicWorker):
             try:
                 dataset = DataSet(key=key, db=self.db)
             except DataSetException:
+                # TODO: would another dataset user same get_result_folder_path? and additional files?
                 if self.db.fetchone(f"select * from datasets where result_file = '{file.name}'") is not None:
                     # Another dataset is using this file
                     continue

@@ -505,7 +505,7 @@
     <script type='text/html' id='selected-image-template'>
       <div class='modal-content'>
         <div class='modal-x'>✕</div>
-        <div class='modal-left'>
+        <div class='modal-top'>
           <div id='selected-image-container'>
             <div id='selected-image-target'></div>
             <div class='icons' id='selected-image-icons'>
@@ -522,8 +522,8 @@
             <% } %>
           </div>
         </div>
-        <div class='modal-right' id='selected-image-meta'>
-          <div class='modal-right-content'>
+        <div class='modal-bottom' id='selected-image-meta'>
+          <div class='modal-bottom-content'>
             <div class='modal-text-left'>
               <div id='image-title'><%- meta.filename ? decodeURIComponent(meta.filename) : decodeURIComponent(meta.src) %></div>
               <div class='modal-text-right'>

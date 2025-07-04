@@ -1,5 +1,4 @@
 from backend.lib.preset import ProcessorPreset
-from common.lib.dataset import DataSet
 from processors.visualisation.download_images import ImageDownloader
 from processors.visualisation.download_telegram_images import TelegramImageDownloader
 from processors.visualisation.download_tiktok import TikTokImageDownloader
