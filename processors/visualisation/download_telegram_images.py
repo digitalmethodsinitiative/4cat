@@ -38,6 +38,7 @@ class TelegramImageDownloader(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image"  # media type of the result
     flawless = True
+    is_hidden = True # hide from UI; this processor is called by the preset TelegramImageDownloaderPreset
 
     followups = ImageDownloader.followups
 
@@ -69,10 +70,9 @@ class TelegramImageDownloader(BasicProcessor):
         options = {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "No. of images" if max_number_images == 0 else f"No. of images (max {max_number_images})",
+                "help": "No. of images" + (f" (max {max_number_images:,})" if max_number_images != 0 else ""),
                 "default": 100,
                 "min": 0 if max_number_images == 0 else 1,
-                "tooltip": f"Maximum number of images to download{' (set to 0 to download all images)' if max_number_images == 0 else ''}"
             },
             "video-thumbnails": {
                 "type": UserInput.OPTION_TOGGLE,

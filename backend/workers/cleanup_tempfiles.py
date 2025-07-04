@@ -63,10 +63,13 @@ class TempFileCleaner(BasicWorker):
             # if for whatever reason there are multiple hashes in the filename,
             # the key would always be the last one
             key = possible_keys.pop()
-
             try:
                 dataset = DataSet(key=key, db=self.db)
             except DataSetException:
+                # TODO: would another dataset user same get_result_folder_path? and additional files?
+                if self.db.fetchone(f"select * from datasets where result_file = '{file.name}'") is not None:
+                    # Another dataset is using this file
+                    continue
                 # the dataset has been deleted since, but the result file still
                 # exists - should be safe to clean up
                 if file.name not in tracked_files:

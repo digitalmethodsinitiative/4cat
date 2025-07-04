@@ -662,7 +662,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         self.dataset.update_status("Finished")
         self.dataset.finish(len(data))
 
-    def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
+    def write_archive_and_finish(self, filelist_or_folder, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
         """
         Archive a bunch of files into a zip archive and finish processing
 
@@ -676,21 +676,28 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :param bool finish:  Finish the dataset/job afterwards or not?
         """
         is_folder = False
-        if issubclass(type(files), PurePath):
-            is_folder = files
-            if not files.exists() or not files.is_dir():
-                raise RuntimeError("Folder %s is not a folder that can be archived" % files)
+        if issubclass(type(filelist_or_folder), PurePath):
+			# folder with files
+            is_folder = filelist_or_folder
+            if not filelist_or_folder.exists() or not filelist_or_folder.is_dir():
+                raise RuntimeError("Folder %s is not a folder that can be archived" % filelist_or_folder)
 
-            files = files.glob("*")
-
-        # create zip of archive and delete temporary files and folder
+		# create zip of archive and delete temporary files and folder
         self.dataset.update_status("Compressing results into archive")
         done = 0
-        with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zip:
-            for output_path in files:
-                zip.write(output_path, output_path.name)
-                output_path.unlink()
-                done += 1
+        with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zipf:
+            if is_folder:
+                for root, dirs, files in os.walk(filelist_or_folder):
+                    for file in files:
+                        zipf.write(os.path.join(root, file),
+                                    os.path.relpath(os.path.join(root, file), filelist_or_folder))
+                        done += 1
+            else:
+                # list of files
+                for output_path in filelist_or_folder:
+                    zipf.write(output_path, output_path.name)
+                    output_path.unlink()
+                    done += 1
 
         # delete temporary folder
         if is_folder:
