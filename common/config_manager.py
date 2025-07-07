@@ -366,7 +366,7 @@ class ConfigManager:
                 value = cached_values[tag]
                 break
         else:
-            value = default if default else None
+            value = None
 
         # parse some values...
         if not is_json and value is not None:
