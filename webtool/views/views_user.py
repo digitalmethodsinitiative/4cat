@@ -277,7 +277,7 @@ def first_run_dialog():
             interface_hue = random.randrange(0, 360)
 
         g.config.set("4cat.layout_hue", interface_hue)
-        generate_css_colours(force=True)
+        generate_css_colours(config=g.config, force=True)
 
         # make user an admin
         g.db.update("users", where={"name": username}, data={"is_deactivated": False})

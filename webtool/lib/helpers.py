@@ -230,7 +230,7 @@ def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="f
 	new_img.save(output_filepath)
 
 
-def generate_css_colours(config=None, force=False):
+def generate_css_colours(config, force=False):
 	"""
 	Write the colours.css CSS file based on configuration
 
