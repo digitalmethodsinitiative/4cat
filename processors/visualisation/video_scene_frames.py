@@ -9,7 +9,6 @@ https://ffmpeg.org/
 import shutil
 import subprocess
 import oslex
-
 from packaging import version
 
 from backend.lib.processor import BasicProcessor

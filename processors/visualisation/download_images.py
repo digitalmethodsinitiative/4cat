@@ -27,6 +27,9 @@ class InvalidDownloadedFileException(FourcatException):
 
 class ImageDownloader(BasicProcessor):
     """
+	NOTE: The image-download-preset.py file is a preset for this processor and automatically runs the cartographer in
+	addition to downloading the images. This processor is marked as "not compatible" so it does not appear in the UI.
+
     Image downloader
 
     Downloads top images and saves as zip archive
@@ -42,6 +45,7 @@ class ImageDownloader(BasicProcessor):
         "is included in the output archive."
     )  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    is_hidden = True # hide in UI; processor is called by ImageDownloaderPreset
     media_type = "image"  # media type of the dataset
 
     followups = [

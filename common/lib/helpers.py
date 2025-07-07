@@ -2,6 +2,7 @@
 Miscellaneous helper functions for the 4CAT backend
 """
 import subprocess
+import zipfile
 import imagehash
 import hashlib
 import requests
@@ -119,6 +120,7 @@ def sniff_encoding(file):
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
+
 def sniff_csv_dialect(csv_input):
     """
     Determine CSV dialect for an input stream
@@ -139,6 +141,13 @@ def sniff_csv_dialect(csv_input):
     dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
 
     return dialect, has_header
+
+
+def get_html_redirect_page(url):
+    """
+    Returns a html string to redirect to PixPlot.
+    """
+    return f"<head><meta http-equiv='refresh' charset='utf-8' content='0; URL={url}'></head>"
 
 
 def get_git_branch():
@@ -1278,6 +1287,22 @@ def split_urls(url_string, allowed_schemes=None):
             potential_urls.append(recombined_url)
     return potential_urls
 
+
+def get_archived_file(archive_path, archived_file, temp_dir):
+    with zipfile.ZipFile(archive_path, "r") as archive_file:
+        archive_contents = sorted(archive_file.namelist())
+
+        if archived_file in archive_contents:
+            info = archive_file.getinfo(archived_file)
+            if info.is_dir():
+                raise IsADirectoryError("File is a directory")
+
+            archive_file.extract(archived_file, temp_dir)
+
+            return temp_dir.joinpath(archived_file)
+
+        else:
+            raise FileNotFoundError("File not found in archive")
 
 def folder_size(path='.'):
     """

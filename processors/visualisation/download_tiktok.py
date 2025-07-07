@@ -166,6 +166,7 @@ class TikTokImageDownloader(BasicProcessor):
     title = "Download TikTok Images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
+    is_hidden = True  # Hide from UI; only used in preset TikTokImageDownloaderPreset
     media_type = "image"
 
     followups = ImageDownloader.followups

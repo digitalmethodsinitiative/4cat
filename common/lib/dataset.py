@@ -891,20 +891,21 @@ class DataSet(FourcatModule):
         self.db.delete("datasets_owners", where={"key": self.key}, commit=commit)
         self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
-        # delete from drive
-        try:
-            if self.get_results_path().exists():
-                self.get_results_path().unlink()
-            if self.get_results_path().with_suffix(".log").exists():
-                self.get_results_path().with_suffix(".log").unlink()
-            if self.get_results_folder_path().exists():
-                shutil.rmtree(self.get_results_folder_path())
+        # delete from drive if not used elsewhere
+        if self.db.fetchone(f"select * from datasets where result_file = '{self.get_results_path().name}' and key != '{self.key}'") is None:
+            try:
+                if self.get_results_path().exists():
+                    self.get_results_path().unlink()
+                if self.get_results_path().with_suffix(".log").exists():
+                    self.get_results_path().with_suffix(".log").unlink()
+                if self.get_results_folder_path().exists():
+                    shutil.rmtree(self.get_results_folder_path())
 
-        except FileNotFoundError:
-            # already deleted, apparently
-            pass
-        except PermissionError as e:
-            self.db.log.error(
+            except FileNotFoundError:
+                    # already deleted, apparently
+                    pass
+            except PermissionError as e:
+                self.db.log.error(
                 f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}"
             )
 

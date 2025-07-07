@@ -848,6 +848,7 @@ class DatasetVideoLibrary:
                 # parent dataset no longer exists!
                 pass
 
+        # Instantiate the downloader datasets so we can use their methods
         return previous_downloaders
 
     def collect_metadata_file(self, dataset, staging_area):
