@@ -190,9 +190,9 @@ class DelegatedRequestHandler:
     queue = {}
     session = None
     proxy_pool = {}
+    proxy_settings = {}
     halted = set()
     log = None
-    config = None
     index = 0
 
     # some magic values
@@ -205,7 +205,24 @@ class DelegatedRequestHandler:
         pool = ThreadPoolExecutor()
         self.session = FuturesSession(executor=pool)
         self.log = log
-        self.config = config
+
+        self.refresh_settings(config)
+
+    def refresh_settings(self, config):
+        """
+        Load proxy settings
+
+        This is done on demand, so that we do not need a persistent
+        configuration reader, which could make things complicated in
+        thread-based contexts.
+
+        :param config:  Configuration reader
+        """
+
+        self.proxy_settings = {
+            k: config.get(k) for k in ("proxies.urls", "proxies.cooloff", "proxies.concurrent-overall",
+                                            "proxies.concurrent-host", "proxies.concurrent-host")
+        }
 
     def add_urls(self, urls, queue_name="_", position=-1, **kwargs):
         """
@@ -256,19 +273,21 @@ class DelegatedRequestHandler:
 
         return queue_length
 
-    def claim_proxy(self, url):
+    def claim_proxy(self, url, config=None):
         """
         Find a proxy to do the request with
 
         Finds a `SophisticatedFuturesProxy` that has an open slot for this URL.
 
         :param str url:  URL to proxy a request for
+        :param config:  Configuration reader; if `None`, use the delegator's
+        configuration reader, but one can be passed for thread-based contexts
         :return SophisticatedFuturesProxy or False:
         """
         if not self.proxy_pool:
             # this will trigger the first time this method is called
             # build a proxy pool with some information per available proxy
-            proxies = self.config.get("proxies.urls")
+            proxies = self.proxy_settings["proxies.urls"]
             for proxy_url in proxies:
                 self.proxy_pool[proxy_url] = namedtuple(
                     "ProxyEntry", ("proxy", "last_used")
@@ -276,9 +295,9 @@ class DelegatedRequestHandler:
                 self.proxy_pool[proxy_url].proxy = SophisticatedFuturesProxy(
                     proxy_url,
                     self.log,
-                    self.config.get("proxies.cooloff"),
-                    self.config.get("proxies.concurrent-overall"),
-                    self.config.get("proxies.concurrent-host"),
+                    self.proxy_settings["proxies.cooloff"],
+                    self.proxy_settings["proxies.concurrent-overall"],
+                    self.proxy_settings["proxies.concurrent-host"],
                 )
                 self.proxy_pool[proxy_url].last_used = 0
 
