@@ -1,5 +1,6 @@
 import json
 
+from flask import g
 from typing import List, Optional, Union
 from pydantic import SecretStr
 from langchain_core.messages import BaseMessage
@@ -111,19 +112,18 @@ class LLMAdapter:
         return response
 
     @staticmethod
-    def get_model_options(config) -> dict:
+    def get_model_options() -> dict:
         """
         Returns model choice options for UserInput
 
-        :param config:  Configuration reader
         """
 
-        models = LLMAdapter.get_models(config)
+        models = LLMAdapter.get_models()
         options = {model_id: model_values["name"] for model_id, model_values in models.items()}
         return options
 
     @staticmethod
-    def get_models(config) -> dict:
+    def get_models() -> dict:
         """
         Returns a dict with LLM models supported by 4CAT, either through an API or as a local option.
         Make sure to keep up-to-date!
@@ -134,7 +134,7 @@ class LLMAdapter:
         """
 
         with (
-            config.get("PATH_ROOT")
+            g.config.get("PATH_ROOT")
             .joinpath("common/assets/llms.json")
             .open() as available_models
         ):

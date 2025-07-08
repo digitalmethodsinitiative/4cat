@@ -54,7 +54,7 @@ class LLMPrompter(BasicProcessor):
             "api_model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Model",
-                "options": LLMAdapter.get_model_options(config),
+                "options": LLMAdapter.get_model_options(),
                 "default": "mistral-small-2503",
                 "requires": "api_or_local==api",
             },
@@ -84,17 +84,13 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_INFO,
                 "requires": "api_or_local==local",
                 "help": "You can use local LLMs with various applications. 4CAT currently supports LM Studio and Ollama. "
-                        "These applications need to be reachable by this 4CAT server, e.g. by running them "
-                        "locally on the same machine.",
+                "These applications need to be reachable by this 4CAT server, e.g. by running them "
+                "locally on the same machine.",
             },
             "local_provider": {
                 "type": UserInput.OPTION_CHOICE,
                 "requires": "api_or_local==local",
-                "options": {
-                    "none": "",
-                    "lmstudio": "LM Studio",
-                    "ollama": "Ollama"
-                },
+                "options": {"none": "", "lmstudio": "LM Studio", "ollama": "Ollama"},
                 "default": "none",
                 "help": "Local LLM provider",
             },
@@ -126,7 +122,7 @@ class LLMPrompter(BasicProcessor):
                 "default": "",
                 "help": "Base URL for local models",
                 "tooltip": "Leaving this empty will use default values (http://localhost:1234/v1 for LM Studio, "
-                           "http://localhost:11434 for Ollama)",
+                "http://localhost:11434 for Ollama)",
             },
             "ollama_model": {
                 "type": UserInput.OPTION_TEXT,
@@ -134,6 +130,11 @@ class LLMPrompter(BasicProcessor):
                 "default": "",
                 "help": "Ollama model name",
                 "tooltip": "E.g. 'llama3.2:latest'",
+            },
+            "system_prompt": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "System prompt",
+                "tooltip": "Optional",
             },
             "prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
@@ -149,6 +150,13 @@ class LLMPrompter(BasicProcessor):
                 "outputs while a score close to 1 leads to more creative outputs.",
             },
             "max_tokens": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Max output tokens",
+                "default": 50,
+                "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
+                "text for common English text.",
+            },
+            "batch_prompt": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Max output tokens",
                 "default": 50,
@@ -187,12 +195,14 @@ class LLMPrompter(BasicProcessor):
         return module.get_extension() in ["csv", "ndjson"]
 
     def process(self):
-        self.dataset.update_status("Connecting to LLM provider")
+
+        self.dataset.update_status("Validating settings")
 
         api_consent = self.parameters.get("consent", False)
         api_model = self.parameters.get("api_model")
         use_local_model = True if self.parameters.get("api_or_local", "api") == "local" else False
 
+        # Add some friction if an API is used.
         if not use_local_model and not api_consent:
             self.dataset.finish_with_error("You must consent to your data being sent to the LLM provider first")
             return
@@ -227,6 +237,8 @@ class LLMPrompter(BasicProcessor):
         except ValueError:
             self.dataset.finish_with_error("Max tokens must be a number")
             return
+
+        system_prompt = self.parameters.get("system_prompt", None)
 
         # Set all variables through which we can reach the LLM
         api_key = ""
@@ -271,6 +283,7 @@ class LLMPrompter(BasicProcessor):
             return
 
         # Start LLM
+        self.dataset.update_status("Connecting to LLM provider")
         try:
             llm = LLMAdapter(provider=provider, model=model, api_key=api_key, base_url=base_url, temperature=temperature)
         except Exception as e:
@@ -286,6 +299,10 @@ class LLMPrompter(BasicProcessor):
         annotations = []
 
         i = 1
+
+        # Save items if we're batching prompts
+        batched_data = []
+
         for item in self.source_dataset.iterate_items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while generating text through LLMs")
@@ -301,7 +318,7 @@ class LLMPrompter(BasicProcessor):
                     return
 
             try:
-                response = llm.text_generation(prompt)
+                response = llm.text_generation(prompt, system_prompt=system_prompt)
             except Exception as e:
                 self.dataset.finish_with_error(str(e))
                 return
