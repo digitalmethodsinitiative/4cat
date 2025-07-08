@@ -1211,8 +1211,16 @@ class DataSet(FourcatModule):
                 try:
                     keys = list(next(items).keys())
                     if self.annotation_fields:
-                        keys.extend(self.annotation_fields.keys())
-                        
+                        for annotation_field in self.annotation_fields.values():
+                            annotation_column = annotation_field["label"]
+                            label_count = 1
+                            while annotation_column in keys:
+                                label_count += 1
+                                annotation_column = (
+                                    f"{annotation_field['label']}_{label_count}"
+                                )
+                            keys.append(annotation_column)
+
                     self._cached_columns = keys
                 except (StopIteration, NotImplementedError):
                     # No items or otherwise unable to iterate
