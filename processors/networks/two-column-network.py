@@ -211,10 +211,10 @@ class ColumnNetworker(BasicProcessor):
 
             try:
                 interval = get_interval_descriptor(item, interval_type)
+                if interval == "unknown_date":
+                    raise ValueError(f"Date '{item.get('timestamp')}' cannot be parsed")
             except ValueError as e:
-                self.dataset.update_status(f"{e}, cannot count posts per {interval_type}", is_final=True)
-                self.dataset.update_status(0)
-                return
+                return self.dataset.finish_with_error(f"{e}, cannot count posts per {interval_type}")
             
             # Track nodes per item (categoise option adjusts node name to include column if True)
             processed_nodes = set()
