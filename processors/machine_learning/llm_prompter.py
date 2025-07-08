@@ -31,6 +31,7 @@ class LLMPrompter(BasicProcessor):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
+
         options = {
             "per_item": {
                 "type": UserInput.OPTION_INFO,
@@ -156,12 +157,16 @@ class LLMPrompter(BasicProcessor):
                 "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
                 "text for common English text.",
             },
-            "batch_prompt": {
+            "batches": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Max output tokens",
-                "default": 50,
-                "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
-                "text for common English text.",
+                "help": "Items per prompt",
+                "coerce_type": int,
+                "max": 1000,
+                "default": 1,
+                "tooltip": "How many items to insert into the prompt. These will be added with newlines wherever the "
+                           "column brackets are used (e.g. '[body]'). Max: 1000. Note: Some models may have trouble "
+                           "outputting as many output values as input values. Batching prompts may increase speed but "
+                           "at the cost of accuracy.",
             },
             "ethics_warning3": {
                 "type": UserInput.OPTION_INFO,
@@ -181,7 +186,6 @@ class LLMPrompter(BasicProcessor):
                 "default": False,
             },
         }
-
         return options
 
     @classmethod
@@ -240,6 +244,17 @@ class LLMPrompter(BasicProcessor):
 
         system_prompt = self.parameters.get("system_prompt", None)
 
+        batches = self.parameters.get("batches", 1)
+        if batches == 0:
+            batches = 1
+        if not batches or not isinstance(batches, int):
+            self.dataset.finish_with_error(f"Invalid value for batches {batches}")
+            return
+        if batches == 1:
+            self.dataset.delete_parameter("batches")
+
+        print("BATCHES", batches)
+
         # Set all variables through which we can reach the LLM
         api_key = ""
         base_url = None
@@ -255,7 +270,7 @@ class LLMPrompter(BasicProcessor):
                     base_url = "http://localhost:11434"
 
         else:
-            provider = LLMAdapter.get_models(self.config)[api_model]["provider"]
+            provider = LLMAdapter.get_models()[api_model]["provider"]
             model = api_model
             api_key = self.parameters.get("api_key", "")
             if not api_key:
@@ -274,8 +289,8 @@ class LLMPrompter(BasicProcessor):
             self.dataset.finish_with_error("You need to insert a valid prompt")
             return
 
-        replacements = re.findall(r"\[.*?\]", base_prompt)
-        if not replacements:
+        columns_to_use = re.findall(r"\[.*?\]", base_prompt)
+        if not columns_to_use:
             self.dataset.finish_with_error(
                 "You need to provide the prompt with input values using [brackets] of "
                 "column names"
@@ -298,10 +313,14 @@ class LLMPrompter(BasicProcessor):
         results = []
         annotations = []
 
-        i = 1
+        i = 0
 
         # Save items if we're batching prompts
-        batched_data = []
+        batched_data = {}
+        batched_ids = []
+
+        if batches > 1:
+            system_prompt += "\nOutput ONLY as many items as input items. Separate the output values with `___`."
 
         for item in self.source_dataset.iterate_items():
             if self.interrupted:
@@ -309,52 +328,78 @@ class LLMPrompter(BasicProcessor):
 
             # Replace with dataset values
             prompt = base_prompt
-            for replacement in replacements:
-                try:
-                    field_name = str(item[replacement[1:-1]]).strip()
-                    prompt = prompt.replace(replacement, field_name)
-                except KeyError as e:
-                    self.dataset.finish_with_error("Field %s could not be found in the parent dataset" % str(e))
-                    return
-
-            try:
-                response = llm.text_generation(prompt, system_prompt=system_prompt)
-            except Exception as e:
-                self.dataset.finish_with_error(str(e))
-                return
 
             if "id" in item:
                 item_id = item["id"]
             elif "item_id" in item:
                 item_id = item["item_id"]
             else:
-                item_id = str(i)
+                item_id = str(i + 1)
+            batched_ids.append(item_id)
 
-            time_created = time.time()
-            results.append({
-                "id": item_id,
-                "prompt": prompt,
-                model + " output": response,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "model": model,
-                "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
-                "time_created_utc": time_created
-            })
+            # Store dataset values in batches
+            for column_to_use in columns_to_use:
+                if column_to_use not in batched_data:
+                    batched_data[column_to_use] = []
+                try:
+                    item_value = str(item[column_to_use[1:-1]]).strip()
+                except KeyError:
+                    self.dataset.finish_with_error(f"Field {column_to_use} could not be found in the parent dataset")
+                    return
 
-            if save_annotations:
-                annotation = {
-                    "label": label,
-                    "item_id": item_id,
-                    "value": response,
-                    "type": "textarea",
-                }
-                annotations.append(annotation)
+                batched_data[column_to_use].append(item_value)
 
-            self.dataset.update_status(
-                "Generated output for item %s/%s" % (i, self.source_dataset.num_rows)
-            )
             i += 1
+
+            # Prompt we've reached the batch length (which can also be 1). Also do this at the end of the dataset.
+            if i == batches or i == len(self.source_dataset):
+
+                # Replace data
+                for column_to_use in columns_to_use:
+                    prompt = prompt.replace(column_to_use, "\n".join(batched_data[column_to_use]))
+                batched_data = {}
+                try:
+                    response = llm.text_generation(prompt, system_prompt=system_prompt)
+                except Exception as e:
+                    self.dataset.finish_with_error(str(e))
+                    return
+
+                if batches > 1:
+                    output_items = response.split("___")
+                    if len(output_items) != batches:
+                        self.dataset.finish_with_error("Model could not output as many values as the batch. Try only using "
+                                                       "one value per prompt or using a different model.")
+                else:
+                    output_items = [response]
+
+                for n, output_item in enumerate(output_items):
+
+                    time_created = time.time()
+                    results.append({
+                        "id": batched_ids[n],
+                        "prompt": prompt,
+                        model + " output": response,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "model": model,
+                        "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
+                        "time_created_utc": time_created
+                    })
+
+                    if save_annotations:
+                        annotation = {
+                            "label": label,
+                            "item_id": batched_ids[n],
+                            "value": response,
+                            "type": "textarea",
+                        }
+                        annotations.append(annotation)
+
+                    self.dataset.update_status(
+                        "Generated output for item %s/%s" % (i, self.source_dataset.num_rows)
+                    )
+
+                batched_ids = []
 
             # Rate limits for different providers
             if provider == "mistral":

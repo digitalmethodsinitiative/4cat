@@ -128,8 +128,6 @@ class LLMAdapter:
         Returns a dict with LLM models supported by 4CAT, either through an API or as a local option.
         Make sure to keep up-to-date!
 
-        :param config:  Configuration reader
-
         :returns dict, A dict with model IDs as keys and details as values
         """
 
