@@ -273,15 +273,13 @@ class DelegatedRequestHandler:
 
         return queue_length
 
-    def claim_proxy(self, url, config=None):
+    def claim_proxy(self, url):
         """
         Find a proxy to do the request with
 
         Finds a `SophisticatedFuturesProxy` that has an open slot for this URL.
 
         :param str url:  URL to proxy a request for
-        :param config:  Configuration reader; if `None`, use the delegator's
-        configuration reader, but one can be passed for thread-based contexts
         :return SophisticatedFuturesProxy or False:
         """
         if not self.proxy_pool:
