@@ -178,15 +178,28 @@ def get_result(query_file, dataset_key, dataset=None):
             g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
     
-    # Check if query_file is a valid file in the dataset
-    if query_file == dataset.get_results_path().name:
-        if not dataset.get_results_path().exists():
-            return error(404, error="Result file not found.")
-    elif not query_file.startswith(dataset.get_results_folder_path().name + "/"):
-        return error(404, error="File not found in dataset.")
+    # Security: Build and validate the full path
+    data_root = g.config.get('PATH_ROOT').joinpath(g.config.get('PATH_DATA'))
+    requested_file = data_root.joinpath(query_file)
+    
+    try:
+        # Resolve the path to ensure it is within the data directory
+        resolved_path = requested_file.resolve(strict=True)
 
-    # Send related file
-    return send_from_directory(directory=g.config.get('PATH_ROOT').joinpath(g.config.get('PATH_DATA')), path=query_file)
+        # Check if it's the main results file
+        if resolved_path == dataset.get_results_path():
+            if not dataset.get_results_path().exists():
+                return error(404, error="Result file not found.")
+            
+        # Check if it's within the dataset's results folder
+        elif not str(resolved_path).startswith(str(dataset.get_results_folder_path().resolve())):
+            return error(404, error="File not found in dataset.")
+
+    except (OSError, ValueError, FileNotFoundError):
+        return error(404, error="File not found.")
+
+    # Send related file (Flask can handle file not found w/ 404 error)
+    return send_from_directory(directory=data_root, path=query_file)
 
 
 @component.route('/mapped-result/<string:key>/')
