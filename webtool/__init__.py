@@ -163,7 +163,7 @@ with app.app_context():
     # gets populated before `before_request`), but can read from current_app
     # instead. Note that where possible g.config should always be preferred
     # over app.fourcat_config because the former is not user-aware!
-    app.openapi = OpenAPICollector(app, config)
+    app.openapi = OpenAPICollector(app)
     app.log = log
     app.db = db
     app.fourcat_config = config
