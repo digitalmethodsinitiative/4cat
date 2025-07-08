@@ -39,7 +39,6 @@ class DataSet(FourcatModule):
     key = ""
 
     _children = None
-    _cached_columns = None
     available_processors = None
     _genealogy = None
     preset_parent = None
@@ -70,7 +69,7 @@ class DataSet(FourcatModule):
         type=None,
         is_private=True,
         owner="anonymous",
-        modules=None,
+        modules=None
     ):
         """
         Create new dataset object
@@ -1201,37 +1200,35 @@ class DataSet(FourcatModule):
             # no file to get columns from
             return []
 
-        if self._cached_columns is None:
-            if (self.get_results_path().suffix.lower() == ".csv") or (
-                self.get_results_path().suffix.lower() == ".ndjson"
-                and self.get_own_processor() is not None
-                and self.get_own_processor().map_item_method_available(dataset=self)
-            ):
-                items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
-                try:
-                    keys = list(next(items).keys())
-                    if self.annotation_fields:
-                        for annotation_field in self.annotation_fields.values():
-                            annotation_column = annotation_field["label"]
-                            label_count = 1
-                            while annotation_column in keys:
-                                label_count += 1
-                                annotation_column = (
-                                    f"{annotation_field['label']}_{label_count}"
-                                )
-                            keys.append(annotation_column)
+        if (self.get_results_path().suffix.lower() == ".csv") or (
+            self.get_results_path().suffix.lower() == ".ndjson"
+            and self.get_own_processor() is not None
+            and self.get_own_processor().map_item_method_available(dataset=self)
+        ):
+            items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
+            try:
+                keys = list(next(items).keys())
+                if self.annotation_fields:
+                    for annotation_field in self.annotation_fields.values():
+                        annotation_column = annotation_field["label"]
+                        label_count = 1
+                        while annotation_column in keys:
+                            label_count += 1
+                            annotation_column = (
+                                f"{annotation_field['label']}_{label_count}"
+                            )
+                        keys.append(annotation_column)
+                columns = keys
+            except (StopIteration, NotImplementedError):
+                # No items or otherwise unable to iterate
+                columns = []
+            finally:
+                del items
+        else:
+            # Filetype not CSV or an NDJSON with `map_item`
+            columns = []
 
-                    self._cached_columns = keys
-                except (StopIteration, NotImplementedError):
-                    # No items or otherwise unable to iterate
-                    self._cached_columns = []
-                finally:
-                    del items
-            else:
-                # Filetype not CSV or an NDJSON with `map_item`
-                self._cached_columns = []
-
-        return self._cached_columns
+        return columns
 
     def update_label(self, label):
         """
@@ -2240,8 +2237,6 @@ class DataSet(FourcatModule):
         if annotation_fields != self.annotation_fields:
             self.save_annotation_fields(annotation_fields)
 
-        # columns may have changed if there are new annotations
-        self._cached_columns = None
         return count
 
     def save_annotation_fields(self, new_fields: dict, add=False) -> int:
