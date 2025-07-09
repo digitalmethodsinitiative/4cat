@@ -55,7 +55,7 @@ class LLMPrompter(BasicProcessor):
             "api_model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Model",
-                "options": LLMAdapter.get_model_options(),
+                "options": LLMAdapter.get_model_options(config),
                 "default": "mistral-small-2503",
                 "requires": "api_or_local==api",
             },
@@ -140,7 +140,8 @@ class LLMPrompter(BasicProcessor):
             "prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Prompt",
-                "tooltip": "See the references for this processor on best practices for LLM prompts",
+                "tooltip": "Use [brackets] with columns names to insert items in the prompt. See the references for "
+                           "this processor on best prompting practices.",
             },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
@@ -201,7 +202,6 @@ class LLMPrompter(BasicProcessor):
     def process(self):
 
         self.dataset.update_status("Validating settings")
-
         api_consent = self.parameters.get("consent", False)
         api_model = self.parameters.get("api_model")
         use_local_model = True if self.parameters.get("api_or_local", "api") == "local" else False
@@ -253,8 +253,6 @@ class LLMPrompter(BasicProcessor):
         if batches == 1:
             self.dataset.delete_parameter("batches")
 
-        print("BATCHES", batches)
-
         # Set all variables through which we can reach the LLM
         api_key = ""
         base_url = None
@@ -270,7 +268,7 @@ class LLMPrompter(BasicProcessor):
                     base_url = "http://localhost:11434"
 
         else:
-            provider = LLMAdapter.get_models()[api_model]["provider"]
+            provider = LLMAdapter.get_models(self.config)[api_model]["provider"]
             model = api_model
             api_key = self.parameters.get("api_key", "")
             if not api_key:
@@ -319,8 +317,12 @@ class LLMPrompter(BasicProcessor):
         batched_data = {}
         batched_ids = []
 
+        split_prompt = ""
         if batches > 1:
-            system_prompt += "\nOutput ONLY as many items as input items. Separate the output values with `___`."
+            split_prompt = ("\nInput items are separated with `___`. Answer per input item and split the answers "
+                              "with `___`. Example input: ```What is the capital of these countries? Morocco\n___\nJapan"
+                              "___\nThe Netherlands``` Example output: "
+                              "```Marrakech___Tokyo___Amsterdam```")
 
         for item in self.source_dataset.iterate_items():
             if self.interrupted:
@@ -352,23 +354,29 @@ class LLMPrompter(BasicProcessor):
             i += 1
 
             # Prompt we've reached the batch length (which can also be 1). Also do this at the end of the dataset.
-            if i == batches or i == len(self.source_dataset):
-
+            if i % batches == 0 or i == self.source_dataset.num_rows:
+                print(batched_ids)
                 # Replace data
                 for column_to_use in columns_to_use:
-                    prompt = prompt.replace(column_to_use, "\n".join(batched_data[column_to_use]))
+                    prompt = prompt.replace(column_to_use, "\n___\n".join(batched_data[column_to_use]))
                 batched_data = {}
+                if i == self.source_dataset.num_rows:
+                    split_prompt = ""
                 try:
-                    response = llm.text_generation(prompt, system_prompt=system_prompt)
+                    response = llm.text_generation(prompt, system_prompt=system_prompt + split_prompt)
                 except Exception as e:
                     self.dataset.finish_with_error(str(e))
                     return
 
-                if batches > 1:
+                # Split outputs with `___` and stop if this wasn't possible
+                # Don't do this if we are processing a last item at the end of the dataset.
+                if batches > 1 and i != self.source_dataset.num_rows:
                     output_items = response.split("___")
                     if len(output_items) != batches:
-                        self.dataset.finish_with_error("Model could not output as many values as the batch. Try only using "
-                                                       "one value per prompt or using a different model.")
+                        self.dataset.update_status(f"Output did not result in {batches} items: {response}")
+                        self.dataset.finish_with_error("Model could not output as many values as the batch. See log "
+                                                       "for incorrect output. Try only using one value per prompt or "
+                                                       "using a different model.")
                 else:
                     output_items = [response]
 
@@ -378,7 +386,7 @@ class LLMPrompter(BasicProcessor):
                     results.append({
                         "id": batched_ids[n],
                         "prompt": prompt,
-                        model + " output": response,
+                        model + " output": output_item,
                         "temperature": temperature,
                         "max_tokens": max_tokens,
                         "model": model,
@@ -390,7 +398,7 @@ class LLMPrompter(BasicProcessor):
                         annotation = {
                             "label": label,
                             "item_id": batched_ids[n],
-                            "value": response,
+                            "value": output_item,
                             "type": "textarea",
                         }
                         annotations.append(annotation)
@@ -401,9 +409,9 @@ class LLMPrompter(BasicProcessor):
 
                 batched_ids = []
 
-            # Rate limits for different providers
-            if provider == "mistral":
-                time.sleep(1)
+                # Rate limits for different providers
+                if provider == "mistral":
+                    time.sleep(1)
 
         # Write annotations
         if save_annotations:

@@ -112,18 +112,18 @@ class LLMAdapter:
         return response
 
     @staticmethod
-    def get_model_options() -> dict:
+    def get_model_options(config) -> dict:
         """
         Returns model choice options for UserInput
 
         """
 
-        models = LLMAdapter.get_models()
+        models = LLMAdapter.get_models(config)
         options = {model_id: model_values["name"] for model_id, model_values in models.items()}
         return options
 
     @staticmethod
-    def get_models() -> dict:
+    def get_models(config) -> dict:
         """
         Returns a dict with LLM models supported by 4CAT, either through an API or as a local option.
         Make sure to keep up-to-date!
@@ -132,7 +132,7 @@ class LLMAdapter:
         """
 
         with (
-            g.config.get("PATH_ROOT")
+            config.PATH_ROOT
             .joinpath("common/assets/llms.json")
             .open() as available_models
         ):
