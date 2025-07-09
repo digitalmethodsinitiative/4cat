@@ -30,7 +30,17 @@ class ThingExpirer(BasicWorker):
 	type = "expire-datasets"
 	max_workers = 1
 
-	ensure_job = {"remote_id": "localhost", "interval": 300}
+	@classmethod
+	def ensure_job(cls, config=None):
+		"""
+		Ensure that the expirer is always running
+
+		This is used to ensure that the expirer is always running, and if it is
+		not, it will be started by the WorkerManager.
+
+		:return:  Job parameters for the worker
+		"""
+		return {"remote_id": "localhost", "interval": 300}
 
 	def work(self):
 		"""
