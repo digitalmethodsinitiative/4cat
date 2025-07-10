@@ -5,6 +5,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.cluster import KMeans
 from common.lib.helpers import UserInput
 import colorsys
+import shutil
 import copy
 
 from processors.visualisation.video_wall import VideoWallGenerator
@@ -32,14 +33,24 @@ class ImageWallGenerator(VideoWallGenerator):
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
-        Allow processor on token sets
+        Check compatibility
+
+        This processor can run 1) if ffmpeg is available and 2) if the source
+        is an image or video dataset
 
         :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.get_media_type() in ("video", "image") \
-               or module.type.startswith("image-downloader") \
-               or module.type == "video-frames"
+        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
+        ffprobe_path = (
+            shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
+            if ffmpeg_path
+            else None
+        )
+        have_ffmpeg = (ffmpeg_path and ffprobe_path)
+        return have_ffmpeg and (module.get_media_type() in ("video", "image")
+               or module.type.startswith("image-downloader")
+               or module.type == "video-frames")
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -55,13 +66,33 @@ class ImageWallGenerator(VideoWallGenerator):
                 f" (up to {max_number_images})" if max_number_images != 0 else "")
         }
 
-        options["sort-mode"]["options"] = {
-            "": "Do not sort",
-            "random": "Random",
-            "dominant": "Dominant colour (decent, faster)",
-            "kmeans-dominant": "Dominant K-means (precise, slow)",
-            "average-hsv": "Average colour (HSV; imprecise, fastest)",
-        }
+        if parent_dataset:
+            have_video_source = (parent_dataset.get_media_type() == "video" or parent_dataset.type.startswith("video-downloader"))
+        else:
+            have_video_source = False
+            
+        if not have_video_source:
+            # these sort options can only be used if we're working with image
+            # files - video files can't be inspected for average colour etc
+            options["sort-mode"]["options"] = {
+                "": "Do not sort",
+                "random": "Random",
+                "dominant": "Dominant colour (decent, faster)",
+                "kmeans-dominant": "Dominant K-means (precise, slow)",
+                "average-hsv": "Average colour (HSV; imprecise, fastest)",
+            }
+        else:
+            # add some caveats for running this directly on a video dataset
+            options["sort-mode"]["tooltip"] = ("To sort by e.g. average colour, first extract frames as images and "
+                                               "then make an image wall from the separate frame images.")
+            options = {
+                "info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": "The first frame of each video will be used as an image. If you want to select specific "
+                            "frames for inclusion, use the 'Extract frames from videos' processor first and create an "
+                            "image  wall of the resulting dataset."
+                }, **options
+            }
 
         del options["max-length"]
         del options["audio"]
