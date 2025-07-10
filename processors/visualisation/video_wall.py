@@ -164,6 +164,12 @@ class VideoWallGenerator(BasicProcessor):
         base_dataset = None
         while try_types and not base_dataset:
             base_dataset = self.source_dataset.nearest(f"{try_types.pop(0)}*")
+
+        if not base_dataset:
+            # not one of the known types, but processor is compatible, so
+            # assume it's just the parent dataset
+            base_dataset = self.source_dataset
+
         collage_staging_area = base_dataset.get_staging_area()
 
         lengths = {}
