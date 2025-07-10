@@ -4,11 +4,8 @@ Base filter class to handle filetypes
 import abc
 import csv
 import json
-import secrets
 import collections
 
-from common.lib.item_mapping import MappedItem
-from common.lib.helpers import hash_to_md5
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
