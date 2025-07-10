@@ -138,6 +138,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         # Clean up after work successfully completed or terminates
         self.clean_up()
 
+        # explicitly close database connection as soon as it's possible
+        self.db.close()
+
     def clean_up(self):
         """
         Clean up after a processor runs successfully or results in error.
