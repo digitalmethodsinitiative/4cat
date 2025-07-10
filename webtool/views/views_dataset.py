@@ -264,14 +264,10 @@ def preview_items(key):
     preview_size = 1000
     preview_bytes = (1024 * 1024 * 1)  # 1MB
 
-    processor = dataset.get_own_processor()
-    if not processor:
-        return render_template("components/error_message.html", title="Preview not available",
-                               message="No preview is available for this file.")
-
     # json and ndjson can use mapped data for the preview or the raw json;
-    # this depends on 4CAT settings
-    has_mapper = hasattr(processor, "map_item")
+    # this depends on 4CAT settings 
+    processor = dataset.get_own_processor()
+    has_mapper = processor and hasattr(processor, "map_item")
     use_mapper = has_mapper and g.config.get("ui.prefer_mapped_preview")
 
     if dataset.get_extension() == "gexf":
@@ -364,6 +360,13 @@ def preview_items(key):
                 truncated = len(data)
 
         return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+
+    else:
+        return render_template(
+            "components/error_message.html",
+            title="Preview not available",
+            message="No preview is available for this file.",
+        )
 
 
 """

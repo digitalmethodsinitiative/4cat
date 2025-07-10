@@ -56,7 +56,7 @@ def openapi_specification(api_id="all"):
 
 	:return: OpenAPI-formatted API specification
 	"""
-	return jsonify(current_app.openapi.generate(api_id))
+	return jsonify(current_app.openapi.generate(g.config, api_id))
 
 
 @component.route('/api/status.json')

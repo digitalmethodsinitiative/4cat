@@ -16,7 +16,7 @@
                 session.</p>
 
             {% if not tokens %}
-                <form action="{{ url_for('user.request_token') }}" method="GET" class="wide">
+                <form action="{{ url_for('toolapi.request_token') }}" method="GET" class="wide">
                     <p>You currently have no active access token(s). Request one:</p>
                     <div class="form-element form-footer">
                         <input type="hidden" name="forward" value="yes">

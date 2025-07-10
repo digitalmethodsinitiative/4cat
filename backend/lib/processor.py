@@ -449,6 +449,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         queue_name = self._proxy_queue_name()
         delegator = self.manager.proxy_delegator
 
+        delegator.refresh_settings(self.config)
+
         # 50 is an arbitrary batch size - but we top up every 0.05s, so
         # that should be sufficient
         batch_size = 50

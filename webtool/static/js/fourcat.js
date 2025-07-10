@@ -1310,6 +1310,9 @@ const dynamic_container = {
 
         $('.content-container').each(function () {
             let url = $(this).attr('data-source');
+            if(!url) {
+                return;
+            }
             let interval = parseInt($(this).attr('data-interval'));
             let previous = $(this).attr('data-last-call');
             if (!previous) {
@@ -1323,12 +1326,15 @@ const dynamic_container = {
 
             let container = $(this);
             container.attr('data-last-call', Math.floor(Date.now() / 1000));
-            $.get({
-                'url': url, 'success': function (response) {
-                    if (response === container.html()) {
+            fetch(url, {
+                method: 'GET'
+            }).then(async (response) => {
+                if (response.ok) {
+                    text = await response.text();
+                    if (text === container.html()) {
                         return;
                     }
-                    container.html(response);
+                    container.html(text);
                 }
             });
         });

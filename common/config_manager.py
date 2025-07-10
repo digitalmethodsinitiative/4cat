@@ -216,12 +216,13 @@ class ConfigManager:
         self.set("flask.tag_order", tag_order)
         self.db.commit()
 
-    def get_all_setting_names(self):
+    def get_all_setting_names(self, with_core=True):
         """
         Get names of all settings
 
         For when the value doesn't matter!
 
+        :param bool with_core:  Also include core (i.e. config.ini) settings
         :return list:  List of setting names known by the database and core settings
         """
         # attempt to initialise the database connection so we can include
@@ -229,12 +230,12 @@ class ConfigManager:
         if not self.db:
             self.with_db()
 
-        settings = list(self.core_settings.keys())
+        settings = list(self.core_settings.keys()) if with_core else []
         settings.extend([s["name"] for s in self.db.fetchall("SELECT DISTINCT name FROM settings")])
 
         return settings
 
-    def get_all(self, is_json=False, user=None, tags=None, memcache=None):
+    def get_all(self, is_json=False, user=None, tags=None, with_core=True, memcache=None):
         """
         Get all known settings
 
@@ -249,13 +250,14 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
+        :param bool with_core:  Also include core (i.e. config.ini) settings
         :param MemcacheClient memcache:  Memcache client. If `None` and
         `self.memcache` exists, use that instead.
 
         :return dict: Setting value, as a dictionary with setting names as keys
         and setting values as values.
         """
-        for setting in self.get_all_setting_names():
+        for setting in self.get_all_setting_names(with_core=with_core):
             yield setting, self.get(setting, None, is_json, user, tags, memcache)
 
 
@@ -364,7 +366,7 @@ class ConfigManager:
                 value = cached_values[tag]
                 break
         else:
-            value = default if default else None
+            value = None
 
         # parse some values...
         if not is_json and value is not None:
@@ -712,7 +714,7 @@ class ConfigWrapper:
         :param tags:
         :return list:
         """
-        active_tags = self.config.get_active_tags(user, tags)
+        active_tags = self.config.get_active_tags(user, tags, self.memcache)
         if not tags:
             active_tags = self.request_override(active_tags)
 
@@ -736,9 +738,11 @@ class ConfigWrapper:
         if type(tags) is str:
             tags = [tags]
 
+        # use self.config.get here, not self.get, because else we get infinite
+        # recursion (since self.get can call this method)
         if self.request and self.request.headers.get("X-4Cat-Config-Tag") and \
-            self.config.get("flask.proxy_secret") and \
-            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
+            self.config.get("flask.proxy_secret", memcache=self.memcache) and \
+            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret", memcache=self.memcache):
             # need to ensure not just anyone can add this header to their
             # request!
             # to this end, the second header must be set to the secret value;

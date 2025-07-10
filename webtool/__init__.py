@@ -163,7 +163,7 @@ with app.app_context():
     # gets populated before `before_request`), but can read from current_app
     # instead. Note that where possible g.config should always be preferred
     # over app.fourcat_config because the former is not user-aware!
-    app.openapi = OpenAPICollector(app, config)
+    app.openapi = OpenAPICollector(app)
     app.log = log
     app.db = db
     app.fourcat_config = config
@@ -227,7 +227,7 @@ with app.app_context():
     # ensure that colour definition CSS file is present - the CSS colours can be
     # changed by the admin so we need to regenerate the CSS file to make sure it
     # is up to date. Might want to use e.g. SCSS in the future...
-    generate_css_colours()
+    generate_css_colours(config)
 
 # run it (when called directly)
 if __name__ == "__main__":

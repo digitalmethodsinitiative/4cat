@@ -230,7 +230,7 @@ def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="f
 	new_img.save(output_filepath)
 
 
-def generate_css_colours(force=False):
+def generate_css_colours(config, force=False):
 	"""
 	Write the colours.css CSS file based on configuration
 
@@ -238,18 +238,19 @@ def generate_css_colours(force=False):
 	these necessitates also updating the relevant CSS files, which this method
 	does.
 
+	:param config:  Configuration reader to get colour values from
 	:param bool force:  Create colour definition file even if it exists already
 	:return:
 	"""
-	interface_hue = current_app.fourcat_config.get("4cat.layout_hue") / 360  # colorsys expects 0-1 values
-	secondary_hue = current_app.fourcat_config.get("4cat.layout_hue_secondary") / 360
+	interface_hue = config.get("4cat.layout_hue") / 360  # colorsys expects 0-1 values
+	secondary_hue = config.get("4cat.layout_hue_secondary") / 360
 	main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
 	accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
 	# get opposite by adjusting the hue by 50%
 	opposite_colour = colorsys.hsv_to_rgb(secondary_hue, 0.87, 0.9)
 
-	template_file = current_app.fourcat_config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
-	colour_file = current_app.fourcat_config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")
+	template_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
+	colour_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")
 
 	if colour_file.exists() and not force:
 		# exists already, don't overwrite
@@ -268,8 +269,8 @@ def generate_css_colours(force=False):
 	# Update the favicon
 	new_favicon_color(
 		color=tuple([int(bit*255) for bit in main_colour]),
-		input_filepath=current_app.fourcat_config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon-bw.ico"),
-		output_filepath=current_app.fourcat_config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon.ico")
+		input_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon-bw.ico"),
+		output_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon.ico")
 	)
 
 
