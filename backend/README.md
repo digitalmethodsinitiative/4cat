@@ -10,6 +10,8 @@ The backend is intended to be run as a daemon process. See the
 `4cat-daemon.py` script in the parent folder for instructions on how to start 
 and control the daemon.
 
+Also see the [architecture diagrams](architecture.md).
+
 ## What it does
 Queries a central job queue for outstanding jobs, and starts workers compatible
 with those jobs once any are available.
