@@ -4,7 +4,11 @@ Base filter class to handle filetypes
 import abc
 import csv
 import json
+import secrets
+import collections
 
+from common.lib.item_mapping import MappedItem
+from common.lib.helpers import hash_to_md5
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
@@ -45,25 +49,74 @@ class BaseFilter(BasicProcessor):
         # Filter posts
         matching_posts = self.filter_items()
 
+        # Keep track of whether we need to copy over annotations and/or annotation fields
+        annotation_fields = self.source_dataset.annotation_fields
+        num_annotations = 0 if not annotation_fields else self.source_dataset.num_annotations()
+        all_annotations = None
+
+        # If this source dataset has less than n annotations, just retrieve them all before iterating
+        if 0 < num_annotations <= 500:
+            # Convert to dict for faster lookup when iterating over items
+            all_annotations = collections.defaultdict(list)
+            for annotation in self.source_dataset.get_annotations():
+                all_annotations[annotation.item_id].append(annotation)
+
         # Write the posts
         num_posts = 0
-        if parent_extension == "csv":
-            with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-                writer = None
-                for post in matching_posts:
+        kwargs = {"newline": ""} if parent_extension == "ndjson" else {}
+
+        with self.dataset.get_results_path().open("w", encoding="utf-8", **kwargs) as outfile:
+
+            writer = None
+            copied_annotations = []
+
+            # Loop through all filtered posts. These ought to be the `original` object in case of a MappedItem; we're
+            # filtering, not changing the data (at least in principle).
+            for post in matching_posts:
+
+                # If the original dataset has annotations, we'll copy these over to the filtered dataset.
+                if annotation_fields:
+                    # For small datasets, get the annotations from all this dataset's annotations
+                    if all_annotations:
+                        item_annotations = all_annotations.get(post["id"])
+                    # Or get annotations per item for large datasets (more queries but less memory usage)
+                    else:
+                        item_annotations = self.source_dataset.get_annotations_for_item(
+                            post["id"]
+                        )
+
+                    if item_annotations:
+                        # Only use the annotation data to instantiate a new Annotation object, with a fresh ID
+                        item_annotations = [item_annotation.data for item_annotation in item_annotations]
+
+                        # Change some annotation values
+                        for i in range(len(item_annotations)):
+                            del item_annotations[i]["id"]  #  Set by the db
+                            item_annotations[i]["dataset"] = self.dataset.key  # Changed in `get_standalone()`
+                        copied_annotations += item_annotations
+
+                # Save the actual item
+                if parent_extension == "csv":
                     if not writer:
                         writer = csv.DictWriter(outfile, fieldnames=post.keys())
                         writer.writeheader()
-                    writer.writerow(post)
-                    num_posts += 1
-        elif parent_extension == "ndjson":
-            with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
-                for post in matching_posts:
+                    writer.writerow(post.original)
+                elif parent_extension == "ndjson":
+                    outfile.write(json.dumps(post.original) + "\n")
+                else:
+                    raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
 
-                    outfile.write(json.dumps(post) + "\n")
-                    num_posts += 1
-        else:
-            raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
+                # copy annotations in bulk
+                if len(copied_annotations) > 1000:
+                    self.dataset.save_annotations(copied_annotations)
+                    copied_annotations = []
+
+                num_posts += 1
+
+        # copy over leftover annotations
+        # annotation fields are copied over in `create_standalone()`
+        if copied_annotations:
+            self.dataset.save_annotations(copied_annotations)
 
         if num_posts == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
