@@ -1,6 +1,6 @@
 <div class="parameters">
     <ul>
-        {% if item.get_extension() in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "mp4") or item.get_own_processor().map_item %}
+        {% if (item.get_extension() in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "mp4") or item.get_own_processor().map_item) and item.is_finished() and item.num_rows %}
             <li>
                 <a href="{{ url_for('dataset.preview_items', key=item.key) }}"
                    data-load-from="{{ url_for('dataset.preview_items', key=item.key) }}"
