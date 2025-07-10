@@ -73,7 +73,8 @@ class ConvertText(BasicProcessor):
                 "type": UserInput.OPTION_ANNOTATION,
                 "label": "converted text",
                 "tooltip": "The converted text will be added as a new column to the previous dataset",
-                "default": False
+                "default": False,
+                "to_parent": True
             }
         }
 

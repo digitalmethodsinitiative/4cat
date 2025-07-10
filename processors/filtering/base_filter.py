@@ -100,9 +100,9 @@ class BaseFilter(BasicProcessor):
                     if not writer:
                         writer = csv.DictWriter(outfile, fieldnames=post.keys())
                         writer.writeheader()
-                    writer.writerow(post.original)
+                    writer.writerow(post)
                 elif parent_extension == "ndjson":
-                    outfile.write(json.dumps(post.original) + "\n")
+                    outfile.write(json.dumps(post) + "\n")
                 else:
                     raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
 

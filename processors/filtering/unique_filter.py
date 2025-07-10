@@ -115,7 +115,7 @@ class UniqueFilter(BaseFilter):
 
             if unique_item:
                 unique += 1
-                yield mapped_item
+                yield mapped_item.original
 
             if processed % 500 == 0:
                 self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
