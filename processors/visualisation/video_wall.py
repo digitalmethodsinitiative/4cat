@@ -423,7 +423,7 @@ class VideoWallGenerator(BasicProcessor):
             row_width += item_width
 
             # prepare filter to transform item into wall tile
-            cropscale = "select=eq(n\\,0)," if have_only_images
+            cropscale = "select=eq(n\\,0)," if have_only_images else ""
 
             if sizing_mode == "fit-height":
                 # the scale filter does not guarantee exact pixel dimensions
