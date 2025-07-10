@@ -7,10 +7,11 @@ import random
 import shutil
 import oslex
 import math
+import re
 
 from packaging import version
 
-from common.lib.helpers import UserInput, get_ffmpeg_version
+from common.lib.helpers import UserInput, get_ffmpeg_version, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, MediaSignatureException
 
@@ -187,7 +188,7 @@ class VideoWallGenerator(BasicProcessor):
                 return ProcessorInterruptedException("Interrupted while unpacking files")
 
             # skip metadata and log files
-            self.dataset.update_status(f"Read {len(media):,} of {self.source_dataset.num_rows:,} file(s)")
+            self.dataset.update_status(f"Determined dimensions of {len(media):,} of {self.source_dataset.num_rows:,} file(s)")
             if item.suffix.lower() in (".json", ".log"):
                 continue
 
@@ -375,18 +376,21 @@ class VideoWallGenerator(BasicProcessor):
         row_widths = []
 
         # todo: periodically check if we still need to support ffmpeg < 5.1...
-        have_old_ffmpeg_version = get_ffmpeg_version(ffmpeg_path) < version.parse("7.1")
-        fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
+        ffmpeg_version = get_ffmpeg_version(ffmpeg_path)
+        have_old_ffmpeg_version = ffmpeg_version < version.parse("7.1")
+        fps_command = "-fps_mode" if ffmpeg_version >= version.parse("5.1") else "-vsync"
 
         # go through each item and transform as needed
         # why not use the xstack filter that ffmpeg has for this purpose?
         # the xstack filter does not cope well with items of variable size,
         # which are often abundant in 4CAT datasets
         looping = True
+        iter_index = 0
         while True:
             try:
-                item = included_media.pop(0)
+                item = included_media[iter_index]
                 path = media[item]
+                iter_index += 1
             except IndexError:
                 looping = False
 
@@ -419,7 +423,9 @@ class VideoWallGenerator(BasicProcessor):
             row_width += item_width
 
             # prepare filter to transform item into wall tile
-            cropscale = "select=eq(n\\,0)," if have_only_images else ""
+            cropscale = "colorspace=bt709,"
+            if have_only_images:
+                cropscale += "select=eq(n\\,0),"
 
             if sizing_mode == "fit-height":
                 # the scale filter does not guarantee exact pixel dimensions
@@ -543,9 +549,17 @@ class VideoWallGenerator(BasicProcessor):
             if have_old_ffmpeg_version:
                 self.dataset.log("You may be able to prevent this error by updating to a newer version of ffmpeg.")
 
+            # we get only stream numbers from ffmpeg, make this a bit easier
+            # to interpret:
+            if erroneous_stream := re.findall("input from stream ([0-9]+)", ffmpeg_error):
+                erroneous_stream = convert_to_int(erroneous_stream[0], None)
+                if erroneous_stream is not None and erroneous_stream < len(included_media):
+                    self.dataset.log(f"The error message indicates the file {included_media[erroneous_stream]} cannot be read; it may be corrupt.")
+
         shutil.rmtree(collage_staging_area, ignore_errors=True)
 
         if result.returncode != 0:
+
             return self.dataset.finish_with_error(
                 f"Could not make collage (error {result.returncode}); check the dataset log for details.")
 
