@@ -8,7 +8,13 @@
 <div class="image-preview-container">
     <input type="checkbox" name="image-zoom" class="image-zoom" id="image-zoom" >
     <label for="image-zoom">
+        {% if dataset.get_extension() == "mp4" %}
+            <video controls height="100%">
+                <source src="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}" type="video/mp4">
+            </video>
+        {% else %}
         <img src="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}" alt="">
+        {% endif %}
     </label>
 </div>
 </body>
