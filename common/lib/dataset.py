@@ -804,12 +804,12 @@ class DataSet(FourcatModule):
             db=self.db,
             extension=self.result_file.split(".")[-1],
             type=self.type,
-            modules=self.modules,
+            modules=self.modules
         )
+
         for field in self.data:
             if field in ("id", "key", "timestamp", "job", "parameters", "result_file"):
                 continue
-
             copy.__setattr__(field, self.data[field])
 
         if shallow:
@@ -873,17 +873,17 @@ class DataSet(FourcatModule):
         self.db.delete("annotations", where={"dataset": self.key}, commit=commit)
         # delete annotations that have been generated as part of this dataset
         self.db.delete("annotations", where={"from_dataset": self.key}, commit=commit)
-        # delete annotation fields from other datasets that were created as part of this dataset
-        for parent_dataset in self.get_genealogy():
+        # delete annotation fields on parent dataset(s) stemming from this dataset
+        for related_dataset in self.get_genealogy():
             field_deleted = False
-            annotation_fields = parent_dataset.annotation_fields
+            annotation_fields = related_dataset.annotation_fields
             if annotation_fields:
                 for field_id in list(annotation_fields.keys()):
                     if annotation_fields[field_id].get("from_dataset", "") == self.key:
                         del annotation_fields[field_id]
                         field_deleted = True
             if field_deleted:
-                parent_dataset.save_annotation_fields(annotation_fields)
+                related_dataset.save_annotation_fields(annotation_fields)
 
         # delete dataset from database
         self.db.delete("datasets", where={"key": self.key}, commit=commit)
@@ -2228,7 +2228,7 @@ class DataSet(FourcatModule):
                 annotation_data["author"] = self.get_owners()[0]
 
             # Create Annotation object, which also saves it to the database
-            # If this dataset/item ID/label combination already exists, this retrieves the
+            # If this dataset/item_id/field_id combination already exists, this retrieves the
             # existing data and updates it with new values.
             Annotation(data=annotation_data, db=self.db)
             count += 1
@@ -2259,7 +2259,6 @@ class DataSet(FourcatModule):
         old_fields = self.annotation_fields
         changes = False
 
-        # Do some validation
         # Annotation field must be valid JSON.
         try:
             json.dumps(new_fields)
@@ -2293,7 +2292,7 @@ class DataSet(FourcatModule):
                 )
 
         # Check if fields are removed
-        if not add:
+        if not add and old_fields:
             for field_id in old_fields.keys():
                 if field_id not in new_fields:
                     changes = True

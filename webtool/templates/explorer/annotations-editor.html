@@ -43,6 +43,9 @@
                     {% else %}
                         {# If processor-generated, show processor/dataset metadata #}
                         {% set from_dataset = from_datasets[annotation_field.from_dataset] %}
+                        {% if from_dataset == "deleted" %}
+                            <h4>Dataset that made this field was deleted</h4>
+                        {% else %}
                         <div class="dataset-annotation-field">
                         <h4>{{ from_dataset.get_own_processor().title }} </h4>
                         <button class="tooltip-trigger" aria-controls="tooltip-dataset-annotation-field-{{ from_dataset.key }}" aria-label="Dataset annotation field">?</button>
@@ -53,6 +56,7 @@
                         {% set parent_key = dataset.key %}
                         {% include 'components/result-parameters.html' %}
                         </div>
+                        {% endif %}
                     {% endif %}
                     </span>
                     <div class="field-controls">

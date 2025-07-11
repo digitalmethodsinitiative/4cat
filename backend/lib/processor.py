@@ -728,6 +728,32 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         standalone.body_match = "(Filtered) " + top_parent.query
         standalone.datasource = top_parent.parameters.get("datasource", "custom")
 
+        # Copy over annotation fields and update annotations with new IDs
+        if top_parent.annotation_fields:
+            # New field IDs based on the new dataset key
+            annotation_fields = {
+                hash_to_md5(old_field_id + standalone.key): field_values
+                for old_field_id, field_values in top_parent.annotation_fields.items()
+            }
+            standalone.annotation_fields = {}  # So we're not checking changes with old annotation fields
+            standalone.save_annotation_fields(annotation_fields)  # Save to db
+
+            # Make sure copied-over annotations have the right dataset key. We only know this key now,
+            # but filter processors already copied annotations, and we don't want to iterate here again.
+            self.db.update(
+                "annotations",
+                where={"dataset": self.dataset.key},
+                data={"dataset": standalone.key},
+            )
+
+            # Also update field IDs
+            for i, old_field_id in enumerate(top_parent.annotation_fields.keys()):
+                self.db.update(
+                    "annotations",
+                    where={"field_id": old_field_id, "dataset": standalone.key},
+                    data={"field_id": hash_to_md5(old_field_id + standalone.key)
+                })
+
         try:
             standalone.board = top_parent.board
         except AttributeError:
