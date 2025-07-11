@@ -47,7 +47,7 @@ class VideoStack(BasicProcessor):
         },
         "transparency": {
             "type": UserInput.OPTION_TEXT,
-            "coerce_tye": float,
+            "coerce_type": float,
             "default": 0.15,
             "min": 0,
             "max": 1,
