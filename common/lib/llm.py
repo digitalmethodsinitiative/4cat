@@ -1,10 +1,10 @@
 import json
 
-from flask import g
 from typing import List, Optional, Union
 from pydantic import SecretStr
 from langchain_core.messages import BaseMessage
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.output_parsers.json import JsonOutputParser
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
@@ -18,13 +18,17 @@ class LLMAdapter:
         model: str,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
+        structured_output = False,
+        json_schema = None,
         temperature: float = 0.0,
     ):
         """
-        provider: 'openai', 'google', 'mistral', 'ollama', 'vllm', 'lmstudio', 'mistral'
+        provider: 'openai', 'google', 'mistral', 'ollama', 'lmstudio', 'mistral'
         model: model name (e.g., 'gpt-4o-mini', 'claude-3-opus', 'mistral-small', etc.)
         api_key: API key if required (OpenAI, Claude, Google, Mistral)
         base_url: for local models or Mistral custom endpoints
+        structured_output: if true, structured output is returned
+        json_schema: use a custom JSON schema
         """
         self.provider = provider.lower()
         self.model = model
@@ -32,7 +36,11 @@ class LLMAdapter:
         self.base_url = base_url
         self.temperature = temperature
         self.llm: BaseChatModel = self._load_llm()
+        self.structured_output = structured_output
+        self.parser = None
 
+        if structured_output:
+            self.set_structure(json_schema=json_schema)
 
     def _load_llm(self) -> BaseChatModel:
         if self.provider == "openai":
@@ -87,10 +95,11 @@ class LLMAdapter:
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
-    def text_generation(
+    def generate_text(
         self,
         messages: Union[str, List[BaseMessage]],
         system_prompt: Optional[str] = None,
+        temperature: float = 0.1,
     ) -> str:
         """
         Supports string input or LangChain message list.
@@ -104,12 +113,23 @@ class LLMAdapter:
         else:
             lc_messages = messages
 
+        kwargs = {"temperature": temperature}
+        if self.provider == "google":  # Temperature not supported here by Google
+            kwargs = {}
         try:
-            response = self.llm.invoke(lc_messages).content
+            response = self.llm.invoke(lc_messages, **kwargs)
         except Exception as e:
             raise e
 
-        return response
+        return response if self.structured_output else response.content
+
+    def set_structure(self, json_schema=None):
+        if json_schema:
+            self.llm = self.llm.with_structured_output(json_schema)
+        else:
+            self.llm = self.llm.with_structured_output(method="json_mode")
+
+        self.structured_output = True
 
     @staticmethod
     def get_model_options(config) -> dict:

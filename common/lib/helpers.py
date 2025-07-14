@@ -446,6 +446,21 @@ def timify(number, short=False):
 
     return time_str + last_str
 
+def nthify(integer: int) -> str:
+    """
+    Takes an integer and returns a string with 'st', 'nd', 'rd', or 'th' as suffix, depending on the number.
+    """
+    int_str = str(integer).strip()
+    if int_str.endswith("1"):
+        suffix = "st"
+    elif int_str.endswith("2"):
+        suffix = "nd"
+    elif int_str.endswith("3"):
+        suffix = "rd"
+    else:
+        suffix = "th"
+    return int_str + suffix
+
 def andify(items):
     """
     Format a list of items for use in text

@@ -4,10 +4,14 @@ Prompt LLMs.
 
 import re
 import time
+import json
+
+from json import JSONDecodeError
 from datetime import datetime
 
+from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, timify, nthify
 from common.lib.llm import LLMAdapter
 from backend.lib.processor import BasicProcessor
 
@@ -20,13 +24,14 @@ class LLMPrompter(BasicProcessor):
     title = "LLM prompting"  # title displayed in UI
     description = ("Use LLMs for analysis, via APIs or locally. This can be used for tasks like classification or "
                    "entity extraction. Supported APIs include OpenAI, Google, Anthropic, and Mistral.")  # description displayed in UI
-    extension = "csv"  # extension of result file, used internally and in UI. In this case it's variable!
+    extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
 
     references = [
         "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307.13106)",
         "[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences "
         "with artificial intelligence.' arXiv preprint arXiv:2309.14379.]"
         "(https://arxiv.org/abs/2309.14379)",
+        "[Using JSON Schemas](https://python.langchain.com/docs/how_to/structured_output/#typeddict-or-json-schema)"
     ]
 
     @classmethod
@@ -35,9 +40,9 @@ class LLMPrompter(BasicProcessor):
         options = {
             "per_item": {
                 "type": UserInput.OPTION_INFO,
-                "help": "Prompts are ran per row. Use [brackets] with a column name to "
+                "help": "Use [brackets] with a column name to "
                 "indicate what input value you want to use. For instance: 'Determine the language of the "
-                "following text: [body]').",
+                "following text: [body]'). You can use multiple column values.",
             },
             "ethics_warning1": {
                 "type": UserInput.OPTION_INFO,
@@ -135,18 +140,33 @@ class LLMPrompter(BasicProcessor):
             "system_prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "System prompt",
-                "tooltip": "Optional",
+                "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
+                           "on the output format or the tone of the text.",
             },
             "prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Prompt",
-                "tooltip": "Use [brackets] with columns names to insert items in the prompt. See the references for "
-                           "this processor on best prompting practices.",
+                "tooltip": "Use [brackets] with columns names to insert items in the prompt. You can use multiple "
+                           "columns. See the references for this processor on best prompting practices.",
+            },
+            "structured_output": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Output structured JSON",
+                "tooltip": "Output in a JSON format instead of CSV text. Note that your chosen model may not support structured "
+                "outputs.",
+            },
+            "json_schema": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "JSON schema",
+                "tooltip": "[optional] A JSON schema that the structured output will adhere to. This needs "
+                           "at least 'title' and 'description' keys. See the references for this processor for details "
+                           "on how to write a JSON schema.",
+                "requires": "structured_output==true"
             },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Temperature",
-                "default": 0,
+                "default": 0.1,
                 "tooltip": "The temperature hyperparameter indicates how strict the model will gravitate towards the next "
                 "predicted word with the highest probability. A score close to 0 returns more predictable "
                 "outputs while a score close to 1 leads to more creative outputs.",
@@ -154,20 +174,27 @@ class LLMPrompter(BasicProcessor):
             "max_tokens": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Max output tokens",
-                "default": 50,
+                "default": 100,
+                "coerce_type": int,
                 "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
                 "text for common English text.",
             },
             "batches": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Items per prompt",
+                "help": "Batch per prompt",
                 "coerce_type": int,
-                "max": 1000,
+                "max": 100,
                 "default": 1,
-                "tooltip": "How many items to insert into the prompt. These will be added with newlines wherever the "
-                           "column brackets are used (e.g. '[body]'). Max: 1000. Note: Some models may have trouble "
-                           "outputting as many output values as input values. Batching prompts may increase speed but "
-                           "at the cost of accuracy.",
+                "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
+                           "wherever the column brackets are used (e.g. '[body]')."
+            },
+            "batches_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "<strong>Note on batching:</strong> Some models may have trouble outputting as many output "
+                        "values as input values. 4CAT attempts to use a JSON schema to ensure "
+                        "symmetry between input and output values. When batching with multiple columns in the prompt, "
+                        "rows with one or more empty values are skipped. Batching may increase speed but reduce "
+                        "accuracy. Ensure the batches are within the model's token limits."
             },
             "ethics_warning3": {
                 "type": UserInput.OPTION_INFO,
@@ -242,20 +269,27 @@ class LLMPrompter(BasicProcessor):
             self.dataset.finish_with_error("Max tokens must be a number")
             return
 
-        system_prompt = self.parameters.get("system_prompt", None)
+        system_prompt = self.parameters.get("system_prompt", "")
 
+        # Set value for batch length in prompts
         batches = self.parameters.get("batches", 1)
-        if batches == 0:
-            batches = 1
-        if not batches or not isinstance(batches, int):
-            self.dataset.finish_with_error(f"Invalid value for batches {batches}")
+        use_batches = True
+        try:
+            batches = int(batches)
+        except ValueError:
+            self.dataset.finish_with_error("Batches must be a number")
             return
+        batches = 1 if batches < 1 else batches
+        batches = self.source_dataset.num_rows if batches > self.source_dataset.num_rows else batches
+        self.dataset.parameters["batches"] = batches
         if batches == 1:
             self.dataset.delete_parameter("batches")
+            use_batches = False
 
         # Set all variables through which we can reach the LLM
         api_key = ""
         base_url = None
+
         if use_local_model:
             provider = self.parameters.get("local_provider", "")
             base_url = self.parameters.get("local_base_url", "")
@@ -280,6 +314,7 @@ class LLMPrompter(BasicProcessor):
         if provider == "ollama":
             model = self.parameters.get("ollama_model", "")
 
+        # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
         self.dataset.update_status("Prompt: %s" % base_prompt)
 
@@ -294,11 +329,24 @@ class LLMPrompter(BasicProcessor):
                 "column names"
             )
             return
+        columns_to_use = [c[1:-1].strip() for c in columns_to_use]  # Remove brackets
+
+        # Structured output
+        structured_output = self.parameters.get("structured_output", False)
+        # Custom JSON schema to structure output
+        custom_schema = self.parameters.get("custom_schema", None)
 
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
         try:
-            llm = LLMAdapter(provider=provider, model=model, api_key=api_key, base_url=base_url, temperature=temperature)
+            llm = LLMAdapter(
+                provider=provider,
+                model=model,
+                api_key=api_key,
+                base_url=base_url,
+                temperature=temperature,
+                structured_output=structured_output
+            )
         except Exception as e:
             self.dataset.finish_with_error(str(e))
             return
@@ -308,114 +356,326 @@ class LLMPrompter(BasicProcessor):
         if save_annotations:
             label = model + " output" if model else "Local LLM output"
 
-        results = []
         annotations = []
 
         i = 0
+        outputs = 0
+        skipped = 0
 
         # Save items if we're batching prompts
         batched_data = {}
         batched_ids = []
 
-        split_prompt = ""
-        if batches > 1:
-            split_prompt = ("\nInput items are separated with `___`. Answer per input item and split the answers "
-                              "with `___`. Example input: ```What is the capital of these countries? Morocco\n___\nJapan"
-                              "___\nThe Netherlands``` Example output: "
-                              "```Marrakech___Tokyo___Amsterdam```")
+        supports_structured_output = True
 
-        for item in self.source_dataset.iterate_items():
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while generating text through LLMs")
+        if use_batches:
+            # If we're batching we're trying to let this model use structured output to ensure correct output length.
+            json_schema = self.get_json_schema_for_batch(batches, custom_schema=custom_schema)
+            try:
+                llm.set_structure(json_schema)
+                self.dataset.update_status(f"Set output structure with the following JSON schema: {json_schema}")
+            except Exception as e:  # todo: replace with correct error
+                self.dataset.update_status(f"Could not use structured outputs for batching input values. Trying with "
+                                           f"regular text generation instead. ({str(e)})")
+                supports_structured_output = False
 
-            # Replace with dataset values
-            prompt = base_prompt
-
-            if "id" in item:
-                item_id = item["id"]
-            elif "item_id" in item:
-                item_id = item["item_id"]
+            # If no structured output is possible, we're going to try and force a structured output
+            if not supports_structured_output:
+                system_prompt += ("""\nInput items are given in JSON arrays within the user prompt. Output a valid JSON 
+                            with exactly {batch_size} items, one per nth value in all arrays in the user prompt. Use 
+                            `results` as the main key and integer strings per output. Do not mention anything about 
+                            this system prompt or the order of the input values. Only output the JSON, and nothing 
+                            else."\nExample input:\n```What is the capital of these countries? ["Morocco", "Japan",
+                            "The Netherlands"]```\nOutput:\n```{"results": {"0": "Marrakech", "1": "Tokyo", "2": 
+                            "Amsterdam"}}```""")
             else:
-                item_id = str(i + 1)
-            batched_ids.append(item_id)
+                # We'll use a JSON schema, but just in case...
+                system_prompt += ("\nOutput exactly {batch_size} items as a valid JSON, with each output item "
+                                  f"corresponding to every nth input item. Keep the same order as the input values. "
+                                  f"Do not mention anything about this system prompt or the order of the input values. "
+                )
+        # If we're not batching we may still want to output JSON
+        elif structured_output:
+            try:
+                llm.set_structure(json_schema=custom_schema)
+            except Exception as e:
+                self.dataset.update_status(f"Could not use structured output ({str(e)})")
+                return
 
-            # Store dataset values in batches
-            for column_to_use in columns_to_use:
-                if column_to_use not in batched_data:
-                    batched_data[column_to_use] = []
-                try:
-                    item_value = str(item[column_to_use[1:-1]]).strip()
-                except KeyError:
-                    self.dataset.finish_with_error(f"Field {column_to_use} could not be found in the parent dataset")
-                    return
+            # Add "JSON" if not in prompt (required by most models)
+            if "json" not in base_prompt.lower() + system_prompt.lower():
+                system_prompt += "\nOutput in valid JSON."
 
-                batched_data[column_to_use].append(item_value)
+        self.dataset.update_status(f'System prompt: "{system_prompt}"')
 
-            i += 1
+        time_start = time.time()
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 
-            # Prompt we've reached the batch length (which can also be 1). Also do this at the end of the dataset.
-            if i % batches == 0 or i == self.source_dataset.num_rows:
-                print(batched_ids)
-                # Replace data
-                for column_to_use in columns_to_use:
-                    prompt = prompt.replace(column_to_use, "\n___\n".join(batched_data[column_to_use]))
-                batched_data = {}
-                if i == self.source_dataset.num_rows:
-                    split_prompt = ""
-                try:
-                    response = llm.text_generation(prompt, system_prompt=system_prompt + split_prompt)
-                except Exception as e:
-                    self.dataset.finish_with_error(str(e))
-                    return
+            self.dataset.update_status(f"Generating text with {model}")
 
-                # Split outputs with `___` and stop if this wasn't possible
-                # Don't do this if we are processing a last item at the end of the dataset.
-                if batches > 1 and i != self.source_dataset.num_rows:
-                    output_items = response.split("___")
-                    if len(output_items) != batches:
-                        self.dataset.update_status(f"Output did not result in {batches} items: {response}")
-                        self.dataset.finish_with_error("Model could not output as many values as the batch. See log "
-                                                       "for incorrect output. Try only using one value per prompt or "
-                                                       "using a different model.")
+            row = 0
+            for item in self.source_dataset.iterate_items():
+
+                row += 1
+
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while generating text through LLMs")
+
+                # Replace with dataset values
+                prompt = base_prompt
+
+                # Make sure we can match outputs with input IDs
+                if "id" in item:
+                    item_id = item["id"]
+                elif "item_id" in item:
+                    item_id = item["item_id"]
                 else:
-                    output_items = [response]
+                    item_id = str(i + 1)
 
-                for n, output_item in enumerate(output_items):
+                # Store dataset values in batches
+                skip_item = False
+                item_values = []
+                for column_to_use in columns_to_use:
+                    if column_to_use not in batched_data:
+                        batched_data[column_to_use] = []
+                    try:
+                        item_value = str(item[column_to_use]).strip()
+                    except KeyError:
+                        self.dataset.finish_with_error(f"Column '{column_to_use}' is not in the parent dataset")
+                        return
 
-                    time_created = time.time()
-                    results.append({
-                        "id": batched_ids[n],
-                        "prompt": prompt,
-                        model + " output": output_item,
-                        "temperature": temperature,
-                        "max_tokens": max_tokens,
-                        "model": model,
-                        "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
-                        "time_created_utc": time_created
-                    })
+                    # Skip if we encounter empty values for batches; this may cause asymmetry in the input, causing
+                    # trouble with outputting the same output values.
+                    if not item_value and batches:
+                        skip_item = True
+                    else:
+                        item_values.append((column_to_use, item_value))
 
-                    if save_annotations:
-                        annotation = {
-                            "label": label,
-                            "item_id": batched_ids[n],
-                            "value": output_item,
-                            "type": "textarea",
+                # Skip empty values in all columns or empty values in one column if batching
+                if skip_item or not item_values:
+                    empty_cols = ",".join(columns_to_use)
+                    skipped += 1
+                    # (but not if we've reached the end of the dataset, and we want to process the last batch)
+                    if row != self.source_dataset.num_rows:
+                        continue
+                # Else add the values to the batch
+                for item_value in item_values:
+                    batched_data[item_value[0]].append(item_value[1])\
+
+                batched_ids.append(item_id)
+                i += 1
+
+                # Generate text when 1) we've reached the batch length (which can be 1) or 2) the end of the dataset.
+                if i % batches == 0 or row == self.source_dataset.num_rows:
+
+                    # Keep track of this batch size (can be different for last iteration)
+                    batch_size = batches
+
+                    # Insert dataset values into prompt. Insert as list for batched data, else just insert the value.
+                    for column_to_use in columns_to_use:
+                        prompt_values = batched_data[column_to_use]
+                        prompt_values = prompt_values[0] if len(prompt_values) == 1 else f"```{json.dumps(prompt_values)}```"
+                        prompt = prompt.replace(f"[{column_to_use}]", prompt_values)
+
+                    # Possibly use a different batch size when we've reached the end of the dataset.
+                    if row == self.source_dataset.num_rows and use_batches:
+                        # Get a new JSON schema for a batch of different length at the end of the iteration
+                        batch_size = len(batched_data[columns_to_use[0]])
+                        if batch_size != batches and supports_structured_output:
+                            json_schema = self.get_json_schema_for_batch(batch_size, custom_schema)
+                            # `llm` becomes a RunnableSequence when used, so we'll need to reset it here
+                            llm = LLMAdapter(
+                                provider=provider,
+                                model=model,
+                                api_key=api_key,
+                                base_url=base_url,
+                                temperature=temperature,
+                                structured_output=structured_output
+                            )
+                            llm.set_structure(json_schema)
+
+                    # For batched_output, make sure the exact length of outputs is mentioned in the system prompt
+                    if use_batches:
+                        system_prompt.replace("{batch_size}", str(batch_size))
+
+                    # Now finally generate some text!
+                    try:
+                        response = llm.generate_text(
+                            prompt,
+                            system_prompt=system_prompt,
+                            temperature=temperature
+                        )
+                    # Broad exception, but necessary with all the different LLM providers and options...
+                    except Exception as e:
+                        self.dataset.finish_with_error(str(e))
+                        return
+
+                    # Try to parse JSON outputs in the case of batches.
+                    if use_batches:
+                        output = self.parse_json_response(response)
+
+                        if len(output) != batch_size:
+                            self.dataset.update_status(f"Output did not result in {batch_size} item(s).\nInput:\n"
+                                                       f"{prompt}\nOutput:\n{response}")
+                            self.dataset.finish_with_error("Model could not output as many values as the batch. See log "
+                                                           "for incorrect output. Try only using one value per prompt, "
+                                                           "adding more instructions to the system prompt, or using a "
+                                                           "different model.")
+                            return
+
+                    # Else we'll just store the output in a list
+                    else:
+                        output = [response]
+
+                    for n, output_item in enumerate(output):
+
+                        # Retrieve the input values used
+                        if use_batches:
+                            input_value = [v[n] for v in batched_data.values()]
+                        else:
+                            input_value = list(batched_data.values())[0]
+
+                        time_created = time.time()
+
+                        # Write!
+                        result = {
+                            "id": batched_ids[n],
+                            "output": output_item,
+                            "input_value": input_value,
+                            "prompt": prompt if not use_batches else base_prompt,  # Insert dataset values if not batching
+                            "system_prompt": system_prompt.replace("{batch_size}", str(batch_size)),
+                            "temperature": temperature,
+                            "max_tokens": max_tokens,
+                            "model": model,
+                            "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
+                            "time_created_utc": time_created,
+                            "batch_number": n + 1,
                         }
-                        annotations.append(annotation)
+                        outfile.write(json.dumps(result) + "\n")
+                        outputs += 1
+
+                        if save_annotations:
+                            annotation = {
+                                "label": label,
+                                "item_id": batched_ids[n],
+                                "value": output_item,
+                                "type": "textarea",
+                            }
+                            annotations.append(annotation)
 
                     self.dataset.update_status(
                         "Generated output for item %s/%s" % (i, self.source_dataset.num_rows)
                     )
 
-                batched_ids = []
+                    # Remove batched data and store what row we've left off
+                    batched_ids = []
+                    batched_data = {}
 
-                # Rate limits for different providers
-                if provider == "mistral":
-                    time.sleep(1)
+                    # Rate limits for different providers
+                    if provider == "mistral":
+                        time.sleep(1)
 
-        # Write annotations
-        if save_annotations:
+                # Write annotations in batches
+                if i % 1000 == 0:
+                    self.save_annotations(annotations)
+                    annotations = []
+
+        outfile.close()
+
+        if not outputs:
+            self.dataset.finish_with_error("Did not generate any output")
+            return
+
+        # Write leftover annotations
+        if annotations:
             self.save_annotations(annotations)
 
-        # Write to csv file
-        self.write_csv_items_and_finish(results)
+        time_end = time.time()
+        time_progressed = timify(time_end - time_start)
+
+        if skipped:
+            self.dataset.update_status(f"Skipped {skipped} item(s) with empty value(s).")
+        self.dataset.update_status(f"Finished, {model} generated {i} items in {time_progressed}")
+        self.dataset.finish(i)
+
+    @staticmethod
+    def get_json_schema_for_batch(batch_size: int, custom_schema: dict = None) -> dict:
+        """
+        Generates a JSON schema for an array of exactly `batch_size` items.
+
+        Each item in the array will conform to the given `item_schema`.
+
+        Parameters:
+        - batch_size (int): Number of items in the array.
+        - custom_schema (dict): Schema of a single item in the array.
+
+        Returns:
+        - dict: A JSON schema dict.
+
+        """
+        json_schema = {
+            "title": "output_values",
+            "description": "Objects for all nth values found in all lists in the user prompt.",
+            "type": "object",
+            "properties": {}
+        }
+        for batch in range(batch_size):
+            # 1st, 2nd, 3rd, 4th...
+            batch_str = nthify(batch + 1)
+            # Add nth item to schema
+            json_schema["properties"][str(batch)] = {
+                "description": f"The output for every {batch_str} item in all lists found in the user prompt",
+                "type": "string" if not custom_schema else "array"
+            }
+            if custom_schema:
+                json_schema["properties"][str(batch)]["items"] = custom_schema
+
+        json_schema["required"] = [str(i) for i in range(batch_size)]
+
+        return json_schema
+
+    @staticmethod
+    def parse_json_response(response) -> list:
+        """
+        Parse the LLM output and return all values as a list. Used for batched outputs.
+        """
+
+        parsed_response = response
+        # Cast to string
+        if isinstance(parsed_response, str):
+            try:
+                parsed_response = json.loads(parsed_response)
+            except JSONDecodeError:
+                pass
+
+        if isinstance(parsed_response, dict):
+            # Output is often with a key 'results'
+            parsed_response = parsed_response.get("results", parsed_response)
+            # Get values key, if present (should have already been 'results').
+            if len(parsed_response.keys()) == 1:
+                parsed_response = parsed_response[list(parsed_response.keys())[0]]
+
+        # Load values from dictionaries
+        if isinstance(parsed_response, dict):
+            parsed_response = [v for v in parsed_response.values()]
+        elif isinstance(parsed_response, str):
+            parsed_response = [parsed_response]
+
+        return parsed_response
+
+    @staticmethod
+    def map_item(item):
+
+        return MappedItem({
+            "id": item["id"],
+            "output": item["output"],
+            "input_value": ",".join(item["input_value"]),
+            "prompt": item["prompt"],
+            "system_prompt": item["system_prompt"],
+            "temperature": item["temperature"],
+            "max_tokens": item["max_tokens"],
+            "model": item["model"],
+            "time_created": item["time_created"],
+            "time_created_utc": item["time_created_utc"],
+            "batch_number": item["batch_number"],
+        })
