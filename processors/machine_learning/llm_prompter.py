@@ -167,8 +167,8 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Temperature",
                 "default": 0.1,
-                "tooltip": "The temperature hyperparameter indicates how strict the model will gravitate towards the next "
-                "predicted word with the highest probability. A score close to 0 returns more predictable "
+                "tooltip": "The temperature hyperparameter indicates how strict the model will gravitate towards the most "
+                "probable next token. A score close to 0 returns more predictable "
                 "outputs while a score close to 1 leads to more creative outputs.",
             },
             "max_tokens": {
