@@ -20,8 +20,17 @@ class UpdateChecker(BasicWorker):
     type = "check-for-updates"
     max_workers = 1
 
-    # check once every three hours
-    ensure_job = {"remote_id": "", "interval": 10800}
+    @classmethod
+    def ensure_job(cls, config=None):
+        """
+        Ensure that the update checker is always running
+
+        This is used to ensure that the update checker is always running, and if
+        it is not, it will be started by the WorkerManager.
+
+        :return:  Job parameters for the worker
+        """
+        return {"remote_id": "", "interval": 10800}
 
     def work(self):
         versionfile = Path(self.config.get("PATH_ROOT"), "config/.current-version")

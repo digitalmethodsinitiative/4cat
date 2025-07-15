@@ -25,10 +25,20 @@ class TempFileCleaner(BasicWorker):
     type = "clean-temp-files"
     max_workers = 1
 
-    ensure_job = {"remote_id": "localhost", "interval": 10800}
-
     # Use tracking file to delay deletion of files that may still be in use
     days_to_keep = 7
+
+    @classmethod
+    def ensure_job(cls, config=None):
+        """
+        Ensure that the temp file cleaner is always running
+
+        This is used to ensure that the temp file cleaner is always running, and
+        if it is not, it will be started by the WorkerManager.
+
+        :return:  Job parameters for the worker
+        """
+        return {"remote_id": "localhost", "interval": 10800}
 
     def work(self):
         """
