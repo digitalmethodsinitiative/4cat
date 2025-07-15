@@ -1,5 +1,6 @@
 import json
 
+from flask import g
 from typing import List, Optional, Union
 from pydantic import SecretStr
 from langchain_core.messages import BaseMessage
