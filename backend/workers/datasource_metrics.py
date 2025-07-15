@@ -48,7 +48,11 @@ class DatasourceMetrics(BasicWorker):
         total = 0
         for entry in os.scandir(path):
             if entry.is_file():
-                total += entry.stat().st_size
+                try:
+                    total += entry.stat().st_size
+                except FileNotFoundError:
+                    # If the file was removed while scanning, skip it
+                    continue
             elif entry.is_dir():
                 total += DatasourceMetrics.folder_size(entry.path)
         return total
