@@ -369,8 +369,9 @@ class LLMPrompter(BasicProcessor):
             return
 
         # Set custom model name in output
-        if provider == "lm-studio":
-            model = llm.model
+        if provider in ("lmstudio", "ollama"):
+            model = "custom model"
+            self.dataset.parameters["model"] = model
 
         # Setup annotation saving
         annotations = []

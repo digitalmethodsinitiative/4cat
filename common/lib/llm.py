@@ -20,8 +20,7 @@ class LLMAdapter:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         temperature: float = 0.1,
-        max_tokens: int = 1000,
-        json_schema=None
+        max_tokens: int = 1000
     ):
         """
         provider: 'openai', 'google', 'mistral', 'ollama', 'lmstudio', 'mistral'
@@ -93,7 +92,6 @@ class LLMAdapter:
             if self.provider == "lmstudio" and not self.api_key:
                 self.api_key = "lm-studio"
             llm = ChatOpenAI(
-                model=self.model,
                 temperature=self.temperature,
                 api_key=SecretStr(self.api_key),
                 base_url=self.base_url,
