@@ -555,6 +555,7 @@ class LLMPrompter(BasicProcessor):
 
                     # Else we'll just store the output in a list
                     else:
+                        output = response
                         if not isinstance(output, list):
                             output = [response]
 
