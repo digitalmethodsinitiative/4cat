@@ -100,6 +100,99 @@ def api_status():
 
 	return jsonify(response)
 
+@component.route("/api/available-processors/<string:dataset_key>/")
+@login_required
+@current_app.openapi.endpoint("tool")
+def collect_available_processors(dataset_key):
+	"""
+	Get available processors for a given processor type and dataset
+	:param processor_type:  Processor type, as specified in processor class `type` attribute
+	:param dataset_id:  Dataset ID, as specified in the dataset class `key` attribute
+	:return: A JSON object with the `status`, `processor`, `dataset`, and `available_processors` for the processor.
+	"""
+	if not dataset_key:
+		return error(400, message="Dataset ID is required to get available processors.")
+	
+	# cover all bases - can only run processor on "parent" dataset
+	try:
+		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
+	except DataSetException:
+		return error(404, error="Not a valid dataset key.")
+
+	if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not current_user.can_access_dataset(dataset):
+		return error(403, error="You do not have access to this dataset")
+
+	# check if processor is available for this dataset
+	available_processors = dataset.get_available_processors(config=g.config, exclude_hidden=True)
+
+	return jsonify({
+		"status": "success",
+		"dataset": dataset_key,
+		"available_processors": [{"type": processor_type, "title":processor.title, "description":processor.description, "category":processor.category, "extension":processor.get_extension()} for processor_type, processor in available_processors.items()],
+	})
+
+@component.route("/api/processor-options/<string:processor_type>/")
+@component.route("/api/processor-options/<string:processor_type>/<string:dataset_id>/")
+@login_required
+@current_app.openapi.endpoint("tool")
+def get_processor_options(processor_type, dataset_id=None):
+	"""
+	Get processor options
+
+	Optionally returns the options for a specific dataset as datasets may have
+	different options for the same processor type. Converts datasources to processor types
+	if the processor type is a datasource.
+
+	:param processor_type:  Processor type, as specified in processor class `type` attribute
+	:param dataset_id:  Dataset ID, as specified in the dataset class `key` attribute
+	:return: A JSON object with the `status`, `processor`, `dataset`, and `options` for the processor.
+	"""
+	if processor_type in g.modules.datasources:
+		# Datasources were poorly named
+		processor_type = processor_type + "-search"
+
+	if processor_type not in g.modules.processors:
+		return error(404, message="Processor '%s' does not exist" % processor_type)
+	
+	processor = g.modules.processors[processor_type]
+	
+	if not hasattr(processor, "get_options"):
+		return jsonify({
+			"status": "success",
+			"processor": processor_type,
+			"dataset": dataset_id,
+			"options": {},
+			"message": "Processor does not have options defined"
+		})
+
+	# get the options for the processor
+	if dataset_id:
+		try:
+			dataset = DataSet(key=dataset_id, db=g.db, modules=g.modules)
+		except DataSetException:
+			return error(404, message="Dataset '%s' does not exist" % dataset_id)
+		
+		# Check compatibility of processor with dataset
+		if hasattr(processor, "is_compatible_with") and not processor.is_compatible_with(dataset, g.config):
+			return error(422, message="Processor '%s' is not compatible with dataset '%s'" % (processor_type, dataset_id))
+
+		worker_options = processor.get_options(dataset, g.config)
+	else:
+		worker_options = processor.get_options(None, g.config)
+
+	for option_name, option in worker_options.items():
+		if "coerce_type" in option:
+			# if the processor has a coerce option, we need to convert it to a string
+			# so that it can be JSONified
+			option["coerce_type"] = str(option["coerce_type"])
+
+	return jsonify({
+		"status": "success",
+		"processor": processor_type,
+		"dataset": dataset_id,
+		"options": worker_options,
+		"message": "'type' defines form type (for frontend), 'help' provides help title text, 'tooltip' additional help information, 'default' the default value, 'choices' the possible choices for the field, 'min' is minimum (for numeric), 'max' is maximum (for numeric), 'coerce_type' the data type the value will be coerced to, and 'requires' denotes if field is only relevant given another option's value."
+	})
 
 @component.route("/api/datasource-form/<string:datasource_id>/")
 @login_required

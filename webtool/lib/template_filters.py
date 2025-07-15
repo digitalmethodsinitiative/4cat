@@ -153,14 +153,17 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
 	except ValueError:
 		return content
 
-	for link in set(ural.urls_from_text(str(content))):
-		if ellipsiate > 0:
-			link_text = _jinja2_filter_ellipsiate(link, ellipsiate, True, "[&hellip;]")
-		else:
-			link_text = link
-		content = content.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
-
-	return content
+	result_content = ""
+	# ural.urls_from_text() cannot handle commas (comma + space seems to work more consistantly); more powerful comma-separated list here:
+	# https://github.com/digitalmethodsinitiative/4cat_web_studies_extensions/blob/3b67237c0d5ca7fa1af30590363c424f68af0ac5/selenium_scraper.py#L479
+	for pos_link in content.split(","):
+		for link in set(ural.urls_from_text(pos_link)):
+			if ellipsiate > 0:
+				link_text = _jinja2_filter_ellipsiate(link, ellipsiate, True, "[&hellip;]")
+			else:
+				link_text = link
+			result_content += (("," if result_content else "") + pos_link.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>'))
+	return result_content
 
 @current_app.template_filter('markdown',)
 def _jinja2_filter_markdown(text, trim_container=False):
