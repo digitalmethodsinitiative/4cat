@@ -169,7 +169,7 @@ class LLMAdapter:
         """
 
         with (
-            config.PATH_ROOT
+            config.get("PATH_ROOT")
             .joinpath("common/assets/llms.json")
             .open() as available_models
         ):
