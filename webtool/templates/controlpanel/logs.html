@@ -27,5 +27,15 @@
 {{ headers }}
             </pre>
         </section>
+
+        {% if in_docker %}
+        <section>
+            <h2><span>Frontend log</span></h2>
+            <p>Displaying last 250 lines of the log file.</p>
+            <pre id="frontend-log" class="content-container" data-source="{{ url_for("admin.get_log", logfile="frontend") }}" data-interval="3">
+                Loading log file...
+            </pre>
+        </section>
+        {% endif %}
     </article>
 {% endblock %}

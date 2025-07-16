@@ -829,13 +829,14 @@ def view_logs():
     :return:
     """
     headers = "\n".join([f"{h}: {request.headers[h]}" for h in dict(request.headers)])
-    return render_template("controlpanel/logs.html", headers=headers)
+    return render_template("controlpanel/logs.html", headers=headers, in_docker=g.config.get("USING_DOCKER", False))
 
 
 @component.route("/logs/<string:logfile>/")
+@component.route("/logs/<string:logfile>/<int:max_lines>/")
 @login_required
 @setting_required("privileges.admin.can_view_status")
-def get_log(logfile):
+def get_log(logfile, max_lines=250):
     """
     Get last lines of log file
 
@@ -844,13 +845,19 @@ def get_log(logfile):
     :param str logfile: 'backend' or 'stderr'
     :return:
     """
-    if logfile not in ("stderr", "backend", "import"):
+    if logfile not in ("stderr", "backend", "import", "frontend"):
         return "Not Found", 404
+
+    # number of lines to return
+    if max_lines < 1:
+        max_lines = 250
 
     if logfile == "backend":
         filename = "4cat.log" if not g.config.get("USING_DOCKER") else "backend_4cat.log"
     elif logfile == "stderr":
         filename = "4cat.stderr"
+    elif logfile == "frontend":
+        filename = "4cat.log" if not g.config.get("USING_DOCKER") else "frontend_4cat.log"
     else:
         filename = f"{logfile}.log"
 
@@ -864,7 +871,7 @@ def get_log(logfile):
             while infile.tell():
                 infile.seek(-1, 1)
                 byte = infile.read(1)
-                if byte == "" or lines >= 250:
+                if byte == "" or lines >= max_lines:
                     break
 
                 infile.seek(-1, 1)
