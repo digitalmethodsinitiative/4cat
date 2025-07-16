@@ -63,12 +63,6 @@ class ConvertText(BasicProcessor):
                 "default": False,
                 "help": "Case sensitive",
             },
-            "only-keep-replacements": {
-                "type": UserInput.OPTION_TOGGLE,
-                "default": True,
-                "help": "Only keep rows with matches",
-                "tooltip": "This will filter out any rows that did not have any of the texts to replace.",
-            },
             "save_annotations": {
                 "type": UserInput.OPTION_ANNOTATION,
                 "label": "converted text",
@@ -116,12 +110,10 @@ class ConvertText(BasicProcessor):
             self.dataset.finish_with_error("Please indicate what text should be replaced")
             return
 
-        replace = self.parameters.get("replace", "")
+        replace = self.parameters.get("replace", "").replace("\\", r"\\")
         if not replace:
             self.dataset.finish_with_error("Please provide a replacement text")
             return
-
-        only_keep_replacements = self.parameters.get("only-keep-replacements", False)
 
         case_sensitive = self.parameters.get("case-sensitive", False)
         kwargs = {}
@@ -201,15 +193,13 @@ class ConvertText(BasicProcessor):
                             }
                             annotations.append(annotation)
 
-                # Only write when things are replaced or when we're writing everything anyway
-                if not only_keep_replacements or replaced > 0:
-                    if processed == 0:  # Write header on first row
-                        writer.writeheader()
+                if processed == 0:  # Write header on first row
+                    writer.writeheader()
 
-                    converted_item["replacements"] = replaced
-                    writer.writerow(converted_item)
-                    processed += 1
-                    replaced_total += replaced
+                converted_item["replacements"] = replaced
+                writer.writerow(converted_item)
+                processed += 1
+                replaced_total += replaced
 
                 if processed % 2500 == 0:
                     if save_annotations:
