@@ -177,8 +177,8 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Temperature",
                 "default": 0.1,
-                "coerce_type": int,
-                "max": 2,
+                "coerce_type": float,
+                "max": 2.0,
                 "tooltip": "The temperature hyperparameter indicates how strict the model will gravitate towards the most "
                 "probable next token. A score close to 0 returns more predictable "
                 "outputs while a score close to 1 leads to more creative outputs.",
