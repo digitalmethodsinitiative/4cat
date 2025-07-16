@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput, nthify, andify
+from common.lib.helpers import UserInput, nthify, andify, remove_nuls
 from common.lib.llm import LLMAdapter
 from backend.lib.processor import BasicProcessor
 
@@ -25,31 +25,25 @@ class LLMPrompter(BasicProcessor):
     category = "Machine learning"  # category
     title = "LLM prompting"  # title displayed in UI
     description = ("Use LLMs for analysis, via APIs or locally. This can be used for tasks like classification or "
-                   "entity extraction. Supported APIs include OpenAI, Google, Anthropic, and Mistral.")  # description displayed in UI
+                   "entity extraction. Supported APIs include OpenAI, Google, Anthropic, and Mistral.")
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
 
     references = [
-        "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307.13106)",
+        "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307."
+        "13106)",
         "[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences "
         "with artificial intelligence.' arXiv preprint arXiv:2309.14379.]"
-        "(https://arxiv.org/abs/2309.14379)",
-        "[Using JSON Schemas](https://python.langchain.com/docs/how_to/structured_output/#typeddict-or-json-schema)"
+        "(https://arxiv.org/abs/2309.14379)"
     ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
 
         options = {
-            "per_item": {
-                "type": UserInput.OPTION_INFO,
-                "help": "Use [brackets] with a column name to "
-                "indicate what input value you want to use. For instance: 'Determine the language of the "
-                "following text: [body]'). You can use multiple column values.",
-            },
             "ethics_warning1": {
                 "type": UserInput.OPTION_INFO,
-                "help": "Consider testing your prompt on a handful of rows. You can sample your dataset with "
-                "filtering processors.",
+                "help": "Always <strong>test your prompt</strong> on a sample of rows, for instance by first using the "
+                        "<strong>Random filter</strong> processor.",
             },
             "api_or_local": {
                 "type": UserInput.OPTION_CHOICE,
@@ -61,39 +55,42 @@ class LLMPrompter(BasicProcessor):
             },
             "api_model": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": "Model",
+                "help": "API model",
                 "options": LLMAdapter.get_model_options(config),
                 "default": "mistral-small-2503",
+                "tooltip": "Select from the predefined model list or insert manually",
                 "requires": "api_or_local==api",
             },
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "API key",
-                "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization/api-keys)",
+                "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
+                           "/api-keys). Note that this often involves billing.",
                 "requires": "api_or_local==api",
                 "sensitive": True,
             },
-            "api_custom_model_info": {
-                "type": UserInput.OPTION_INFO,
+            "api_custom_model_provider": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Model provider",
                 "requires": "api_model==custom",
-                "help": "Most LLM providers allow fine-tuning your own custom model (e.g. through the [OpenAI portal]"
-                "(https://platform.openai.com/docs/guides/fine-tuning). Fine-tuned models may perform better for"
-                " specific analysis tasks.",
+                "options": LLMAdapter.get_model_providers(config),
+                "tooltip": "Company that hosts this model. Currently limited to this list.",
             },
             "api_custom_model_id": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Model ID",
                 "requires": "api_model==custom",
-                "tooltip": "Check the API provider's documentation on what model ID to use. OpenAI for instance requires"
-                " the following format: ft:[modelname]:[org_id]:[custom_suffix]:",
+                "tooltip": "E.g. 'mistral-small-2503'. Check the API provider's documentation on what model ID to use. "
+                           "Fine-tuned models often require more info; OpenAI for instance requires the following "
+                           "format: ft:[modelname]:[org_id]:[custom_suffix]:",
             },
             "local_info": {
                 "type": UserInput.OPTION_INFO,
                 "requires": "api_or_local==local",
-                "help": "You can use local LLMs with various applications. 4CAT currently supports LM Studio and Ollama. "
-                "These applications need to be reachable by this 4CAT server, e.g. by running them "
-                "locally on the same machine.",
+                "help": "You can use local LLMs with LM Studio and Ollama. These applications need to be reachable by "
+                        "this 4CAT server, e.g. by running them on the same machine. You can also set the provider to "
+                        "LM Studio and use the Base URL to interface with any OpenAI-like API endpoint.",
             },
             "local_provider": {
                 "type": UserInput.OPTION_CHOICE,
@@ -108,19 +105,20 @@ class LLMPrompter(BasicProcessor):
                 "help": "LM Studio is a desktop application to chat with LLMs, but that you can also run as a local "
                 "server. See [this link for intructions on how to run LM Studio as a server](https://lmstudio.ai/docs/"
                 "app/api). When the server is running, the endpoint is shown in the 'Developer' tab on the top "
-                "right (default: http://localhost:1234/v1). 4CAT will use the top-most model you have loaded in",
+                "right (default: `http://localhost:1234/v1`). 4CAT will use the top-most model you have loaded.",
             },
             "ollama-info": {
                 "type": UserInput.OPTION_INFO,
                 "requires": "local_provider==ollama",
-                "help": "Ollama is a command-line application that you can also run as a local server. See [this link]"
-                "(https://lmstudio.ai/docs/app/api) for instructions.",
+                "help": "Ollama is a simple command-line application that lets you interface with a range of open-"
+                        "source LLMs and that you can run as a local server. See [this link]"
+                        "(https://github.com/ollama/ollama/blob/main/README.md#quickstart) for instructions.",
             },
             "lmstudio_api_key": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "LM Studio API key",
-                "tooltip": "Leaving this empty will use the default `lm-studio` key.",
+                "tooltip": "[optional] Uses `lm-studio` by default.",
                 "requires": "local_provider==lmstudio",
                 "sensitive": True,
             },
@@ -129,48 +127,59 @@ class LLMPrompter(BasicProcessor):
                 "requires": "api_or_local==local",
                 "default": "",
                 "help": "Base URL for local models",
-                "tooltip": "Leaving this empty will use default values (http://localhost:1234/v1 for LM Studio, "
-                "http://localhost:11434 for Ollama)",
+                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1` for LM "
+                           "Studio, `http://localhost:11434` for Ollama)",
             },
             "ollama_model": {
                 "type": UserInput.OPTION_TEXT,
                 "requires": "local_provider==ollama",
                 "default": "",
                 "help": "Ollama model name",
-                "tooltip": "E.g. 'llama3.2:latest'",
+                "tooltip": "[required] for example 'llama3.2'",
             },
             "system_prompt": {
-                "type": UserInput.OPTION_TEXT,
+                "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "System prompt",
                 "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
-                           "on the output format or the tone of the text.",
+                           "on the tone of the text. This processor may edit the system prompt to "
+                           "ensure correct output. Full system prompts are included in the results file.",
             },
             "prompt_info": {
                 "type": UserInput.OPTION_INFO,
-                "help": "<strong>Use [brackets] with column names</strong> to insert dataset items in the prompt. You "
-                        "can use multiple columns in different brackets or put them within one bracket to merge items."
-                        "<br><strong>Example 1</strong>: 'Describe the topic of this social media post: `[body, tags]`'"
-                        "<br><strong>Example 2</strong>: 'Given the following hashtags: `[tags]`, answer whether they "
-                        "are 'related' or 'unrelated' to the following text: `[body]`'"
-                        "<br><strong>Prompting is a delicate art</strong>. See processor references on best prompting practices."
+                "help": "<strong>How to prompt on 4CAT</strong><br>"
+                        "Use `[brackets]` with column names to insert dataset items in the prompt. You "
+                        "can place column brackets in different parts of the prompt or use multiple column names within"
+                        " a single column bracket to merge items.<br>Example 1: \"Describe the topic "
+                        "of this social media post in max. 3 words: `[body, tags]`\"<br>Example 2: "
+                        "\"Given the following hashtags: `[tags]`, answer whether they are 'related' or 'unrelated' "
+                        "to the following text: `[body]`\"<br><strong>Prompting is a delicate art</strong>. See "
+                        "processor references on best prompting practices.<br>For predefined research prompts, see "
+                        "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
+                        "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
+                        "library)."
             },
             "prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Prompt",
+                "help": "User prompt",
                 "tooltip": "Use [brackets] with columns names.",
             },
             "structured_output": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Output structured JSON",
-                "tooltip": "Output in a JSON format instead of CSV text. Note that your chosen model may not support structured "
-                "outputs.",
+                "tooltip": "Output in a JSON format instead of CSV text. Note that your chosen model may not support "
+                           "structured output."
+            },
+            "json_schema_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
+                        "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
+                        "(https://json-schema.org/learn/miscellaneous-examples).",
+                "requires": "structured_output==true"
             },
             "json_schema": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "JSON schema",
-                "tooltip": "[required] A JSON schema that the structured output will adhere to. This needs "
-                           "at least 'title' and 'description' keys. See the references for this processor for details "
-                           "on how to write a JSON schema.",
+                "tooltip": "[required] A JSON schema that the structured output will adhere to",
                 "requires": "structured_output==true"
             },
             "temperature": {
@@ -179,9 +188,9 @@ class LLMPrompter(BasicProcessor):
                 "default": 0.1,
                 "coerce_type": float,
                 "max": 2.0,
-                "tooltip": "The temperature hyperparameter indicates how strict the model will gravitate towards the most "
+                "tooltip": "Temperature indicates how strict the model will gravitate towards the most "
                 "probable next token. A score close to 0 returns more predictable "
-                "outputs while a score close to 1 leads to more creative outputs.",
+                "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
             },
             "max_tokens": {
                 "type": UserInput.OPTION_TEXT,
@@ -195,17 +204,17 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Items per prompt",
                 "coerce_type": int,
-                "max": 100,
                 "default": 1,
                 "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
                            "wherever the column brackets are used (e.g. '[body]')."
             },
             "batch_info": {
                 "type": UserInput.OPTION_INFO,
-                "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Make sure "
-                        "to use plurals in the prompt when introducing the values. Models may have trouble outputting "
-                        "as many output values as input values. This processor uses JSON schemas to ensure symmetry. "
-                        "When using multiple column brackets in your prompt, rows with any empty values are skipped."
+                "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Models "
+                        "need to support structured output for batching. This processor uses JSON schemas to ensure "
+                        "symmetry between input and output lengths, but models may struggle to match input and output "
+                        "values. Describe the dataset values in plurals in your prompt when batching. If you use "
+                        "multiple column brackets in your prompt, rows with any empty values are skipped."
             },
             "ethics_warning3": {
                 "type": UserInput.OPTION_INFO,
@@ -238,11 +247,13 @@ class LLMPrompter(BasicProcessor):
         return module.get_extension() in ["csv", "ndjson"]
 
     def process(self):
-
+        
         self.dataset.update_status("Validating settings")
+
         api_consent = self.parameters.get("consent", False)
         api_model = self.parameters.get("api_model")
-        use_local_model = True if self.parameters.get("api_or_local", "api") == "local" else False
+        use_local_model = self.parameters.get("api_or_local", "api") == "local"
+        model = ""
 
         # Add some friction if an API is used.
         if not use_local_model and not api_consent:
@@ -251,48 +262,15 @@ class LLMPrompter(BasicProcessor):
 
         self.dataset.delete_parameter("consent")
 
-        if not use_local_model and api_model == "custom":
-            if not self.parameters.get("custom_model", ""):
-                self.dataset.finish_with_error(
-                    "You must provide a valid ID for your custom model"
-                )
-                return
-            else:
-                custom_model_id = self.parameters.get("custom_model", "")
-                self.parameters["model"] = custom_model_id
-                model = custom_model_id
-
-        if use_local_model:
-            if self.parameters.get("local_provider") == "none":
-                self.dataset.finish_with_error("Choose a local model provider")
-                return
-            model = "custom"
-
-        try:
-            temperature = float(self.parameters.get("temperature"))
-        except ValueError:
-            self.dataset.finish_with_error("Temperature must be a number")
-            return
-
-        temperature = min(max(temperature, 0), 2)
-
+        temperature = min(max(self.parameters.get("temperature", 0.1), 0), 2)
         max_tokens = int(self.parameters.get("max_tokens"))
-
         system_prompt = self.parameters.get("system_prompt", "")
 
         # Set value for batch length in prompts
-        batches = self.parameters.get("batches", 1)
-        use_batches = True
-        try:
-            batches = int(batches)
-        except ValueError:
-            self.dataset.finish_with_error("Batches must be a number")
-            return
-        batches = max(1, min(batches, self.source_dataset.num_rows))
-
-        if batches == 1:
+        batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
+        use_batches = batches > 1
+        if not use_batches:
             self.dataset.delete_parameter("batches")
-            use_batches = False
 
         # Set all variables through which we can reach the LLM
         api_key = ""
@@ -301,26 +279,47 @@ class LLMPrompter(BasicProcessor):
         if use_local_model:
             provider = self.parameters.get("local_provider", "")
             base_url = self.parameters.get("local_base_url", "")
-            if provider == "lmstudio" and not self.parameters.get("lmstudio_api_key"):
-                api_key = "lm-studio"
-            if not base_url:
-                if provider == "lmstudio":
-                    base_url = "http://127.0.0.1:1234/v1"
-                elif provider == "ollama":
-                    base_url = "http://localhost:11434"
 
+            if not provider:
+                self.dataset.finish_with_error("Choose a local model provider")
+                return
+
+            if provider == "lmstudio":
+                model = "lmstudio_model"
+                if not base_url:
+                    base_url = "http://127.0.0.1:1234/v1"
+                if not self.parameters.get("lmstudio_api_key"):
+                    api_key = "lm-studio"
+            elif provider == "ollama":
+                model = self.parameters.get("ollama_model", "")
+                if not model:
+                    self.dataset.finish_with_error("You need to provide a model name for Ollama (e.g. 'llama3.2')")
+                    return
+                if not base_url:
+                    base_url = "http://localhost:11434"
+            else:
+                self.dataset.finish_with_error("Local provider not supported, choose either lmstudio or ollama")
+                return
         else:
-            provider = LLMAdapter.get_models(self.config)[api_model]["provider"]
-            model = api_model
-            api_key = self.parameters.get("api_key", "")
-            if not api_key:
-                api_key = self.config.get(f"api.{provider}.api_key", "")
+            # Models can be set manually already
+            if api_model == "custom":
+                model = self.parameters.get("api_custom_model_id", "")
+                provider = self.parameters.get("api_custom_model_provider", "")
+                if not model:
+                    self.dataset.finish_with_error("You must provide a valid API model name/ID")
+                    return
+                if not provider:
+                    self.dataset.finish_with_error("You must provide a valid API model provider")
+                    return
+            else:
+                model_info = LLMAdapter.get_models(self.config).get(api_model, {})
+                provider = model_info.get("provider")
+                model = api_model
+
+            api_key = self.parameters.get("api_key") or self.config.get(f"api.{provider}.api_key", "")
             if not api_key:
                 self.dataset.finish_with_error("You need to provide a valid API key")
                 return
-
-        if provider == "ollama":
-            model = self.parameters.get("ollama_model", "")
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
@@ -331,7 +330,7 @@ class LLMPrompter(BasicProcessor):
             return
 
         # Get column values in prompt. These can be one or multiple, and multiple within a bracket as well.
-        columns_to_use = re.findall(r"\[.*?\]", base_prompt)
+        columns_to_use = re.findall(r"\[.*?]", base_prompt)
         if not columns_to_use:
             self.dataset.finish_with_error(
                 "You need to insert column name(s) in the prompts within brackets (e.g. '[body]' "
@@ -342,20 +341,21 @@ class LLMPrompter(BasicProcessor):
 
         # Structured output
         structured_output = self.parameters.get("structured_output", False)
-        # Custom JSON schema to structure output
-        json_schema = self.parameters.get("json_schema", None) if structured_output else None
-        if structured_output and not json_schema:
-            self.dataset.finish_with_error("You need to provide a JSON schema for structured outputs. See the "
-                                           "references of this processor.")
-            return
-        elif structured_output and json_schema:
+        json_schema = self.parameters.get("json_schema") if structured_output else None
+
+        if structured_output:
+            if not json_schema:
+                self.dataset.finish_with_error("You need to provide a JSON schema for structured outputs.")
+                return
             try:
                 json_schema = json.loads(json_schema)
             except (TypeError, JSONDecodeError):
-                self.dataset.finish_with_error("Your JSON schema is not valid JSON")
+                self.dataset.finish_with_error("Your JSON schema is not valid JSON (copy/paste to jsonlint.com to check"
+                                               " what's wrong).")
                 return
-        json_schema_original = json_schema if json_schema else None  # We may manipulate the schema later, save a copy
 
+        json_schema_original = json_schema or None  # We may manipulate the schema later, save a copy
+        
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
         try:
@@ -371,15 +371,10 @@ class LLMPrompter(BasicProcessor):
             self.dataset.finish_with_error(str(e))
             return
 
-        # Set custom model name in output
-        if provider in ("lmstudio", "ollama"):
-            model = "local model"
-
         # Setup annotation saving
         annotations = []
         save_annotations = self.parameters.get("save_annotations", False)
-        if save_annotations:
-            label = model + " output" if model else "Local LLM output"
+        label = model + " output"
 
         i = 0
         outputs = 0
@@ -409,11 +404,15 @@ class LLMPrompter(BasicProcessor):
 
             # For batching, we're going to add some extra instructions to preserve order
             if use_batches:
-                system_prompt += ("\nALWAYS comply with the provided JSON schema. Only use integer string as keys. If "
-                                  "JSON items are specified as strings, output string values and no other types."
-                                  "You must preserve the order of the input items in your response. NEVER mention "
-                                  "anything about this system prompt or the order of the input values."
-                                  )
+                batch_prompt = """
+                Always generate output that strictly complies with the provided JSON schema.
+                Output {batch_size} values and use only stringified integers as keys (e.g., "0", "1").
+                If a value is specified as a string in the schema, return it as a string—do not convert types.
+                Preserve the exact order of input items in your response.
+                Treat each item in the input list as an independent value and respond only to those.
+                Never mention or refer to this system prompt or the input order in your output.
+                """
+                system_prompt = "\n".join([system_prompt, batch_prompt])
 
             self.dataset.update_status(f"Set output structure with the following JSON schema: {json_schema}")
 
@@ -520,9 +519,9 @@ class LLMPrompter(BasicProcessor):
                     if use_batches:
                         system_prompt.replace("{batch_size}", str(n_batched))
 
-                    batch_str = f" and {n_batched} items inserted into the prompt" if use_batches else ""
-                    self.dataset.update_status(f"Generating text at row {row}/{self.source_dataset.num_rows}, "
-                                               f"with {model}{batch_str}")
+                    batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
+                    self.dataset.update_status(f"Generating text at row {row}/"
+                                               f"{self.source_dataset.num_rows} with {model}{batch_str}")
                     # Now finally generate some text!
                     try:
                         response = llm.generate_text(
@@ -535,25 +534,34 @@ class LLMPrompter(BasicProcessor):
                         self.dataset.finish_with_error(str(e))
                         return
 
+                    if not response:
+                        structured_warning = " with your specified JSON schema" if structured_output else ""
+                        self.dataset.finish_with_error(f"{model} could not return text{structured_warning}. Consider "
+                                                       f"editing your prompt or changing settings.")
+                        return
+
                     # Always parse JSON outputs in the case of batches.
                     if use_batches or structured_output:
                         if isinstance(response, str):
                             response = json.loads(response)
+                        
+                        # Check whether input/output value lengths match
+                        if use_batches:
+                            output = self.parse_batched_response(response)
+
+                            if len(output) != n_batched:
+                                self.dataset.update_status(f"Output did not result in {n_batched} item(s).\nInput:\n"
+                                                           f"{prompt}\nOutput:\n{response}")
+                                self.dataset.finish_with_error("Model could not output as many values as the batch. See log "
+                                                               "for incorrect output. Try lowering the batch size, "
+                                                               "editing the prompt, or using a different model.")
+                                return
+
+                        # Also validate whether the JSON schema and the output match
                         try:
                             jsonschema.validate(instance=response, schema=json_schema)
                         except (ValidationError, SchemaError) as e:
-                            self.dataset.finish_with_error(f"Invalid JSON schema, {e}")
-                            return
-
-                    if use_batches:
-                        output = self.parse_batched_response(response)
-
-                        if len(output) != n_batched:
-                            self.dataset.update_status(f"Output did not result in {n_batched} item(s).\nInput:\n"
-                                                       f"{prompt}\nOutput:\n{response}")
-                            self.dataset.finish_with_error("Model could not output as many values as the batch. See log "
-                                                           "for incorrect output. Try lowering the batch size, "
-                                                           "editing the prompt, or using a different model.")
+                            self.dataset.finish_with_error(f"Invalid JSON schema and/or LLM output: {e}")
                             return
 
                     # Else we'll just store the output in a list
@@ -578,13 +586,13 @@ class LLMPrompter(BasicProcessor):
                             "output": output_item,
                             "input_value": input_value,
                             "prompt": prompt if not use_batches else base_prompt,  # Insert dataset values if not batching
-                            "system_prompt": system_prompt.replace("{batch_size}", str(n_batched)),
                             "temperature": temperature,
                             "max_tokens": max_tokens,
                             "model": model,
                             "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                             "time_created_utc": time_created,
                             "batch_number": n + 1 if use_batches else "",
+                            "system_prompt": system_prompt.replace("{batch_size}", str(n_batched)),
                         }
                         outfile.write(json.dumps(result) + "\n")
                         outputs += 1
@@ -593,11 +601,10 @@ class LLMPrompter(BasicProcessor):
                             annotation = {
                                 "label": label,
                                 "item_id": batched_ids[n],
-                                "value": json.dumps(output_item) if isinstance(output_item, dict) else output_item,
-                                "type": "textarea",
+                                "value": remove_nuls(json.dumps(output_item)) if isinstance(output_item, dict) else output_item,
+                                "type": "text",
                             }
                             annotations.append(annotation)
-
 
                     # Remove batched data and store what row we've left off
                     batched_ids = []
@@ -650,6 +657,7 @@ class LLMPrompter(BasicProcessor):
         json_schema = {
             "title": "batched_output_values",
             "description": "Objects for all nth values found in lists in the user prompt.",
+            "strict": True,
             "type": "object",
             "properties": {}
         }
@@ -705,11 +713,11 @@ class LLMPrompter(BasicProcessor):
             "output": item["output"],
             "input_value": ",".join(item["input_value"]),
             "prompt": item["prompt"],
-            "system_prompt": item["system_prompt"],
             "temperature": item["temperature"],
             "max_tokens": item["max_tokens"],
             "model": item["model"],
             "time_created": item["time_created"],
             "time_created_utc": item["time_created_utc"],
             "batch_number": item["batch_number"],
+            "system_prompt": item["system_prompt"]
         })

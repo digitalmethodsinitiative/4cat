@@ -121,13 +121,13 @@ class LLMAdapter:
             lc_messages = messages
 
         kwargs = {"temperature": temperature}
-        if self.provider == "google":  # Temperature not supported here by Google
+        if self.provider in ("google", "ollama") or "o3" in self.model:  # Temperature not supported here by Google
             kwargs = {}
         try:
             response = self.llm.invoke(lc_messages, **kwargs)
         except Exception as e:
             raise e
-
+        
         return response if self.structured_output and not isinstance(response, AIMessage) else response.content
 
     def set_structure(self, json_schema):
@@ -156,7 +156,25 @@ class LLMAdapter:
         """
 
         models = LLMAdapter.get_models(config)
+        if not models:
+            return {}
         options = {model_id: model_values["name"] for model_id, model_values in models.items()}
+        return options
+
+    @staticmethod
+    def get_model_providers(config) -> dict:
+        """
+        Returns available model providers through APIs
+
+        """
+
+        models = LLMAdapter.get_models(config)
+        if not models:
+            return {}
+        providers = list(set([model_values.get("provider", "") for model_values in models.values()]))
+        if not providers:
+            return {}
+        options = {provider: provider.capitalize() for provider in providers if provider}
         return options
 
     @staticmethod
