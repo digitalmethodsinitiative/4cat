@@ -159,7 +159,8 @@ def explorer_dataset(dataset_key: str, page=1):
 		posts_per_page=posts_per_page,
 		post_count=post_count,
 		max_posts=max_posts,
-		warning=warning
+		warning=warning,
+		config=g.config
 	)
 
 @component.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
