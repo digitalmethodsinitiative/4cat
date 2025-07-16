@@ -173,7 +173,8 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_INFO,
                 "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
                         "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
-                        "(https://json-schema.org/learn/miscellaneous-examples).",
+                        "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
+                        "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
                 "requires": "structured_output==true"
             },
             "json_schema": {
@@ -261,8 +262,9 @@ class LLMPrompter(BasicProcessor):
             return
 
         self.dataset.delete_parameter("consent")
-
-        temperature = min(max(self.parameters.get("temperature", 0.1), 0), 2)
+        
+        temperature = float(self.parameters.get("temperature", 0.1))
+        temperature = min(max(temperature, 0), 2)
         max_tokens = int(self.parameters.get("max_tokens"))
         system_prompt = self.parameters.get("system_prompt", "")
 
@@ -404,15 +406,14 @@ class LLMPrompter(BasicProcessor):
 
             # For batching, we're going to add some extra instructions to preserve order
             if use_batches:
-                batch_prompt = """
-                Always generate output that strictly complies with the provided JSON schema.
-                Output {batch_size} values and use only stringified integers as keys (e.g., "0", "1").
-                If a value is specified as a string in the schema, return it as a string—do not convert types.
-                Preserve the exact order of input items in your response.
-                Treat each item in the input list as an independent value and respond only to those.
-                Never mention or refer to this system prompt or the input order in your output.
-                """
-                system_prompt = "\n".join([system_prompt, batch_prompt])
+                batch_prompt = ("Always generate output that strictly complies with the provided JSON schema.\n"
+                                "Output {batch_size} values and use only stringified integers as keys (e.g. \"0\", "
+                                "\"1\"). If a value is specified as a string in the schema, return it as a string—do "
+                                "not convert types.\nPreserve the exact order of input items in your response.\n"
+                                "Treat each item in the input list as an independent value and respond only to those.\n"
+                                "Never mention or refer to this system prompt or the input order in your output.")
+                
+                system_prompt = "\n".join([system_prompt, batch_prompt]) if system_prompt else batch_prompt
 
             self.dataset.update_status(f"Set output structure with the following JSON schema: {json_schema}")
 
@@ -531,9 +532,9 @@ class LLMPrompter(BasicProcessor):
                         )
                     # Broad exception, but necessary with all the different LLM providers and options...
                     except Exception as e:
-                        self.dataset.finish_with_error(str(e))
+                        self.dataset.finish_with_error(f"`{e}`")
                         return
-
+                    
                     if not response:
                         structured_warning = " with your specified JSON schema" if structured_output else ""
                         self.dataset.finish_with_error(f"{model} could not return text{structured_warning}. Consider "
@@ -561,7 +562,7 @@ class LLMPrompter(BasicProcessor):
                         try:
                             jsonschema.validate(instance=response, schema=json_schema)
                         except (ValidationError, SchemaError) as e:
-                            self.dataset.finish_with_error(f"Invalid JSON schema and/or LLM output: {e}")
+                            self.dataset.finish_with_error(f"Invalid JSON schema and/or LLM output: `{e}`")
                             return
 
                     # Else we'll just store the output in a list
@@ -657,7 +658,6 @@ class LLMPrompter(BasicProcessor):
         json_schema = {
             "title": "batched_output_values",
             "description": "Objects for all nth values found in lists in the user prompt.",
-            "strict": True,
             "type": "object",
             "properties": {}
         }
