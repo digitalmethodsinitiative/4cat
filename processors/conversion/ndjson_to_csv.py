@@ -49,7 +49,7 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 
 		self.dataset.update_status("Converting file")
 		staging_area = self.dataset.get_staging_area()
-		with staging_area.joinpath('temp.ndjson').open("w") as output:
+		with staging_area.joinpath('temp.ndjson').open("w", encoding="utf-8") as output:
 			for mapped_item in self.source_dataset.iterate_items(self):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
@@ -68,11 +68,11 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 
 		processed = 0
 		# Create new CSV file
-		with self.dataset.get_results_path().open("w", newline="") as output:
+		with self.dataset.get_results_path().open("w", newline="", encoding="utf-8") as output:
 			writer = csv.DictWriter(output, fieldnames=all_keys)
 			writer.writeheader()
 
-			with staging_area.joinpath('temp.ndjson').open("r") as infile:
+			with staging_area.joinpath('temp.ndjson').open("r", encoding="utf-8") as infile:
 				for line in infile:
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing results to file")

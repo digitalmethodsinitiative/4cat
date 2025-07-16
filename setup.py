@@ -29,6 +29,7 @@ packages = set([
 	"ImageHash>4.2.0",
 	"jieba",
 	"json_stream",
+	"jsonschema",
 	"langchain_core",
 	"langchain_community",
 	"langchain_anthropic",
