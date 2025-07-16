@@ -33,11 +33,12 @@ class DebateMetrics(BasicProcessor):
 	followups = []
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor if dataset is a 'top level' dataset
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
 
@@ -48,10 +49,6 @@ class DebateMetrics(BasicProcessor):
 		"""
 
 		threads = {}
-		reply_lengths = []
-		
-		datasource = self.source_dataset.parameters["datasource"]
-		board = self.source_dataset.parameters["board"]
 
 		self.dataset.update_status("Reading source file")
 		for post in self.source_dataset.iterate_items(self):

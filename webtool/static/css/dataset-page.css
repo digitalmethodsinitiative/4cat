@@ -198,12 +198,39 @@ article.result > section:first-child {
     line-height: 1.3em;
 }
 
+.button-like-small.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+
 .dataset-owner-list li {
     display: inline-block;
 }
 
 .dataset-owner-list li:not(:last-child)::after {
     content: '\02022';
+}
+
+.annotation-fields-list {
+    position: relative;
+}
+
+.annotation-fields-list ul {
+    list-style: none;
+    margin: 0;
+    padding-right: 5em;
+}
+
+.annotation-fields-list li {
+    display: inline-block;
+}
+
+.annotation-fields-list #edit-annotation-fields {
+    position: absolute;
+    top: 0;
+    right: 0.5em;
+    line-height: 1.3em;
 }
 
 /** dataset toolbox **/
@@ -225,6 +252,7 @@ article.result > section:first-child {
     background: var(--gray-light);
     border: 1px solid var(--gray-dark);
     font-size: 0.8em;
+    cursor: pointer;
 }
 
 .dataset-toolbox a:hover, a.button-like-small:hover {
@@ -319,6 +347,7 @@ article.result > section:first-child {
 }
 
 .child-wrapper .button-wrap.processor-result-indicator a {
+    display: inline-block;
     color: inherit;
 }
 
@@ -333,6 +362,7 @@ article.result > section:first-child {
 }
 
 .child-wrapper .button-wrap .byline {
+    cursor: default;
     font-size: 0.8em;
 }
 
@@ -357,7 +387,6 @@ article.result > section:first-child {
 }
 
 .child-list .property-badge.permalink {
-    text-indent: -0.4em;
     color: var(--accent);
 }
 
@@ -410,7 +439,7 @@ article.result > section:first-child {
     display: none;
 }
 
-.child-list .processor-header .property-badge {
+.child-list .processor-header .property-badge, p[role=tooltip] .property-badge {
     border: 0;
     background: var(--gray);
     display: inline;
@@ -475,6 +504,10 @@ article.result > section:first-child {
     min-width: 13em;
 }
 
+.processor-options .multichoice-wrapper.inline label {
+    min-width: 17em;
+}
+
 .processor-options .multichoice-wrapper label {
     display: block;
     margin-left: 1em;
@@ -485,6 +518,11 @@ article.result > section:first-child {
     content: '\2022';
     position: absolute;
     left: -.75em;
+}
+
+.processor-options .multichoice-wrapper.inline {
+    margin-top: .2em;
+    margin-bottom: .2em;
 }
 
 .processor-options .multichoice-wrapper.inline label {
@@ -503,6 +541,7 @@ article.result > section:first-child {
     padding: 0.5em;
     display: flex;
     flex-wrap: wrap;
+    align-items: baseline;
     border-bottom: 1px var(--gray-darker) dotted;
 }
 
@@ -512,20 +551,31 @@ article.result > section:first-child {
 
 .processor-option-wrap > label {
     display: flex;
-    align-items: center;
+    align-items: baseline;
 }
 
 .processor-option-wrap > label.option-type-toggle {
     min-width: auto;
 }
 
+.processor-option-wrap > label.option-type-toggle {
+    min-width: auto;
+}
+
+.processor-option-wrap > label.option-type-toggle > input[type="checkbox"] {
+    margin-top: 0.2em;
+}
+
 .processor-option-wrap > *:not(label) {
-    margin-left: 0.5em;
+
+}
+
+.processor-option-wrap > .processor-tooltip {
+    margin-left: auto;
 }
 
 .processor-option-wrap button.tooltip-trigger {
-    margin-top: 0.5em;
-    margin-left: 0.5em;
+
 }
 
 .processor-options textarea {
@@ -588,6 +638,28 @@ article.result > section:first-child {
     margin-right: 1px;
     cursor: pointer;
     user-select: none;
+}
+
+.processor-option-wrap .property-badge.annotation-label {
+    margin-left: 0.3em;
+    margin-right: 0.3em;
+}
+
+.processor-option-wrap .hidden-annotation-notice {
+    font-size: 0.8em;
+    margin-left: 0.3em;
+    color: var(--gray-darker);
+}
+
+.processor-option-wrap .annotation-explainer {
+    font-size: 0.8em;
+    margin-left: 1.5em;
+    flex-basis: 70%;
+    line-height: 1em;
+}
+
+.processor-option-wrap .annotation-explainer.after-multi {
+    margin: 0.2em 0 0em 0;
 }
 
 @keyframes child-blink {
@@ -710,4 +782,193 @@ body.image-preview {
 #image-zoom:checked + label img {
     max-height: none;
     cursor: zoom-out;
+}
+
+/* EXPLORER VIEW */
+#explorer-controls .metadata-wrapper dd {
+    padding: 0
+}
+
+#explorer-controls .metadata-wrapper dd .padding {
+    padding: 0.5em;
+}
+
+#annotation-fields-editor {
+    height: 0;
+    overflow-y: hidden;
+}
+
+#annotation-fields-editor-controls {
+
+}
+
+#annotation-fields-editor-controls li.annotation-field {
+    background-color: white;
+    position: relative;
+    padding: 12px 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 60px;
+    box-sizing: border-box;
+}
+
+#annotation-fields-editor-controls li.annotation-field:not(:last-child) {
+    border-bottom: 1px dotted var(--contrast-dark);
+}
+
+#explorer-controls .info-row {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    padding: 0;
+    margin: 0;
+}
+
+#explorer-controls .info-row > #tutorial-cell {
+    border-left: 1px solid var(--gray);
+}
+
+.annotation-field > .annotation-field-icons {
+    margin-top: 0.4em;
+}
+
+.annotation-field > .annotation-field-icons > .handle {
+    flex-shrink: 0;
+    cursor: move;
+}
+
+.annotation-field-input {
+    flex-shrink: 0;
+    min-width: 120px;
+    margin-right: 1em;
+}
+
+.annotation-field-input input {
+    width: 100%;
+    min-width: 120px;
+}
+
+.annotation-field > span:has(.annotation-field-type) {
+    flex-shrink: 0;
+    min-width: 120px;
+}
+
+.annotation-field-type {
+    width: 100%;
+    padding: 0.35em;
+}
+
+.annotation-field .dataset-annotation-field {
+    flex: 1;
+    min-width: 0; /* Allow shrinking */
+}
+
+.annotation-field .dataset-annotation-field h4 {
+    margin: 0 0 8px 0;
+    display: inline;
+}
+
+.annotation-field .dataset-annotation-field .parameters {
+    margin-top: 8px;
+}
+
+.annotation-field .dataset-annotation-field ul {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.annotation-field .dataset-annotation-field ul li {
+    display: inline-flex;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+.annotation-field .parameters .property-badge {
+    border: none;
+    background: var(--gray, #f0f0f0);
+    display: inline-block;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.annotation-field .field-controls {
+    margin-left: auto;
+}
+
+.annotation-field .field-controls a {
+    margin: 0.1em;
+}
+
+
+#edit-annotation-fields #input-warning {
+    color: var(--accent-warning)
+}
+
+/* Remove all styles for Explorer posts */
+/* these ought to be defined specifically, */
+/* and 4CAT styles shouldn't interfere. */
+#explorer-posts, #explorer-posts > ol li {
+    all: initial;
+    padding: 0;
+}
+
+.explorer-content-container {
+    margin-top: 1em;
+}
+
+#explorer-content {
+    all: initial;
+    padding: 0;
+}
+
+.post-annotations {
+    box-sizing: border-box;
+    border-width: 0;
+}
+
+.annotation-control-button {
+    min-width: 140px;
+}
+
+.annotation-field-label.invalid, .option-field > input.invalid {
+    border: 1px solid var(--accent-warning);
+}
+
+#edit-annotation-fields {
+    padding: 0.5em
+}
+
+.post-annotations p[role="tooltip"] .property-badge {
+    display: inline-block;
+    margin: 2px 0px 2px 0px;
+    background-color: white;
+    border: 1px solid black;
+}
+
+#save-annotations-notice {
+    position: fixed;
+    background-color: var(--accent-okay);
+    color: var(--contrast-bright);
+    display: none;
+    right: 20px;
+    bottom: 64px;
+    width: 200px;
+    text-align: center;
+    padding: 10px 5px 10px 5px;
+    border-radius: 10px;
+}
+
+.delete-input {
+    float: right;
+}
+
+.spinner {
+    animation: fa-spin;
+    animation-duration: 1000ms;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
 }

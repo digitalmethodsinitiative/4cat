@@ -39,6 +39,10 @@
     src: url("../fonts/fsex300-webfont.woff")
 }
 
+@font-face {
+    font-family: 'Inter';
+    src: url("../fonts/Inter-VariableFont_opsz,wght.ttf");
+}
 
 /** --------------------- *
      Basic HTML elements
@@ -460,6 +464,12 @@ nav > ul.flat > li:not(:last-child)::after {
     text-align: center;
 }
 
+/** --------------------- *
+  Utility classes -> Clipboard
+  * --------------------- */
+.copy-to-clipboard, .property-badge.copy-to-clipboard {
+    cursor: grab;
+}
 
 
 /** --------------------- *
@@ -487,15 +497,16 @@ nav > ul.flat > li:not(:last-child)::after {
 
 button.tooltip-trigger {
     max-height: 1.75em;
-}
-
-button.tooltip-trigger {
 	font-size: 0.8em;
 	position: relative;
 	top: -0.1em;
     padding: 0 0.5em;
     border-width: 1px;
     border-color: var(--gray-dark);
+}
+
+p[role=tooltip] > .tooltip-line {
+    display: inline-block;
 }
 
 
@@ -959,6 +970,11 @@ article section.data-overview .description {
 .pagination li.page a:hover, .pagination li.page a:focus {
 	background: var(--accent);
     color: var(--contrast-bright);
+}
+
+.pagination .details {
+    margin: 0 auto;
+    text-align: center;
 }
 
 .tabs {

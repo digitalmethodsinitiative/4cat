@@ -1,6 +1,5 @@
 import datetime
 import json
-import csv
 import re
 
 from dateutil.parser import parse as parse_datetime
@@ -350,27 +349,43 @@ def map_csv_items(reader, columns, dataset, parameters):
         # is a unix timestamp. this will override the columns if they
         # already exist! but it is necessary for 4CAT to handle the
         # data in processors etc and should be an equivalent value.
-        try:
-            if mapped_row["timestamp"].replace(".", "").isdecimal() and mapped_row["timestamp"].count(".") <= 1:  # ignore . for floats
-                timestamp = datetime.datetime.fromtimestamp(float(mapped_row["timestamp"]))
-            else:
-                timestamp = parse_datetime(mapped_row["timestamp"])
+        if not mapped_row.get("timestamp"):
+            if mapped_row.get("unix_timestamp"):
+                # if unix timestamp is given, convert to datetime
+                try:
+                    timestamp = datetime.datetime.fromtimestamp(int(mapped_row["unix_timestamp"]))
+                    mapped_row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                except (ValueError, OSError) as e:
+                    yield InvalidImportedItem(f"{e.__class__.__name__} - {e} (value was '{mapped_row['unix_timestamp']}')")
+                    continue
 
-            mapped_row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            mapped_row["unix_timestamp"] = int(timestamp.timestamp())
+            # no timestamp given, set to empty string
+            mapped_row["timestamp"] = ""
+            mapped_row["unix_timestamp"] = None
+            
+        else:
+            try:
+                
+                if mapped_row["timestamp"].replace(".", "").isdecimal() and mapped_row["timestamp"].count(".") <= 1:  # ignore . for floats
+                    timestamp = datetime.datetime.fromtimestamp(float(mapped_row["timestamp"]))
+                else:
+                    timestamp = parse_datetime(mapped_row["timestamp"])
 
-            # this ensures that the required columns are always the first
-            # columns, and the rest is in original order
-            for field, value in row.items():
-                if field not in mapped_row and field:
-                    mapped_row[field] = value
+                mapped_row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                mapped_row["unix_timestamp"] = int(timestamp.timestamp())                
 
-        except (ValueError, OSError, AttributeError) as e:
-            # skip rows without a valid timestamp - this may happen
-            # despite validation because only a sample is validated
-            # this is an OSError on Windows sometimes???
-            yield InvalidImportedItem(f"{e.__class__.__name__} - {e} (value was '{mapped_row['timestamp']}')")
-            continue
+            except (ValueError, OSError, AttributeError) as e:
+                # skip rows without a valid timestamp - this may happen
+                # despite validation because only a sample is validated
+                # this is an OSError on Windows sometimes???
+                yield InvalidImportedItem(f"{e.__class__.__name__} - {e} (value was '{mapped_row['timestamp']}')")
+                continue
+        
+        # this ensures that the required columns are always the first
+        # columns, and the rest is in original order
+        for field, value in row.items():
+            if field not in mapped_row and field:
+                mapped_row[field] = value
 
         yield mapped_row
 

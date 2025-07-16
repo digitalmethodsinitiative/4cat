@@ -61,12 +61,13 @@ if not args.no_version_check:
 # we can only import this here, because the version check above needs to be
 # done first, as it may detect that the user needs to migrate first before
 # the config manager can be run properly
-from common.config_manager import config
-from common.lib.helpers import call_api
+from common.config_manager import ConfigManager  # noqa: E402
+from common.lib.helpers import call_api  # noqa: E402
 # ---------------------------------------------
 #     Check validity of configuration file
 # (could be expanded to check for other values)
 # ---------------------------------------------
+config = ConfigManager()
 if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "REPLACE_THIS":
     print(
         "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
@@ -129,7 +130,7 @@ def start():
                 umask=0x002,
                 stderr=open(config.get('PATH_LOGS').joinpath("4cat.stderr"), "w+"),
                 detach_process=True
-        ) as context:
+        ):
             import backend.bootstrap as bootstrap
             bootstrap.run(as_daemon=True, log_level=args.log_level)
 
@@ -193,7 +194,7 @@ def stop(force=False):
             nowtime = time.time()
             if nowtime - starttime > 60:
                 # give up if it takes too long
-                if force == True and not killed:
+                if force and not killed:
                     os.system("kill -9 %s" % str(pid))
                     print("...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL...")
                     killed = True

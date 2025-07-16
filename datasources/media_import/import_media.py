@@ -1,5 +1,4 @@
 import re
-import math
 import json
 import time
 import zipfile
@@ -7,14 +6,9 @@ import mimetypes
 from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
-from common.config_manager import config
 from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
-
-# approximate number of files that can be uploaded in a single request rounded to 100
-# todo: bring this back into get_options after merging #455
-# max_files_approx = int((math.floor(config.get('flask.max_form_parts', 1000)-50)/100)) * 100
 
 class SearchMedia(BasicProcessor):
     type = "media-import-search"  # job ID
@@ -31,7 +25,10 @@ class SearchMedia(BasicProcessor):
     accepted_file_types = ["audio", "video", "image"]
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
+        # approximate number of files that can be uploaded in a single request rounded to 100
+        #max_files_approx = int((math.floor(config.get('flask.max_form_parts', 1000) - 50) / 100)) * 100
+
         return {
             "intro": {
                 "type": UserInput.OPTION_INFO,
@@ -39,8 +36,8 @@ class SearchMedia(BasicProcessor):
                 "help": "Upload media files to make them be available for further analysis. "
                         "Please include only one type of file per dataset (image, audio, or video) and "
                         "4CAT will be able to run various processors on these media collections. "
-                        f"\n\nFor collections **larger than a few hundred**, please upload a single "
-                        f"ZIP file. More than ~500 files will fail (and a ZIP file will also load much faster)."
+                        "\n\nFor collections **larger than a few hundred**, please upload a single "
+                        "ZIP file. More than ~500 files will fail (and a ZIP file will also load much faster)."
             },
             "data_upload": {
                 "type": UserInput.OPTION_FILE,
@@ -50,7 +47,7 @@ class SearchMedia(BasicProcessor):
         }
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Step 1: Validate query and files
 
@@ -58,8 +55,7 @@ class SearchMedia(BasicProcessor):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
-        :return dict:  Safe query parameters
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         # do we have uploaded files?
         bad_files = []
@@ -107,7 +103,7 @@ class SearchMedia(BasicProcessor):
                     except (AttributeError, TypeError):
                         bad_files.append(file["filename"])
 
-            except (ValueError, zipfile.BadZipfile) as e:
+            except (ValueError, zipfile.BadZipfile):
                 raise QueryParametersException("Cannot read zip file - it may be encrypted or corrupted and cannot "
                                                "be uploaded to 4CAT.")
 

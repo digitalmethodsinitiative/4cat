@@ -4,7 +4,7 @@ The heart of the app - manages jobs and workers
 import signal
 import time
 
-from common.lib.module_loader import ModuleCollector
+from backend.lib.proxied_requests import DelegatedRequestHandler
 from common.lib.exceptions import JobClaimedException
 
 
@@ -16,6 +16,7 @@ class WorkerManager:
 	db = None
 	log = None
 	modules = None
+	proxy_delegator = None
 
 	worker_pool = {}
 	job_mapping = {}
@@ -23,19 +24,21 @@ class WorkerManager:
 	looping = True
 	unknown_jobs = set()
 
-	def __init__(self, queue, database, logger, as_daemon=True):
+	def __init__(self, queue, database, logger, modules, as_daemon=True):
 		"""
 		Initialize manager
 
 		:param queue:  Job queue
 		:param database:  Database handler
 		:param logger:  Logger object
+		:param modules:  Modules cache via ModuleLoader()
 		:param bool as_daemon:  Whether the manager is being run as a daemon
 		"""
 		self.queue = queue
 		self.db = database
 		self.log = logger
-		self.modules = ModuleCollector(write_config=True)
+		self.modules = modules
+		self.proxy_delegator = DelegatedRequestHandler(self.log, self.modules.config)
 
 		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)
@@ -48,7 +51,17 @@ class WorkerManager:
 		# queue jobs for workers that always need one
 		for worker_name, worker in self.modules.workers.items():
 			if hasattr(worker, "ensure_job"):
-				self.queue.add_job(jobtype=worker_name, **worker.ensure_job)
+				# ensure_job is a class method that returns a dict with job parameters if job should be added
+				# pass config for some workers (e.g., web studies extensions)
+				try:
+					job_params = worker.ensure_job(config=self.modules.config)
+				except Exception as e:
+					self.log.error(f"Error while ensuring job for worker {worker_name}: {e}")
+					job_params = None
+				
+				if job_params:
+					self.queue.add_job(jobtype=worker_name, **job_params)
+
 
 		self.log.info("4CAT Started")
 
@@ -128,6 +141,7 @@ class WorkerManager:
 				self.looping = False
 
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
+
 		# request shutdown from all workers except the API
 		# this allows us to use the API to figure out if a certain worker is
 		# hanging during shutdown, for example
@@ -171,7 +185,7 @@ class WorkerManager:
 			if datasource + "-search" not in self.modules.workers and datasource + "-import" not in self.modules.workers:
 				self.log.error("No search worker defined for datasource %s or its modules are missing. Search queries will not be executed." % datasource)
 
-			self.modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource)
+			self.modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource, self.modules.config)
 
 	def abort(self, signal=None, stack=None):
 		"""

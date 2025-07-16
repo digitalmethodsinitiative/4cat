@@ -44,6 +44,11 @@ class ProcessorException(FourcatException):
     """
     pass
 
+class AnnotationException(FourcatException):
+    """
+    Raise for exceptions with setting/getting annotations.
+    """
+    pass
 
 class MapItemException(ProcessorException):
     """
@@ -149,5 +154,11 @@ class ProcessorInterruptedException(WorkerInterruptedException):
 class DatabaseQueryInterruptedException(WorkerInterruptedException):
     """
     Raise when interrupting a DB query before it has finished
+    """
+    pass
+
+class MediaSignatureException(FourcatException):
+    """
+    Raise in media processors when the media cannot be read
     """
     pass

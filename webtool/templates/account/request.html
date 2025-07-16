@@ -20,7 +20,7 @@
                 could provide some more detail than e.g. just "research" as your stated intent.</p>
         {% endif %}
 
-            <form action="{{ url_for('request_access') }}" method="POST" class="wide">
+            <form action="{{ url_for('user.request_access') }}" method="POST" class="wide">
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice }}</p>
                 {% endfor %}
@@ -52,9 +52,9 @@
             <footer class="form-footer">
                 <nav>
                     <ul class="flat">
-                        <li><a href="{{ url_for('request_access') }}">Request access</a></li>
-                        <li><a href="{{ url_for('request_password') }}">Recover password</a></li>
-                        <li><a href="{{ url_for('show_page', page='data-policy') }}">Data policy</a></li>
+                        <li><a href="{{ url_for('user.request_access') }}">Request access</a></li>
+                        <li><a href="{{ url_for('user.request_password') }}">Recover password</a></li>
+                        <li><a href="{{ url_for('misc.show_page', page='data-policy') }}">Data policy</a></li>
                     </ul>
                 </nav>
             </footer>

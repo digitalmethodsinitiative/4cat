@@ -5,7 +5,6 @@ import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.config_manager import config
 
 
 class SearchGab(Search):
@@ -39,12 +38,13 @@ class SearchGab(Search):
         :param node:  Data as received from Gab
         :return dict:  Mapped item
         """
+        unknown_data = []
         post_id = post.get("i", post["id"])
         metadata = post.get("__import_meta", {})
         timestamp_collected = datetime.datetime.fromtimestamp(metadata.get("timestamp_collected")/1000).strftime("%Y-%m-%d %H:%M:%S") if metadata.get("timestamp_collected") else MissingMappedField("Unknown")
         # reaction_type seems to just be nummeric keys; unsure which reactions they map to
         reactions =  post.get("rc", post.get("reactions_counts"))
-        if type(reactions) != int:
+        if type(reactions) is not int:
             reaction_count = sum([reaction_value for reaction_type, reaction_value in post.get("rc", post.get("reactions_counts")).items()])
         else:
             reaction_count = reactions
@@ -61,12 +61,11 @@ class SearchGab(Search):
         image_urls = [media.get("u", media.get("url")) for media in media_items if media.get("t", media.get("type")) == "image"]
         video_urls = [media.get("smp4", media.get("source_mp4")) for media in media_items if media.get("t", media.get("type")) == "video"]
         if any([media_type not in ["image", "video"] for media_type in [media.get("t", media.get("type")) for media in media_items]]):
-            # TODO: Use MappedItem message; currently it is not called...
-            config.with_db()
-            config.db.log.warning(f"Unknown media type in post {post_id}: {media_items}")
+            unknown_data.extend([f"Unknown media type: {media}" for media in media_items if media.get('t', media.get('type')) not in ['image', 'video']])
         if any([True for vid in video_urls if vid is None]) or any([True for img in image_urls if img is None]):
-            config.with_db()
-            config.db.log.warning(f"Missing media URL in post {post_id}: {media_items}")
+            unknown_data.extend([f"Media missing URL: {img}" for img in image_urls if img is None])
+            unknown_data.extend([f"Media missing URL: {vid}" for vid in video_urls if vid is None])
+            # remove None values from the lists
             image_urls = [img for img in image_urls if img is not None]
             video_urls = [vid for vid in video_urls if vid is not None]
         
@@ -113,4 +112,4 @@ class SearchGab(Search):
             "timestamp": post_time.strftime("%Y-%m-%d %H:%M:%S")
         }        
     
-        return MappedItem(mapped_item)
+        return MappedItem(mapped_item, message="".join(unknown_data)) if unknown_data else MappedItem(mapped_item)

@@ -3,19 +3,14 @@
 """
 import re
 
-from flask import render_template, request, flash, get_flashed_messages, redirect, url_for
-from flask_login import current_user, login_required
+from flask import Blueprint, render_template, flash, get_flashed_messages, redirect, url_for
+from flask_login import login_required
 
-from webtool import app, config, queue
-from webtool.lib.helpers import setting_required
 from common.lib.helpers import find_extensions
 
-from common.config_manager import ConfigWrapper
+component = Blueprint("extensions", __name__)
 
-config = ConfigWrapper(config, user=current_user, request=request)
-
-
-@app.route("/admin/extensions/", methods=["GET", "POST"])
+@component.route("/admin/extensions/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_extensions")
 def extensions_panel():

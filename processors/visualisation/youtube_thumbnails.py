@@ -9,7 +9,6 @@ from apiclient.discovery import build
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -36,11 +35,12 @@ class YouTubeThumbnails(BasicProcessor):
 	sleep_time = 10
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on YouTube metadata sets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "youtube-metadata"
 
@@ -88,7 +88,6 @@ class YouTubeThumbnails(BasicProcessor):
 				except Exception as error:
 					self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
 					retries += 1
-					api_error = error
 					time.sleep(self.sleep_time)  # Wait a bit before trying again
 
 			# Do nothing with the results if the requests failed -
@@ -111,8 +110,4 @@ class YouTubeThumbnails(BasicProcessor):
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")
-
-		# Save the count of images for `finish` function
-		image_count = 0
-
 		self.write_archive_and_finish(results_path)

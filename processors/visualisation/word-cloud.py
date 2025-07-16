@@ -25,16 +25,17 @@ class MakeWordCloud(BasicProcessor):
 	extension = "svg"
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type in ("tfidf", "collocations", "vector-ranker", "vectorise-tokens-by-category", "similar-word2vec", "extract-nouns", "get-entities")
 
 	@classmethod
-	def get_options(self, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 
 		options = {}
 		if not parent_dataset:
@@ -82,7 +83,7 @@ class MakeWordCloud(BasicProcessor):
 		to_lower = self.parameters.get("to_lower")
 		try:
 			max_words = int(self.parameters.get("max_words"))
-		except (ValueError, TypeError) as e:
+		except (ValueError, TypeError):
 			max_words = self.parameters["max_words"]["default"]
 
 		self.dataset.update_status("Extracting words and counts.")

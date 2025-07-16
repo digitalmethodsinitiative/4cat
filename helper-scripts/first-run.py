@@ -42,7 +42,7 @@ for current_version_file in current_version_files:
 shutil.copy(version_file, current_version_file)
 
 # Now check for presence of required NLTK packages
-import nltk
+import nltk  # noqa: E402
 nltk_downloads = ("wordnet", "punkt_tab", "omw-1.4")
 for package in nltk_downloads:
     # if it already exists, .download() will just NOP

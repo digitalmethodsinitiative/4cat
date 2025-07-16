@@ -2,7 +2,6 @@
 Search Telegram via API
 """
 import traceback
-import datetime
 import hashlib
 import asyncio
 import json
@@ -17,7 +16,6 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient
@@ -25,7 +23,7 @@ from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, Cha
     FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import User, MessageEntityMention
+from telethon.tl.types import MessageEntityMention
 
 
 
@@ -81,7 +79,7 @@ class SearchTelegram(Search):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -90,11 +88,10 @@ class SearchTelegram(Search):
 
         :param DataSet parent_dataset:  An object representing the dataset that
           the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-          case they are requested for display in the 4CAT web interface. This can
-          be used to show some options only to privileges users.
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+
+        max_entities = config.get("telegram-search.max_entities", 25)
         options = {
             "intro": {
                 "type": UserInput.OPTION_INFO,
@@ -178,7 +175,7 @@ class SearchTelegram(Search):
             options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
                                               f"(channels or groups) at a time. Separate with line breaks or commas.")
 
-        all_messages = config.get("telegram-search.can_query_all_messages", False, user=user)
+        all_messages = config.get("telegram-search.can_query_all_messages", False)
         if all_messages:
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
@@ -186,7 +183,7 @@ class SearchTelegram(Search):
             options["max_posts"]["help"] = (f"Messages to collect per entity. You can query up to "
                                              f"{options['max_posts']['max']:,} messages per entity.")
 
-        if config.get("telegram-search.max_crawl_depth", 0, user=user) > 0:
+        if config.get("telegram-search.max_crawl_depth", 0) > 0:
             options["crawl_intro"] = {
                 "type": UserInput.OPTION_INFO,
                 "help": "Optionally, 4CAT can 'discover' new entities via forwarded messages; for example, if a "
@@ -271,9 +268,11 @@ class SearchTelegram(Search):
         # order to avoid having to re-enter the security code
         query = self.parameters
 
-        session_id = SearchTelegram.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
+        session_id = SearchTelegram.create_session_id(query["api_phone"].strip(),
+                                                      query["api_id"].strip(),
+                                                      query["api_hash"].strip())
         self.dataset.log(f'Telegram session id: {session_id}')
-        session_path = config.get("PATH_SESSIONS").joinpath(session_id + ".session")
+        session_path = self.config.get("PATH_SESSIONS").joinpath(session_id + ".session")
 
         client = None
 
@@ -333,7 +332,7 @@ class SearchTelegram(Search):
             return posts
         except ProcessorInterruptedException as e:
             raise e
-        except Exception as e:
+        except Exception:
             # catch-all so we can disconnect properly
             # ...should we?
             self.dataset.update_status("Error scraping posts from Telegram; halting collection.")
@@ -382,7 +381,6 @@ class SearchTelegram(Search):
         # we may not always know the 'entity username' for an entity ID, so
         # keep a reference map as we go
         entity_id_map = {}
-        query_id_map= {}
 
         # Collect queries
         # Use while instead of for so we can change queries during iteration
@@ -759,8 +757,7 @@ class SearchTelegram(Search):
         forwarded_name = ""
         forwarded_id = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (
-                type(message["fwd_from"]["from_id"]) is int):
+        if message.get("fwd_from") and "from_id" in message["fwd_from"] and type(message["fwd_from"]["from_id"]) is not int:
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not
@@ -827,6 +824,12 @@ class SearchTelegram(Search):
                     # Failsafe; can be updated to support formatting of new datastructures in the future
                     reactions += f"{reaction}, "
 
+        is_reply = False
+        reply_to = ""
+        if message.get("reply_to"):
+            is_reply = True
+            reply_to = message["reply_to"].get("reply_to_msg_id", "")
+
         # t.me links
         linked_entities = set()
         all_links = ural.urls_from_text(message["message"])
@@ -868,7 +871,9 @@ class SearchTelegram(Search):
             "author_name": fullname,
             "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
-            "reply_to": message.get("reply_to_msg_id", ""),
+            "body_markdown": message.get("message_markdown", MissingMappedField("")),
+            "is_reply": is_reply,
+            "reply_to": reply_to,
             "views": message["views"] if message["views"] else "",
             # "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
@@ -963,16 +968,23 @@ class SearchTelegram(Search):
         # Add the _type if the original object was a telethon type
         if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
             mapped_obj["_type"] = type(input_obj).__name__
+
+        # Store the markdown-formatted text
+        if type(input_obj).__name__ == "Message":
+            mapped_obj["message_markdown"] = input_obj.text
+
         return mapped_obj
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate Telegram query
 
+        :param config:
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
         :param User user:  User object of user who has submitted the query
+        :param ConfigManager config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # no query 4 u
@@ -982,10 +994,11 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        all_posts = config.get("telegram-search.can_query_all_messages", False, user=user)
-        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+        all_posts = config.get("telegram-search.can_query_all_messages", False)
+        max_entities = config.get("telegram-search.max_entities", 25)
 
-        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options()["max_posts"]["max"])
+        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options(
+            config=config)["max_posts"]["max"])
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
@@ -1008,14 +1021,14 @@ class SearchTelegram(Search):
         min_date, max_date = query.get("daterange")
 
         # now check if there is an active API session
-        if not user or not user.is_authenticated or user.is_anonymous:
+        if not hasattr(config, "user") or not config.user.is_authenticated or config.user.is_anonymous:
             raise QueryParametersException("Telegram scraping is only available to logged-in users with personal "
                                            "accounts.")
 
         # check for the information we need
         session_id = SearchTelegram.create_session_id(query.get("api_phone"), query.get("api_id"),
                                                       query.get("api_hash"))
-        user.set_value("telegram.session", session_id)
+        config.user.set_value("telegram.session", session_id)
         session_path = config.get('PATH_SESSIONS').joinpath(session_id + ".session")
 
         client = None
@@ -1028,10 +1041,10 @@ class SearchTelegram(Search):
 
         # maybe we've entered a code already and submitted it with the request
         if "option-security-code" in request.form and request.form.get("option-security-code").strip():
-            code_callback = lambda: request.form.get("option-security-code")
+            code_callback = lambda: request.form.get("option-security-code")  # noqa: E731
             max_attempts = 1
         else:
-            code_callback = lambda: -1
+            code_callback = lambda: -1  # noqa: E731
             # max_attempts = 0 because authing will always fail: we can't wait for
             # the code to be entered interactively, we'll need to do a new request
             # but we can't just immediately return, we still need to call start()
@@ -1052,17 +1065,17 @@ class SearchTelegram(Search):
                 # this happens if 2FA is required
                 raise QueryParametersException("Your account requires two-factor authentication. 4CAT at this time "
                                                f"does not support this authentication mode for Telegram. ({e})")
-            except RuntimeError as e:
+            except RuntimeError:
                 # A code was sent to the given phone number
                 needs_code = True
         except FloodWaitError as e:
             # uh oh, we got rate-limited
             raise QueryParametersException("You were rate-limited and should wait a while before trying again. " +
                                            str(e).split("(")[0] + ".")
-        except ApiIdInvalidError as e:
+        except ApiIdInvalidError:
             # wrong credentials
             raise QueryParametersException("Your API credentials are invalid.")
-        except PhoneNumberInvalidError as e:
+        except PhoneNumberInvalidError:
             # wrong phone number
             raise QueryParametersException(
                 "The phone number provided is not a valid phone number for these credentials.")

@@ -4,17 +4,25 @@ Default 4CAT Configuration Options
 Possible options and their default values. Options are actually set in 4CAT"s
 Database. Additional options can be defined in Data sources or Processors as
 `config` objects.
+
+The order of th dictionary below determines the order of the settings in the interface.
+
 """
 from common.lib.user_input import UserInput
-import json
 
 config_definition = {
-    "datasources._intro": {
+    "datasources.intro": {
         "type": UserInput.OPTION_INFO,
         "help": "Data sources enabled below will be offered to people on the 'Create Dataset' page. Additionally, "
                 "people can upload datasets for these by for example exporting them with "
                 "[Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) to this 4CAT instance.\n\n"
                 "Some data sources offer further settings which may be configured on other tabs."
+    },
+    "datasources.intro2": {
+        "type": UserInput.OPTION_INFO,
+        "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
+                "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
+                "expiration status of existing datasets."
     },
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
@@ -22,12 +30,6 @@ config_definition = {
                     "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
-    },
-    "datasources._intro2": {
-        "type": UserInput.OPTION_INFO,
-        "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
-                "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
-                "expiration status of existing datasets."
     },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
@@ -73,7 +75,7 @@ config_definition = {
         "default": "",
         "help": "Server information",
         "tooltip": "Custom server information that is displayed on the 'About' page. Can for instance be used to show "
-                   "information about who maintains the tool or what its intended purpose is."
+                   "information about who maintains the tool or what its intended purpose is. Accepts Markdown markup.",
     },
     "4cat.crash_message": {
         "type": UserInput.OPTION_TEXT_LARGE,
@@ -121,8 +123,8 @@ config_definition = {
     "privileges.can_use_explorer": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
-        "help": "Can use explorer",
-        "tooltip": "Controls whether users can use the Explorer feature to navigate datasets."
+        "help": "Can use Explorer",
+        "tooltip": "Controls whether users can use the Explorer feature to analyse and annotate datasets."
     },
     "privileges.can_export_datasets": {
         "type": UserInput.OPTION_TOGGLE,
@@ -263,6 +265,41 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
+    # proxy stuff
+    "proxies.urls": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": ["__localhost__"],
+        "help": "Proxy URLs",
+        "tooltip": "A JSON Array of full proxy URLs. Include any proxy login details in the URL itself (e.g. "
+                   "http://username:password@proxy:port). There is one special value, '__localhost__'; this means a " 
+                   "direct request, without using a proxy."
+    },
+    "proxies.cooloff": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": float,
+        "help": "Cool-off time",
+        "tooltip": "After a request has finished, do not use the proxy again for this many seconds.",
+        "default": 0.1,
+        "min": 0.0
+    },
+    "proxies.concurrent-overall": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": int,
+        "default": 1,
+        "min": 1,
+        "help": "Max concurrent requests (overall)",
+        "tooltip": "Per proxy, this many requests can run concurrently overall."
+    },
+    "proxies.concurrent-host": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": int,
+        "default": 1,
+        "min": 1,
+        "help": "Max concurrent requests (per host)",
+        "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
+                   "overall limit."
+    },
+    # logging
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
@@ -329,13 +366,18 @@ config_definition = {
         "global": True
     },
     # Explorer settings
-    # The maximum allowed amount of rows (prevents timeouts and memory errors)
+    "explorer.basic-explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT's Explorer feature lets you navigate and annotate datasets as if they "
+                "appared on their original platform. This is intended to facilitate qualitative "
+                "exploration and manual coding."
+    },
     "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
         "help": "Amount of posts",
         "coerce_type": int,
-        "tooltip": "Amount of posts to show in Explorer. The maximum allowed amount of rows (prevents timeouts and "
+        "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
     "explorer.posts_per_page": {
@@ -343,7 +385,20 @@ config_definition = {
         "default": 50,
         "help": "Posts per page",
         "coerce_type": int,
-        "tooltip": "Posts to display per page"
+        "tooltip": "Number of posts to display per page"
+    },
+    "explorer.config_explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "Data sources use <em>Explorer templates</em> that determine how they look and what information is "
+                "displayed. Explorer templates consist of [custom HTML templates](https://github.com/"
+                "digitalmethodsinitiative/4cat/tree/master/webtool/templates/explorer/datasource-templates) and "
+                "[custom CSS files](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/"
+                "explorer). If no template is available for a data source, a <em>generic</em> template is used "
+                "made of [this HTML file](https://github.com/digitalmethodsinitiative/4cat/blob/master/webtool/"
+                "templates/explorer/datasource-templates/generic.html) and [this CSS file](https://github.com/"
+                "digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer/generic.css).\n\n"
+                "You can request a new data source Explorer template by [creating a GitHub issue](https://github.com/"
+                "digitalmethodsinitiative/4cat/issues) or adding them yourself and opening a pull request."
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
@@ -369,14 +424,17 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-listed hostnames",
-        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and "
+                   "Server Name. Front-end needs to be restarted for changed to apply.",
         "global": True
     },
     "flask.autologin.api": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-list for API",
-        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. "
+                   "Docker should include localhost and Server Name.  Front-end needs to be restarted for changed to "
+                   "apply.",
         "global": True
     },
     "flask.https": {
@@ -465,7 +523,12 @@ config_definition = {
     # it is used by a number of processors
     "dmi-service-manager.aa_DSM-intro-1": {
             "type": UserInput.OPTION_INFO,
-            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager#start-dmi-service-manager) is a support tool used to run some advanced processors. These processors generally require high CPU usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also possible for multiple 4CAT instances to use the same service manager. Please see the link for instructions on setting up your own instance of the DMI Service Manager.",
+            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager) is a "
+                    "support tool used to run some advanced processors. These processors generally require high CPU "
+                    "usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also "
+                    "possible for multiple 4CAT instances to use the same service manager. Please see [this link]"
+                    "(https://github.com/digitalmethodsinitiative/dmi_service_manager?tab=readme-ov-file#installation) "
+                    "for instructions on setting up your own instance of the DMI Service Manager.",
         },
     "dmi-service-manager.ab_server_address": {
         "type": UserInput.OPTION_TEXT,
@@ -571,7 +634,7 @@ categories = {
     "4cat": "4CAT Tool settings",
     "api": "API credentials",
     "flask": "Flask settings",
-    "explorer": "Data Explorer",
+    "explorer": "Explorer",
     "datasources": "Data sources",
     "expire": "Dataset expiration settings",
     "mail": "Mail settings & credentials",
@@ -580,6 +643,7 @@ categories = {
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
     "ui": "User interface",
+    "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
     "extensions": "Extensions"
 }

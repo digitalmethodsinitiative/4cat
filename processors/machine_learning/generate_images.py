@@ -6,14 +6,11 @@ Why? Because we can.
 import shutil
 import json
 import re
-import os
 
 from backend.lib.processor import BasicProcessor
 from processors.visualisation.download_images import ImageDownloader
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -60,11 +57,11 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
     options = {
         "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "coerce_type": int,
-                "help": "Number of images to generate",
-                "default": 20,
-            },
+            "type": UserInput.OPTION_TEXT,
+            "coerce_type": int,
+            "help": "Number of images to generate",
+            "default": 20,
+        },
         "prompt-column": {
             "type": UserInput.OPTION_TEXT,
             "default": False,
@@ -81,15 +78,15 @@ class StableDiffusionImageGenerator(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
         These are dynamic for this processor: the 'column names' option is
         populated with the column names from the parent dataset, if available.
 
+        :param config:
         :param DataSet parent_dataset:  Parent dataset
-        :param user:  Flask User to which the options are shown, if applicable
         :return dict:  Processor options
         """
         options = cls.options
@@ -111,7 +108,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
                 "options": {"": "", **parent_columns},
                 "default": ""
             })
-        max_prompts = config.get("dmi-service-manager.sd_num_files")
+        max_prompts = config.get("dmi-service-manager.sd_num_files", 0)
         if max_prompts == 0:
             options["amount"]["tooltip"] = "Use '0' to allow unlimited number"
         else:
@@ -123,12 +120,12 @@ class StableDiffusionImageGenerator(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on datasets with columns (from which a prompt can be retrieved)
         """
-        return config.get("dmi-service-manager.sd_enabled", False, user=user) and \
-            config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.sd_enabled", False) and \
+            config.get("dmi-service-manager.ab_server_address", False) and \
             module.get_columns()
 
     @staticmethod
@@ -173,7 +170,6 @@ class StableDiffusionImageGenerator(BasicProcessor):
                 break
             elif user_max_prompts != 0 and len(prompts) >= user_max_prompts:
                 break
-
 
             prompts[item.get("id", len(prompts) + 1)] = {
                 "prompt": item.get(prompt_c, ""),
@@ -223,14 +219,14 @@ class StableDiffusionImageGenerator(BasicProcessor):
 
         # interface.py args
         data = {"timeout": (86400 * 7), "args": ['--output-dir', f"data/{path_to_results}",
-                         "--prompts-file",
-                         f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(prompts_file.name))}"],
+                                                 "--prompts-file",
+                                                 f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(prompts_file.name))}"],
                 "pass_key": True,  # This tells the DMI SM there is a status update endpoint in the clip image
 
                 }
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "stable_diffusion"
 
         try:

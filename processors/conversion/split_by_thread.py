@@ -26,11 +26,12 @@ class ThreadSplitter(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Determine if processor is compatible with dataset
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.parameters.get("datasource") in ("4chan", "8chan", "reddit", "breitbart")
 		
@@ -40,8 +41,6 @@ class ThreadSplitter(BasicProcessor):
 		with one column with unique usernames and in the other one the amount
 		of posts for that user name
 		"""
-		users = {}
-
 		# prepare staging area
 		results_path = self.dataset.get_staging_area()
 

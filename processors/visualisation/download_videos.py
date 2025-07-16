@@ -16,29 +16,15 @@ from urllib.parse import urlparse
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
-from common.lib.helpers import UserInput, sets_to_lists
+from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
-
-
-def url_to_filename(url, extension, directory):
-    # Create filename
-    filename = re.sub(r"[^0-9a-z]+", "_", url.lower())[:100]  # [:100] is to avoid folder length shenanigans
-    save_location = directory.joinpath(Path(filename + "." + extension))
-    filename_index = 0
-    while save_location.exists():
-        save_location = directory.joinpath(
-            filename + "-" + str(filename_index) + save_location.suffix.lower())
-        filename_index += 1
-
-    return save_location
 
 
 class VideoDownloaderPlus(BasicProcessor):
@@ -58,11 +44,10 @@ class VideoDownloaderPlus(BasicProcessor):
 
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
-    if config.get("video-downloader.allow-indirect"):
-        references = [
-            "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
-            "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
-        ]
+    references = [
+        "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
+        "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
+    ]
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 
@@ -153,15 +138,16 @@ class VideoDownloaderPlus(BasicProcessor):
         self.last_post_process_status = None
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Updating columns with actual columns and setting max_number_videos per
         the max number of images allowed.
+        :param config:
         """
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_videos = int(config.get('video-downloader.max', 100, user=user))
+        max_number_videos = int(config.get('video-downloader.max', 100))
         if max_number_videos == 0:
             options['amount']['help'] = "No. of videos"
             options["amount"]["tooltip"] = "Use 0 to download all videos"
@@ -170,7 +156,7 @@ class VideoDownloaderPlus(BasicProcessor):
             options['amount']['help'] = f"No. of videos (max {max_number_videos:,})"
 
         # And update the max size and help from config
-        max_video_size = int(config.get('video-downloader.max-size', 100, user=user))
+        max_video_size = int(config.get('video-downloader.max-size', 100))
         if max_video_size == 0:
             # Allow video of any size
             options["max_video_size"]["tooltip"] = "Set to 0 if all sizes are to be downloaded."
@@ -190,13 +176,13 @@ class VideoDownloaderPlus(BasicProcessor):
             options["columns"]["options"] = {v: v for v in columns}
 
             # Figure out default column
-            priority = ["video_url", "video_link", "media_url", "media_link", "final_url", "url", "link", "video", "body"]
+            priority = ["video_url", "video_link", "video", "media_url", "media_link", "media", "final_url", "url", "link", "body"]
             columns.sort(key=lambda col: next((i for i, p in enumerate(priority) if p in col.lower()), len(priority)))
             options["columns"]["default"] = [columns.pop(0)]
 
         # these two options are likely to be unwanted on instances with many
         # users, so they are behind an admin config options
-        if config.get("video-downloader.allow-indirect", user=user):
+        if config.get("video-downloader.allow-indirect"):
             options["use_yt_dlp"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Also attempt to download non-direct video links (such YouTube and other video hosting sites)",
@@ -213,7 +199,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 "requires": "use_yt_dlp=true"
             }
 
-        if config.get("video-downloader.allow-multiple", user=user):
+        if config.get("video-downloader.allow-multiple"):
             options["channel_videos"] = {
                                             "type": UserInput.OPTION_TEXT,
                                             "help": "Download multiple videos per link?",
@@ -234,7 +220,7 @@ class VideoDownloaderPlus(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -243,6 +229,7 @@ class VideoDownloaderPlus(BasicProcessor):
         dataset anyway.
 
         :param module:  Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         return ((module.type.endswith("-search") or module.is_from_collector())
@@ -368,7 +355,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         self.dataset.log(f"Copying previously downloaded video for url: {url}")
                         num_copied = self.copy_previous_video(previous_vid_metadata, results_path, vid_lib.previous_downloaders)
                         urls[url] = previous_vid_metadata
-                        self.dataset.update_status(f"Copied previously downloaded video to current dataset.")
+                        self.dataset.update_status("Copied previously downloaded video to current dataset.")
                         copied_videos += num_copied
                         continue
                     except FailedToCopy as e:
@@ -462,7 +449,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         self.last_post_process_status = {}
                         self.dataset.update_status("Downloading %i/%i via yt-dlp: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
                         try:
-                            info = ydl.extract_info(url)
+                            ydl.extract_info(url)
                         except MaxVideosDownloaded:
                             self.dataset.log("Max videos for URL reached.")
                             # Raised when already downloaded max number of videos per URL as defined in self.max_videos_per_url
@@ -488,7 +475,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             # LiveVideoException raised when a video is known to be live
                             if "Requested format is not available" in str(e):
                                 self.dataset.log(f"Format Error: {str(e)}")
-                                message = f"No format available for video (check max size/resolution settings and try again)"
+                                message = "No format available for video (check max size/resolution settings and try again)"
                             elif "Unable to download webpage: The read operation timed out" in str(e):
                                 # Certain sites fail repeatedly (22-12-8 TikTok has this issue)
                                 message = 'DownloadError: %s' % str(e)
@@ -643,7 +630,8 @@ class VideoDownloaderPlus(BasicProcessor):
                                      f"Content-Type for url {url}: {response.headers['Content-Type']}")
 
                 # Ensure unique filename
-                save_location = url_to_filename(url, extension, results_path)
+                unique_filename = url_to_filename(url, staging_area=results_path, default_ext="."+extension)
+                save_location = results_path.joinpath(unique_filename)
 
                 # Check video size (after ensuring it is actually a video above)
                 if not max_video_size == 0:
@@ -685,7 +673,7 @@ class VideoDownloaderPlus(BasicProcessor):
         """
         urls = {}
         columns = self.parameters.get("columns")
-        if type(columns) == str:
+        if type(columns) is str:
             columns = [columns]
 
         if not columns:
@@ -754,10 +742,10 @@ class VideoDownloaderPlus(BasicProcessor):
         elif "filename" in previous_vid_metadata:
             files = [{"filename": previous_vid_metadata.get("filename"), "success": True}]
         else:
-            raise FailedToCopy(f"Unable to read video metadata")
+            raise FailedToCopy("Unable to read video metadata")
 
         if not files:
-            raise FailedToCopy(f"No file found in metadata")
+            raise FailedToCopy("No file found in metadata")
 
         if not dataset:
             raise FailedToCopy(f"Dataset with key {dataset_key} not found")

@@ -4,7 +4,6 @@ Transform tokeniser output into vectors by category w/ filter
 import csv
 import json
 import pickle
-import itertools
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
@@ -20,15 +19,15 @@ class VectoriseByCategory(BasicProcessor):
 	"""
 	type = "vectorise-tokens-by-category"  # job type ID
 	category = "Text analysis"  # category
-	title = "Count words by Category"  # title displayed in UI
-	description = "Counts all tokens and categorizes them so they are transformed into category => token => frequency counts." \
+	title = "Count words by category"  # title displayed in UI
+	description = "Counts all tokens and categorizes them so they are transformed into category => token => frequency counts. " \
 				  "This is also known as a bag of words."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	followups = ["wordcloud", "render-graphs-isometric", "render-rankflow"]
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token sets
 
@@ -37,7 +36,7 @@ class VectoriseByCategory(BasicProcessor):
 		return module.type == "tokenise-posts"
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		"""
 		Allow user to select category column
 		"""
@@ -79,7 +78,7 @@ class VectoriseByCategory(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": 1,
 				"help": "Threshold (include if >= X occurrences)",
-				"coerce": int,
+				"coerce_type": int,
 				"min": 1,
 				"tooltip": "Only include words/tokens that occur at least this many times in a given category",
 				"requires": "threshold_type=true",
@@ -88,7 +87,7 @@ class VectoriseByCategory(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": 0,
 				"help": "Top N words/tokens per category",
-				"coerce": int,
+				"coerce_type": int,
 				"min": 0,
 				"tooltip": "Only include the top N words/tokens in a given category (0 includes all)",
 				"requires": "threshold_type=true",

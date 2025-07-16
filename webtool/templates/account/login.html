@@ -7,7 +7,7 @@
     <article class="small">
         <section class="login-form">
             <h2><span>Log in</span></h2>
-                <p>Please log in to access {{ __user_config("4cat.name") }}.{% if __user_config("4cat.allow_access_request") %} If you do not have an account, you can <a href="{{ url_for('request_access') }}">request one</a>.{% endif %}</p>
+                <p>Please log in to access {{ __user_config("4cat.name") }}.{% if __user_config("4cat.allow_access_request") %} If you do not have an account, you can <a href="{{ url_for('user.request_access') }}">request one</a>.{% endif %}</p>
         {% if __user_config("ui.advertise_install") %}
                 <p>You can also install your own 4CAT instance. See the <a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT">installation page on the GitHub wiki</a>.</p>
         {% endif %}
@@ -32,11 +32,11 @@
                     <ul class="flat">
                         {% if have_email %}
                             {% if __user_config("4cat.allow_access_request") %}
-                                <li><a href="{{ url_for('request_access') }}">Request access</a></li>
+                                <li><a href="{{ url_for('user.request_access') }}">Request access</a></li>
                             {% endif %}
-                            <li><a href="{{ url_for('request_password') }}">Recover password</a></li>
+                            <li><a href="{{ url_for('user.request_password') }}">Recover password</a></li>
                         {% endif %}
-                        <li><a href="{{ url_for('show_page', page='data-policy') }}">Data policy</a></li>
+                        <li><a href="{{ url_for('misc.show_page', page='data-policy') }}">Data policy</a></li>
                     </ul>
                 </nav>
             </footer>

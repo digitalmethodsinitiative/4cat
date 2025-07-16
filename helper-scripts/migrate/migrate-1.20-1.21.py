@@ -12,8 +12,9 @@ try:
 	import config
 	import logging
 	db = Database(logger=logging, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
-except (SyntaxError, ImportError, AttributeError) as e:
-	from common.config_manager import config
+except (SyntaxError, ImportError, AttributeError):
+	from common.config_manager import CoreConfigManager
+	config = CoreConfigManager()
 	from common.lib.logger import Logger
 	log = Logger(output=True)
 	db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")

@@ -9,7 +9,7 @@ import re
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.lib.exceptions import WorkerInterruptedException, MapItemException
+from common.lib.exceptions import MapItemException
 
 
 class SearchInstagram(Search):
@@ -76,6 +76,8 @@ class SearchInstagram(Search):
         """
         Parse Instagram post in Graph format
 
+        2025-6-5: potentially legacy format
+
         :param node:  Data as received from Instagram
         :return dict:  Mapped item
         """
@@ -113,10 +115,11 @@ class SearchInstagram(Search):
             media_types = set([s["node"]["__typename"] for s in node["edge_sidecar_to_children"]["edges"]])
             media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
-        location = {"name": "", "latlong": "", "city": ""}
+        location = {"name": "", "latlong": "", "city": "", "location_id": ""}
         # location has 'id', 'has_public_page', 'name', and 'slug' keys in tested examples; no lat long or "city" though name seems
         if node.get("location"):
             location["name"] = node["location"].get("name")
+            location["location_id"] = node["location"].get("pk")
             # Leaving this though it does not appear to be used in this type; maybe we'll be surprised in the future...
             location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
                 "location"].get("lat") else ""
@@ -131,30 +134,50 @@ class SearchInstagram(Search):
                 raise MapItemException("Unable to parse item: different user and owner")
 
         mapped_item = {
+            # Post data
             "id": node["shortcode"],
             "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"),  # Zeeschuimer metadata
+            "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
             "thread_id": node["shortcode"],
             "parent_id": node["shortcode"],
+            "url": "https://www.instagram.com/p/" + node["shortcode"],
             "body": caption,
-            "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
+
+
+            # Author data
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
+            "is_verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
-            "type": media_type,
-            "url": "https://www.instagram.com/p/" + node["shortcode"],
-            "image_url": node["display_url"],
-            "media_url": media_url,
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
-            # "usertags": ",".join(
-            #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
+            # Unable to find graph type posts to test
+            "coauthors": MissingMappedField(""),
+            "coauthor_fullnames": MissingMappedField(""),
+            "coauthor_ids": MissingMappedField(""),
+
+            # Media
+            "media_type": media_type,
+            "num_media": num_media,
+            "image_urls": node["display_url"],
+            "media_urls": media_url,
+
+            # Engagement
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", caption)),
+            # Unsure if usertags will work; need data (this could raise it to attention...)
+            "usertags": ",".join(
+                [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["edge_media_preview_like"]["count"] if not no_likes else MissingMappedField(0),
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
-            "num_media": num_media,
+
+            # Location data
             "location_name": location["name"],
+            "location_id": location["location_id"],
             "location_latlong": location["latlong"],
             "location_city": location["city"],
-            "unix_timestamp": node["taken_at_timestamp"]
+
+            # Metadata
+            "unix_timestamp": node["taken_at_timestamp"],
+            "missing_media": None
         }
 
         return mapped_item
@@ -168,38 +191,44 @@ class SearchInstagram(Search):
         :return dict:  Mapped item
         """
         num_media = 1 if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
-        caption = MissingMappedField("") if not "caption" in node else "" if not node.get("caption") else node["caption"]["text"]
+        caption = MissingMappedField("") if "caption" not in node else "" if not node.get("caption") else node["caption"]["text"]
 
-        # get media url
+        # get media urls
+        display_urls = []
+        media_urls = []
+        missing_media = None
+        type_map = {SearchInstagram.MEDIA_TYPE_PHOTO: "photo", SearchInstagram.MEDIA_TYPE_VIDEO: "video"}
+        media_types = set()
         # for carousels, get the first media item, for videos, get the video
         # url, for photos, get the highest resolution
         if node["media_type"] == SearchInstagram.MEDIA_TYPE_CAROUSEL:
-            media_node = node["carousel_media"][0]
+            media_nodes = node["carousel_media"]
         else:
-            media_node = node
+            media_nodes = [node]
 
-        if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
-            media_url = media_node["video_versions"][0]["url"]
-            if "image_versions2" in media_node:
-                display_url = media_node["image_versions2"]["candidates"][0]["url"]
+        for media_node in media_nodes:
+            if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
+                # Videos
+                media_urls.append(media_node["video_versions"][0]["url"])
+                if "image_versions2" in media_node:
+                    display_urls.append(media_node["image_versions2"]["candidates"][0]["url"])
+                else:
+                    # no image links at all :-/
+                    # video is all we have
+                    display_urls.append(media_node["video_versions"][0]["url"])
+
+            elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO and media_node.get("image_versions2"):
+                # Images
+                media_url = media_node["image_versions2"]["candidates"][0]["url"]
+                display_urls.append(media_url)
+                media_urls.append(media_url)
             else:
-                # no image links at all :-/
-                # video is all we have
-                display_url = media_node["video_versions"][0]["url"]
-        elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO and media_node.get("image_versions2"):
-            media_url = media_node["image_versions2"]["candidates"][0]["url"]
-            display_url = media_url
-        else:
-            media_url = MissingMappedField("")
-            display_url = MissingMappedField("")
+                missing_media = MissingMappedField("")
+
+            media_types.add(type_map.get(media_node["media_type"], "unknown"))
 
         # type, 'mixed' means carousel with video and photo
-        type_map = {SearchInstagram.MEDIA_TYPE_PHOTO: "photo", SearchInstagram.MEDIA_TYPE_VIDEO: "video"}
-        if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL:
-            media_type = type_map.get(node["media_type"], "unknown")
-        else:
-            media_types = set([s["media_type"] for s in node["carousel_media"]])
-            media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
+        media_type = "mixed" if len(media_types) > 1 else media_types.pop()
 
         if "comment_count" in node:
             num_comments = node["comment_count"]
@@ -208,9 +237,10 @@ class SearchInstagram(Search):
         else:
             num_comments = -1
 
-        location = {"name": "", "latlong": "", "city": ""}
+        location = {"name": "", "latlong": "", "city": "", "location_id": ""}
         if node.get("location"):
             location["name"] = node["location"].get("name")
+            location["location_id"] = node["location"].get("pk")
             location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
                 "location"].get("lat") else ""
             location["city"] = node["location"].get("city")
@@ -221,33 +251,66 @@ class SearchInstagram(Search):
             if user.get("username") != owner.get("username"):
                 raise MapItemException("Unable to parse item: different user and owner")
 
+        # Instagram posts also allow 'Collabs' with up to one co-author
+        coauthors = []
+        coauthor_fullnames = []
+        coauthor_ids = []
+        if node.get("coauthor_producers"):
+            for coauthor_node in node["coauthor_producers"]:
+                coauthors.append(coauthor_node.get("username"))
+                coauthor_fullnames.append(coauthor_node.get("full_name"))
+                coauthor_ids.append(coauthor_node.get("id"))
+
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
+        # usertags
+        if "usertags" in node:
+            usertags = ",".join([user["user"]["username"] for user in node["usertags"]["in"]]) if node["usertags"] else ""
+        else:
+            # Not always included; MissingMappedField may be more appropriate, but it flags virtually all posts without tags (some do return `None`)
+            usertags = ""
+
         mapped_item = {
+            # Post and caption
             "id": node["code"],
             "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"), # Zeeschuimer metadata
+            "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "thread_id": node["code"],
             "parent_id": node["code"],
+            "url": "https://www.instagram.com/p/" + node["code"],
             "body": caption,
+
+            # Authors
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
+            "verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
-            "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
-            "type": media_type,
-            "url": "https://www.instagram.com/p/" + node["code"],
-            "image_url": display_url,
-            "media_url": media_url,
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
-            # "usertags": ",".join(
-            #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
+            "coauthors": ",".join(coauthors),
+            "coauthor_fullnames": ",".join(coauthor_fullnames),
+            "coauthor_ids": ",".join(coauthor_ids),
+
+            # Media
+            "media_type": media_type,
+            "num_media": num_media,
+            "image_urls": ",".join(display_urls),
+            "media_urls": ",".join(media_urls),
+
+            # Engagement
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)),
+            "usertags": usertags,
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["like_count"] if not no_likes else MissingMappedField(0),
             "num_comments": num_comments,
-            "num_media": num_media,
+
+            # Location
             "location_name": location["name"],
+            "location_id": location["location_id"],
             "location_latlong": location["latlong"],
             "location_city": location["city"],
-            "unix_timestamp": node["taken_at"]
+
+            # Metadata
+            "unix_timestamp": node["taken_at"],
+            "missing_media": missing_media, # This denotes media that is unable to be mapped and is otherwise None
         }
 
         return mapped_item
