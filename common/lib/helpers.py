@@ -316,7 +316,6 @@ def find_extensions():
             "url": "",
             "git_url": "",
             "is_git": False,
-            "enabled": config.get("extensions.enabled").get(extension.name, {}).get("enabled")
         } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
     }
 

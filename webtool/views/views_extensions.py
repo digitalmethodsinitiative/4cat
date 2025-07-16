@@ -3,10 +3,11 @@
 """
 import re
 
-from flask import Blueprint, render_template, flash, get_flashed_messages, redirect, url_for
+from flask import Blueprint, render_template, flash, get_flashed_messages, redirect, url_for, request, g
 from flask_login import login_required
 
 from common.lib.helpers import find_extensions
+from webtool.lib.helpers import setting_required
 
 component = Blueprint("extensions", __name__)
 
@@ -27,16 +28,16 @@ def extensions_panel():
         if request.files["extension-file"].filename:
             uploaded_file = request.files["extension-file"]
             stem = re.sub(r"[^a-zA-Z0-9_-]", "", uploaded_file.filename.replace(" ", "_")).strip()
-            temporary_path = config.get("PATH_EXTENSIONS").joinpath(f"temp-{stem}.zip")
+            temporary_path = g.config.get("PATH_EXTENSIONS").joinpath(f"temp-{stem}.zip")
             uploaded_file.save(temporary_path)
-            queue.add_job("manage-extension", details={"task": "install", "source": "local"},
+            g.queue.add_job("manage-extension", details={"task": "install", "source": "local"},
                           remote_id=str(temporary_path))
             extension_reference = uploaded_file.filename
 
         else:
             extension_reference = request.form.get("extension-url")
             if extension_reference:
-                queue.add_job("manage-extension", details={"task": "install", "source": "remote"},
+                g.queue.add_job("manage-extension", details={"task": "install", "source": "remote"},
                               remote_id=extension_reference)
             else:
                 install_started = False
@@ -54,7 +55,7 @@ def extensions_panel():
                            flashes=get_flashed_messages(), incomplete=incomplete)
 
 
-@app.route("/admin/uninstall-extension", methods=["POST"])
+@component.route("/admin/uninstall-extension", methods=["POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_extensions")
 def uninstall_extension():
@@ -65,7 +66,7 @@ def uninstall_extension():
     if not extensions or not extension_reference or extension_reference not in extensions:
         flash(f"Extension {extension_reference} unknown - cannot uninstall extension.")
     else:
-        queue.add_job("manage-extension", details={"task": "uninstall"},
+        g.queue.add_job("manage-extension", details={"task": "uninstall"},
                       remote_id=extension_reference)
 
         flash(f"Initiated uninstall of extension '{extension_reference}'. Find its status in the panel at the bottom "
