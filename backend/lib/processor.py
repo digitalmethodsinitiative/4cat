@@ -707,10 +707,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
     def create_standalone(self):
         """
-        Copy this dataset and make that copy standalone
+        Copy this dataset and make that copy standalone.
 
         This has the benefit of allowing for all analyses that can be run on
         full datasets on the new, filtered copy as well.
+        
+        This also transfers annotations and annotation fields.
 
         :return DataSet:  The new standalone dataset
         """
@@ -727,7 +729,22 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         standalone = self.dataset.copy(shallow=False)
         standalone.body_match = "(Filtered) " + top_parent.query
         standalone.datasource = top_parent.parameters.get("datasource", "custom")
-
+        
+        # Copy over annotations
+        if top_parent.annotation_fields and top_parent.num_annotations() > 0:
+            
+            # Get column names dynamically
+            annotation_cols = self.db.fetchone("SELECT * FROM annotations LIMIT 1")
+            annotation_cols = list(annotation_cols.keys())
+            annotation_cols.remove("id")  # Set by the DB
+            cols_str = ",".join(annotation_cols)
+            select_str = ",".join(["a."+col for col in annotation_cols if col != "dataset"])
+            
+            self.db.execute(f"INSERT INTO annotations ({cols_str}) "
+                            f"OVERRIDING USER VALUE "
+                            f"SELECT '{standalone.key}', {select_str} "
+                            f"FROM annotations AS a WHERE a.dataset = '{top_parent.key}' ")
+    
         # Copy over annotation fields and update annotations with new IDs
         if top_parent.annotation_fields:
             # New field IDs based on the new dataset key
@@ -738,15 +755,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             standalone.annotation_fields = {}  # So we're not checking changes with old annotation fields
             standalone.save_annotation_fields(annotation_fields)  # Save to db
 
-            # Make sure copied-over annotations have the right dataset key. We only know this key now,
-            # but filter processors already copied annotations, and we don't want to iterate here again.
-            self.db.update(
-                "annotations",
-                where={"dataset": self.dataset.key},
-                data={"dataset": standalone.key},
-            )
-
-            # Also update field IDs
+            # Also update field IDs in annotations
             for i, old_field_id in enumerate(top_parent.annotation_fields.keys()):
                 self.db.update(
                     "annotations",
