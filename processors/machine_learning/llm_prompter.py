@@ -177,6 +177,8 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Temperature",
                 "default": 0.1,
+                "coerce_type": int,
+                "max": 2,
                 "tooltip": "The temperature hyperparameter indicates how strict the model will gravitate towards the most "
                 "probable next token. A score close to 0 returns more predictable "
                 "outputs while a score close to 1 leads to more creative outputs.",
@@ -272,6 +274,8 @@ class LLMPrompter(BasicProcessor):
             self.dataset.finish_with_error("Temperature must be a number")
             return
 
+        temperature = min(max(temperature, 0), 2)
+
         max_tokens = int(self.parameters.get("max_tokens"))
 
         system_prompt = self.parameters.get("system_prompt", "")
@@ -284,9 +288,8 @@ class LLMPrompter(BasicProcessor):
         except ValueError:
             self.dataset.finish_with_error("Batches must be a number")
             return
-        batches = 1 if batches < 1 else batches
-        batches = self.source_dataset.num_rows if batches > self.source_dataset.num_rows else batches
-        self.dataset.parameters["batches"] = batches
+        batches = max(1, min(batches, self.source_dataset.num_rows))
+
         if batches == 1:
             self.dataset.delete_parameter("batches")
             use_batches = False
@@ -370,8 +373,7 @@ class LLMPrompter(BasicProcessor):
 
         # Set custom model name in output
         if provider in ("lmstudio", "ollama"):
-            model = "custom model"
-            self.dataset.parameters["model"] = model
+            model = "local model"
 
         # Setup annotation saving
         annotations = []
