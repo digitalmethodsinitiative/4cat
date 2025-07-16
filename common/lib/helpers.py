@@ -1082,7 +1082,7 @@ def send_email(recipient, message, mail_config):
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     """
     Return a flattened dictionary where nested dictionary objects are given new
-    keys using the partent key combined using the seperator with the child key.
+    keys using the parent key combined using the seperator with the child key.
 
     Lists will be converted to json strings via json.dumps()
 
