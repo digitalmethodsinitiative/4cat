@@ -11,6 +11,8 @@ from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, HTTPHandler
 
+from common.config_manager import CoreConfigManager
+
 class WebHookLogHandler(HTTPHandler):
     """
     Basic HTTPHandler for webhooks via standard log handling
@@ -179,8 +181,10 @@ class Logger:
 
         self.print_logs = output
 
+        
         if type(log_path) is str:
-            log_path = Path(__file__).parent.parent.parent.joinpath("logs").joinpath(log_path)
+            core_config = CoreConfigManager()
+            log_path = core_config.get("PATH_LOGS").joinpath(log_path)
 
         if not log_path.parent.exists():
             log_path.parent.mkdir(parents=True)
