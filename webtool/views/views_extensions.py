@@ -72,4 +72,4 @@ def uninstall_extension():
         flash(f"Initiated uninstall of extension '{extension_reference}'. Find its status in the panel at the bottom "
               f"of the page. You may need to refresh the page afterwards.")
 
-    return redirect(url_for("extensions_panel"))
+    return redirect(url_for("extensions.extensions_panel"))
