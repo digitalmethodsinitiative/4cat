@@ -105,10 +105,10 @@ setup(
 	description=('4CAT: Capture and Analysis Tool is a comprehensive tool for '
 				 'analysing discourse on online social platforms'),
 	long_description=readme,
-	author="Open Intelligence Lab",
+	author="Open Intelligence Lab / Digital Methods Initiative",
 	author_email="4cat@oilab.eu",
-	url="https://oilab.eu",
+	url="https://4cat.nl",
 	packages=['backend', 'webtool', 'datasources'],
-	python_requires='>=3.7',
+	python_requires='>=3.11',
 	install_requires=list(packages),
 )
