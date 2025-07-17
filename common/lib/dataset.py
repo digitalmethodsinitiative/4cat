@@ -1594,7 +1594,7 @@ class DataSet(FourcatModule):
             return ""
 
         filepath = self.data.get("software_file", "")
-        if filepath.startswith("/extensions/"):
+        if filepath.startswith("/config/extensions/"):
             # go to root of extension
             filepath = "/" + "/".join(filepath.split("/")[3:])
 

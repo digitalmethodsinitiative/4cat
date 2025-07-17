@@ -35,7 +35,7 @@ if result.returncode != 0:
 # ---------------------------------------------
 if not args.no_version_check:
     target_version_file = Path("VERSION")
-    current_version_file = Path("data/config/.current-version")
+    current_version_file = Path("config/.current-version")
 
     if not current_version_file.exists():
         # 1.9 was the latest version lacking version files

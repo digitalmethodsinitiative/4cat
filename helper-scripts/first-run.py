@@ -31,7 +31,7 @@ if not version_file.exists():
     exit(1)
 
 # If any .current-version file exists, we don't need to do anything (though the sys admin may need to run migrate.py)
-current_version_files = [".current-version", "config/.current-version", "data/config/.current-version"]
+current_version_files = [".current-version", "config/.current-version"]
 for current_version_file in current_version_files:
     current_version_file = version_file.parent.joinpath(current_version_file)
     if current_version_file.exists():

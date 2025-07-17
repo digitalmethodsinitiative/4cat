@@ -1,6 +1,6 @@
 """
 Creates and/or manages the 4CAT configuration file located at
-data/config/config.ini.
+config/config.ini.
 
 For Docker, it is necessary to keep this file in a shared volume as both the
 backend and frontend use it. The config_manager will also read and edit this
@@ -58,20 +58,12 @@ if __name__ == "__main__":
     from pathlib import Path
 
     # Configuration file location
-    OLD_CONFIG_FILE = 'config/config.ini' # Pre v1.46; moved to accomodate a single Docker volume
-    CONFIG_FILE = 'data/config/config.ini'
-
-    # Check if old config file exists
-    # TODO: if migrating actual files; remove this check (DO NOT RECREATE, but it needs to be updated with new paths)
-    if os.path.exists(OLD_CONFIG_FILE):
-        print(f'Old config file {OLD_CONFIG_FILE} exists. Moving to new location {CONFIG_FILE}')
-        os.makedirs(Path(CONFIG_FILE).parent, exist_ok=True)
-        shutil.move(OLD_CONFIG_FILE, CONFIG_FILE)
+    CONFIG_FILE = 'config/config.ini'
 
     # Check if file does not already exist
     if not os.path.exists(CONFIG_FILE):
         # Create the config file
-        print('Creating data/config/config.ini file')
+        print('Creating config/config.ini file')
         config_parser = configparser.ConfigParser()
 
         # Flag 4CAT as using Docker
@@ -106,7 +98,7 @@ if __name__ == "__main__":
         # Write environment variables to database
         # Must write prior to importing config (where the values are read)
         update_config_from_environment(CONFIG_FILE, config_parser)
-        print('Created data/config/config.ini file')
+        print('Created config/config.ini file')
 
         # Ensure filepaths exist
         from common.config_manager import ConfigManager
@@ -139,7 +131,7 @@ if __name__ == "__main__":
 
     # Config file already exists; Update .env variables if they changed
     else:
-        print('Configuration file data/config/config.ini already exists')
+        print('Configuration file config/config.ini already exists')
         print('Checking Docker .env variables and updating if necessary')
         config_parser = configparser.ConfigParser()
         config_parser.read(CONFIG_FILE)

@@ -45,3 +45,10 @@ secret_key = REPLACE_THIS
 # Public/external facing ports
 [SERVER]
 public_port = 80
+
+# Use Memcache
+# Requires setting up a memcache server (e.g., https://www.memcached.org/)
+# This can speed up some 4CAT functionality, primarily in the frontend with many users
+# Docker will do this for you (see docker-compose.yml memcached service)
+#[MEMCACHE]
+#memcache_host=localhost:11211 # example

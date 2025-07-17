@@ -112,13 +112,7 @@ class ConfigManager:
 
         :return:
         """
-        old_config_file = Path(__file__).parent.parent.joinpath("config/config.ini")
-        config_file = Path(__file__).parent.parent.joinpath("data/config/config.ini")
-        if old_config_file.exists():
-            # move old config file to new location
-            shutil.move(old_config_file, config_file)
-            print("Moved config file to new location: data/config/config.ini")
-
+        config_file = Path(__file__).parent.parent.joinpath("config/config.ini")
         config_reader = configparser.ConfigParser()
         in_docker = False
         if config_file.exists():
@@ -128,7 +122,7 @@ class ConfigManager:
                 in_docker = True
         else:
             # config should be created!
-            raise ConfigException("No data/config/config.ini file exists! Update and rename the config.ini-example file.")
+            raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
         
         # Set up core settings
         # Using Path.joinpath() will ensure paths are relative to ROOT_PATH or absolute (if /some/path is provided)
@@ -149,8 +143,8 @@ class ConfigManager:
             "MEMCACHE_SERVER": config_reader.get("MEMCACHE", option="memcache_host", fallback={}),
 
             "PATH_ROOT": root_path,
-            "PATH_CONFIG": root_path.joinpath("data/config"), # .current-version, config.ini are hardcoded here via docker/docker_setup.py and helper-scripts/migrate.py
-            "PATH_EXTENSIONS": root_path.joinpath("data/extensions"), # Must match setup.py and migrate.py
+            "PATH_CONFIG": root_path.joinpath("config"), # .current-version, config.ini are hardcoded here via docker/docker_setup.py and helper-scripts/migrate.py
+            "PATH_EXTENSIONS": root_path.joinpath("config/extensions"), # Must match setup.py and migrate.py
             "PATH_LOGS": root_path.joinpath(config_reader["PATHS"].get("path_logs", "")),
             "PATH_IMAGES": root_path.joinpath(config_reader["PATHS"].get("path_images", "")),
             "PATH_DATA": root_path.joinpath(config_reader["PATHS"].get("path_data", "")),

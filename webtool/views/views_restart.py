@@ -116,9 +116,9 @@ def upgrade_frontend():
     procedure. The request ends after migrate.py has finished running after
     which it is up to the back-end to determine what to do next.
 
-    This route expects a file data/config/.current-version-frontend to exist. This
+    This route expects a file config/.current-version-frontend to exist. This
     file should be created before requesting this route so that the front-end
-    knows what version it is running, since data/config/.current-version will have
+    knows what version it is running, since config/.current-version will have
     been updated by the back-end at this point to reflect the newer version
     after that container's upgrade.
     """

@@ -49,7 +49,7 @@ else
   # Seed DB
   cd /usr/src/app && psql --host=$POSTGRES_HOST --port=$POSTGRES_PORT --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
   # No database exists, new build, no need to migrate so create .current-version file
-  mkdir -p data/config && cp VERSION data/config/.current-version
+  mkdir -p config && cp VERSION config/.current-version
 fi
 
 # If backend did gracefully shutdown, PID lockfile remains; Remove lockfile
@@ -70,5 +70,4 @@ python3 4cat-daemon.py start
 # Tail logs and wait for SIGTERM
 sleep 1  # give the logger time to initialise
 # get log location from python config.get("PATH_LOGS")
-LOG_PATH=$(python3 -c "from common.config_manager import config; print(config.get('PATH_LOGS'))")
-exec tail -f -n 3 $LOG_PATH/backend_4cat.log & wait $!
+exec tail -f -n 3 logs/backend_4cat.log & wait $!

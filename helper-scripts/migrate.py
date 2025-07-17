@@ -92,36 +92,36 @@ def install_extensions(no_pip=True):
 	"""
 	if os.path.isdir("extensions") and not os.path.islink("extensions"):
 		# User already has existing extensions folder (and not a symbolic link)
-		# but it is in the wrong place (4CAT root rather than /data)
+		# but it is in the wrong place (4CAT root rather than /config)
 		print("Migrating extensions folder...")
-		if not os.path.isdir("data/extensions"):
-			# No data/extensions folder, so we move the existing extensions folder
-			shutil.move("extensions", "data/extensions")
+		if not os.path.isdir("config/extensions"):
+			# No config/extensions folder, so we move the existing extensions folder
+			shutil.move("extensions", "config/extensions")
 		else:
-			# Both extensions and data/extensions exist, so we need to merge them
+			# Both extensions and config/extensions exist, so we need to merge them
 			for root, dirs, files in os.walk("extensions"):
 				for file in files:
 					# Do not overwrite existing files
-					if not os.path.exists(os.path.join("data/extensions", root, file)):
+					if not os.path.exists(os.path.join("config/extensions", root, file)):
 						try:
-							shutil.move(os.path.join(root, file), os.path.join("data/extensions", root, file))
+							shutil.move(os.path.join(root, file), os.path.join("config/extensions", root, file))
 						except FileNotFoundError:
 							# this can happen with temporary OS files like .DS_Store
 							pass
 
 			shutil.rmtree("extensions")
 
-	if not os.path.isdir("data/extensions"):
-		os.makedirs("data/extensions")
+	if not os.path.isdir("config/extensions"):
+		os.makedirs("config/extensions")
 
 	if not os.path.islink("extensions"):
 		# Create symbolic link to extensions folder
 		# os.path.abspath necessary for Windows
-		os.symlink(os.path.abspath("data/extensions"), os.path.abspath("extensions"))
+		os.symlink(os.path.abspath("config/extensions"), os.path.abspath("extensions"))
 		
 	# Check for extension packages
-	if os.path.isdir("data/extensions"):
-		for root, dirs, files in os.walk("data/extensions"):
+	if os.path.isdir("config/extensions"):
+		for root, dirs, files in os.walk("config/extensions"):
 			for file in files:
 				if file == "fourcat_install.py":
 					command = [interpreter, os.path.join(root, file)]
@@ -179,7 +179,7 @@ cli.add_argument("--release", "-l", default=False, action="store_true", help="Pu
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
-cli.add_argument("--current-version", "-v", default="data/config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
+cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
 cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate ('both', 'backend', 'frontend'). Skips check for if 4CAT is running when set to 'frontend'. Also used by extensions w/ fourcat_install.py")
 cli.add_argument("--branch", "-b", default=False, help="Which branch to check out from GitHub. By default, check out the latest release.")

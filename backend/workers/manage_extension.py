@@ -17,7 +17,6 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from backend.lib.worker import BasicWorker
-from common.config_manager import config
 
 
 class ExtensionManipulator(BasicWorker):
@@ -45,10 +44,6 @@ class ExtensionManipulator(BasicWorker):
         extension_reference = self.job.data["remote_id"]
         task = self.job.details.get("task")
 
-        # note that this is a databaseless config reader
-        # since we only need it for file paths
-        self.config = config
-
         # this worker uses its own log file instead of the main 4CAT log
         # this is so that it is easier to monitor error messages about failed
         # installations etc and display those separately in e.g. the web
@@ -69,7 +64,7 @@ class ExtensionManipulator(BasicWorker):
             success = self.install_extension(extension_reference)
             if success:
                 # Add job to restart 4CAT; include upgrade to ensure migrate.py runs which will install any extension updates and new python packages
-                lock_file = config.get("PATH_CONFIG").joinpath("restart.lock")
+                lock_file = self.config.get("PATH_CONFIG").joinpath("restart.lock")
                 if lock_file.exists():
                     # restart already in progress
                     self.extension_log.info("4CAT restart already in progress. Upgrade will be applied on next restart.")
@@ -79,11 +74,11 @@ class ExtensionManipulator(BasicWorker):
                     lock_file.touch()
                     # this log file is used to keep track of the progress, and will also
                     # be viewable in the web interface
-                    restart_log_file = config.get("PATH_CONFIG").joinpath("restart.log")
+                    restart_log_file = self.config.get("PATH_LOGS").joinpath("restart.log")
                     with restart_log_file.open("w") as outfile:
                         outfile.write(
                             f"Upgrade initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
-                        outfile.write(f"Telling 4CAT to upgrade via job queue...\n")
+                        outfile.write("Telling 4CAT to upgrade via job queue...\n")
                     
                     # add job to restart 4CAT
                     self.queue.add_job("restart-4cat", {}, "upgrade")
