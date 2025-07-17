@@ -20,9 +20,9 @@ class ConvertText(BasicProcessor):
     """
     type = "convert-text"  # job type ID
     category = "Conversion"  # category
-    title = "Convert text"  # title displayed in UI
-    description = ("Changes text and outputs these in a new dataset. Converted text can also be added to the original "
-                   "dataset as annotations.")  # description displayed in UI
+    title = "Replace text"  # title displayed in UI
+    description = ("Find and replace text in selected fields and and output these in a new dataset. Changed text can "
+                   "also be added to the original dataset as annotations.")  # description displayed in UI
     extension = "csv"
 
     @classmethod
