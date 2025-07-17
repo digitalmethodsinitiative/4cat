@@ -168,7 +168,6 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                         frontend_upgrade = requests.post(upgrade_url, data={"token": infile.read()}, timeout=(10 * 60))
                     upgrade_ok = frontend_upgrade.json()["status"] == "OK"
                     upgrade_error_message = frontend_upgrade.json().get("message")
-                    self.log.error("Front-end upgrade failed: %s" % upgrade_error_message)
                 except requests.RequestException:
                     pass
                 except TimeoutError:
@@ -182,6 +181,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                                              "containers manually.\n")
                     if upgrade_error_message:
                         log_stream_restart.write(f"Error message: {upgrade_error_message}\n")
+                    self.log.error("Error upgrading front-end container. See %s for details." % log_stream_restart.name)
                     lock_file.unlink()
                     return self.job.finish()
 
