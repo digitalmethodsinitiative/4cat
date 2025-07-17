@@ -20,7 +20,7 @@
                 currently, to manage extensions you will need to access the filesystem and move files into the correct
                 location manually.</p>
             <p>Extensions need to be enabled after installation to run. You can do so via the
-                <a href="{{ url_for("manipulate_settings") }}">4CAT settings panel</a>.</p>
+                <a href="{{ url_for("admin.manipulate_settings") }}">4CAT settings panel</a>.</p>
             <div class="user-panel">
                 <table class="fullwidth notification-table cp-table extensions-table">
                     <colgroup>
@@ -53,7 +53,7 @@
                                             class="sr-only">Remote git repository</span></a>{% endif %}
                                 </td>
                                 <td>
-                                    <form action="{{ url_for("uninstall_extension") }}" method="POST">
+                                    <form action="{{ url_for("extensions.uninstall_extension") }}" method="POST">
                                         <input type="hidden" name="extension-name" value="{{ extension_id }}">
                                         <button class="confirm-first" data-confirm-action="uninstall this extension"><i class="fa fa-folder-minus tooltip-trigger" aria-hidden="true" aria-controls="tooltip-uninstall"></i> <span class="sr-only">Uninstall extension</span></button>
                                     </form>
@@ -82,9 +82,9 @@
                 the extension files in it below. <strong>Note that extension code can basically do anything on the
                 system 4CAT runs on - make sure to only install code you trust.</strong></p>
             <p>After installing, the extension will initially be disabled. You can enable and disable extensions via the
-                <a href="{{ url_for("manipulate_settings") }}">4CAT settings panel</a>.</p>
+                <a href="{{ url_for("admin.manipulate_settings") }}">4CAT settings panel</a>.</p>
 
-            <form action="{{ url_for("extensions_panel") }}" method="POST" class="wide" enctype="multipart/form-data">
+            <form action="{{ url_for("extensions.extensions_panel") }}" method="POST" class="wide" enctype="multipart/form-data">
                 <div class="form-element{% if "extension-url" in incomplete %} missing{% endif %}">
                     <label for="extension-url">Repository URL</label>
                     <input type="text" id="extension-url" name="extension-url">
@@ -104,7 +104,7 @@
         <section>
             <h2><span>Extension installation log</span></h2>
             <p>Displaying last 150 lines of the log file.</p>
-            <pre id="extension-log" class="content-container log-display wrapped-log" data-source="{{ url_for("get_log", logfile="extensions") }}" data-interval="3">
+            <pre id="extension-log" class="content-container log-display wrapped-log" data-source="{{ url_for("admin.get_log", logfile="extensions") }}" data-interval="3">
                 Loading log file...
             </pre>
         </section>
