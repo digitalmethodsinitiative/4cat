@@ -59,7 +59,7 @@ rm -f ./backend/4cat.pid
 export PYTHONPATH=/usr/src/app:$PYTHONPATH
 
 # Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
-python3 helper-scripts/migrate.py -y -o logs/migrate-backend.log
+python3 helper-scripts/migrate.py -y -o data/logs/migrate-backend.log
 
 # Run docker_setup to update any environment variables if they were changed
 python3 -m docker.docker_setup
@@ -69,5 +69,6 @@ python3 4cat-daemon.py start
 
 # Tail logs and wait for SIGTERM
 sleep 1  # give the logger time to initialise
-# get log location from python config.get("PATH_LOGS")
-exec tail -f -n 3 logs/backend_4cat.log & wait $!
+# get log location from python config.get("PATH_LOGS") as it is more reliable than hardcoding
+log_file=$(python3 -c "import CoreConfigManager; config = CoreConfigManager(); print(config.get('PATH_LOGS').joinpath('backend_4cat.log'));")
+exec tail -f -n 3 ${log_file} & wait $!
