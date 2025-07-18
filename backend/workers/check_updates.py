@@ -4,7 +4,6 @@ import json
 
 from common.lib.helpers import add_notification, get_github_version
 from backend.lib.worker import BasicWorker
-from pathlib import Path
 
 
 class UpdateChecker(BasicWorker):
@@ -33,7 +32,7 @@ class UpdateChecker(BasicWorker):
         return {"remote_id": "", "interval": 10800}
 
     def work(self):
-        versionfile = Path(self.config.get("PATH_ROOT"), "config/.current-version")
+        versionfile = self.config.get("PATH_CONFIG").joinpath(".current-version")
         repo_url = self.config.get("4cat.github_url")
 
         if not versionfile.exists() or not repo_url:

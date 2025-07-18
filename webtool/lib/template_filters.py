@@ -412,7 +412,7 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	cv_path = g.config.get("PATH_ROOT").joinpath("config/.current-version")
+	cv_path = g.config.get("PATH_CONFIG").joinpath(".current-version")
 	if cv_path.exists():
 		with cv_path.open() as infile:
 			version = infile.readline().strip()

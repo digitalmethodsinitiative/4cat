@@ -79,9 +79,9 @@ packages = set([
 ])
 
 # Check for extension packages
-if os.path.isdir("extensions"):
+if os.path.isdir("config/extensions"):
 	extension_packages = set()
-	for root, dirs, files in os.walk("extensions"):
+	for root, dirs, files in os.walk("config/extensions"):
 		for file in files:
 			if file == "requirements.txt":
 				with open(os.path.join(root, file)) as extension_requirements:

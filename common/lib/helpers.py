@@ -239,7 +239,7 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = core_config.get("PATH_ROOT").joinpath("config/.current-version")
+    current_version_file = core_config.get("PATH_CONFIG").joinpath(".current-version")
     if not current_version_file.exists():
         return ""
 
@@ -303,10 +303,10 @@ def find_extensions():
     :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
     dictionary, and a list of (str) errors encountered while loading
     """
-    extension_path = core_config.get("PATH_ROOT").joinpath("extensions")
+    extension_path = core_config.get("PATH_EXTENSIONS")
     errors = []
     if not extension_path.exists() or not extension_path.is_dir():
-        return [], None
+        return {}, errors
 
     # each folder in the extensions folder is an extension
     extensions = {
@@ -315,7 +315,7 @@ def find_extensions():
             "version": "",
             "url": "",
             "git_url": "",
-            "is_git": False
+            "is_git": False,
         } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
     }
 

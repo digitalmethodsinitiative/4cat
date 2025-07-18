@@ -9,8 +9,6 @@ import ural
 import time
 import re
 
-from pathlib import Path
-
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
@@ -272,7 +270,7 @@ class SearchTelegram(Search):
                                                       query["api_id"].strip(),
                                                       query["api_hash"].strip())
         self.dataset.log(f'Telegram session id: {session_id}')
-        session_path = Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_SESSIONS"), session_id + ".session")
+        session_path = self.config.get("PATH_SESSIONS").joinpath(session_id + ".session")
 
         client = None
 
@@ -1029,7 +1027,7 @@ class SearchTelegram(Search):
         session_id = SearchTelegram.create_session_id(query.get("api_phone"), query.get("api_id"),
                                                       query.get("api_hash"))
         config.user.set_value("telegram.session", session_id)
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
+        session_path = config.get('PATH_SESSIONS').joinpath(session_id + ".session")
 
         client = None
 

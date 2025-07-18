@@ -2,7 +2,6 @@
 VK keyword search
 """
 import datetime
-from pathlib import Path
 
 import vk_api
 
@@ -176,7 +175,7 @@ class SearchVK(Search):
         """
         vk_session = vk_api.VkApi(username,
                                   password,
-                                  config_filename=Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_SESSIONS"), username+"-vk_config.json"))
+                                  config_filename=self.config.get("PATH_SESSIONS").joinpath(username+"-vk_config.json"))
         vk_session.auth()
 
         return vk_session

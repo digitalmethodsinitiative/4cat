@@ -26,7 +26,6 @@ ENV PYTHONUNBUFFERED=1
 
 # Set up environment for Python setup.py
 COPY ./requirements.txt /usr/src/app/requirements.txt
-COPY ./extensions /usr/src/app/extensions
 COPY ./setup.py /usr/src/app/setup.py
 COPY ./VERSION /usr/src/app/VERSION
 COPY ./README.md /usr/src/app/README.md

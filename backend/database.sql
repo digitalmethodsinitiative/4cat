@@ -202,5 +202,6 @@ INSERT INTO settings (name, value, tag) VALUES
   ('privileges.admin.can_manage_tags', 'true', 'admin'),
   ('privileges.admin.can_restart', 'true', 'admin'),
   ('privileges.admin.can_manipulate_all_datasets', 'true', 'admin'),
+  ('privileges.admin.can_manage_extensions', 'true', 'admin'),
   ('privileges.can_view_all_datasets', 'true', 'admin'),
   ('privileges.can_view_private_datasets', 'true', 'admin');

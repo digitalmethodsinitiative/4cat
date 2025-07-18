@@ -6,7 +6,6 @@ import shutil
 import pandas as pd
 import math
 
-from pathlib import Path
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
@@ -167,7 +166,7 @@ class YouTubeImageWall(BasicProcessor):
 					image_archive.extract(file + ".jpg", results_path)
 					delete_after_use = True
 			else:
-				temp_path = Path(self.config.get('PATH_ROOT'), "common/assets/no-video.jpg")
+				temp_path = self.config.get('PATH_ROOT').joinpath("common/assets/no-video.jpg")
 
 			# Resize the image
 			image = Image.open(temp_path)

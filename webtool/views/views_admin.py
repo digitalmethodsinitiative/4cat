@@ -26,7 +26,7 @@ from webtool.lib.helpers import error, Pagination, generate_css_colours, setting
 from common.lib.user import User
 from common.lib.dataset import DataSet
 from common.lib.job import Job
-from common.lib.helpers import call_api, send_email, UserInput, get_git_branch
+from common.lib.helpers import call_api, send_email, UserInput, get_git_branch, find_extensions
 from common.lib.exceptions import DataSetException, JobNotFoundException, QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -673,7 +673,7 @@ def manipulate_settings():
         option_owner = option.split(".")[0]
         submenu = "other"
         if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
-                                    "logging", "ui"):
+                                    "logging", "ui", "extensions"):
             submenu = "core"
         elif option_owner.endswith("-search"):
             submenu = "datasources"
@@ -728,10 +728,18 @@ def manipulate_settings():
         }
         for datasource, info in g.modules.datasources.items()}
 
+    # similar deal for extensions
+    extension_config = {
+        extension_name: {
+            **extension,
+            "enabled": g.config.get("extensions.enabled").get(extension_name, {}).get("enabled")
+        }
+        for extension_name, extension in find_extensions()[0].items()}
+
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
                            datasources_config=datasources, changed=changed_categories,
-                           expire_override=expire_override)
+                           expire_override=expire_override, extensions_config=extension_config)
 
 
 @component.route("/manage-notifications/", methods=["GET", "POST"])
@@ -845,7 +853,7 @@ def get_log(logfile, max_lines=250):
     :param str logfile: 'backend' or 'stderr'
     :return:
     """
-    if logfile not in ("stderr", "backend", "import", "frontend"):
+    if logfile not in ("stderr", "backend", "import", "extensions", "frontend"):
         return "Not Found", 404
 
     # number of lines to return
@@ -861,7 +869,7 @@ def get_log(logfile, max_lines=250):
     else:
         filename = f"{logfile}.log"
 
-    log_file = g.config.get("PATH_ROOT").joinpath(g.config.get("PATH_LOGS")).joinpath(filename)
+    log_file = g.config.get("PATH_LOGS").joinpath(filename)
     if log_file.exists():
         with log_file.open("rb") as infile:
             infile.seek(0, 2)  # end of file
