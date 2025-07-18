@@ -279,8 +279,7 @@ class ExtensionManipulator(BasicWorker):
         if clone_outcome.returncode != 0:
             cloned_correctly = False
             self.extension_log.info(clone_outcome.stdout.decode("utf-8"))
-            self.extension_log.error(f"Could not clone 4CAT extension repository from {repository_url} - see log for "
-                                     f"details.")
+            self.extension_log.error(f"Could not clone 4CAT extension repository from {repository_url}:\n\n{clone_outcome.stderr}")
 
         if not cloned_correctly:
             if extension_folder.exists():
