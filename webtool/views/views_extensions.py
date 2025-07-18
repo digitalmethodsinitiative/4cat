@@ -16,6 +16,14 @@ component = Blueprint("extensions", __name__)
 @setting_required("privileges.admin.can_manage_extensions")
 def extensions_panel():
     extensions, load_errors = find_extensions()
+    # check is extensions are enabled deal for extensions
+    extensions = {
+        extension_name: {
+            **extension,
+            "enabled": g.config.get("extensions.enabled").get(extension_name, {}).get("enabled")
+        }
+        for extension_name, extension in extensions.items()}
+
 
     if extensions is None:
         return render_template("error.html", message="No extensions folder is available - cannot "
