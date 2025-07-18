@@ -12,7 +12,6 @@ from calendar import monthrange
 from flask_login import current_user
 from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
-from pathlib import Path
 
 csv.field_size_limit(1024 * 1024 * 1024)
 

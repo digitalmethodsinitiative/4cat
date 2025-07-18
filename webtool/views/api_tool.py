@@ -9,8 +9,6 @@ import time
 import csv
 import os
 
-from pathlib import Path
-
 from flask import Blueprint, current_app, jsonify, request, render_template, render_template_string, redirect, url_for, flash, \
 	get_flashed_messages, send_from_directory, g
 from flask_login import login_required, current_user

@@ -6,7 +6,6 @@ import shutil
 import pandas as pd
 import math
 
-from pathlib import Path
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
