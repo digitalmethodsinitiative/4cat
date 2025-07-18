@@ -9,8 +9,6 @@ import ural
 import time
 import re
 
-from pathlib import Path
-
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException

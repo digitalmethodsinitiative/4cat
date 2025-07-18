@@ -54,8 +54,6 @@ if __name__ == "__main__":
     import os
     import configparser
     import bcrypt
-    import shutil
-    from pathlib import Path
 
     # Configuration file location
     CONFIG_FILE = 'config/config.ini'

@@ -5,8 +5,6 @@ import asyncio
 import hashlib
 import json
 
-from pathlib import Path
-
 import telethon.errors
 from telethon import TelegramClient
 from telethon.errors import TimedOutError, BadRequestError

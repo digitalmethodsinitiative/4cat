@@ -43,7 +43,7 @@ jobs:
         if: failure()
         run: |
           if [ "$(docker ps | grep 4cat)" ]; then 
-              docker cp 4cat_backend:/usr/src/app/data/logs/backend_4cat.log ./backend_4cat.log
+              docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
               echo "::group::Backend logs"
               cat backend_4cat.log
               echo "::endgroup::"

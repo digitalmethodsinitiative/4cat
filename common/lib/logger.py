@@ -181,7 +181,6 @@ class Logger:
 
         self.print_logs = output
 
-        
         if type(log_path) is str:
             core_config = CoreConfigManager()
             log_path = core_config.get("PATH_LOGS").joinpath(log_path)

@@ -4,7 +4,6 @@ import json
 
 from common.lib.helpers import add_notification, get_github_version
 from backend.lib.worker import BasicWorker
-from pathlib import Path
 
 
 class UpdateChecker(BasicWorker):

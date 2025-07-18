@@ -10,8 +10,6 @@ import time
 import uuid
 import sys
 
-from pathlib import Path
-
 from backend.lib.worker import BasicWorker
 from common.lib.exceptions import WorkerInterruptedException
 

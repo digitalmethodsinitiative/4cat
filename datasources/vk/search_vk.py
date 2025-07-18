@@ -2,7 +2,6 @@
 VK keyword search
 """
 import datetime
-from pathlib import Path
 
 import vk_api
 

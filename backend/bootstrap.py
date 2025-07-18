@@ -4,8 +4,6 @@
 import shutil
 import os
 
-from pathlib import Path
-
 from common.lib.queue import JobQueue
 from common.lib.database import Database
 from common.lib.module_loader import ModuleCollector
