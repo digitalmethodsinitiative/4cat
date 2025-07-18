@@ -201,8 +201,7 @@ class ExtensionManipulator(BasicWorker):
                 return False
 
         extension_folder.rename(canonical_folder)
-        version = f"version {manifest_data.get('version', 'unknown')}"
-        self.extension_log.info(f"Finished installing extension {canonical_name} (version {version}) with ID "
+        self.extension_log.info(f"Finished installing extension {canonical_name} (version {manifest_data.get('version', 'unknown')}) with ID "
                                 f"{canonical_id}.")
         return True
 
