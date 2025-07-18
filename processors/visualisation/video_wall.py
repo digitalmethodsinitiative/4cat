@@ -552,6 +552,8 @@ class VideoWallGenerator(BasicProcessor):
             if erroneous_stream := re.findall("input from stream ([0-9]+)", ffmpeg_error):
                 erroneous_stream = convert_to_int(erroneous_stream[0], None)
                 if erroneous_stream is not None and erroneous_stream < len(included_media):
+                    # todo: could run again without this video... but that
+                    # would require a bit of a refactor
                     self.dataset.log(f"The error message indicates the file {included_media[erroneous_stream]} cannot be read; it may be corrupt.")
 
         shutil.rmtree(collage_staging_area, ignore_errors=True)
