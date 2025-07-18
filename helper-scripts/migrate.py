@@ -227,9 +227,6 @@ if not current_version_file.exists():
 	if cwd.joinpath(".current-version").exists():
 		logger.info("Moving .current-version to new location")
 		shutil.move(cwd.joinpath(".current-version"), current_version_file)
-	elif cwd.joinpath("config/.current-version").exists():
-		logger.info("Moving config/.current-version to new location")
-		shutil.move(cwd.joinpath("config/.current-version"), current_version_file)
 
 if not current_version_file.exists():
 	logger.info("Creating .current-version file ")
