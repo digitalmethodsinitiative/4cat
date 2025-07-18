@@ -70,5 +70,5 @@ python3 4cat-daemon.py start
 # Tail logs and wait for SIGTERM
 sleep 1  # give the logger time to initialise
 # get log location from python config.get("PATH_LOGS") as it is more reliable than hardcoding
-log_file=$(python3 -c "import CoreConfigManager; config = CoreConfigManager(); print(config.get('PATH_LOGS').joinpath('backend_4cat.log'));")
+log_file=$(python3 -c "from common.config_manager import CoreConfigManager; config = CoreConfigManager(); print(config.get('PATH_LOGS').joinpath('backend_4cat.log'));")
 exec tail -f -n 3 ${log_file} & wait $!
