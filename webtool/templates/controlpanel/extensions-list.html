@@ -21,6 +21,8 @@
                 location manually.</p>
             <p>Extensions need to be enabled after installation to run. You can do so via the
                 <a href="{{ url_for("admin.manipulate_settings") }}">4CAT settings panel</a>.</p>
+            <br>
+            <p><strong>WARNING:</strong> installing and uninstalling extensions will trigger a restart and interrupt any running processors. Ensure no important analyses are running via the Control Panel first.</p>
             <div class="user-panel">
                 <table class="fullwidth notification-table cp-table extensions-table">
                     <colgroup>
@@ -36,15 +38,15 @@
                     </tr>
                     {% if extensions %}
                         {% for extension_id, extension in extensions.items() %}
-                            <tr{% if not extension.enabled %} class="tooltip-trigger"{% endif %} aria-controls="tooltip-disabled">
-                                <td {% if not extension.enabled %}class="disabled"{% endif %}>
+                            <tr>
+                                <td {% if not extension.enabled %}class="disabled tooltip-trigger" aria-controls="tooltip-disabled"{% endif %}>
                                 {% if not extension.enabled %}<i class="fa fa-times" aria-hidden="true"></i>
                                     <span class="sr-only">This extension is currently disabled.</span>{% endif %}
                                     <span class="property-badge">
                                     {{ extension_id }}</span>{% if extension_id != extension.name %}
                                     {{ extension.name }}{% endif %}</td>
-                                <td>{% if extension.version %}{{ extension.version }}{% else %}unknown{% endif %}</td>
-                                <td>
+                                <td {% if not extension.enabled %}class="tooltip-trigger" aria-controls="tooltip-disabled"{% endif %}>{% if extension.version %}{{ extension.version }}{% else %}unknown{% endif %}</td>
+                                <td {% if not extension.enabled %}class="tooltip-trigger" aria-controls="tooltip-disabled"{% endif %}>
                                     {% if extension.url and extension.url != extension.git_url %}
                                         <a href="{{ extension.url }}"><i class="fa fa-fw fa-link" aria-hidden="true"></i><span
                                                 class="sr-only">Website</span></a>{% endif %}
