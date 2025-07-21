@@ -40,7 +40,7 @@
                                 <div class="post-annotation-parameters">
                                     <ul>
                                     {% for option in item.parameters %}
-                                        {% if processor_options[option].type not in ("annotation", "annotations") %}
+                                        {% if option in processor_options and processor_options[option].type not in ("annotation", "annotations") %}
                                             {% set extra_tooltip_id =  annotation.id %}
                                             {% include 'components/result-parameter.html' %}
                                         {% endif %}
