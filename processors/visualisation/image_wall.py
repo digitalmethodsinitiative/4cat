@@ -118,6 +118,10 @@ class ImageWallGenerator(VideoWallGenerator):
         :param str ffprobe_path:  Path to the ffprobe executable
         :return:  A value to sort the file by
         """
+        if sort_mode == "":
+            # no sort, default
+            return (0, 0, 0)
+        
         sample_max = 75  # image size for colour sampling
 
         try:
