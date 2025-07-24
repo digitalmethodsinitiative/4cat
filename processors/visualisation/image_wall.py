@@ -159,7 +159,7 @@ class ImageWallGenerator(VideoWallGenerator):
             colours = sorted(colours, key=lambda x: x[0], reverse=True)
             value = colours[0][1]
 
-        elif sort_mode in ("kmeans-dominant"):
+        elif sort_mode in ("kmeans-dominant",):
             # use k-means clusters to determine the representative colour
             # this is more computationally expensive but gives far better
             # results.
