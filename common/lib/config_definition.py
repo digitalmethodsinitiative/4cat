@@ -626,6 +626,14 @@ config_definition = {
         "help": "Show email when complete option",
         "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
     },
+    "image-visuals.max_images": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 1000,
+        "coerce_type": int,
+        "help": "Maximum images to show",
+        "tooltip": "Maximum number of images to show in the image visualization tab of a dataset. This is to prevent "
+                   "issues with large datasets.",
+    }
 }
 
 # These are used in the web interface for more readable names
