@@ -567,7 +567,8 @@ class VideoWallGenerator(BasicProcessor):
         shutil.rmtree(collage_staging_area, ignore_errors=True)
 
         if result.returncode != 0:
-
+            if ffmpeg_error:
+                self.log.warning(f"ffmpeg error (dataset {self.dataset.key}): {ffmpeg_error}")
             return self.dataset.finish_with_error(
                 f"Could not make collage (error {result.returncode}); check the dataset log for details.")
 
