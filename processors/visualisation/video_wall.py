@@ -148,7 +148,15 @@ class VideoWallGenerator(BasicProcessor):
         sizing_mode = self.parameters.get("tile-size")
         sort_mode = self.parameters.get("sort-mode")
         amount = self.parameters.get("amount")
-        amount = amount if amount else self.get_options()["amount"].get("max", 500)
+        if amount == 0:
+            # user requests max number of video/images
+            max_number_images = self.get_options(config=self.config).get("amount").get("max")
+            if max_number_images:
+                # server defined max
+                amount = max_number_images
+            else:
+                # no max, so use all available media
+                amount = self.source_dataset.num_rows
         sound = self.parameters.get("audio", "longest")
         max_length = self.parameters.get("max-length", 60)
         aspect_ratio = self.parameters.get("aspect-ratio")

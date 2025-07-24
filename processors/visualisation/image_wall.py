@@ -56,15 +56,25 @@ class ImageWallGenerator(VideoWallGenerator):
     def get_options(cls, parent_dataset=None, config=None):
         options = copy.deepcopy(cls.options)
         max_number_images = int(config.get("image-visuals.max_images", 1000))
-        options["amount"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of images" + (f" (max {max_number_images})" if max_number_images != 0 else ""),
-            "default": 100 if max_number_images == 0 else min(max_number_images, 100),
-            "min": 0 if max_number_images == 0 else 1,
-            "max": max_number_images,
-            "tooltip": "'0' uses as many images as available in the archive" + (
-                f" (up to {max_number_images})" if max_number_images != 0 else "")
-        }
+        if max_number_images <= 0:
+            # cannot set max
+            options["amount"] = {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of images",
+                "default": min(max_number_images, 100),
+                "min": 0,
+                "tooltip": "'0' uses as many images as available in the archive"
+            }
+        else:
+            # could set min to 1, but per tooltip we will use the max instead
+            options["amount"] = {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of images",
+                "default": 100,
+                "min": 0,
+                "max": max_number_images,
+                "tooltip": f"'0' uses as many images as available in the archive (up to {max_number_images})"
+            }
 
         if parent_dataset:
             have_video_source = (parent_dataset.get_media_type() == "video" or parent_dataset.type.startswith("video-downloader"))
