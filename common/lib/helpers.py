@@ -1132,8 +1132,12 @@ def sets_to_lists(d: MutableMapping):
 
 def url_to_hash(url, remove_scheme=True, remove_www=True):
     """
-    Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
-    rest of the URL.
+    Convert a URL to a hash. Allows removing scheme and www prefix before hashing.
+    
+    :param url: URL to hash
+    :param remove_scheme: If True, removes the scheme from URL before hashing
+    :param remove_www: If True, removes the www. prefix from URL before hashing
+    :return: Hash of the URL
     """
     parsed_url = urlparse(url.lower())
     if parsed_url:
@@ -1142,23 +1146,25 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
         if remove_www:
             netloc = re.sub(r"^www\.", "", parsed_url.netloc)
             parsed_url = parsed_url._replace(netloc=netloc)
-
-        url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
+        
+        # Hash the normalized URL directly
+        normalized_url = urlunparse(parsed_url).strip("/")
     else:
-        # Unable to parse URL; use regex
+        # Unable to parse URL; use regex normalization
+        normalized_url = url.lower().strip("/")
         if remove_scheme:
-            url = re.sub(r"^https?://", "", url)
+            normalized_url = re.sub(r"^https?://", "", normalized_url)
         if remove_www:
             if not remove_scheme:
-                scheme = re.match(r"^https?://", url).group()
-                temp_url = re.sub(r"^https?://", "", url)
-                url = scheme + re.sub(r"^www\.", "", temp_url)
+                scheme_match = re.match(r"^https?://", normalized_url)
+                if scheme_match:
+                    scheme = scheme_match.group()
+                    temp_url = re.sub(r"^https?://", "", normalized_url)
+                    normalized_url = scheme + re.sub(r"^www\.", "", temp_url)
             else:
-                url = re.sub(r"^www\.", "", url)
+                normalized_url = re.sub(r"^www\.", "", normalized_url)
 
-        url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
-
-    return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+    return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
@@ -1167,6 +1173,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         Prefer the original filename (extracted from the URL), but this may not
         always be possible or be an actual filename. Also, avoid using the same
         filename multiple times. Ensures filenames don't exceed max_bytes.
+
+        Note: Collision possible without staging area (used to check for already 
+        existing filenames).
 
         :param str url:  URLs to determine filenames for
         :param Path staging_area:  Path to the staging area where files are saved
