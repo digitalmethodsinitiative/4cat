@@ -10,8 +10,6 @@ import time
 import uuid
 import sys
 
-from pathlib import Path
-
 from backend.lib.worker import BasicWorker
 from common.lib.exceptions import WorkerInterruptedException
 
@@ -49,11 +47,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
         # prevent multiple restarts running at the same time which could blow
         # up really fast
-        lock_file = Path(self.config.get("PATH_ROOT")).joinpath("config/restart.lock")
+        lock_file = self.config.get("PATH_CONFIG").joinpath("restart.lock")
 
         # this file has the log of the restart worker itself and is checked by
         # the frontend to see how far we are
-        log_file_restart = Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_LOGS")).joinpath("restart.log")
+        log_file_restart = self.config.get("PATH_LOGS").joinpath("restart.log")
         log_stream_restart = log_file_restart.open("a")
 
         if not is_resuming:
@@ -142,7 +140,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # front-end restart or upgrade too
             self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             log_stream_restart.write("4CAT restarted.\n")
-            with Path(self.config.get("PATH_ROOT")).joinpath("config/.current-version").open() as infile:
+            with self.config.get("PATH_CONFIG").joinpath(".current-version").open() as infile:
                 log_stream_restart.write(f"4CAT is now running version {infile.readline().strip()}.\n")
 
             # we're gonna use some specific Flask routes to trigger this, i.e.
@@ -161,11 +159,13 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_restart.close()  # close, because front-end will be writing to it
                 upgrade_ok = False
                 upgrade_timeout = False
+                upgrade_error_message = False
                 try:
                     upgrade_url = api_host + "/admin/trigger-frontend-upgrade/"
                     with lock_file.open() as infile:
                         frontend_upgrade = requests.post(upgrade_url, data={"token": infile.read()}, timeout=(10 * 60))
                     upgrade_ok = frontend_upgrade.json()["status"] == "OK"
+                    upgrade_error_message = frontend_upgrade.json().get("message")
                 except requests.RequestException:
                     pass
                 except TimeoutError:
@@ -175,8 +175,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 if not upgrade_ok:
                     if upgrade_timeout:
                         log_stream_restart.write("Upgrade timed out.")
-                    log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart"
+                    log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart "
                                              "containers manually.\n")
+                    if upgrade_error_message:
+                        log_stream_restart.write(f"Error message: {upgrade_error_message}\n")
+                    self.log.error("Error upgrading front-end container. See %s for details." % log_stream_restart.name)
                     lock_file.unlink()
                     return self.job.finish()
 

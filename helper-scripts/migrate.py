@@ -86,10 +86,42 @@ def install_extensions(no_pip=True):
 	Check for extensions and run any installation scripts found.
 
 	Note: requirements texts are handled by setup.py
+
+	:param bool no_pip:  Do not run pip when running extension install script
+	(because migrate runs pip itself)
 	"""
+	if os.path.isdir("extensions") and not os.path.islink("extensions"):
+		# User already has existing extensions folder (and not a symbolic link)
+		# but it is in the wrong place (4CAT root rather than /config)
+		print("Migrating extensions folder...")
+		if not os.path.isdir("config/extensions"):
+			# No config/extensions folder, so we move the existing extensions folder
+			shutil.move("extensions", "config/extensions")
+		else:
+			# Both extensions and config/extensions exist, so we need to merge them
+			for root, dirs, files in os.walk("extensions"):
+				for file in files:
+					# Do not overwrite existing files
+					if not os.path.exists(os.path.join("config/extensions", root, file)):
+						try:
+							shutil.move(os.path.join(root, file), os.path.join("config/extensions", root, file))
+						except FileNotFoundError:
+							# this can happen with temporary OS files like .DS_Store
+							pass
+
+			shutil.rmtree("extensions")
+
+	if not os.path.isdir("config/extensions"):
+		os.makedirs("config/extensions")
+
+	if not os.path.islink("extensions"):
+		# Create symbolic link to extensions folder
+		# os.path.abspath necessary for Windows
+		os.symlink(os.path.abspath("config/extensions"), os.path.abspath("extensions"))
+		
 	# Check for extension packages
-	if os.path.isdir("extensions"):
-		for root, dirs, files in os.walk("extensions"):
+	if os.path.isdir("config/extensions"):
+		for root, dirs, files in os.walk("config/extensions"):
 			for file in files:
 				if file == "fourcat_install.py":
 					command = [interpreter, os.path.join(root, file)]
@@ -168,6 +200,7 @@ logger.setLevel(logging.INFO)
 if args.output:
 	# Add *only* a file handler if output is set
 	# i.e. script will not output to stdout!
+	os.makedirs(os.path.dirname(args.output), exist_ok=True)
 	handler = logging.FileHandler(args.output)
 else:
 	handler = logging.StreamHandler(sys.stdout)
@@ -188,9 +221,12 @@ logger.info(f"Current Datetime:        {time.strftime('%Y-%m-%d %H:%M:%S')}")
 # ---------------------------------------------
 target_version_file = cwd.joinpath("VERSION")
 current_version_file = cwd.joinpath(args.current_version)
-if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
-	logger.info("Moving .current-version to new location")
-	cwd.joinpath(".current-version").rename(current_version_file)
+if not current_version_file.exists():
+	os.makedirs(os.path.dirname(current_version_file), exist_ok=True)
+	# Check for old locations of .current-version
+	if cwd.joinpath(".current-version").exists():
+		logger.info("Moving .current-version to new location")
+		shutil.move(cwd.joinpath(".current-version"), current_version_file)
 
 if not current_version_file.exists():
 	logger.info("Creating .current-version file ")

@@ -37,6 +37,8 @@ def mock_basic_config(tmp_path, mock_database):
             "PATH_ROOT": PATH_ROOT,
             "PATH_DATA": PATH_ROOT,
             "PATH_LOGS": PATH_ROOT / "logs",
+            "PATH_EXTENSIONS": PATH_ROOT / "config/extensions",
+            "extensions.enabled": {},
         }.get(key, default))
     mocked_basic_config.load_user_settings = MagicMock()
     # Create necessary directories

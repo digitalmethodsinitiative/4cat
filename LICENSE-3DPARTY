@@ -3,28 +3,76 @@ Incorporates the Dutch word list of the OpenTaal project
     - at /common/assets/wordlists/wordlist-opentaal-dutch.txt
     - from https://www.opentaal.org/
 
-    Copyright <YEAR> <COPYRIGHT HOLDER>
+    You are kindly requested to read this file called `LICENSE.txt` and to keep a
+    copy of it with every copy you make of this project or files of this project.
+
+    1. Title: Dutch word list
+    2. Creator: OpenTaal https://opentaal.org
+    3. Rights: Revised BSD License and/or CC BY 3.0
+    4. Date and version: see the file datetimeversion.txt
+
+    For questions regarding licenses or source attribution, please contact OpenTaal.
+
+    5. Source: https://github.com/OpenTaal/opentaal-wordlist
+    6. License choice: To enable the broadest (re)use, these language files are
+       freely available under the liberal licenses at the discretion of the user. We
+       strongly recommend to read the applicable license before usage. Choose one or
+       both licenses which apply best for you.
+       A) Revised BSD License (3-clause license), as is defined at
+       https://opensource.org/licenses/BSD-3-Clause (see also below)
+       B) Creative Commons, Attribution 3.0 Unported (CC BY 3.0), as is defined at
+       https://creativecommons.org/licenses/by/3.0/legalcode.txt (see also below)
+    7. Creator history:
+       © 2020 OpenTaal (Simon Brouwer, Sander van Geloven)
+       © 2006 - 2011 OpenTaal (Ruud Baars, Simon Brouwer)
+       © 2001 - 2005 Simon Brouwer and others
+       © 1996 Nederlandstalige TeX Gebruikersgroep
+    8. Support: Stichting OpenTaal is a volunteer organisation which is designated
+       by the Dutch Tax Administration as an Institution for General Benefit
+       (algemeen nut beogende instelling or ANBI), https://belastingdienst.nl/anbi .
+       Hence, your donations via https://opentaal.org/vrienden-van-opentaal can be
+       tax deductible.
+    9. Participate: Everyone is welcome to participate. By contributing to the
+       project you agree that your contribution is available under free or/open
+       source licenses. If you wish, your name will be mentioned on the website.
+    10.Rights of third parties: OpenTaal respects the rights of third parties and
+       aims to keep its data freely available. Therefore you may not use protected
+       sources of third parties, i.e. dictionaries, without their permission when
+       you contribute to the project. It is permitted to consult the materials of
+       the Dutch Language Union, i.e. their spelling instruction and word list. In
+       case you believe OpenTaal is violating your rights, we ask you to send us a
+       written notice as soon as possible.
+
+
+    # Revised BSD License (3-clause license)
+
+    Copyright (c) 2020, OpenTaal
+    All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions are met:
 
-    1. Redistributions of source code must retain the above copyright notice, this
-    list of conditions and the following disclaimer.
+    * Redistributions of source code must retain the above copyright notice, this
+      list of conditions and the following disclaimer.
 
-    2. Redistributions in binary form must reproduce the above copyright notice,
-    this list of conditions and the following disclaimer in the documentation
-    and/or other materials provided with the distribution.
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
 
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    * Neither the name of the copyright holder nor the names of its
+      contributors may be used to endorse or promote products derived from
+      this software without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+    AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
     DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
     FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-    DAMAGES  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+    DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
     SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-    CAUSED AND ON ANY  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
     OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-    OF THIS SOFTWARE,  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Incorporates the cracklib word list

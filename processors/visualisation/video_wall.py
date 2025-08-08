@@ -148,7 +148,15 @@ class VideoWallGenerator(BasicProcessor):
         sizing_mode = self.parameters.get("tile-size")
         sort_mode = self.parameters.get("sort-mode")
         amount = self.parameters.get("amount")
-        amount = amount if amount else self.get_options()["amount"].get("max", 500)
+        if amount == 0:
+            # user requests max number of video/images
+            max_number_images = self.get_options(config=self.config).get("amount").get("max")
+            if max_number_images:
+                # server defined max
+                amount = max_number_images
+            else:
+                # no max, so use all available media
+                amount = self.source_dataset.num_rows
         sound = self.parameters.get("audio", "longest")
         max_length = self.parameters.get("max-length", 60)
         aspect_ratio = self.parameters.get("aspect-ratio")
@@ -552,12 +560,15 @@ class VideoWallGenerator(BasicProcessor):
             if erroneous_stream := re.findall("input from stream ([0-9]+)", ffmpeg_error):
                 erroneous_stream = convert_to_int(erroneous_stream[0], None)
                 if erroneous_stream is not None and erroneous_stream < len(included_media):
+                    # todo: could run again without this video... but that
+                    # would require a bit of a refactor
                     self.dataset.log(f"The error message indicates the file {included_media[erroneous_stream]} cannot be read; it may be corrupt.")
 
         shutil.rmtree(collage_staging_area, ignore_errors=True)
 
         if result.returncode != 0:
-
+            if ffmpeg_error:
+                self.log.warning(f"ffmpeg error (dataset {self.dataset.key}): {ffmpeg_error}")
             return self.dataset.finish_with_error(
                 f"Could not make collage (error {result.returncode}); check the dataset log for details.")
 

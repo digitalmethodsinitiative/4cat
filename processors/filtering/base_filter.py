@@ -45,25 +45,31 @@ class BaseFilter(BasicProcessor):
         # Filter posts
         matching_posts = self.filter_items()
 
+        # If this source dataset has less than n annotations, just retrieve them all before iterating
+        
         # Write the posts
         num_posts = 0
-        if parent_extension == "csv":
-            with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-                writer = None
-                for post in matching_posts:
+        kwargs = {"newline": ""} if parent_extension == "ndjson" else {}
+
+        with self.dataset.get_results_path().open("w", encoding="utf-8", **kwargs) as outfile:
+
+            writer = None
+            # Loop through all filtered posts. These ought to be the `original` object in case of a MappedItem; we're
+            # filtering, not changing the data (at least in principle).
+            for post in matching_posts:
+
+                # Save the actual item
+                if parent_extension == "csv":
                     if not writer:
                         writer = csv.DictWriter(outfile, fieldnames=post.keys())
                         writer.writeheader()
                     writer.writerow(post)
-                    num_posts += 1
-        elif parent_extension == "ndjson":
-            with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
-                for post in matching_posts:
-
+                elif parent_extension == "ndjson":
                     outfile.write(json.dumps(post) + "\n")
-                    num_posts += 1
-        else:
-            raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
+                else:
+                    raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
+
+                num_posts += 1
 
         if num_posts == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)

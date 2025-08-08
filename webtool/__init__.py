@@ -80,7 +80,7 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
     app.logger.setLevel(gunicorn_logger.level) # debug is int 10
 
     # Gunicorn Error Log file
-    error_file_path = Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), 'error_gunicorn.log')
+    error_file_path = config.get('PATH_LOGS').joinpath('error_gunicorn.log')
     file_handler = logging.handlers.RotatingFileHandler(
                                                         filename=error_file_path,
                                                         maxBytes=int( 50 * 1024 * 1024),

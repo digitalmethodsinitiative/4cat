@@ -12,10 +12,20 @@ class InternalAPI(BasicWorker):
 	type = "api"
 	max_workers = 1
 
-	ensure_job = {"remote_id": "localhost"}
-
 	host = None
 	port = None
+
+	@classmethod
+	def ensure_job(cls, config=None):
+		"""
+		Ensure that the API worker is always running
+
+		This is used to ensure that the API worker is always running, and if it
+		is not, it will be started by the WorkerManager.
+
+		:return:  Job parameters for the worker
+		"""
+		return {"remote_id": "localhost"}
 
 	def work(self):
 		"""

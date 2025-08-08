@@ -239,7 +239,7 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = core_config.get("PATH_ROOT").joinpath("config/.current-version")
+    current_version_file = core_config.get("PATH_CONFIG").joinpath(".current-version")
     if not current_version_file.exists():
         return ""
 
@@ -303,10 +303,10 @@ def find_extensions():
     :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
     dictionary, and a list of (str) errors encountered while loading
     """
-    extension_path = core_config.get("PATH_ROOT").joinpath("extensions")
+    extension_path = core_config.get("PATH_EXTENSIONS")
     errors = []
     if not extension_path.exists() or not extension_path.is_dir():
-        return [], None
+        return {}, errors
 
     # each folder in the extensions folder is an extension
     extensions = {
@@ -315,7 +315,7 @@ def find_extensions():
             "version": "",
             "url": "",
             "git_url": "",
-            "is_git": False
+            "is_git": False,
         } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
     }
 
@@ -445,6 +445,21 @@ def timify(number, short=False):
         time_str += " and "
 
     return time_str + last_str
+
+def nthify(integer: int) -> str:
+    """
+    Takes an integer and returns a string with 'st', 'nd', 'rd', or 'th' as suffix, depending on the number.
+    """
+    int_str = str(integer).strip()
+    if int_str.endswith("1"):
+        suffix = "st"
+    elif int_str.endswith("2"):
+        suffix = "nd"
+    elif int_str.endswith("3"):
+        suffix = "rd"
+    else:
+        suffix = "th"
+    return int_str + suffix
 
 def andify(items):
     """
@@ -1067,7 +1082,7 @@ def send_email(recipient, message, mail_config):
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     """
     Return a flattened dictionary where nested dictionary objects are given new
-    keys using the partent key combined using the seperator with the child key.
+    keys using the parent key combined using the seperator with the child key.
 
     Lists will be converted to json strings via json.dumps()
 
@@ -1117,8 +1132,12 @@ def sets_to_lists(d: MutableMapping):
 
 def url_to_hash(url, remove_scheme=True, remove_www=True):
     """
-    Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
-    rest of the URL.
+    Convert a URL to a hash. Allows removing scheme and www prefix before hashing.
+    
+    :param url: URL to hash
+    :param remove_scheme: If True, removes the scheme from URL before hashing
+    :param remove_www: If True, removes the www. prefix from URL before hashing
+    :return: Hash of the URL
     """
     parsed_url = urlparse(url.lower())
     if parsed_url:
@@ -1127,23 +1146,25 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
         if remove_www:
             netloc = re.sub(r"^www\.", "", parsed_url.netloc)
             parsed_url = parsed_url._replace(netloc=netloc)
-
-        url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
+        
+        # Hash the normalized URL directly
+        normalized_url = urlunparse(parsed_url).strip("/")
     else:
-        # Unable to parse URL; use regex
+        # Unable to parse URL; use regex normalization
+        normalized_url = url.lower().strip("/")
         if remove_scheme:
-            url = re.sub(r"^https?://", "", url)
+            normalized_url = re.sub(r"^https?://", "", normalized_url)
         if remove_www:
             if not remove_scheme:
-                scheme = re.match(r"^https?://", url).group()
-                temp_url = re.sub(r"^https?://", "", url)
-                url = scheme + re.sub(r"^www\.", "", temp_url)
+                scheme_match = re.match(r"^https?://", normalized_url)
+                if scheme_match:
+                    scheme = scheme_match.group()
+                    temp_url = re.sub(r"^https?://", "", normalized_url)
+                    normalized_url = scheme + re.sub(r"^www\.", "", temp_url)
             else:
-                url = re.sub(r"^www\.", "", url)
+                normalized_url = re.sub(r"^www\.", "", normalized_url)
 
-        url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
-
-    return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+    return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
@@ -1152,6 +1173,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         Prefer the original filename (extracted from the URL), but this may not
         always be possible or be an actual filename. Also, avoid using the same
         filename multiple times. Ensures filenames don't exceed max_bytes.
+
+        Note: Collision possible without staging area (used to check for already 
+        existing filenames).
 
         :param str url:  URLs to determine filenames for
         :param Path staging_area:  Path to the staging area where files are saved

@@ -42,7 +42,7 @@ def trigger_restart():
     common in e.g. mod_wsgi) it should trigger a reload.
     """
     # figure out the versions we are dealing with
-    current_version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version")
+    current_version_file = g.config.get("PATH_CONFIG").joinpath(".current-version")
     if current_version_file.exists():
         current_version = current_version_file.open().readline().strip()
     else:
@@ -62,7 +62,7 @@ def trigger_restart():
     can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
         current_version) >= packaging.version.parse(github_version))
 
-    lock_file = Path(g.config.get("PATH_ROOT"), "config/restart.lock")
+    lock_file = g.config.get("PATH_CONFIG").joinpath("restart.lock")
     if request.method == "POST" and lock_file.exists():
         flash("A restart is already in progress. Wait for it to complete. Check the process log for more details.")
 
@@ -81,7 +81,7 @@ def trigger_restart():
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
-        restart_log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
+        restart_log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
         with restart_log_file.open("w") as outfile:
             outfile.write(
                 f"{mode.capitalize().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
@@ -126,8 +126,8 @@ def upgrade_frontend():
     if not g.config.get("USING_DOCKER") or not check_restart_request():
         return current_app.login_manager.unauthorized()
 
-    restart_log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
-    frontend_version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version-frontend")
+    restart_log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
+    frontend_version_file = g.config.get("PATH_CONFIG").joinpath(".current-version-frontend")
     if not frontend_version_file.exists():
         return jsonify({"status": "error", "message": "No version file found"})
 
@@ -282,7 +282,7 @@ def restart_log():
 
     :return:
     """
-    log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
+    log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
     if log_file.exists():
         with open(log_file, encoding="utf-8") as infile:
             return infile.read()

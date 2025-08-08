@@ -51,7 +51,17 @@ class WorkerManager:
 		# queue jobs for workers that always need one
 		for worker_name, worker in self.modules.workers.items():
 			if hasattr(worker, "ensure_job"):
-				self.queue.add_job(jobtype=worker_name, **worker.ensure_job)
+				# ensure_job is a class method that returns a dict with job parameters if job should be added
+				# pass config for some workers (e.g., web studies extensions)
+				try:
+					job_params = worker.ensure_job(config=self.modules.config)
+				except Exception as e:
+					self.log.error(f"Error while ensuring job for worker {worker_name}: {e}")
+					job_params = None
+				
+				if job_params:
+					self.queue.add_job(jobtype=worker_name, **job_params)
+
 
 		self.log.info("4CAT Started")
 
@@ -104,7 +114,7 @@ class WorkerManager:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=self.modules)
 						worker.start()
-						self.log.debug(f"Starting new worker of for job {job.data['jobtype']}/{job.data['remote_id']}")
+						self.log.info(f"Starting new worker of for job {job.data['jobtype']}/{job.data['remote_id']}")
 						self.worker_pool[jobtype].append(worker)
 					except JobClaimedException:
 						# it's fine

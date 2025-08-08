@@ -24,7 +24,17 @@ class DatasourceMetrics(BasicWorker):
     type = "datasource-metrics"
     max_workers = 1
 
-    ensure_job = {"remote_id": "localhost", "interval": 43200}
+    @classmethod
+    def ensure_job(cls, config=None):
+        """
+        Ensure that the datasource metrics worker is always running
+
+        This is used to ensure that the datasource metrics worker is always
+        running, and if it is not, it will be started by the WorkerManager.
+
+        :return:  Job parameters for the worker
+        """
+        return {"remote_id": "localhost", "interval": 43200}
 
     def work(self):
         self.general_stats()
@@ -38,7 +48,11 @@ class DatasourceMetrics(BasicWorker):
         total = 0
         for entry in os.scandir(path):
             if entry.is_file():
-                total += entry.stat().st_size
+                try:
+                    total += entry.stat().st_size
+                except FileNotFoundError:
+                    # If the file was removed while scanning, skip it
+                    continue
             elif entry.is_dir():
                 total += DatasourceMetrics.folder_size(entry.path)
         return total

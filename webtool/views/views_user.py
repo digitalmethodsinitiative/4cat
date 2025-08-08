@@ -202,7 +202,8 @@ def first_run_dialog():
     if has_admin_user and not wants_phone_home:
         return error(403, message="The 'first run' page is not available")
 
-    version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version")
+    version_file = g.config.get("PATH_CONFIG").joinpath(".current-version")
+
     if version_file.exists():
         with version_file.open() as infile:
             version = infile.readline().strip()
@@ -210,6 +211,7 @@ def first_run_dialog():
         version = "unknown"
 
     missing = []
+    
     # choose a random adjective to differentiate this 4CAT instance (this can
     # be edited by the user)
     adjective_file = Path(g.config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
@@ -286,7 +288,7 @@ def first_run_dialog():
         flash("The admin user '%s' was created, you can now use it to log in." % username)
 
     if phone_home_url and request.form.get("phonehome"):
-        with Path(g.config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
+        with g.config.get("PATH_CONFIG").joinpath(".current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {

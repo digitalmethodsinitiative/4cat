@@ -5,8 +5,6 @@ import asyncio
 import hashlib
 import json
 
-from pathlib import Path
-
 from telethon import TelegramClient
 from telethon.errors import FloodError, BadRequestError
 
@@ -132,7 +130,7 @@ class TelegramVideoDownloader(BasicProcessor):
         query = self.source_dataset.top_parent().parameters
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(self.config.get('PATH_ROOT')).joinpath(self.config.get('PATH_SESSIONS'), session_id + ".session")
+        session_path = self.config.get('PATH_SESSIONS').joinpath(session_id + ".session")
         amount = self.parameters.get("amount")
 
         client = None

@@ -35,6 +35,7 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
+    OPTION_EXTENSIONS = "extensions"  # extension toggling
     OPTION_DATASOURCES_TABLE = "datasources_table"  # a table with settings per data source
     OPTION_ANNOTATION = "annotation"  # checkbox for whether to an annotation
     OPTION_ANNOTATIONS = "annotations"  # table for whether to write multiple annotations
@@ -146,6 +147,12 @@ class UserInput:
 
                 parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
                 parsed_input[option.split(".")[0] + ".expiration"] = datasources
+
+            elif settings.get("type") == UserInput.OPTION_EXTENSIONS:
+                # also a special case
+                parsed_input[option] = {extension: {
+                    "enabled": f"{option}-enable-{extension}" in input
+                } for extension in input[option].split(",")}
 
             elif settings.get("type") == UserInput.OPTION_DATASOURCES_TABLE:
                 # special case, parse table values to generate a dict

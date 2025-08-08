@@ -39,6 +39,18 @@ config_definition = {
                    "setting.",
         "indirect": True
     },
+    # Extensions
+    "extensions._intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT extensions can be disabled and disabled via the control below. When enabled, extensions may "
+                "define further settings that can typically be configured via the extension's tab on the left side of "
+                "this page. **Note that 4CAT needs to be restarted for this to take effect!**"
+    },
+    "extensions.enabled": {
+        "type": UserInput.OPTION_EXTENSIONS,
+        "default": {},
+        "help": "Extensions"
+    },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
     # notice may also show up in the web interface regardless of the value entered here.
@@ -150,6 +162,12 @@ config_definition = {
         "default": False,
         "help": "Can restart/upgrade",
         "tooltip": "Controls whether users can restart, upgrade, and manage extensions 4CAT via the Control Panel"
+    },
+    "privileges.admin.can_manage_extensions": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can manage extensions",
+        "tooltip": "Controls whether users can install and uninstall 4CAT extensions via the Control Panel"
     },
     "privileges.can_upgrade_to_dev": {
         # this is NOT an admin privilege, because all admins automatically
@@ -608,6 +626,14 @@ config_definition = {
         "help": "Show email when complete option",
         "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
     },
+    "image-visuals.max_images": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 1000,
+        "coerce_type": int,
+        "help": "Maximum images to show",
+        "tooltip": "Maximum number of images to show in the image visualization tab of a dataset. This is to prevent "
+                   "issues with large datasets.",
+    }
 }
 
 # These are used in the web interface for more readable names
@@ -627,4 +653,5 @@ categories = {
     "ui": "User interface",
     "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
+    "extensions": "Extensions"
 }

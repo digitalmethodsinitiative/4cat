@@ -6,7 +6,6 @@ import shutil
 import pandas as pd
 import math
 
-from pathlib import Path
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
@@ -63,7 +62,8 @@ class YouTubeImageWall(BasicProcessor):
 		"""
 		# Get the required parameters
 		# path to the YouTube csv data that was the source of the thumbnails
-		root_csv = self.dataset.get_genealogy()[-3].get_results_path()
+		root_csv = self.dataset.get_parent().get_parent().get_results_path()
+		
 		max_amount = convert_to_int(self.parameters.get("max_amount", 0), 0)
 		category_overlay = self.parameters.get("category_overlay")
 
@@ -117,8 +117,9 @@ class YouTubeImageWall(BasicProcessor):
 
 		# Read the csv and get video ids
 		df = pd.read_csv(path_to_yt_metadata)
-
-		files = df["id"].tolist()
+		
+		id_col = "video_id" if "video_id" in df.columns else "id"
+		files = df[id_col].tolist()
 
 		# Cut the videos if there's a threshold given
 		if max_amount != 0:
@@ -167,7 +168,7 @@ class YouTubeImageWall(BasicProcessor):
 					image_archive.extract(file + ".jpg", results_path)
 					delete_after_use = True
 			else:
-				temp_path = Path(self.config.get('PATH_ROOT'), "common/assets/no-video.jpg")
+				temp_path = self.config.get('PATH_ROOT').joinpath("common/assets/no-video.jpg")
 
 			# Resize the image
 			image = Image.open(temp_path)

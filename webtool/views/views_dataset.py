@@ -163,7 +163,11 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    return send_from_directory(directory=g.config.get('PATH_ROOT').joinpath(g.config.get('PATH_DATA')), path=query_file)
+    # Handle favicon relative requests that get caught by this broad route
+    if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
+        return redirect(url_for('static', filename='img/favicon/favicon.ico'))
+    
+    return send_from_directory(directory=g.config.get('PATH_DATA'), path=query_file)
 
 
 @component.route('/mapped-result/<string:key>/')

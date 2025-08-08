@@ -12,7 +12,6 @@ from calendar import monthrange
 from flask_login import current_user
 from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
-from pathlib import Path
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -298,7 +297,7 @@ def check_restart_request():
 	file. This ensures a restart is in progress and the request belongs to that
 	specific restart.
 	"""
-	lock_file = Path(g.config.get("PATH_ROOT"), "config/restart.lock")
+	lock_file = g.config.get("PATH_CONFIG").joinpath("restart.lock")
 	if not lock_file.exists():
 		return False
 

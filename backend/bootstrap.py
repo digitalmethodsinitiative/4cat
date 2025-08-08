@@ -4,8 +4,6 @@
 import shutil
 import os
 
-from pathlib import Path
-
 from common.lib.queue import JobQueue
 from common.lib.database import Database
 from common.lib.module_loader import ModuleCollector
@@ -17,7 +15,7 @@ def run(as_daemon=True, log_level="INFO"):
 	# initialise configuration reader
 	config = ConfigManager()
 
-	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
+	pidfile = config.get('PATH_LOCKFILE').joinpath("4cat.pid")
 
 	if as_daemon:
 		with pidfile.open("w") as outfile:

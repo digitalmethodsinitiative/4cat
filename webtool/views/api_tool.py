@@ -9,8 +9,6 @@ import time
 import csv
 import os
 
-from pathlib import Path
-
 from flask import Blueprint, current_app, jsonify, request, render_template, render_template_string, redirect, url_for, flash, \
 	get_flashed_messages, send_from_directory, g
 from flask_login import login_required, current_user
@@ -77,7 +75,7 @@ def api_status():
 	jobs_sorted["total"] = jobs_count
 
 	# determine if backend is live by checking if the process is running
-	lockfile = Path(g.config.get('PATH_ROOT'), g.config.get('PATH_LOCKFILE'), "4cat.pid")
+	lockfile = g.config.get('PATH_LOCKFILE').joinpath("4cat.pid")
 	if os.path.isfile(lockfile):
 		with lockfile.open() as pidfile:
 			pid = pidfile.read()
