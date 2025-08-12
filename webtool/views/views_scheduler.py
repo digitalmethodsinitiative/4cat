@@ -110,7 +110,7 @@ def view_scheduler_datasets(scheduler_id, page):
     # only instantiate datasets for the current page
     for result in results[offset:offset + page_size]:
         try:
-            datasets.append(DataSet(key=result.get("dataset_id"), db=g.db))
+            datasets.append(DataSet(key=result.get("dataset_id"), db=g.db, modules=g.modules))
         except DataSetNotFoundException:
             # Dataset may have been deleted, but scheduled_job entry still exists
             pass
