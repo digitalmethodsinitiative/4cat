@@ -116,7 +116,7 @@ def view_scheduler_datasets(scheduler_id, page):
             pass
 
     # Prepare pagination
-    pagination = Pagination(page, page_size, len(results), route="view_scheduler_datasets", route_args={"scheduler_id": scheduler_id})
+    pagination = Pagination(page, page_size, len(results), route="scheduler.view_scheduler_datasets", route_args={"scheduler_id": scheduler_id})
 
     return render_template("scheduler_results.html", filter={}, depth="all",
                            datasets=datasets, pagination=pagination)
