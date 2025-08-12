@@ -117,8 +117,11 @@ def install_extensions(no_pip=True):
 	if not os.path.islink("extensions"):
 		# Create symbolic link to extensions folder
 		# os.path.abspath necessary for Windows
-		os.symlink(os.path.abspath("config/extensions"), os.path.abspath("extensions"))
-		
+		try:
+			os.symlink(os.path.abspath("config/extensions"), os.path.abspath("extensions"))
+		except OSError:
+			pass
+
 	# Check for extension packages
 	if os.path.isdir("config/extensions"):
 		for root, dirs, files in os.walk("config/extensions"):

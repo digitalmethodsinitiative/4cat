@@ -475,6 +475,7 @@ class User:
         if tag not in self.data["tags"]:
             self.data["tags"].append(tag)
             self.sort_user_tags()
+            self.config.uncache_user_tags([self.get_id()])
 
     def remove_tag(self, tag):
         """
@@ -487,6 +488,7 @@ class User:
         if tag in self.data["tags"]:
             self.data["tags"].remove(tag)
             self.sort_user_tags()
+            self.config.uncache_user_tags([self.get_id()])
 
     def sort_user_tags(self):
         """
