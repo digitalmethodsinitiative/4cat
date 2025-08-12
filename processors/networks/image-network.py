@@ -36,7 +36,7 @@ class ImageGrapher(BasicProcessor):
     options = {}
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         root_dataset = cls.get_root_dataset(parent_dataset)
         columns = root_dataset.get_columns() if root_dataset else None
 
@@ -99,7 +99,7 @@ class ImageGrapher(BasicProcessor):
         return None
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor to run on images downloaded from a dataset
 
@@ -140,7 +140,7 @@ class ImageGrapher(BasicProcessor):
                     if file_hash not in hash_file_map:
                         hash_file_map[file_hash] = file.name
 
-                except (FileNotFoundError, ValueError) as e:
+                except (FileNotFoundError, ValueError):
                     continue
 
         if not metadata:

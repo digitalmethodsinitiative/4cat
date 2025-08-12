@@ -93,7 +93,7 @@ class SearchCustom(BasicProcessor):
             # With validated csvs, save as is but make sure the raw file is sorted
             infile.seek(0)
             dialect = possible_dialects.pop() # Use the last dialect first
-            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect) if type(dialect) == csv.Dialect else dialect}")
+            self.dataset.log(f"Importing CSV file with dialect: {vars(dialect) if type(dialect) is csv.Dialect else dialect}")
             reader = csv.DictReader(infile, dialect=dialect)
 
             if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
@@ -109,6 +109,7 @@ class SearchCustom(BasicProcessor):
             writer = None
             done = 0
             skipped = 0
+            timestamp_missing = 0
             with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
                 # mapper is defined in import_formats
                 try:
@@ -126,6 +127,12 @@ class SearchCustom(BasicProcessor):
 
                         if self.parameters.get("strip_html") and "body" in item:
                             item["body"] = strip_tags(item["body"])
+
+                        # check for None/empty timestamp
+                        if not item.get("timestamp"):
+                            # Notify the user that items are missing a timestamp
+                            timestamp_missing += 1
+                            self.dataset.log(f"Item {i} ({item.get('id')}) has no timestamp.")
 
                         # pseudonymise or anonymise as needed
                         filtering = self.parameters.get("pseudonymise")
@@ -160,13 +167,13 @@ class SearchCustom(BasicProcessor):
                     temp_file.unlink()
                     return self.dataset.finish_with_error(str(e))
 
-                except UnicodeDecodeError as e:
+                except UnicodeDecodeError:
                     infile.close()
                     temp_file.unlink()
                     return self.dataset.finish_with_error("The uploaded file is not encoded with the UTF-8 character set. "
                                                           "Make sure the file is encoded properly and try again.")
 
-                except CsvDialectException as e:
+                except CsvDialectException:
                     self.dataset.log(f"Error with CSV dialect: {vars(dialect)}")
                     continue
 
@@ -175,9 +182,15 @@ class SearchCustom(BasicProcessor):
             # We successfully read the CSV, no need to try other dialects
             break
 
-        if skipped:
+        if skipped or timestamp_missing:
+            error_message = ""
+            if timestamp_missing:
+                error_message += f"{timestamp_missing:,} items had no timestamp"
+            if skipped:
+                error_message += f"{' and ' if timestamp_missing else ''}{skipped:,} items were skipped because they could not be parsed or did not match the expected format"
+            
             self.dataset.update_status(
-                f"CSV file imported, but {skipped:,} items were skipped because their date could not be parsed.",
+                f"CSV file imported, but {error_message}. See dataset log for details.",
                 is_final=True)
 
         temp_file.unlink()
@@ -188,7 +201,7 @@ class SearchCustom(BasicProcessor):
         else:
             self.dataset.finish(done)
 
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate custom data input
 
@@ -197,7 +210,7 @@ class SearchCustom(BasicProcessor):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # do we have an uploaded file?
@@ -244,7 +257,7 @@ class SearchCustom(BasicProcessor):
             for prop in tool_format.get("csv_dialect", {}):
                 setattr(dialect, prop, tool_format["csv_dialect"][prop])
 
-        except UnicodeDecodeError as e:
+        except UnicodeDecodeError:
             raise QueryParametersException("The uploaded file does not seem to be a CSV file encoded with UTF-8. "
                                            "Save the file in the proper format and try again.")
         except csv.Error:
@@ -325,14 +338,25 @@ class SearchCustom(BasicProcessor):
                 # stop parsing because no complete rows will follow
                 raise StopIteration
 
-            try:
-                if row[timestamp_column].isdecimal():
-                    datetime.fromtimestamp(float(row[timestamp_column]))
+            if row[timestamp_column]:
+                try:
+                    if row[timestamp_column].isdecimal():
+                        datetime.fromtimestamp(float(row[timestamp_column]))
+                    else:
+                        parse_datetime(row[timestamp_column])
+                except (ValueError, OSError):
+                    raise QueryParametersException(
+                        "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+            else:
+                # the timestamp column is empty or contains empty values
+                if not query.get("frontend-confirm"):
+                    # TODO: THIS never triggers! frontend-confirm is already set when columns are mapped
+                    # TODO: frontend-confirm exceptions need to be made unique
+                    raise QueryNeedsExplicitConfirmationException(
+                        "Your 'timestamp' column contains empty values. Continue anyway?")
                 else:
-                    parse_datetime(row[timestamp_column])
-            except (ValueError, OSError):
-                raise QueryParametersException(
-                    "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+                    # `None` value will be used
+                    pass
 
         except StopIteration:
             pass

@@ -17,7 +17,6 @@ from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
-from common.config_manager import config
 
 class SearchTikTokByID(Search):
     """
@@ -77,15 +76,19 @@ class SearchTikTokByID(Search):
         return loop.run_until_complete(tiktok_scraper.request_metadata(query["urls"].split(",")))
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate TikTok query
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
+        if not query.get("urls"):
+            # no URLs provided
+            raise QueryParametersException("Missing \"Post URLs\" (\"urls\" parameter). Please provide a list of TikTok video URLs.")
+        
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
@@ -328,7 +331,6 @@ class TikTokScraper:
                 if response.status_code == 404:
                     failed += 1
                     self.processor.dataset.log("Video at %s no longer exists (404), skipping" % response.url)
-                    skip_to_next = True
                     continue
 
                 # haven't seen these in the wild - 403 or 429 might happen?
@@ -488,7 +490,7 @@ class TikTokScraper:
                              "https": available_proxy} if available_proxy != "__localhost__" else None
                     session.headers.update(video_download_headers)
                     video_requests[video_download_url] = {
-                        "request": session.get(video_download_url, proxies=proxy, timeout=30),
+                        "request": session.get(video_download_url, proxies=proxy, timeout=30), # not using stream=True here, as it seems slower; possibly due to short video lengths
                         "video_id": video_id,
                         "type": "download",
                     }

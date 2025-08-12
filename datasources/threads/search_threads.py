@@ -5,7 +5,7 @@ It's prohibitively difficult to scrape data from Threads within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs, unquote
+from urllib.parse import urlparse, parse_qs
 import re
 
 from backend.lib.search import Search

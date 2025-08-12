@@ -7,7 +7,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from common.config_manager import config
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.exceptions import WorkerInterruptedException, DataSetException
@@ -26,11 +25,20 @@ class TempFileCleaner(BasicWorker):
     type = "clean-temp-files"
     max_workers = 1
 
-    ensure_job = {"remote_id": "localhost", "interval": 10800}
-
     # Use tracking file to delay deletion of files that may still be in use
-    tracking_file = config.get('PATH_DATA').joinpath(".temp_file_cleaner")
     days_to_keep = 7
+
+    @classmethod
+    def ensure_job(cls, config=None):
+        """
+        Ensure that the temp file cleaner is always running
+
+        This is used to ensure that the temp file cleaner is always running, and
+        if it is not, it will be started by the WorkerManager.
+
+        :return:  Job parameters for the worker
+        """
+        return {"remote_id": "localhost", "interval": 10800}
 
     def work(self):
         """
@@ -39,19 +47,20 @@ class TempFileCleaner(BasicWorker):
         :return:
         """
         # Load tracking file
-        if not self.tracking_file.exists():
+        tracking_file = self.config.get('PATH_DATA').joinpath(".temp_file_cleaner")
+        if not tracking_file.exists():
             tracked_files = {}
         else:
-            tracked_files = json.loads(self.tracking_file.read_text())
+            tracked_files = json.loads(tracking_file.read_text())
 
-        result_files = Path(config.get('PATH_DATA')).glob("*")
+        result_files = Path(self.config.get('PATH_DATA')).glob("*")
         for file in result_files:
             if file.stem.startswith("."):
                 # skip hidden files
                 continue
 
             if self.interrupted:
-                self.tracking_file.write_text(json.dumps(tracked_files))
+                tracking_file.write_text(json.dumps(tracked_files))
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
 
             # the key of the dataset files belong to can be extracted from the
@@ -99,11 +108,14 @@ class TempFileCleaner(BasicWorker):
                 # if the dataset is finished, the staging area should have been
                 # compressed into a zip file, or deleted, so this is also safe
                 # to clean up
-                self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (
-                dataset.key, str(file)))
-                shutil.rmtree(file)
+                if file.name not in tracked_files:
+                    self.log.info("Dataset %s is finished, but staging area remains at %s, marking for deletion" % (dataset.key, str(file)))
+                    tracked_files[file.name] = datetime.now().timestamp() + (self.days_to_keep * 86400)
+                elif tracked_files[file.name] < datetime.now().timestamp():
+                    self.log.info("Dataset %s is finished, but staging area remains at %s, deleting folder" % (dataset.key, str(file)))
+                    shutil.rmtree(file)
 
         # Update tracked files
-        self.tracking_file.write_text(json.dumps(tracked_files))
+        tracking_file.write_text(json.dumps(tracked_files))
 
         self.job.finish()

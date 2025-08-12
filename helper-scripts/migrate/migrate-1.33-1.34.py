@@ -10,7 +10,8 @@ from common.lib.database import Database
 from common.lib.logger import Logger
 
 log = Logger(output=True)
-from common.config_manager import config
+from common.config_manager import CoreConfigManager # noqa: E402
+config = CoreConfigManager()
 
 db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'),
               host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
@@ -129,8 +130,8 @@ for admin_key in admin_keys:
     print(f"  - privileges.admin.{admin_key} = True")
     config.set(f"privileges.admin.{admin_key}", True, tag="admin")
 
-config.set(f"privileges.can_view_all_datasets", True, tag="admin")
-config.set(f"privileges.can_view_private_datasets", True, tag="admin")
+config.set("privileges.can_view_all_datasets", True, tag="admin")
+config.set("privileges.can_view_private_datasets", True, tag="admin")
 
 # ---------------------------------------------
 #         More consistent setting names

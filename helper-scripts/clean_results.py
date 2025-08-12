@@ -10,7 +10,9 @@ from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
-from common.config_manager import config
+from common.config_manager import CoreConfigManager
+
+config = CoreConfigManager()
 
 logger = Logger()
 database = Database(logger=logger, appname="result-cleaner")

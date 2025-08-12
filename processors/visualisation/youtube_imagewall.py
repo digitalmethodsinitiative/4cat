@@ -6,13 +6,11 @@ import shutil
 import pandas as pd
 import math
 
-from pathlib import Path
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int
-from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Partha Das"]
@@ -47,11 +45,12 @@ class YouTubeImageWall(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on YouTube thumbnail sets
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "youtube-thumbnails"
 
@@ -61,12 +60,10 @@ class YouTubeImageWall(BasicProcessor):
 		turns it into an image wall. 
 
 		"""
-		results_path = self.dataset.get_results_path()
-		dirname = Path(results_path.parent, results_path.name.replace(".", ""))
-
 		# Get the required parameters
 		# path to the YouTube csv data that was the source of the thumbnails
-		root_csv = self.dataset.get_genealogy()[-3].get_results_path()
+		root_csv = self.dataset.get_parent().get_parent().get_results_path()
+		
 		max_amount = convert_to_int(self.parameters.get("max_amount", 0), 0)
 		category_overlay = self.parameters.get("category_overlay")
 
@@ -120,8 +117,9 @@ class YouTubeImageWall(BasicProcessor):
 
 		# Read the csv and get video ids
 		df = pd.read_csv(path_to_yt_metadata)
-
-		files = df["id"].tolist()
+		
+		id_col = "video_id" if "video_id" in df.columns else "id"
+		files = df[id_col].tolist()
 
 		# Cut the videos if there's a threshold given
 		if max_amount != 0:
@@ -142,7 +140,6 @@ class YouTubeImageWall(BasicProcessor):
 
 		wall = Image.new("RGBA", (wall_width, wall_height))
 		counter = 0
-		category_amount = 1
 		categories_legend = []
 
 		# Get a list of filenames of succesfully downloaded images
@@ -171,7 +168,7 @@ class YouTubeImageWall(BasicProcessor):
 					image_archive.extract(file + ".jpg", results_path)
 					delete_after_use = True
 			else:
-				temp_path = Path(config.get('PATH_ROOT'), "common/assets/no-video.jpg")
+				temp_path = self.config.get('PATH_ROOT').joinpath("common/assets/no-video.jpg")
 
 			# Resize the image
 			image = Image.open(temp_path)
@@ -215,7 +212,7 @@ class YouTubeImageWall(BasicProcessor):
 			wall.paste(wall_old, box=(0,0))
 			# Draw the category on the side
 			# Get a font
-			font = ImageFont.truetype(str(config.get('PATH_ROOT').joinpath("common/assets/Inconsolata-Bold.ttf")), 50)
+			font = ImageFont.truetype(str(self.config.get('PATH_ROOT').joinpath("common/assets/Inconsolata-Bold.ttf")), 50)
 			# Get a drawing context
 			draw = ImageDraw.Draw(wall)
 

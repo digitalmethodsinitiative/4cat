@@ -8,11 +8,10 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from packaging import version
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_ffmpeg_version
@@ -52,7 +51,7 @@ class VideoSceneFrames(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -127,14 +126,14 @@ class VideoSceneFrames(BasicProcessor):
 
             command = [
                 ffmpeg_path,
-                "-i", shlex.quote(str(video)),
+                "-i", oslex.quote(str(video)),
                 "-vf", f"select='{vf_param}'",
                 fps_command, "passthrough",
-                shlex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
+                oslex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
             ]
 
             if frame_size != "no_modify":
-                command += ["-s", shlex.quote(frame_size)]
+                command += ["-s", oslex.quote(frame_size)]
 
             result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)

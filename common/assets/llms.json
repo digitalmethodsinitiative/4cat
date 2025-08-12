@@ -1,0 +1,122 @@
+{
+    "custom": {
+        "name": "Insert manually",
+        "model_card": "",
+        "provider": ""
+    },
+    "gpt-4.1-mini": {
+        "name": "[OpenAI] GPT-4.1 mini",
+        "model_card": "https://platform.openai.com/docs/models/gpt-4.1-mini",
+        "provider": "openai"
+    },
+    "gpt-4.1-nano": {
+        "name": "[OpenAI] GPT-4.1 nano",
+        "model_card": "https://platform.openai.com/docs/models/gpt-4.1-nano",
+        "provider": "openai"
+    },
+    "gpt-4.1": {
+        "name": "[OpenAI] GPT-4.1",
+        "model_card": "https://platform.openai.com/docs/models/gpt-4.1",
+        "provider": "openai"
+    },
+    "gpt-4o-mini": {
+        "name": "[OpenAI] GPT-4o mini",
+        "model_card": "https://platform.openai.com/docs/models/gpt-4o-mini",
+        "provider": "openai"
+    },
+    "gpt-4o": {
+        "name": "[OpenAI] GPT-4o",
+        "model_card": "https://platform.openai.com/docs/models/gpt-4o",
+        "provider": "openai"
+    },
+    "o4-mini": {
+        "name": "[OpenAI] o4-mini",
+        "model_card": "https://platform.openai.com/docs/models/o4-mini",
+        "provider": "openai"
+    },
+    "o3": {
+        "name": "[OpenAI] o3",
+        "model_card": "https://platform.openai.com/docs/models/o3",
+        "provider": "openai"
+    },
+    "o3-pro": {
+        "name": "[OpenAI] o3-pro",
+        "model_card": "https://platform.openai.com/docs/models/o3-pro",
+        "provider": "openai"
+    },
+    "o3-mini": {
+        "name": "[OpenAI] o3-mini",
+        "model_card": "https://platform.openai.com/docs/models/o3-mini",
+        "provider": "openai"
+    },
+    "gemini-2.0-flash": {
+        "name": "[Google] Gemini 2.0 Flash",
+        "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-0-flash",
+        "provider": "google"
+    },
+    "gemini-2.0-flash-lite": {
+        "name": "[Google] Gemini 2.0 Flash Lite",
+        "provider": "google"
+    },
+    "gemini-2.5-pro-preview-06-05": {
+        "name": "[Google] Gemini 2.5 Pro (preview 06-05)",
+        "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-pro",
+        "provider": "google"
+    },
+    "gemini-2.5-flash-preview-05-20": {
+        "name": "[Google] Gemini 2.5 Flash (preview 05-20)",
+        "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash",
+        "provider": "google"
+    },
+    "gemma-3": {
+        "name": "[Google] Gemma 3",
+        "model_card": "https://console.cloud.google.com/vertex-ai/publishers/google/model-garden/gemma3",
+        "provider": "google"
+    },
+    "claude-opus-4-0": {
+        "name": "[Anthropic] Claude Opus 4 (latest)",
+        "model_card": "https://www.anthropic.com/claude/opus",
+        "provider": "anthropic"
+    },
+    "claude-sonnet-4-0": {
+        "name": "[Anthropic] Claude Sonnet 4 (latest)",
+        "model_card": "https://docs.anthropic.com/en/release-notes/system-prompts#claude-opus-4",
+        "provider": "anthropic"
+    },
+    "claude-3-5-haiku-latest": {
+        "name": "[Anthropic] Claude 3.5 Haiku (latest)",
+         "model_card": "https://www.anthropic.com/claude/haiku",
+        "provider": "anthropic"
+    },
+    "magistral-small-2505": {
+        "name": "[Mistral] Magistral Small (25.05)",
+        "model_card": "https://huggingface.co/mistralai/Magistral-Small-2506",
+        "provider": "mistral"
+    },
+    "magistral-medium-2506": {
+        "name": "[Mistral] Magistral Medium (25.06)",
+        "model_card": "https://mistral.ai/news/magistral",
+        "provider": "mistral"
+    },
+    "mistral-small-2503": {
+        "name": "[Mistral] Mistral Small (25.03)",
+        "model_card": "https://mistral.ai/news/mistral-small-3-1",
+        "provider": "mistral",
+        "default": true
+    },
+    "mistral-medium-2505": {
+        "name": "[Mistral] Magistral Medium (25.05)",
+        "model_card": "https://mistral.ai/news/mistral-medium-3",
+        "provider": "mistral"
+    },
+    "mistral-large-2506": {
+        "name": "[Mistral] Mistral Large (25.06)",
+        "model_card": "https://mistral.ai/news/mistral-large",
+        "provider": "mistral"
+    },
+    "open-mistral-nemo": {
+        "name": "[Mistral] Mistral Nemo",
+        "model_card": "https://mistral.ai/news/mistral-nemo",
+        "provider": "mistral"
+    }
+}

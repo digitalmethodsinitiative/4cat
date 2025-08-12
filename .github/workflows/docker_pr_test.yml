@@ -33,27 +33,22 @@ jobs:
               echo -e "Docker 4cat_frontend container is not running...\nPrinting 4cat_frontend logs:\n\n$(docker container logs 4cat_frontend)"
               exit 1
           fi
-      - name: Check 4CAT backend log for expected INFO message
+      - name: Run modules tests
         run: |
-          test_case=" INFO at api.py:65: Local API listening for requests at backend:4444"
-          sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
-          echo "::group::Backend test"
-          if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then 
-              echo "4CAT backend running as expected"
-          else 
-              echo "::error::Backend failed to start"
-              echo "Test:$test_case"
-              echo "Log :$(echo "$var" | tr "|" "\n" | sed -n '2p')"
-              exit 1
-          fi
+          sleep 30
+          echo "::group::Running module tests"
+          docker exec 4cat_backend pytest -v tests/test_modules.py
           echo "::endgroup::"
       - name: Print log on failure
         if: failure()
         run: |
           if [ "$(docker ps | grep 4cat)" ]; then 
-              docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
+              docker cp 4cat_backend:/usr/src/app/data/logs/backend_4cat.log ./backend_4cat.log
               echo "::group::Backend logs"
               cat backend_4cat.log
+              echo "4cat.stderr logs"
+              docker cp 4cat_backend:/usr/src/app/data/logs/4cat.stderr ./4cat.stderr
+              cat 4cat.stderr
               echo "::endgroup::"
           else 
               echo "Docker containers not running; check logs in previous steps"

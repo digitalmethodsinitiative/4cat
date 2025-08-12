@@ -6,7 +6,7 @@
 
 {% block body %}
     <nav class="view-controls block">
-        <form action="{{ url_for("show_results") }}" method="GET">
+        <form action="{{ url_for("dataset.show_results") }}" method="GET">
             <input type="hidden" name="depth" value="{{ depth }}">
             <ul>
                 <li><input aria-label="Filter by query or label" placeholder="Filter datasets..." name="filter"
@@ -37,9 +37,9 @@
             <h2><span>Recently created datasets</span></h2>
             <nav class="tabs">
                 <ul>
-                    {% if __user_config("privileges.can_view_all_datasets") %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}
-                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
-                    <li{% if depth == "favourites" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites only</a></li>
+                    {% if __user_config("privileges.can_view_all_datasets") %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}
+                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
+                    <li{% if depth == "favourites" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites only</a></li>
                 </ul>
             </nav>
         {% if datasets %}
@@ -51,7 +51,7 @@
 
                         <div class="property-container">
                             <div class="result">
-                                <a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
+                                <a href="{{ url_for('dataset.show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
                                 {% if __user_config("ui.show_datasource") %}<span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>{% endif %}
                                 <h4>{{ dataset.get_label() }}</h4>
                                 {% if dataset.is_finished() %}
@@ -65,13 +65,19 @@
                         {% if not dataset.is_finished() or dataset.num_rows == 0 %}
                             <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status"><span class="result-status">{% include "components/result-status.html" %}</span></span></p>
                         {% else %}
-                            <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
+                            {% if dataset.get_results_path().exists() %}
+                                {% if dataset.get_own_processor().map_item or dataset.annotation_fields %}
+                                <a class="button-like" href="{{ url_for('dataset.get_mapped_result', key=dataset.key) }}"><i class="fas fa-download" aria-hidden="true"></i> Download csv</a>
+                                {% else %}
+                                <a class="button-like" href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> Download {{ dataset.result_file.split(".")[-1] }}</a>
+                                {% endif %}
+                            {% endif %}
                         {% endif %}
                         </div>
 
                         {% if dataset.is_finished() and dataset.num_rows > 0 %}
                             <div class="property-container analysis">
-                                <a class="button-like processor-link" href="{{ url_for('show_result', key=dataset.key) }}">Analysis{% if dataset.get_children()|length > 0 %} (+{{ dataset.get_children()|length }}){% endif %}</a>
+                                <a class="button-like processor-link" href="{{ url_for('dataset.show_result', key=dataset.key) }}">Analysis{% if dataset.get_children()|length > 0 %} (+{{ dataset.get_children()|length }}){% endif %}</a>
                             </div>
                         {% endif %}
                     </li>

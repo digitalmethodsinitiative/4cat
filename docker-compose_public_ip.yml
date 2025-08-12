@@ -23,6 +23,16 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  
+  memcached:
+    image: memcached:${MEMCACHED_TAG:-alpine}
+    container_name: 4cat_memcached
+    command: ["-m", "64"]
+    healthcheck:
+      test: ["CMD-SHELL", "echo stats | nc localhost 11211 | grep -q uptime"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   backend:
     image: digitalmethodsinitiative/4cat:latest
@@ -33,6 +43,8 @@ services:
       - .env
     depends_on:
       db:
+        condition: service_healthy
+      memcached:
         condition: service_healthy
     volumes:
       - 4cat_data:/usr/src/app/data/

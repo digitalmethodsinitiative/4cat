@@ -52,7 +52,7 @@ class VideoTimelines(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -61,6 +61,7 @@ class VideoTimelines(BasicProcessor):
         archive. Each folder will be rendered as a separate timeline.
 
         :param str module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         return module.type in ["video-frames", "video-scene-frames"]
@@ -219,11 +220,11 @@ class VideoTimelines(BasicProcessor):
             # determine appropriate label
             # is this the right place? should it be in the datasource?
             if dataset.type == "tiktok-search":
-                mapper = lambda item: item.get("tiktok_url")
+                mapper = lambda item: item.get("tiktok_url")  # noqa: E731
             elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
-                mapper = lambda item: item.get("youtube_url")
+                mapper = lambda item: item.get("youtube_url")  # noqa: E731
             else:
-                mapper = lambda item: item.get("id")
+                mapper = lambda item: item.get("id")  # noqa: E731
 
             for item in dataset.iterate_items(self):
                 for filename in urls:

@@ -4,7 +4,6 @@ Collect Bluesky posts
 import hashlib
 import time
 from datetime import datetime
-from pathlib import Path
 
 from dateutil import parser
 
@@ -15,10 +14,9 @@ from atproto_client.exceptions import UnauthorizedError, BadRequestError, Invoke
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException, \
     ProcessorInterruptedException
-from common.lib.helpers import timify_long
+from common.lib.helpers import timify
 from common.lib.user_input import UserInput
-from common.config_manager import config
-from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.item_mapping import MappedItem
 
 class SearchBluesky(Search):
     """
@@ -46,7 +44,7 @@ class SearchBluesky(Search):
     handle_lookup_error_messages = ['account is deactivated', "profile not found", "account has been suspended"]
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -71,6 +69,7 @@ class SearchBluesky(Search):
                 "help": "Bluesky Username",
                 "cache": True,
                 "sensitive": True,
+                "tooltip": "If no server is specified, .bsky.social is used."
             },
             "password": {
                 "type": UserInput.OPTION_TEXT,
@@ -101,7 +100,7 @@ class SearchBluesky(Search):
         }
 
         # Update the max_posts setting from config
-        max_posts = int(config.get('bsky-search.max_results', 100, user=user))
+        max_posts = int(config.get('bsky-search.max_results', default=100))
         if max_posts == 0:
             # This is potentially madness
             options["max_posts"]["tooltip"] = "Set to 0 to collect all posts."
@@ -113,7 +112,7 @@ class SearchBluesky(Search):
         return options
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate Bluesky query
 
@@ -129,11 +128,18 @@ class SearchBluesky(Search):
         if not query.get("username", None) or not query.get("password", None) :
             raise QueryParametersException("You need to provide valid Bluesky login credentials first.")
 
+        # If no server is specified, default to .bsky.social
+        if "." not in query.get("username"):
+            query["username"] += ".bsky.social"
+        # Remove @ at the start
+        if query.get("username").startswith("@"):
+            query["username"] = query["username"][1:]
+
         # Test login credentials
         session_id = SearchBluesky.create_session_id(query["username"], query["password"])
         try:
-            SearchBluesky.bsky_login(username=query["username"], password=query["password"], session_id=session_id)
-        except UnauthorizedError as e:
+            SearchBluesky.bsky_login(username=query["username"], password=query["password"], session_id=session_id, session_directory=config.get("PATH_ROOT").joinpath(config.get("PATH_SESSIONS")))
+        except UnauthorizedError:
             raise QueryParametersException("Invalid Bluesky login credentials.")
         except RequestException as e:
             if e.response.content.message == 'Rate Limit Exceeded':
@@ -158,12 +164,12 @@ class SearchBluesky(Search):
             expected_tweets = query.get("max_posts", 100) * len(sanitized_query)
             # Warn if process may take more than ~1 hours
             if expected_tweets > (posts_per_second * 3600):
-                expected_time = timify_long(expected_tweets / posts_per_second)
+                expected_time = timify(expected_tweets / posts_per_second)
                 raise QueryNeedsExplicitConfirmationException(f"This query matches approximately {expected_tweets} tweets and may take {expected_time} to complete. Do you want to continue?")
             elif max_posts == 0 and not min_date:
-                raise QueryNeedsExplicitConfirmationException(f"No maximum number of posts set! This query has no minimum date and thus may take a very, very long time to complete. Do you want to continue?")
+                raise QueryNeedsExplicitConfirmationException("No maximum number of posts set! This query has no minimum date and thus may take a very, very long time to complete. Do you want to continue?")
             elif max_posts == 0:
-                raise QueryNeedsExplicitConfirmationException(f"No maximum number of posts set! This query may take a long time to complete. Do you want to continue?")
+                raise QueryNeedsExplicitConfirmationException("No maximum number of posts set! This query may take a long time to complete. Do you want to continue?")
 
         return {
             "max_posts": query.get("max_posts"),
@@ -189,7 +195,7 @@ class SearchBluesky(Search):
 
         session_id = SearchBluesky.create_session_id(query.get("username"), query.get("password")) if not query.get("session_id") else query["session_id"]
         try:
-            client = SearchBluesky.bsky_login(username=query.get("username"), password=query.get("password"), session_id=session_id)
+            client = SearchBluesky.bsky_login(username=query.get("username"), password=query.get("password"), session_id=session_id, session_directory=self.config.get("PATH_ROOT").joinpath(self.config.get("PATH_SESSIONS")))
         except (UnauthorizedError, RequestException, BadRequestError) as e:
             self.dataset.log(f"Bluesky login failed: {e}")
             return self.dataset.finish_with_error("Bluesky login failed; please re-create this datasource.")
@@ -292,7 +298,7 @@ class SearchBluesky(Search):
                     # Expected from NetworkError, but the query will have been added back to the queue
                     # If not, then there was a problem with the query
                     if len(queries) == 0:
-                        self.dataset.update_status(f"Error collecting posts from Bluesky; see log for details", is_final=True)
+                        self.dataset.update_status("Error collecting posts from Bluesky; see log for details", is_final=True)
                     if query not in queries:
                         # Query was not added back; there was an unexpected issue with the query itself
                         self.dataset.update_status(f"Error continuing {query} from Bluesky (see log for details); continuing to next query")
@@ -305,7 +311,7 @@ class SearchBluesky(Search):
                     invalid_post_counter += 1
                     if invalid_post_counter >= 100:
                         #  Max limit is 100; this should not occur, but we do not want to continue searching post by post indefinitely
-                        self.dataset.log(f"Unable to identify invalid post; discontinuing search")
+                        self.dataset.log("Unable to identify invalid post; discontinuing search")
                         query_parameters["limit"] = limit
                         search_for_invalid_post = False
                         invalid_post_counter = 0
@@ -572,11 +578,6 @@ class SearchBluesky(Search):
         # if item["record"].get("tags"):
         #     unmapped_data.append({"loc": "record.tags", "obj": item["record"].get("tags")})
 
-        if unmapped_data:
-            # TODO: Use MappedItem message; currently it is not called...
-            config.with_db()
-            config.db.log.warning(f"Bluesky new mappings ({item['uri']}): {unmapped_data}")
-
         return MappedItem({
             "collected_at": datetime.fromtimestamp(item["4CAT_metadata"]["collected_at"]).isoformat(),
             "query": item["4CAT_metadata"]["query"],
@@ -658,7 +659,7 @@ class SearchBluesky(Search):
                     return user_profile.handle
                 else:
                     return None
-            except (NetworkError, InvokeTimeoutError) as e:
+            except (NetworkError, InvokeTimeoutError):
                 # Network error; try again
                 tries += 1
                 time.sleep(1)
@@ -671,13 +672,14 @@ class SearchBluesky(Search):
                 return None
 
     @staticmethod
-    def bsky_login(username, password, session_id):
+    def bsky_login(username, password, session_id, session_directory):
         """
         Login to Bluesky
 
         :param str username:  Username for Bluesky
         :param str password:  Password for Bluesky
         :param str session_id:  Session ID to use for login
+        :param Path session_directory:  Directory to save the session file
         :return Client:  Client object with login credentials
         """
         if not session_id:
@@ -685,7 +687,7 @@ class SearchBluesky(Search):
         elif (not username or not password) and not session_id:
             raise ValueError("Must provide both username and password or else session_id.")
 
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), "bsky_" + session_id + ".session")
+        session_path = session_directory.joinpath("bsky_" + session_id + ".session")
 
         def on_session_change(event: SessionEvent, session: Session) -> None:
             """

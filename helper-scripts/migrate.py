@@ -16,7 +16,7 @@ import requests
 import argparse
 import logging
 import shutil
-import shlex
+import oslex
 import time
 import json
 import sys
@@ -86,10 +86,42 @@ def install_extensions(no_pip=True):
 	Check for extensions and run any installation scripts found.
 
 	Note: requirements texts are handled by setup.py
+
+	:param bool no_pip:  Do not run pip when running extension install script
+	(because migrate runs pip itself)
 	"""
+	if os.path.isdir("extensions") and not os.path.islink("extensions"):
+		# User already has existing extensions folder (and not a symbolic link)
+		# but it is in the wrong place (4CAT root rather than /config)
+		print("Migrating extensions folder...")
+		if not os.path.isdir("config/extensions"):
+			# No config/extensions folder, so we move the existing extensions folder
+			shutil.move("extensions", "config/extensions")
+		else:
+			# Both extensions and config/extensions exist, so we need to merge them
+			for root, dirs, files in os.walk("extensions"):
+				for file in files:
+					# Do not overwrite existing files
+					if not os.path.exists(os.path.join("config/extensions", root, file)):
+						try:
+							shutil.move(os.path.join(root, file), os.path.join("config/extensions", root, file))
+						except FileNotFoundError:
+							# this can happen with temporary OS files like .DS_Store
+							pass
+
+			shutil.rmtree("extensions")
+
+	if not os.path.isdir("config/extensions"):
+		os.makedirs("config/extensions")
+
+	if not os.path.islink("extensions"):
+		# Create symbolic link to extensions folder
+		# os.path.abspath necessary for Windows
+		os.symlink(os.path.abspath("config/extensions"), os.path.abspath("extensions"))
+		
 	# Check for extension packages
-	if os.path.isdir("extensions"):
-		for root, dirs, files in os.walk("extensions"):
+	if os.path.isdir("config/extensions"):
+		for root, dirs, files in os.walk("config/extensions"):
 			for file in files:
 				if file == "fourcat_install.py":
 					command = [interpreter, os.path.join(root, file)]
@@ -168,6 +200,7 @@ logger.setLevel(logging.INFO)
 if args.output:
 	# Add *only* a file handler if output is set
 	# i.e. script will not output to stdout!
+	os.makedirs(os.path.dirname(args.output), exist_ok=True)
 	handler = logging.FileHandler(args.output)
 else:
 	handler = logging.StreamHandler(sys.stdout)
@@ -188,9 +221,12 @@ logger.info(f"Current Datetime:        {time.strftime('%Y-%m-%d %H:%M:%S')}")
 # ---------------------------------------------
 target_version_file = cwd.joinpath("VERSION")
 current_version_file = cwd.joinpath(args.current_version)
-if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
-	logger.info("Moving .current-version to new location")
-	cwd.joinpath(".current-version").rename(current_version_file)
+if not current_version_file.exists():
+	os.makedirs(os.path.dirname(current_version_file), exist_ok=True)
+	# Check for old locations of .current-version
+	if cwd.joinpath(".current-version").exists():
+		logger.info("Moving .current-version to new location")
+		shutil.move(cwd.joinpath(".current-version"), current_version_file)
 
 if not current_version_file.exists():
 	logger.info("Creating .current-version file ")
@@ -261,12 +297,12 @@ if args.release or args.branch:
 			finish(args, logger, no_pip=pip_ran)
 
 	logger.info("  ...ensuring repository %s is a known remote" % args.repository)
-	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
+	remote = subprocess.run(oslex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd, text=True)
 	if remote.stderr:
 		if remote.stderr.strip() == "error: remote 4cat_migrate already exists.":
 			# Update URL
-			remote = subprocess.run(shlex.split("git remote set-url 4cat_migrate %s" % args.repository),
+			remote = subprocess.run(oslex.split("git remote set-url 4cat_migrate %s" % args.repository),
 									stdout=subprocess.PIPE,
 									stderr=subprocess.PIPE, cwd=cwd, text=True)
 			if remote.stderr:
@@ -279,16 +315,17 @@ if args.release or args.branch:
 			exit(1)
 
 	logger.info("  ...fetching tags from repository")
-	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+	fetch = subprocess.run(oslex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
 		if "fatal: could not read Username" in fetch.stderr:
 			# git requiring login
-			from common.config_manager import config
+			from common.config_manager import CoreConfigManager
+			config = CoreConfigManager()
 			if config.get("USING_DOCKER"):
 				# update git config setting
-				unset_authorization = subprocess.run(shlex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
-				fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
+				unset_authorization = subprocess.run(oslex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+				fetch = subprocess.run(oslex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
 									   stdout=subprocess.PIPE, cwd=cwd, text=True)
 				if fetch.returncode != 0:
 					logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
@@ -304,10 +341,10 @@ if args.release or args.branch:
 		command = f"git checkout --force 4cat_migrate/{args.branch}"
 	else:
 		logger.info("  ...checking out latest release")
-		tag_ref = shlex.quote("refs/tags/" + tag)
+		tag_ref = oslex.quote("refs/tags/" + tag)
 		command = "git checkout --force %s" % tag_ref
 
-	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
+	result = subprocess.run(oslex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
@@ -371,7 +408,8 @@ else:
 # ---------------------------------------------
 
 try:
-	from common.config_manager import config
+	from common.config_manager import CoreConfigManager
+	config = CoreConfigManager()
 except ImportError:
 	config = None
 

@@ -3,7 +3,6 @@ Delete old items
 """
 import datetime
 import time
-import json
 import re
 
 from backend.lib.worker import BasicWorker
@@ -11,6 +10,7 @@ from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetNotFoundException, WorkerInterruptedException
 
 from common.lib.user import User
+from common.config_manager import ConfigWrapper
 
 
 class ThingExpirer(BasicWorker):
@@ -30,7 +30,17 @@ class ThingExpirer(BasicWorker):
 	type = "expire-datasets"
 	max_workers = 1
 
-	ensure_job = {"remote_id": "localhost", "interval": 300}
+	@classmethod
+	def ensure_job(cls, config=None):
+		"""
+		Ensure that the expirer is always running
+
+		This is used to ensure that the expirer is always running, and if it is
+		not, it will be started by the WorkerManager.
+
+		:return:  Job parameters for the worker
+		"""
+		return {"remote_id": "localhost", "interval": 300}
 
 	def work(self):
 		"""
@@ -58,9 +68,11 @@ class ThingExpirer(BasicWorker):
 			if self.interrupted:
 				raise WorkerInterruptedException("Interrupted while expiring datasets")
 
+			# the dataset creator's configuration context determines expiration
 			try:
 				dataset = DataSet(key=dataset["key"], db=self.db)
-				if dataset.is_expired():
+				wrapper = ConfigWrapper(self.config, user=User.get_by_name(self.db, dataset.creator))
+				if dataset.is_expired(config=wrapper):
 					self.log.info(f"Deleting dataset {dataset.key} (expired)")
 					dataset.delete()
 
@@ -87,7 +99,7 @@ class ThingExpirer(BasicWorker):
 			if self.interrupted:
 				raise WorkerInterruptedException("Interrupted while expiring users")
 
-			user = User.get_by_name(self.db, expiring_user["name"])
+			user = User.get_by_name(self.db, expiring_user["name"], config=self.config)
 			username = user.data["name"]
 
 			# parse expiration date if available

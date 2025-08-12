@@ -8,15 +8,23 @@
     <article class="small">
         <section class="result-list">
             <h2><span>4CAT Extensions</span></h2>
-                        {% for notice in flashes %}
-                            <p class="form-notice">{{ notice|safe }}</p>
-                        {% endfor %}
-            <p>4CAT extensions can be installed in the <code>extensions</code> folder in the 4CAT root. For more
+            {% if flashes %}
+                <div class="form-notices-wrapper">
+                {% for notice in flashes %}
+                <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                </div>
+            {% endif %}
+            <p class="intro">4CAT extensions can be installed in the <code>extensions</code> folder in the 4CAT root. For more
                 information, see the README file in that folder. This page lists all currently installed extensions;
                 currently, to manage extensions you will need to access the filesystem and move files into the correct
                 location manually.</p>
+            <p>Extensions need to be enabled after installation to run. You can do so via the
+                <a href="{{ url_for("admin.manipulate_settings") }}">4CAT settings panel</a>.</p>
+            <br>
+            <p><strong>WARNING:</strong> installing and uninstalling extensions will trigger a restart and interrupt any running processors. Ensure no important analyses are running via the Control Panel first.</p>
             <div class="user-panel">
-                <table class="fullwidth notification-table cp-table">
+                <table class="fullwidth notification-table cp-table extensions-table">
                     <colgroup>
                         <col>
                         <col>
@@ -26,14 +34,19 @@
                         <th>Extension</th>
                         <th>Version</th>
                         <th>Links</th>
+                        <th>Actions</th>
                     </tr>
                     {% if extensions %}
                         {% for extension_id, extension in extensions.items() %}
                             <tr>
-                                <td><span class="property-badge">{{ extension_id }}</span>{% if extension_id != extension.name %}
+                                <td {% if not extension.enabled %}class="disabled tooltip-trigger" aria-controls="tooltip-disabled"{% endif %}>
+                                {% if not extension.enabled %}<i class="fa fa-times" aria-hidden="true"></i>
+                                    <span class="sr-only">This extension is currently disabled.</span>{% endif %}
+                                    <span class="property-badge">
+                                    {{ extension_id }}</span>{% if extension_id != extension.name %}
                                     {{ extension.name }}{% endif %}</td>
-                                <td>{% if extension.version %}{{ extension.version }}{% else %}unknown{% endif %}</td>
-                                <td>
+                                <td {% if not extension.enabled %}class="tooltip-trigger" aria-controls="tooltip-disabled"{% endif %}>{% if extension.version %}{{ extension.version }}{% else %}unknown{% endif %}</td>
+                                <td {% if not extension.enabled %}class="tooltip-trigger" aria-controls="tooltip-disabled"{% endif %}>
                                     {% if extension.url and extension.url != extension.git_url %}
                                         <a href="{{ extension.url }}"><i class="fa fa-fw fa-link" aria-hidden="true"></i><span
                                                 class="sr-only">Website</span></a>{% endif %}
@@ -41,15 +54,61 @@
                                                                                                    aria-hidden="true"></i><span
                                             class="sr-only">Remote git repository</span></a>{% endif %}
                                 </td>
+                                <td>
+                                    <form action="{{ url_for("extensions.uninstall_extension") }}" method="POST">
+                                        <input type="hidden" name="extension-name" value="{{ extension_id }}">
+                                        <button class="confirm-first" data-confirm-action="uninstall this extension"><i class="fa fa-folder-minus tooltip-trigger" aria-hidden="true" aria-controls="tooltip-uninstall"></i> <span class="sr-only">Uninstall extension</span></button>
+                                    </form>
+                                </td>
                             </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="3">No 4CAT extensions are installed.</td>
+                            <td colspan="4">No 4CAT extensions are installed.</td>
                         </tr>
                     {% endif %}
                 </table>
+
+                <p role="tooltip" class="multiple" id="tooltip-uninstall" aria-hidden="true">Uninstall this
+                    extension</p>
+                <p role="tooltip" class="multiple" id="tooltip-enabled" aria-hidden="true">This extension is currently
+                    enabled</p>
+                <p role="tooltip" class="multiple" id="tooltip-disabled" aria-hidden="true">This extension is currently
+                    disabled</p>
             </div>
+        </section>
+
+        <section>
+            <h2><span>Install new extension</span></h2>
+            <p>Install a new extension by providing <strong>either</strong> a Git repository URL or a zip archive with
+                the extension files in it below. <strong>Note that extension code can basically do anything on the
+                system 4CAT runs on - make sure to only install code you trust.</strong></p>
+            <p>After installing, the extension will initially be disabled. You can enable and disable extensions via the
+                <a href="{{ url_for("admin.manipulate_settings") }}">4CAT settings panel</a>.</p>
+
+            <form action="{{ url_for("extensions.extensions_panel") }}" method="POST" class="wide" enctype="multipart/form-data">
+                <div class="form-element{% if "extension-url" in incomplete %} missing{% endif %}">
+                    <label for="extension-url">Repository URL</label>
+                    <input type="text" id="extension-url" name="extension-url">
+                </div>
+                <div class="form-element{% if "extension-file" in incomplete %} missing{% endif %}">
+                    <label for="extension-file">Zip archive</label>
+                    <input type="file" id="extension-file" name="extension-file">
+                </div>
+                <div class="submit-container">
+                        <button>
+                            <i class="fa fa-folder-plus" aria-hidden="true"></i> Install
+                        </button>
+                    </div>
+            </form>
+        </section>
+
+        <section>
+            <h2><span>Extension installation log</span></h2>
+            <p>Displaying last 150 lines of the log file.</p>
+            <pre id="extension-log" class="content-container log-display wrapped-log" data-source="{{ url_for("admin.get_log", logfile="extensions") }}" data-interval="3">
+                Loading log file...
+            </pre>
         </section>
     </article>
 {% endblock %}

@@ -5,7 +5,6 @@ import hashlib
 import base64
 import re
 
-from common.config_manager import config
 from collections import Counter, OrderedDict
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
@@ -24,7 +23,7 @@ class TopImageCounter(BasicProcessor):
     Collects all images used in a data set, and sorts by most-used.
     """
     type = "top-images"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Rank image URLs"  # title displayed in UI
     description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
@@ -32,11 +31,12 @@ class TopImageCounter(BasicProcessor):
     followups = ["image-downloader"]
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         All top-level datasets, excluding Telegram, which has a different image logic
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
 
         return module.is_top_dataset() and module.type != "telegram-search" and module.get_extension() in ("csv", "ndjson")
@@ -110,7 +110,7 @@ class TopImageCounter(BasicProcessor):
                 "filename": images[id]["filename"],
                 "num_posts": images[id]["count"],
                 "url_4cat": (
-                                "https" if config.get("flask.https") else "http") + "://" + config.get("flask.server_name") + "/api/image/" +
+                                "https" if self.config.get("flask.https") else "http") + "://" + self.config.get("flask.server_name") + "/api/image/" +
                             images[id]["md5"] + "." + images[id]["filename"].split(".")[
                                 -1],
                 "url_4plebs": "https://archive.4plebs.org/_/search/image/" + images[id]["hash"].replace("/", "_"),
@@ -175,7 +175,7 @@ class TopImageCounter(BasicProcessor):
         self.write_csv_items_and_finish(results)
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -183,7 +183,7 @@ class TopImageCounter(BasicProcessor):
         only work properly on csv datasets so check the extension before
         showing it.
 
-        :param user:
+        :param config:
         :param parent_dataset:  Dataset to get options for
         :return dict:
         """

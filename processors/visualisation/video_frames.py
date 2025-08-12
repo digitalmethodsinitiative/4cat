@@ -6,9 +6,8 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -59,12 +58,14 @@ class VideoFrames(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on videos
+
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-			   config.get("video-downloader.ffmpeg_path", user=user) and \
+			   config.get("video-downloader.ffmpeg_path") and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):
@@ -109,7 +110,7 @@ class VideoFrames(BasicProcessor):
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", shlex.quote(str(path))
+				"-i", oslex.quote(str(path))
 			]
 
 			if frame_interval != 0:
@@ -118,8 +119,8 @@ class VideoFrames(BasicProcessor):
 				command += ["-vframes", "1"]
 
 			if frame_size != 'no_modify':
-				command += ['-s', shlex.quote(frame_size)]
-			command += [shlex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
+				command += ['-s', oslex.quote(frame_size)]
+			command += [oslex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
 
 			self.dataset.log(" ".join(command))
 

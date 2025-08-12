@@ -1,0 +1,7 @@
+{% set pid = uniqid() %}
+<div class="processor-tooltip">
+    <button class="tooltip-trigger" aria-controls="tooltip-option-{{ pid }}" aria-label="Post-processor option details">?</button>
+    <p role="tooltip" id="tooltip-option-{{ pid }}">
+        {{ option_settings.tooltip }}
+    </p>
+</div>

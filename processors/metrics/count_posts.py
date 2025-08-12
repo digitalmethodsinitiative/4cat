@@ -12,10 +12,10 @@ __email__ = "4cat@oilab.eu"
 
 class CountPosts(BasicProcessor):
 	"""
-	Merge post body into one long string
+	Count items in a dataset
 	"""
 	type = "count-posts"  # job type ID
-	category = "Post metrics" # category
+	category = "Metrics" # category
 	title = "Count items"  # title displayed in UI
 	description = "Counts how many items are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
@@ -38,11 +38,12 @@ class CountPosts(BasicProcessor):
 	}
 
 	@staticmethod
-	def is_compatible_with(module=None, user=None):
+	def is_compatible_with(module=None, config=None):
 		"""
         Determine compatibility
 
         :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
@@ -58,31 +59,37 @@ class CountPosts(BasicProcessor):
 
 		timeframe = self.parameters.get("timeframe")
 		add_relative = self.parameters.get("add_relative", False)
+		unknown_dates = 0 # seperate counter as padding will not interpret this correctly
 
 		first_interval = "9999"
 		last_interval = "0000"
 
 		self.dataset.update_status("Processing items")
-		with self.dataset.get_results_path().open("w") as results:
+		with self.dataset.get_results_path().open("w"):
 			counter = 0
 
 			for post in self.source_dataset.iterate_items(self):
-				try:
-					date = get_interval_descriptor(post, timeframe)
-				except ValueError as e:
-					self.dataset.update_status(f"{e}, cannot count items per {timeframe}", is_final=True)
-					self.dataset.update_status(0)
-					return
-
-				# Add a count for the respective timeframe
-				if date not in intervals:
-					intervals[date] = {}
-					intervals[date]["absolute"] = 1
+				# Ensure the post has a date
+				if timeframe != "all" and not post.get("timestamp"):
+					# Count these as "unknown_date"
+					unknown_dates += 1
 				else:
-					intervals[date]["absolute"] += 1
+					try:
+						date = get_interval_descriptor(post, timeframe)
+					except ValueError as e:
+						self.dataset.update_status(f"{e}, cannot count items per {timeframe}", is_final=True)
+						self.dataset.update_status(0)
+						return
 
-				first_interval = min(first_interval, date)
-				last_interval = max(last_interval, date)
+					# Add a count for the respective timeframe
+					if date not in intervals:
+						intervals[date] = {}
+						intervals[date]["absolute"] = 1
+					else:
+						intervals[date]["absolute"] += 1
+
+					first_interval = min(first_interval, date)
+					last_interval = max(last_interval, date)
 
 				counter += 1
 
@@ -94,11 +101,11 @@ class CountPosts(BasicProcessor):
 			# visualised as a histogram, for example
 			if self.parameters.get("pad") and timeframe != "all":
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
-
-				# Convert 0 values to dict
-				for k, v in intervals.items():
-					if isinstance(v, int):
-						intervals[k] = {"absolute": v}
+				if intervals:
+					# Convert 0 values to dict
+					for k, v in intervals.items():
+						if isinstance(v, int):
+							intervals[k] = {"absolute": v}
 
 			# Add relative counts, if needed
 			if add_relative:
@@ -145,6 +152,17 @@ class CountPosts(BasicProcessor):
 						intervals[interval]["relative"] = intervals[interval]["absolute"] / total_counts[interval]
 
 			rows = []
+			# Add unknown dates if needed
+			if unknown_dates > 0:
+				rows.append({
+					"date": "unknown_date",
+					"item": "activity",
+					"value": unknown_dates
+				})
+				if add_relative:
+					# This should not exist as all database items have a date
+					rows[-1]["value_relative"] = None
+				
 			for interval in intervals:
 
 				row = {
@@ -157,10 +175,13 @@ class CountPosts(BasicProcessor):
 					row["value_relative"] = intervals[interval]["relative"]
 				rows.append(row)
 
-		self.write_csv_items_and_finish(rows)
+		if rows:
+			self.write_csv_items_and_finish(rows)
+		else:
+			return self.dataset.finish_with_error("No items could be counted. See dataset log for details")
 
 	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None):
 		
 		options = cls.options
 

@@ -30,6 +30,7 @@ webtool/pages/access-policy.md
 stats.json
 news.json
 ANNOUNCEMENT.md
+backend/4cat.pid
 
 # build artefacts
 startup/
@@ -43,6 +44,7 @@ webtool/venv/
 .env/
 *.ipynb
 venv/
+__pycache__/
 
 # do not ignore interface images
 !webtool/static/img/*.png
@@ -66,3 +68,4 @@ keys/
 images/
 sphinx-3.3.1/
 sphinx/
+extensions/
