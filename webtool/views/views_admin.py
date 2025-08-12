@@ -656,6 +656,7 @@ def manipulate_settings():
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
+    # Get all settings for the current tag
     all_settings = dict(g.config.get_all(user=None, tags=[tag], with_core=False))
     options = {}
     changed_categories = set()
@@ -723,8 +724,8 @@ def manipulate_settings():
     datasources = {
         datasource: {
             **info,
-            "enabled": datasource in g.config.get("datasources.enabled"),
-            "expires": g.config.get("datasources.expiration").get(datasource, {})
+            "enabled": datasource in all_settings.get("datasources.enabled"),
+            "expires": all_settings.get("datasources.expiration").get(datasource, {})
         }
         for datasource, info in g.modules.datasources.items()}
 
@@ -732,7 +733,7 @@ def manipulate_settings():
     extension_config = {
         extension_name: {
             **extension,
-            "enabled": g.config.get("extensions.enabled").get(extension_name, {}).get("enabled")
+            "enabled": all_settings.get("extensions.enabled").get(extension_name, {}).get("enabled")
         }
         for extension_name, extension in find_extensions()[0].items()}
 
@@ -960,7 +961,7 @@ def user_bulk():
                         expires_after = parse_datetime(user["expires"])
                         user_obj.set_value("delete-after", int(expires_after.timestamp()))
                     except (OverflowError, ParserError):
-                        # delete the already created user because we have bad
+                        # delete the already created user because we have ba    d
                         # data, and continue with the next one
                         failed_rows.append(user.get("name"))
                         user_obj.delete()
