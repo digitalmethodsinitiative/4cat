@@ -49,7 +49,8 @@ config_definition = {
     "extensions.enabled": {
         "type": UserInput.OPTION_EXTENSIONS,
         "default": {},
-        "help": "Extensions"
+        "help": "Extensions",
+        "global": True
     },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
