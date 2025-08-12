@@ -17,7 +17,7 @@
 
                     <div class="property-container">
                         <div class="result">
-                            <a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
+                            <a href="{{ url_for('dataset.show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
                             {% if __user_config("ui.show_datasource") %}<span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>{% endif %}
                             <h4>{{ dataset.get_label() }}</h4>
                             {% if dataset.is_finished() %}
@@ -44,13 +44,13 @@
                     {% if not dataset.is_finished() or dataset.num_rows == 0 %}
                         <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status">{% include "components/result-status.html" %}</span></p>
                     {% else %}
-                        <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
+                        <a class="button-like" href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
                     {% endif %}
                     </div>
 
                     {% if dataset.is_finished() and dataset.num_rows > 0 %}
                         <div class="property-container analysis">
-                            <a class="button-like processor-link" href="{{ url_for('show_result', key=dataset.key) }}">Analysis{% if dataset.children|length > 0 %} (+{{ dataset.children|length }}){% endif %}</a>
+                            <a class="button-like processor-link" href="{{ url_for('dataset.show_result', key=dataset.key) }}">Analysis{% if dataset.children|length > 0 %} (+{{ dataset.children|length }}){% endif %}</a>
                         </div>
                     {% endif %}
                 </li>

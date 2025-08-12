@@ -192,6 +192,7 @@ with app.app_context():
     app.register_blueprint(webtool.views.views_explorer.component)
     app.register_blueprint(webtool.views.api_standalone.component)
     app.register_blueprint(webtool.views.api_tool.component)
+    app.register_blueprint(webtool.views.views_scheduler.component)
 
     @app.before_request
     def before_request():

@@ -10,8 +10,8 @@
             <h2><span>Scheduled Jobs</span></h2>
             <nav class="tabs">
                 <ul>
-                    <li{% if depth == "current" %} class="current"{% endif %}><a href="{{ url_for('show_scheduler') }}?&amp;depth=current">Current Jobs</a></li>
-                    <li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_scheduler') }}?&amp;depth=all">All</a></li>
+                    <li{% if depth == "current" %} class="current"{% endif %}><a href="{{ url_for('scheduler.show_scheduler') }}?&amp;depth=current">Current Jobs</a></li>
+                    <li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('scheduler.show_scheduler') }}?&amp;depth=all">All</a></li>
                 </ul>
             </nav>
         {% if schedulers %}
@@ -29,7 +29,7 @@
                                     <h5>Number of datasets: {{ job.get('number_datasets')}}</h5>
                                     <h5>Active: {{ job.get('active') }}</h5>
                                 {% if job.get('active') %}
-                                    <a href="{{ url_for('delete_job', job_id=job.get('scheduler_id')) }}" class="confirm-first"
+                                    <a href="{{ url_for('scheduler.delete_job', job_id=job.get('scheduler_id')) }}" class="confirm-first"
                                    data-confirm-action="delete this job"><i class="fas fa-trash-alt"
                                                                                 aria-hidden="true"></i>
                                     Delete scheduler</a>
@@ -38,7 +38,7 @@
                         </div>
                         {% if job.get('number_datasets') > 0 %}
                         <div class="processor-container view-datasets">
-                            <a class="button-like view-datsets" href="{{ url_for('view_scheduler_datasets', scheduler_id=job.get('scheduler_id'), page=1) }}">
+                            <a class="button-like view-datsets" href="{{ url_for('scheduler.view_scheduler_datasets', scheduler_id=job.get('scheduler_id'), page=1) }}">
                                 <i class="fas fa-plus" aria-hidden="true"></i>
                                 View datasets
                                 <span class="sr-only">View datasets</span>
