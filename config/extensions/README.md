@@ -25,15 +25,16 @@ folder. An extension containing both processors and a data source could look lik
 
 ```
 [4CAT root]/
-├─ extensions/
-│  ├─ my_extension/
-│     ├─ my_processor.py
-│     ├─ my_other_processor.py
-│     ├─ datasources/
+├─ config/
+|  ├─ extensions/
+│    ├─ my_extension/
+│      ├─ my_processor.py
+│      ├─ my_other_processor.py
+│      ├─ datasources/
 │        ├─ my_datasource/
-│           ├─ __init__.py
-│           ├─ DESCRIPTION.md
-│           ├─ search_my_datasource.py
+│          ├─ __init__.py
+│          ├─ DESCRIPTION.md
+│          ├─ search_my_datasource.py
 ```
 
 In this scenario, `my_extension` would be a git repository within which all other files are contained. 
