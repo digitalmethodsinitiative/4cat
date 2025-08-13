@@ -29,7 +29,7 @@ path_data = data/datasets
 # Lockfile the daemon lockfile will be saved in this folder. Probably no need to change!
 path_lockfile = backend
  # Sessions: folder where API session data is stored (e.g., Telegram)
-path_sessions = data/sessions
+path_sessions = config/sessions
 # Logs: store logs here - empty means the 4CAT root folder
 path_logs = data/logs
 

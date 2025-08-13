@@ -2,7 +2,3 @@
 *
 # Except these files
 !.gitignore
-!config/
-!logs/
-!extensions/
-!sessions/
