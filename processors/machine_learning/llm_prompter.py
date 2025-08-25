@@ -468,7 +468,7 @@ class LLMPrompter(BasicProcessor):
                     # Skip row if we encounter *any* empty value in *different* brackets in the
                     # prompt *when batching*. This is because lists with different length in the prompt cause asymmetry
                     # in the input values, and it's though to then output the correct number of values.
-                    if not item_value and batches:
+                    if not item_value and use_batches:
                         item_values = {}
                         self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {column_to_use}")
                         break
