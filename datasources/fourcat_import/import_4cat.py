@@ -6,6 +6,7 @@ import json
 import time
 import zipfile
 from pathlib import Path
+from psycopg2.errors import InFailedSqlTransaction
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import (QueryParametersException, FourcatException, ProcessorInterruptedException,
@@ -99,6 +100,13 @@ class SearchImportFromFourcat(BasicProcessor):
                 self.halt_and_catch_fire()
             except ProcessorInterruptedException:
                 pass
+            except InFailedSqlTransaction:
+                # Catch database issue and retry
+                self.db.rollback()
+                try:
+                    self.halt_and_catch_fire()
+                except ProcessorInterruptedException:
+                    pass
             # Reraise the original exception for logging
             raise e
 
