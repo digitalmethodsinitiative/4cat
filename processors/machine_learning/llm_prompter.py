@@ -10,6 +10,7 @@ import jsonschema
 from json import JSONDecodeError
 from jsonschema.exceptions import ValidationError, SchemaError
 from datetime import datetime, timedelta
+from langchain_core.messages.ai import AIMessage
 
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException
@@ -468,7 +469,7 @@ class LLMPrompter(BasicProcessor):
                     # Skip row if we encounter *any* empty value in *different* brackets in the
                     # prompt *when batching*. This is because lists with different length in the prompt cause asymmetry
                     # in the input values, and it's though to then output the correct number of values.
-                    if not item_value and batches:
+                    if not item_value and use_batches:
                         item_values = {}
                         self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {column_to_use}")
                         break
@@ -534,7 +535,11 @@ class LLMPrompter(BasicProcessor):
                     except Exception as e:
                         self.dataset.finish_with_error(f"`{e}`")
                         return
-                    
+
+                    model = response.response_metadata.get("model_name", model)
+                    if "models/" in model:
+                        model = model.replace("models/", "")
+
                     if not response:
                         structured_warning = " with your specified JSON schema" if structured_output else ""
                         self.dataset.finish_with_error(f"{model} could not return text{structured_warning}. Consider "
@@ -567,9 +572,9 @@ class LLMPrompter(BasicProcessor):
 
                     # Else we'll just store the output in a list
                     else:
-                        output = response
+                        output = response.content
                         if not isinstance(output, list):
-                            output = [response]
+                            output = [output]
 
                     for n, output_item in enumerate(output):
 
@@ -682,7 +687,8 @@ class LLMPrompter(BasicProcessor):
         Parse the batched LLM output and return all values as a list.
         """
 
-        parsed_response = response
+        parsed_response = response.content
+
         # Cast to string
         if isinstance(parsed_response, str):
             try:

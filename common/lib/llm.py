@@ -107,7 +107,7 @@ class LLMAdapter:
         messages: Union[str, List[BaseMessage]],
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
-    ) -> str:
+    ) -> BaseMessage:
         """
         Supports string input or LangChain message list.
         """
@@ -121,14 +121,14 @@ class LLMAdapter:
             lc_messages = messages
 
         kwargs = {"temperature": temperature}
-        if self.provider in ("google", "ollama") or "o3" in self.model:  # Temperature not supported here by Google
+        if self.provider in ("google", "ollama") or "o3" in self.model or "gpt-5" in self.model:
             kwargs = {}
         try:
             response = self.llm.invoke(lc_messages, **kwargs)
         except Exception as e:
             raise e
         
-        return response if self.structured_output and not isinstance(response, AIMessage) else response.content
+        return response
 
     def set_structure(self, json_schema):
 

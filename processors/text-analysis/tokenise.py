@@ -366,7 +366,20 @@ class Tokenise(BasicProcessor):
         processed = 0
         annotations = []
 
-        for post in self.source_dataset.iterate_items(self, get_annotations=False):
+        # Only get annotations if the text to tokenise are annotations
+        get_annotations = False
+        if self.source_dataset.annotation_fields:
+            annotation_field_labels = self.source_dataset.get_annotation_field_labels()
+            for column in columns:
+                # Duplicate annotation labels names get a `_2` appended, so we remove this if present.
+                # (This has an edge case where annotations are unnecessarily retrieved when a regular column name is the
+                # same as an annotation label, but should speed things up anyway).
+                column = re.sub(r"_\d+$", "", column)
+                if column in annotation_field_labels:
+                    get_annotations = True
+                    break
+
+        for post in self.source_dataset.iterate_items(self, get_annotations=get_annotations):
             # determine what output unit this post belongs to
             if docs_per != "thread":
                 try:

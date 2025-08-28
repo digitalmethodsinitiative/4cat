@@ -56,7 +56,7 @@ class ExportDatasets(BasicProcessor):
 			self.dataset.log(f"Exporting dataset {dataset_key}.")
 
 			try:
-				dataset = DataSet(key=dataset_key, db=self.db)
+				dataset = DataSet(key=dataset_key, db=self.db, modules=self.modules)
 			except DataSetException:
 				self.dataset.update_status(f"Dataset {dataset_key} not found: it may have been deleted prior to export; skipping.")
 				failed_exports.append(dataset_key)
