@@ -426,6 +426,7 @@ def inject_now():
 		"__notifications": current_user.get_notifications(),
 		"__user_config": lambda setting: g.config.get(setting),
 		"__config": g.config,
+		"__request": g.request,
 		"__user_cp_access": any([g.config.get(p) for p in g.config.config_definition.keys() if p.startswith("privileges.admin")]),
 		"__version": version,
 		"uniqid": uniqid
