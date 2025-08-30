@@ -1,5 +1,5 @@
-# Update the 'annotations' table so every annotation has its own row.
-# also add extra data
+# Add a column to the notifications table where a long(er) version of the
+# notification can be viewed
 import sys
 import os
 
@@ -16,37 +16,39 @@ ini = configparser.ConfigParser()
 ini.read(Path(__file__).parent.parent.parent.resolve().joinpath("config/config.ini"))
 db_config = ini["DATABASE"]
 
-db = Database(logger=log, dbname=db_config["db_name"], user=db_config["db_user"], password=db_config["db_password"],
-              host=db_config["db_host"], port=db_config["db_port"], appname="4cat-migrate")
+db = Database(
+    logger=log,
+    dbname=db_config["db_name"],
+    user=db_config["db_user"],
+    password=db_config["db_password"],
+    host=db_config["db_host"],
+    port=db_config["db_port"],
+    appname="4cat-migrate",
+)
 
-print("  Adding `from_dataset` column to annotations table...")
-# Original annotations table had columns 'key' and 'annotations', new annotations has 'dataset' among others
-has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'annotations' AND column_name = 'from_dataset'")
+columns = {
+    "notification_long": "TEXT DEFAULT ''",
+    "canonical_id": "TEXT DEFAULT ''",
+    "is_dismissed": "BOOLEAN DEFAULT FALSE",
+}
 
-# Ensure we do not attempt to update the annotations table if it has already been updated
-# This will drop the annotations table and create a new one losing all annotations
-# (both backend and frontend run migrate.py in case they have to update different aspects)
-if has_column["num"] > 0:
-    print("    Annotations table seems to have been updated already")
-else:
-    print("    Annotations table needs to be updated")
-    db.execute("ALTER TABLE annotations ADD from_dataset TEXT")
+for column, definition in columns.items():
+    print(f"  Checking for `{column}` column in notifications table...")
+    has_column = db.fetchone(
+        "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users_notifications' AND column_name = %s",
+        (column,),
+    )
 
+    if has_column["num"] > 0:
+        print(f"    Notifications table already has column '{column}'")
+    else:
+        print(f"    Adding column '{column}' to notifications table...")
+        db.execute("ALTER TABLE users_notifications ADD " + column + " " + definition)
 
-print("    Creating indexes for `from_dataset` and unique fields for the annotations table...")
-db.execute("""
-CREATE INDEX IF NOT EXISTS annotations_from_dataset
-ON annotations (
-    from_dataset
-);
-DROP INDEX IF EXISTS annotation_unique;
-DROP INDEX IF EXISTS annotation_value;
-CREATE UNIQUE INDEX annotation_unique
-ON annotations (
-    dataset,
-    item_id,
-    field_id
-);
-""")
+print("  Re-making unique index for notifications table...")
+db.execute("DROP INDEX IF EXISTS users_notifications_unique")
+db.execute(
+    "CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique ON users_notifications (canonical_id, username, notification)"
+)
 
 print("  - done!")
