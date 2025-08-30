@@ -32,6 +32,8 @@ class UpdateChecker(BasicWorker):
         return {"remote_id": "", "interval": 10800}
 
     def work(self):
+        self.get_remote_notifications()
+        
         versionfile = self.config.get("PATH_CONFIG").joinpath(".current-version")
         repo_url = self.config.get("4cat.github_url")
 
@@ -69,5 +71,53 @@ class UpdateChecker(BasicWorker):
 
         else:
             # up to date? dismiss any notifications about new versions
+            # not if it has a canonical_id - then get_remote_notifications()
+            # will deal with it
             self.db.execute("DELETE FROM users_notifications WHERE username = '!admin' "
-                            "AND notification LIKE 'A new version of 4CAT%'")
+                            "AND notification LIKE 'A new version of 4CAT%' AND canonical_id = ''")
+
+    def get_remote_notifications(self):
+        """
+        Get notifications from notifications server
+
+        For important upgrade patch notes, for example, it can be useful to
+        have a more elaborate notification than just "a new version is
+        available". This method retrieves such notifications from the
+        configured "phone home" server and queues them for display to admins.
+        """
+        phonehome_url = self.config.get("4cat.phone_home_url")
+        if not phonehome_url:
+            return
+
+        if phonehome_url.endswith("/"):
+            phonehome_url = phonehome_url[:-1]
+
+        phonehome_url += "/get-notifications/"
+
+        try:
+            notifications = requests.get(phonehome_url).json()
+        except (requests.RequestException, json.JSONDecodeError) as e:
+            self.log.warning(f"Cannot retrieve notifications from notifications server ({e})")
+            return
+
+        # add notifications that do not yet exist to the table and address them
+        # to all 4CAT admins
+        for canonical_id, notification in notifications.items():
+            exists = self.db.fetchone("SELECT * FROM users_notifications WHERE canonical_id = %s", (canonical_id,))
+            if exists:
+                continue
+
+            self.db.insert("users_notifications", {
+                "canonical_id": canonical_id,
+                "notification": notification["notification"],
+                "notification_long": notification["notification_long"],
+                "username": "!admin",
+                "allow_dismiss": True
+            })
+
+        # if a notification has been dismissed and no longer exists on the
+        # server, it can also be deleted locally (but not before that, else it
+        # will be added back next time the server is queried)
+        for dismissed in self.db.fetchall("SELECT * FROM users_notifications WHERE is_dismissed = TRUE"):
+            if dismissed["canonical_id"] not in notifications:
+                self.db.delete("users_notifications", {"id": dismissed["id"]}, commit=True)

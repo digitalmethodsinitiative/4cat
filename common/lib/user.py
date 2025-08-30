@@ -432,18 +432,24 @@ class User:
 
         :param int notification_id:  ID of the notification to dismiss
         """
-        current_notifications = [n["id"] for n in self.get_notifications() if n["allow_dismiss"]]
-        if notification_id not in current_notifications:
+        all_notifications = {n["id"]: n for n in self.get_notifications() if n["allow_dismiss"]}
+        if notification_id not in all_notifications:
             return
 
-        self.db.delete("users_notifications", where={"id": notification_id})
+        # notifications with a canonical ID are just hidden, not deleted
+        # this is because they are received from a notification server, and
+        # deleting them would just re-add them on the next sync
+        if all_notifications[notification_id]["canonical_id"]:
+            self.db.update("users_notifications", data={"is_dismissed": True}, where={"id": notification_id})
+        else:
+            self.db.delete("users_notifications", where={"id": notification_id})
 
     def get_notifications(self):
         """
         Get all notifications for this user
 
         That is all the user's own notifications, plus those for the groups of
-        users this user belongs to
+        users this user belongs to. Dismissed notifications are ignored.
 
         :return list:  Notifications, as a list of dictionaries
         """
@@ -460,7 +466,8 @@ class User:
         notifications = self.db.fetchall(
             "SELECT n.* FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s "
-            "AND (u.name = n.username OR n.username IN %s)", (self.get_id(), tuple(tag_recipients)))
+            "AND (u.name = n.username OR n.username IN %s)"
+            "AND n.is_dismissed = FALSE", (self.get_id(), tuple(tag_recipients)))
 
         return notifications
 

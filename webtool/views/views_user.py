@@ -550,12 +550,20 @@ def show_access_tokens():
 
     return render_template("access-tokens.html", tokens=tokens)
 
-@component.route("/dismiss-notification/<int:notification_id>")
+@component.route("/view-notification/<int:notification_id>")
+def view_notification(notification_id):
+    notification = g.db.fetchone("SELECT * FROM users_notifications WHERE id = %s", (notification_id,))
+    if not notification:
+        return render_template("error.html", message="No such notification."), 404
+
+    return render_template("account/notification.html", notification=notification)
+
+@component.route("/dismiss-notification/<int:notification_id>", methods=["GET", "POST"])
 def dismiss_notification(notification_id):
     current_user.dismiss_notification(notification_id)
 
     if not request.args.get("async"):
-        redirect_url = request.headers.get("Referer")
+        redirect_url = request.form.get("redirect") or request.headers.get("Referer")
         if not redirect_url:
             redirect_url = url_for("misc.show_frontpage")
 

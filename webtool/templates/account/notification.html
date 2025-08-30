@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+
+{% block title %}View notification{% endblock %}
+{% block body_class %}plain-page markdown-page {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article>
+        <section>
+            <h2>Notification</h2>
+            {{ notification.notification_long|markdown|safe }}
+
+            {% if not notification.is_dismissed %}
+            <form action="{{ url_for('user.dismiss_notification', notification_id=notification.id) }}" method="POST" class="wide">
+                <div class="submit-container">
+                    <input type="hidden" name="redirect" value="{{ __request.referrer }}">
+                    <button>
+                        <i class="fa fa-times" aria-hidden="true"></i> Dismiss notification
+                    </button>
+                </div>
+            </form>
+            {% else %}
+                <p><i>This notification was dismissed and will be deleted automatically when it expires on the 4CAT update server.</i></p>
+            {% endif %}
+        </section>
+    </article>
+{% endblock %}
