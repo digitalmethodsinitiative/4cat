@@ -308,8 +308,20 @@ def first_run_dialog():
     # don't ask phone home again until next update
     g.config.set("4cat.phone_home_asked", True)
 
-    redirect_path = "user.show_login" if not has_admin_user else "misc.show_frontpage"
-    return redirect(url_for(redirect_path))
+    message = "4CAT is now ready for use. You can log in to it with the account you just created."
+
+    if phone_home_url:
+        message += f"""\n\n
+While running, 4CAT will periodically fetch notifications about e.g. security issues and upgrade instructions from
+an <a href="{phone_home_url}">external server</a>. You can disable this functionality by going into the Control Panel's 
+'Settings' page, and setting the 'Phone home URL' under '4CAT Tool Settings' to an empty value. 4CAT will still let you 
+know when a new version is available if you do this; but you will not receive any other notifications, e.g. security 
+warnings or upgrade instructions, so we recommend leaving this enabled.
+"""
+
+    redirect_url = url_for("user.show_login" if not has_admin_user else "misc.show_frontpage")
+    return render_template("error.html", title="4CAT is ready", redirect_url=redirect_url,
+                           message=message, flashes=get_flashed_messages())
 
 
 @component.route('/login/', methods=['GET', 'POST'])

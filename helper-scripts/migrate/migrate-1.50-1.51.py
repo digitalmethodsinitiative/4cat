@@ -64,7 +64,8 @@ db.insert("users_notifications", {
                          "You can disable this functionality by going into the Control Panel's 'Settings' page, and "
                          "setting the 'Phone home URL' under '4CAT Tool Settings' to an empty value. 4CAT will still "
                          "let you know when a new version is available if you do this; but you will not receive any "
-                         "other notifications, e.g. security warnings or upgrade instructions.",
+                         "other notifications, e.g. security warnings or upgrade instructions, so we recommend leaving "
+                         "this enabled.",
     "allow_dismiss": True
 })
 
