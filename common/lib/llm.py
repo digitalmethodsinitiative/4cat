@@ -20,7 +20,7 @@ class LLMAdapter:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         temperature: float = 0.1,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
     ):
         """
         provider: 'openai', 'google', 'mistral', 'ollama', 'lmstudio', 'mistral'
@@ -46,20 +46,22 @@ class LLMAdapter:
         if self.provider == "openai":
             kwargs = {}
             if "o3" not in self.model:
-                kwargs["temperature"] = self.temperature # temperature not supported for all models
+                kwargs["temperature"] = (
+                    self.temperature
+                )  # temperature not supported for all models
             return ChatOpenAI(
                 model=self.model,
                 api_key=SecretStr(self.api_key),
                 base_url=self.base_url or "https://api.openai.com/v1",
                 max_tokens=self.max_tokens,
-                **kwargs
+                **kwargs,
             )
         elif self.provider == "google":
             return ChatGoogleGenerativeAI(
                 model=self.model,
                 temperature=self.temperature,
                 google_api_key=self.api_key,
-                max_tokens=self.max_tokens
+                max_tokens=self.max_tokens,
             )
         elif self.provider == "anthropic":
             return ChatAnthropic(
@@ -68,7 +70,7 @@ class LLMAdapter:
                 api_key=SecretStr(self.api_key),
                 max_tokens=self.max_tokens,
                 timeout=100,
-                stop=None
+                stop=None,
             )
         elif self.provider == "mistral":
             return ChatMistralAI(
@@ -83,7 +85,7 @@ class LLMAdapter:
                 model=self.model,
                 temperature=self.temperature,
                 base_url=self.base_url or "http://localhost:11434",
-                max_tokens=self.max_tokens
+                max_tokens=self.max_tokens,
             )
             self.model = ollama_adapter.model
             return ollama_adapter
@@ -113,6 +115,7 @@ class LLMAdapter:
         """
         if isinstance(messages, str):
             from langchain_core.messages import HumanMessage, SystemMessage
+
             lc_messages = []
             if system_prompt:
                 lc_messages.append(SystemMessage(content=system_prompt))
@@ -121,17 +124,20 @@ class LLMAdapter:
             lc_messages = messages
 
         kwargs = {"temperature": temperature}
-        if self.provider in ("google", "ollama") or "o3" in self.model or "gpt-5" in self.model:
+        if (
+            self.provider in ("google", "ollama")
+            or "o3" in self.model
+            or "gpt-5" in self.model
+        ):
             kwargs = {}
         try:
             response = self.llm.invoke(lc_messages, **kwargs)
         except Exception as e:
             raise e
-        
+
         return response
 
     def set_structure(self, json_schema):
-
         if not json_schema:
             raise ValueError("json_schema is None")
 
@@ -142,7 +148,10 @@ class LLMAdapter:
 
         # LM Studio needs some more guidance
         if self.provider == "lmstudio":
-            json_schema = {"type": "json_schema", "json_schema": {"schema": json_schema}}
+            json_schema = {
+                "type": "json_schema",
+                "json_schema": {"schema": json_schema},
+            }
             self.llm = self.llm.bind(response_format=json_schema)
         else:
             self.llm = self.llm.with_structured_output(json_schema)
@@ -158,7 +167,9 @@ class LLMAdapter:
         models = LLMAdapter.get_models(config)
         if not models:
             return {}
-        options = {model_id: model_values["name"] for model_id, model_values in models.items()}
+        options = {
+            model_id: model_values["name"] for model_id, model_values in models.items()
+        }
         return options
 
     @staticmethod
@@ -171,10 +182,14 @@ class LLMAdapter:
         models = LLMAdapter.get_models(config)
         if not models:
             return {}
-        providers = list(set([model_values.get("provider", "") for model_values in models.values()]))
+        providers = list(
+            set([model_values.get("provider", "") for model_values in models.values()])
+        )
         if not providers:
             return {}
-        options = {provider: provider.capitalize() for provider in providers if provider}
+        options = {
+            provider: provider.capitalize() for provider in providers if provider
+        }
         return options
 
     @staticmethod
