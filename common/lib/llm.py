@@ -3,7 +3,6 @@ import json
 from typing import List, Optional, Union
 from pydantic import SecretStr
 from langchain_core.messages import BaseMessage
-from langchain_core.messages.ai import AIMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI

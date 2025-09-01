@@ -10,7 +10,6 @@ import jsonschema
 from json import JSONDecodeError
 from jsonschema.exceptions import ValidationError, SchemaError
 from datetime import datetime, timedelta
-from langchain_core.messages.ai import AIMessage
 
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException
