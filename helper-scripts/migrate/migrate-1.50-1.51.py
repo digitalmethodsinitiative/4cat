@@ -51,4 +51,22 @@ db.execute(
     "CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique ON users_notifications (canonical_id, username, notification)"
 )
 
+print("  Notifying 4CAT admin about new notification functionality")
+db.insert("users_notifications", {
+    "username": "!admin",
+    "notification": "From this version onwards, 4CAT will fetch notifications concerning security warnings and upgrade "
+                    "instructions from an external server.",
+    "notification_long": "As of version 1.51, 4CAT will periodically contact the server at "
+                         "[https://ping.4cat.nl](https://ping.4cat.nl) to check for news released by its developers, "
+                         "e.g. to inform you about security issues or upgrade instructions.\n\n"
+                         "You can read more about what happens with your personal data via the link above. In short: "
+                         "no personally identifiable information (PII) is retained.\n\n"
+                         "You can disable this functionality by going into the Control Panel's 'Settings' page, and "
+                         "setting the 'Phone home URL' under '4CAT Tool Settings' to an empty value. 4CAT will still "
+                         "let you know when a new version is available if you do this; but you will not receive any "
+                         "other notifications, e.g. security warnings or upgrade instructions.",
+    "allow_dismiss": True
+})
+
 print("  - done!")
+
