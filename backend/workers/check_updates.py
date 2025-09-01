@@ -2,7 +2,7 @@ import packaging.version
 import requests
 import json
 
-from common.lib.helpers import add_notification, get_github_version
+from common.lib.helpers import add_notification, get_github_version, get_software_version
 from backend.lib.worker import BasicWorker
 
 
@@ -92,7 +92,8 @@ class UpdateChecker(BasicWorker):
         if phonehome_url.endswith("/"):
             phonehome_url = phonehome_url[:-1]
 
-        phonehome_url += "/get-notifications/"
+        current_version = get_software_version()[:16]
+        phonehome_url += f"/get-notifications/?version={current_version}"
 
         try:
             notifications = requests.get(phonehome_url).json()
