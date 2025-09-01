@@ -285,8 +285,6 @@ def first_run_dialog():
         g.db.update("users", where={"name": username}, data={"is_deactivated": False})
         g.db.commit()
 
-        flash("The admin user '%s' was created, you can now use it to log in." % username)
-
     if phone_home_url and request.form.get("phonehome"):
         with g.config.get("PATH_CONFIG").joinpath(".current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
@@ -320,7 +318,7 @@ warnings or upgrade instructions, so we recommend leaving this enabled.
 """
 
     redirect_url = url_for("user.show_login" if not has_admin_user else "misc.show_frontpage")
-    return render_template("error.html", title="4CAT is ready", redirect_url=redirect_url,
+    return render_template("error.html", title="4CAT is ready", redirect=redirect_url,
                            message=message, flashes=get_flashed_messages())
 
 
