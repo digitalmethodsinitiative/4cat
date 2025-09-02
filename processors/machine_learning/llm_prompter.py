@@ -549,6 +549,7 @@ class LLMPrompter(BasicProcessor):
 
                     # Always parse JSON outputs in the case of batches.
                     if use_batches or structured_output:
+                        print(response)
                         if isinstance(response, str):
                             response = json.loads(response)
                         
@@ -563,6 +564,8 @@ class LLMPrompter(BasicProcessor):
                                                                "for incorrect output. Try lowering the batch size, "
                                                                "editing the prompt, or using a different model.")
                                 return
+                        else:
+                            output = response
 
                         # Also validate whether the JSON schema and the output match
                         try:
