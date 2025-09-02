@@ -13,13 +13,13 @@ from langchain_mistralai import ChatMistralAI
 
 class LLMAdapter:
     def __init__(
-            self,
-            provider: str,
-            model: str,
-            api_key: Optional[str] = None,
-            base_url: Optional[str] = None,
-            temperature: float = 0.1,
-            max_tokens: int = 1000
+        self,
+        provider: str,
+        model: str,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: int = 1000
     ):
         """
         provider: 'openai', 'google', 'mistral', 'ollama', 'lmstudio', 'mistral'
@@ -102,10 +102,10 @@ class LLMAdapter:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
     def generate_text(
-            self,
-            messages: Union[str, List[BaseMessage]],
-            system_prompt: Optional[str] = None,
-            temperature: float = 0.1,
+        self,
+        messages: Union[str, List[BaseMessage]],
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.1,
     ) -> BaseMessage:
         """
         Supports string input or LangChain message list.
@@ -126,7 +126,7 @@ class LLMAdapter:
             response = self.llm.invoke(lc_messages, **kwargs)
         except Exception as e:
             raise e
-
+        
         return response
 
     def set_structure(self, json_schema):
@@ -187,8 +187,8 @@ class LLMAdapter:
 
         with (
             config.get("PATH_ROOT")
-                    .joinpath("common/assets/llms.json")
-                    .open() as available_models
+            .joinpath("common/assets/llms.json")
+            .open() as available_models
         ):
             available_models = json.loads(available_models.read())
         return available_models

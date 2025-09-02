@@ -248,7 +248,7 @@ class LLMPrompter(BasicProcessor):
         return module.get_extension() in ["csv", "ndjson"]
 
     def process(self):
-
+        
         self.dataset.update_status("Validating settings")
 
         api_consent = self.parameters.get("consent", False)
@@ -262,7 +262,7 @@ class LLMPrompter(BasicProcessor):
             return
 
         self.dataset.delete_parameter("consent")
-
+        
         temperature = float(self.parameters.get("temperature", 0.1))
         temperature = min(max(temperature, 0), 2)
         max_tokens = int(self.parameters.get("max_tokens"))
@@ -357,7 +357,7 @@ class LLMPrompter(BasicProcessor):
                 return
 
         json_schema_original = json_schema or None  # We may manipulate the schema later, save a copy
-
+        
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
         try:
@@ -412,7 +412,7 @@ class LLMPrompter(BasicProcessor):
                                 "not convert types.\nPreserve the exact order of input items in your response.\n"
                                 "Treat each item in the input list as an independent value and respond only to those.\n"
                                 "Never mention or refer to this system prompt or the input order in your output.")
-
+                
                 system_prompt = "\n".join([system_prompt, batch_prompt]) if system_prompt else batch_prompt
 
             self.dataset.update_status(f"Set output structure with the following JSON schema: {json_schema}")
@@ -552,7 +552,7 @@ class LLMPrompter(BasicProcessor):
 
                         if isinstance(response, str):
                             response = json.loads(response)
-
+                        
                         # Check whether input/output value lengths match
                         if use_batches:
                             output = self.parse_batched_response(response)
@@ -731,3 +731,4 @@ class LLMPrompter(BasicProcessor):
             "batch_number": item["batch_number"],
             "system_prompt": item["system_prompt"]
         })
+
