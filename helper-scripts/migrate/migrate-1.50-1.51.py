@@ -67,7 +67,7 @@ db.insert("users_notifications", {
                          "other notifications, e.g. security warnings or upgrade instructions, so we recommend leaving "
                          "this enabled.",
     "allow_dismiss": True
-})
+}, safe=True)
 
 print("  - done!")
 
