@@ -162,8 +162,8 @@ class ClassificationEvaluation(BasicProcessor):
                     continue
 
             if multi_label:
-                label_true = [l.strip() for l in label_true.split(",")]
-                label_pred = [l.strip() for l in label_pred.split(",")]
+                label_true = [label.strip() for label in label_true.split(",")]
+                label_pred = [label.strip() for label in label_pred.split(",")]
 
             labels_true.append(label_true)
             labels_pred.append(label_pred)
