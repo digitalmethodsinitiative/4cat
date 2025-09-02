@@ -549,7 +549,7 @@ class LLMPrompter(BasicProcessor):
 
                     # Always parse JSON outputs in the case of batches.
                     if use_batches or structured_output:
-                        print(response)
+
                         if isinstance(response, str):
                             response = json.loads(response)
                         
@@ -565,7 +565,7 @@ class LLMPrompter(BasicProcessor):
                                                                "editing the prompt, or using a different model.")
                                 return
                         else:
-                            output = response
+                            output = [response]
 
                         # Also validate whether the JSON schema and the output match
                         try:
@@ -691,7 +691,7 @@ class LLMPrompter(BasicProcessor):
         Parse the batched LLM output and return all values as a list.
         """
 
-        parsed_response = response.content
+        parsed_response = response.content if not isinstance(response, dict) else response
 
         # Cast to string
         if isinstance(parsed_response, str):
