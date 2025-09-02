@@ -126,11 +126,13 @@ class ImageDownloader(BasicProcessor):
             # Pick a good default
             if "image_url" in columns:
                 options["columns"]["default"] = "image_url"
-            elif "image" in "".join(columns):
+            elif any("image" in (col or "").lower() for col in columns):
                 # Any image will do
-                options["columns"]["default"] = sorted(
-                    columns, key=lambda k: "image" in k
-                ).pop()
+                image_cols = sorted(
+                    [col for col in columns if "image" in (col or "").lower()],
+                    key=lambda c: (len(c), c.lower()),
+                )
+                options["columns"]["default"] = image_cols[0] if image_cols else "body"
             else:
                 options["columns"]["default"] = "body"
 
@@ -172,6 +174,7 @@ class ImageDownloader(BasicProcessor):
 
         if amount == 0:
             amount = self.config.get("image-downloader.max", 1000)
+
         columns = self.parameters.get("columns")
         if type(columns) is str:
             columns = [columns]
@@ -268,6 +271,7 @@ class ImageDownloader(BasicProcessor):
             self.filenames[url] = url_filename
             url_filenames.append(url_filename)
 
+        max_images = min(len(urls), amount) if amount > 0 else len(urls)
         for url, response in self.iterate_proxied_requests(
             urls,
             preserve_order=False,
@@ -386,9 +390,9 @@ class ImageDownloader(BasicProcessor):
                     if len(downloaded_files) < amount or amount == 0:
                         downloaded_files.add(url)
                         self.dataset.update_status(
-                            f"Downloaded {len(downloaded_files):,} of {amount:,} file(s)"
+                            f"Downloaded {len(downloaded_files):,} of {max_images:,} file(s)"
                         )
-                        self.dataset.update_progress(len(downloaded_files) / amount)
+                        self.dataset.update_progress(len(downloaded_files) / max_images)
 
                     if len(downloaded_files) >= amount and amount != 0:
                         # parallel requests may still be running so halt these
