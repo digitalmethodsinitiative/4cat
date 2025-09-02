@@ -731,4 +731,3 @@ class LLMPrompter(BasicProcessor):
             "batch_number": item["batch_number"],
             "system_prompt": item["system_prompt"]
         })
-
