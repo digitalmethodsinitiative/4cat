@@ -257,7 +257,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
         self.dataset.log('Collected %i urls.' % len(urls))
 
-        vid_lib = DatasetVideoLibrary(self.dataset)
+        vid_lib = DatasetVideoLibrary(self.dataset, modules=self.modules)
 
         # Prepare staging area for videos and video tracking
         results_path = self.dataset.get_staging_area()
@@ -800,7 +800,8 @@ class VideoDownloaderPlus(BasicProcessor):
 
 class DatasetVideoLibrary:
 
-    def __init__(self, current_dataset):
+    def __init__(self, current_dataset, modules):
+        self.modules = modules
         self.current_dataset = current_dataset
         self.previous_downloaders = self.collect_previous_downloaders()
         self.current_dataset.log(f"Previously video downloaders: {[downloader.key for downloader in self.previous_downloaders]}")
@@ -841,7 +842,7 @@ class DatasetVideoLibrary:
         # Check to see if filtered dataset
         if "copied_from" in parent_dataset.parameters and parent_dataset.is_top_dataset():
             try:
-                original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
+                original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db, modules=self.modules)
                 previous_downloaders += [child for child in original_dataset.top_parent().get_children() if
                                          (child.type == "video-downloader" and child.key != self.current_dataset.key)]
             except DataSetException:

@@ -70,7 +70,7 @@ class ThingExpirer(BasicWorker):
 
 			# the dataset creator's configuration context determines expiration
 			try:
-				dataset = DataSet(key=dataset["key"], db=self.db)
+				dataset = DataSet(key=dataset["key"], db=self.db, modules=self.modules)
 				wrapper = ConfigWrapper(self.config, user=User.get_by_name(self.db, dataset.creator))
 				if dataset.is_expired(config=wrapper):
 					self.log.info(f"Deleting dataset {dataset.key} (expired)")
@@ -118,7 +118,7 @@ class ThingExpirer(BasicWorker):
 			# check if expired...
 			if expires_at < now:
 				self.log.info(f"User {username} expired - deleting user and datasets")
-				user.delete()
+				user.delete(modules=self.modules)
 			else:
 				warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%-d %B %Y %H:%M')}</time>. Make sure to back up your data before then."
 				user.add_notification(warning_notification)
