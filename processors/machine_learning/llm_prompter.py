@@ -535,9 +535,11 @@ class LLMPrompter(BasicProcessor):
                         self.dataset.finish_with_error(f"`{e}`")
                         return
 
-                    model = response.response_metadata.get("model_name", model)
-                    if "models/" in model:
-                        model = model.replace("models/", "")
+                    # Set model name from the response for more details
+                    if hasattr(response, "response_metadata"):
+                        model = response.response_metadata.get("model_name", model)
+                        if "models/" in model:
+                            model = model.replace("models/", "")
 
                     if not response:
                         structured_warning = " with your specified JSON schema" if structured_output else ""
