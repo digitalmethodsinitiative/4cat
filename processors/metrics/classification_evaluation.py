@@ -40,7 +40,7 @@ class ClassificationEvaluation(BasicProcessor):
                     "cohens_kappa": "Cohen's Kappa",
                 },
                 "default": ["accuracy", "precision", "recall", "f1"],
-                "tooltip": "What evaluation metrics to calculate.",
+                "tooltip": "Which evaluation metrics to calculate.",
                 "inline": True,
             },
             "column_true": {
@@ -63,9 +63,12 @@ class ClassificationEvaluation(BasicProcessor):
             },
             "precision_average_info": {
                 "type": UserInput.OPTION_INFO,
-                "help": "When having multi-label values, the precision can be calculated via different stategies. See "
+                "help": "When having multi-label values, the precision can be calculated via different strategies. "
+                        "<strong>Micro</strong> calculates the overall precision across all labels. </strong>Macro"
+                        "</strong> averages the precision across each label so it gives more weight to rare ones. "
+                        "<strong>Weigthed</strong> is like Macro, but gives more weight to bigger classes. See "
                         "the [scikit-learn documentation](https://scikit-learn.org/stable/modules/generated/sklearn."
-                        "metrics.precision_score.html#sklearn.metrics.precision_score) for explanations.",
+                        "metrics.precision_score.html#sklearn.metrics.precision_score) for further explanation.",
                 "requires": "multi_label==true",
             },
             "precision_average": {
@@ -74,10 +77,9 @@ class ClassificationEvaluation(BasicProcessor):
                 "options": {
                     "micro": "Micro",
                     "macro": "Macro",
-                    "weighted": "Weighted",
-                    "samples": "Samples",
+                    "weighted": "Weighted"
                 },
-                "default": "Macro",
+                "default": "macro",
                 "requires": "multi_label==true",
                 "tooltip": "See the scikit-learn references for more information.",
             },
@@ -143,6 +145,7 @@ class ClassificationEvaluation(BasicProcessor):
 
             label_true = item.get(column_true)
             label_pred = item.get(column_pred)
+            count += 1
 
             if skip_empty and (not label_pred or not label_true):
                 self.dataset.update_status(f"Skipping row {count} (no values in both columns)")
@@ -167,23 +170,23 @@ class ClassificationEvaluation(BasicProcessor):
 
             labels_true.append(label_true)
             labels_pred.append(label_pred)
-            count += 1
 
         results = []
-
         # Support for multiple labels per item
         binarizer = MultiLabelBinarizer() if multi_label else LabelBinarizer()
         true_bin = binarizer.fit_transform(labels_true)
         pred_bin = binarizer.transform(labels_pred)
         all_labels = ["overall"] + list(binarizer.classes_)
-        all_labels_str = andify(all_labels)
+        all_labels_str = andify(all_labels) if len(all_labels) < 25 else ", ".join(all_labels) + "..."
         self.dataset.update_status(f"Calculating metrics for {all_labels_str}")
+
         # Compute metrics
         for i, label in enumerate(all_labels):
             label_metrics = {"label": label}
 
             true_col = true_bin
             pred_col = pred_bin
+
             if label != "overall":
                 true_col = true_bin[:, i - 1]  # i-1 because first is 'overall'
                 pred_col = pred_bin[:, i - 1]
