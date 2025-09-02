@@ -112,8 +112,7 @@ class ConvertText(BasicProcessor):
 
         replace = self.parameters.get("replace", "").replace("\\", r"\\")
         if not replace:
-            self.dataset.finish_with_error("Please provide a replacement text")
-            return
+            replace = ""
 
         case_sensitive = self.parameters.get("case-sensitive", False)
         kwargs = {}

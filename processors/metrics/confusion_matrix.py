@@ -63,10 +63,6 @@ class ConfusionMatrix(BasicProcessor):
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
-        """
-        This takes a 4CAT results file as input, and outputs a plain text file
-        containing all post bodies as one continuous string, sanitized.
-        """
 
         skip_empty = self.parameters.get("skip_empty", False)
 
@@ -85,7 +81,7 @@ class ConfusionMatrix(BasicProcessor):
             self.dataset.finish_with_error(f"Specified columns not found in the dataset: {labels}")
             return
 
-        # Get vales
+        # Get values
         y_true = []
         y_pred = []
         count = 1
@@ -99,7 +95,8 @@ class ConfusionMatrix(BasicProcessor):
                 self.dataset.update_status(f"Skipping row {count} (no values in both columns)")
                 continue
             elif not skip_empty and (not val_pred or not val_true):
-                self.dataset.finish_with_error("Make sure that both columns have values in every row")
+                self.dataset.finish_with_error("Make sure that both columns have values in every row or select 'Skip "
+                                               "empty values'")
                 return
 
             y_true.append(val_true)
