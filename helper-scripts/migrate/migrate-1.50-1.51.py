@@ -29,6 +29,7 @@ db = Database(
 columns = {
     "notification_long": "TEXT DEFAULT ''",
     "canonical_id": "TEXT DEFAULT ''",
+    "version_match": "TEXT DEFAULT ''",
     "is_dismissed": "BOOLEAN DEFAULT FALSE",
 }
 

@@ -113,6 +113,7 @@ class UpdateChecker(BasicWorker):
                 "canonical_id": canonical_id,
                 "notification": notification["notification"],
                 "notification_long": notification["notification_long"],
+                "version_match": notification.get("version_match", ""),
                 "username": "!admin",
                 "allow_dismiss": True
             })

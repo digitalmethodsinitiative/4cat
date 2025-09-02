@@ -168,6 +168,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
 CREATE TABLE IF NOT EXISTS users_notifications (
     id                  SERIAL PRIMARY KEY,
     canonical_id        TEXT DEFAULT '',
+    version_match       TEXT DEFAULT '',
     username            TEXT,
     notification        TEXT,
     notification_long   TEXT DEFAULT '',
