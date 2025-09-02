@@ -93,7 +93,8 @@ class UpdateChecker(BasicWorker):
             phonehome_url = phonehome_url[:-1]
 
         current_version = get_software_version()[:16]
-        phonehome_url += f"/get-notifications/?version={current_version}"
+        docker = "yes" if self.config.get("USING_DOCKER") else "no"
+        phonehome_url += f"/get-notifications/?version={current_version}&docker={docker}"
 
         try:
             notifications = requests.get(phonehome_url).json()
