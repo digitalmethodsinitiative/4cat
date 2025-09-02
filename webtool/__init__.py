@@ -216,6 +216,7 @@ with app.app_context():
         g.log = log
         g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request)
         g.modules = current_app.fourcat_modules
+        g.request = request
 
         current_user.with_config(g.config)
 

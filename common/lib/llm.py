@@ -192,3 +192,4 @@ class LLMAdapter:
         ):
             available_models = json.loads(available_models.read())
         return available_models
+
