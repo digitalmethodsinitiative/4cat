@@ -140,7 +140,7 @@ def get_worker_status():
     workers = [
         {
             **worker,
-            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=g.db)
+            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=g.db, modules=g.modules)
         } for worker in api_response["response"]["running"]
     ]
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=g.modules.workers,
@@ -403,7 +403,7 @@ def delete_user():
                                title="User cannot be deleted"), 403
 
     # first delete favourites and notifications and api tokens
-    user.delete()
+    user.delete(modules=g.modules)
 
     flash(f"User {username} and their datasets have been deleted.")
     return redirect(url_for("admin.frontpage"))
@@ -964,7 +964,7 @@ def user_bulk():
                         # delete the already created user because we have ba    d
                         # data, and continue with the next one
                         failed_rows.append(user.get("name"))
-                        user_obj.delete()
+                        user_obj.delete(modules=g.modules)
                         continue
 
                 if user.get("password"):

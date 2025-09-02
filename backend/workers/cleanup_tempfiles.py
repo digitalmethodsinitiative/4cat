@@ -75,7 +75,7 @@ class TempFileCleaner(BasicWorker):
             key = possible_keys.pop()
 
             try:
-                dataset = DataSet(key=key, db=self.db)
+                dataset = DataSet(key=key, db=self.db, modules=self.modules)
             except DataSetException:
                 # the dataset has been deleted since, but the result file still
                 # exists - should be safe to clean up

@@ -521,7 +521,7 @@ class User:
         self.data["tags"] = sorted_tags
         self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
 
-    def delete(self, also_datasets=True):
+    def delete(self, also_datasets=True, modules=None):
         from common.lib.dataset import DataSet
 
         username = self.data["name"]
@@ -535,9 +535,11 @@ class User:
 
         # delete any datasets and jobs related to deleted datasets
         if datasets:
+            if modules is None:
+                raise ValueError("To delete a user and their datasets, the 'modules' parameter must be provided.")
             for dataset in datasets:
                 try:
-                    dataset = DataSet(key=dataset["key"], db=self.db)
+                    dataset = DataSet(key=dataset["key"], db=self.db, modules=modules)
                 except DataSetException:
                     # dataset already deleted?
                     continue
