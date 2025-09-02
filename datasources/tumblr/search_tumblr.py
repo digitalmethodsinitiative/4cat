@@ -1241,14 +1241,14 @@ class SearchTumblr(Search):
 		Used to notify of potential API errors.
 
 		"""
-		super().after_process()
 		self.client = None
 		errors = []
 		if len(self.failed_notes) > 0:
 			errors.append("API error(s) when fetching notes %s" % ", ".join(self.failed_notes))
 		if len(self.failed_posts) > 0:
-			errors.append("API error(s) when fetching reblogs %s" % ", ".join(self.failed_posts))
+			errors.append("API error(s) when fetching reblogs %s" % ", ".join([str(pid) for pid in self.failed_posts]))
 		if errors:
 			self.dataset.log(";\n ".join(errors))
 			self.dataset.update_status(
-				"Dataset completed but failed to capture some notes/reblogs; see log for details")
+				"Dataset completed but failed to capture some notes/reblogs; see log for details", is_final=True)
+		super().after_process()
