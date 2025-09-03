@@ -376,7 +376,6 @@ class LLMPrompter(BasicProcessor):
         # Setup annotation saving
         annotations = []
         save_annotations = self.parameters.get("save_annotations", False)
-        label = model + " output"
 
         i = 0
         outputs = 0
