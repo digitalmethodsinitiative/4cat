@@ -86,8 +86,13 @@ class ClassificationEvaluation(BasicProcessor):
             "skip_empty": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Skip empty values",
-                "default": False,
+                "default": True,
                 "tooltip": "Selecting this will skip rows where one or both columns do not contain a value",
+            },
+            "to_lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Convert labels to lowercase",
+                "default": True
             },
         }
 
@@ -114,6 +119,7 @@ class ClassificationEvaluation(BasicProcessor):
     def process(self):
 
         skip_empty = self.parameters.get("skip_empty", False)
+        to_lowercase = self.parameters.get("to_lowercase", True)
         multi_label = self.parameters.get("multi_label", False)
         metrics = self.parameters.get("metrics", [])
         if not metrics:
@@ -143,8 +149,9 @@ class ClassificationEvaluation(BasicProcessor):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while getting values for confusion matrix")
 
-            label_true = item.get(column_true).strip()
-            label_pred = item.get(column_pred).strip()
+            label_true = item.get(column_true)
+            label_pred = item.get(column_pred)
+
             count += 1
 
             if skip_empty and (not label_pred or not label_true):
@@ -164,13 +171,20 @@ class ClassificationEvaluation(BasicProcessor):
                                                f"text (types: {type(label_true)}, {type(label_pred)}), skipping")
                     continue
 
+            if to_lowercase:
+                label_true = label_true.lower()
+                label_pred = label_pred.lower()
+            label_true = label_true.strip()
+            label_pred = label_pred.strip()
+
             # Add labels independently in the case of multi-label values
-            if multi_label:
-                labels_true.append([label.strip() for label in label_true.split(",") if label])
-                labels_pred.append([label.strip() for label in label_pred.split(",") if label])
-            else:
-                labels_true.append([label_true])
-                labels_pred.append([label_pred])
+            if label_true and label_pred:
+                if multi_label:
+                    labels_true.append([label.strip() for label in label_true.split(",") if label])
+                    labels_pred.append([label.strip() for label in label_pred.split(",") if label])
+                else:
+                    labels_true.append([label_true])
+                    labels_pred.append([label_pred])
 
         results = []
         # Support for multiple labels per item
