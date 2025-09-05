@@ -194,6 +194,6 @@ class HatebaseAnalyser(BasicProcessor):
             columns = parent_dataset.get_columns()
             options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
             options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = ["body"] if "body" in columns else [sorted(columns).pop()]
+            options["columns"]["default"] = ["body"] if "body" in columns else (columns[0] if columns else [])
 
         return options
