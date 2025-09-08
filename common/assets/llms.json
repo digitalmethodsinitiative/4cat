@@ -83,11 +83,6 @@
         "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash",
         "provider": "google"
     },
-    "gemma-3": {
-        "name": "[Google] Gemma 3",
-        "model_card": "https://console.cloud.google.com/vertex-ai/publishers/google/model-garden/gemma3",
-        "provider": "google"
-    },
     "claude-opus-4-0": {
         "name": "[Anthropic] Claude Opus 4 (latest)",
         "model_card": "https://www.anthropic.com/claude/opus",

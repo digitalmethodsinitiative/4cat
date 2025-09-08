@@ -167,10 +167,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
 -- notifications
 CREATE TABLE IF NOT EXISTS users_notifications (
     id                  SERIAL PRIMARY KEY,
+    canonical_id        TEXT DEFAULT '',
+    version_match       TEXT DEFAULT '',
     username            TEXT,
     notification        TEXT,
+    notification_long   TEXT DEFAULT '',
     timestamp_expires   INTEGER,
-    allow_dismiss       BOOLEAN DEFAULT TRUE
+    allow_dismiss       BOOLEAN DEFAULT TRUE,
+    is_dismissed        BOOLEAN DEFAULT FALSE
 );
 
 CREATE INDEX IF NOT EXISTS users_notifications_name
@@ -180,7 +184,7 @@ CREATE INDEX IF NOT EXISTS users_notifications_name
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique
   ON users_notifications (
-    username, notification
+    canonical_id, username, notification
   );
 
 -- used to quickly update table counts

@@ -62,26 +62,27 @@ def make_version_comparable(version):
 	return version[0].zfill(3) + "." + version[1].zfill(3)
 
 
-def check_for_nltk():
+def check_for_nltk(logger):
 	# ---------------------------------------------
 	#        Check for and install packages
 	# ---------------------------------------------
 	# NLTK
+	logger.info("\nChecking for NLTK data...")
 	import nltk
 	try:
 		nltk.data.find('tokenizers/punkt_tab')
 	except LookupError:
-		print("Downloading NLTK punkt data...")	
+		logger.info("Downloading NLTK punkt data...")
 		nltk.download('punkt_tab', quiet=True)
 	try:
 		nltk.data.find('corpora/wordnet')
 	except LookupError:
-		print("Downloading NLTK wordnet data...")	
+		logger.info("Downloading NLTK wordnet data...")
 		nltk.download("wordnet", quiet=True)
 	
 	nltk.download("omw-1.4", quiet=True)
 
-def install_extensions(no_pip=True):
+def install_extensions(logger, no_pip=True):
 	"""
 	Check for extensions and run any installation scripts found.
 
@@ -93,7 +94,7 @@ def install_extensions(no_pip=True):
 	if os.path.isdir("extensions") and not os.path.islink("extensions"):
 		# User already has existing extensions folder (and not a symbolic link)
 		# but it is in the wrong place (4CAT root rather than /config)
-		print("Migrating extensions folder...")
+		logger.info("Migrating extensions folder...")
 		if not os.path.isdir("config/extensions"):
 			# No config/extensions folder, so we move the existing extensions folder
 			shutil.move("extensions", "config/extensions")
@@ -138,14 +139,14 @@ def install_extensions(no_pip=True):
 					if no_pip:
 						command.append("--no-pip")
 
-					print(f"Installing extension: {os.path.join(root, file)}")
+					logger.info(f"\nRunning extension setup: {os.path.join(root, file)}")
 					result = subprocess.run(command, stdout=subprocess.PIPE,
 											stderr=subprocess.PIPE)
 					if result.returncode != 0:
-						print("Error while running extension installation script: " + os.path.join(root, file))
+						logger.error("Error while running extension installation script: " + os.path.join(root, file))
 
-					print(result.stdout.decode("utf-8")) if result.stdout else None
-					print(result.stderr.decode("utf-8")) if result.stderr else None
+					logger.info(result.stdout.decode("utf-8")) if result.stdout else None
+					logger.info(result.stderr.decode("utf-8")) if result.stderr else None
 
 
 def finish(args, logger, no_pip=True):
@@ -156,8 +157,8 @@ def finish(args, logger, no_pip=True):
 	this is made a function that can be called from any point in the script to
 	wrap up and exit.
 	"""
-	check_for_nltk()
-	install_extensions(no_pip=no_pip)
+	check_for_nltk(logger=logger)
+	install_extensions(no_pip=no_pip, logger=logger)
 	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
@@ -186,6 +187,7 @@ cli.add_argument("--current-version", "-v", default="config/.current-version", h
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
 cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate ('both', 'backend', 'frontend'). Skips check for if 4CAT is running when set to 'frontend'. Also used by extensions w/ fourcat_install.py")
 cli.add_argument("--branch", "-b", default=False, help="Which branch to check out from GitHub. By default, check out the latest release.")
+cli.add_argument("--stream_log", "-s", default=True, help="Stream logs from the 4CAT daemon. (Always streams if no output file is set)")
 args = cli.parse_args()
 
 print("")
@@ -205,9 +207,11 @@ if args.output:
 	# i.e. script will not output to stdout!
 	os.makedirs(os.path.dirname(args.output), exist_ok=True)
 	handler = logging.FileHandler(args.output)
-else:
+	logger.addHandler(handler)
+
+if args.stream_log or not args.output:
 	handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
+	logger.addHandler(handler)
 
 logger.info("           4CAT migration agent           ")
 logger.info("------------------------------------------")

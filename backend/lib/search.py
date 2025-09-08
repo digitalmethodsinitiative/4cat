@@ -91,10 +91,11 @@ class Search(BasicProcessor, ABC):
 		elif items is not None:
 			self.dataset.update_status("Query finished, no results found.")
 
-		if self.import_warning_count == 0 and self.import_error_count == 0:
-			self.dataset.finish(num_rows=num_items)
-		else:
+		if self.import_warning_count != 0 or self.import_error_count != 0:
+			# This may not update if `update_status(is_final=True)` has already been called (e.g., via `finish_with_error`)
 			self.dataset.update_status(f"All data imported. {str(self.import_error_count) + ' item(s) had an unexpected format and cannot be used in 4CAT processors. ' if self.import_error_count != 0 else ''}{str(self.import_warning_count) + ' item(s) missing some data fields. ' if self.import_warning_count != 0 else ''}\n\nMissing data is noted in the `missing_fields` column of this dataset's CSV file; see also the dataset log for details.", is_final=True)
+				
+		if not self.dataset.is_finished():
 			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):

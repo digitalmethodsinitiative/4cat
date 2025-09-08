@@ -38,6 +38,18 @@
                     No upgrades are currently available.
                 {% endif %}</p>
 
+            {% if version_notes %}
+                <p>The following notifications may be relevant:</p>
+                <ul class="patch-notes">
+                {% for notification in version_notes %}
+                    <li>
+                        {{ notification.notification }}
+                        {% if notification.notification_long %}(<a href="{{ url_for("user.view_notification", notification_id=notification.id) }}">read more</a>){% endif %}
+                    </li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+
             <form action="{{ url_for("restart.trigger_restart") }}" method="POST">
             <ul class="button-container">
                 <li><button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>

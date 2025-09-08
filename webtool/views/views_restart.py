@@ -18,6 +18,7 @@ import os
 
 from pathlib import Path
 from flask import Blueprint, current_app, render_template, request, flash, get_flashed_messages, jsonify, g
+from packaging.specifiers import SpecifierSet
 
 from flask_login import login_required
 from webtool.lib.helpers import setting_required, check_restart_request
@@ -48,6 +49,7 @@ def trigger_restart():
     else:
         current_version = "unknown"
 
+    current_version_compare = packaging.version.parse(current_version)
     code_version = Path(g.config.get("PATH_ROOT"), "VERSION").open().readline().strip()
     try:
         github_version = get_github_version(g.config.get("4cat.github_url"), timeout=5)
@@ -59,8 +61,7 @@ def trigger_restart():
 
     # upgrade is available if we have all info and the release is newer than
     # the currently checked out code
-    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
-        current_version) >= packaging.version.parse(github_version))
+    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or current_version_compare >= packaging.version.parse(github_version))
 
     lock_file = g.config.get("PATH_CONFIG").joinpath("restart.lock")
     if request.method == "POST" and lock_file.exists():
@@ -98,10 +99,19 @@ def trigger_restart():
         g.queue.add_job("restart-4cat", details, mode)
         flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
 
+    version_notes = []
+    for notification in g.db.fetchall("SELECT * FROM users_notifications WHERE canonical_id != '' AND version_match != ''"):
+        version_match = SpecifierSet(notification["version_match"])
+        if current_version_compare in version_match:
+            version_notes.append(notification)
+        else:
+            print(notification)
+        
+
     current_branch = get_git_branch()
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
-                           release_notes=release_notes, current_branch=current_branch)
+                           release_notes=release_notes, current_branch=current_branch, version_notes=version_notes)
 
 
 @component.route("/admin/trigger-frontend-upgrade/", methods=["POST"])

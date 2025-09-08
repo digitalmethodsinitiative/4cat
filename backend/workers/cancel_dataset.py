@@ -25,7 +25,7 @@ class DatasetCanceller(BasicWorker):
 
 		# delete dataset
 		try:
-			dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
+			dataset = DataSet(key=self.job.data["remote_id"], db=self.db, modules=self.modules)
 			jobtype = dataset.data["type"]
 		except DataSetException:
 			# dataset already deleted, apparently

@@ -214,9 +214,10 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "https://ping.4cat.nl",
         "help": "Phone home URL",
-        "tooltip": "This URL is called once - when 4CAT is installed. If the installing user consents, information "
-                   "is sent to this URL to help the 4CAT developers (the Digital Methods Initiative) keep track of how "
-                   "much it is used. There should be no need to change this URL after installation.",
+        "tooltip": "This URL is called when 4CAT is installed, if the user consents, to help the 4CAT developers (the "
+                   "Digital Methods Initiative) keep track of how much it is used. Later, notifications for 4CAT "
+                   "admins are fetched from this URL to inform them about important changes and update procedures. If "
+                   "you want to disable this functionality, leave this field empty.",
         "global": True
     },
     "4cat.phone_home_asked": {

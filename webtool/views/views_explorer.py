@@ -186,7 +186,7 @@ def explorer_save_annotation_fields(dataset_key: str):
 	if not dataset_key:
 		return error(404, error="No dataset key provided")
 	try:
-		dataset = DataSet(key=dataset_key, db=g.db)
+		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
@@ -228,7 +228,7 @@ def explorer_save_annotations(dataset_key: str):
 	# Save it!
 	annotations = request.get_json()
 	try:
-		dataset = DataSet(key=dataset_key, db=g.db)
+		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 

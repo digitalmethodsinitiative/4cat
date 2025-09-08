@@ -195,11 +195,19 @@ class Logger:
         self.logger.setLevel(log_level)
 
         # this handler manages the text log files
+        formatter = logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
+                                                   "%d-%m-%Y %H:%M:%S")
         if not self.logger.handlers:
             handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024), backupCount=1)
             handler.setLevel(log_level)
-            handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s at %(location)s: %(message)s",
-                                                   "%d-%m-%Y %H:%M:%S"))
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+
+        # to stdout
+        if output:
+            handler = logging.StreamHandler()
+            handler.setLevel(log_level)
+            handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
     def load_webhook(self, config):

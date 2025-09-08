@@ -470,6 +470,9 @@ def andify(items):
     :param items:  Iterable list
     :return str:  Formatted string
     """
+
+    items = items.copy()
+
     if len(items) == 0:
         return ""
     elif len(items) == 1:
