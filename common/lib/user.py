@@ -49,7 +49,7 @@ class User:
         use a global configuration manager.
         :return:  User object, or `None` if login was invalid
         """
-        user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
+        user = db.fetchone("SELECT * FROM users WHERE LOWER(name) = LOWER(%s)", (name,))
         if not user or not user.get("password", None):
             # registration not finished yet
             return None

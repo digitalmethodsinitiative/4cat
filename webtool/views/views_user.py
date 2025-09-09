@@ -343,7 +343,7 @@ def show_login():
     if request.method == 'GET':
         return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email), 401
 
-    username = request.form['username']
+    username = request.form['username'].strip()
     password = request.form['password']
     registered_user = User.get_by_login(g.db, username, password)
 
