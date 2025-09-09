@@ -6,7 +6,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, andify
 from backend.lib.processor import BasicProcessor
 
-from sklearn.preprocessing import MultiLabelBinarizer, LabelBinarizer
+from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, cohen_kappa_score
 
 __author__ = "Sal Hagen"
@@ -86,8 +86,13 @@ class ClassificationEvaluation(BasicProcessor):
             "skip_empty": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Skip empty values",
-                "default": False,
+                "default": True,
                 "tooltip": "Selecting this will skip rows where one or both columns do not contain a value",
+            },
+            "to_lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Convert labels to lowercase",
+                "default": True
             },
         }
 
@@ -114,6 +119,7 @@ class ClassificationEvaluation(BasicProcessor):
     def process(self):
 
         skip_empty = self.parameters.get("skip_empty", False)
+        to_lowercase = self.parameters.get("to_lowercase", True)
         multi_label = self.parameters.get("multi_label", False)
         metrics = self.parameters.get("metrics", [])
         if not metrics:
@@ -145,6 +151,7 @@ class ClassificationEvaluation(BasicProcessor):
 
             label_true = item.get(column_true)
             label_pred = item.get(column_pred)
+
             count += 1
 
             if skip_empty and (not label_pred or not label_true):
@@ -155,7 +162,7 @@ class ClassificationEvaluation(BasicProcessor):
                                                "empty values'")
                 return
 
-            if type(label_true) not in (str, float, int) or type(label_pred) not in (str, float, int):
+            if type(label_true) not in (str, float, int, bool) or type(label_pred) not in (str, float, int, bool):
                 try:
                     label_true = str(label_true)
                     label_pred = str(label_pred)
@@ -164,16 +171,24 @@ class ClassificationEvaluation(BasicProcessor):
                                                f"text (types: {type(label_true)}, {type(label_pred)}), skipping")
                     continue
 
-            if multi_label:
-                label_true = [label.strip() for label in label_true.split(",")]
-                label_pred = [label.strip() for label in label_pred.split(",")]
+            if to_lowercase:
+                label_true = label_true.lower()
+                label_pred = label_pred.lower()
+            label_true = label_true.strip()
+            label_pred = label_pred.strip()
 
-            labels_true.append(label_true)
-            labels_pred.append(label_pred)
+            # Add labels independently in the case of multi-label values
+            if label_true and label_pred:
+                if multi_label:
+                    labels_true.append([label.strip() for label in label_true.split(",") if label])
+                    labels_pred.append([label.strip() for label in label_pred.split(",") if label])
+                else:
+                    labels_true.append([label_true])
+                    labels_pred.append([label_pred])
 
         results = []
         # Support for multiple labels per item
-        binarizer = MultiLabelBinarizer() if multi_label else LabelBinarizer()
+        binarizer = MultiLabelBinarizer()
         true_bin = binarizer.fit_transform(labels_true)
         pred_bin = binarizer.transform(labels_pred)
         all_labels = ["overall"] + list(binarizer.classes_)
@@ -182,7 +197,7 @@ class ClassificationEvaluation(BasicProcessor):
 
         # Compute metrics
         for i, label in enumerate(all_labels):
-            label_metrics = {"label": label}
+            label_metrics = {"label": str(label)}
 
             true_col = true_bin
             pred_col = pred_bin
@@ -191,15 +206,18 @@ class ClassificationEvaluation(BasicProcessor):
                 true_col = true_bin[:, i - 1]  # i-1 because first is 'overall'
                 pred_col = pred_bin[:, i - 1]
 
+            average = precision_average if label == "overall" else 'binary'
+            label = None if label == "overall" else 1  # None returns all values, and else we use 1 because we binarized
+
             if get_accuracy:
                 label_metrics["accuracy"] = round(accuracy_score(true_col, pred_col), 5)
             if get_precision:
-                label_metrics["precision"] = round(precision_score(true_col, pred_col, average=precision_average,
-                                                                   zero_division=0), 5)
+                label_metrics["precision"] = round(precision_score(true_col, pred_col, average=average,
+                                                                   zero_division=0, pos_label=label), 5)
             if get_recall:
-                label_metrics["recall"] = round(recall_score(true_col, pred_col, average=precision_average), 5)
+                label_metrics["recall"] = round(recall_score(true_col, pred_col, average=average, pos_label=label), 5)
             if get_f1:
-                label_metrics["f1"] = round(f1_score(true_col, pred_col, average=precision_average), 5)
+                label_metrics["f1"] = round(f1_score(true_col, pred_col, average=average, pos_label=label), 5)
             if get_cohens_kappa:
                 if get_cohens_kappa:
                     if label == "overall":
@@ -213,7 +231,7 @@ class ClassificationEvaluation(BasicProcessor):
                         # Per-label Cohen's Kappa
                         label_metrics["cohens_kappa"] = round(cohen_kappa_score(true_col.ravel(), pred_col.ravel()), 5)
 
-            label_metrics["support"] = true_col.shape[0] if label == "overall" else true_bin.sum()
+            label_metrics["support"] = true_col.shape[0] if label == "overall" else true_col.sum()
             results.append(label_metrics)
 
         # Finish up

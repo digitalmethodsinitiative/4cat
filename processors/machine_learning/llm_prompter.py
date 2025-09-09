@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput, nthify, andify, remove_nuls
+from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
 from common.lib.llm import LLMAdapter
 from backend.lib.processor import BasicProcessor
 
@@ -376,7 +376,6 @@ class LLMPrompter(BasicProcessor):
         # Setup annotation saving
         annotations = []
         save_annotations = self.parameters.get("save_annotations", False)
-        label = model + " output"
 
         i = 0
         outputs = 0
@@ -530,6 +529,7 @@ class LLMPrompter(BasicProcessor):
                             system_prompt=system_prompt,
                             temperature=temperature
                         )
+
                     # Broad exception, but necessary with all the different LLM providers and options...
                     except Exception as e:
                         self.dataset.finish_with_error(f"`{e}`")
@@ -608,13 +608,21 @@ class LLMPrompter(BasicProcessor):
                         outputs += 1
 
                         if save_annotations:
-                            annotation = {
-                                "label": label,
-                                "item_id": batched_ids[n],
-                                "value": remove_nuls(json.dumps(output_item)) if isinstance(output_item, dict) else output_item,
-                                "type": "text",
-                            }
-                            annotations.append(annotation)
+                            # Save annotations for every value produced by the LLM, in case of structured output.
+                            # Else this will just save one string.
+                            if isinstance(output_item, dict):
+                                annotation_output = flatten_dict({model: output_item})
+                            else:
+                                annotation_output = {model + "_output": output_item}
+
+                            for output_key, output_value in annotation_output.items():
+                                annotation = {
+                                    "label": output_key,
+                                    "item_id": batched_ids[n],
+                                    "value": remove_nuls(output_value),
+                                    "type": "text",
+                                }
+                                annotations.append(annotation)
 
                     # Remove batched data and store what row we've left off
                     batched_ids = []
@@ -718,9 +726,13 @@ class LLMPrompter(BasicProcessor):
     @staticmethod
     def map_item(item):
 
+        # Output could be a JSON via structured output
+        # Every nested key in this JSON will become its own flattened key if this is the case.
+        output = flatten_dict({"output": item["output"]}) if isinstance(item["output"], dict) else {"output": item["output"]}
+
         return MappedItem({
             "id": item["id"],
-            "output": item["output"],
+            **output,
             "input_value": ",".join(item["input_value"]),
             "prompt": item["prompt"],
             "temperature": item["temperature"],

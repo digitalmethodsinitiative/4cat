@@ -44,10 +44,10 @@ class MonthlyHistogramCreator(ProcessorPreset):
 		query = self.parameters.copy()
 		header = self.source_dataset.get_label() + f": Items per {query['timeframe']}"
 		if len(header) > 40:
-			header = "Items per month"
+			header = f"Items per {query['timeframe']}"
 
 		pipeline = [
-			# first, count activity per month
+			# first, count activity per timeframe
 			{
 				"type": "count-posts",
 				"parameters": {

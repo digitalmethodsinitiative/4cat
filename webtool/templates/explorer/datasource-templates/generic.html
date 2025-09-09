@@ -42,15 +42,17 @@ set all_known_fields = {
 <!-- Post header -->
 <header>
 	<span title="ID" class="id">{{ fields.get("id") }}</span>
-	<span title="Thread ID" class="thread_id">{{ fields.get("thread_id") }}</span>
+	{% if fields.get("thread_id") and fields["thread_id"] != fields.get("id") %}
+        <span title="Thread ID" class="thread_id">{{ fields["thread_id"] }}</span>
+    {% endif %}
 	
 	<!-- Author name -->
 	{% if pseudonymised %}
 		<span title="Pseudonymous author" class="author">
 		<i class="fa fa-user-secret tooltip-trigger"></i>
-	{% else %}
+	{% elif fields.get("author") %}
 		<span title="Author" class="author">
-		{{ fields.get("author") }}
+		{{ fields["author"] }}
 	{% endif %}
 	</span>
 
@@ -90,7 +92,7 @@ set all_known_fields = {
 
 	<!-- Post body -->
 	<div class="post-content">
-		{{ fields.body | safe }}
+		{{ fields.body }}
 	</div>
 
 	<!-- Tags -->
