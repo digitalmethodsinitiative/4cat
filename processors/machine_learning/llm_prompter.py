@@ -193,13 +193,20 @@ class LLMPrompter(BasicProcessor):
                 "probable next token. A score close to 0 returns more predictable "
                 "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
             },
+            "truncate_input": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Max chars in input value",
+                "default": 0,
+                "coerce_type": int,
+                "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
+            },
             "max_tokens": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Max output tokens",
                 "default": 1000,
                 "coerce_type": int,
                 "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
-                "text for common English text.",
+                "text for common English text. This includes tokens spent for reasoning.",
             },
             "batches": {
                 "type": UserInput.OPTION_TEXT,
@@ -265,6 +272,7 @@ class LLMPrompter(BasicProcessor):
         
         temperature = float(self.parameters.get("temperature", 0.1))
         temperature = min(max(temperature, 0), 2)
+        max_input_len = int(self.parameters.get("truncate_input", 0))
         max_tokens = int(self.parameters.get("max_tokens"))
         system_prompt = self.parameters.get("system_prompt", "")
 
@@ -339,7 +347,7 @@ class LLMPrompter(BasicProcessor):
                 "or '[timestamp, author]')"
             )
             return
-        columns_to_use = [c[1:-1] for c in columns_to_use]  # Remove brackets
+        columns_to_use = [c[1:-1].strip() for c in columns_to_use]  # Remove brackets
 
         # Structured output
         structured_output = self.parameters.get("structured_output", False)
@@ -457,9 +465,11 @@ class LLMPrompter(BasicProcessor):
                                 if col_value:
                                     item_value.append(col_value)
                             item_value = ", ".join(item_value)
+
                         # Else just get the single item
                         else:
                             item_value = str(item[column_to_use]).strip()
+
                     except KeyError:
                         self.dataset.finish_with_error(f"Column(s) '{column_to_use}' not in the parent dataset")
                         return
@@ -485,6 +495,8 @@ class LLMPrompter(BasicProcessor):
                 # Else add the values to the batch
                 else:
                     for item_column, item_value in item_values.items():
+                        if max_input_len > 0:
+                            item_value = item_value[:max_input_len]
                         batched_data[item_column].append(item_value)
                     n_batched += 1
                     batched_ids.append(item_id)  # Also store IDs, so we can match them to the output
@@ -622,6 +634,7 @@ class LLMPrompter(BasicProcessor):
                                     "value": remove_nuls(output_value),
                                     "type": "text",
                                 }
+
                                 annotations.append(annotation)
 
                     # Remove batched data and store what row we've left off
