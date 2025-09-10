@@ -70,5 +70,8 @@ db.insert("users_notifications", {
     "allow_dismiss": True
 }, safe=True)
 
-print("  - done!")
+# Add new admin privilege to manage extensions
+print("  Ensuring new admin privilege to manage extensions exists...")
+db.insert("settings", data={"name": "privileges.admin.can_manage_extensions", "value": "true", "tag": "admin"}, safe=True)
 
+print("  - done!")

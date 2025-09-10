@@ -26,13 +26,13 @@ __credits__ = ["Stijn Peeters, Sal Hagen"]
 __maintainer__ = "Stijn Peeters, Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-class ImageDownloader(BasicProcessor):
+class FourchanSearchImageDownloader(BasicProcessor):
 	"""
 	Image downloader
 
 	Downloads top images and saves as zip archive
 	"""
-	type = "image-downloader"  # job type ID
+	type = "image-downloader-4chan"  # job type ID
 	category = "Visual"  # category
 	title = "Download images"  # title displayed in UI
 	description = "Download images and store in a a zip file. May take a while to complete as images are retrieved " \
@@ -124,7 +124,7 @@ class ImageDownloader(BasicProcessor):
 		return options
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on top image rankings
 
