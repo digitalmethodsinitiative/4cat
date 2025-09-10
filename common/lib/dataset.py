@@ -312,7 +312,6 @@ class DataSet(FourcatModule):
         """
         path = self.get_results_path()
 
-
         # Yield through items one by one
         if path.suffix.lower() == ".csv":
             with path.open("rb") as infile:
@@ -353,7 +352,8 @@ class DataSet(FourcatModule):
             raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
     def iterate_items(
-        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None
+        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None,
+            offset=0
     ):
         """
         Generate mapped dataset items
@@ -399,6 +399,7 @@ class DataSet(FourcatModule):
           field with a strategy for that field ('default', 'abort', or a callback)
         :param get_annotations: Whether to also fetch annotations from the database.
           This can be disabled to help speed up iteration.
+        :param offset: After how many rows we should yield items.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0
@@ -409,16 +410,12 @@ class DataSet(FourcatModule):
             item_mapper = True
 
         # Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
+        # If we're getting annotations, we're caching items so we don't need to retrieve annotations one-by-one.
+        get_annotations = True if self.annotation_fields and get_annotations else False
         if get_annotations:
             annotation_fields = self.annotation_fields
-            num_annotations = 0 if not annotation_fields else self.num_annotations()
-            all_annotations = None
-            # If this dataset has less than n annotations, just retrieve them all before iterating
-            if 0 < num_annotations <= 500:
-                # Convert to dict for faster lookup when iterating over items
-                all_annotations = collections.defaultdict(list)
-                for annotation in self.get_annotations():
-                    all_annotations[annotation.item_id].append(annotation)
+            item_batch_size = 500
+            dataset_item_cache = []
 
         # missing field strategy can be for all fields at once, or per field
         # if it is per field, it is a dictionary with field names and their strategy
@@ -430,6 +427,10 @@ class DataSet(FourcatModule):
 
         # Loop through items
         for i, item in enumerate(self._iterate_items(processor)):
+
+            if i < offset:
+                continue
+
             # Save original to yield
             original_item = item.copy()
 
@@ -477,51 +478,8 @@ class DataSet(FourcatModule):
             else:
                 mapped_item = original_item
 
-            # Add possible annotation values
-            if get_annotations and annotation_fields:
-                # We're always handling annotated data as a MappedItem object,
-                # even if no map_item() function is available for the data source.
-                if not isinstance(mapped_item, MappedItem):
-                    mapped_item = MappedItem(mapped_item)
-
-                # Retrieve from all annotations
-                if all_annotations:
-                    item_annotations = all_annotations.get(mapped_item.data["id"])
-                # Or get annotations per item for large datasets (more queries but less memory usage)
-                else:
-                    item_annotations = self.get_annotations_for_item(
-                        mapped_item.data["id"]
-                    )
-
-                # Loop through annotation fields
-                for (
-                    annotation_field_id,
-                    annotation_field_items,
-                ) in annotation_fields.items():
-                    # Set default value to an empty string
-                    value = ""
-                    # Set value if this item has annotations
-                    if item_annotations:
-                        # Items can have multiple annotations
-                        for annotation in item_annotations:
-                            if annotation.field_id == annotation_field_id:
-                                value = annotation.value
-                            if isinstance(value, list):
-                                value = ",".join(value)
-
-                    # Make sure labels are unique when iterating through items
-                    column_name = annotation_field_items["label"]
-                    label_count = 1
-                    while column_name in mapped_item.data:
-                        label_count += 1
-                        column_name = f"{annotation_field_items['label']}_{label_count}"
-
-                    # We're always adding an annotation value
-                    # as an empty string, even if it's absent.
-                    mapped_item.data[column_name] = value
-
             # yield a DatasetItem, which is a dict with some special properties
-            yield DatasetItem(
+            dataset_item = DatasetItem(
                 mapper=item_mapper,
                 original=original_item,
                 mapped_object=mapped_item,
@@ -531,6 +489,67 @@ class DataSet(FourcatModule):
                     else mapped_item
                 ),
             )
+
+            # If we're getting annotations, yield in items batches so we don't need to get annotations per item.
+            if get_annotations:
+                dataset_item_cache.append(dataset_item)
+
+                # When we reach the batch limit, get the annotations for cached items
+                if len(dataset_item_cache) >= item_batch_size:
+                    item_ids = [dataset_item.get("id") for dataset_item in dataset_item_cache]
+
+                    # Dict with item ids for fast lookup
+                    annotations_dict = collections.defaultdict(dict)
+                    annotations = self.get_annotations_for_item(item_ids)
+                    for item_annotation in annotations:
+                        item_id = item_annotation.item_id
+                        if item_annotation:
+                            annotations_dict[item_id][item_annotation.field_id] = item_annotation.value
+
+                    # Create a label base name in case there's repeated labels
+                    labels = {}
+                    for annotation_field_id, annotation_field_items in annotation_fields.items():
+                        base_label = annotation_field_items["label"]
+                        labels[annotation_field_id] = base_label
+
+                    # Process each dataset item
+                    for dataset_item in dataset_item_cache:
+                        item_id = dataset_item.get("id")
+                        item_annotations = annotations_dict.get(item_id, {})
+
+                        # Track used column names
+                        used_columns = set(dataset_item.keys())
+
+                        for annotation_field_id, annotation_field_items in annotation_fields.items():
+                            # Get annotation value
+                            value = item_annotations.get(annotation_field_id, "")
+
+                            # Convert list to string if needed
+                            if isinstance(value, list):
+                                value = ",".join(value)
+                            elif value != "":
+                                value = str(value)  # Ensure string type
+                            else:
+                                value = ""
+
+                            # Generate unique column name
+                            base_label = labels[annotation_field_id]
+                            column_name = base_label
+                            counter = 1
+                            while column_name in used_columns:
+                                counter += 1
+                                column_name = f"{base_label}_{counter}"
+
+                            used_columns.add(column_name)
+                            dataset_item[column_name] = value
+
+                        yield dataset_item
+
+                    dataset_item_cache = []
+
+            else:
+                yield dataset_item
+
 
     def sort_and_iterate_items(
         self, sort="", reverse=False, chunk_size=50000, **kwargs
@@ -543,6 +562,7 @@ class DataSet(FourcatModule):
 
         :param sort:				The item key that determines the sort order.
         :param reverse:				Whether to sort by largest values first.
+        :param chunk_size:          How many items to write
 
         :returns dict:				Yields iterated post
         """
@@ -589,7 +609,7 @@ class DataSet(FourcatModule):
                     self.iterate_items(**kwargs),
                     sort,
                     reverse,
-                    convert_sort_to_float=False,
+                    convert_sort_to_float=False
                 )
 
         else:
@@ -2140,7 +2160,7 @@ class DataSet(FourcatModule):
 
         return Annotation.get_annotations_for_dataset(self.db, self.key)
 
-    def get_annotations_for_item(self, item_id: str) -> list:
+    def get_annotations_for_item(self, item_id: str | list) -> list:
         """
         Retrieves all annotations from this dataset for a specific item (e.g. social media post).
         """
