@@ -6,7 +6,7 @@ import random
 
 from backend.lib.worker import BasicWorker
 
-class ImageDownloader(BasicWorker):
+class FourchanImageDownloader(BasicWorker):
 	"""
 	Image downloader
 
