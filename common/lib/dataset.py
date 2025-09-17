@@ -403,6 +403,7 @@ class DataSet(FourcatModule):
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0
+
         # Collect item_mapper for use with filter
         item_mapper = False
         own_processor = self.get_own_processor()
@@ -494,8 +495,10 @@ class DataSet(FourcatModule):
             if get_annotations:
                 dataset_item_cache.append(dataset_item)
 
-                # When we reach the batch limit, get the annotations for cached items
-                if len(dataset_item_cache) >= item_batch_size:
+                # When we reach the batch limit or the end of the dataset,
+                # get the annotations for cached items and yield the entire thing.
+                if len(dataset_item_cache) >= item_batch_size or i == (self.num_rows - 1):
+
                     item_ids = [dataset_item.get("id") for dataset_item in dataset_item_cache]
 
                     # Dict with item ids for fast lookup
