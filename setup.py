@@ -46,6 +46,7 @@ packages = set([
 	"packaging",
 	"pandas",
 	"Pillow>=10.3",
+	"pylint~=2.17",	# pin PyLint version 2 for 4Cat and pyreverse
 	"praw~=7.0",
 	"prawcore~=2.0",
 	"psutil~=5.0",
