@@ -60,8 +60,6 @@ processor_packages = {
 	"networkx~=2.8.0",  # networks/*
 	"numpy>=1.19.2",  # image_wall, histwords, video_hasher, hash_similarity_network, aggregate_stats, tf_idf
 	"pandas",  # youtube_imagewall, tf_idf
-	"praw~=7.0",  # reddit_get_votes
-	"prawcore~=2.0",  # reddit_get_votes
 	"pyahocorasick~=1.4.0",  # tokenise
 	"PyTumblr==0.1.0",  # search_tumblr
 	"razdel~=0.5",  # tokenise
