@@ -71,7 +71,7 @@ class User:
         use a global configuration manager.
         :return:  User object, or `None` for invalid user name
         """
-        user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
+        user = db.fetchone("SELECT * FROM users WHERE name LIKE %s", (name,))
         if not user:
             return None
         else:
