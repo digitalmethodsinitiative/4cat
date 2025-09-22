@@ -19,9 +19,9 @@ from datetime import datetime
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, \
     FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
-from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.channels import GetFullChannelRequest, SearchPostsRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import MessageEntityMention
+from telethon.tl.types import MessageEntityMention, InputPeerEmpty
 
 
 
@@ -124,7 +124,8 @@ class SearchTelegram(Search):
             "query": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Entities to scrape",
-                "tooltip": "Separate with commas or line breaks."
+                "tooltip": "Separate with commas or line breaks. Entities can be channel or group names, or hashtags. "
+                           "For hashtags, always include the # prefix."
             },
             "max_posts": {
                 "type": UserInput.OPTION_TEXT,
@@ -157,10 +158,11 @@ class SearchTelegram(Search):
                 "type": UserInput.OPTION_INFO,
                 "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
                         "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                        "figure out where or who a message was forwarded from.\n\nHowever, this increases query time and "
-                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
-                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
-                        "data, so only enable this if you really need it!"
+                        "figure out where or who a message was forwarded from. It is also required if you want to know "
+                        "the name of the channel a message was posted in when searching by hashtag.\n\n"
+                        "However, this increases query time and for large datasets, increases the chance you will be "
+                        "rate-limited and your dataset isn't able to finish capturing. It will also dramatically "
+                        "increase the disk space needed to store the data, so only enable this if you really need it!"
             },
             "resolve-entities": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -171,7 +173,11 @@ class SearchTelegram(Search):
 
         if max_entities:
             options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
-                                              f"(channels or groups) at a time. Separate with line breaks or commas.")
+                                              f"(channels, hashtags, or groups) at a time. Separate with line breaks "
+                                              f"or commas. Date ranges have **no** effect for [hashtag "
+                                              f"searches](https://telegram.org/blog/message-effects-and-more), which "
+                                              f"will always simply return all matching messages in reverse "
+                                              f"chronological order.")
 
         all_messages = config.get("telegram-search.can_query_all_messages", False)
         if all_messages:
@@ -278,6 +284,7 @@ class SearchTelegram(Search):
             client = TelegramClient(str(session_path), int(query.get("api_id")), query.get("api_hash"),
                                     loop=self.eventloop)
             await client.start(phone=SearchTelegram.cancel_start)
+            self._client = client
         except RuntimeError:
             # session is no longer useable, delete file so user will be asked
             # for security code again. The RuntimeError is raised by
@@ -325,7 +332,7 @@ class SearchTelegram(Search):
 
         posts = []
         try:
-            async for post in self.gather_posts(client, queries, max_items, min_date, max_date):
+            async for post in self.gather_posts(queries, max_items, min_date, max_date):
                 posts.append(post)
             return posts
         except ProcessorInterruptedException as e:
@@ -340,11 +347,10 @@ class SearchTelegram(Search):
         finally:
             await client.disconnect()
 
-    async def gather_posts(self, client, queries, max_items, min_date, max_date):
+    async def gather_posts(self, queries, max_items, min_date, max_date):
         """
         Gather messages for each entity for which messages are requested
 
-        :param TelegramClient client:  Telegram Client
         :param list queries:  List of entities to query (as string)
         :param int max_items:  Messages to scrape per entity
         :param int min_date:  Datetime date to get posts after
@@ -403,8 +409,10 @@ class SearchTelegram(Search):
                 self.dataset.update_status(f"Retrieving messages for entity '{entity_id_map.get(query, query)}'")
                 entity_posts = 0
                 discovered = 0
+                iter_method = self.iter_hashtag_messages if query.startswith("#") else self._client.iter_messages
+
                 try:
-                    async for message in client.iter_messages(entity=query, offset_date=max_date):
+                    async for message in iter_method(entity=query, offset_date=max_date):
                         entity_posts += 1
                         total_messages += 1
                         if self.interrupted:
@@ -423,17 +431,21 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
+                        print(json.dumps(serialized_message, indent=4))
+                        
                         if "_chat" in serialized_message:
+                            chat_reference = serialized_message["_chat"] or serialized_message["_chat_peer"]
+                            chat_id = chat_reference.get("id", chat_reference.get("channel_id"))
                             # Add query ID to check if queries have been crawled previously
-                            full_query.add(serialized_message["_chat"]["id"])
-                            if query not in entity_id_map and serialized_message["_chat"]["id"] == query:
+                            full_query.add(chat_id)
+                            if query not in entity_id_map and chat_id == query:
                                 # once we know what a channel ID resolves to, use the username instead so it is easier to
-                                # understand for the user
-                                entity_id_map[query] = serialized_message["_chat"]["username"]
+                                # understand for the user, if the username is available
+                                entity_id_map[query] = chat_reference.get("username", "(unknown channel name)")
                                 self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
 
                         if resolve_refs:
-                            serialized_message = await self.resolve_groups(client, serialized_message)
+                            serialized_message = await self.resolve_groups(serialized_message)
 
                         # Stop if we're below the min date
                         if min_date and serialized_message.get("date") < min_date:
@@ -574,7 +586,7 @@ class SearchTelegram(Search):
                 self.dataset.log(f"Completed {entity_id_map.get(query, query)} with {entity_posts} messages (discovered {discovered} new entities)")
                 break
 
-    async def resolve_groups(self, client, message):
+    async def resolve_groups(self, message):
         """
         Recursively resolve references to groups and users
 
@@ -596,7 +608,7 @@ class SearchTelegram(Search):
                         continue
 
                     if value["channel_id"] not in self.details_cache:
-                        channel = await client(GetFullChannelRequest(value["channel_id"]))
+                        channel = await self._client(GetFullChannelRequest(value["channel_id"]))
                         self.details_cache[value["channel_id"]] = SearchTelegram.serialize_obj(channel)
 
                     resolved_message[key] = self.details_cache[value["channel_id"]]
@@ -608,13 +620,13 @@ class SearchTelegram(Search):
                         continue
 
                     if value["user_id"] not in self.details_cache:
-                        user = await client(GetFullUserRequest(value["user_id"]))
+                        user = await self._client(GetFullUserRequest(value["user_id"]))
                         self.details_cache[value["user_id"]] = SearchTelegram.serialize_obj(user)
 
                     resolved_message[key] = self.details_cache[value["user_id"]]
                     resolved_message[key]["user_id"] = value["user_id"]
                 else:
-                    resolved_message[key] = await self.resolve_groups(client, value)
+                    resolved_message[key] = await self.resolve_groups(value)
 
             except (TypeError, ChannelPrivateError, UsernameInvalidError) as e:
                 self.failures_cache.add(value.get("channel_id", value.get("user_id")))
@@ -646,16 +658,22 @@ class SearchTelegram(Search):
         :param Message message:  Message to parse
         :return dict:  4CAT-compatible item object
         """
-        if message["_chat"]["username"]:
-            # chats can apparently not have usernames???
-            # truly telegram objects are way too lenient for their own good
-            thread = message["_chat"]["username"]
-        elif message["_chat"]["title"]:
-            thread = re.sub(r"\s", "", message["_chat"]["title"])
+        if message.get("_chat"):
+            thread_id = message["_chat"].get("username") or message["_chat"].get("id")
+            if not thread_id and "title" in message["_chat"]:
+                # chats can apparently not have usernames???
+                # truly telegram objects are way too lenient for their own good
+                thread_id = re.sub(r"\s", "", message["_chat"]["title"])
+        elif message.get("_chat_peer"):
+            if message["_chat_peer"].get("chats"):
+                thread_id = message["_chat_peer"]["chats"][0].get("username", message["_chat_peer"].get("channel_id"))
+            else:
+                thread_id = message["_chat_peer"].get("channel_id")
         else:
             # just give up
-            thread = "unknown"
+            thread_id = "unknown"
 
+        thread_id = str(thread_id)
         # determine username
         # API responses only include the user *ID*, not the username, and to
         # complicate things further not everyone is a user and not everyone
@@ -727,7 +745,7 @@ class SearchTelegram(Search):
                 "dc_id": attachment["dc_id"],
                 "file_reference": attachment["file_reference"],
             })
-            attachment_filename = thread + "-" + str(message["id"]) + ".jpeg"
+            attachment_filename = thread_id + "-" + str(message["id"]) + ".jpeg"
 
         elif attachment_type == "poll":
             # unfortunately poll results are only available when someone has
@@ -861,9 +879,9 @@ class SearchTelegram(Search):
                 seen.add(connection.lower())
 
         return MappedItem({
-            "id": f"{message['_chat']['username']}-{message['id']}",
-            "thread_id": thread,
-            "chat": message["_chat"]["username"],
+            "id": f"{thread_id}-{message['id']}",
+            "thread_id": thread_id,
+            "chat": thread_id,
             "author": user_id,
             "author_username": username,
             "author_name": fullname,
@@ -1116,6 +1134,33 @@ class SearchTelegram(Search):
             "crawl-threshold": query.get("crawl-threshold"),
             "crawl-via-links": query.get("crawl-via-links")
         }
+
+    async def iter_hashtag_messages(self, entity, offset_date=None):
+        batch_size = 100
+        offset_peer = InputPeerEmpty()
+        offset_rate = 0
+        offset_id = 0
+
+        while True:
+            batch = await self._client(SearchPostsRequest(
+                offset_peer = offset_peer,
+                limit = batch_size,
+                offset_rate = offset_rate,
+                offset_id = offset_id,
+                hashtag = entity
+            ))
+
+            i = 0
+            for message in batch.messages:
+                offset_id = message.id
+                offset_peer = message.peer_id
+                yield message
+                i += 1
+
+            offset_rate = batch.next_rate
+
+            if i < batch_size:
+                break
 
     @staticmethod
     def create_session_id(api_phone, api_id, api_hash):
