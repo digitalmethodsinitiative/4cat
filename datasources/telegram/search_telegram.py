@@ -431,7 +431,6 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
-                        print(json.dumps(serialized_message, indent=4))
                         
                         if "_chat" in serialized_message:
                             chat_reference = serialized_message["_chat"] or serialized_message["_chat_peer"]
@@ -1136,12 +1135,26 @@ class SearchTelegram(Search):
         }
 
     async def iter_hashtag_messages(self, entity, offset_date=None):
-        batch_size = 100
+        """
+        Iterate search results for a given hashtag
+
+        Telegram has a global hashtag search since 2024. Results are returned
+        in reverse chronological order; all messages contain the same hashtag.
+
+        :param str entity:  The hashtag; should start with '#'
+        :param offset_date:  Dummy for compatibility with `iter_messages()`;
+        does nothing when fetching search results
+        :return:  Yield one Message object per message
+        """
+        batch_size = 100  # higher has no effect
         offset_peer = InputPeerEmpty()
         offset_rate = 0
         offset_id = 0
 
         while True:
+            # this is a bit arcane, but Telegram does offsets in a complicated
+            # way. this mirrors what the Telegram desktop app does when
+            # searching for hashtags.
             batch = await self._client(SearchPostsRequest(
                 offset_peer = offset_peer,
                 limit = batch_size,
@@ -1151,15 +1164,17 @@ class SearchTelegram(Search):
             ))
 
             i = 0
-            for message in batch.messages:
-                offset_id = message.id
-                offset_peer = message.peer_id
-                yield message
-                i += 1
+            if batch.messages:
+                for message in batch.messages:
+                    offset_id = message.id
+                    offset_peer = message.peer_id
+                    yield message
+                    i += 1
 
-            offset_rate = batch.next_rate
+                offset_rate = batch.next_rate
 
             if i < batch_size:
+                # get fewer than we asked for? results exhausted
                 break
 
     @staticmethod
