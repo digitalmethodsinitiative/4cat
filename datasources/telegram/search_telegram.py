@@ -158,8 +158,7 @@ class SearchTelegram(Search):
                 "type": UserInput.OPTION_INFO,
                 "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
                         "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                        "figure out where or who a message was forwarded from. It is also required if you want to know "
-                        "the name of the channel a message was posted in when searching by hashtag.\n\n"
+                        "figure out where or who a message was forwarded from.\n\n"
                         "However, this increases query time and for large datasets, increases the chance you will be "
                         "rate-limited and your dataset isn't able to finish capturing. It will also dramatically "
                         "increase the disk space needed to store the data, so only enable this if you really need it!"
@@ -1163,11 +1162,18 @@ class SearchTelegram(Search):
                 hashtag = entity
             ))
 
+            # chat metadata is stored separately from the messages
+            batch_chats = {c.id: c for c in batch.chats} if batch.chats else {}
+
             i = 0
             if batch.messages:
                 for message in batch.messages:
                     offset_id = message.id
                     offset_peer = message.peer_id
+                    if message._chat_peer.channel_id in batch_chats:
+                        # enrich...
+                        message._chat = batch_chats[message._chat_peer.channel_id]
+                        
                     yield message
                     i += 1
 
