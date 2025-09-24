@@ -86,7 +86,7 @@ class Database:
 		if not cursor:
 			cursor = self.get_cursor()
 
-		self.log.debug("Executing query %s" % cursor.mogrify(query, replacements))
+		self.log.debug2("Executing query %s" % cursor.mogrify(query, replacements))
 		try:
 			cursor.execute(query, replacements)
 		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -378,7 +378,7 @@ class Database:
 			cursor = self._execute_query(query, cursor=cursor, *args)
 		except psycopg2.extensions.QueryCanceledError:
 			# interrupted with cancellation worker (or manually)
-			self.log.debug("Query in connection %s was interrupted..." % self.appname)
+			self.log.debug2("Query in connection %s was interrupted..." % self.appname)
 			self.rollback()
 			cursor.close()
 			raise DatabaseQueryInterruptedException("Interrupted while querying database")

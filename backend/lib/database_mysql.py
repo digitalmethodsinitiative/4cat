@@ -44,7 +44,7 @@ class MySQLDatabase:
 		:return None:
 		"""
 		if self.log:
-			self.log.debug("Executing query %s" % self.mogrify(query, replacements))
+			self.log.debug2("Executing query %s" % self.mogrify(query, replacements))
 
 		return self.cursor.execute(query, replacements)
 

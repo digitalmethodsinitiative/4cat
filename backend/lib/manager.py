@@ -85,7 +85,7 @@ class WorkerManager:
 		jobs = self.queue.get_all_jobs()
 
 		num_active = sum([len(self.worker_pool[jobtype]) for jobtype in self.worker_pool])
-		self.log.debug("Running workers: %i" % num_active)
+		self.log.debug2("Running workers: %i" % num_active)
 
 		# clean up workers that have finished processing
 		for jobtype in self.worker_pool:

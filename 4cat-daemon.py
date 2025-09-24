@@ -10,7 +10,7 @@ from pathlib import Path
 cli = argparse.ArgumentParser()
 cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
                  action="store_true")
-cli.add_argument("--log-level", "-l", default="INFO", help="Set log level (\"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
+cli.add_argument("--log-level", "-l", default="INFO", help="Set log level (\"DEBUG2\", \"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
 cli.add_argument("--no-version-check", "-n", default=False,
                  help="Skip version check that may prompt the user to migrate first.", action="store_true")
 cli.add_argument("command")
