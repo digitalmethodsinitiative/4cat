@@ -41,12 +41,6 @@ from webtool.lib.openapi_collector import OpenAPICollector  # noqa: E402
 app = Flask(__name__)
 config = ConfigManager()
 
-# this ensures that HTTPS is properly applied to built URLs even if the app
-# is running behind a proxy
-# see https://stackoverflow.com/a/45333882
-proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
-app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
-
 # set up logger for error logging etc
 log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
 if config.get("USING_DOCKER"):
@@ -56,7 +50,14 @@ if config.get("USING_DOCKER"):
 else:
     log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("4cat.log"))
 
+config.with_logger(log)
 log.load_webhook(config)
+
+# this ensures that HTTPS is properly applied to built URLs even if the app
+# is running behind a proxy
+# see https://stackoverflow.com/a/45333882
+proxy_overrides = {param: 1 for param in config.get("flask.proxy_override")}
+app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
 # test memcache
 # this is also done in the backend, but the frontend may not be able to connect
