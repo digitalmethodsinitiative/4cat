@@ -10,7 +10,7 @@ from pathlib import Path
 cli = argparse.ArgumentParser()
 cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
                  action="store_true")
-cli.add_argument("--log-level", "-l", default="INFO", help="Set log level (\"DEBUG2\", \"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
+cli.add_argument("--log-level", "-l", default=None, help="Set log level (\"DEBUG2\", \"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
 cli.add_argument("--no-version-check", "-n", default=False,
                  help="Skip version check that may prompt the user to migrate first.", action="store_true")
 cli.add_argument("command")
@@ -78,20 +78,21 @@ if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "
 #   POSIX-compatible systems - run interactive
 #                on Windows.
 # ---------------------------------------------
+    
 if os.name not in ("posix",):
     # if not, run the backend directly and quit
     print("Using '%s' to run the 4CAT backend is only supported on UNIX-like systems." % __file__)
     print("Running backend in interactive mode instead.")
     import backend.bootstrap as bootstrap
 
-    bootstrap.run(as_daemon=False, log_level=args.log_level)
+    bootstrap.run(as_daemon=False, log_level=args.log_level or "DEBUG")
     sys.exit(0)
 
 if args.interactive:
     print("Running backend in interactive mode.")
     import backend.bootstrap as bootstrap
 
-    bootstrap.run(as_daemon=False, log_level=args.log_level)
+    bootstrap.run(as_daemon=False, log_level=args.log_level or "DEBUG")
     sys.exit(0)
 else:
     # if so, import necessary modules
@@ -132,7 +133,7 @@ def start():
                 detach_process=True
         ):
             import backend.bootstrap as bootstrap
-            bootstrap.run(as_daemon=True, log_level=args.log_level)
+            bootstrap.run(as_daemon=True, log_level=args.log_level or "INFO")
 
         sys.exit(0)
 
