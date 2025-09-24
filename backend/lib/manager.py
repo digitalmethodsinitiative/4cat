@@ -114,7 +114,8 @@ class WorkerManager:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=self.modules)
 						worker.start()
-						self.log.info(f"Starting new worker for job {job.data['jobtype']}/{job.data['remote_id']}")
+						log_level = self.log.levels["DEBUG"] if job.data["interval"] else self.log.levels["INFO"]
+						self.log.log(f"Starting new worker for job {job.data['jobtype']}/{job.data['remote_id']}", log_level)
 						self.worker_pool[jobtype].append(worker)
 					except JobClaimedException:
 						# it's fine
