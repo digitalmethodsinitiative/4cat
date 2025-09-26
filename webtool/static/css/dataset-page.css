@@ -580,7 +580,13 @@ article.result > section:first-child {
 
 .processor-options textarea {
     min-width: 25em;
-    min-height: 6em;
+    min-height: 7.5em;
+    flex-grow: 0.95;
+}
+
+.processor-options select {
+    max-width: 100%;
+    flex-grow: 0.9;
 }
 
 .multi-select-search {
