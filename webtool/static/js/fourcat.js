@@ -1941,7 +1941,10 @@ const ui_helpers = {
                     requirement = [null, element.getAttribute('data-requires'), '!=', ''];
                 }
 
-                const negate = requirement[2] === '!=';
+                const negate = requirement[2].startsWith('!');
+                if (negate) {
+                    requirement[2] = requirement[2].substring(1);
+                }
                 const other_field = 'option-' + requirement[1];
                 const other_element = form.querySelector("*[name='" + other_field + "']");
 
@@ -1976,6 +1979,10 @@ const ui_helpers = {
                     } else if(['==', '='].includes(requirement[2])) {
                         requirement_met = other_value === requirement[3];
                     }
+                }
+
+                if(negate) {
+                    requirement_met = !requirement_met
                 }
 
                 if (requirement_met) {
@@ -2084,7 +2091,6 @@ function find_parent(element, selector, start_self=false) {
     while(element.parentNode) {
         if(!start_self) { element = element.parentNode; }
         if(element instanceof HTMLDocument) { return null; }
-        console.log(element);
         if(element.matches(selector)) {
             return element;
         }
