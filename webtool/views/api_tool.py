@@ -1119,40 +1119,84 @@ def queue_processor(key=None, processor=None):
 	except DataSetException:
 		return error(404, error="Not a valid dataset key.")
 
-	if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not current_user.can_access_dataset(dataset):
+	if not g.config.get(
+		"privileges.admin.can_manipulate_all_datasets"
+	) and not current_user.can_access_dataset(dataset):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
-	available_processors = dataset.get_available_processors(config=g.config, exclude_hidden=True)
+	available_processors = dataset.get_available_processors(
+		config=g.config, exclude_hidden=True
+	)
 	if processor not in available_processors:
-		return error(404, error="This processor is not available for this dataset or has already been run.")
+		return error(
+			404,
+			error="This processor is not available for this dataset or has already been run.",
+		)
 
 	processor_worker = available_processors[processor]
 	try:
-		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, g.config), request.form,
-                                              silently_correct=False)
+		sanitised_query = UserInput.parse_all(
+			processor_worker.get_options(dataset, g.config),
+			request.form,
+			silently_correct=False,
+		)
+
+		sanitised_query["frontend-confirm"] = bool(request.form.get("frontend-confirm", False))
 
 		if hasattr(processor_worker, "validate_query"):
 			# validate_query is optional for processors
-			sanitised_query = processor_worker.validate_query(sanitised_query, request, g.config)
+			sanitised_query = processor_worker.validate_query(
+				sanitised_query, request, g.config
+			)
 
 	except QueryParametersException as e:
 		# parameters need amending
-		return jsonify({"status": "error", "message": (str(e) if e else "Cannot run the processor with these settings.")})
+		return jsonify(
+			{
+				"status": "error",
+				"message": (
+					str(e) if e else "Cannot run the processor with these settings."
+				),
+			}
+		)
 
+	except QueryNeedsExplicitConfirmationException as e:
+		return jsonify({"status": "confirm", "message": str(e)})
+
+	except QueryNeedsFurtherInputException as e:
+		# ask the user for more input by returning a HTML snippet
+		# containing form fields to be added to the form before it is
+		# re-submitted
+		form = "\n".join(
+			[
+				render_template(
+					"components/processor-option.html",
+					option_override={k: v},
+					option=k,
+					dataset=dataset,
+					processor=processor_worker,
+				)
+				for k, v in e.config.items()
+			]
+		)
+		return jsonify({"status": "extra-form", "html": form})
 
 	if request.form.to_dict().get("email-complete", False):
-		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
+		sanitised_query["email-complete"] = request.form.to_dict().get(
+			"email-user", False
+		)
 
 	# private or not is inherited from parent dataset
-	analysis = DataSet(parent=dataset.key,
-					   parameters=sanitised_query,
-					   db=g.db,
-					   extension=available_processors[processor].get_extension(parent_dataset=dataset),
-					   type=processor,
-					   is_private=dataset.is_private,
-					   owner=current_user.get_id(),
-					   modules=g.modules
+	analysis = DataSet(
+		parent=dataset.key,
+		parameters=sanitised_query,
+		db=g.db,
+		extension=available_processors[processor].get_extension(parent_dataset=dataset),
+		type=processor,
+		is_private=dataset.is_private,
+		owner=current_user.get_id(),
+		modules=g.modules,
 	)
 
 	# give same ownership as parent dataset
@@ -1165,21 +1209,32 @@ def queue_processor(key=None, processor=None):
 		analysis.link_job(job)
 		analysis.update_status("Queued")
 	else:
-		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
-			  available_processors[processor].title)
+		flash(
+			"This analysis (%s) is currently queued or has already been run with these parameters."
+			% available_processors[processor].title
+		)
 
 	if hasattr(processor_worker, "after_create"):
 		processor_worker.after_create(sanitised_query, analysis, request)
 
-	return jsonify({
-		"status": "success",
-		"container": "*[data-dataset-key=" + dataset.key + "]",
-		"key": analysis.key,
-		"html": render_template("components/result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
-                                processors=g.modules.processors) if analysis.is_new else "",
-		"messages": get_flashed_messages(),
-		"is_filter": available_processors[processor].is_filter()
-	})
+	return jsonify(
+		{
+			"status": "success",
+			"container": "*[data-dataset-key=" + dataset.key + "]",
+			"key": analysis.key,
+			"html": render_template(
+				"components/result-child.html",
+				child=analysis,
+				dataset=dataset,
+				parent_key=dataset.key,
+				processors=g.modules.processors,
+			)
+			if analysis.is_new
+			else "",
+			"message": get_flashed_messages(),
+			"is_filter": available_processors[processor].is_filter(),
+		}
+	)
 
 
 @component.route('/api/check-processors/')
