@@ -1179,7 +1179,7 @@ class SearchTelegram(Search):
 
                 offset_rate = batch.next_rate
 
-            if i < batch_size:
+            if i == 0:
                 # get fewer than we asked for? results exhausted
                 break
 
