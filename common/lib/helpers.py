@@ -476,7 +476,7 @@ def andify(items):
     if len(items) == 0:
         return ""
     elif len(items) == 1:
-        return str(items[1])
+        return str(items[0])
 
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result

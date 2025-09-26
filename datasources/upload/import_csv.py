@@ -347,6 +347,8 @@ class SearchCustom(BasicProcessor):
                 except (ValueError, OSError):
                     raise QueryParametersException(
                         "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+                except AttributeError:
+                    raise QueryParametersException("Couldn't correctly read the file, try formatting it differently")
             else:
                 # the timestamp column is empty or contains empty values
                 if not query.get("frontend-confirm"):

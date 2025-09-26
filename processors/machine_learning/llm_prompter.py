@@ -203,7 +203,7 @@ class LLMPrompter(BasicProcessor):
             "max_tokens": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Max output tokens",
-                "default": 1000,
+                "default": 10000,
                 "coerce_type": int,
                 "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
                 "text for common English text. This includes tokens spent for reasoning.",

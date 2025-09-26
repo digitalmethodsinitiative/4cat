@@ -82,6 +82,12 @@ class UserInput:
         # prefix
         input = {re.sub(r"^option-", "", field): input[field] for field in input}
 
+        # fields can be 'delegated', i.e. they only show up under some condition
+        # or in a later stage of form input. here we determine if input was
+        # actually filled in or was only defined but never delegated
+        never_delegated = set([option for option in options if options[option].get("delegated")])
+        never_delegated -= set(input.keys())
+
         # re-order input so that the fields relying on the value of other
         # fields are parsed last
         options = {k: options[k] for k in sorted(options, key=lambda k: options[k].get("requires") is not None)}
@@ -94,6 +100,12 @@ class UserInput:
 
             if settings.get("type") in UserInput.OPTIONS_COSMETIC:
                 # these are structural form elements and never have a value
+                continue
+
+            if option in never_delegated:
+                # these options were never actually part of the input because
+                # the required conditions were never met, so they can be
+                # ignored
                 continue
 
             elif settings.get("type") == UserInput.OPTION_DATERANGE:

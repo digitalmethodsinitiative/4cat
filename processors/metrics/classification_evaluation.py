@@ -186,6 +186,10 @@ class ClassificationEvaluation(BasicProcessor):
                     labels_true.append([label_true])
                     labels_pred.append([label_pred])
 
+        if not labels_true or not labels_pred:
+            self.dataset.finish_with_error("No items found with values in both columns")
+            return
+
         results = []
         # Support for multiple labels per item
         binarizer = MultiLabelBinarizer()

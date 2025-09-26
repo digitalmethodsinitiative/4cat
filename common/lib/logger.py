@@ -157,6 +157,7 @@ class Logger:
     db = None
     previous_report = 0
     levels = {
+        "DEBUG2": 5,  # logging.DEBUG = 10
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
         "WARNING": logging.WARNING,
@@ -254,6 +255,17 @@ class Logger:
         # Logging uses the location, Slack uses the full stack
         location = frame.filename.split("/")[-1] + ":" + str(frame.lineno)
         self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack})
+
+    def debug2(self, message, frame=None):
+        """
+        Log DEBUG2 level message
+
+        DEBUG2 is a custom log level, with less priority than the standard DEBUG
+
+        :param message: Message to log
+        :param frame:  Traceback frame relating to the error
+        """
+        self.log(message, 5, frame)
 
     def debug(self, message, frame=None):
         """

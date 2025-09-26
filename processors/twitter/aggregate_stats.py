@@ -3,7 +3,7 @@ Twitter APIv2 aggregated user statistics
 """
 import datetime
 import numpy as np
-from scipy import stats
+import statistics
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
@@ -66,6 +66,23 @@ class TwitterAggregatedStats(BasicProcessor):
         """
         return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
+    def trim_mean(self, values, cut_pct):
+        """
+        Return mean of array after trimming a specified fraction of extreme values
+
+        Removes the specified proportion of elements from each end of the sorted
+        array, then computes the mean of the remaining elements.
+        
+        :param values:  Values to calculate mean of
+        :param float cut_pct:  Percentage to cut (0.0-1.0)
+        :return float:  Mean value
+        """
+        cuttable = int(len(values) * cut_pct)
+        if cuttable:
+            values = values[cuttable:-cuttable]
+
+        return statistics.mean(values)
+
     def process(self):
         """
         This takes a 4CAT twitter dataset file as input, and outputs a csv.
@@ -105,7 +122,7 @@ class TwitterAggregatedStats(BasicProcessor):
                 row['Q1'] = np.percentile(values, 25)
                 row['Q2'] = np.median(values)
                 row['Q3'] = np.percentile(values, 75)
-                row['25%_trimmed_mean'] = stats.trim_mean(values, 0.25)
+                row['25%_trimmed_mean'] = self.trim_mean(values, 0.25)
 
                 rows.append({**{"date": interval, 'category': header_category, "data_type": data_type}, **row})
 
