@@ -232,10 +232,10 @@ class Annotation:
 
         if item_id:
             if isinstance(item_id, str):
-                item_id = set(item_id)
+                item_id = [item_id]
             data = db.fetchall(
-                "SELECT * FROM annotations WHERE dataset = %s AND item_id IN %s",
-                (dataset_key, tuple(item_id),)
+                "SELECT * FROM annotations WHERE dataset = %s AND item_id = ANY(%s)",
+                (dataset_key, item_id,)
             )
         else:
             data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s", (dataset_key,))
