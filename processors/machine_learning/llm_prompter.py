@@ -75,7 +75,7 @@ class LLMPrompter(BasicProcessor):
                 "help": "Model provider",
                 "requires": "api_model==custom",
                 "options": LLMAdapter.get_model_providers(config),
-                "tooltip": "Company that hosts this model. Currently limited to this list.",
+                "tooltip": "Company that hosts this model. Currently limited to this list."
             },
             "api_custom_model_id": {
                 "type": UserInput.OPTION_TEXT,
@@ -84,6 +84,7 @@ class LLMPrompter(BasicProcessor):
                 "tooltip": "E.g. 'mistral-small-2503'. Check the API provider's documentation on what model ID to use. "
                            "Fine-tuned models often require more info; OpenAI for instance requires the following "
                            "format: ft:[modelname]:[org_id]:[custom_suffix]:",
+                "default": ""
             },
             "local_info": {
                 "type": UserInput.OPTION_INFO,
@@ -143,6 +144,7 @@ class LLMPrompter(BasicProcessor):
                 "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
                            "on the tone of the text. This processor may edit the system prompt to "
                            "ensure correct output. Full system prompts are included in the results file.",
+                "default": ""
             },
             "prompt_info": {
                 "type": UserInput.OPTION_INFO,
@@ -162,12 +164,14 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "User prompt",
                 "tooltip": "Use [brackets] with columns names.",
+                "default": ""
             },
             "structured_output": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Output structured JSON",
                 "tooltip": "Output in a JSON format instead of CSV text. Note that your chosen model may not support "
-                           "structured output."
+                           "structured output.",
+                "default": False
             },
             "json_schema_info": {
                 "type": UserInput.OPTION_INFO,
@@ -181,7 +185,8 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "JSON schema",
                 "tooltip": "[required] A JSON schema that the structured output will adhere to",
-                "requires": "structured_output==true"
+                "requires": "structured_output==true",
+                "default": ""
             },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
