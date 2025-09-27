@@ -25,7 +25,9 @@
                     {% if column == "missing_fields" %} class="missing-field-meta tooltip-trigger" aria-controls="tooltip-missing-field-explainer"
                     {% elif column in row.missing_fields %} class="missing-field tooltip-trigger" aria-controls="tooltip-missing-field"{% endif %}
             >
-                {{ cell|e|add_ahref(ellipsiate=50)|add_colour|safe }}
+            {% autoescape false %}
+                {{ cell|e|replace("\n","<br>\n")|add_ahref(ellipsiate=50)|add_colour|safe }}
+            {% endautoescape %}
             </t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
         {% endfor %}
         </tr>
