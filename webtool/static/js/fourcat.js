@@ -188,7 +188,7 @@ const processor = {
                             return;
                         } else if (response['status'] === 'error') {
                             reset_form = false;
-                            if (response.hasOwnProperty("message") && response.messages) {
+                            if (response.hasOwnProperty("message") && response.message) {
                                 popup.alert(response.message);
                             }
                             return;
