@@ -549,8 +549,8 @@ class LLMPrompter(BasicProcessor):
                         system_prompt.replace("{batch_size}", str(n_batched))
 
                     batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
-                    self.dataset.update_status(f"Generating text at row {row}/"
-                                               f"{self.source_dataset.num_rows} with {model}{batch_str}")
+                    self.dataset.update_status(f"Generating text at row {row:,}/"
+                                               f"{max_processed:,} with {model}{batch_str}")
                     # Now finally generate some text!
                     try:
                         response = llm.generate_text(
