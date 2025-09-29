@@ -246,6 +246,14 @@ class LLMPrompter(BasicProcessor):
                 "label": "prompt outputs",
                 "default": False,
             },
+            "limit": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Only annotate this many items, then stop",
+                "default": 0,
+                "coerce_type": int,
+                "min": 0,
+                "delegated": True
+            }
         }
         return options
 
@@ -266,7 +274,6 @@ class LLMPrompter(BasicProcessor):
         api_consent = self.parameters.get("consent", False)
         api_model = self.parameters.get("api_model")
         use_local_model = self.parameters.get("api_or_local", "api") == "local"
-        model = ""
 
         # Add some friction if an API is used.
         if not use_local_model and not api_consent:
@@ -280,6 +287,8 @@ class LLMPrompter(BasicProcessor):
         max_input_len = int(self.parameters.get("truncate_input", 0))
         max_tokens = int(self.parameters.get("max_tokens"))
         system_prompt = self.parameters.get("system_prompt", "")
+        limit = self.parameters.get("limit", 0)
+        limit_reached = False
 
         # Set value for batch length in prompts
         batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
@@ -436,8 +445,8 @@ class LLMPrompter(BasicProcessor):
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 
             row = 0
+            max_processed = min(limit, self.dataset.num_rows) if limit else self.dataset.num_rows
             for item in self.source_dataset.iterate_items():
-
                 row += 1
 
                 if self.interrupted:
@@ -507,8 +516,11 @@ class LLMPrompter(BasicProcessor):
                     batched_ids.append(item_id)  # Also store IDs, so we can match them to the output
 
                 i += 1
+                if limit and i >= max_processed:
+                    limit_reached = True
+                    
                 # Generate text when we've reached 1) the batch length (which can be 1) or 2) the end of the dataset.
-                if n_batched % batches == 0 or (n_batched and row == self.source_dataset.num_rows):
+                if n_batched % batches == 0 or (n_batched and row == self.source_dataset.num_rows) or limit_reached:
 
                     # Insert dataset values into prompt. Insert as list for batched data, else just insert the value.
                     for column_to_use in columns_to_use:
@@ -652,11 +664,13 @@ class LLMPrompter(BasicProcessor):
                         time.sleep(1)
 
                 # Write annotations in batches
-                if i % 1000 == 0 and annotations:
+                if (i % 1000 == 0 and annotations) or limit_reached:
                     self.save_annotations(annotations)
                     annotations = []
 
-                self.dataset.update_progress(row / self.source_dataset.num_rows)
+                self.dataset.update_progress(row / max_processed)
+                if limit_reached:
+                    break
 
         outfile.close()
 
