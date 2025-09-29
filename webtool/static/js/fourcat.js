@@ -175,7 +175,7 @@ const processor = {
                 })
                 .then(function (response) {
                     if (response.hasOwnProperty('message') && response.message instanceof Array) {
-                        response.message = response.message.join(' ');
+                        response.message = response.message.join('\n\n');
                     }
 
                     if(['confirm', 'error', 'extra-form'].includes(response.status)) {
@@ -188,8 +188,8 @@ const processor = {
                             return;
                         } else if (response['status'] === 'error') {
                             reset_form = false;
-                            if (response.hasOwnProperty("messages") && response.messages.length > 0) {
-                                popup.alert(response.messages.join("\n\n"));
+                            if (response.hasOwnProperty("message") && response.messages) {
+                                popup.alert(response.message);
                             }
                             return;
                         } else if (response['status'] === 'extra-form') {
