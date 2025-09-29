@@ -445,7 +445,7 @@ class LLMPrompter(BasicProcessor):
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 
             row = 0
-            max_processed = min(limit, self.dataset.num_rows) if limit else self.dataset.num_rows
+            max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
             for item in self.source_dataset.iterate_items():
                 row += 1
 
