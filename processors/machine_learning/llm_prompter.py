@@ -253,6 +253,12 @@ class LLMPrompter(BasicProcessor):
                 "coerce_type": int,
                 "min": 0,
                 "delegated": True
+            },
+            "annotation_label": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Label for the annotations to add to the dataset",
+                "default": "",
+                "delegated": True
             }
         }
         return options
@@ -641,6 +647,8 @@ class LLMPrompter(BasicProcessor):
                             # Else this will just save one string.
                             if isinstance(output_item, dict):
                                 annotation_output = flatten_dict({model: output_item})
+                            elif self.parameters.get("annotation_label"):
+                                annotation_output = {self.parameters.get("annotation_label"): output_item}
                             else:
                                 annotation_output = {model + "_output": output_item}
 
