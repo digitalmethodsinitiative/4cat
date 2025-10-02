@@ -361,6 +361,8 @@ const query = {
         $(document).on('click', '.edit-dataset-label', query.label.handle);
         $(document).on('keydown', '#new-dataset-label', query.label.handle);
 
+        $(document).on('click', '.result-page .card .annotation-fields-list .property-badge', query.annotation_label.handle);
+
         // convert dataset
         $(document).on('change', '#convert-dataset', query.convert_dataset)
 
@@ -915,6 +917,45 @@ const query = {
             $(input_id).val(0);
         } else {
             $(input_id).val(timestamp);
+        }
+    },
+
+    annotation_label: {
+        handle: function (e) {
+            e.preventDefault();
+            let target = e.target;
+            if (target.tagName !== 'SPAN') {
+                target = $(target).parents('span')[0];
+            }
+
+            const current_label = target.innerText;
+            const callback_url = find_parent(target, 'div').getAttribute('data-label-edit-href')
+
+            popup.dialog(
+                '<p>Edit the label for this annotation:</p>' +
+                '<label>Label: <input type="text" id="new-annotation-label" name="label" value="' + current_label + '"></label>',
+                'Edit annotation label',
+                function () {
+                    const new_label = document.querySelector('#new-annotation-label').value.trim();
+                    const payload = {'annotation_id': target.getAttribute('data-annotation-id'), 'label': new_label };
+                    fetch(callback_url, {
+                        method: 'POST',
+                        body: JSON.stringify(payload),
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                    })
+                        .then((response) => response.json())
+                        .then(response_json => {
+                            if(response_json.status && response_json.status === 'success') {
+                                target.childNodes[1].nodeValue = ' ' + new_label;
+                            }
+                        })
+                        .catch((error) => {
+                            popup.alert('There was an error changing the annotation label. Refresh and try again later.');
+                        })
+                }
+            );
         }
     },
 

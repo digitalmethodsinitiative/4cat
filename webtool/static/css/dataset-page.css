@@ -216,6 +216,10 @@ article.result > section:first-child {
     position: relative;
 }
 
+.result-page .annotation-fields-list .property-badge {
+    cursor: pointer;
+}
+
 .annotation-fields-list ul {
     list-style: none;
     margin: 0;

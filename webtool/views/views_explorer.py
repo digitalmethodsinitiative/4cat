@@ -166,7 +166,7 @@ def explorer_dataset(dataset_key: str, page=1):
 		warning=warning
 	)
 
-@component.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
+@component.route("/explorer/save_annotation_fields/<string:dataset_key>/", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
@@ -207,6 +207,50 @@ def explorer_save_annotation_fields(dataset_key: str):
 
 	# Else return the amount of fields saved.
 	return str(fields_saved)
+
+@component.route("/explorer/save_annotation_label/<string:dataset_key>/", methods=["POST"])
+@api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
+@current_app.openapi.endpoint("explorer")
+def explorer_save_annotation_label(dataset_key: str):
+	"""
+	Change the label of a single annotation field
+
+	:param dataset_key:  		The dataset key.
+
+	:return-error 404:  If the dataset ID does not exist.
+	:return int:		The number of annotation fields saved.
+	"""
+
+	# Get dataset.
+	if not dataset_key:
+		return error(404, error="No dataset key provided")
+	try:
+		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
+	except DataSetException:
+		return error(404, error="Dataset not found.")
+
+	payload = request.get_json(silent=True)
+	if type(payload) is not dict:
+		return error(400, error="Invalid request payload")
+
+	if payload.get("annotation_id") not in dataset.annotation_fields:
+		return error(400, error="Invalid annotation ID")
+
+	if type(payload.get("label")) is not str or not payload.get("label").strip():
+		return error(400, error="Invalid label")
+
+	annotation_fields = dataset.annotation_fields
+	annotation_fields[payload.get("annotation_id")]["label"] = payload["label"]
+	try:
+		dataset.save_annotation_fields(annotation_fields)
+	except AnnotationException as e:
+		return error(400, error=str(e))
+
+	return jsonify({"status": "success"})
+
 
 @component.route("/explorer/save_annotations/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
