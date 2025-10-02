@@ -195,7 +195,7 @@ class SlackLogHandler(WebHookLogHandler):
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"{emoji} 4CAT {record.levelname.lower()} logged on `{platform.uname().node}`:",
+                                "text": f"{emoji} *4CAT {record.levelname.lower()} logged on `{platform.uname().node}`:*",
                             },
                         },
                         {
