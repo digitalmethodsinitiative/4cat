@@ -6,6 +6,7 @@ import platform
 import logging
 import time
 import json
+import re
 
 from pathlib import Path
 
@@ -93,6 +94,9 @@ class SlackLogHandler(WebHookLogHandler):
     Slack webhook log handler
     """
     _base_github_url = ""
+    _base_4cat_url = ""
+    _base_4cat_path = ""
+    _extension_path = ""
 
     def __init__(self, *args, **kwargs):
         """
@@ -104,9 +108,31 @@ class SlackLogHandler(WebHookLogHandler):
         :param args:
         :param kwargs:
         """
-        if "github_url" in kwargs:
-            self._base_github_url = kwargs["github_url"]
-            del kwargs["github_url"]
+        if "config" in kwargs:
+            config = kwargs["config"]
+            del kwargs["config"]
+        else:
+            raise TypeError("SlackLogHandler() expects a config reader as argument")
+
+        # construct a github URL to link in slack alerts to easily review
+        # erroneous code
+        if config.get("4cat.github_url"):
+            github_url = config.get("4cat.github_url")
+            if github_url.endswith("/"):
+                github_url = github_url[:-1]
+            github_url += "/blob/"
+
+            # use commit hash if available, else link to master
+            commit = get_software_commit()
+            github_url += f"{commit[0] or 'master'}/"
+            self._base_github_url = github_url
+
+        # we cannot use the config reader later because the logger is shared
+        # across threads and the config reader/memcache is not thread-safe, so
+        # pre-read the relevant values here
+        self._base_4cat_url = f"http{'s' if config.get('flask.https') else ''}://{config.get('flask.server_name')}/results/"
+        self._base_4cat_path = config.get("PATH_ROOT")
+        self._extension_path = config.get("PATH_EXTENSIONS")
 
         super().__init__(*args, **kwargs)
 
@@ -126,6 +152,10 @@ class SlackLogHandler(WebHookLogHandler):
             emoji = ":information_source:"
             color = "#3CC619"  # green
 
+        # this also catches other 32-char hex strings...
+        # but a few false positives are OK as a trade-off for the convenience
+        error_message = re.sub(r"\b([0-9a-fA-F]{32})\b", f"<{self._base_4cat_url}\\1/|\\1>", record.message)
+
         # simple stack trace
         if record.stack:
             # this is the stack where the log was called
@@ -135,11 +165,9 @@ class SlackLogHandler(WebHookLogHandler):
             # the frame before that is where the exception was raised
             frames = traceback.extract_stack()[:-9]
 
-        nice_frames = []
-        root_path = Path(__file__).parent.parent.parent
-
         # go through the traceback and distinguish 4CAT's own code from library
         # or stdlib code, and annotate accordingly
+        nice_frames = []
         highlight_frame = None
         highlight_link = None
         for frame in frames:
@@ -148,8 +176,13 @@ class SlackLogHandler(WebHookLogHandler):
 
             # make a link to the github if it is a file in the 4cat root and
             # not in the venv (i.e. it is 4CAT's own code)
-            if framepath.is_relative_to(root_path) and "site-packages" not in framepath.parts and self._base_github_url:
-                sub_path = str(framepath.relative_to(root_path))
+            if (
+                    framepath.is_relative_to(self._base_4cat_path)
+                    and not framepath.is_relative_to(self._extension_path)
+                    and "site-packages" not in framepath.parts
+                    and self._base_github_url
+            ):
+                sub_path = str(framepath.relative_to(self._base_4cat_path))
                 url = f"{self._base_github_url}{sub_path}#L{frame.lineno}"
                 frame_location = f"<{url}|`{frame_location}`>"
                 highlight_frame = frame
@@ -200,7 +233,7 @@ class SlackLogHandler(WebHookLogHandler):
                         },
                         {
                             "type": "section",
-                            "text": {"type": "mrkdwn", "text": record.message},
+                            "text": {"type": "mrkdwn", "text": error_message},
                         },
                         *attachments,
                     ],
@@ -288,20 +321,7 @@ class Logger:
         :return:
         """
         if config.get("logging.slack.webhook"):
-            # construct a github URL to link in slack alerts to easily review
-            # erroneous code
-            github_url = None
-            if config.get("4cat.github_url"):
-                github_url = config.get("4cat.github_url")
-                if github_url.endswith("/"):
-                    github_url = github_url[:-1]
-                github_url += "/blob/"
-
-                # use commit hash if available, else link to master
-                commit = get_software_commit()
-                github_url += f"{commit[0] or 'master'}/"
-                    
-            slack_handler = SlackLogHandler(config.get("logging.slack.webhook"), github_url=github_url)
+            slack_handler = SlackLogHandler(config.get("logging.slack.webhook"), config=config)
             slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
             self.logger.addHandler(slack_handler)
 
@@ -315,7 +335,7 @@ class Logger:
         extrapolated
         """
         if type(frame) is traceback.StackSummary:
-            # Full strack was provided
+            # Full stack was provided
             stack = frame
             frame = stack[-1]
         else:
