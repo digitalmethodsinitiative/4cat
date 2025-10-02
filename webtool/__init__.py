@@ -43,12 +43,7 @@ config = ConfigManager()
 
 # set up logger for error logging etc
 log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
-if config.get("USING_DOCKER"):
-    # in Docker it is useful to have two separate files - since 4CAT is also
-    # in two separate containers
-    log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("frontend_4cat.log"))
-else:
-    log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("4cat.log"))
+log = Logger(logger_name='4cat-frontend', log_path=log_folder.joinpath("frontend_4cat.log"))
 
 config.with_logger(log)
 log.load_webhook(config)
