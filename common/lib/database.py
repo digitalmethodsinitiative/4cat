@@ -48,6 +48,10 @@ class Database:
 
 		if self.log is None:
 			self.log = logging
+			# add debug2 to use debug functionality
+			def debug2(msg):
+				self.log.debug(msg)
+			self.log.debug2 = debug2
 
 	def reconnect(self, tries=3, wait=10):
 		"""
