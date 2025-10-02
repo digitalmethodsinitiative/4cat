@@ -82,7 +82,7 @@ class ItemToAnnotation(BasicProcessor):
             # Convert text in every column
             for column in columns:
 
-                if item[column]:
+                if item.get(column):
 
                     item_value = item[column]
 
