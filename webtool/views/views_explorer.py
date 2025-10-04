@@ -3,6 +3,8 @@
 format and lets users annotate the data.
 """
 
+import collections
+
 from pathlib import Path
 
 from flask import Blueprint, current_app, request, render_template, jsonify, g
@@ -93,19 +95,15 @@ def explorer_dataset(dataset_key: str, page=1):
 	# Load posts
 	post_ids = []
 	posts = []
-	count = 0
 
 	# We don't need to sort if we're showing the existing dataset order (default).
 	# If we're sorting, we need to iterate over the entire dataset first.
 	if not sort or (sort == "dataset-order" and not reverse):
-		for row in dataset.iterate_items(warn_unmappable=False):
+		count = offset
+		# Not getting annotations here because we want to separate them from regular fields
+		for row in dataset.iterate_items(warn_unmappable=False, get_annotations=False, offset=offset):
 
 			count += 1
-
-			# Use an offset if we're showing a page beyond the first.
-			if count <= offset:
-				continue
-
 			# Attribute column names and collect dataset's posts.
 			post_ids.append(row["id"])
 			posts.append(row)
@@ -114,7 +112,9 @@ def explorer_dataset(dataset_key: str, page=1):
 			if count >= (offset + posts_per_page) or count > max_posts:
 				break
 	else:
-		for row in sort_and_iterate_items(dataset, sort, reverse=reverse, warn_unmappable=False):
+		count = 0
+		get_annotations = True if sort in dataset.get_annotation_field_labels() else False
+		for row in sort_and_iterate_items(dataset, sort, reverse=reverse, warn_unmappable=False, get_annotations=get_annotations):
 			count += 1
 			if count <= offset:
 				continue
@@ -131,9 +131,12 @@ def explorer_dataset(dataset_key: str, page=1):
 	# If there's annotations made, pass these to the template and set the post ID
 	# as key so we can easily retrieve them later.
 	post_annotations = {}
-	for post_id in post_ids:
-		annotations = dataset.get_annotations_for_item(post_id)
-		post_annotations[post_id] = [a for a in annotations if a]
+	if dataset.annotation_fields:
+		annotations = dataset.get_annotations_for_item(post_ids)
+		post_annotations = collections.defaultdict(dict)
+		if annotations:
+			for annotation in annotations:
+				post_annotations[annotation.item_id][annotation.field_id] = annotation
 
 	# We can use either a generic or a pre-made, data source-specific template.
 	template = "datasource" if has_datasource_template(datasource) else "generic"
