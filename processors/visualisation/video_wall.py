@@ -157,6 +157,7 @@ class VideoWallGenerator(BasicProcessor):
             else:
                 # no max, so use all available media
                 amount = self.source_dataset.num_rows
+
         sound = self.parameters.get("audio", "longest")
         max_length = self.parameters.get("max-length", 60)
         aspect_ratio = self.parameters.get("aspect-ratio")
@@ -222,6 +223,12 @@ class VideoWallGenerator(BasicProcessor):
         media_keys = list(media.keys())
         included_media = media_keys[:amount]
         excluded_media = media_keys[amount:]
+
+        # if a dimension is empty, the next step will fail, so intercept
+        if not included_media:
+            return self.dataset.finish_with_error("No media with parseable dimensions left for collage after applying "
+                                                  "selection criteria. There may be non-image files or corrupted files "
+                                                  "in your dataset.")
 
         # overall average dimensions will be useful for some of the sizing modes
         avg = statistics.mean if sizing_mode == "average" else statistics.median
