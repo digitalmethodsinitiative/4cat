@@ -209,6 +209,11 @@ class VideoWallGenerator(BasicProcessor):
                 skipped += 1
                 continue
 
+            if any([d == 0 for d in dimensions[item.name]]):
+                self.dataset.log(f"Dimensions of file {item.name} read as 0 pixels; skipping")
+                skipped += 1
+                continue
+
             media[item.name] = item
 
             # if not sorting, we don't need to probe everything and can stop
@@ -583,7 +588,8 @@ class VideoWallGenerator(BasicProcessor):
              self.dataset.update_status(f"Rendering finished. {skipped} item(s) were skipped; see dataset log for details.", is_final=True)
         else:
              self.dataset.update_status("Rendering finished.")
-             self.dataset.finish(1)
+
+        self.dataset.finish(1)
 
     def get_signature(self, file_path, sort_mode, ffprobe_path):
         """
