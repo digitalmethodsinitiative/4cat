@@ -626,6 +626,9 @@ class LLMPrompter(BasicProcessor):
                         time_created = int(time.time())
 
                         # Write!
+                        if n not in batched_ids:
+                            continue
+
                         result = {
                             "id": batched_ids[n],
                             "output": output_item,
