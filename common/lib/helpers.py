@@ -1196,6 +1196,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         else:
             base_filename = default_name + default_ext
 
+        # remove some problematic characters
+        base_filename = re.sub(r"[:/~]", "", base_filename)
+
         if not existing_filenames:
             existing_filenames = []
 
