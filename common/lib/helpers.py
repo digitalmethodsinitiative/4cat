@@ -316,7 +316,7 @@ def find_extensions():
             "url": "",
             "git_url": "",
             "is_git": False,
-        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
+        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir() and not extension.name.startswith("__")
     }
 
     # collect metadata for extensions
