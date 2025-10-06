@@ -150,9 +150,6 @@
                 <p><label for="label-threshold">Labeling threshold: </label>
                     <input class="parameter-input" id="label-threshold" name="label-threshold" type="range" value="0" min="0" max="15" step="0.5">
                 </p>
-                <p><label for="label-size">Label density: </label>
-                    <input class="parameter-input" id="label-size" name="label-size" type="number" min="1" value="14">
-                </p>
                 <p><label for="label-size-type">Size labels by node size: </label>
                     <input class="parameter-input" id="label-size-type" name="label-size-type" type="checkbox">
                 </p>
@@ -171,6 +168,10 @@
 {% if with_gephi_lite %}
 <a class="gephi-link" target="_blank" href="https://gephi.org/gephi-lite/?file={{ url_for('dataset.get_result', query_file=dataset.result_file, _external=True) }}">
     <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Gephi Lite
+</a>
+
+<a class="retina-link" target="_blank" href="https://ouestware.gitlab.io/retina/#/graph/?url={{ url_for('dataset.get_result', query_file=dataset.result_file, _external=True) }}">
+    <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Retina
 </a>
 {% endif %}
 
