@@ -57,8 +57,8 @@ processor_packages = {
 	"jsonschema",  # llm_prompter
 	"lxml",  # dowload_images_4chan, wikipedia_network, url_titles
 	"nltk~=3.9.1",  # similar-words, word-trees, collocations, split_sentences, tokenise
-	"networkx~=2.8.0",  # networks/*
-	"numpy>=1.19.2",  # image_wall, histwords, video_hasher, hash_similarity_network, aggregate_stats, tf_idf
+	"networkx>=3.0",  # networks/*
+	"numpy",  # image_wall, histwords, video_hasher, hash_similarity_network, aggregate_stats, tf_idf
 	"pandas",  # youtube_imagewall, tf_idf
 	"pyahocorasick~=1.4.0",  # tokenise
 	"PyTumblr==0.1.0",  # search_tumblr
