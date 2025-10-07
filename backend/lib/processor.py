@@ -245,17 +245,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
                 break
 
-        # see if we have anything else lined up to run next
-        for next in self.parameters.get("next", []):
-            can_run_next = True
-            next_parameters = next.get("parameters", {})
-            next_type = next.get("type", "")
-            try:
-                available_processors = self.dataset.get_available_processors(config=self.config)
-            except ValueError:
-                self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
-                break
-
 
             # run it only if the post-processor is actually available for this query
             if self.dataset.data["num_rows"] <= 0:
