@@ -116,7 +116,7 @@ class TfIdf(BasicProcessor):
 			n_size = (convert_to_int(n_size_split[0]), convert_to_int(n_size_split[1]))
 
 		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
-		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
+		max_occurrences = convert_to_int(self.parameters.get("max_occurrences", -1), -1)
 		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
 		smartirs = self.parameters.get("smartirs", "nfc")
 
@@ -158,7 +158,8 @@ class TfIdf(BasicProcessor):
 			min_occurrences = len(tokens) - 1
 		if max_occurrences <= 0 or max_occurrences > len(tokens):
 			max_occurrences = len(tokens)
-
+		self.dataset.log(f"Running tf-idf with library {library}, n_size {n_size}, min_occurrences {min_occurrences}, max_occurrences {max_occurrences}, max_output {max_output}, smartirs {smartirs}")
+		
 		# Get the tf-idf matrix.
 		self.dataset.update_status("Generating tf-idf for token set")
 		try:
@@ -240,13 +241,24 @@ class TfIdf(BasicProcessor):
 		"""
 
 		# Vectorise
-		self.dataset.update_status("Vectorizing")
-		tfidf_vectorizer = TfidfVectorizer(min_df=min_occurrences, max_df=max_occurrences, ngram_range=ngram_range,
-										   analyzer="word", token_pattern=None, tokenizer=lambda i: i, lowercase=False)
+		self.dataset.update_status("Vectorizing")\
+		# sklearn requires min_df >= 1 (int) or [0.0, 1.0] (float). Coerce 0 -> 1.
+		min_df = 1 if isinstance(min_occurrences, int) and min_occurrences <= 0 else min_occurrences
+
+		tfidf_vectorizer = TfidfVectorizer(
+			min_df=min_df, 
+			max_df=max_occurrences, 
+			ngram_range=ngram_range,
+			analyzer="word", 
+			token_pattern=None, 
+			tokenizer=lambda i: i, 
+			lowercase=False
+			)
 
 		try:
 			tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
-		except ValueError:
+		except ValueError as e:
+			self.dataset.log(f"sklearn ValueError: {e!r}")
 			self.dataset.update_status("No tokens remain with these parameters. Set less strict constraints and try again.", is_final=True)
 			self.dataset.finish(0)
 			return
