@@ -246,6 +246,13 @@ class LLMPrompter(BasicProcessor):
                 "label": "prompt outputs",
                 "default": False,
             },
+            "hide_think": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Hide reasoning",
+                "default": False,
+                "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
+                           "removes this tag and its contents from the output."
+            },
             "limit": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Only annotate this many items, then stop",
@@ -280,6 +287,7 @@ class LLMPrompter(BasicProcessor):
         api_consent = self.parameters.get("consent", False)
         api_model = self.parameters.get("api_model")
         use_local_model = self.parameters.get("api_or_local", "api") == "local"
+        hide_think = self.parameters.get("hide_think", False)
 
         # Add some friction if an API is used.
         if not use_local_model and not api_consent:
@@ -584,7 +592,6 @@ class LLMPrompter(BasicProcessor):
 
                     # Always parse JSON outputs in the case of batches.
                     if use_batches or structured_output:
-
                         if isinstance(response, str):
                             response = json.loads(response)
                         
@@ -624,6 +631,10 @@ class LLMPrompter(BasicProcessor):
                             input_value = list(batched_data.values())[0]
 
                         time_created = int(time.time())
+
+                        # remove reasoning if so desired
+                        if hide_think:
+                            output_item = re.sub(r"<think>.*</think>", "", output_item, flags=re.DOTALL).strip()
 
                         result = {
                             "id": batched_ids[n],
