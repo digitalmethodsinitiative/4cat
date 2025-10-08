@@ -116,7 +116,7 @@ class TfIdf(BasicProcessor):
 			n_size = (convert_to_int(n_size_split[0]), convert_to_int(n_size_split[1]))
 
 		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
-		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
+		max_occurrences = convert_to_int(self.parameters.get("max_occurrences", -1), -1)
 		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
 		smartirs = self.parameters.get("smartirs", "nfc")
 
