@@ -628,7 +628,7 @@ class LLMPrompter(BasicProcessor):
                         if use_batches:
                             input_value = [v[n] for v in batched_data.values()]
                         else:
-                            input_value = list(batched_data.values())[0]
+                            input_value = [v[0] for v in batched_data.values()]
 
                         time_created = int(time.time())
 
