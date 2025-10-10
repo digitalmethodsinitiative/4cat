@@ -377,6 +377,14 @@ class LLMPrompter(BasicProcessor):
             return
         columns_to_use = [c[1:-1].strip() for c in columns_to_use]  # Remove brackets
 
+        # Check if there's no duplicate column brackets in the prompt
+        all_columns = [c.strip() for col in columns_to_use for c in col.split(",")]  # Get all unique column names
+        if len(set(all_columns)) != len(all_columns):
+            duplicate_columns = set([c for c in all_columns if all_columns.count(c) > 1])
+            self.dataset.finish_with_error(f"Only use unique column brackets. The current prompt "
+                                           f"contains the following duplicate brackets: {", ".join(duplicate_columns)}.")
+            return
+
         # Structured output
         structured_output = self.parameters.get("structured_output", False)
         json_schema = self.parameters.get("json_schema") if structured_output else None
@@ -477,7 +485,7 @@ class LLMPrompter(BasicProcessor):
                 else:
                     item_id = str(i + 1)
 
-                # Store dataset values in batches
+                # Store dataset values in batches. Store just one item when we're not batching.
                 item_values = {}
                 for column_to_use in columns_to_use:
                     if column_to_use not in batched_data:
@@ -533,8 +541,9 @@ class LLMPrompter(BasicProcessor):
                 if limit and i >= max_processed:
                     limit_reached = True
                     
-                # Generate text when we've reached 1) the batch length (which can be 1) or 2) the end of the dataset.
-                if n_batched % batches == 0 or (n_batched and row == self.source_dataset.num_rows) or limit_reached:
+                # Generate text when there's something to process and when we've reached 1) the batch length (which can
+                # be 1) or 2) the end of the dataset or 3) the custom limit.
+                if n_batched and (n_batched % batches == 0 or row == self.source_dataset.num_rows or limit_reached):
 
                     # Insert dataset values into prompt. Insert as list for batched data, else just insert the value.
                     for column_to_use in columns_to_use:
