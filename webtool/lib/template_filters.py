@@ -63,7 +63,7 @@ def _jinja2_filter_commafy(number):
 	"""
 	try:
 		number = int(number)
-	except TypeError:
+	except (ValueError, TypeError):
 		return number
 
 	return f"{number:,}"
