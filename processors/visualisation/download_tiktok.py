@@ -112,7 +112,7 @@ class TikTokVideoDownloader(BasicProcessor):
         results_path = self.dataset.get_staging_area()
 
         self.dataset.update_status("Downloading TikTok media")
-        video_ids_to_download = []
+        video_ids_to_download = set()
         for mapped_item in self.source_dataset.iterate_items(self):
             post_id = mapped_item.get(column)
             if not post_id:
@@ -124,14 +124,16 @@ class TikTokVideoDownloader(BasicProcessor):
                 self.dataset.finish_with_error(f"Column {column} must contain TikTok post IDs")
                 return
             
-            video_ids_to_download.append(post_id)
+            video_ids_to_download.add(post_id)
 
         # the downloader is an asynchronous method because we want to be able
         # to run multiple downloads in parallel
+
         tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
         results = loop.run_until_complete(
-            tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
+            tiktok_scraper.download_videos(list(video_ids_to_download), results_path, max_amount)
+        )
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
