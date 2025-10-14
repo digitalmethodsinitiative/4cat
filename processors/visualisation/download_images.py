@@ -379,6 +379,8 @@ class ImageDownloader(BasicProcessor):
                     try:
                         extension = self.get_valid_file_extension(downloaded_file)
                         downloaded_file.rename(downloaded_file.with_suffix(extension))
+                        # update filename mapping to reflect new extension
+                        self.filenames[url] = self.filenames[url].rsplit(".", 1)[0] + extension
 
                     except InvalidDownloadedFileException as e:
                         self.dataset.log(
