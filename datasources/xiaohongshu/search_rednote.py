@@ -108,6 +108,7 @@ class SearchRedNote(Search):
             "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
             "title": item.get("display_title", ""),
             "body": item.get("desc", "") if "desc" in item else MissingMappedField(""),
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", item["desc"])) if "desc" in item else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
             "author": item["user"]["nickname"],
             "author_avatar_url": item["user"]["avatar"],
