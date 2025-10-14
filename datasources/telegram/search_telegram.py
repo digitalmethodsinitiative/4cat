@@ -408,7 +408,7 @@ class SearchTelegram(Search):
                 self.dataset.update_status(f"Retrieving messages for entity '{entity_id_map.get(query, query)}'")
                 entity_posts = 0
                 discovered = 0
-                iter_method = self.iter_hashtag_messages if query.startswith("#") else self._client.iter_messages
+                iter_method = self.iter_hashtag_messages if (type(query) is str and query.startswith("#")) else self._client.iter_messages
 
                 try:
                     async for message in iter_method(entity=query, offset_date=max_date):
