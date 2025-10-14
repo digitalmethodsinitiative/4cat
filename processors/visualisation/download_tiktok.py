@@ -12,7 +12,7 @@ import requests
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
+from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper, RepeatedFailure
 from processors.visualisation.download_videos import VideoDownloaderPlus
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 from processors.visualisation.download_images import ImageDownloader
@@ -131,9 +131,17 @@ class TikTokVideoDownloader(BasicProcessor):
 
         tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
-        results = loop.run_until_complete(
-            tiktok_scraper.download_videos(list(video_ids_to_download), results_path, max_amount)
-        )
+        try:
+            results = loop.run_until_complete(
+                tiktok_scraper.download_videos(list(video_ids_to_download), results_path, max_amount)
+            )
+        except RepeatedFailure as e:
+            if self.source_dataset.type == "upload-search":
+                self.dataset.finish_with_error(f"TikTok video downloader failed repeatedly. Please check that the column '{column}' contains valid TikTok post IDs. Error: {e}")
+            else:
+                self.log.warning(f"TikTok video downloader failed repeatedly; may be parsing issue: {e}")
+                self.dataset.finish_with_error(f"TikTok video downloader failed repeatedly: {e}")
+            return
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
