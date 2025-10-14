@@ -141,6 +141,11 @@ class SearchRedNote(Search):
         xsec_bit = f"?xsec_token={note['xsecToken']}"
         timestamp = item.get("time", None)
 
+        if "interactInfo" in item:
+            likes = item["interactInfo"]["likedCount"]
+        elif "interact_info" in item:
+            likes = item["interact_info"]["liked_count"]
+
         return MappedItem({
             "id": item["id"],
             "thread_id": item["id"],
@@ -155,7 +160,7 @@ class SearchRedNote(Search):
             "video_url": MissingMappedField(""),
             # only available when loading an individual post page, so skip
             # "tags": ",".join(t["name"] for t in item["tag_list"]),
-            "likes": item["interactInfo"]["likedCount"],
+            "likes": likes,
             # "collects": item["interact_info"]["collected_count"],
             # "comments": item["interact_info"]["comment_count"],
             # "shares": item["interact_info"]["share_count"],
