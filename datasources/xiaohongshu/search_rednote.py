@@ -4,6 +4,8 @@ Import scraped RedNote data
 It's prohibitively difficult to scrape data from RedNote within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+import re
+
 from datetime import datetime
 
 from backend.lib.search import Search
@@ -106,6 +108,7 @@ class SearchRedNote(Search):
             "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
             "title": item.get("display_title", ""),
             "body": item.get("desc", "") if "desc" in item else MissingMappedField(""),
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", item["desc"])) if "desc" in item else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
             "author": item["user"]["nickname"],
             "author_avatar_url": item["user"]["avatar"],
@@ -144,6 +147,7 @@ class SearchRedNote(Search):
             "url": f"https://www.xiaohongshu.com/explore/{item['id']}{xsec_bit}",
             "title": note.get("title", ""),
             "body": note.get("desc", "") if "desc" in note else MissingMappedField(""),
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", note["desc"])) if "desc" in note else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
             "author": note["user"]["nickname"],
             "author_avatar_url": note["user"]["avatar"],
@@ -174,6 +178,7 @@ class SearchRedNote(Search):
             "url": f"https://www.xiaohongshu.com{item['url']}",
             "title": item["title"],
             "body": MissingMappedField(""),
+            "hashtags": MissingMappedField(""),
             "timestamp": MissingMappedField(""),
             "author": item["author_name"],
             "author_avatar_url": item["author_avatar_url"],
