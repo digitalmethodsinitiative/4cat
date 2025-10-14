@@ -141,10 +141,14 @@ class SearchRedNote(Search):
         xsec_bit = f"?xsec_token={note['xsecToken']}"
         timestamp = item.get("time", None)
 
-        if "interactInfo" in item:
-            likes = item["interactInfo"]["likedCount"]
-        elif "interact_info" in item:
-            likes = item["interact_info"]["liked_count"]
+        if "interactInfo" in note:
+            likes = note["interactInfo"]["likedCount"]
+        elif "interact_info" in note:
+            likes = note["interact_info"]["liked_count"]
+        elif "likes" in note:
+            likes = note["likes"]
+        else:
+            likes = MissingMappedField("")
 
         return MappedItem({
             "id": item["id"],
