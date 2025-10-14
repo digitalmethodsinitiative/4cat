@@ -1177,6 +1177,9 @@ class SearchTelegram(Search):
                     yield message
                     i += 1
 
+                if not hasattr(batch, "next_rate"):
+                    break
+                    
                 offset_rate = batch.next_rate
 
             if i == 0:
