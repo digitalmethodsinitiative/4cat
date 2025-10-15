@@ -1,4 +1,3 @@
-{% set parent = item %}
 {% set item = child %}
 {% set can_process = (current_user.is_authenticated and item.get_available_processors(config=__config)) %}
 {% set deprecated = (item.type not in processors) %}
@@ -93,7 +92,9 @@
         {# Child processors, recursively #}
         <ol class="children-datasets child-list">
             {% for child in item.get_children() %}
-                {% include "components/result-child.html" %}
+                {% with dataset = item %}
+                    {% include "components/result-child.html" %}
+                {% endwith %}
             {% endfor %}
         </ol>
 
