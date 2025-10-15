@@ -1,0 +1,103 @@
+# Multi-stage build for 4CAT - Slim version
+# Stage 1: Build stage with all build dependencies
+FROM python:3.11-slim as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    # Build tools
+    build-essential \
+    gcc \
+    g++ \
+    # Development headers
+    libpq-dev \
+    python3-dev \
+    postgresql-server-dev-all \
+    # Git for any git-based dependencies
+    git \
+    # Additional build dependencies that might be needed
+    pkg-config \
+    libffi-dev \
+    libssl-dev \
+    # Clean up cache
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Set environment variables for building
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Copy requirements and setup files first
+COPY ./requirements.txt /usr/src/app/requirements.txt
+COPY ./setup.py /usr/src/app/setup.py
+COPY ./VERSION /usr/src/app/VERSION
+COPY ./README.md /usr/src/app/README.md
+
+# Copy only the extensions directory for dependency detection
+COPY ./extensions /usr/src/app/extensions
+
+# Create minimal directory structure that setup.py expects
+RUN mkdir -p /usr/src/app/backend /usr/src/app/webtool /usr/src/app/datasources
+RUN touch /usr/src/app/backend/__init__.py /usr/src/app/webtool/__init__.py /usr/src/app/datasources/__init__.py
+
+# Install Python dependencies to a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip and install wheel first
+RUN pip install --upgrade pip
+
+# Install build dependencies for Python packages
+RUN pip install --no-cache-dir setuptools==78.1.0 wheel==0.46.1
+
+# Install requirements with verbose output for debugging
+RUN pip install --no-cache-dir --verbose -r requirements.txt
+
+# Install gunicorn
+RUN pip install --no-cache-dir gunicorn
+
+# Stage 2: Runtime stage with minimal dependencies
+FROM python:3.11-slim as runtime
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    # Runtime libraries only
+    libpq5 \
+    # Tools needed at runtime
+    curl \
+    netcat-traditional \
+    postgresql-client \
+    # Git for application use
+    git \
+    # Video processing (if needed)
+    #ffmpeg \
+    # Clean up
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
+
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Ensure Python outputs everything
+ENV PYTHONUNBUFFERED=1
+
+# Copy application code
+COPY . /usr/src/app/
+
+# Set permissions for scripts
+RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint.sh
+
+# Remove unnecessary files to save space
+RUN find /usr/src/app -name "*.pyc" -delete && \
+    find /usr/src/app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/src/app -name "*.pyo" -delete && \
+    find /usr/src/app -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true 
