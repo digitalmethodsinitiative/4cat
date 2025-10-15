@@ -35,17 +35,6 @@ class TikTokVideoDownloader(BasicProcessor):
 
     followups = VideoDownloaderPlus.followups
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of videos (max 1000)",
-            "default": 100,
-            "min": 0,
-            "max": 1000,
-            "tooltip": "Due to simultaneous downloads, you may end up with a few extra videos."
-        },
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
@@ -61,7 +50,16 @@ class TikTokVideoDownloader(BasicProcessor):
         the processor would be run on can be used to show some options only to
         privileges users.
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of videos (max 1000)",
+                "default": 100,
+                "min": 0,
+                "max": 1000,
+                "tooltip": "Due to simultaneous downloads, you may end up with a few extra videos."
+            },
+        }
 
         # Update the amount max and help from config
         max_number_videos = int(config.get('video-downloader.max', 1000))
@@ -180,26 +178,6 @@ class TikTokImageDownloader(BasicProcessor):
 
     followups = ImageDownloader.followups
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of items (max 1000)",
-            "default": 100,
-            "min": 0,
-            "max": 1000
-        },
-        "thumb_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Media type",
-            "options": {
-                "thumbnail": "Video Thumbnail",
-                "music": "Music Thumbnail",
-                "author_avatar": "User avatar"
-            },
-            "default": "thumbnail"
-        }
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
@@ -216,7 +194,25 @@ class TikTokImageDownloader(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of items (max 1000)",
+                "default": 100,
+                "min": 0,
+                "max": 1000
+            },
+            "thumb_type": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Media type",
+                "options": {
+                    "thumbnail": "Video Thumbnail",
+                    "music": "Music Thumbnail",
+                    "author_avatar": "User avatar"
+                },
+                "default": "thumbnail"
+            }
+        }
 
         # Update the amount max, min, tooltip, and help from config
         max_number_images = int(config.get("image-downloader.max", 1000))
