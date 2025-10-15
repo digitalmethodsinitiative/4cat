@@ -389,7 +389,8 @@ class Tokenise(BasicProcessor):
                     self.dataset.update_status(0)
                     return
             else:
-                document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
+                # Ensure descriptor is a safe filename (strip disallowed characters)
+                document_descriptor = re.sub(r"[^a-zA-Z0-9._+-]", "", str(post.get("thread_id", "") if post.get("thread_id") else "undefined")) or "undefined"
 
             # Prep metadata
             # document_numbers lists the indexes for documents found in filename relating to this post/item
