@@ -612,7 +612,9 @@ class VideoWallGenerator(BasicProcessor):
             if have_old_ffmpeg_version:
                 self.dataset.log("You may be able to prevent this error by updating to a newer version of ffmpeg.")
             if ffmpeg_error:
-                self.log.warning(f"ffmpeg error (dataset {self.dataset.key}): {ffmpeg_error}")
+                # show only the last line; rest should be in dataset log
+                ffmpeg_error = ffmpeg_error.strip().split("\n")[-1]
+                self.log.warning(f"ffmpeg error (see dataset {self.dataset.key} log for full details): {ffmpeg_error}")
             return self.dataset.finish_with_error(
                 f"Could not make collage (error {result.returncode}); check the dataset log for details.")
 
