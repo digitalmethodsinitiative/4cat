@@ -1199,8 +1199,8 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         # remove some problematic characters
         base_filename = re.sub(r"[:~]", "", base_filename)
 
-        if not existing_filenames:
-            existing_filenames = []
+        if existing_filenames is None:
+            existing_filenames = set()
 
         # Split base filename into name and extension
         if '.' in base_filename:
@@ -1232,12 +1232,14 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
 
         filename = base_filename
 
-        if staging_area:
+        if staging_area or existing_filenames:
             # Ensure the filename is unique in the staging area
-            file_path = staging_area.joinpath(filename)
             file_index = 1
+
+            file_path = staging_area.joinpath(filename) if staging_area else None
             
-            while file_path.exists() or filename in existing_filenames:
+            # Loop while collision in-memory OR on disk (if staging_area given)
+            while (filename in existing_filenames) or (staging_area and file_path.exists()):
                 # Calculate space needed for index suffix
                 index_suffix = f"-{file_index}"
                 
@@ -1262,7 +1264,8 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
                     filename = test_filename
                 
                 file_index += 1
-                file_path = staging_area.joinpath(filename)
+                if staging_area:
+                    file_path = staging_area.joinpath(filename)
 
         return filename
 
