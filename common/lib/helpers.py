@@ -1177,17 +1177,20 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         always be possible or be an actual filename. Also, avoid using the same
         filename multiple times. Ensures filenames don't exceed max_bytes.
 
-        Note: Collision possible without staging area (used to check for already 
-        existing filenames).
+        Check both in-memory existing filenames and on-disk filenames in the
+        staging area (if provided) to avoid collisions. Note: With a new staging
+        area, only in-memory checks are beneficial; leave as None to skip on-disk checks.
 
         :param str url:  URLs to determine filenames for
         :param Path staging_area:  Path to the staging area where files are saved
-        (to avoid collisions); if None, no collision avoidance is done.
+        (to avoid collisions with existing files); if None, no disk checks are done.
         :param str default_name:  Default name to use if no filename can be
         extracted from the URL
         :param str default_ext:  Default extension to use if no filename can be
         extracted from the URL
         :param int max_bytes:  Maximum number of bytes for the filename
+        :param set existing_filenames:  Set of existing filenames to avoid
+        collisions with (in addition to those in the staging area, if provided).
         :return str:  Suitable file name
         """
         clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
@@ -1201,6 +1204,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
 
         if existing_filenames is None:
             existing_filenames = set()
+        if type(existing_filenames) is not set:
+            # Could force set() here, but likely would be forcing in a loop
+            raise TypeError("existing_filenames must be a set")
 
         # Split base filename into name and extension
         if '.' in base_filename:

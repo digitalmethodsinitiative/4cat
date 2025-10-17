@@ -271,7 +271,7 @@ class ImageDownloader(BasicProcessor):
         for i, url in enumerate(urls):
             url_filename = url_to_filename(
                 url,
-                staging_area=self.staging_area,
+                staging_area=None,  # we do not check on-disk here as we know we have a new empty staging area
                 default_name="file",
                 default_ext=".png",
                 existing_filenames=url_filenames_seen,  # set instead of list
