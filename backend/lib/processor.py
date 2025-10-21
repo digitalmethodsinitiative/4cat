@@ -330,10 +330,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
                 surrogate.update_status(self.dataset.get_status())
 
-            except ValueError:
+            except DataSetException:
                 # dataset with key to attach to doesn't exist...
-                self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (
-                    self.dataset.key, self.parameters["attach_to"]))
+                self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist, may have "
+                                 "been deleted in the meantime)" % (self.dataset.key, self.parameters["attach_to"]))
 
         self.job.finish()
 
@@ -530,6 +530,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             raise RuntimeError("Staging area %s is not a valid folder")
 
         with zipfile.ZipFile(path, "r") as archive_file:
+            # sorting is important because it ensures .metadata.json is read
+            # first
             archive_contents = sorted(archive_file.namelist())
 
             for archived_file in archive_contents:
