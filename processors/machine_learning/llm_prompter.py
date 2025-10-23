@@ -382,7 +382,7 @@ class LLMPrompter(BasicProcessor):
         if len(set(all_columns)) != len(all_columns):
             duplicate_columns = set([c for c in all_columns if all_columns.count(c) > 1])
             self.dataset.finish_with_error(f"Only use unique column brackets. The current prompt "
-                                           f"contains the following duplicate brackets: {", ".join(duplicate_columns)}.")
+                                           f"contains the following duplicate brackets: {', '.join(duplicate_columns)}.")
             return
 
         # Structured output
