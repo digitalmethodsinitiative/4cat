@@ -19,7 +19,8 @@ class LLMAdapter:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         temperature: float = 0.1,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
+        client_kwargs: Optional[dict] = None,
     ):
         """
         provider: 'openai', 'google', 'mistral', 'ollama', 'lmstudio', 'mistral'
@@ -30,6 +31,7 @@ class LLMAdapter:
         json_schema: use a custom JSON schema,
         temperature: temperature hyperparameter,
         max_tokens: how many output tokens may be used
+        client_kwargs: additional client parameters
         """
         self.provider = provider.lower()
         self.model = model
@@ -39,6 +41,7 @@ class LLMAdapter:
         self.structured_output = False
         self.parser = None
         self.max_tokens = max_tokens
+        self.client_kwargs = dict(client_kwargs) if client_kwargs else {}
         self.llm: BaseChatModel = self._load_llm()
 
     def _load_llm(self) -> BaseChatModel:
@@ -82,7 +85,8 @@ class LLMAdapter:
                 model=self.model,
                 temperature=self.temperature,
                 base_url=self.base_url or "http://localhost:11434",
-                max_tokens=self.max_tokens
+                max_tokens=self.max_tokens,
+                client_kwargs=self.client_kwargs
             )
             self.model = ollama_adapter.model
             return ollama_adapter

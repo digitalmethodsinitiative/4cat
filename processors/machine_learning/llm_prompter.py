@@ -38,6 +38,15 @@ class LLMPrompter(BasicProcessor):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
+        # Check if 4CAT wide LLM server is available
+        if config.get("llm.access", False) and config.get("llm.server", ""):
+            shared_llm_name = config.get("llm.host_name", "4CAT LLM Server")
+            shared_llm_models = {model.get("model"): model.get("name") for model in config.get("llm.available_models", [])}
+            shared_llm_default = list(shared_llm_models.keys())[0] if shared_llm_models else ""
+        else:
+            shared_llm_name = False
+            shared_llm_default = ""
+            shared_llm_models = {}
 
         options = {
             "ethics_warning1": {
@@ -48,8 +57,8 @@ class LLMPrompter(BasicProcessor):
             "api_or_local": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Local or API",
-                "options": {"api": "API", "local": "Local"},
-                "default": "api",
+                "options": {"api": "API", "local": "Local"} if not shared_llm_name else {"hosted": shared_llm_name, "api": "API", "local": "Local"},
+                "default": "api" if not shared_llm_name else "hosted",
                 "tooltip": "You can use 'local' models through Ollama and LM Studio as long as you have a valid "
                 "and accessible URL through which the model can be reached.",
             },
@@ -106,7 +115,8 @@ class LLMPrompter(BasicProcessor):
                 "help": "LM Studio is a desktop application to chat with LLMs, but that you can also run as a local "
                 "server. See [this link for intructions on how to run LM Studio as a server](https://lmstudio.ai/docs/"
                 "app/api). When the server is running, the endpoint is shown in the 'Developer' tab on the top "
-                "right (default: `http://localhost:1234/v1`). 4CAT will use the top-most model you have loaded.",
+                "right (default: `http://localhost:1234/v1` or `http://host.docker.internal:1234/v1` in Docker). "
+                "4CAT will use the top-most model you have loaded. ",
             },
             "ollama-info": {
                 "type": UserInput.OPTION_INFO,
@@ -128,8 +138,8 @@ class LLMPrompter(BasicProcessor):
                 "requires": "api_or_local==local",
                 "default": "",
                 "help": "Base URL for local models",
-                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1` for LM "
-                           "Studio, `http://localhost:11434` for Ollama)",
+                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1`  or `http://host.docker.internal:1234/v1` for LM "
+                           "Studio, `http://localhost:11434` or `http://host.docker.internal:11434` for Ollama).",
             },
             "ollama_model": {
                 "type": UserInput.OPTION_TEXT,
@@ -137,6 +147,13 @@ class LLMPrompter(BasicProcessor):
                 "default": "",
                 "help": "Ollama model name",
                 "tooltip": "[required] for example 'llama3.2'",
+            },
+            "hosted_llm_model": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "LLM model",
+                "options": shared_llm_models,
+                "default": shared_llm_default,
+                "requires": "api_or_local==hosted",
             },
             "system_prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
@@ -286,11 +303,11 @@ class LLMPrompter(BasicProcessor):
 
         api_consent = self.parameters.get("consent", False)
         api_model = self.parameters.get("api_model")
-        use_local_model = self.parameters.get("api_or_local", "api") == "local"
+        modal_location = self.parameters.get("api_or_local", "api") 
         hide_think = self.parameters.get("hide_think", False)
 
         # Add some friction if an API is used.
-        if not use_local_model and not api_consent:
+        if modal_location not in ["local", "hosted"] and not api_consent:
             self.dataset.finish_with_error("You must consent to your data being sent to the LLM provider first")
             return
 
@@ -313,8 +330,9 @@ class LLMPrompter(BasicProcessor):
         # Set all variables through which we can reach the LLM
         api_key = ""
         base_url = None
+        client_kwargs = {}
 
-        if use_local_model:
+        if modal_location == "local":
             provider = self.parameters.get("local_provider", "")
             base_url = self.parameters.get("local_base_url", "")
 
@@ -325,7 +343,7 @@ class LLMPrompter(BasicProcessor):
             if provider == "lmstudio":
                 model = "lmstudio_model"
                 if not base_url:
-                    base_url = "http://127.0.0.1:1234/v1"
+                    base_url = "http://127.0.0.1:1234/v1" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:1234/v1"
                 if not self.parameters.get("lmstudio_api_key"):
                     api_key = "lm-studio"
             elif provider == "ollama":
@@ -334,9 +352,24 @@ class LLMPrompter(BasicProcessor):
                     self.dataset.finish_with_error("You need to provide a model name for Ollama (e.g. 'llama3.2')")
                     return
                 if not base_url:
-                    base_url = "http://localhost:11434"
+                    base_url = "http://localhost:11434" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:11434"
             else:
                 self.dataset.finish_with_error("Local provider not supported, choose either lmstudio or ollama")
+                return
+        elif modal_location == "hosted":
+            base_url = self.config.get("llm.server", "")
+            provider = self.config.get("llm.provider_type", "none").lower()
+            api_key = self.config.get("llm.api_key", "")
+            llm_auth_type = self.config.get("llm.auth_type", "")
+            model = self.parameters.get("hosted_llm_model", "")
+            if api_key and llm_auth_type:
+                client_kwargs = {
+                    "headers": {
+                        llm_auth_type: api_key
+                    }
+                }
+            if provider == "none" or not base_url:
+                self.dataset.finish_with_error("4CAT LLM server not properly configured; contact the administrator")
                 return
         else:
             # Models can be set manually already
@@ -404,6 +437,7 @@ class LLMPrompter(BasicProcessor):
         
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
+        self.dataset.log(f"Using LLM provider '{provider}' with model '{model}' at base URL '{base_url}'")
         try:
             llm = LLMAdapter(
                 provider=provider,
@@ -411,7 +445,8 @@ class LLMPrompter(BasicProcessor):
                 api_key=api_key,
                 base_url=base_url,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                client_kwargs=client_kwargs
             )
         except Exception as e:
             self.dataset.finish_with_error(str(e))
@@ -563,7 +598,8 @@ class LLMPrompter(BasicProcessor):
                                 api_key=api_key,
                                 base_url=base_url,
                                 temperature=temperature,
-                                max_tokens=max_tokens
+                                max_tokens=max_tokens,
+                                client_kwargs=client_kwargs
                             )
                             llm.set_structure(json_schema)
 

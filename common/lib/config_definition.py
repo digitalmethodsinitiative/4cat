@@ -550,6 +550,69 @@ config_definition = {
         },
         "global": True
     },
+
+    # LLM Server settings
+    # allows 4CAT LLM processors to connect to a local or remote LLM server
+    "llm.intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT LLM processors allow users to utilize common APIs (e.g. OpenAI, Google, Anthropic) as well as connect "
+                "to local or remote LLM servers. You can also set up your own LLM server using open source software such as "
+                "[Ollama](https://ollama.com/) and connect 4CAT to it using the settings below for your users."
+    },
+    "llm.host_name": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "4CAT LLM Server",
+        "help": "Name of LLM Server in UI",
+        "tooltip": "The name that will be shown to users in the interface when selecting an LLM server (or API or custom).",
+        "global": True
+    },
+    "llm.provider_type": {
+        "type": UserInput.OPTION_CHOICE,
+        "help": "LLM Provider Type",
+        "default": "none",
+        "options": {
+            "ollama": "Ollama",
+            "none": "None",
+        },
+        "global": True,
+    },
+    "llm.server": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "LLM Server URL",
+        "tooltip": "The URL of the LLM server, e.g. http://localhost:5000",
+        "global": True
+    },
+    "llm.auth_type": {
+        "type": UserInput.OPTION_TEXT,
+        "help": "LLM Server Authentication Type",
+        "default": "",
+        "tooltip": "The authentication type required to connect to the server (e.g. 'X-API-KEY', 'Authorization'). Passed in the request header with the API key.",
+        "global": True,
+    },
+    "llm.api_key": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "LLM Server API Key",
+        "tooltip": "The API key to access the LLM server, if required.",
+        "global": True
+    },
+    "llm.available_models": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": [],
+        "help": "Available LLM models",
+        "tooltip": "A JSON array of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
+        "indirect": True,
+        "global": True
+    },
+    "llm.access": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "LLM Access",
+        "default": False,
+        "tooltip": "Use tags or individual users to allow access to the LLM server (or set True in global for all).",
+    },
+    # TODO: add setting to restrict models per user/group?
+    
     # UI settings
     # this configures what the site looks like
     "ui.homepage": {
@@ -655,5 +718,6 @@ categories = {
     "ui": "User interface",
     "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
-    "extensions": "Extensions"
+    "extensions": "Extensions",
+    "llm": "LLM Server Settings"
 }
