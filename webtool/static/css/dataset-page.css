@@ -755,6 +755,14 @@ embed.details-only {
     margin: 0;
     min-width: 100%;
     border: 0;
+    border-collapse: separate; /* helps sticky work reliably */
+}
+
+/* scrollable table */
+.csv-preview th {
+  position: sticky;
+  top: 0;
+  z-index: 2;       /* keep above cells */
 }
 
 .csv-preview td:first-child, th:first-child {
