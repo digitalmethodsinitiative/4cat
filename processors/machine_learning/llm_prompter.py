@@ -38,6 +38,15 @@ class LLMPrompter(BasicProcessor):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
+        # Check if 4CAT wide LLM server is available
+        if config.get("llm.access", False) and config.get("llm.server", ""):
+            shared_llm_name = config.get("llm.host_name", "4CAT LLM Server")
+            shared_llm_models = {model.get("model"): model.get("name") for model in config.get("llm.available_models", [])}
+            shared_llm_default = list(shared_llm_models.keys())[0] if shared_llm_models else ""
+        else:
+            shared_llm_name = False
+            shared_llm_default = ""
+            shared_llm_models = {}
 
         options = {
             "ethics_warning1": {
@@ -48,8 +57,8 @@ class LLMPrompter(BasicProcessor):
             "api_or_local": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Local or API",
-                "options": {"api": "API", "local": "Local"},
-                "default": "api",
+                "options": {"api": "API", "local": "Local"} if not shared_llm_name else {"hosted": shared_llm_name, "api": "API", "local": "Local"},
+                "default": "api" if not shared_llm_name else "hosted",
                 "tooltip": "You can use 'local' models through Ollama and LM Studio as long as you have a valid "
                 "and accessible URL through which the model can be reached.",
             },
@@ -75,7 +84,7 @@ class LLMPrompter(BasicProcessor):
                 "help": "Model provider",
                 "requires": "api_model==custom",
                 "options": LLMAdapter.get_model_providers(config),
-                "tooltip": "Company that hosts this model. Currently limited to this list.",
+                "tooltip": "Company that hosts this model. Currently limited to this list."
             },
             "api_custom_model_id": {
                 "type": UserInput.OPTION_TEXT,
@@ -84,6 +93,7 @@ class LLMPrompter(BasicProcessor):
                 "tooltip": "E.g. 'mistral-small-2503'. Check the API provider's documentation on what model ID to use. "
                            "Fine-tuned models often require more info; OpenAI for instance requires the following "
                            "format: ft:[modelname]:[org_id]:[custom_suffix]:",
+                "default": ""
             },
             "local_info": {
                 "type": UserInput.OPTION_INFO,
@@ -105,7 +115,8 @@ class LLMPrompter(BasicProcessor):
                 "help": "LM Studio is a desktop application to chat with LLMs, but that you can also run as a local "
                 "server. See [this link for intructions on how to run LM Studio as a server](https://lmstudio.ai/docs/"
                 "app/api). When the server is running, the endpoint is shown in the 'Developer' tab on the top "
-                "right (default: `http://localhost:1234/v1`). 4CAT will use the top-most model you have loaded.",
+                "right (default: `http://localhost:1234/v1` or `http://host.docker.internal:1234/v1` in Docker). "
+                "4CAT will use the top-most model you have loaded. ",
             },
             "ollama-info": {
                 "type": UserInput.OPTION_INFO,
@@ -127,8 +138,8 @@ class LLMPrompter(BasicProcessor):
                 "requires": "api_or_local==local",
                 "default": "",
                 "help": "Base URL for local models",
-                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1` for LM "
-                           "Studio, `http://localhost:11434` for Ollama)",
+                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1`  or `http://host.docker.internal:1234/v1` for LM "
+                           "Studio, `http://localhost:11434` or `http://host.docker.internal:11434` for Ollama).",
             },
             "ollama_model": {
                 "type": UserInput.OPTION_TEXT,
@@ -137,12 +148,20 @@ class LLMPrompter(BasicProcessor):
                 "help": "Ollama model name",
                 "tooltip": "[required] for example 'llama3.2'",
             },
+            "hosted_llm_model": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "LLM model",
+                "options": shared_llm_models,
+                "default": shared_llm_default,
+                "requires": "api_or_local==hosted",
+            },
             "system_prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "System prompt",
                 "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
                            "on the tone of the text. This processor may edit the system prompt to "
                            "ensure correct output. Full system prompts are included in the results file.",
+                "default": ""
             },
             "prompt_info": {
                 "type": UserInput.OPTION_INFO,
@@ -162,12 +181,14 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "User prompt",
                 "tooltip": "Use [brackets] with columns names.",
+                "default": ""
             },
             "structured_output": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Output structured JSON",
                 "tooltip": "Output in a JSON format instead of CSV text. Note that your chosen model may not support "
-                           "structured output."
+                           "structured output.",
+                "default": False
             },
             "json_schema_info": {
                 "type": UserInput.OPTION_INFO,
@@ -181,7 +202,8 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "JSON schema",
                 "tooltip": "[required] A JSON schema that the structured output will adhere to",
-                "requires": "structured_output==true"
+                "requires": "structured_output==true",
+                "default": ""
             },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
@@ -193,13 +215,20 @@ class LLMPrompter(BasicProcessor):
                 "probable next token. A score close to 0 returns more predictable "
                 "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
             },
+            "truncate_input": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Max chars in input value",
+                "default": 0,
+                "coerce_type": int,
+                "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
+            },
             "max_tokens": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Max output tokens",
-                "default": 1000,
+                "default": 10000,
                 "coerce_type": int,
                 "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
-                "text for common English text.",
+                "text for common English text. This includes tokens spent for reasoning.",
             },
             "batches": {
                 "type": UserInput.OPTION_TEXT,
@@ -234,6 +263,27 @@ class LLMPrompter(BasicProcessor):
                 "label": "prompt outputs",
                 "default": False,
             },
+            "hide_think": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Hide reasoning",
+                "default": False,
+                "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
+                           "removes this tag and its contents from the output."
+            },
+            "limit": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Only annotate this many items, then stop",
+                "default": 0,
+                "coerce_type": int,
+                "min": 0,
+                "delegated": True
+            },
+            "annotation_label": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Label for the annotations to add to the dataset",
+                "default": "",
+                "delegated": True
+            }
         }
         return options
 
@@ -253,11 +303,11 @@ class LLMPrompter(BasicProcessor):
 
         api_consent = self.parameters.get("consent", False)
         api_model = self.parameters.get("api_model")
-        use_local_model = self.parameters.get("api_or_local", "api") == "local"
-        model = ""
+        modal_location = self.parameters.get("api_or_local", "api") 
+        hide_think = self.parameters.get("hide_think", False)
 
         # Add some friction if an API is used.
-        if not use_local_model and not api_consent:
+        if modal_location not in ["local", "hosted"] and not api_consent:
             self.dataset.finish_with_error("You must consent to your data being sent to the LLM provider first")
             return
 
@@ -265,8 +315,11 @@ class LLMPrompter(BasicProcessor):
         
         temperature = float(self.parameters.get("temperature", 0.1))
         temperature = min(max(temperature, 0), 2)
+        max_input_len = int(self.parameters.get("truncate_input", 0))
         max_tokens = int(self.parameters.get("max_tokens"))
         system_prompt = self.parameters.get("system_prompt", "")
+        limit = self.parameters.get("limit", 0)
+        limit_reached = False
 
         # Set value for batch length in prompts
         batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
@@ -277,8 +330,9 @@ class LLMPrompter(BasicProcessor):
         # Set all variables through which we can reach the LLM
         api_key = ""
         base_url = None
+        client_kwargs = {}
 
-        if use_local_model:
+        if modal_location == "local":
             provider = self.parameters.get("local_provider", "")
             base_url = self.parameters.get("local_base_url", "")
 
@@ -289,7 +343,7 @@ class LLMPrompter(BasicProcessor):
             if provider == "lmstudio":
                 model = "lmstudio_model"
                 if not base_url:
-                    base_url = "http://127.0.0.1:1234/v1"
+                    base_url = "http://127.0.0.1:1234/v1" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:1234/v1"
                 if not self.parameters.get("lmstudio_api_key"):
                     api_key = "lm-studio"
             elif provider == "ollama":
@@ -298,9 +352,24 @@ class LLMPrompter(BasicProcessor):
                     self.dataset.finish_with_error("You need to provide a model name for Ollama (e.g. 'llama3.2')")
                     return
                 if not base_url:
-                    base_url = "http://localhost:11434"
+                    base_url = "http://localhost:11434" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:11434"
             else:
                 self.dataset.finish_with_error("Local provider not supported, choose either lmstudio or ollama")
+                return
+        elif modal_location == "hosted":
+            base_url = self.config.get("llm.server", "")
+            provider = self.config.get("llm.provider_type", "none").lower()
+            api_key = self.config.get("llm.api_key", "")
+            llm_auth_type = self.config.get("llm.auth_type", "")
+            model = self.parameters.get("hosted_llm_model", "")
+            if api_key and llm_auth_type:
+                client_kwargs = {
+                    "headers": {
+                        llm_auth_type: api_key
+                    }
+                }
+            if provider == "none" or not base_url:
+                self.dataset.finish_with_error("4CAT LLM server not properly configured; contact the administrator")
                 return
         else:
             # Models can be set manually already
@@ -339,7 +408,15 @@ class LLMPrompter(BasicProcessor):
                 "or '[timestamp, author]')"
             )
             return
-        columns_to_use = [c[1:-1] for c in columns_to_use]  # Remove brackets
+        columns_to_use = [c[1:-1].strip() for c in columns_to_use]  # Remove brackets
+
+        # Check if there's no duplicate column brackets in the prompt
+        all_columns = [c.strip() for col in columns_to_use for c in col.split(",")]  # Get all unique column names
+        if len(set(all_columns)) != len(all_columns):
+            duplicate_columns = set([c for c in all_columns if all_columns.count(c) > 1])
+            self.dataset.finish_with_error(f"Only use unique column brackets. The current prompt "
+                                           f"contains the following duplicate brackets: {', '.join(duplicate_columns)}.")
+            return
 
         # Structured output
         structured_output = self.parameters.get("structured_output", False)
@@ -360,6 +437,7 @@ class LLMPrompter(BasicProcessor):
         
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
+        self.dataset.log(f"Using LLM provider '{provider}' with model '{model}' at base URL '{base_url}'")
         try:
             llm = LLMAdapter(
                 provider=provider,
@@ -367,7 +445,8 @@ class LLMPrompter(BasicProcessor):
                 api_key=api_key,
                 base_url=base_url,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                client_kwargs=client_kwargs
             )
         except Exception as e:
             self.dataset.finish_with_error(str(e))
@@ -423,8 +502,8 @@ class LLMPrompter(BasicProcessor):
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 
             row = 0
+            max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
             for item in self.source_dataset.iterate_items():
-
                 row += 1
 
                 if self.interrupted:
@@ -441,7 +520,7 @@ class LLMPrompter(BasicProcessor):
                 else:
                     item_id = str(i + 1)
 
-                # Store dataset values in batches
+                # Store dataset values in batches. Store just one item when we're not batching.
                 item_values = {}
                 for column_to_use in columns_to_use:
                     if column_to_use not in batched_data:
@@ -457,9 +536,11 @@ class LLMPrompter(BasicProcessor):
                                 if col_value:
                                     item_value.append(col_value)
                             item_value = ", ".join(item_value)
+
                         # Else just get the single item
                         else:
                             item_value = str(item[column_to_use]).strip()
+
                     except KeyError:
                         self.dataset.finish_with_error(f"Column(s) '{column_to_use}' not in the parent dataset")
                         return
@@ -485,13 +566,19 @@ class LLMPrompter(BasicProcessor):
                 # Else add the values to the batch
                 else:
                     for item_column, item_value in item_values.items():
+                        if max_input_len > 0:
+                            item_value = item_value[:max_input_len]
                         batched_data[item_column].append(item_value)
                     n_batched += 1
                     batched_ids.append(item_id)  # Also store IDs, so we can match them to the output
 
                 i += 1
-                # Generate text when we've reached 1) the batch length (which can be 1) or 2) the end of the dataset.
-                if n_batched % batches == 0 or (n_batched and row == self.source_dataset.num_rows):
+                if limit and i >= max_processed:
+                    limit_reached = True
+                    
+                # Generate text when there's something to process and when we've reached 1) the batch length (which can
+                # be 1) or 2) the end of the dataset or 3) the custom limit.
+                if n_batched and (n_batched % batches == 0 or row == self.source_dataset.num_rows or limit_reached):
 
                     # Insert dataset values into prompt. Insert as list for batched data, else just insert the value.
                     for column_to_use in columns_to_use:
@@ -511,7 +598,8 @@ class LLMPrompter(BasicProcessor):
                                 api_key=api_key,
                                 base_url=base_url,
                                 temperature=temperature,
-                                max_tokens=max_tokens
+                                max_tokens=max_tokens,
+                                client_kwargs=client_kwargs
                             )
                             llm.set_structure(json_schema)
 
@@ -520,8 +608,8 @@ class LLMPrompter(BasicProcessor):
                         system_prompt.replace("{batch_size}", str(n_batched))
 
                     batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
-                    self.dataset.update_status(f"Generating text at row {row}/"
-                                               f"{self.source_dataset.num_rows} with {model}{batch_str}")
+                    self.dataset.update_status(f"Generating text at row {row:,}/"
+                                               f"{max_processed:,} with {model}{batch_str}")
                     # Now finally generate some text!
                     try:
                         response = llm.generate_text(
@@ -549,7 +637,6 @@ class LLMPrompter(BasicProcessor):
 
                     # Always parse JSON outputs in the case of batches.
                     if use_batches or structured_output:
-
                         if isinstance(response, str):
                             response = json.loads(response)
                         
@@ -586,11 +673,14 @@ class LLMPrompter(BasicProcessor):
                         if use_batches:
                             input_value = [v[n] for v in batched_data.values()]
                         else:
-                            input_value = list(batched_data.values())[0]
+                            input_value = [v[0] for v in batched_data.values()]
 
                         time_created = int(time.time())
 
-                        # Write!
+                        # remove reasoning if so desired
+                        if hide_think:
+                            output_item = re.sub(r"<think>.*</think>", "", output_item, flags=re.DOTALL).strip()
+
                         result = {
                             "id": batched_ids[n],
                             "output": output_item,
@@ -612,6 +702,8 @@ class LLMPrompter(BasicProcessor):
                             # Else this will just save one string.
                             if isinstance(output_item, dict):
                                 annotation_output = flatten_dict({model: output_item})
+                            elif self.parameters.get("annotation_label"):
+                                annotation_output = {self.parameters.get("annotation_label"): output_item}
                             else:
                                 annotation_output = {model + "_output": output_item}
 
@@ -622,6 +714,7 @@ class LLMPrompter(BasicProcessor):
                                     "value": remove_nuls(output_value),
                                     "type": "text",
                                 }
+
                                 annotations.append(annotation)
 
                     # Remove batched data and store what row we've left off
@@ -634,11 +727,13 @@ class LLMPrompter(BasicProcessor):
                         time.sleep(1)
 
                 # Write annotations in batches
-                if i % 1000 == 0 and annotations:
+                if (i % 1000 == 0 and annotations) or limit_reached:
                     self.save_annotations(annotations)
                     annotations = []
 
-                self.dataset.update_progress(row / self.source_dataset.num_rows)
+                self.dataset.update_progress(row / max_processed)
+                if limit_reached:
+                    break
 
         outfile.close()
 

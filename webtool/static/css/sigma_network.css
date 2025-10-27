@@ -259,11 +259,15 @@ i.invisible {
     display: none;
 }
 
-.gephi-link {
+.gephi-link, .retina-link {
     position: absolute;
     bottom: 0.5em;
     right: 0.5em;
     font-size: 0.8em;
     background-color: rgba(250, 250, 250, 0.8);
     padding: 0.25em;
+}
+
+.retina-link {
+    bottom: 2.5em;
 }

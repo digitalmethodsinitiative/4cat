@@ -155,7 +155,7 @@ class ClassificationEvaluation(BasicProcessor):
             count += 1
 
             if skip_empty and (not label_pred or not label_true):
-                self.dataset.update_status(f"Skipping row {count} (no values in both columns)")
+                self.dataset.update_status(f"Skipping row {count}, no input value(s)")
                 continue
             elif not skip_empty and (not label_pred or not label_true):
                 self.dataset.finish_with_error("Make sure that both columns have values in every row or select 'Skip "
@@ -185,6 +185,10 @@ class ClassificationEvaluation(BasicProcessor):
                 else:
                     labels_true.append([label_true])
                     labels_pred.append([label_pred])
+
+        if not labels_true or not labels_pred:
+            self.dataset.finish_with_error("No items found with values in both columns")
+            return
 
         results = []
         # Support for multiple labels per item

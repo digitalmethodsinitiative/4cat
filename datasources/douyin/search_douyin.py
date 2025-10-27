@@ -51,6 +51,7 @@ class SearchDouyin(Search):
                 post_timestamp = datetime.fromtimestamp(stream_data.get("createtime", item.get(
                     "requestTime") / 1000))  # These may only have the timestamp of the request
                 video_url = stream_data.get("stream_url").get("flv_pull_url", {}).get("FULL_HD1")
+                video_thumbnail = stream_data.get("video", {}).get("cover")
                 video_description = stream_data.get("title")
                 duration = "Unknown"
                 prevent_download = None
@@ -65,13 +66,13 @@ class SearchDouyin(Search):
             else:
                 post_timestamp = datetime.fromtimestamp(item["createTime"])
                 videos_list = item.get("video").get("bitRateList")
-                if not videos_list:
-                    # Image galleries do not have video data
-                    video_url = ""
-                else:
+                if videos_list:
                     videos = sorted([vid for vid in item.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
                                 reverse=True)
                     video_url = "https" + videos[0]["playApi"]
+                else:
+                    video_url = ""
+                video_thumbnail = item.get("video", {}).get("cover")
                 video_description = item["desc"]
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
                 prevent_download = "yes" if item["download"]["prevent"] else "no"
@@ -119,6 +120,7 @@ class SearchDouyin(Search):
                     stream_data.get("create_time", item.get("create_time", metadata.get(
                         "timestamp_collected") / 1000)))  # Some posts appear to have no timestamp! We substitute collection time
                 video_url = stream_data.get("stream_url").get("flv_pull_url", {}).get("FULL_HD1")
+                video_thumbnail = stream_data.get("video", {}).get("cover")
                 video_description = stream_data.get("title")
                 duration = "Unknown"
 
@@ -133,10 +135,12 @@ class SearchDouyin(Search):
                 if not videos_list:
                     # Image galleries do not have video data
                     video_url = ""
+                    video_thumbnail = ""
                 else:
                     videos = sorted([vid for vid in item["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
                                 reverse=True)
-                    video_url = videos[0]["play_addr"].get("url_list", [''])[-1] if len(videos) > 0 else ""
+                    video_url = videos[0]["play_addr"].get("url_list", [''])[0] if len(videos) > 0 else ""
+                    video_thumbnail = item.get("video", {}).get("cover",{}).get("url_list", [""])[0]
                 video_description = item["desc"]
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
 
@@ -231,6 +235,7 @@ class SearchDouyin(Search):
             "video_tags": video_tags,
             "prevent_download": prevent_download,
             "video_url": video_url,
+            "video_thumbnail": video_thumbnail,
             "video_duration": duration,
             "image_urls": ','.join(image_urls),
             "music_author": music_author,

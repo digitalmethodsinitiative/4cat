@@ -261,17 +261,30 @@ class ImageDownloader(BasicProcessor):
         failures = []
         metadata = {}
 
+        self.dataset.log(f"Filename prep for {len(urls)} URLs")
         # prepare filenames for each url
         self.filenames = CaseInsensitiveDict()
         self.url_redirects = {}
 
-        url_filenames = []
-        for url in urls:
-            url_filename = url_to_filename(url, staging_area=self.staging_area, default_name="file", default_ext=".png", existing_filenames=url_filenames)
+        # Use a set for O(1) membership during filename uniqueness checks
+        url_filenames_seen = set()
+        for i, url in enumerate(urls):
+            url_filename = url_to_filename(
+                url,
+                staging_area=None,  # we do not check on-disk here as we know we have a new empty staging area
+                default_name="file",
+                default_ext=".png",
+                existing_filenames=url_filenames_seen,  # set instead of list
+            )
+            
             self.filenames[url] = url_filename
-            url_filenames.append(url_filename)
+            url_filenames_seen.add(url_filename)  # record membership
+            if i in (0, 9, 49) or ((i + 1) % 200 == 0):
+                # Log progress every 10, 50, then every 200
+                self.dataset.log(f"Filename progress {i+1}/{len(urls)} filenames done")
 
         max_images = min(len(urls), amount) if amount > 0 else len(urls)
+        self.dataset.log(f"Starting download of up to {max_images:,} image(s).")
         for url, response in self.iterate_proxied_requests(
             urls,
             preserve_order=False,
@@ -379,6 +392,8 @@ class ImageDownloader(BasicProcessor):
                     try:
                         extension = self.get_valid_file_extension(downloaded_file)
                         downloaded_file.rename(downloaded_file.with_suffix(extension))
+                        # update filename mapping to reflect new extension
+                        self.filenames[url] = self.filenames[url].rsplit(".", 1)[0] + extension
 
                     except InvalidDownloadedFileException as e:
                         self.dataset.log(

@@ -5,8 +5,9 @@ import time
 import urllib3
 import ural
 import requests
-from collections import namedtuple
 
+from collections import namedtuple
+from asyncio import CancelledError
 
 class FailedProxiedRequest:
     """
@@ -348,6 +349,7 @@ class DelegatedRequestHandler:
 
                     except (
                         ConnectionError,
+                        CancelledError,
                         requests.exceptions.RequestException,
                         urllib3.exceptions.HTTPError,
                     ) as e:

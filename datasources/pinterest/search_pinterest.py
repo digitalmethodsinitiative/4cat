@@ -84,7 +84,7 @@ class SearchPinterest(Search):
             "author": post["pinner"]["username"],
             "author_fullname": post["pinner"].get("fullName", post["pinner"].get("full_name", "")),
             "author_original": post["nativeCreator"]["username"] if post.get("nativeCreator") else post["pinner"]["username"],
-            "body": post["description"].strip(),
+            "body": post.get("description", "").strip(),
             "subject": post["title"].strip(),
             "ai_description": post.get("auto_alt_text", ""),
             "pinner_original": post["originPinner"]["fullName"] if post.get("originPinner") else "",

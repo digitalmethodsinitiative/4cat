@@ -104,7 +104,7 @@ class DataSet(FourcatModule):
         self.data = {}
         self.parameters = {}
         self.available_processors = {}
-        self._genealogy = []
+        self._genealogy = None
         self.staging_areas = []
         self.modules = modules
 
@@ -874,7 +874,7 @@ class DataSet(FourcatModule):
         # delete annotations that have been generated as part of this dataset
         self.db.delete("annotations", where={"from_dataset": self.key}, commit=commit)
         # delete annotation fields on parent dataset(s) stemming from this dataset
-        for related_dataset in self.get_genealogy():
+        for related_dataset in self.get_genealogy(update_cache=True):
             field_deleted = False
             annotation_fields = related_dataset.annotation_fields
             if annotation_fields:
@@ -1635,7 +1635,7 @@ class DataSet(FourcatModule):
         genealogy = self.get_genealogy()
         return genealogy[0]
 
-    def get_genealogy(self):
+    def get_genealogy(self, update_cache=False):
         """
         Get genealogy of this dataset
 
@@ -1643,9 +1643,10 @@ class DataSet(FourcatModule):
         'top' dataset, and each subsequent one being a child of the previous
         one, ending with the current dataset.
 
+        :param bool update_cache:  Update the cached genealogy if True, else return cached value
         :return list:  Dataset genealogy, oldest dataset first
         """
-        if not self._genealogy:
+        if not self._genealogy or update_cache:
             key_parent = self.key_parent
             genealogy = []
 
@@ -1662,12 +1663,14 @@ class DataSet(FourcatModule):
                     break
 
             genealogy.reverse()
+
+            # add self to the end
+            genealogy.append(self)
+            # cache the result
             self._genealogy = genealogy
 
-        genealogy = self._genealogy
-        genealogy.append(self)
-
-        return genealogy
+        # return a copy to prevent external modification
+        return list(self._genealogy)
 
     def get_children(self, update=False):
         """
@@ -1896,6 +1899,9 @@ class DataSet(FourcatModule):
         self.db.update(
             "datasets", where={"key": self.key}, data={"key_parent": key_parent}
         )
+        # reset caches
+        self.data["key_parent"] = key_parent
+        self._genealogy = None  
 
     def get_parent(self):
         """

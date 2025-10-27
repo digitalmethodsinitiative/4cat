@@ -163,12 +163,13 @@ can
         # Start writing result file
         self.dataset.update_status("Collecting model predictions")
         index = 0
+        parent_rows = self.dataset.top_parent().num_rows
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline='') as results:
             writer = csv.DictWriter(results, fieldnames=post_column_names + model_column_names)
             writer.writeheader()
 
             # Loop through the source dataset
-            for post in self.dataset.top_parent().iterate_items(self):
+            for i, post in enumerate(self.dataset.top_parent().iterate_items(self)):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while writing results file")
 
@@ -203,7 +204,7 @@ can
 
                     # Collect predictions for post
                     for document_number in token_data['document_numbers']:
-                        combined_data['id'] = str(post.get('id')) + '-' + str(document_number)
+                        combined_data['id'] = str(post['id']) + '-' + str(document_number)
                         combined_data['document_id'] = document_number
 
                         # Note if original document was split (by sentence or using multiple columns in tokenizer)
@@ -227,24 +228,33 @@ can
                             annotations.append({
                                 "label": "top_topic(s)",
                                 "value": top_topics,
-                                "item_id": post.get("id")
+                                "item_id": post["id"]
                             })
 
-                        for i, topic in enumerate(related_topic_columns):
-                            combined_data[topic] = doc_predictions[str(i)]
+                        for n, topic in enumerate(related_topic_columns):
+                            combined_data[topic] = doc_predictions[str(n)]
 
                             # Potentially add topic weights as annotations
                             if save_annotations:
                                 annotations.append({
                                     "label": topic,
-                                    "value": doc_predictions[str(i)],
+                                    "value": doc_predictions[str(n)],
                                     "item_id": post.get("id")
                                     })
+
+                                # batch-save annotations
+                                if len(annotations) > 1000:
+                                    self.save_annotations(annotations)
+                                    annotations = []
 
                         writer.writerow(combined_data)
                         index += 1
 
-        if save_annotations:
+                if i % 100 == 0:
+                    self.dataset.update_status(f"Processed {i} items")
+                    self.dataset.update_progress(i / parent_rows)
+
+        if annotations:
             self.save_annotations(annotations)
 
         self.dataset.update_status("Results saved")

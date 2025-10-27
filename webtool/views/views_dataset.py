@@ -483,6 +483,8 @@ def queue_processor_interactive(key, processor):
     if result.json["status"] == "success":
         return redirect("/results/" + key + "/")
 
+    return render_template("error.html", message=result.json.get("message", "Error :("))
+
 
 @component.route("/results/<string:key>/toggle-favourite/")
 @login_required

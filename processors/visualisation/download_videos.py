@@ -112,11 +112,12 @@ class VideoDownloaderPlus(BasicProcessor):
                        "videos with unknown sizes."
         },
         "video-downloader.allow-indirect": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
+            "type": UserInput.OPTION_CHOICE,
+            "default": "none",
+            "options": {"none": "No indirect links", "yt_only": "YouTube only", "all": "All links"},
             "help": "Allow indirect downloads",
             "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet, link to a YouTube video). "
-                       "Enabling can be confusing for users and download more than intended."
+                       "Enabling all can be confusing for users and download more than intended."
         },
         "video-downloader.allow-multiple": {
             "type": UserInput.OPTION_TOGGLE,
@@ -182,13 +183,19 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # these two options are likely to be unwanted on instances with many
         # users, so they are behind an admin config options
-        if config.get("video-downloader.allow-indirect"):
-            options["use_yt_dlp"] = {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Also attempt to download non-direct video links (such YouTube and other video hosting sites)",
-                "default": False,
-                "tooltip": "If False, 4CAT will only download directly linked videos (works with fields like Twitter's \"video\", TikTok's \"video_url\" or Instagram's \"media_url\"), but if True 4CAT uses YT-DLP to download from YouTube and a number of other video hosting sites (see references)."
+        indirect_setting = config.get("video-downloader.allow-indirect", "none")
+        if indirect_setting and indirect_setting != "none":
+            possible_options = {"none": "No indirect links", "yt_only": "YouTube links"}
+            if indirect_setting == "all":
+                possible_options["all"] = "Attempt all links"
+            options["also_indirect"] = {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "none",
+                "help": "Also attempt to download non-direct videos link?",
+                "options": possible_options,
+                "tooltip": "4CAT will always download directly linked videos (works with fields like Twitter's \"video\", TikTok's \"video_url\" or Instagram's \"media_url\"), but 4CAT can use YT-DLP to download from YouTube and a number of other video hosting sites (see references)."
             }
+            
             options["max_video_res"] = {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Max video resolution height (use 0 for any)",
@@ -196,7 +203,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 "default": 0,
                 "min": 0,
                 "tooltip": "If 0, any resolution is allowed. Otherwise, only videos with a resolution less than or equal to this height will be downloaded (e.g. videos less than 480p).",
-                "requires": "use_yt_dlp=true"
+                "requires": "also_indirect!=none"
             }
 
         if config.get("video-downloader.allow-multiple"):
@@ -206,7 +213,7 @@ class VideoDownloaderPlus(BasicProcessor):
                                             "default": 0,
                                             "min": 0,
                                             "max": 5,
-                                            "requires": "use_yt_dlp=true",
+                                            "requires": "also_indirect!=none",
                                             "tooltip": "If more than 0, links leading to multiple videos will be downloaded (e.g. a YouTube user's channel)"
                                         }
         if config.get('video-downloader.allow-unknown-size', False):
@@ -273,7 +280,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 raise LiveVideoException("4CAT settings do not allow downloading live videos with this processor")
 
         # Use YT-DLP
-        use_yt_dlp = self.parameters.get("use_yt_dlp", False)
+        also_indirect = self.parameters.get("also_indirect", "none")
 
         # Set up YT-DLP options
         ydl_opts = {
@@ -377,7 +384,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
             # Check for repeated timeouts
             if consecutive_errors >= 5:
-                if use_yt_dlp:
+                if also_indirect != "none":
                     message = "Downloaded %i videos. Errors %i consecutive times; try " \
                               "deselecting the non-direct videos setting" % (self.downloaded_videos, consecutive_errors)
                 else:
@@ -437,7 +444,20 @@ class VideoDownloaderPlus(BasicProcessor):
                     urls[url]["retry"] = False
                 continue
             except VideoStreamUnavailable as e:
-                if use_yt_dlp:
+                def is_youtube_link(u):
+                    """
+                    Helper to determine if a URL is a YouTube link
+                    Only used if also_indirect is "yt_only"
+                    :param u: URL to check
+                    :return: True if YouTube link, else False
+                    """
+                    netloc = urlparse(u).netloc.lower()
+                    return (
+                        netloc == 'youtu.be' or
+                        netloc == 'youtube.com' or
+                        netloc.endswith('.youtube.com')
+                    )
+                if also_indirect == "all" or (also_indirect == "yt_only" and is_youtube_link(url)):
                     # Take it away yt-dlp
                     # Update filename
                     ydl_opts["outtmpl"] = str(results_path) + '/' + re.sub(r"[^0-9a-z]+", "_", url.lower())[

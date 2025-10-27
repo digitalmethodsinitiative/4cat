@@ -235,12 +235,16 @@ class ConsolidateURLs(BasicProcessor):
         """
         options = cls.options
         # Get the columns for the select columns option
-        if parent_dataset and parent_dataset.get_columns():
-            columns = parent_dataset.get_columns()
-            options["column"]["type"] = UserInput.OPTION_CHOICE
-            options["column"]["options"] = {v: v for v in columns}
-            options["column"]["default"] = "4CAT_extracted_urls" if "4CAT_extracted_urls" in columns else sorted(columns,
-                                                                                    key=lambda k: any([name in k for name in ["url", "urls", "link"]])).pop()
+        if parent_dataset:
+            columns = parent_dataset.get_columns()  # call once
+            if columns:
+                options["column"]["type"] = UserInput.OPTION_CHOICE
+                options["column"]["options"] = {v: v for v in columns}
+                if "4CAT_extracted_urls" in columns:
+                    options["column"]["default"] = "4CAT_extracted_urls"
+                else:
+                    # first column with url, urls, or link in name (if any), otherwise first column
+                    options["column"]["default"] = sorted(columns, key=lambda k: any([name in k.lower() for name in ["url", "urls", "link"]]), reverse=True)[0]
 
         return options
 

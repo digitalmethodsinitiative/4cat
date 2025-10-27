@@ -73,7 +73,7 @@ class Annotation:
             current = self.get_by_id(annotation_id)
             if not current:
                 raise AnnotationException(
-                    "Annotation() requires a valid ID for an existing annotation, %s given" % id)
+                    "Annotation() requires a valid ID for an existing annotation, %s given" % annotation_id)
 
         # If an ID is not given, get or create an Annotation object from its data.
         # First check if required fields are present in `data`.
@@ -222,7 +222,8 @@ class Annotation:
         Returns all annotations for a dataset.
         :param db:                  Database object.
         :param str dataset_key:     A dataset key.
-        :param str item_id:         An optional item ID to only get annotations from one item (i.g. social media post).
+        :param str item_id:         An optional item ID or multiple item IDs to only get annotations from specific
+                                    items
 
         :return list: List with annotations.
         """
@@ -230,9 +231,11 @@ class Annotation:
             return []
 
         if item_id:
+            if isinstance(item_id, str):
+                item_id = [item_id]
             data = db.fetchall(
-                "SELECT * FROM annotations WHERE dataset = %s AND item_id = %s",
-                (dataset_key, str(item_id),)
+                "SELECT * FROM annotations WHERE dataset = %s AND item_id = ANY(%s)",
+                (dataset_key, item_id,)
             )
         else:
             data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s", (dataset_key,))

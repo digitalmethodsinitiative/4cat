@@ -54,7 +54,8 @@ class TfIdf(BasicProcessor):
 			"min": 0,
 			"max": 10000,
 			"help": "[scikit-learn] Ignore terms that appear in less than this amount of documents",
-			"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data)."
+			"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data).",
+			"requires": "library==scikit-learn"
 		},
 		"max_occurrences": {
 			"type": UserInput.OPTION_TEXT,
@@ -62,7 +63,8 @@ class TfIdf(BasicProcessor):
 			"min": 0,
 			"max": 10000,
 			"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
-			"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months."
+			"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months.",
+			"requires": "library==scikit-learn"
 		},
 		"n_size": {
 			"type": UserInput.OPTION_CHOICE,
@@ -70,12 +72,14 @@ class TfIdf(BasicProcessor):
 			"options": {"1":"unigrams (1)", "2": "bigrams (2)", "3": "trigrams", "1-2": "uni- and bigrams (1-2)", "1-3": "uni-, bi-, and trigrams (1-3)"},
 			"help": "[scikit-learn] Amount of words to return",
 			"tooltip":  "Selecting a range can be useful to e.g. extract multi-word nouns like names.",
+			"requires": "library==scikit-learn"
 		},
 		"smartirs": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "nfc",
 			"help": "[gensim] SMART parameters",
-			"tooltip": "SMART is a mnemonic notation type for various tf-idf parameters. Check this module's references for more information."
+			"tooltip": "SMART is a mnemonic notation type for various tf-idf parameters. Check this module's references for more information.",
+			"requires": "library==gensim"
 		}
 	}
 
@@ -116,7 +120,7 @@ class TfIdf(BasicProcessor):
 			n_size = (convert_to_int(n_size_split[0]), convert_to_int(n_size_split[1]))
 
 		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
-		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
+		max_occurrences = convert_to_int(self.parameters.get("max_occurrences", -1), -1)
 		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
 		smartirs = self.parameters.get("smartirs", "nfc")
 
@@ -158,7 +162,8 @@ class TfIdf(BasicProcessor):
 			min_occurrences = len(tokens) - 1
 		if max_occurrences <= 0 or max_occurrences > len(tokens):
 			max_occurrences = len(tokens)
-
+		self.dataset.log(f"Running tf-idf with library {library}, n_size {n_size}, min_occurrences {min_occurrences}, max_occurrences {max_occurrences}, max_output {max_output}, smartirs {smartirs}")
+		
 		# Get the tf-idf matrix.
 		self.dataset.update_status("Generating tf-idf for token set")
 		try:
@@ -240,13 +245,24 @@ class TfIdf(BasicProcessor):
 		"""
 
 		# Vectorise
-		self.dataset.update_status("Vectorizing")
-		tfidf_vectorizer = TfidfVectorizer(min_df=min_occurrences, max_df=max_occurrences, ngram_range=ngram_range,
-										   analyzer="word", token_pattern=None, tokenizer=lambda i: i, lowercase=False)
+		self.dataset.update_status("Vectorizing")\
+		# sklearn requires min_df >= 1 (int) or [0.0, 1.0] (float). Coerce 0 -> 1.
+		min_df = 1 if isinstance(min_occurrences, int) and min_occurrences <= 0 else min_occurrences
+
+		tfidf_vectorizer = TfidfVectorizer(
+			min_df=min_df, 
+			max_df=max_occurrences, 
+			ngram_range=ngram_range,
+			analyzer="word", 
+			token_pattern=None, 
+			tokenizer=lambda i: i, 
+			lowercase=False
+			)
 
 		try:
 			tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
-		except ValueError:
+		except ValueError as e:
+			self.dataset.log(f"sklearn ValueError: {e!r}")
 			self.dataset.update_status("No tokens remain with these parameters. Set less strict constraints and try again.", is_final=True)
 			self.dataset.finish(0)
 			return

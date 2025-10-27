@@ -12,9 +12,9 @@ class AnnotationMetadata(BasicProcessor):
 	"""
 	type = "annotation-metadata"  # job type ID
 	category = "Metrics"  # category
-	title = "Annotation metadata"  # title displayed in UI
-	description = ("Download metadata about annotations for this dataset. "
-				   "Includes information like annotation author, timestamp, type, etc.") # description displayed in UI
+	title = "Export annotations"  # title displayed in UI
+	description = ("Download annotations and their metadata for this dataset. "
+				   "Includes annotation author, timestamp, type, etc.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod

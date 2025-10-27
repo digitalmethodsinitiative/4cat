@@ -134,19 +134,19 @@ const processor = {
      *
      * @param e  Event that triggered queueing
      */
-    queue: function (e) {
+    queue: function (e, extra_data=null, run=false) {
         e.preventDefault();
 
-        if ($(this).text().includes('Run')) {
-            const run_button = $(this);
-            let form = run_button.parents('form');
+        const form = find_parent(e.target, 'form');
+        const run_button = form.querySelector('.processor-queue-button');
 
+        if (run_button.innerText.includes('Run')) {
             // if it's a big dataset, ask if the user is *really* sure
-            let parent = run_button.parents('li.child-wrapper');
-            if (parent.length === 0) {
-                parent = $('.result-tree');
+            let parent = find_parent(run_button, 'li.child-wrapper');
+            if (!parent) {
+                parent = document.querySelector('.result-tree');
             }
-            let num_rows = parseInt($('#dataset-' + parent.attr('data-dataset-key') + '-result-count').attr('data-num-results'));
+            let num_rows = parseInt($('#dataset-' + parent.getAttribute('data-dataset-key') + '-result-count').attr('data-num-results'));
 
             if (num_rows > 500000) {
                 if (!confirm('You are about to start a processor for a dataset with over 500,000 items. This may take a very long time and block others from running the same type of analysis on their datasets.\n\nYou may be able to get useful analysis results with a smaller dataset instead. Are you sure you want to start this analysis?')) {
@@ -154,8 +154,19 @@ const processor = {
                 }
             }
 
+            run = true;
+        }
+
+        if(run) {
             let reset_form = true;
-            fetch(form.attr('data-async-action') + '?async', {method: form.attr('method'), body: new FormData(form[0])})
+            let request_body = new FormData(form);
+            if (extra_data) {
+                for (let key in extra_data) {
+                    request_body.set(key, extra_data[key]);
+                }
+            }
+
+            fetch(form.getAttribute('data-async-action') + '?async', {method: form.getAttribute('method'), body: request_body})
                 .then(function (response) {
                     if (!response.ok) {
                         throw response;
@@ -163,15 +174,43 @@ const processor = {
                     return response.json();
                 })
                 .then(function (response) {
-                    if (response.hasOwnProperty("messages") && response.messages.length > 0) {
-                        popup.alert(response.messages.join("\n\n"));
-                    } else if(response.hasOwnProperty('message')) {
-                        popup.alert(response.message);
+                    if (response.hasOwnProperty('message') && response.message instanceof Array) {
+                        response.message = response.message.join('\n\n');
                     }
 
-                    if(response.hasOwnProperty('status') && response['status'] === 'error') {
-                        reset_form = false;
-                        return;
+                    if(['confirm', 'error', 'extra-form'].includes(response.status)) {
+                        if (response['status'] === 'confirm') {
+                            reset_form = false;
+                            popup.confirm(response.message, 'Confirm', function () {
+                                // re-send, but this time for real
+                                processor.queue(e, {'frontend-confirm': true});
+                            });
+                            return;
+                        } else if (response['status'] === 'error') {
+                            reset_form = false;
+                            if (response.hasOwnProperty("message") && response.message) {
+                                popup.alert(response.message);
+                            }
+                            return;
+                        } else if (response['status'] === 'extra-form') {
+                            // new form elements to fill in
+                            // some fancy css juggling to make it obvious that these need to be completed
+                            reset_form = false;
+                            const options_container = form.querySelector('.processor-options');
+
+                            let extra_elements = $(response.html);
+                            extra_elements.addClass('datasource-extra-input').css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').appendTo(options_container);
+                            let targetHeight = extra_elements.height();
+                            extra_elements.css('position', '').css('display', '').css('visibility', '').css('height', 0);
+
+                            extra_elements.animate({'height': targetHeight}, 250, function () {
+                                $(this).css('height', '').addClass('flash-once');
+                            });
+
+                            return;
+                        } else if (response.hasOwnProperty('message')) {
+                            popup.alert(response.message);
+                        }
                     }
 
                     if (response.html.length > 0) {
@@ -227,19 +266,21 @@ const processor = {
                     }
                 })
                 .finally(() => {
-                    if (reset_form && run_button.data('original-content')) {
-                        run_button.html(run_button.data('original-content'));
-                        run_button.trigger('click');
-                        run_button.html(run_button.data('original-content'));
-                        form.trigger('reset');
+                    if (reset_form && run_button.getAttribute('original-content')) {
+                        run_button.innerHTML = run_button.getAttribute('original-content');
+                        run_button.click();
+                        run_button.innerHTML = run_button.getAttribute('original-content');
+                        form.querySelectorAll('.delegated-option').forEach(n => n.remove());
+                        form.reset();
                         ui_helpers.toggleButton({target: run_button});
                     }
                 });
         } else {
-            $(this).data('original-content', $(this).html());
-            $(this).find('.byline').html('Run');
-            $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
-            ui_helpers.toggleButton({target: $(this)[0]});
+            run_button.setAttribute('original-content', run_button.innerHTML);
+            run_button.querySelector('.byline').innerText = 'Run';
+            run_button.querySelector('.fa').classList.remove('.fa-cog');
+            run_button.querySelector('.fa').classList.add('fa-play');
+            ui_helpers.toggleButton({target: run_button});
         }
     },
 
@@ -319,6 +360,8 @@ const query = {
         $('.result-page .card h2.editable').each(query.label.init);
         $(document).on('click', '.edit-dataset-label', query.label.handle);
         $(document).on('keydown', '#new-dataset-label', query.label.handle);
+
+        $(document).on('click', '.result-page .card .annotation-fields-list .property-badge', query.annotation_label.handle);
 
         // convert dataset
         $(document).on('change', '#convert-dataset', query.convert_dataset)
@@ -874,6 +917,45 @@ const query = {
             $(input_id).val(0);
         } else {
             $(input_id).val(timestamp);
+        }
+    },
+
+    annotation_label: {
+        handle: function (e) {
+            e.preventDefault();
+            let target = e.target;
+            if (target.tagName !== 'SPAN') {
+                target = $(target).parents('span')[0];
+            }
+
+            const current_label = target.innerText;
+            const callback_url = find_parent(target, 'div').getAttribute('data-label-edit-href')
+
+            popup.dialog(
+                '<p>Edit the label for this annotation:</p>' +
+                '<label>Label: <input type="text" id="new-annotation-label" name="label" value="' + current_label + '"></label>',
+                'Edit annotation label',
+                function () {
+                    const new_label = document.querySelector('#new-annotation-label').value.trim();
+                    const payload = {'annotation_id': target.getAttribute('data-annotation-id'), 'label': new_label };
+                    fetch(callback_url, {
+                        method: 'POST',
+                        body: JSON.stringify(payload),
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                    })
+                        .then((response) => response.json())
+                        .then(response_json => {
+                            if(response_json.status && response_json.status === 'success') {
+                                target.childNodes[1].nodeValue = ' ' + new_label;
+                            }
+                        })
+                        .catch((error) => {
+                            popup.alert('There was an error changing the annotation label. Refresh and try again later.');
+                        })
+                }
+            );
         }
     },
 
@@ -1900,7 +1982,10 @@ const ui_helpers = {
                     requirement = [null, element.getAttribute('data-requires'), '!=', ''];
                 }
 
-                const negate = requirement[2] === '!=';
+                const negate = requirement[2].startsWith('!');
+                if (negate) {
+                    requirement[2] = requirement[2].substring(1);
+                }
                 const other_field = 'option-' + requirement[1];
                 const other_element = form.querySelector("*[name='" + other_field + "']");
 
@@ -1935,6 +2020,10 @@ const ui_helpers = {
                     } else if(['==', '='].includes(requirement[2])) {
                         requirement_met = other_value === requirement[3];
                     }
+                }
+
+                if(negate) {
+                    requirement_met = !requirement_met
                 }
 
                 if (requirement_met) {
@@ -2042,6 +2131,7 @@ function hsv2hsl(h, s, v) {
 function find_parent(element, selector, start_self=false) {
     while(element.parentNode) {
         if(!start_self) { element = element.parentNode; }
+        if(element instanceof HTMLDocument) { return null; }
         if(element.matches(selector)) {
             return element;
         }

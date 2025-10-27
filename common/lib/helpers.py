@@ -316,7 +316,7 @@ def find_extensions():
             "url": "",
             "git_url": "",
             "is_git": False,
-        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
+        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir() and not extension.name.startswith("__")
     }
 
     # collect metadata for extensions
@@ -476,7 +476,7 @@ def andify(items):
     if len(items) == 0:
         return ""
     elif len(items) == 1:
-        return str(items[1])
+        return str(items[0])
 
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
@@ -1177,17 +1177,20 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         always be possible or be an actual filename. Also, avoid using the same
         filename multiple times. Ensures filenames don't exceed max_bytes.
 
-        Note: Collision possible without staging area (used to check for already 
-        existing filenames).
+        Check both in-memory existing filenames and on-disk filenames in the
+        staging area (if provided) to avoid collisions. Note: With a new staging
+        area, only in-memory checks are beneficial; leave as None to skip on-disk checks.
 
         :param str url:  URLs to determine filenames for
         :param Path staging_area:  Path to the staging area where files are saved
-        (to avoid collisions); if None, no collision avoidance is done.
+        (to avoid collisions with existing files); if None, no disk checks are done.
         :param str default_name:  Default name to use if no filename can be
         extracted from the URL
         :param str default_ext:  Default extension to use if no filename can be
         extracted from the URL
         :param int max_bytes:  Maximum number of bytes for the filename
+        :param set existing_filenames:  Set of existing filenames to avoid
+        collisions with (in addition to those in the staging area, if provided).
         :return str:  Suitable file name
         """
         clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
@@ -1196,8 +1199,14 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         else:
             base_filename = default_name + default_ext
 
-        if not existing_filenames:
-            existing_filenames = []
+        # remove some problematic characters
+        base_filename = re.sub(r"[:~]", "", base_filename)
+
+        if existing_filenames is None:
+            existing_filenames = set()
+        if type(existing_filenames) is not set:
+            # Could force set() here, but likely would be forcing in a loop
+            raise TypeError("existing_filenames must be a set")
 
         # Split base filename into name and extension
         if '.' in base_filename:
@@ -1229,12 +1238,14 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
 
         filename = base_filename
 
-        if staging_area:
+        if staging_area or existing_filenames:
             # Ensure the filename is unique in the staging area
-            file_path = staging_area.joinpath(filename)
             file_index = 1
+
+            file_path = staging_area.joinpath(filename) if staging_area else None
             
-            while file_path.exists() or filename in existing_filenames:
+            # Loop while collision in-memory OR on disk (if staging_area given)
+            while (filename in existing_filenames) or (staging_area and file_path.exists()):
                 # Calculate space needed for index suffix
                 index_suffix = f"-{file_index}"
                 
@@ -1259,7 +1270,8 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
                     filename = test_filename
                 
                 file_index += 1
-                file_path = staging_area.joinpath(filename)
+                if staging_area:
+                    file_path = staging_area.joinpath(filename)
 
         return filename
 
