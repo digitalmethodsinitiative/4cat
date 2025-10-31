@@ -173,7 +173,7 @@ class MakeWordtree(BasicProcessor):
         # settings
         columns = self.parameters.get("columns", [])
         if not columns:
-            self.dataset.finish_with_error("Please select at least one columns for the word tree")
+            return self.dataset.finish_with_error("Please select at least one columns for the word tree")
 
         strip_urls = self.parameters.get("strip-urls")
         strip_symbols = self.parameters.get("strip-symbols")
@@ -188,11 +188,9 @@ class MakeWordtree(BasicProcessor):
 
         # do some validation
         if not query.strip() or re.sub(r"\s", "", query) != query:
-            self.dataset.update_status(
+            return self.dataset.finish_with_error(
                 "Invalid query for word tree generation. Query cannot be empty or contain whitespace."
             )
-            self.dataset.finish(0)
-            return
 
         window = max(1, window)
 
@@ -380,11 +378,7 @@ class MakeWordtree(BasicProcessor):
 
         if not breadths_left:
             if sides == "left":
-                self.dataset.update_status(
-                    "No data available to the left of the query", is_final=True
-                )
-                self.dataset.finish(0)
-                return None
+                return self.dataset.finish_with_error("No data available to the left of the query")
             elif sides == "both":
                 self.dataset.log("No data available to the left of the query")
                 sides = "right"
@@ -392,11 +386,8 @@ class MakeWordtree(BasicProcessor):
 
         if not breadths_right:
             if sides == "right":
-                self.dataset.update_status(
-                    "No data available to the right of the query", is_final=True
-                )
-                self.dataset.finish(0)
-                return None
+
+                return self.dataset.finish_with_error("No data available to the right of the query")
             elif sides == "both":
                 self.dataset.log("No data available to the right of the query")
                 sides = "left"

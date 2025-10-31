@@ -63,15 +63,6 @@ class AudioToText(BasicProcessor):
         }
     }
 
-    local_whisper = (
-        True
-        if (
-            config.get("dmi-service-manager.bc_whisper_enabled", False)
-            and config.get("dmi-service-manager.ab_server_address", False)
-        )
-        else False
-    )
-
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -85,6 +76,15 @@ class AudioToText(BasicProcessor):
         Collect maximum number of audio files from configuration and update options accordingly
         :param config:
         """
+        local_whisper = (
+            True
+            if (
+                config.get("dmi-service-manager.bc_whisper_enabled", False)
+                and config.get("dmi-service-manager.ab_server_address", False)
+            )
+            else False
+        )
+
         options = {
             "host_model_info": {
                 "type": UserInput.OPTION_INFO,
@@ -171,7 +171,7 @@ class AudioToText(BasicProcessor):
             }
         }
 
-        if cls.local_whisper:
+        if local_whisper:
             # Update the amount max and help from config
             max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100))
             if max_number_audio_files == 0:  # Unlimited allowed
@@ -213,7 +213,16 @@ class AudioToText(BasicProcessor):
 
         model_host = self.parameters.get("model_host", "external")
 
-        if model_host == "local" and not self.local_whisper:
+        local_whisper = (
+            True
+            if (
+                self.config.get("dmi-service-manager.bc_whisper_enabled", False)
+                and self.config.get("dmi-service-manager.ab_server_address", False)
+            )
+            else False
+        )
+
+        if model_host == "local" and not local_whisper:
             self.dataset.finish_with_error("Can't run a self-hosted Whisper model. Admins can configure this in the "
                                            "4CAT settings (settings -> DMI Service Manager).")
             return

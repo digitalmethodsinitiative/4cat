@@ -2,6 +2,7 @@
 Generate network of values from two columns
 """
 from dateutil.relativedelta import relativedelta
+from functools import partial
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
@@ -92,6 +93,10 @@ class ColumnNetworker(BasicProcessor):
             "tooltip": "Separate with commas if you want to ignore multiple nodes"
         }
     }
+
+    references = [
+        "Utilises [Networkx](https://networkx.org/)' built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms."
+    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -354,6 +359,21 @@ class ColumnNetworker(BasicProcessor):
         for component in (network.nodes, network.edges):
             for item in component:
                 del component[item]["intervals"]
+
+        # add community classes, as a treat
+        # static seed to make deterministic
+        community_types = {
+            "louvain_community": partial(nx.community.louvain_communities, seed=0),
+            "greedy_modularity_class": partial(nx.community.greedy_modularity_communities, weight="weight"),
+        }
+        for community_prop, community_function in community_types.items():
+            self.dataset.update_status(f"Calculating node communities ({community_prop})")
+            community_id = 0
+            for community in community_function(network):
+                community_id += 1
+                for node_id in community:
+                    # needs to be string for Retina to recognise it as qualitative
+                    network.nodes[node_id][community_prop] = f"cluster-{community_id}"
 
         self.dataset.update_status("Writing network file")
         nx.write_gexf(network, self.dataset.get_results_path())

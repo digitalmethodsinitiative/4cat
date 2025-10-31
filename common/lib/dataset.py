@@ -1903,7 +1903,7 @@ class DataSet(FourcatModule):
         )
         # reset caches
         self.data["key_parent"] = key_parent
-        self._genealogy = None
+        self._genealogy = None  
 
     def get_parent(self):
         """

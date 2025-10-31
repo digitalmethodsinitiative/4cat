@@ -215,8 +215,14 @@ class ExtractURLs(BasicProcessor):
             columns = parent_dataset.get_columns()
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = "body" if "body" in columns else sorted(columns,
-                                                                                    key=lambda k: "text" in k).pop()
+
+            if "body" in columns:
+                options["columns"]["default"] = "body"
+            elif text_columns := sorted(columns, key=lambda k: "text" in k):
+                options["columns"]["default"] = text_columns.pop()
+            else:
+                # give up, no column we can recognise as text-based
+                options["columns"]["default"] = columns[0]
 
         return options
 

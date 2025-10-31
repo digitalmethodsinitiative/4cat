@@ -157,6 +157,7 @@ class VideoWallGenerator(BasicProcessor):
             else:
                 # no max, so use all available media
                 amount = self.source_dataset.num_rows
+
         sound = self.parameters.get("audio", "longest")
         max_length = self.parameters.get("max-length", 60)
         aspect_ratio = self.parameters.get("aspect-ratio")
@@ -208,6 +209,11 @@ class VideoWallGenerator(BasicProcessor):
                 skipped += 1
                 continue
 
+            if any([d == 0 for d in dimensions[item.name]]):
+                self.dataset.log(f"Dimensions of file {item.name} read as 0 pixels; skipping")
+                skipped += 1
+                continue
+
             media[item.name] = item
 
             # if not sorting, we don't need to probe everything and can stop
@@ -222,6 +228,12 @@ class VideoWallGenerator(BasicProcessor):
         media_keys = list(media.keys())
         included_media = media_keys[:amount]
         excluded_media = media_keys[amount:]
+
+        # if a dimension is empty, the next step will fail, so intercept
+        if not included_media:
+            return self.dataset.finish_with_error("No media with parseable dimensions left for collage after applying "
+                                                  "selection criteria. There may be non-image files or corrupted files "
+                                                  "in your dataset.")
 
         # overall average dimensions will be useful for some of the sizing modes
         avg = statistics.mean if sizing_mode == "average" else statistics.median
@@ -366,7 +378,11 @@ class VideoWallGenerator(BasicProcessor):
         self.dataset.log(f"Aiming for {round(size_y / tile_h)} vertical rows")
 
         # now we are ready to render the collage
-        command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
+        debug_mode = False
+        if debug_mode:
+            command = [ffmpeg_path, "-y", "-hide_banner", "-report", "-loglevel", "verbose", "-threads", "1"]
+        else:
+            command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
         if not have_only_images and max_length:
             command.extend(["-t", str(max_length)]) # limit read length
 
@@ -461,6 +477,8 @@ class VideoWallGenerator(BasicProcessor):
             else:
                 raise NotImplementedError(f"Unknown sizing mode {sizing_mode}")
 
+            # Normalize each tile to a safe common pixel format (RGBA) to avoid subsampling issues
+            cropscale += ",format=rgba"
             cropscale += f"[scaled{index}]"
             resize.append(cropscale)
 
@@ -474,7 +492,11 @@ class VideoWallGenerator(BasicProcessor):
                 # we cannot use the pad filter since that requires that we
                 # increase the height as well, but we just want to increase
                 # width - so overlay on a correctly sized black canvas
-                padding.append(f"color=size={max(row_widths)}x{tile_h}:color=black[bg{row}];[bg{row}][stack{row}]overlay=0:0[stack{row}]")
+                padding.append(
+                    f"color=size={max(row_widths)}x{tile_h}:color=black[bg{row}];"
+                    f"[bg{row}]format=rgba[bg{row}f];"
+                    f"[bg{row}f][stack{row}]overlay=0:0[stack{row}]"
+                )
 
         # now create the ffmpeg filter from this
         filter_chain = ""
@@ -503,14 +525,25 @@ class VideoWallGenerator(BasicProcessor):
         if output_w % 2 != 0 and output_h % 2 != 0:
             filter_chain += f";[final]pad={output_w+1}:{output_h+1}[final]"
         elif output_w % 2 != 0:
-            filter_chain += f";color=size={output_w+1}x{output_h}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
+            filter_chain += (
+                f";color=size={output_w+1}x{output_h}:color=black[bgfinal];"
+                f"[bgfinal]format=rgba[bgfinalf];"
+                f"[bgfinalf][final]overlay=0:0[final]"
+            )
         elif output_h % 2 != 0:
-            filter_chain += f";color=size={output_w}x{output_h+1}:color=black[bgfinal];[bgfinal][final]overlay=0:0[final]"
+            filter_chain += (
+                f";color=size={output_w}x{output_h+1}:color=black[bgfinal];"
+                f"[bgfinal]format=rgba[bgfinalf];"
+                f"[bgfinalf][final]overlay=0:0[final]"
+            )
 
         # force 30 fps because we don't know what the source videos did and
         # they could be using different fps
         if not have_only_images:
             filter_chain += ";[final]fps=30[final]"
+
+        # Ensure the final stream uses a stable encoder pixel format
+        filter_chain += ";[final]format=yuv420p[final]"
 
         # add filter to ffmpeg command, plus a parameter to control output FPS
         ffmpeg_filter = oslex.quote(filter_chain)[1:-1]
@@ -532,6 +565,9 @@ class VideoWallGenerator(BasicProcessor):
         if max_length and not have_only_images:
             command.extend(["-t", str(max_length)])
 
+        # enforce encoder pixel format
+        command += ["-pix_fmt", "yuv420p"]
+
         # set output file
         output_file = self.dataset.get_results_path()
         command.append(oslex.quote(str(output_file)))
@@ -546,7 +582,6 @@ class VideoWallGenerator(BasicProcessor):
 
         # Capture logs
         ffmpeg_error = result.stderr.decode("utf-8")
-
         if ffmpeg_error:
             self.dataset.log("ffmpeg returned the following errors:")
             for line in ffmpeg_error.split("\n"):
@@ -564,11 +599,22 @@ class VideoWallGenerator(BasicProcessor):
                     # would require a bit of a refactor
                     self.dataset.log(f"The error message indicates the file {included_media[erroneous_stream]} cannot be read; it may be corrupt.")
 
+       
+        ffmpeg_output = result.stdout.decode("utf-8")
+        if ffmpeg_output:
+            self.dataset.log("ffmpeg returned the following output:")
+            for line in ffmpeg_output.split("\n"):
+                self.dataset.log("  " + line)
+
         shutil.rmtree(collage_staging_area, ignore_errors=True)
 
         if result.returncode != 0:
+            if have_old_ffmpeg_version:
+                self.dataset.log("You may be able to prevent this error by updating to a newer version of ffmpeg.")
             if ffmpeg_error:
-                self.log.warning(f"ffmpeg error (dataset {self.dataset.key}): {ffmpeg_error}")
+                # show only the last line; rest should be in dataset log
+                ffmpeg_error = ffmpeg_error.strip().split("\n")[-1]
+                self.log.warning(f"ffmpeg error (see dataset {self.dataset.key} log for full details): {ffmpeg_error}")
             return self.dataset.finish_with_error(
                 f"Could not make collage (error {result.returncode}); check the dataset log for details.")
 
@@ -576,7 +622,8 @@ class VideoWallGenerator(BasicProcessor):
              self.dataset.update_status(f"Rendering finished. {skipped} item(s) were skipped; see dataset log for details.", is_final=True)
         else:
              self.dataset.update_status("Rendering finished.")
-             self.dataset.finish(1)
+
+        self.dataset.finish(1)
 
     def get_signature(self, file_path, sort_mode, ffprobe_path):
         """

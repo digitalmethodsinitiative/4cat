@@ -80,7 +80,7 @@ class ImageWallGenerator(VideoWallGenerator):
             have_video_source = (parent_dataset.get_media_type() == "video" or parent_dataset.type.startswith("video-downloader"))
         else:
             have_video_source = False
-            
+
         if not have_video_source:
             # these sort options can only be used if we're working with image
             # files - video files can't be inspected for average colour etc
@@ -121,7 +121,7 @@ class ImageWallGenerator(VideoWallGenerator):
         if sort_mode == "":
             # no sort, default
             return (0, 0, 0)
-        
+
         sample_max = 75  # image size for colour sampling
 
         try:

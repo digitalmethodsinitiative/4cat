@@ -56,7 +56,7 @@
     {# Processor header, showing title, status, and a tooltip with a description #}
     <div class="processor-header">
         <header>
-            <h4>{{ processors[item.type].title if not deprecated else "(Deprecated analysis) " + item.type }}</h4>
+            <h4>{% if item.get_label(default=None) %}{{ item.get_label() }}{% else %}{{ processors[item.type].title if not deprecated else "(Deprecated analysis) " + item.type }}{% endif %}</h4>
             <button class="tooltip-trigger" aria-controls="tooltip-processor-result-{{ item.key }}" aria-label="Post-processor details">?</button>
             <p role="tooltip" id="tooltip-processor-result-{{ item.key }}">{{ processors[item.type].description if not deprecated else "This analysis module has been deprecated but you can still download the result." }}</p>
         </header>
@@ -77,7 +77,7 @@
         {% if item.is_finished() and (item.get_children() or (item.num_rows > 0 and current_user.is_authenticated and item.get_available_processors(config=__config, exclude_hidden=True))) %}
         <button aria-controls="child-{{ item.key }}-details" class="toggle-button">
             <span class="headline">
-            <i class="fa fa-sitemap" aria-hidden="true"></i> <span class="sr-only">More info</span>
+            <i class="fa fa-sitemap" aria-hidden="true"></i> <span class="sr-only">More processors</span>
             {% if item.get_children() %}
                 +{{ item.get_children()|length }}
             {% endif %}
@@ -92,7 +92,9 @@
         {# Child processors, recursively #}
         <ol class="children-datasets child-list">
             {% for child in item.get_children() %}
-                {% include "components/result-child.html" %}
+                {% with dataset = item %}
+                    {% include "components/result-child.html" %}
+                {% endwith %}
             {% endfor %}
         </ol>
 

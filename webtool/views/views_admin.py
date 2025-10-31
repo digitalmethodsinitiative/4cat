@@ -862,11 +862,11 @@ def get_log(logfile, max_lines=250):
         max_lines = 250
 
     if logfile == "backend":
-        filename = "4cat.log" if not g.config.get("USING_DOCKER") else "backend_4cat.log"
+        filename = "backend_4cat.log" if not g.config.get("USING_DOCKER") else "backend_4cat.log"
     elif logfile == "stderr":
         filename = "4cat.stderr"
     elif logfile == "frontend":
-        filename = "4cat.log" if not g.config.get("USING_DOCKER") else "frontend_4cat.log"
+        filename = "frontend_4cat.log"
     else:
         filename = f"{logfile}.log"
 

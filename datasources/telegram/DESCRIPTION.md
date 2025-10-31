@@ -5,6 +5,10 @@ Note that due to how Telegram works, you need to know what channels or groups yo
 collect it; you cannot search by keyword as you can for some other platforms. You can, however, use the search function 
 in the Telegram app to find groups and channels, and then collect messages from the ones you find with 4CAT.
 
+[Since 2024](https://telegram.org/blog/message-effects-and-more), there is also a limited global hashtag search feature, 
+which searches in "big public channels". Empirically this seems to include all public channels with more than 100 
+subscribers. When searching for hashtags, it is not possible to also filter by date.
+
 Another way of finding relevant groups is through a standard web search engine, like Google. Search for, for example,
 [`bill gates site:t.me`](https://www.google.com/search?q=bill+gates+site:t.me&hl=en&filter=0&dpr=2) on Google to find 
 Telegram groups Google has indexed that mention 'Bill Gates'. This is never a complete picture, but can be a good way 

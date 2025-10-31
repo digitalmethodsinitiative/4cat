@@ -28,6 +28,7 @@ class ConfigManager:
     dbconn = None
     cache = {}
     memcache = None
+    logger = None
 
     core_settings = {}
     config_definition = {}
@@ -52,13 +53,28 @@ class ConfigManager:
         :param db:  Database object. If None, initialise it using the core config
         """
         if db or not self.db:
+            if db and db.log and not self.logger:
+                # borrow logger from database
+                self.with_logger(db.log)
+
             # Replace w/ db if provided else only initialise if not already
-            self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
+            self.db = db if db else Database(logger=self.logger, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
                                          port=self.get("DB_PORT"), appname="config-reader")
         else:
             # self.db already initialized and no db provided
             pass
+
+    def with_logger(self, logger):
+        """
+        Attach logger to config manager
+
+        4CAT's logger has some features on top of the basic Python logger that
+        are needed for further operation, e.g. the Debug2 log level.
+
+        :param Logger logger:
+        """
+        self.logger = logger
 
     def load_user_settings(self):
         """
