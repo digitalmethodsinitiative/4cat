@@ -58,18 +58,18 @@ class DataSet(FourcatModule):
     _queue_position = None
 
     def __init__(
-        self,
-        parameters=None,
-        key=None,
-        job=None,
-        data=None,
-        db=None,
-        parent="",
-        extension=None,
-        type=None,
-        is_private=True,
-        owner="anonymous",
-        modules=None
+            self,
+            parameters=None,
+            key=None,
+            job=None,
+            data=None,
+            db=None,
+            parent="",
+            extension=None,
+            type=None,
+            is_private=True,
+            owner="anonymous",
+            modules=None
     ):
         """
         Create new dataset object
@@ -128,10 +128,10 @@ class DataSet(FourcatModule):
         elif data is not None:
             current = data
             if (
-                "query" not in data
-                or "key" not in data
-                or "parameters" not in data
-                or "key_parent" not in data
+                    "query" not in data
+                    or "key" not in data
+                    or "parameters" not in data
+                    or "key_parent" not in data
             ):
                 raise DataSetException(
                     "DataSet() requires a complete dataset record for its 'data' argument"
@@ -289,7 +289,7 @@ class DataSet(FourcatModule):
         with log_path.open("a", encoding="utf-8") as outfile:
             outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
 
-    def _iterate_items(self, processor=None):
+    def _iterate_items(self, processor=None, offset=0):
         """
         A generator that iterates through a CSV or NDJSON file
 
@@ -308,10 +308,10 @@ class DataSet(FourcatModule):
 
         :param BasicProcessor processor:  A reference to the processor
         iterating the dataset.
+        :param offset int:  How many items to skip.
         :return generator:  A generator that yields each item as a dictionary
         """
         path = self.get_results_path()
-
 
         # Yield through items one by one
         if path.suffix.lower() == ".csv":
@@ -323,37 +323,44 @@ class DataSet(FourcatModule):
                     # Processor was deprecated or removed; CSV file is likely readable but some legacy types are not
                     first_item = next(reader)
                     if first_item is None or any(
-                        [True for key in first_item if type(key) is not str]
+                            [True for key in first_item if type(key) is not str]
                     ):
                         raise NotImplementedError(
                             f"Cannot iterate through CSV file (deprecated processor {self.type})"
                         )
                     yield first_item
 
-                for item in reader:
+                for i, item in enumerate(reader):
                     if hasattr(processor, "interrupted") and processor.interrupted:
                         raise ProcessorInterruptedException(
                             "Processor interrupted while iterating through CSV file"
                         )
-                    
+
+                    if i < offset:
+                        continue
+
                     yield item
 
         elif path.suffix.lower() == ".ndjson":
             # In NDJSON format each line in the file is a self-contained JSON
             with path.open(encoding="utf-8") as infile:
-                for line in infile:
+                for i, line in enumerate(infile):
                     if hasattr(processor, "interrupted") and processor.interrupted:
                         raise ProcessorInterruptedException(
                             "Processor interrupted while iterating through NDJSON file"
                         )
-                    
+
+                    if i < offset:
+                        continue
+
                     yield json.loads(line)
 
         else:
             raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
     def iterate_items(
-        self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None
+            self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None,
+            offset=0
     ):
         """
         Generate mapped dataset items
@@ -399,9 +406,11 @@ class DataSet(FourcatModule):
           field with a strategy for that field ('default', 'abort', or a callback)
         :param get_annotations: Whether to also fetch annotations from the database.
           This can be disabled to help speed up iteration.
+        :param offset: After how many rows we should yield items.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0
+
         # Collect item_mapper for use with filter
         item_mapper = False
         own_processor = self.get_own_processor()
@@ -409,16 +418,23 @@ class DataSet(FourcatModule):
             item_mapper = True
 
         # Annotations are dynamically added, and we're handling them as 'extra' map_item fields.
+        # If we're getting annotations, we're caching items so we don't need to retrieve annotations one-by-one.
+        get_annotations = True if self.annotation_fields and get_annotations else False
         if get_annotations:
             annotation_fields = self.annotation_fields
-            num_annotations = 0 if not annotation_fields else self.num_annotations()
-            all_annotations = None
-            # If this dataset has less than n annotations, just retrieve them all before iterating
-            if 0 < num_annotations <= 500:
-                # Convert to dict for faster lookup when iterating over items
-                all_annotations = collections.defaultdict(list)
-                for annotation in self.get_annotations():
-                    all_annotations[annotation.item_id].append(annotation)
+            item_batch_size = 500
+            dataset_item_cache = []
+            annotations_before = int(time.time())
+
+            # Append a number to annotation labels if there's duplicate ones
+            annotation_labels = {}
+            for (annotation_field_id, annotation_field_items,) in annotation_fields.items():
+                unique_label = annotation_field_items["label"]
+                counter = 1
+                while unique_label in annotation_labels.values():
+                    counter += 1
+                    unique_label = f"{annotation_field_items['label']}_{counter}"
+                annotation_labels[annotation_field_id] = unique_label
 
         # missing field strategy can be for all fields at once, or per field
         # if it is per field, it is a dictionary with field names and their strategy
@@ -429,7 +445,8 @@ class DataSet(FourcatModule):
             map_missing = {}
 
         # Loop through items
-        for i, item in enumerate(self._iterate_items(processor)):
+        for i, item in enumerate(self._iterate_items(processor, offset=offset)):
+
             # Save original to yield
             original_item = item.copy()
 
@@ -442,7 +459,7 @@ class DataSet(FourcatModule):
                         self.warn_unmappable_item(
                             i, processor, e, warn_admins=unmapped_items is False
                         )
-                        
+
                     unmapped_items += 1
                     if max_unmappable and unmapped_items > max_unmappable:
                         break
@@ -477,51 +494,8 @@ class DataSet(FourcatModule):
             else:
                 mapped_item = original_item
 
-            # Add possible annotation values
-            if get_annotations and annotation_fields:
-                # We're always handling annotated data as a MappedItem object,
-                # even if no map_item() function is available for the data source.
-                if not isinstance(mapped_item, MappedItem):
-                    mapped_item = MappedItem(mapped_item)
-
-                # Retrieve from all annotations
-                if all_annotations:
-                    item_annotations = all_annotations.get(mapped_item.data["id"])
-                # Or get annotations per item for large datasets (more queries but less memory usage)
-                else:
-                    item_annotations = self.get_annotations_for_item(
-                        mapped_item.data["id"]
-                    )
-
-                # Loop through annotation fields
-                for (
-                    annotation_field_id,
-                    annotation_field_items,
-                ) in annotation_fields.items():
-                    # Set default value to an empty string
-                    value = ""
-                    # Set value if this item has annotations
-                    if item_annotations:
-                        # Items can have multiple annotations
-                        for annotation in item_annotations:
-                            if annotation.field_id == annotation_field_id:
-                                value = annotation.value
-                            if isinstance(value, list):
-                                value = ",".join(value)
-
-                    # Make sure labels are unique when iterating through items
-                    column_name = annotation_field_items["label"]
-                    label_count = 1
-                    while column_name in mapped_item.data:
-                        label_count += 1
-                        column_name = f"{annotation_field_items['label']}_{label_count}"
-
-                    # We're always adding an annotation value
-                    # as an empty string, even if it's absent.
-                    mapped_item.data[column_name] = value
-
             # yield a DatasetItem, which is a dict with some special properties
-            yield DatasetItem(
+            dataset_item = DatasetItem(
                 mapper=item_mapper,
                 original=original_item,
                 mapped_object=mapped_item,
@@ -532,8 +506,53 @@ class DataSet(FourcatModule):
                 ),
             )
 
+            # If we're getting annotations, yield in items batches so we don't need to get annotations per item.
+            if get_annotations:
+                dataset_item_cache.append(dataset_item)
+
+                # When we reach the batch limit or the end of the dataset,
+                # get the annotations for cached items and yield the entire thing.
+                if len(dataset_item_cache) >= item_batch_size or i == (self.num_rows - 1):
+
+                    item_ids = [dataset_item.get("id") for dataset_item in dataset_item_cache]
+
+                    # Dict with item ids for fast lookup
+                    annotations_dict = collections.defaultdict(dict)
+                    annotations = self.get_annotations_for_item(item_ids, before=annotations_before)
+                    for item_annotation in annotations:
+                        item_id = item_annotation.item_id
+                        if item_annotation:
+                            annotations_dict[item_id][item_annotation.field_id] = item_annotation.value
+
+                    # Process each dataset item
+                    for dataset_item in dataset_item_cache:
+                        item_id = dataset_item.get("id")
+                        item_annotations = annotations_dict.get(item_id, {})
+
+                        for annotation_field_id, annotation_field_items in annotation_fields.items():
+                            # Get annotation value
+                            value = item_annotations.get(annotation_field_id, "")
+
+                            # Convert list to string if needed
+                            if isinstance(value, list):
+                                value = ",".join(value)
+                            elif value != "":
+                                value = str(value)  # Ensure string type
+                            else:
+                                value = ""
+
+                            dataset_item[annotation_labels[annotation_field_id]] = value
+
+                        yield dataset_item
+
+                    dataset_item_cache = []
+
+            else:
+                yield dataset_item
+
+
     def sort_and_iterate_items(
-        self, sort="", reverse=False, chunk_size=50000, **kwargs
+            self, sort="", reverse=False, chunk_size=50000, **kwargs
     ) -> dict:
         """
         Loop through items in a dataset, sorted by a given key.
@@ -543,6 +562,7 @@ class DataSet(FourcatModule):
 
         :param sort:				The item key that determines the sort order.
         :param reverse:				Whether to sort by largest values first.
+        :param chunk_size:          How many items to write
 
         :returns dict:				Yields iterated post
         """
@@ -589,7 +609,7 @@ class DataSet(FourcatModule):
                     self.iterate_items(**kwargs),
                     sort,
                     reverse,
-                    convert_sort_to_float=False,
+                    convert_sort_to_float=False
                 )
 
         else:
@@ -942,8 +962,8 @@ class DataSet(FourcatModule):
         :return bool:  Whether the dataset is rankable or not
         """
         if (
-            self.get_results_path().suffix != ".csv"
-            or not self.get_results_path().exists()
+                self.get_results_path().suffix != ".csv"
+                or not self.get_results_path().exists()
         ):
             return False
 
@@ -981,11 +1001,11 @@ class DataSet(FourcatModule):
 
         # owners that are owner by being part of a tag
         if username in itertools.chain(
-            *[
-                tagged_owners
-                for tag, tagged_owners in self.tagged_owners.items()
-                if (role is None or self.owners[f"tag:{tag}"]["role"] == role)
-            ]
+                *[
+                    tagged_owners
+                    for tag, tagged_owners in self.tagged_owners.items()
+                    if (role is None or self.owners[f"tag:{tag}"]["role"] == role)
+                ]
         ):
             return True
 
@@ -1201,9 +1221,9 @@ class DataSet(FourcatModule):
             return []
 
         if (self.get_results_path().suffix.lower() == ".csv") or (
-            self.get_results_path().suffix.lower() == ".ndjson"
-            and self.get_own_processor() is not None
-            and self.get_own_processor().map_item_method_available(dataset=self)
+                self.get_results_path().suffix.lower() == ".ndjson"
+                and self.get_own_processor() is not None
+                and self.get_own_processor().map_item_method_available(dataset=self)
         ):
             items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
             try:
@@ -1287,11 +1307,11 @@ class DataSet(FourcatModule):
         elif parameters.get("board") and "datasource" in parameters:
             return parameters["datasource"] + "/" + parameters["board"]
         elif (
-            "datasource" in parameters
-            and parameters["datasource"] in self.modules.datasources
+                "datasource" in parameters
+                and parameters["datasource"] in self.modules.datasources
         ):
             return (
-                self.modules.datasources[parameters["datasource"]]["name"] + " Dataset"
+                    self.modules.datasources[parameters["datasource"]]["name"] + " Dataset"
             )
         else:
             return default
@@ -1334,10 +1354,10 @@ class DataSet(FourcatModule):
         # Use country code for country flag queries
         elif "country_flag" in parameters and parameters["country_flag"] != "all":
             file = (
-                "countryflag-"
-                + str(parameters["country_flag"])
-                + "-"
-                + self.data["key"]
+                    "countryflag-"
+                    + str(parameters["country_flag"])
+                    + "-"
+                    + self.data["key"]
             )
         # Use the query string for all other queries
         else:
@@ -1465,10 +1485,10 @@ class DataSet(FourcatModule):
         # for presets, copy the updated status to the preset(s) this is part of
         if self.preset_parent is None:
             self.preset_parent = [
-                parent
-                for parent in self.get_genealogy()
-                if parent.type.find("preset-") == 0 and parent.key != self.key
-            ][:1]
+                                     parent
+                                     for parent in self.get_genealogy()
+                                     if parent.type.find("preset-") == 0 and parent.key != self.key
+                                 ][:1]
 
         if self.preset_parent:
             for preset_parent in self.preset_parent:
@@ -1599,10 +1619,10 @@ class DataSet(FourcatModule):
             filepath = "/" + "/".join(filepath.split("/")[3:])
 
         return (
-            self.data["software_source"]
-            + "/blob/"
-            + self.data["software_version"]
-            + filepath
+                self.data["software_source"]
+                + "/blob/"
+                + self.data["software_version"]
+                + filepath
         )
 
     def top_parent(self):
@@ -1749,7 +1769,7 @@ class DataSet(FourcatModule):
 
             own_processor = self.get_own_processor()
             if own_processor and own_processor.exclude_followup_processors(
-                processor_type
+                    processor_type
             ):
                 continue
 
@@ -1968,11 +1988,11 @@ class DataSet(FourcatModule):
 
         # is this dataset explicitly marked as expiring after a certain time?
         future = (
-            time.time() + 3600
+                time.time() + 3600
         )  # ensure we don't delete datasets with invalid expiration times
         if (
-            self.parameters.get("expires-after")
-            and convert_to_int(self.parameters["expires-after"], future) < time.time()
+                self.parameters.get("expires-after")
+                and convert_to_int(self.parameters["expires-after"], future) < time.time()
         ):
             return True
 
@@ -1984,9 +2004,9 @@ class DataSet(FourcatModule):
         # is the dataset older than the set timeout?
         if expiration.get(self.parameters.get("datasource")).get("timeout"):
             return (
-                self.timestamp
-                + expiration[self.parameters.get("datasource")]["timeout"]
-                < time.time()
+                    self.timestamp
+                    + expiration[self.parameters.get("datasource")]["timeout"]
+                    < time.time()
             )
 
         return False
@@ -2061,11 +2081,11 @@ class DataSet(FourcatModule):
         # we cheat a little here by using the modules' config reader, but these
         # will never be context-dependent values anyway
         url_to_file = ('https://' if self.modules.config.get("flask.https") else 'http://') + \
-                        self.modules.config.get("flask.server_name") + '/result/' + filename
+                      self.modules.config.get("flask.server_name") + '/result/' + filename
         return url_to_file
 
     def warn_unmappable_item(
-        self, item_count, processor=None, error_message=None, warn_admins=True
+            self, item_count, processor=None, error_message=None, warn_admins=True
     ):
         """
         Log an item that is unable to be mapped and warn administrators.
@@ -2146,12 +2166,14 @@ class DataSet(FourcatModule):
 
         return Annotation.get_annotations_for_dataset(self.db, self.key)
 
-    def get_annotations_for_item(self, item_id: str) -> list:
+    def get_annotations_for_item(self, item_id: str | list, before=0) -> list:
         """
         Retrieves all annotations from this dataset for a specific item (e.g. social media post).
+        :param str item_id:  The ID of the annotation item
+        :param int before:   The upper timestamp range for annotations.
         """
         return Annotation.get_annotations_for_dataset(
-            self.db, self.key, item_id=item_id
+            self.db, self.key, item_id=item_id, before=before
         )
 
     def has_annotation_fields(self) -> bool:
@@ -2217,7 +2239,7 @@ class DataSet(FourcatModule):
                     "got %s" % annotation_data
                 )
             if "label" not in annotation_data or not isinstance(
-                annotation_data["label"], str
+                    annotation_data["label"], str
             ):
                 raise AnnotationException(
                     "Can't save annotations; annotation must have a `label` field, "

@@ -83,7 +83,7 @@ class RandomFilter(BaseFilter):
 		match_row = posts_to_keep[0]  # The row count of the first matching row
 
 		# Iterate through posts and keep those in the match list
-		for mapped_item in self.source_dataset.iterate_items(processor=self):
+		for mapped_item in self.source_dataset.iterate_items(processor=self, get_annotations=False):
 
 			# Yield on match
 			if count == match_row:
