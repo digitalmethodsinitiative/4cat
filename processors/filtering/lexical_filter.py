@@ -167,8 +167,8 @@ class LexicalFilter(BaseFilter):
                 continue
 
             # if one does, record which match, and save it to the output
-            # TODO: this is a conversion and will not show via map_items() for NDJSONs
+            # TODO: this is a conversion and will not show via map_items() for NDJSONs. Change to annotation!
             mapped_item.original["4cat_matching_lexicons"] = ",".join(matching_lexicons)
 
             matching_items += 1
-            yield mapped_item.original
+            yield mapped_item

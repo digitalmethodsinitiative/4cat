@@ -223,7 +223,7 @@ class ColumnFilter(BaseFilter):
                     pass
 
             if matches:
-                yield mapped_item.original
+                yield mapped_item
                 matching_items += 1
 
     def filter_top(self, column, top_n, bottom=False):
