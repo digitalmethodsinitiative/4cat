@@ -54,7 +54,7 @@ class ImageWallGenerator(VideoWallGenerator):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
-        options = copy.deepcopy(cls.options)
+        options = copy.deepcopy(VideoWallGenerator.get_options(parent_dataset, config))
         max_number_images = int(config.get("image-visuals.max_images", 1000))
         if max_number_images <= 0:
             # cannot set max

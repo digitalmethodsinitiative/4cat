@@ -29,14 +29,25 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                    "to the original dataset.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    options = {
-        "save_annotations": {
-            "type": UserInput.OPTION_ANNOTATION,
-            "label": "image features",
-            "default": False,
-            "tooltip": "Every feature will receive its own annotation"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "label": "image features",
+                "default": False,
+                "tooltip": "Every feature will receive its own annotation"
+            }
         }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

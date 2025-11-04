@@ -32,48 +32,58 @@ class TopicModeler(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
 
     followups = ["document_count", "document_topic_matrix", "topic-model-words"]
-
-    options = {
-        "vectoriser": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "count": "Frequency",
-                "tf-idf": "Tf-idf"
-            },
-            "default": "count",
-            "help": "Vectorisation method",
-            "tooltip": "Tf-idf will reduce the influence of common words, for sparser but more specific topics"
-        },
-        "topics": {
-            "type": UserInput.OPTION_TEXT,
-            "min": 2,
-            "max": 50,
-            "default": 10,
-            "help": "Number of topics",
-            "tooltip": "Topics will be divided in this many clusters. Should be between 2 and 50."
-        },
-        "min_df": {
-            "type": UserInput.OPTION_TEXT,
-            "min": 0.0,
-            "max": 1.0,
-            "default": 0.01,
-            "help": "Minimum document frequency",
-            "tooltip": "Tokens are ignored if they do not occur in at least this fraction (between 0 and 1) of all tokenised items."
-        },
-        "max_df": {
-            "type": UserInput.OPTION_TEXT,
-            "min": 0.0,
-            "max": 1.0,
-            "default": 0.8,
-            "help": "Maximum document frequency",
-            "tooltip": "Tokens are ignored if they  occur in more than this fraction (between 0 and 1) of all tokenised items."
-        }
-    }
-
     references = [
         'Blei, David M., Andrew Y. Ng, and Michael I. Jordan (2003). "Latent dirichlet allocation." the *Journal of machine Learning research* 3: 993-1022.',
         'Blei, David M. (2003). "Topic Modeling and Digital Humanities." *Journal of Digital Humanities* 2(1).'
     ]
+    
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "vectoriser": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "count": "Frequency",
+                    "tf-idf": "Tf-idf"
+                },
+                "default": "count",
+                "help": "Vectorisation method",
+                "tooltip": "Tf-idf will reduce the influence of common words, for sparser but more specific topics"
+            },
+            "topics": {
+                "type": UserInput.OPTION_TEXT,
+                "min": 2,
+                "max": 50,
+                "default": 10,
+                "help": "Number of topics",
+                "tooltip": "Topics will be divided in this many clusters. Should be between 2 and 50."
+            },
+            "min_df": {
+                "type": UserInput.OPTION_TEXT,
+                "min": 0.0,
+                "max": 1.0,
+                "default": 0.01,
+                "help": "Minimum document frequency",
+                "tooltip": "Tokens are ignored if they do not occur in at least this fraction (between 0 and 1) of all tokenised items."
+            },
+            "max_df": {
+                "type": UserInput.OPTION_TEXT,
+                "min": 0.0,
+                "max": 1.0,
+                "default": 0.8,
+                "help": "Maximum document frequency",
+                "tooltip": "Tokens are ignored if they  occur in more than this fraction (between 0 and 1) of all tokenised items."
+            }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

@@ -31,47 +31,6 @@ class ExtractURLs(BasicProcessor):
     description = "Extract any URLs from selected column(s) with the option to expand shortened URLs."
     extension = "csv"
 
-    options = {
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Columns to extract URLs",
-            "default": "body",
-            "inline": True,
-            "tooltip": "Multiple columns can be selected.",
-        },
-        "eager": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Eagerly extract URLs without 'http(s)://' or 'www.' prepended",
-            "tooltip": "This will likely introduce false positives.",
-        },
-        "eager_domains": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Only eagerly extract these domain names",
-            "tooltip": "E.g. youtube.com, wikipedia.org. Leave empty for all.",
-            "requires": "eager==true"
-        },
-        "expand_urls": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Expand shortened URLs",
-            "tooltip": "This can take a long time for large datasets and it is NOT recommended to run this processor on datasets larger than 10,000 items.",
-        },
-        "correct_crowdtangle": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "CrowdTangle dataset",
-            "tooltip": "CrowdTangle text contains resolved links using :=: symbols; these are extracted directly",
-        },
-        "save_annotations": {
-            "type": UserInput.OPTION_ANNOTATION,
-            "label": "Extracted URLs",
-            "default": False,
-            "tooltip": "URLs will be saved as a comma-separated string"
-        }
-    }
-
     # taken from https://github.com/timleland/url-shorteners
     # current as of 9 April 2021
     redirect_domains = (
@@ -209,7 +168,47 @@ class ExtractURLs(BasicProcessor):
         Update "columns" option with parent dataset columns
         :param config:
         """
-        options = cls.options
+        options = {
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Columns to extract URLs",
+                "default": "body",
+                "inline": True,
+                "tooltip": "Multiple columns can be selected.",
+            },
+            "eager": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Eagerly extract URLs without 'http(s)://' or 'www.' prepended",
+                "tooltip": "This will likely introduce false positives.",
+            },
+            "eager_domains": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Only eagerly extract these domain names",
+                "tooltip": "E.g. youtube.com, wikipedia.org. Leave empty for all.",
+                "requires": "eager==true"
+            },
+            "expand_urls": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Expand shortened URLs",
+                "tooltip": "This can take a long time for large datasets and it is NOT recommended to run this processor on datasets larger than 10,000 items.",
+            },
+            "correct_crowdtangle": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "CrowdTangle dataset",
+                "tooltip": "CrowdTangle text contains resolved links using :=: symbols; these are extracted directly",
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "label": "Extracted URLs",
+                "default": False,
+                "tooltip": "URLs will be saved as a comma-separated string"
+            }
+        }
+        
         # Get the columns for the select columns option
         if parent_dataset and parent_dataset.get_columns():
             columns = parent_dataset.get_columns()

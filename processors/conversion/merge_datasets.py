@@ -29,32 +29,6 @@ class DatasetMerger(BasicProcessor):
     description = "Merge this dataset with other datasets of the same format. A new dataset is " \
                   "created containing a combination of items from the original datasets."  # description displayed in UI
 
-    options = {
-        "source": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Source dataset URLs",
-            "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
-                       "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "
-                       "commas."
-        },
-        "merge": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Merge strategy",
-            "options": {
-                "remove": "Remove duplicates",
-                "keep": "Keep duplicates"
-            },
-            "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their "
-                       "`id` field is identical, regardless of the value of other properties.",
-            "default": "remove"
-        },
-        "label": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Dataset name",
-            "tooltip": "Name of the merged dataset. If left empty, a name will be generated."
-        }
-    }
-
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -96,7 +70,31 @@ class DatasetMerger(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Processor options
         """
-        options = cls.options
+        options = {
+            "source": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Source dataset URLs",
+                "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
+                        "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "
+                        "commas."
+            },
+            "merge": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Merge strategy",
+                "options": {
+                    "remove": "Remove duplicates",
+                    "keep": "Keep duplicates"
+                },
+                "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their "
+                        "`id` field is identical, regardless of the value of other properties.",
+                "default": "remove"
+            },
+            "label": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Dataset name",
+                "tooltip": "Name of the merged dataset. If left empty, a name will be generated."
+            }
+        }
 
         if parent_dataset and isinstance(parent_dataset, DataSet):
             options["label"]["default"] = f"(Merged) {parent_dataset.get_label()}"

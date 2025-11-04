@@ -27,73 +27,6 @@ class ColumnNetworker(BasicProcessor):
                   "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
     extension = "gexf"
 
-    options = {
-        "column-a": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Attribute A"
-        },
-        "column-b": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Attribute B"
-        },
-        "interval": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Make network dynamic by",
-            "default": "overall",
-            "options": {
-                "overall": "Do not make dynamic",
-                "year": "Year",
-                "month": "Month",
-                "week": "Week",
-                "day": "Day"
-            },
-            "tooltip": "Dynamic networks will record in which interval(s) nodes and edges were present. "
-                       "Weights will also be calculated per interval. Dynamic graphs can be opened in e.g. Gephi to "
-                       "visually analyse the evolution of the network over time."
-        },
-        "directed": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Directed edges?",
-            "default": True,
-            "tooltip": "If enabled, e.g. an edge from 'hello' in column 1 to 'world' in column 2 creates a different edge "
-                       "than from 'world' in column 1 to 'hello' in column 2. If disabled, these would be considered "
-                       "the same edge."
-        },
-        "allow-loops": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Allow loops?",
-            "default": False,
-            "tooltip": "If enabled, a looping edge (from a node to itself) is created if the two columns contain the same value."
-        },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Split column values by comma?",
-            "default": False,
-            "tooltip": "If enabled, values separated by commas are considered separate nodes, and create separate "
-                       "edges. Useful if columns contain e.g. lists of hashtags."
-        },
-        "categorise": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Categorize nodes by column?",
-            "default": True,
-            "tooltip": "If enabled, the same values from different columns are treated as separate nodes. For "
-                       "example, the value 'hello' from the column 'user' is treated as a different node than the "
-                       "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
-        },
-        "to-lowercase": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Convert values to lowercase",
-            "tooltip": "Merges values with varying cases"
-        },
-        "ignore-nodes": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Nodes to ignore",
-            "tooltip": "Separate with commas if you want to ignore multiple nodes"
-        }
-    }
-
     references = [
         "Utilises [Networkx](https://networkx.org/)' built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms."
     ]
@@ -110,7 +43,72 @@ class ColumnNetworker(BasicProcessor):
         :param DataSet parent_dataset:  Parent dataset
         :return dict:  Processor options
         """
-        options = cls.options
+        options = {
+            "column-a": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Attribute A"
+            },
+            "column-b": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Attribute B"
+            },
+            "interval": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Make network dynamic by",
+                "default": "overall",
+                "options": {
+                    "overall": "Do not make dynamic",
+                    "year": "Year",
+                    "month": "Month",
+                    "week": "Week",
+                    "day": "Day"
+                },
+                "tooltip": "Dynamic networks will record in which interval(s) nodes and edges were present. "
+                        "Weights will also be calculated per interval. Dynamic graphs can be opened in e.g. Gephi to "
+                        "visually analyse the evolution of the network over time."
+            },
+            "directed": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Directed edges?",
+                "default": True,
+                "tooltip": "If enabled, e.g. an edge from 'hello' in column 1 to 'world' in column 2 creates a different edge "
+                        "than from 'world' in column 1 to 'hello' in column 2. If disabled, these would be considered "
+                        "the same edge."
+            },
+            "allow-loops": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Allow loops?",
+                "default": False,
+                "tooltip": "If enabled, a looping edge (from a node to itself) is created if the two columns contain the same value."
+            },
+            "split-comma": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Split column values by comma?",
+                "default": False,
+                "tooltip": "If enabled, values separated by commas are considered separate nodes, and create separate "
+                        "edges. Useful if columns contain e.g. lists of hashtags."
+            },
+            "categorise": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Categorize nodes by column?",
+                "default": True,
+                "tooltip": "If enabled, the same values from different columns are treated as separate nodes. For "
+                        "example, the value 'hello' from the column 'user' is treated as a different node than the "
+                        "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
+            },
+            "to-lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Convert values to lowercase",
+                "tooltip": "Merges values with varying cases"
+            },
+            "ignore-nodes": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Nodes to ignore",
+                "tooltip": "Separate with commas if you want to ignore multiple nodes"
+            }
+        }
         if parent_dataset is None:
             return options
 

@@ -27,34 +27,32 @@ class HashSimilarityNetworker(BasicProcessor):
     description = "Calculate similarity of hashes and create a GEXF network file."
     extension = "gexf"
 
-    options = {
-        "descriptor_column": {
-            "help": "Column containing ID or unique descriptor (e.g., URL, filename, etc.)",
-            "inline": True,
-        },
-        "choice_column": {
-            "help": "Column containing hashes",
-            "inline": True,
-            "tooltip": "Expects all hashes to be of the same length"
-        },
-        "percent_similar": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Minimum percentage for connection",
-            "tooltip": "Only create a connection if the two hashes are at least X percent similar (e.g. at least 75% of the two hashes must be identical). Use 0 to create weighted edges for all hash comparisons.",
-            "coerce_type": int,
-            "default": 90,
-            "min": 0,
-            "max": 100,
-        },
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
         Update column option with actual columns
         :param config:
         """
-        options = cls.options
+        options = {
+            "descriptor_column": {
+                "help": "Column containing ID or unique descriptor (e.g., URL, filename, etc.)",
+                "inline": True,
+            },
+            "choice_column": {
+                "help": "Column containing hashes",
+                "inline": True,
+                "tooltip": "Expects all hashes to be of the same length"
+            },
+            "percent_similar": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Minimum percentage for connection",
+                "tooltip": "Only create a connection if the two hashes are at least X percent similar (e.g. at least 75% of the two hashes must be identical). Use 0 to create weighted edges for all hash comparisons.",
+                "coerce_type": int,
+                "default": 90,
+                "min": 0,
+                "max": 100,
+            },
+        }
 
         # Get the columns for the select columns option
         if parent_dataset and parent_dataset.get_columns():

@@ -51,58 +51,69 @@ class ClarifaiAPIFetcher(BasicProcessor):
         """
         return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Images to process (0 = all)",
-            "cache": True,
-            "sensitive": True,
-            "default": 0
-        },
-        "api_key": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API Key",
-            "cache": True,
-            "sensitive": True,
-            "tooltip": "The API key for your Clarifai account. You'll need to go to clarifai.com and create a new "
-                       "project to generate a key."
-        },
-        "models": {
-            "type": UserInput.OPTION_MULTI,
-            "help": "Models",
-            "tooltip": "Which models to use for recognition? More models = more API calls = potentially more costs. "
-                       "See the model browser in processor references for more details on each model.",
-            "options": {
-                "general-image-recognition": "General Concept Recognition (general-image-recognition)",
-                "apparel-recognition": "Clothing & Apparel (apparel-recognition)",
-                "color-recognition": "Dominant color recognition (color-recognition)",
-                "celebrity-face-detection": "Celebrity faces (celebrity-face-detection)",
-                "food-item-recognition": "Food items (food-item-recognition)",
-                "moderation-recognition": "Inappropriate content (moderation-recognition)",
-                "nsfw-recognition": "NSFW content (mostly nudity, nsfw-recognition)",
-                "texture-recognition": "Materials & textures (texture-recognition)"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Images to process (0 = all)",
+                "cache": True,
+                "sensitive": True,
+                "default": 0
             },
-            "default": ["general-image-recognition"]
-        },
-        "save_annotations": {
-            "type": UserInput.OPTION_ANNOTATION,
-            "label": "labels",
-            "default": False,
-            "tooltip": "Every label will receive its own annotation"
-        },
-        "annotation_threshold": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Only add labels above this confidence",
-            "default": "0.95",
-            "coerce_type": "float",
-            "requires": "save_annotations==true"
-        },
-        "csv_info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "The output can be made human-readable through the following 'Convert Clarifai results to CSV' "
-                    "processor."
+            "api_key": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API Key",
+                "cache": True,
+                "sensitive": True,
+                "tooltip": "The API key for your Clarifai account. You'll need to go to clarifai.com and create a new "
+                        "project to generate a key."
+            },
+            "models": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Models",
+                "tooltip": "Which models to use for recognition? More models = more API calls = potentially more costs. "
+                        "See the model browser in processor references for more details on each model.",
+                "options": {
+                    "general-image-recognition": "General Concept Recognition (general-image-recognition)",
+                    "apparel-recognition": "Clothing & Apparel (apparel-recognition)",
+                    "color-recognition": "Dominant color recognition (color-recognition)",
+                    "celebrity-face-detection": "Celebrity faces (celebrity-face-detection)",
+                    "food-item-recognition": "Food items (food-item-recognition)",
+                    "moderation-recognition": "Inappropriate content (moderation-recognition)",
+                    "nsfw-recognition": "NSFW content (mostly nudity, nsfw-recognition)",
+                    "texture-recognition": "Materials & textures (texture-recognition)"
+                },
+                "default": ["general-image-recognition"]
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "label": "labels",
+                "default": False,
+                "tooltip": "Every label will receive its own annotation"
+            },
+            "annotation_threshold": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Only add labels above this confidence",
+                "default": "0.95",
+                "coerce_type": "float",
+                "requires": "save_annotations==true"
+            },
+            "csv_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "The output can be made human-readable through the following 'Convert Clarifai results to CSV' "
+                        "processor."
+            }
         }
-    }
 
     def process(self):
         """

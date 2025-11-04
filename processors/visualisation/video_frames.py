@@ -33,29 +33,40 @@ class VideoFrames(BasicProcessor):
 
 	followups = ["video-timelines"] + VideoDownloaderPlus.followups
 
-	options = {
-		"frame_interval": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Number of frames extracted per second to extract from video",
-			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
-					   "pass 5, and so on. Use '0' to only capture the first frame of the video.",
-			"coerce_type": float,
-			"default": 1,
-			"min": 0,
-			"max": 5,
-		},
-		"frame_size": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "medium",
-			"options": {
-				"no_modify": "Do not modify",
-				"144x144": "Tiny (144x144)",
-				"432x432": "Medium (432x432)",
-				"1026x1026": "Large (1026x1026)",
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"frame_interval": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Number of frames extracted per second to extract from video",
+				"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
+						"pass 5, and so on. Use '0' to only capture the first frame of the video.",
+				"coerce_type": float,
+				"default": 1,
+				"min": 0,
+				"max": 5,
 			},
-			"help": "Size of extracted frames"
-		},
-	}
+			"frame_size": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "medium",
+				"options": {
+					"no_modify": "Do not modify",
+					"144x144": "Tiny (144x144)",
+					"432x432": "Medium (432x432)",
+					"1026x1026": "Large (1026x1026)",
+				},
+				"help": "Size of extracted frames"
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

@@ -56,27 +56,6 @@ class ImageDownloader(BasicProcessor):
         "google-vision-api",
     ]
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "default": 100,
-        },
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column to get image links from",
-            "default": "image_url",
-            "inline": True,
-            "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
-        },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Split column values by comma?",
-            "default": True,
-            "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-            "separately",
-        },
-    }
-
     config = {
         "image-downloader.max": {
             "type": UserInput.OPTION_TEXT,
@@ -104,7 +83,26 @@ class ImageDownloader(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 100,
+            },
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column to get image links from",
+                "default": "image_url",
+                "inline": True,
+                "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
+            },
+            "split-comma": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Split column values by comma?",
+                "default": True,
+                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+                "separately",
+            },
+        }
 
         # Update the amount max and help from config
         max_number_images = int(config.get("image-downloader.max", 1000))

@@ -29,55 +29,64 @@ class SearchImportFromFourcat(BasicProcessor):
 
     max_workers = 1  # this cannot be more than 1, else things get VERY messy
 
-    options = {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Provide the URL of a dataset in another 4CAT server that you would like to copy to this one here. "
-                    "\n\nTo import a dataset across servers, both servers need to be running the same version of 4CAT. "
-                    "You can find the current version in the footer at the bottom of the interface."
-        },
-        "method": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Import Type",
-            "options": {
-                "zip": "Zip File",
-                "url": "4CAT URL",
-            },
-            "default": "url"
-        },
-        "url": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Dataset URL",
-            "tooltip": "URL to the dataset's page, for example https://4cat.example/results/28da332f8918e6dc5aacd1c3b0170f01b80bd95f8ff9964ac646cecd33bfee49/.",
-            "requires": "method^=url"
-        },
-        "intro2": {
-            "type": UserInput.OPTION_INFO,
-            "help": "You can create an API key via the 'API Access' item in 4CAT's navigation menu. Note that you need "
-                    "an API key from **the server you are importing from**, not the one you are looking at right now. "
-                    "Additionally, you need to have owner access to the dataset you want to import.",
-            "requires": "method^=url"
-        },
-        "api-key": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "4CAT API Key",
-            "sensitive": True,
-            "cache": True,
-            "requires": "method^=url"
-        },
-        "data_upload": {
-            "type": UserInput.OPTION_FILE,
-            "help": "File",
-            "tooltip": "Upload a ZIP file containing a dataset exported from a 4CAT server.",
-            "requires": "method^=zip"
-        },
-
-    }
-
     created_datasets = None
     base = None
     remapped_keys = None
     dataset_owner = None
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param DataSet parent_dataset:  An object representing the dataset that
+          the processor would or was run on
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        """
+        return {
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Provide the URL of a dataset in another 4CAT server that you would like to copy to this one here. "
+                        "\n\nTo import a dataset across servers, both servers need to be running the same version of 4CAT. "
+                        "You can find the current version in the footer at the bottom of the interface."
+            },
+            "method": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Import Type",
+                "options": {
+                    "zip": "Zip File",
+                    "url": "4CAT URL",
+                },
+                "default": "url"
+            },
+            "url": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Dataset URL",
+                "tooltip": "URL to the dataset's page, for example https://4cat.example/results/28da332f8918e6dc5aacd1c3b0170f01b80bd95f8ff9964ac646cecd33bfee49/.",
+                "requires": "method^=url"
+            },
+            "intro2": {
+                "type": UserInput.OPTION_INFO,
+                "help": "You can create an API key via the 'API Access' item in 4CAT's navigation menu. Note that you need "
+                        "an API key from **the server you are importing from**, not the one you are looking at right now. "
+                        "Additionally, you need to have owner access to the dataset you want to import.",
+                "requires": "method^=url"
+            },
+            "api-key": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "4CAT API Key",
+                "sensitive": True,
+                "cache": True,
+                "requires": "method^=url"
+            },
+            "data_upload": {
+                "type": UserInput.OPTION_FILE,
+                "help": "File",
+                "tooltip": "Upload a ZIP file containing a dataset exported from a 4CAT server.",
+                "requires": "method^=zip"
+            },
+
+        }
 
     def process(self):
         """

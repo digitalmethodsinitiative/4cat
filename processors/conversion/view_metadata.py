@@ -27,14 +27,25 @@ class ViewMetadata(BasicProcessor):
 	description = "Reformats the .metadata.json file and calculates analytics"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	options = {
-		"include_failed": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Included failed datapoints",
-			"default": False,
-			"tooltip": "If enabled, rows that failed will also be included (e.g., due to errors et cetera)."
-		},
-	}
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"include_failed": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Included failed datapoints",
+				"default": False,
+				"tooltip": "If enabled, rows that failed will also be included (e.g., due to errors et cetera)."
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
