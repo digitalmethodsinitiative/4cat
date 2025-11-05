@@ -41,9 +41,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
+    # environment:
       # Add server name to the environment; this is set in surf_init.sh
-      - SERVER_NAME=${SERVER_NAME}
+      # - SERVER_NAME=${SERVER_NAME}
     depends_on:
       db:
         condition: service_healthy
