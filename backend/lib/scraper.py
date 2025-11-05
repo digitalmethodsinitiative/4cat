@@ -10,8 +10,6 @@ import abc
 from pathlib import Path
 from backend.lib.worker import BasicWorker
 
-from common.config_manager import config
-
 class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	Abstract JSON scraper class
@@ -75,13 +73,13 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 			try:
 				# see if any proxies were configured that would work for this URL
 				protocol = url.split(":")[0]
-				if protocol in config.get('SCRAPE_PROXIES', []) and config.get('SCRAPE_PROXIES')[protocol]:
-					proxies = {protocol: random.choice(config.get('SCRAPE_PROXIES')[protocol])}
+				if protocol in self.config.get('SCRAPE_PROXIES', []) and self.config.get('SCRAPE_PROXIES')[protocol]:
+					proxies = {protocol: random.choice(self.config.get('SCRAPE_PROXIES')[protocol])}
 				else:
 					proxies = None
 
 				# do the request!
-				data = requests.get(url, timeout=config.get('SCRAPE_TIMEOUT', 60), proxies=proxies, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Safari/605.1.15"})
+				data = requests.get(url, timeout=self.config.get('SCRAPE_TIMEOUT', 60), proxies=proxies, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Safari/605.1.15"})
 			except (requests.exceptions.RequestException, ConnectionRefusedError) as e:
 				if self.job.data["attempts"] > 2:
 					self.job.finish()
@@ -96,7 +94,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 			else:
 				id = self.job.data["remote_id"]
 
-		if data.status_code == 404:
+		if data.status_code == 404 or data.status_code == 403:
 			# this should be handled differently from an actually erroneous response
 			# because it may indicate that the resource has been deleted
 			self.not_found()

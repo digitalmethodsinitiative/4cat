@@ -1,9 +1,8 @@
 """
 General helper functions for Flask templating and 4CAT views
 """
-import datetime
+import markdown2
 import colorsys
-import math
 import csv
 import re
 
@@ -11,11 +10,9 @@ from functools import wraps
 from math import ceil
 from calendar import monthrange
 from flask_login import current_user
-from flask import (current_app, request, jsonify)
+from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
-from pathlib import Path
 
-from common.config_manager import config
 csv.field_size_limit(1024 * 1024 * 1024)
 
 class Pagination(object):
@@ -23,7 +20,7 @@ class Pagination(object):
 	Provide pagination
 	"""
 
-	def __init__(self, page, per_page, total_count, route="show_results"):
+	def __init__(self, page, per_page, total_count, route="dataset.show_results", route_args=None):
 		"""
 		Set up pagination object
 
@@ -36,6 +33,7 @@ class Pagination(object):
 		self.per_page = per_page
 		self.total_count = total_count
 		self.route = route
+		self.route_args = route_args if route_args else {}
 
 	@property
 	def pages(self):
@@ -94,30 +92,6 @@ def error(code=200, **kwargs):
 	response.status_code = code
 	return response
 
-
-def string_to_timestamp(string):
-	"""
-	Convert dd-mm-yyyy date to unix time
-
-	:param string: Date string to parse
-	:return: The unix time, or 0 if value could not be parsed
-	"""
-	bits = string.split("-")
-	if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", string):
-		bits = list(reversed(bits))
-
-	if len(bits) != 3:
-		return 0
-
-	try:
-		day = int(bits[0])
-		month = int(bits[1])
-		year = int(bits[2])
-		date = datetime.datetime(year, month, day)
-	except ValueError:
-		return 0
-
-	return int(date.timestamp())
 
 def pad_interval(intervals, first_interval=None, last_interval=None):
 	"""
@@ -232,7 +206,7 @@ def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="f
 	:param str output_filepath :     String path to save new image
 	"""
 	possible_colors = [k for k, v in ImageColor.colormap.items()]
-	if (type(color) != tuple or len(color) != 3) and (color not in possible_colors):
+	if (type(color) is not tuple or len(color) != 3) and (color not in possible_colors):
 		raise Exception("Color not available")
 
 	img = Image.open(input_filepath)
@@ -255,7 +229,7 @@ def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="f
 	new_img.save(output_filepath)
 
 
-def generate_css_colours(force=False):
+def generate_css_colours(config, force=False):
 	"""
 	Write the colours.css CSS file based on configuration
 
@@ -263,6 +237,7 @@ def generate_css_colours(force=False):
 	these necessitates also updating the relevant CSS files, which this method
 	does.
 
+	:param config:  Configuration reader to get colour values from
 	:param bool force:  Create colour definition file even if it exists already
 	:return:
 	"""
@@ -298,25 +273,6 @@ def generate_css_colours(force=False):
 	)
 
 
-def get_preview(query):
-	"""
-	Generate a data preview of 25 rows of a results csv
-	
-	:param query 
-	:return list: 
-	"""
-	preview = []
-	with query.get_results_path().open(encoding="utf-8") as resultfile:
-		posts = csv.DictReader(resultfile)
-		i = 0
-		for post in posts:
-			i += 1
-			preview.append(post)
-			if i > 25:
-				break
-	return preview
-
-
 def format_chan_post(post):
 	"""
 	Format a plain-text imageboard post post for HTML display
@@ -341,7 +297,7 @@ def check_restart_request():
 	file. This ensures a restart is in progress and the request belongs to that
 	specific restart.
 	"""
-	lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+	lock_file = g.config.get("PATH_CONFIG").joinpath("restart.lock")
 	if not lock_file.exists():
 		return False
 
@@ -369,10 +325,18 @@ def setting_required(setting, required_value=True):
 	def checking_decorator(func):
 		@wraps(func)
 		def decorated_view(*args, **kwargs):
-			if not config.get(setting, user=current_user) == required_value:
+			if not g.config.get(setting, user=current_user) == required_value:
 				return current_app.login_manager.unauthorized()
 			return func(*args, **kwargs)
 
 		return decorated_view
 
 	return checking_decorator
+
+
+def parse_markdown(text, trim_container=False):
+	val = markdown2.markdown(text)
+	if trim_container:
+		val = re.sub(r"^<p>", "", val)
+		val = re.sub(r"</p>$", "", val)
+	return val

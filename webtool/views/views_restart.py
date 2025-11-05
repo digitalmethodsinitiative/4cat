@@ -10,26 +10,23 @@ import requests
 import datetime
 import signal
 import shutil
-import shlex
+import oslex
 import time
 import json
 import sys
 import os
 
 from pathlib import Path
-from flask import render_template, request, flash, get_flashed_messages, jsonify
+from flask import Blueprint, current_app, render_template, request, flash, get_flashed_messages, jsonify, g
+from packaging.specifiers import SpecifierSet
 
-from flask_login import login_required, current_user
-
-from webtool import app, queue, config
+from flask_login import login_required
 from webtool.lib.helpers import setting_required, check_restart_request
 
 from common.lib.helpers import get_github_version, get_git_branch
+component = Blueprint("restart", __name__)
 
-from common.config_manager import ConfigWrapper
-config = ConfigWrapper(config, user=current_user, request=request)
-
-@app.route("/admin/trigger-restart/", methods=["POST", "GET"])
+@component.route("/admin/trigger-restart/", methods=["POST", "GET"])
 @login_required
 @setting_required("privileges.admin.can_restart")
 def trigger_restart():
@@ -46,15 +43,16 @@ def trigger_restart():
     common in e.g. mod_wsgi) it should trigger a reload.
     """
     # figure out the versions we are dealing with
-    current_version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    current_version_file = g.config.get("PATH_CONFIG").joinpath(".current-version")
     if current_version_file.exists():
         current_version = current_version_file.open().readline().strip()
     else:
         current_version = "unknown"
 
-    code_version = Path(config.get("PATH_ROOT"), "VERSION").open().readline().strip()
+    current_version_compare = packaging.version.parse(current_version)
+    code_version = Path(g.config.get("PATH_ROOT"), "VERSION").open().readline().strip()
     try:
-        github_version = get_github_version(timeout=5)
+        github_version = get_github_version(g.config.get("4cat.github_url"), timeout=5)
         release_notes = github_version[1]
         github_version = github_version[0]
     except (json.JSONDecodeError, requests.RequestException):
@@ -63,10 +61,9 @@ def trigger_restart():
 
     # upgrade is available if we have all info and the release is newer than
     # the currently checked out code
-    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
-        current_version) >= packaging.version.parse(github_version))
+    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or current_version_compare >= packaging.version.parse(github_version))
 
-    lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+    lock_file = g.config.get("PATH_CONFIG").joinpath("restart.lock")
     if request.method == "POST" and lock_file.exists():
         flash("A restart is already in progress. Wait for it to complete. Check the process log for more details.")
 
@@ -74,7 +71,7 @@ def trigger_restart():
         # run upgrade or restart via shell commands
         mode = request.form.get("action")
         allowed_modes = ["upgrade", "restart"]
-        if config.get("privileges.can_upgrade_to_dev"):
+        if g.config.get("privileges.can_upgrade_to_dev"):
             allowed_modes.append("upgrade-to-branch")
 
         if mode not in allowed_modes:
@@ -85,7 +82,7 @@ def trigger_restart():
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
-        restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+        restart_log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
         with restart_log_file.open("w") as outfile:
             outfile.write(
                 f"{mode.capitalize().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
@@ -93,22 +90,31 @@ def trigger_restart():
         # this file will be updated when the upgrade runs
         # and it is shared between containers, but we will need to upgrade the
         # front-end separately - so keep a local copy for the latter step
-        if config.get("USING_DOCKER") and mode.startswith("upgrade"):
+        if g.config.get("USING_DOCKER") and mode.startswith("upgrade"):
             frontend_version_file = current_version_file.with_name(".current-version-frontend")
             shutil.copy(current_version_file, frontend_version_file)
 
         # from here on, the back-end takes over
         details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
-        queue.add_job("restart-4cat", details, mode)
+        g.queue.add_job("restart-4cat", details, mode)
         flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
+
+    version_notes = []
+    for notification in g.db.fetchall("SELECT * FROM users_notifications WHERE canonical_id != '' AND version_match != ''"):
+        version_match = SpecifierSet(notification["version_match"])
+        if current_version_compare in version_match:
+            version_notes.append(notification)
+        else:
+            print(notification)
+        
 
     current_branch = get_git_branch()
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
-                           release_notes=release_notes, current_branch=current_branch)
+                           release_notes=release_notes, current_branch=current_branch, version_notes=version_notes)
 
 
-@app.route("/admin/trigger-frontend-upgrade/", methods=["POST"])
+@component.route("/admin/trigger-frontend-upgrade/", methods=["POST"])
 def upgrade_frontend():
     """
     Run migrate.py in the frontend's environment
@@ -127,11 +133,11 @@ def upgrade_frontend():
     after that container's upgrade.
     """
     # this route only makes sense in a Docker context
-    if not config.get("USING_DOCKER") or not check_restart_request():
-        return app.login_manager.unauthorized()
+    if not g.config.get("USING_DOCKER") or not check_restart_request():
+        return current_app.login_manager.unauthorized()
 
-    restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
-    frontend_version_file = Path(config.get("PATH_ROOT"), "config/.current-version-frontend")
+    restart_log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
+    frontend_version_file = g.config.get("PATH_CONFIG").joinpath(".current-version-frontend")
     if not frontend_version_file.exists():
         return jsonify({"status": "error", "message": "No version file found"})
 
@@ -142,17 +148,17 @@ def upgrade_frontend():
     upgrade_ok = False
 
     command = sys.executable + " -m helper-scripts.migrate.py --component frontend --repository %s --yes --current-version %s" % (
-        shlex.quote(config.get("4cat.github_url")), shlex.quote(str(frontend_version_file)))
+        oslex.quote(g.config.get("4cat.github_url")), oslex.quote(str(frontend_version_file)))
 
     # there should be one and only one job of this type, with the parameters of
     # our upgrade. it determines if we update to the latest release or to a
     # branch
-    upgrade_job = queue.get_job("restart-4cat", restrict_claimable=False)
-    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {shlex.quote(upgrade_job.details['branch'])}"
+    upgrade_job = g.queue.get_job("restart-4cat", restrict_claimable=False)
+    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {oslex.quote(upgrade_job.details['branch'])}"
 
     try:
-        response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
-                                  check=True, cwd=str(config.get("PATH_ROOT")), stdin=subprocess.DEVNULL)
+        response = subprocess.run(oslex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
+                                  check=True, cwd=str(g.config.get("PATH_ROOT")), stdin=subprocess.DEVNULL)
         if response.returncode != 0:
             raise RuntimeError(f"Unexpected return code {response.returncode}")
         upgrade_ok = True
@@ -169,7 +175,7 @@ def upgrade_frontend():
     return jsonify({"status": "OK" if upgrade_ok else "error", "message": ""})
 
 
-@app.route("/admin/trigger-frontend-restart/", methods=["POST"])
+@component.route("/admin/trigger-frontend-restart/", methods=["POST"])
 def trigger_restart_frontend():
     """
     Trigger a restart of the 4CAT front-end
@@ -199,8 +205,8 @@ def trigger_restart_frontend():
     # ensure a restart is in progress and the request is from the backend
     # alternatively, this can be called directly, but only with the right
     # privileges
-    if not check_restart_request() and not config.get("privileges.admin.can_restart"):
-        return app.login_manager.unauthorized()
+    if not check_restart_request() and not g.config.get("privileges.admin.can_restart"):
+        return current_app.login_manager.unauthorized()
 
     # we support restarting with gunicorn and apache/mod_wsgi
     # nginx would usually be a front for gunicorn so that use case is also
@@ -257,7 +263,7 @@ def trigger_restart_frontend():
         # apache
         # mod_wsgi? touching the file is always safe
         message = "Detected Flask running in mod_wsgi, touching 4cat.wsgi."
-        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
+        wsgi_file = Path(g.config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
 
         # send a signal to apache to reload if running in daemon mode
         if os.environ.get("mod_wsgi.process_group") not in (None, ""):
@@ -276,7 +282,7 @@ def trigger_restart_frontend():
     return jsonify({"status": status, "message": message})
 
 
-@app.route("/admin/restart-log/")
+@component.route("/admin/restart-log/")
 @setting_required("privileges.admin.can_restart")
 def restart_log():
     """
@@ -286,9 +292,9 @@ def restart_log():
 
     :return:
     """
-    log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+    log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
     if log_file.exists():
-        with log_file.open() as infile:
+        with open(log_file, encoding="utf-8") as infile:
             return infile.read()
     else:
         return "Not Found", 404

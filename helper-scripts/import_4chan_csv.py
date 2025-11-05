@@ -7,7 +7,7 @@ psql -d fourcat -c "COPY (SELECT id, board, thread_id, timestamp, subject, body,
 """
 
 import argparse
-import json
+import psycopg2
 import time
 import csv
 import sys
@@ -16,12 +16,13 @@ import re
 
 from pathlib import Path
 
-from psycopg2.errors import UniqueViolation
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
-from common.config_manager import config
+from common.config_manager import CoreConfigManager
+
+config = CoreConfigManager()
 
 def commit(posts, post_fields, db, datasource, fast=False):
 	posts_added = 0

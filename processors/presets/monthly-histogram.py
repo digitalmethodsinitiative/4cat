@@ -2,6 +2,7 @@
 Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
+from processors.metrics.count_posts import CountPosts
 
 
 class MonthlyHistogramCreator(ProcessorPreset):
@@ -10,38 +11,47 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	"""
 	type = "preset-histogram"  # job type ID
 	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-	title = "Monthly histogram"  # title displayed in UI
-	description = "Generates a histogram with the number of items per month."  # description displayed in UI
+	title = "Histogram"  # title displayed in UI
+	description = "Visualize graphically the number of posts over time."  # description displayed in UI
 	extension = "svg"
 
 	@staticmethod
-	def is_compatible_with(module=None, user=None):
+	def is_compatible_with(module=None, config=None):
 		"""
         Determine compatibility
 
         This preset is compatible with any module that has countable items (via count-posts)
 
         :param Dataset module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+	
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None):
+		count_options = CountPosts.get_options(parent_dataset=parent_dataset, config=config)
+		if "all" in count_options["timeframe"]:
+			# Cannot graph overall counts (or rather it would be a single bar)
+			count_options["timeframe"]["options"].pop("all")
+		return count_options
 
 	def get_processor_pipeline(self):
 		"""
 		This queues a series of post-processors to visualise over-time
 		activity.
 		"""
-
-		header = "'" + self.source_dataset.data["query"] + "': Items per month"
+		query = self.parameters.copy()
+		header = self.source_dataset.get_label() + f": Items per {query['timeframe']}"
 		if len(header) > 40:
-			header = "Items per month"
+			header = f"Items per {query['timeframe']}"
 
 		pipeline = [
-			# first, count activity per month
+			# first, count activity per timeframe
 			{
 				"type": "count-posts",
 				"parameters": {
-					"timeframe": "month"
+					**query
 				}
 			},
 			# then, render it

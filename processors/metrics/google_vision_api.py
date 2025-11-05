@@ -27,11 +27,12 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     Request tags and labels from the Google Vision API for a given set of images
     """
     type = "google-vision-api"  # job type ID
-    category = "Post metrics"  # category
+    category = "Metrics"  # category
     title = "Google Vision API Analysis"  # title displayed in UI
     description = "Use the Google Vision API to annotate images with tags and labels identified via machine learning. " \
-                  "One request will be made per image per annotation type. Note that this is NOT a free service and " \
-                  "requests will be credited by Google to the owner of the API token you provide!"# description displayed in UI
+                  "One request will be made per image per annotation type. Note that this is not a free service and " \
+                  "requests will be credited by Google to the owner of the API token you provide. Requires billing " \
+                  "and Google Vision API enabled (this may take a few minutes)."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     followups = ["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"]
@@ -42,45 +43,62 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     ]
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on image sets
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Images to process (0 = all)",
-            "default": 0
-        },
-        "api_key": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API Key",
-            "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
-                       "key on the API dashboard."
-        },
-        "features": {
-            "type": UserInput.OPTION_MULTI,
-            "help": "Features",
-            "options": {
-                "LABEL_DETECTION": "Label Detection",
-                "TEXT_DETECTION": "Text Detection",
-                "DOCUMENT_TEXT_DETECTION": "Document Text Detection",
-                "SAFE_SEARCH_DETECTION": "Safe Search Detection",
-                "FACE_DETECTION": "Facial Detection",
-                "LANDMARK_DETECTION": "Landmark Detection",
-                "LOGO_DETECTION": "Logo Detection",
-                "IMAGE_PROPERTIES": "Image Properties",
-                "CROP_HINTS": "Crop Hints",
-                "WEB_DETECTION": "Web Detection",
-                "OBJECT_LOCALIZATION": "Object Localization"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Images to process (0 = all)",
+                "default": 0
             },
-            "default": ["LABEL_DETECTION"]
+            "api_key": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API Key",
+                "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
+                        "key on console.cloud.google.com. You also need to enable billing and Vision API."
+            },
+            "features": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Features",
+                "options": {
+                    "LABEL_DETECTION": "Label Detection",
+                    "TEXT_DETECTION": "Text Detection",
+                    "DOCUMENT_TEXT_DETECTION": "Document Text Detection",
+                    "SAFE_SEARCH_DETECTION": "Safe Search Detection",
+                    "FACE_DETECTION": "Facial Detection",
+                    "LANDMARK_DETECTION": "Landmark Detection",
+                    "LOGO_DETECTION": "Logo Detection",
+                    "IMAGE_PROPERTIES": "Image Properties",
+                    "CROP_HINTS": "Crop Hints",
+                    "WEB_DETECTION": "Web Detection",
+                    "OBJECT_LOCALIZATION": "Object Localization"
+                },
+                "default": ["LABEL_DETECTION"]
+            },
+            "annotation_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "The output can be made human-readable through the following `Convert Vision results to CSV` "
+                        "processor. This also lets you write the labels as annotations to the original dataset."
+            }
         }
-    }
 
     def process(self):
         """
@@ -108,6 +126,10 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         processed = 0
         done = 0
 
+        # Get the .metadata.json file if we're writing annotations so we can add them to specific rows.
+        img_metadata = []
+
+        # Loop through images
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
@@ -116,7 +138,14 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             self.dataset.update_progress(done / total)
 
             if image_file.name.startswith(".") or image_file.suffix in (".json", ".log"):
-                self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
+
+                # Get the .metadata.json file so we can also save post IDs.
+                if image_file.name == ".metadata.json":
+                    img_metadata = json.load(image_file.open())
+                    if img_metadata:
+                        img_metadata = {v["filename"]: v.get("post_ids", []) for v in img_metadata.values()}
+                else:
+                    self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
                 continue
 
             try:
@@ -125,11 +154,13 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 # cannot continue fetching, e.g. when API key is invalid
                 break
 
-            processed += 1
             if not annotations:
                 continue
 
-            annotations = {"file_name": image_file.name, **annotations}
+            annotations = {
+                "file_name": image_file.name,
+                "post_ids": img_metadata[image_file.name],
+                **annotations}
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:
                 outfile.write(json.dumps(annotations) + "\n")
@@ -141,7 +172,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         self.dataset.update_status("Annotations retrieved for %i images (%i processed in total)" % (done, processed), is_final=True)
         self.dataset.finish(done)
 
-    def annotate_image(self, image_file, api_key, features):
+    def annotate_image(self, image_file: Path, api_key: str, features: list):
         """
         Get annotations from the Google Vision API
 

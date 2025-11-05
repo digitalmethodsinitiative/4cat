@@ -35,6 +35,10 @@ class UserInput:
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
     OPTION_DATASOURCES = "datasources"  # data source toggling
+    OPTION_EXTENSIONS = "extensions"  # extension toggling
+    OPTION_DATASOURCES_TABLE = "datasources_table"  # a table with settings per data source
+    OPTION_ANNOTATION = "annotation"  # checkbox for whether to an annotation
+    OPTION_ANNOTATIONS = "annotations"  # table for whether to write multiple annotations
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
@@ -59,6 +63,7 @@ class UserInput:
 
         :return dict:  Sanitised form input
         """
+
         from common.lib.helpers import convert_to_int
         parsed_input = {}
 
@@ -77,6 +82,12 @@ class UserInput:
         # prefix
         input = {re.sub(r"^option-", "", field): input[field] for field in input}
 
+        # fields can be 'delegated', i.e. they only show up under some condition
+        # or in a later stage of form input. here we determine if input was
+        # actually filled in or was only defined but never delegated
+        never_delegated = set([option for option in options if options[option].get("delegated")])
+        never_delegated -= set(input.keys())
+
         # re-order input so that the fields relying on the value of other
         # fields are parsed last
         options = {k: options[k] for k in sorted(options, key=lambda k: options[k].get("requires") is not None)}
@@ -89,6 +100,12 @@ class UserInput:
 
             if settings.get("type") in UserInput.OPTIONS_COSMETIC:
                 # these are structural form elements and never have a value
+                continue
+
+            if option in never_delegated:
+                # these options were never actually part of the input because
+                # the required conditions were never met, so they can be
+                # ignored
                 continue
 
             elif settings.get("type") == UserInput.OPTION_DATERANGE:
@@ -118,7 +135,7 @@ class UserInput:
                 except RequirementsNotMetException:
                     pass
 
-            elif settings.get("type") == UserInput.OPTION_TOGGLE:
+            elif settings.get("type") in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
                 # special case too, since if a checkbox is unchecked, it simply
                 # does not show up in the input
                 try:
@@ -142,6 +159,27 @@ class UserInput:
 
                 parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
                 parsed_input[option.split(".")[0] + ".expiration"] = datasources
+
+            elif settings.get("type") == UserInput.OPTION_EXTENSIONS:
+                # also a special case
+                parsed_input[option] = {extension: {
+                    "enabled": f"{option}-enable-{extension}" in input
+                } for extension in input[option].split(",")}
+
+            elif settings.get("type") == UserInput.OPTION_DATASOURCES_TABLE:
+                # special case, parse table values to generate a dict
+                columns = list(settings["columns"].keys())
+                table_input = {}
+
+                for datasource in list(settings["default"].keys()):
+                    table_input[datasource] = {}
+                    for column in columns:
+
+                        choice = input.get(option + "-" + datasource + "-" + column, False)
+                        column_settings = settings["columns"][column]  # sub-settings per column
+                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
+
+                parsed_input[option] = table_input
 
             elif option not in input:
                 # not provided? use default
@@ -185,38 +223,40 @@ class UserInput:
             if field not in other_input:
                 raise RequirementsNotMetException()
 
+            negated = operator.startswith("!")
+            if negated:
+                operator = operator[1:]
+
             other_value = other_input.get(field)
             if type(other_value) is bool:
                 # evalues to a boolean, i.e. checkboxes etc
-                if operator == "!=":
-                    if (other_value and value in ("", "false")) or (not other_value and value in ("true", "checked")):
+                if operator in ("==", "="):
+                    if ((other_value and value in ("", "false")) or (not other_value and value in ("true", "checked"))) != negated:
                         raise RequirementsNotMetException()
                 else:
-                    if (other_value and value not in ("true", "checked")) or (not other_value and value not in ("", "false")):
+                    if ((other_value and value not in ("true", "checked")) or (not other_value and value not in ("", "false"))) != negated:
                         raise RequirementsNotMetException()
 
             else:
                 if type(other_value) in (tuple, list):
-                # iterables are a bit special
+                    # iterables are a bit special
                     if len(other_value) == 1:
                         # treat one-item lists as "normal" values
                         other_value = other_value[0]
                     elif operator == "~=":  # interpret as 'is in list?'
-                        if value not in other_value:
+                        if (value not in other_value) != negated:
                             raise RequirementsNotMetException()
-                    else:
+                    elif not negated:
                         # condition doesn't make sense for a list, so assume it's not True
                         raise RequirementsNotMetException()
 
-                if operator == "^=" and not str(other_value).startswith(value):
+                if (operator == "^=" and not str(other_value).startswith(value)) != negated:
                     raise RequirementsNotMetException()
-                elif operator == "$=" and not str(other_value).endswith(value):
+                elif (operator == "$=" and not str(other_value).endswith(value)) != negated:
                     raise RequirementsNotMetException()
-                elif operator == "~=" and value not in str(other_value):
+                elif (operator == "~=" and value not in str(other_value)) != negated:
                     raise RequirementsNotMetException()
-                elif operator == "!=" and value == other_value:
-                    raise RequirementsNotMetException()
-                elif operator in ("==", "=") and value != other_value:
+                elif (operator in ("==", "=") and value != other_value) != negated:
                     raise RequirementsNotMetException()
 
         input_type = settings.get("type", "")
@@ -224,9 +264,9 @@ class UserInput:
             # these are structural form elements and can never return a value
             return None
 
-        elif input_type == UserInput.OPTION_TOGGLE:
+        elif input_type in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
             # simple boolean toggle
-            if type(choice) == bool:
+            if type(choice) is bool:
                 return choice
             elif choice in ['false', 'False']:
                 # Sanitized options passed back to Flask can be converted to strings as 'false'
@@ -250,7 +290,7 @@ class UserInput:
             finally:
                 return value
 
-        elif input_type == UserInput.OPTION_MULTI:
+        elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS):
             # any number of values out of a list of possible values
             # comma-separated during input, returned as a list of valid options
             if not choice:
@@ -288,7 +328,7 @@ class UserInput:
         elif input_type == UserInput.OPTION_TEXT_JSON:
             # verify that this is actually json
             try:
-                redumped_value = json.dumps(json.loads(choice))
+                json.dumps(json.loads(choice))
             except json.JSONDecodeError:
                 raise QueryParametersException("Invalid JSON value '%s'" % choice)
 
@@ -309,7 +349,7 @@ class UserInput:
             if "max" in settings:
                 try:
                     choice = min(settings["max"], value_type(choice))
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     if not silently_correct:
                         raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
 
@@ -318,7 +358,7 @@ class UserInput:
             if "min" in settings:
                 try:
                     choice = max(settings["min"], value_type(choice))
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     if not silently_correct:
                         raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
 

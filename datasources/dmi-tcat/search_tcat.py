@@ -13,7 +13,6 @@ from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
 
@@ -33,93 +32,6 @@ class SearchWithinTCATBins(Search):
     additional_TCAT_fields = ["to_user_name", "filter_level", "favorite_count", "truncated", "from_user_favourites_count", "from_user_lang", "from_user_utcoffset",
                               "from_user_timezone"]
 
-    options = {
-        "intro-1": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source interfaces with a DMI-TCAT instance to allow subsetting of tweets from a tweet "
-                    "bin in that instance."
-        },
-        "divider-1": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "bin": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Query bin"
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Query text",
-            "tooltip": "Match all tweets containing this text."
-        },
-        "query-exclude": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Exclude text",
-            "tooltip": "Match all tweets that do NOT contain this text."
-        },
-        "user-name": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "From user",
-            "tooltip": "Match all tweets from this username."
-        },
-        "user-exclude": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Exclude user",
-            "tooltip": "Match all tweets NOT from this username."
-        },
-        "exclude-replies": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "exclude": "Exclude replies",
-                "include": "Include replies"
-            },
-            "help": "Reply tweets",
-            "default": "include",
-            "tooltip": "Choose to exclude or include tweets that are replies from the data"
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range"
-        },
-        # Advanced Options Section
-        "divider-2": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "advanced_options_info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Advanced Query Options can further refine your query"
-        },
-        "user-bio": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "User bio text",
-            "tooltip": "Match all tweets from users with biographies containing this text."
-        },
-        "user-language": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "User language",
-            "tooltip": "Match all tweets from users using this language (as detected by Twitter)."
-        },
-        "tweet-language": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Tweet language",
-            "tooltip": "Match all tweets from users with this language (as detected by Twitter)."
-        },
-        "tweet-client": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Twitter client URL/descr",
-            "tooltip": "Match all tweets from clients that match this text."
-        },
-        "url": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "(Part of) URL",
-            "tooltip": "Match all tweets containing this (partial) URL."
-        },
-        "url-media": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "(Part of) media URL",
-            "tooltip": "Match all tweets containing this (partial) media URL."
-        },
-    }
-
     config = {
         "dmi-tcat-search.instances": {
             "type": UserInput.OPTION_TEXT_JSON,
@@ -136,7 +48,7 @@ class SearchWithinTCATBins(Search):
     }
 
     @classmethod
-    def collect_all_bins(cls, force_update=False):
+    def collect_all_bins(cls, config, force_update=False):
         """
         Requests bin information from TCAT instances
         """
@@ -161,22 +73,106 @@ class SearchWithinTCATBins(Search):
                     pass
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get data source options
 
         This method takes the pre-defined options, but fills the 'bins' options
         with bins currently available from the configured TCAT instances.
 
+        :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
+        the processor would be run on can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "intro-1": {
+                "type": UserInput.OPTION_INFO,
+                "help": "This data source interfaces with a DMI-TCAT instance to allow subsetting of tweets from a tweet "
+                        "bin in that instance."
+            },
+            "divider-1": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "bin": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Query bin"
+            },
+            "query": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Query text",
+                "tooltip": "Match all tweets containing this text."
+            },
+            "query-exclude": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Exclude text",
+                "tooltip": "Match all tweets that do NOT contain this text."
+            },
+            "user-name": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "From user",
+                "tooltip": "Match all tweets from this username."
+            },
+            "user-exclude": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Exclude user",
+                "tooltip": "Match all tweets NOT from this username."
+            },
+            "exclude-replies": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "exclude": "Exclude replies",
+                    "include": "Include replies"
+                },
+                "help": "Reply tweets",
+                "default": "include",
+                "tooltip": "Choose to exclude or include tweets that are replies from the data"
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Date range"
+            },
+            # Advanced Options Section
+            "divider-2": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "advanced_options_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Advanced Query Options can further refine your query"
+            },
+            "user-bio": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "User bio text",
+                "tooltip": "Match all tweets from users with biographies containing this text."
+            },
+            "user-language": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "User language",
+                "tooltip": "Match all tweets from users using this language (as detected by Twitter)."
+            },
+            "tweet-language": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Tweet language",
+                "tooltip": "Match all tweets from users with this language (as detected by Twitter)."
+            },
+            "tweet-client": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Twitter client URL/descr",
+                "tooltip": "Match all tweets from clients that match this text."
+            },
+            "url": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "(Part of) URL",
+                "tooltip": "Match all tweets containing this (partial) URL."
+            },
+            "url-media": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "(Part of) media URL",
+                "tooltip": "Match all tweets containing this (partial) media URL."
+            },
+        }
 
-        cls.collect_all_bins()
+        cls.collect_all_bins(config)
         if all([data.get("failed", False) for instance, data in cls.bin_data["all_bins"].items()]):
             options["bin"] = {
                 "type": UserInput.OPTION_INFO,
@@ -217,7 +213,7 @@ class SearchWithinTCATBins(Search):
         # instance URL again here
         # while the parameter could be marked 'sensitive', the values would
         # still show up in e.g. the HTML of the 'create dataset' form
-        available_instances = config.get("dmi-tcat-search.instances", [])
+        available_instances = self.config.get("dmi-tcat-search.instances", [])
         instance_url = ""
         instance = None
         for available_instance in available_instances:
@@ -231,7 +227,7 @@ class SearchWithinTCATBins(Search):
             return self.dataset.finish_with_error("Invalid DMI-TCAT instance name '%s'" % bin_host)
 
         # Collect the bins again (ensure we have updated info in case bin is still active)
-        self.collect_all_bins(force_update=True)
+        self.collect_all_bins(self.config, force_update=True)
         # Add metadata to parameters
         try:
             current_bin = self.bin_data["all_bins"][instance][bin_name]
@@ -290,6 +286,8 @@ class SearchWithinTCATBins(Search):
         fieldnames = None
         items = 0
         encoding = None
+        api_map_errors = 0
+        mapping_errors = 0
         for chunk in response.iter_content(chunk_size=1024):
             # see if this chunk contains a newline, in which case we have a
             # full line to process (e.g. as a tweet)
@@ -336,11 +334,36 @@ class SearchWithinTCATBins(Search):
                     if items % 250 == 0:
                         self.dataset.update_status("Loaded %i tweets from bin %s@%s" % (items, bin_name, bin_host))
 
-                    yield self.tcat_to_APIv2(tweet)
+                    try:
+                        formatted_tweet = self.tcat_to_APIv2(tweet)
+                    except (KeyError, IndexError) as e:
+                        self.dataset.log(f"Error converting TCAT tweet ({items}) to APIv2 format: {e}")
+                        api_map_errors += 1
+                        continue
+                    
+                    # Check mapping errors
+                    try:
+                        SearchWithTwitterAPIv2.map_item(formatted_tweet)
+                    except (KeyError, IndexError) as e:
+                        # these tweets will not be usable by 4CAT processors, but we can still yield and they are availalbe for download as NDJSON
+                        self.dataset.log(f"Error mapping TCAT tweet ({items}) to 4CAT Twitter format: {e}")
+                        mapping_errors += 1
+
+                    # yield formatted_tweet which contains some TCAT specific fields; mapping to X/Twitter APIv2 format is done later
+                    yield formatted_tweet
 
             if not chunk:
                 # end of file
                 break
+
+        if mapping_errors or api_map_errors:
+            error_message = ""
+            if mapping_errors:
+                error_message += f"{mapping_errors} tweets were unable to be imported from TCAT. "
+            if api_map_errors:
+                error_message += f"{api_map_errors} tweets were unable to be formmated corrected and 4CAT will not be able to analyse them."
+            self.log.warning(f"SearchWithinTCATBins: import mapping issue detected ({self.dataset.key})")
+            self.dataset.update_status(error_message, is_final=True)
 
     @ staticmethod
     def tcat_to_4cat_time(tcat_time):
@@ -413,7 +436,7 @@ class SearchWithinTCATBins(Search):
             "author_user": {
                 "protected": None,  # bool; Missing in TCAT data
                 "verified": True if tcat_tweet["from_user_verified"] == 1 else False if tcat_tweet["from_user_verified"] == 0 else None,  # bool
-                "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["from_user_created_at"]),  # str
+                "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["from_user_created_at"]) if tcat_tweet["from_user_created_at"] else "",  # str; may be Missing in TCAT data
                 "name": tcat_tweet["from_user_realname"],  # str
                 "entities": {
                     "description": None,  # dict; contains entities from author description such as mentions, URLs, etc.; Missing in TCAT data
@@ -507,13 +530,13 @@ class SearchWithinTCATBins(Search):
         return APIv2_tweet
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate DMI-TCAT query input
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # no query 4 u

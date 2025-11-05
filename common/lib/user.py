@@ -12,9 +12,10 @@ import os
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+from common.config_manager import ConfigWrapper
 from common.lib.helpers import send_email
 from common.lib.exceptions import DataSetException
-from common.config_manager import config
 
 
 class User:
@@ -28,12 +29,13 @@ class User:
     is_authenticated = False
     is_active = False
     is_anonymous = True
+    config = None
     db = None
 
     name = "anonymous"
 
     @staticmethod
-    def get_by_login(db, name, password):
+    def get_by_login(db, name, password, config=None):
         """
         Get user object, if login is correct
 
@@ -43,9 +45,11 @@ class User:
         :param db:  Database connection object
         :param name:  User name
         :param password:  User password
+        :param config:  Configuration manager. Can be used for request-aware user objects using ConfigWrapper. Empty to
+        use a global configuration manager.
         :return:  User object, or `None` if login was invalid
         """
-        user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
+        user = db.fetchone("SELECT * FROM users WHERE LOWER(name) = LOWER(%s)", (name,))
         if not user or not user.get("password", None):
             # registration not finished yet
             return None
@@ -54,30 +58,34 @@ class User:
             return None
         else:
             # valid login!
-            return User(db, user, authenticated=True)
+            return User(db, user, authenticated=True, config=config)
 
     @staticmethod
-    def get_by_name(db, name):
+    def get_by_name(db, name, config=None):
         """
         Get user object for given user name
 
         :param db:  Database connection object
         :param str name:  Username to get object for
+        :param config:  Configuration manager. Can be used for request-aware user objects using ConfigWrapper. Empty to
+        use a global configuration manager.
         :return:  User object, or `None` for invalid user name
         """
-        user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
+        user = db.fetchone("SELECT * FROM users WHERE LOWER(name) = LOWER(%s)", (name,))
         if not user:
             return None
         else:
-            return User(db, user)
+            return User(db, user, config=config)
 
     @staticmethod
-    def get_by_token(db, token):
+    def get_by_token(db, token, config=None):
         """
         Get user object for given token, if token is valid
 
         :param db:  Database connection object
         :param str token:  Token to get object for
+        :param config:  Configuration manager. Can be used for request-aware user objects using ConfigWrapper. Empty to
+        use a global configuration manager.
         :return:  User object, or `None` for invalid token
         """
         user = db.fetchone(
@@ -86,36 +94,9 @@ class User:
         if not user:
             return None
         else:
-            return User(db, user)
+            return User(db, user, config=config)
 
-    def can_access_dataset(self, dataset, role=None):
-        """
-        Check if this user should be able to access a given dataset.
-
-        This depends mostly on the dataset's owner, which should match the
-        user if the dataset is private. If the dataset is not private, or
-        if the user is an admin or the dataset is private but assigned to
-        an anonymous user, the dataset can be accessed.
-
-        :param dataset:  The dataset to check access to
-        :return bool:
-        """
-        if not dataset.is_private:
-            return True
-
-        elif self.is_admin:
-            return True
-
-        elif dataset.is_accessible_by(self, role=role):
-            return True
-
-        elif dataset.get_owners == ("anonymous",):
-            return True
-
-        else:
-            return False
-
-    def __init__(self, db, data, authenticated=False):
+    def __init__(self, db, data, authenticated=False, config=None):
         """
         Instantiate user object
 
@@ -127,6 +108,7 @@ class User:
         """
         self.db = db
         self.data = data
+
         try:
             self.userdata = json.loads(self.data["userdata"])
         except (TypeError, json.JSONDecodeError):
@@ -143,6 +125,9 @@ class User:
 
         if not self.is_anonymous and self.is_authenticated:
             self.db.update("users", where={"name": self.data["name"]}, data={"timestamp_seen": int(time.time())})
+
+        if config:
+            self.with_config(config)
 
     def authenticate(self):
         """
@@ -170,7 +155,7 @@ class User:
         if self.data["name"] == "anonymous":
             return "Anonymous"
         elif self.data["name"] == "autologin":
-            return config.get("flask.autologin.name")
+            return self.config.get("flask.autologin.name") if self.config else "Autologin"
         else:
             return self.data["name"]
 
@@ -184,6 +169,25 @@ class User:
         """
         return self.generate_token(regenerate=False)
 
+    def with_config(self, config, rewrap=True):
+        """
+        Connect user to configuration manager
+
+        By default, the user object reads from the global configuration
+        manager. For frontend operations it may be desireable to use a
+        request-aware configuration manager, but this is only available after
+        the user has been instantiated. This method can thus be used to connect
+        the user to that config manager later when it is available.
+
+        :param config:  Configuration manager object
+        :param bool rewrap:  Re-wrap with this user as the user context?
+        :return:
+        """
+        if rewrap:
+            self.config = ConfigWrapper(config, user=self)
+        else:
+            self.config = config
+
     def clear_token(self):
         """
         Reset password rest token
@@ -194,6 +198,37 @@ class User:
         :return:
         """
         self.db.update("users", data={"register_token": "", "timestamp_token": 0}, where={"name": self.get_id()})
+
+    def can_access_dataset(self, dataset, role=None):
+        """
+        Check if this user should be able to access a given dataset.
+
+        This depends mostly on the dataset's owner, which should match the
+        user if the dataset is private. If the dataset is not private, or
+        if the user is an admin or the dataset is private but assigned to
+        an anonymous user, the dataset can be accessed.
+
+        :param dataset:  The dataset to check access to
+        :return bool:
+        """
+        if not dataset.is_private:
+            return True
+
+        elif self.is_admin:
+            return True
+        
+        elif self.config.get("privileges.can_view_private_datasets", user=self):
+            # Allowed to see dataset, but perhaps not run processors (need privileges.admin.can_manipulate_all_datasets or dataset ownership)
+            return True
+
+        elif dataset.is_accessible_by(self, role=role):
+            return True
+
+        elif dataset.get_owners == ("anonymous",):
+            return True
+
+        else:
+            return False
 
     @property
     def is_special(self):
@@ -214,7 +249,7 @@ class User:
         """
         try:
             return "admin" in self.data["tags"]
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             # invalid JSON?
             return False
 
@@ -246,7 +281,11 @@ class User:
                           account?
         :return str:  Link for the user to set their password with
         """
-        if not config.get('mail.server'):
+        if not self.config:
+            raise ValueError("User not instantiated with a configuration reader. Provide a ConfigManager at "
+                             "instantiation or use with_config().")
+
+        if not self.config.get('mail.server'):
             raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")
 
         if self.is_special:
@@ -258,14 +297,14 @@ class User:
         register_token = self.generate_token(regenerate=True)
 
         # prepare welcome e-mail
-        sender = config.get('mail.noreply')
+        sender = self.config.get('mail.noreply')
         message = MIMEMultipart("alternative")
         message["From"] = sender
         message["To"] = username
 
         # the actual e-mail...
-        url_base = config.get("flask.server_name")
-        protocol = "https" if config.get("flask.https") else "http"
+        url_base = self.config.get("flask.server_name")
+        protocol = "https" if self.config.get("flask.https") else "http"
         url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, register_token)
 
         # we use slightly different e-mails depending on whether this is the first time setting a password
@@ -297,7 +336,7 @@ class User:
 
         # try to send it
         try:
-            send_email([username], message)
+            send_email([username], message, self.config)
             return url
         except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout, socket.gaierror) as e:
             raise RuntimeError("Could not send password reset e-mail: %s" % e)
@@ -393,22 +432,33 @@ class User:
 
         :param int notification_id:  ID of the notification to dismiss
         """
-        current_notifications = [n["id"] for n in self.get_notifications() if n["allow_dismiss"]]
-        if notification_id not in current_notifications:
+        all_notifications = {n["id"]: n for n in self.get_notifications() if n["allow_dismiss"]}
+        if notification_id not in all_notifications:
             return
 
-        self.db.delete("users_notifications", where={"id": notification_id})
+        # notifications with a canonical ID are just hidden, not deleted
+        # this is because they are received from a notification server, and
+        # deleting them would just re-add them on the next sync
+        if all_notifications[notification_id]["canonical_id"]:
+            self.db.update("users_notifications", data={"is_dismissed": True}, where={"id": notification_id})
+        else:
+            self.db.delete("users_notifications", where={"id": notification_id})
 
     def get_notifications(self):
         """
         Get all notifications for this user
 
         That is all the user's own notifications, plus those for the groups of
-        users this user belongs to
+        users this user belongs to. Dismissed notifications are ignored.
 
         :return list:  Notifications, as a list of dictionaries
         """
-        tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.data["tags"]]]
+        if not self.config:
+            # User not logged in; only view notifications for everyone
+            tag_recipients = ["!everyone"]
+        else:
+            tag_recipients = ["!everyone", *[f"!{tag}" for tag in self.config.get_active_tags(self)]]
+
         if self.is_admin:
             # for backwards compatibility - used to be called '!admins' even if the tag is 'admin'
             tag_recipients.append("!admins")
@@ -416,7 +466,8 @@ class User:
         notifications = self.db.fetchall(
             "SELECT n.* FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s "
-            "AND (u.name = n.username OR n.username IN %s)", (self.get_id(), tuple(tag_recipients)))
+            "AND (u.name = n.username OR n.username IN %s)"
+            "AND n.is_dismissed = FALSE", (self.get_id(), tuple(tag_recipients)))
 
         return notifications
 
@@ -431,6 +482,7 @@ class User:
         if tag not in self.data["tags"]:
             self.data["tags"].append(tag)
             self.sort_user_tags()
+            self.config.uncache_user_tags([self.get_id()])
 
     def remove_tag(self, tag):
         """
@@ -443,6 +495,7 @@ class User:
         if tag in self.data["tags"]:
             self.data["tags"].remove(tag)
             self.sort_user_tags()
+            self.config.uncache_user_tags([self.get_id()])
 
     def sort_user_tags(self):
         """
@@ -454,10 +507,14 @@ class User:
         tags are stored in the database in the right order to begin with. This
         method ensures that.
         """
+        if not self.config:
+            raise ValueError("User not instantiated with a configuration reader. Provide a ConfigManager at "
+                             "instantiation or use with_config().")
+
         tags = self.data["tags"]
         sorted_tags = []
 
-        for tag in config.get("flask.tag_order"):
+        for tag in self.config.get("flask.tag_order"):
             if tag in tags:
                 sorted_tags.append(tag)
 
@@ -471,7 +528,7 @@ class User:
         self.data["tags"] = sorted_tags
         self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
 
-    def delete(self, also_datasets=True):
+    def delete(self, also_datasets=True, modules=None):
         from common.lib.dataset import DataSet
 
         username = self.data["name"]
@@ -485,9 +542,11 @@ class User:
 
         # delete any datasets and jobs related to deleted datasets
         if datasets:
+            if modules is None:
+                raise ValueError("To delete a user and their datasets, the 'modules' parameter must be provided.")
             for dataset in datasets:
                 try:
-                    dataset = DataSet(key=dataset["key"], db=self.db)
+                    dataset = DataSet(key=dataset["key"], db=self.db, modules=modules)
                 except DataSetException:
                     # dataset already deleted?
                     continue

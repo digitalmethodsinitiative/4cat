@@ -16,6 +16,10 @@
     <script type="text/javascript" src="{{url_for('static', filename='js/zip.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/fourcat.js')}}"></script>
 
+    {% if navigation.current == "about" %}
+    <script type="text/javascript" src="{{url_for('static', filename='js/bsky-embed.es.js')}}"></script>
+    {% endif %}
+
 	<!-- favicons -->
 	<link rel="shortcut icon" href="{{url_for('static', filename='img/favicon/favicon.ico')}}">
 	<meta name="msapplication-TileColor" content="#485ba6">
@@ -29,28 +33,28 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 </head>
-<body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}" data-url-root="{{ url_for("show_frontpage") }}">
+<body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}" data-url-root="{{ url_for("misc.show_frontpage") }}">
 	<h1>
         <img src="{{ url_for("static", filename="img/4cat-heads.svg") }}">
-        <span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __user_config("4cat.name_long") }}{% endblock %}</a></span>
+        <span><a href="{{ url_for('misc.show_frontpage') }}">{% block site_header %}{{ __user_config("4cat.name_long") }}{% endblock %}</a></span>
     </h1>
 	<nav class="main-nav">
 		<ul>
             {% if __user_config("privileges.can_create_dataset") %}
-			    <li{% if navigation.current == "create-dataset" %} class="current"{% endif %}><a href="{{ url_for('create_dataset') }}">Create dataset</a></li>
+			    <li{% if navigation.current == "create-dataset" %} class="current"{% endif %}><a href="{{ url_for('dataset.create_dataset') }}">Create dataset</a></li>
             {% endif %}
-			<li{% if navigation.current == "dataset" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}">Datasets</a></li>
-            <li{% if navigation.current == "datasources" %} class="current"{% endif %}><a href="{{ url_for('data_overview') }}">Data sources</a></li>
+			<li{% if navigation.current == "dataset" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}">Datasets</a></li>
+            <li{% if navigation.current == "datasources" %} class="current"{% endif %}><a href="{{ url_for('misc.data_overview') }}">Data sources</a></li>
             {% if current_user.is_authenticated and not current_user.is_special and __user_config("privileges.can_create_api_token") %}
-                <li{% if navigation.current == "api-access" %} class="current"{% endif %}><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
+                <li{% if navigation.current == "api-access" %} class="current"{% endif %}><a href="{{ url_for('user.show_access_tokens') }}">API Access</a></li>
             {% endif %}
             {% if __user_cp_access %}
-                <li{% if navigation.current == "control-panel" %} class="current"{% endif %}><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
+                <li{% if navigation.current == "control-panel" %} class="current"{% endif %}><a href="{{ url_for('admin.frontpage') }}">Control Panel</a></li>
             {% endif %}
-            <li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('show_about') }}">About</a></li>
+            <li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('misc.show_about') }}">About</a></li>
             {% for page in __user_config("ui.nav_pages") %}
             <li{% if navigation.current == page %} class="current"{% endif %}>
-                <a href="{{ url_for("show_page", page=page) }}">{% if page == "faq" %}<abbr title="Frequently Asked Questions">FAQ</abbr>{% else %}{{ page|title }}{% endif %}</a>
+                <a href="{{ url_for("misc.show_page", page=page) }}">{{ page|title }}</a>
             </li>
             {% endfor %}
 		</ul>
@@ -59,8 +63,11 @@
     {% for notification in __notifications %}
         <div class="site-announcement">
             {{ notification.notification|markdown|safe }}
+            {% if notification.notification_long %}
+                (<a href="{{ url_for("user.view_notification", notification_id=notification.id) }}">read more...</a>)
+            {% endif %}
             {% if notification.allow_dismiss %}
-                <a href="{{ url_for("dismiss_notification", notification_id=notification.id) }}"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Dismiss notification</span></a>
+                <a href="{{ url_for("user.dismiss_notification", notification_id=notification.id) }}"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Dismiss notification</span></a>
             {% endif %}
         </div>
     {% endfor %}
@@ -73,15 +80,19 @@
 		<p>Welcome.</p>
 	{% endblock %}
 
+    <p role="tooltip" class="multiple" id="tooltip-clipboard" aria-hidden="true">Click to copy this value to the clipboard</p>
+
 	<footer class="fixed-footer">
 	<nav>
 		<ul class="flat">
 		{% if current_user.is_authenticated %}
-			<li>Logged in {% if not current_user.is_special %} as {{ current_user.get_name() }} (<a href="{{ url_for('logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
+			<li>Logged in {% if not current_user.is_special %} as {{ current_user.get_name() }} (<a href="{{ url_for('user.logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
 		{% endif %}
-		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
-		  <li><a href="{{ url_for('show_page', page='issues') }}">Help &amp; Bug Reports</a></li>
+		  <li><a href="{{ url_for('misc.show_page', page='citing') }}">How to cite</a></li>
+		  <li><a href="{{ url_for('misc.show_page', page='issues') }}">Help &amp; Bug Reports</a></li>
+		{% if current_user.is_authenticated %}
           <li><abbr title="Version">v</abbr>{{ __version }}</li>
+        {% endif %}
 		  <li><a href="https://www.oilab.eu">OILab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
 	</nav>

@@ -35,6 +35,16 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     config_parser['DATABASE']['db_password'] = os.environ['POSTGRES_PASSWORD']
     config_parser['DATABASE']['db_host_auth'] = os.environ['POSTGRES_HOST_AUTH_METHOD']
 
+    # Memcached settings
+    if 'MEMCACHED_HOST' in os.environ and 'MEMCACHED_PORT' in os.environ:
+        if "MEMCACHE" not in config_parser:
+            config_parser.add_section('MEMCACHE')
+        config_parser['MEMCACHE']['memcache_host'] = os.environ['MEMCACHED_HOST'] + f":{os.environ['MEMCACHED_PORT']}"
+    else:
+        # If not set, remove the section if it exists
+        if 'MEMCACHE' in config_parser:
+            config_parser.remove_section('MEMCACHE')
+
     # Save config file
     with open(CONFIG_FILE, 'w') as configfile:
         config_parser.write(configfile)
@@ -44,7 +54,6 @@ if __name__ == "__main__":
     import os
     import configparser
     import bcrypt
-    from pathlib import Path
 
     # Configuration file location
     CONFIG_FILE = 'config/config.ini'
@@ -71,12 +80,13 @@ if __name__ == "__main__":
         config_parser['API']['api_port'] = '4444'  # backend internal port set in docker-compose.py; NOT API_PUBLIC_PORT as that is what port Docker exposes to host network
 
         # File paths
+        # Docker volumes are defined in docker-compose.yml; these rely on one shared volume `data` in the 4CAT root directory
         config_parser.add_section('PATHS')
-        config_parser['PATHS']['path_images'] = 'data'  # shared volume defined in docker-compose.yml
-        config_parser['PATHS']['path_data'] = 'data'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_images'] = 'data/images'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_data'] = 'data/datasets'  # shared volume defined in docker-compose.yml
         config_parser['PATHS']['path_lockfile'] = 'backend'  # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
-        config_parser['PATHS']['path_sessions'] = 'config/sessions'  # shared volume defined in docker-compose.yml
-        config_parser['PATHS']['path_logs'] = 'logs/'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_sessions'] = 'data/sessions'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_logs'] = 'data/logs/'  # shared volume defined in docker-compose.yml
 
         # Generated variables
         config_parser.add_section('GENERATE')
@@ -89,8 +99,10 @@ if __name__ == "__main__":
         print('Created config/config.ini file')
 
         # Ensure filepaths exist
-        from common.config_manager import config
+        from common.config_manager import ConfigManager
         from common.lib.database import Database
+
+        config = ConfigManager()
         config.with_db(Database(logger=None, appname="docker-setup",
 				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
 
@@ -99,11 +111,12 @@ if __name__ == "__main__":
                      config.get('PATH_LOGS'),
                      config.get('PATH_LOCKFILE'),
                      config.get('PATH_SESSIONS'),
+                     config.get('PATH_EXTENSIONS')
                      ]:
-            if Path(config.get('PATH_ROOT'), path).is_dir():
+            if config.get('PATH_ROOT').joinpath(path).is_dir():
                 pass
             else:
-                os.makedirs(Path(config.get('PATH_ROOT'), path))
+                os.makedirs(config.get('PATH_ROOT').joinpath(path))
 
         # Use .env provided SERVER_NAME on first run
         frontend_servername = os.environ['SERVER_NAME']
@@ -126,8 +139,9 @@ if __name__ == "__main__":
         update_config_from_environment(CONFIG_FILE, config_parser)
 
         # Check to see if flask.server_name needs to be updated
-        from common.config_manager import config
+        from common.config_manager import ConfigManager
         from common.lib.database import Database
+        config = ConfigManager()
         config.with_db(Database(logger=None, appname="docker-setup",
 				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
         
@@ -138,7 +152,7 @@ if __name__ == "__main__":
         if frontend_port != public_port:
             print(f"Exposed PUBLIC_PORT {public_port} from .env file not included in Server Name; if you are not using a reverse proxy, you may need to update the Server Name variable.")
             print(f"You can do so by running the following command if you do not have access to the 4CAT frontend Control Panel:\n"
-                  f"docker exec 4cat_backend python -c \"from common.config_manager import config;config.set('flask.server_name', '{frontend_servername}:{public_port}');config.db.commit();\"")
+                  f"docker exec 4cat_backend python -c \"from common.config_manager import ConfigManager;config=ConfigManager();config.with_db();config.set('flask.server_name', '{frontend_servername}:{public_port}');config.db.commit();\"")
 
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"

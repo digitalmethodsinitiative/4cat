@@ -1,0 +1,87 @@
+<div class="post-table">
+	<div class="post-table-row">
+		<div class="profile-picture">
+            {% if post.replied_to_post %}
+                {% if not pseudonymised %}
+                    <a href="{{ post.replied_to_post }}" target="_blank">
+                {% endif %}
+                    <div class="reply-to"></div>
+                {% if not pseudonymised %}
+                    </a>
+                {% endif %}
+            {% endif %}
+            {% if not pseudonymised %}
+                <img src="{{ post.get('author_avatar') }}" alt="bsky avatar">
+			{% else %}
+			    <div title="Pseudonymous author" class="pseudonymous-author"></div>
+			{% endif %}
+		</div>
+		<div class="post-content">
+			<header>
+				{% if not pseudonymised %}
+					<span class="author"><strong><a href="https://bsky.app/profile/{{ post.get('author') }}">{{ post.get("author_display_name")}}</strong> {% if post.get("verified") %} <i class="fa-solid fa-circle-check verified"></i> {% endif %}<span class="atname">@{{ post.get("author") }}</span></a></span>
+				{% else %}
+					<span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+				{% endif %}
+					<span class="time"> · {{ post.get("timestamp") | datetime(fmt='%Y-%m-%d %H:%M', wrap=True) | safe }}</span>
+
+			</header>
+			<div class="body">{{ post.body | social_mediafy(datasource=datasource) | safe }}</div>
+			
+			<!-- Media item -->
+			{% if post.get("images") %}
+				{% set media_url = post.get("images") %}
+			{% elif post.get("videos") %}
+				{% set media_url = post.get("videos") %}
+			{% endif %}
+			{% if media_url %}
+			<div class="media-container">
+				{% for url in media_url.split(",") %}
+					<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+				{% endfor %}
+			</div>
+			{% endif %}
+
+			<!-- Quote tweet -->
+			{% if post.get("quote_author") %}
+			<div class="quote-post">
+				<header>
+					
+				{% if not pseudonymised %}
+					<a href="https://bsky.app/{{ post.get('quote_author') }}"><span class="quote-author atname">@{{ post.get("quote_author") }}</span></a>
+				{% else %}
+					<span title="Pseudonymous author" class="quote-author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+				{% endif %}
+				</header>
+
+				{% if post.quote_body %}
+				<div class="body">
+					{{ post.quote_body | social_mediafy(datasource='twitter') | safe }}
+				</div>
+				{% endif %}
+				<!-- Quote tweet media item -->
+				{% if post.get("quote_images") %}
+					{% set media_url = post.get("quote_images") %}
+				{% elif post.get("quote_videos") %}
+					{% set media_url = post.get("quote_videos") %}
+				{% endif %}
+				{% if media_url %}
+				<div class="media-container">
+					{% for url in media_url.split(",") %}
+						<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+					{% endfor %}
+				</div>
+				{% endif %}
+			</div>
+			{% endif %}
+			<div class="metrics">
+				<span class="comments"><i class="fa-solid fa-comment"></i> {{ post.get("reply_count") | numberify }}</span>
+				<span class="quote"><i class="fa-solid fa-retweet"></i> {{ post.get("quote_count") }}</span>
+				<span class="likes"><i class="fa-solid fa-heart"></i> {{ post.get("like_count") | numberify }}</span>
+				{% if not pseudonymised %}
+				<span class="external-url" title="Go to original post"><a href="{{ post.link }}" target="_blank"><i class="fas fa-external-link-alt"></i></a></span>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+</div>

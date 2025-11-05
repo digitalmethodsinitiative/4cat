@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA, TruncatedSVD
 from gensim.models import KeyedVectors
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
+from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas, convert_to_float
 from common.lib.exceptions import ProcessorInterruptedException
 
 from svgwrite.container import SVG
@@ -49,56 +49,68 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         "Truncated SVD: [Manning, C. D., Raghavan, P., & Schütze, H. (2008). Matrix decompositions and latent semantic indexing. *Introduction to information retrieval*, 403-417.](http://nlp.stanford.edu/IR-book/pdf/18lsi.pdf)"
     ]
 
-    options = {
-        "words": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Word(s)",
-            "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted"
-        },
-        "method": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Vector dimensionality reduction technique",
-            "options": {
-                "t-SNE": "t-SNE (learning rate: 150)",
-                "PCA": "PCA",
-                "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "words": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Word(s)",
+                "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted"
             },
-            "default": "tsne"
-        },
-        "num-words": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Amount of nearest neighbours",
-            "min": 1,
-            "default": 15,
-            "max": 100,
-            "tooltip": "Amount of neighbours to chart per model, per queried word"
-        },
-        "threshold": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Similarity threshold",
-            "tooltip": "Decimal value between 0 and 1; only neighbours with a higher similarity score than this will be included",
-            "default": "0.3"
-        },
-        "overlay": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Plot all models",
-            "default": True,
-            "tooltip": "Plot similar words for all models. If unchecked, only similar words for the most recent model will be plotted."
-        },
-        "all-words": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Always include all words",
-            "default": False,
-            "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
+            "method": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Vector dimensionality reduction technique",
+                "options": {
+                    "t-SNE": "t-SNE (learning rate: 150)",
+                    "PCA": "PCA",
+                    "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)"
+                },
+                "default": "tsne"
+            },
+            "num-words": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Amount of nearest neighbours",
+                "min": 1,
+                "default": 15,
+                "max": 100,
+                "tooltip": "Amount of neighbours to chart per model, per queried word"
+            },
+            "threshold": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Similarity threshold",
+                "tooltip": "Decimal value between 0 and 1; only neighbours with a higher similarity score than this will be included",
+                "default": "0.3"
+            },
+            "overlay": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Plot all models",
+                "default": True,
+                "tooltip": "Plot similar words for all models. If unchecked, only similar words for the most recent model will be plotted."
+            },
+            "all-words": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Always include all words",
+                "default": False,
+                "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
+            }
         }
-    }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on token sets
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type == "generate-embeddings"
 
@@ -111,11 +123,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             return
 
         input_words = input_words.split(",")
-
-        try:
-            threshold = float(self.parameters.get("threshold"))
-        except ValueError:
-            threshold = float(self.get_options()["threshold"]["default"])
+        threshold = convert_to_float(self.parameters.get("threshold"))
 
         threshold = max(-1.0, min(1.0, threshold))
         num_words = convert_to_int(self.parameters.get("num-words"))
@@ -155,7 +163,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # this should make filtering for common words a bit faster further down
         self.dataset.update_status("Sorting vocabulary")
         common_vocab = list(common_vocab)
-        common_vocab.sort(key=lambda w: sum([model.get_vecattr(w, "count") for model in models.values()]), reverse=True)
+
+        # this trips Flake8 for some reason, can ignore
+        common_vocab.sort(key=lambda w: sum([model.get_vecattr(w, "count") for model in models.values()]), reverse=True)  # noqa: F821
 
         # initial boundaries of 2D space (to be adjusted later based on t-sne
         # outcome)
@@ -243,6 +253,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 vectors = tsne.fit_transform(vectors)
             except ValueError:
                 self.dataset.finish_with_error("Insufficient data to reduce to 2D. The word embeddings model may be too small to visualise properly.")
+                return
         elif reduction_method == "TruncatedSVD":
             # standard sklearn parameters made explicit
             svd = TruncatedSVD(n_components=2, algorithm="randomized", n_iter=5, random_state=0)

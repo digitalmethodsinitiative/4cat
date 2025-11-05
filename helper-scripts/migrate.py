@@ -16,7 +16,7 @@ import requests
 import argparse
 import logging
 import shutil
-import shlex
+import oslex
 import time
 import json
 import sys
@@ -62,25 +62,94 @@ def make_version_comparable(version):
 	return version[0].zfill(3) + "." + version[1].zfill(3)
 
 
-def check_for_nltk():
+def check_for_nltk(logger):
 	# ---------------------------------------------
 	#        Check for and install packages
 	# ---------------------------------------------
 	# NLTK
+	logger.info("\nChecking for NLTK data...")
 	import nltk
 	try:
-		nltk.data.find('tokenizers/punkt')
+		nltk.data.find('tokenizers/punkt_tab')
 	except LookupError:
-		nltk.download('punkt', quiet=True)
+		logger.info("Downloading NLTK punkt data...")
+		nltk.download('punkt_tab', quiet=True)
 	try:
 		nltk.data.find('corpora/wordnet')
 	except LookupError:
+		logger.info("Downloading NLTK wordnet data...")
 		nltk.download("wordnet", quiet=True)
 	
 	nltk.download("omw-1.4", quiet=True)
 
+def install_extensions(logger, no_pip=True):
+	"""
+	Check for extensions and run any installation scripts found.
 
-def finish(args, logger):
+	Note: requirements texts are handled by setup.py
+
+	:param bool no_pip:  Do not run pip when running extension install script
+	(because migrate runs pip itself)
+	"""
+	if os.path.isdir("extensions") and not os.path.islink("extensions"):
+		# User already has existing extensions folder (and not a symbolic link)
+		# but it is in the wrong place (4CAT root rather than /config)
+		logger.info("Migrating extensions folder...")
+		if not os.path.isdir("config/extensions"):
+			# No config/extensions folder, so we move the existing extensions folder
+			shutil.move("extensions", "config/extensions")
+		else:
+			# Both extensions and config/extensions exist, so we need to merge them
+			for root, dirs, files in os.walk("extensions"):
+				for file in files:
+					# Do not overwrite existing files
+					if not os.path.exists(os.path.join("config/extensions", root, file)):
+						try:
+							shutil.move(os.path.join(root, file), os.path.join("config/extensions", root, file))
+						except FileNotFoundError:
+							# this can happen with temporary OS files like .DS_Store
+							pass
+
+			shutil.rmtree("extensions")
+
+	if not os.path.isdir("config/extensions"):
+		os.makedirs("config/extensions")
+
+	if not os.path.islink("extensions"):
+		# Create symbolic link to extensions folder
+		# os.path.abspath necessary for Windows
+		try:
+			os.symlink(os.path.abspath("config/extensions"), os.path.abspath("extensions"))
+		except OSError:
+			pass
+
+	# Check for extension packages
+	if os.path.isdir("config/extensions"):
+		for root, dirs, files in os.walk("config/extensions"):
+			for file in files:
+				if file == "fourcat_install.py":
+					command = [interpreter, os.path.join(root, file)]
+					if args.component == "frontend":
+						command.append("--component=frontend")
+					elif args.component == "backend":
+						command.append("--component=backend")
+					elif args.component == "both":
+						command.append("--component=both")
+
+					if no_pip:
+						command.append("--no-pip")
+
+					logger.info(f"\nRunning extension setup: {os.path.join(root, file)}")
+					result = subprocess.run(command, stdout=subprocess.PIPE,
+											stderr=subprocess.PIPE)
+					if result.returncode != 0:
+						logger.error("Error while running extension installation script: " + os.path.join(root, file))
+
+					logger.info(result.stdout.decode("utf-8")) if result.stdout else None
+					logger.info(result.stderr.decode("utf-8")) if result.stderr else None
+
+
+def finish(args, logger, no_pip=True):
 	"""
 	Finish migration
 
@@ -88,7 +157,8 @@ def finish(args, logger):
 	this is made a function that can be called from any point in the script to
 	wrap up and exit.
 	"""
-	check_for_nltk()
+	check_for_nltk(logger=logger)
+	install_extensions(no_pip=no_pip, logger=logger)
 	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
@@ -115,8 +185,9 @@ cli.add_argument("--restart", "-x", default=False, action="store_true", help="Tr
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
 cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
-cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate. Currently only skips check for if 4CAT is running when set to 'frontend'")
+cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate ('both', 'backend', 'frontend'). Skips check for if 4CAT is running when set to 'frontend'. Also used by extensions w/ fourcat_install.py")
 cli.add_argument("--branch", "-b", default=False, help="Which branch to check out from GitHub. By default, check out the latest release.")
+cli.add_argument("--stream_log", "-s", default=True, help="Stream logs from the 4CAT daemon. (Always streams if no output file is set)")
 args = cli.parse_args()
 
 print("")
@@ -125,17 +196,22 @@ if not cwd.glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
 	exit(1)
 
+# track pip
+pip_ran = False
+
 # set up logging
 logger = logging.getLogger("migrate")
 logger.setLevel(logging.INFO)
 if args.output:
-	# Add both a file and a stream handler if output is set
+	# Add *only* a file handler if output is set
+	# i.e. script will not output to stdout!
+	os.makedirs(os.path.dirname(args.output), exist_ok=True)
+	handler = logging.FileHandler(args.output)
+	logger.addHandler(handler)
+
+if args.stream_log or not args.output:
 	handler = logging.StreamHandler(sys.stdout)
 	logger.addHandler(handler)
-	handler = logging.FileHandler(args.output)
-else:
-	handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
 
 logger.info("           4CAT migration agent           ")
 logger.info("------------------------------------------")
@@ -145,15 +221,19 @@ logger.info("Pull branch:             " + (args.branch if args.branch else "no")
 logger.info("Restart after migration: " + ("yes" if args.restart else "no"))
 logger.info("Repository URL:          " + args.repository)
 logger.info(".current-version path:   " + args.current_version)
+logger.info(f"Current Datetime:        {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ---------------------------------------------
 #    Ensure existence of current version file
 # ---------------------------------------------
 target_version_file = cwd.joinpath("VERSION")
 current_version_file = cwd.joinpath(args.current_version)
-if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
-	logger.info("Moving .current-version to new location")
-	cwd.joinpath(".current-version").rename(current_version_file)
+if not current_version_file.exists():
+	os.makedirs(os.path.dirname(current_version_file), exist_ok=True)
+	# Check for old locations of .current-version
+	if cwd.joinpath(".current-version").exists():
+		logger.info("Moving .current-version to new location")
+		shutil.move(cwd.joinpath(".current-version"), current_version_file)
 
 if not current_version_file.exists():
 	logger.info("Creating .current-version file ")
@@ -221,15 +301,15 @@ if args.release or args.branch:
 			logger.info("  ...latest release available from GitHub (%s) is older than or equivalent to currently checked out version "
 				  "(%s)." % (tag_version, current_version_c))
 			logger.info("  ...upgrade not necessary, skipping.")
-			finish(args, logger)
+			finish(args, logger, no_pip=pip_ran)
 
 	logger.info("  ...ensuring repository %s is a known remote" % args.repository)
-	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
+	remote = subprocess.run(oslex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd, text=True)
 	if remote.stderr:
 		if remote.stderr.strip() == "error: remote 4cat_migrate already exists.":
 			# Update URL
-			remote = subprocess.run(shlex.split("git remote set-url 4cat_migrate %s" % args.repository),
+			remote = subprocess.run(oslex.split("git remote set-url 4cat_migrate %s" % args.repository),
 									stdout=subprocess.PIPE,
 									stderr=subprocess.PIPE, cwd=cwd, text=True)
 			if remote.stderr:
@@ -242,16 +322,17 @@ if args.release or args.branch:
 			exit(1)
 
 	logger.info("  ...fetching tags from repository")
-	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+	fetch = subprocess.run(oslex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
 		if "fatal: could not read Username" in fetch.stderr:
 			# git requiring login
-			from common.config_manager import config
+			from common.config_manager import CoreConfigManager
+			config = CoreConfigManager()
 			if config.get("USING_DOCKER"):
 				# update git config setting
-				unset_authorization = subprocess.run(shlex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
-				fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
+				unset_authorization = subprocess.run(oslex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+				fetch = subprocess.run(oslex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
 									   stdout=subprocess.PIPE, cwd=cwd, text=True)
 				if fetch.returncode != 0:
 					logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
@@ -267,10 +348,10 @@ if args.release or args.branch:
 		command = f"git checkout --force 4cat_migrate/{args.branch}"
 	else:
 		logger.info("  ...checking out latest release")
-		tag_ref = shlex.quote("refs/tags/" + tag)
+		tag_ref = oslex.quote("refs/tags/" + tag)
 		command = "git checkout --force %s" % tag_ref
 
-	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
+	result = subprocess.run(oslex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
@@ -297,7 +378,7 @@ logger.info("- Code version: %s" % target_version)
 
 if current_version == target_version:
 	logger.info("  ...already up to date.")
-	finish(args, logger)
+	finish(args, logger, no_pip=pip_ran)
 
 if current_version_c[0:3] != target_version_c[0:3]:
 	logger.info("  ...cannot migrate between different major versions.")
@@ -334,7 +415,8 @@ else:
 # ---------------------------------------------
 
 try:
-	from common.config_manager import config
+	from common.config_manager import CoreConfigManager
+	config = CoreConfigManager()
 except ImportError:
 	config = None
 
@@ -365,6 +447,7 @@ try:
 	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
 								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
 	log_pip_output(logger, pip.stdout)
+	pip_ran = True
 except subprocess.CalledProcessError as e:
 	log_pip_output(logger, e.output)
 	logger.info(f"\n Error running pip: {e}")
@@ -410,4 +493,4 @@ logger.info("  ...done")
 # ---------------------------------------------
 #            Done! Wrap up and finish
 # ---------------------------------------------
-finish(args, logger)
+finish(args, logger, no_pip=pip_ran)

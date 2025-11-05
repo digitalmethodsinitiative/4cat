@@ -2,31 +2,40 @@
 Miscellaneous helper functions for the 4CAT backend
 """
 import subprocess
+import imagehash
+import hashlib
 import requests
 import datetime
 import smtplib
 import fnmatch
 import socket
+import oslex
 import copy
 import time
 import json
 import math
+import ural
+import csv
 import ssl
 import re
 import os
 import io
 
+from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
-from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 from calendar import monthrange
 from packaging import version
+from PIL import Image
 
+from common.config_manager import CoreConfigManager
 from common.lib.user_input import UserInput
-from common.config_manager import config
+__all__ = ("UserInput",)
 
+core_config = CoreConfigManager()
 
-def init_datasource(database, logger, queue, name):
+def init_datasource(database, logger, queue, name, config):
     """
     Initialize data source
 
@@ -37,9 +46,20 @@ def init_datasource(database, logger, queue, name):
     :param Logger logger:  Log handler
     :param JobQueue queue:  Job Queue instance
     :param string name:  ID of datasource that is being initialised
+    :param config:  Configuration reader
     """
     pass
 
+def get_datasource_example_keys(db, modules, dataset_type):
+    """
+    Get example keys for a datasource
+    """
+    from common.lib.dataset import DataSet
+    example_dataset_key = db.fetchone("SELECT key from datasets WHERE type = %s and is_finished = True and num_rows > 0 ORDER BY timestamp_finished DESC LIMIT 1", (dataset_type,))
+    if example_dataset_key:
+        example_dataset = DataSet(db=db, key=example_dataset_key["key"], modules=modules)
+        return example_dataset.get_columns()
+    return []
 
 def strip_tags(html, convert_newlines=True):
     """
@@ -86,7 +106,7 @@ def sniff_encoding(file):
     :param file:
     :return:
     """
-    if type(file) == bytearray:
+    if type(file) is bytearray:
         maybe_bom = file[:3]
     elif hasattr(file, "getbuffer"):
         buffer = file.getbuffer()
@@ -99,6 +119,27 @@ def sniff_encoding(file):
 
     return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
+def sniff_csv_dialect(csv_input):
+    """
+    Determine CSV dialect for an input stream
+
+    :param csv_input:  Input stream
+    :return tuple:  Tuple: Dialect object and a boolean representing whether
+    the CSV file seems to have a header
+    """
+    encoding = sniff_encoding(csv_input)
+    if type(csv_input) is io.TextIOWrapper:
+        wrapped_input = csv_input
+    else:
+        wrapped_input = io.TextIOWrapper(csv_input, encoding=encoding)
+    wrapped_input.seek(0)
+    sample = wrapped_input.read(1024 * 1024)
+    wrapped_input.seek(0)
+    has_header = csv.Sniffer().has_header(sample)
+    dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+
+    return dialect, has_header
+
 
 def get_git_branch():
     """
@@ -109,23 +150,27 @@ def get_git_branch():
     repository or git is not installed an empty string is returned.
     """
     try:
-        cwd = os.getcwd()
-        os.chdir(config.get('PATH_ROOT'))
-        branch = subprocess.run(["git", "branch", "--show-current"], stdout=subprocess.PIPE)
-        os.chdir(cwd)
+        root_dir = str(core_config.get('PATH_ROOT').resolve())
+        branch = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
-        return branch.stdout.decode("utf-8").strip()
+        branch_name = branch.stdout.decode("utf-8").strip()
+        if not branch_name:
+            # Check for detached HEAD state
+            # Most likely occuring because of checking out release tags (which are not branches) or commits
+            head_status = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} status"), stdout=subprocess.PIPE)
+            if head_status.returncode == 0:
+                for line in head_status.stdout.decode("utf-8").split("\n"):
+                    if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
+                        branch_name = line.split("/")[-1] if "/" in line else line.split(" ")[-1]
+                        return branch_name.strip()
     except (subprocess.SubprocessError, ValueError, FileNotFoundError):
         return ""
 
 
-def get_software_commit():
+def get_software_commit(worker=None):
     """
-    Get current 4CAT commit hash
-
-    Reads a given version file and returns the first string found in there
-    (up until the first space). On failure, return an empty string.
+    Get current 4CAT git commit hash
 
     Use `get_software_version()` instead if you need the release version
     number rather than the precise commit hash.
@@ -134,34 +179,54 @@ def get_software_commit():
     repository in the 4CAT root folder, and if so, what commit is currently
     checked out in it.
 
-    :return str:  4CAT git commit hash
+    For extensions, get the repository information for that extension, or if
+    the extension is not a git repository, return empty data.
+
+    :param BasicWorker processor:  Worker to get commit for. If not given, get
+    version information for the main 4CAT installation.
+
+    :return tuple:  4CAT git commit hash, repository name
     """
-    versionpath = config.get('PATH_ROOT').joinpath(config.get('path.versionfile'))
+    # try git command line within the 4CAT root folder
+    # if it is a checked-out git repository, it will tell us the hash of
+    # the currently checked-out commit
 
-    if versionpath.exists() and not versionpath.is_file():
-        return ""
-
-    if not versionpath.exists():
-        # try git command line within the 4CAT root folder
-        # if it is a checked-out git repository, it will tell us the hash of
-        # the currently checked-out commit
-        try:
-            cwd = os.getcwd()
-            os.chdir(config.get('PATH_ROOT'))
-            show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            os.chdir(cwd)
-            if show.returncode != 0:
-                raise ValueError()
-            return show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
-        except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
-            return ""
-
+    # path has no Path.relative()...
     try:
-        with open(versionpath, "r", encoding="utf-8", errors="ignore") as versionfile:
-            version = versionfile.readline().split(" ")[0]
-            return version
-    except OSError:
-        return ""
+        # if extension, go to the extension file's path
+        # we will run git here - if it is not its own repository, we have no
+        # useful version info (since the extension is by definition not in the
+        # main 4CAT repository) and will return an empty value
+        if worker and worker.is_extension:
+            relative_filepath = Path(re.sub(r"^[/\\]+", "", worker.filepath)).parent
+            working_dir = str(core_config.get("PATH_ROOT").joinpath(relative_filepath).resolve())
+            # check if we are in the extensions' own repo or 4CAT's
+            git_cmd = f"git -C {oslex.quote(working_dir)} rev-parse --show-toplevel"
+            repo_level = subprocess.run(oslex.split(git_cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            if Path(repo_level.stdout.decode("utf-8")) == core_config.get("PATH_ROOT"):
+                # not its own repository
+                return ("", "")
+
+        else:
+            working_dir = str(core_config.get("PATH_ROOT").resolve())
+
+        show = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} show"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        if show.returncode != 0:
+            raise ValueError()
+        commit = show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
+
+        # now get the repository the commit belongs to, if we can
+        origin = subprocess.run(oslex.split(f"git -C {oslex.quote(working_dir)} config --get remote.origin.url"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        if origin.returncode != 0 or not origin.stdout:
+            raise ValueError()
+        repository = origin.stdout.decode("utf-8").strip()
+        if repository.endswith(".git"):
+            repository = repository[:-4]
+
+    except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
+        return ("", "")
+
+    return (commit, repository)
 
 def get_software_version():
     """
@@ -174,24 +239,24 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    current_version_file = core_config.get("PATH_CONFIG").joinpath(".current-version")
     if not current_version_file.exists():
         return ""
 
     with current_version_file.open() as infile:
         return infile.readline().strip()
 
-def get_github_version(timeout=5):
+def get_github_version(repo_url, timeout=5):
     """
     Get latest release tag version from GitHub
 
     Will raise a ValueError if it cannot retrieve information from GitHub.
 
+    :param str repo_url:  GitHub repository URL
     :param int timeout:  Timeout in seconds for HTTP request
 
     :return tuple:  Version, e.g. `1.26`, and release URL.
     """
-    repo_url = config.get("4cat.github_url")
     if not repo_url.endswith("/"):
         repo_url += "/"
 
@@ -228,6 +293,67 @@ def get_ffmpeg_version(ffmpeg_path):
     return version.parse(ffmpeg_version)
 
 
+def find_extensions():
+    """
+    Find 4CAT extensions and load their metadata
+
+    Looks for subfolders of the extension folder, and loads additional metadata
+    where available.
+
+    :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
+    dictionary, and a list of (str) errors encountered while loading
+    """
+    extension_path = core_config.get("PATH_EXTENSIONS")
+    errors = []
+    if not extension_path.exists() or not extension_path.is_dir():
+        return {}, errors
+
+    # each folder in the extensions folder is an extension
+    extensions = {
+        extension.name: {
+            "name": extension.name,
+            "version": "",
+            "url": "",
+            "git_url": "",
+            "is_git": False,
+        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir() and not extension.name.startswith("__")
+    }
+
+    # collect metadata for extensions
+    allowed_metadata_keys = ("name", "version", "url")
+    for extension in extensions:
+        extension_folder = extension_path.joinpath(extension)
+        metadata_file = extension_folder.joinpath("metadata.json")
+        if metadata_file.exists():
+            with metadata_file.open() as infile:
+                try:
+                    metadata = json.load(infile)
+                    extensions[extension].update({k: metadata[k] for k in metadata if k in allowed_metadata_keys})
+                except (TypeError, ValueError) as e:
+                    errors.append(f"Error reading metadata file for extension '{extension}' ({e})")
+                    continue
+
+        extensions[extension]["is_git"] = extension_folder.joinpath(".git/HEAD").exists()
+        if extensions[extension]["is_git"]:
+            # try to get remote URL
+            try:
+                extension_root = str(extension_folder.resolve())
+                origin = subprocess.run(oslex.split(f"git -C {oslex.quote(extension_root)} config --get remote.origin.url"), stderr=subprocess.PIPE,
+                                        stdout=subprocess.PIPE)
+                if origin.returncode != 0 or not origin.stdout:
+                    raise ValueError()
+                repository = origin.stdout.decode("utf-8").strip()
+                if repository.endswith(".git") and "github.com" in repository:
+                    # use repo URL
+                    repository = repository[:-4]
+                extensions[extension]["git_url"] = repository
+            except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError) as e:
+                print(e)
+                pass
+
+    return extensions, errors
+
+
 def convert_to_int(value, default=0):
     """
     Convert a value to an integer, with a fallback
@@ -245,8 +371,28 @@ def convert_to_int(value, default=0):
     except (ValueError, TypeError):
         return default
 
+def convert_to_float(value, default=0, force=False) -> float:
+    """
+    Convert a value to a floating point, with a fallback
 
-def timify_long(number):
+    The fallback is used if an Error is thrown during converstion to float.
+    This is a convenience function, but beats putting try-catches everywhere
+    we're using user input as a floating point number.
+
+    :param value:  Value to convert
+    :param int default:  Default value, if conversion not possible
+    :param force:   Whether to force the value into a float if it is not empty or None.
+    :return float:  Converted value
+    """
+    if force:
+        return float(value) if value else default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def timify(number, short=False):
     """
     Make a number look like an indication of time
 
@@ -263,31 +409,31 @@ def timify_long(number):
     month_length = 30.42 * 86400
     months = math.floor(number / month_length)
     if months:
-        components.append("%i month%s" % (months, "s" if months != 1 else ""))
+        components.append(f"{months}{'mt' if short else ' month'}{'s' if months != 1 and not short else ''}")
         number -= (months * month_length)
 
     week_length = 7 * 86400
     weeks = math.floor(number / week_length)
     if weeks:
-        components.append("%i week%s" % (weeks, "s" if weeks != 1 else ""))
+        components.append(f"{weeks}{'w' if short else ' week'}{'s' if weeks != 1 and not short else ''}")
         number -= (weeks * week_length)
 
     day_length = 86400
     days = math.floor(number / day_length)
     if days:
-        components.append("%i day%s" % (days, "s" if days != 1 else ""))
+        components.append(f"{days}{'d' if short else ' day'}{'s' if days != 1 and not short else ''}")
         number -= (days * day_length)
 
     hour_length = 3600
     hours = math.floor(number / hour_length)
     if hours:
-        components.append("%i hour%s" % (hours, "s" if hours != 1 else ""))
+        components.append(f"{hours}{'h' if short else ' hour'}{'s' if hours != 1 and not short else ''}")
         number -= (hours * hour_length)
 
     minute_length = 60
     minutes = math.floor(number / minute_length)
     if minutes:
-        components.append("%i minute%s" % (minutes, "s" if minutes != 1 else ""))
+        components.append(f"{minutes}{'m' if short else ' minute'}{'s' if minutes != 1 and not short else ''}")
 
     if not components:
         components.append("less than a minute")
@@ -300,6 +446,21 @@ def timify_long(number):
 
     return time_str + last_str
 
+def nthify(integer: int) -> str:
+    """
+    Takes an integer and returns a string with 'st', 'nd', 'rd', or 'th' as suffix, depending on the number.
+    """
+    int_str = str(integer).strip()
+    if int_str.endswith("1"):
+        suffix = "st"
+    elif int_str.endswith("2"):
+        suffix = "nd"
+    elif int_str.endswith("3"):
+        suffix = "rd"
+    else:
+        suffix = "th"
+    return int_str + suffix
+
 def andify(items):
     """
     Format a list of items for use in text
@@ -309,14 +470,154 @@ def andify(items):
     :param items:  Iterable list
     :return str:  Formatted string
     """
+
+    items = items.copy()
+
     if len(items) == 0:
         return ""
     elif len(items) == 1:
-        return str(items[1])
+        return str(items[0])
 
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
 
+def ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
+    if len(text) <= length:
+        return text
+
+    elif not inside:
+        return text[:length] + ellipsis_str
+
+    else:
+        # two cases: URLs and normal text
+        # for URLs, try to only ellipsiate after the domain name
+        # this makes the URLs easier to read when shortened
+        if ural.is_url(text):
+            pre_part = "/".join(text.split("/")[:3])
+            if len(pre_part) < length - 6:  # kind of arbitrary
+                before = len(pre_part) + 1
+            else:
+                before = math.floor(length / 2)
+        else:
+            before = math.floor(length / 2)
+
+        after = len(text) - before
+        return text[:before] + ellipsis_str + text[after:]
+
+def stringify_hash(hash_obj, hash_type: str) -> str:
+    """Convert a hash object to a stable string for storage."""
+    if hash_type == "file-hash":
+        # Allow raw bytes or precomputed hex
+        if isinstance(hash_obj, (bytes, bytearray)):
+            return bytes(hash_obj).hex()
+        if isinstance(hash_obj, str):
+            return hash_obj
+        raise TypeError("file-hash must be bytes or hex string")
+    if hash_type == "crhash":
+        comps = normalize_crhash_components(hash_obj)
+        return json.dumps(sorted(str(h) for h in comps))
+    return str(hash_obj)
+
+
+def normalize_crhash_components(hash_obj):
+    """
+    Normalize a crop-resistant hash object to a non-empty list of component ImageHash objects.
+
+    Strict mode: we support exactly the shape we use in this project and the CSV round-trip:
+    - ImageMultiHash with 'segment_hashes' (attribute or method) returning an iterable of ImageHash components.
+    - A list/tuple of ImageHash components (used when reconstructing from CSV).
+
+    Any other shape is an error.
+    """
+    # Preferred: ImageMultiHash exposes 'segment_hashes'
+    if hasattr(hash_obj, "segment_hashes"):
+        attr = getattr(hash_obj, "segment_hashes")
+        comps = attr() if callable(attr) else attr
+        comps_list = list(comps or [])
+        if not comps_list:
+            raise TypeError("segment_hashes returned empty components")
+        return comps_list
+
+    # CSV/regrouper pathway: a concrete list/tuple of components
+    if isinstance(hash_obj, (list, tuple)):
+        if len(hash_obj) == 0:
+            raise TypeError("component list is empty")
+        return list(hash_obj)
+
+    # Anything else is not supported by our contract
+    obj_type = type(hash_obj).__name__
+    raise TypeError(f"Unsupported crhash object type: {obj_type}; expected ImageMultiHash with 'segment_hashes' or a list of ImageHash components")
+
+
+def compute_hash(path: Path, hash_type: str = "file-hash", *, size: int | None = None, mode: str | None = None, as_string: bool = True):
+    """
+    General-purpose file/image hashing with sensible defaults.
+
+    - file-hash: SHA-1 over bytes.
+    - average_hash/dhash/phash: hash_size defaults to 16.
+    - whash-haar/whash-db4 (or 'whash' + mode): hash_size defaults to 16, mode defaults to 'db4'.
+    - colorhash: uses binbits (defaults to 3). If size is given, treated as binbits.
+    - crhash: crop_resistant_hash object; no size.
+
+    Set as_string=False to get raw hash objects for direct comparisons.
+    """
+    if not path.exists():
+        raise FileNotFoundError()
+    
+    if hash_type == "file-hash":
+        hasher = hashlib.sha1()
+        with path.open("rb") as infile:
+            for chunk in iter(lambda: infile.read(65536), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest() if as_string else hasher.digest()
+
+    with Image.open(path) as img:
+        # convert to RGB for consistent hashing (ignores alpha channel changes)
+        img = img.convert("RGB")
+
+        if hash_type == "phash":
+            result = imagehash.phash(img, hash_size=(size or 16))
+
+        elif hash_type == "average_hash":
+            result = imagehash.average_hash(img, hash_size=(size or 16))
+
+        elif hash_type == "dhash":
+            result = imagehash.dhash(img, hash_size=(size or 16))
+
+        elif hash_type in ("whash", "whash-haar", "whash-db4"):
+            wave_mode = mode or ("haar" if hash_type == "whash-haar" else "db4")
+            result = imagehash.whash(img, hash_size=(size or 16), mode=wave_mode)
+
+        elif hash_type == "colorhash":
+            # imagehash.colorhash uses binbits, not hash_size
+            result = imagehash.colorhash(img, binbits=(size if size is not None else 3))
+
+        elif hash_type == "crhash":
+            if size is not None:
+                raise ValueError("hash_size is not applicable for crop-resistant hashes")
+            result = imagehash.crop_resistant_hash(img)
+
+        else:
+            raise NotImplementedError(f"Unknown hash type '{hash_type}'")
+
+    return stringify_hash(result, hash_type) if as_string else result
+
+def hash_file(image_file: Path, hash_type: str = "file-hash", hash_size: int | None = None) -> str:
+    """
+    Legacy wrapper returning a string. Supports:
+    'file-hash', 'colorhash', 'phash', 'average_hash', 'dhash', 'whash-haar', 'whash-db4', 'crhash'
+    """
+    return compute_hash(image_file, hash_type, size=hash_size, as_string=True)
+
+
+def hash_image(image_path: Path, hash_type: str, hash_size: int | None = None, *, as_string: bool = False):
+    """
+    Unified image hashing helper.
+
+    - Omitting hash_size is fine; defaults are applied per type.
+    - Returns raw hash objects by default (as_string=False).
+    """
+    return compute_hash(image_path, hash_type, size=hash_size, as_string=as_string)
 
 def get_yt_compatible_ids(yt_ids):
     """
@@ -411,34 +712,49 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
     return canvas
 
 
-def call_api(action, payload=None):
+def call_api(action, payload=None, wait_for_response=True):
     """
     Send message to server
 
-    Calls the internal API and returns interpreted response.
+    Calls the internal API and returns interpreted response. "status" is always 
+    None if wait_for_response is False.
 
     :param str action: API action
     :param payload: API payload
+    :param bool wait_for_response:  Wait for response? If not close connection
+    immediately after sending data.
 
-    :return: API response, or timeout message in case of timeout
+    :return: API response {"status": "success"|"error", "response": response, "error": error}
     """
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(15)
-    connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    config = CoreConfigManager()
+    try:
+        connection.connect((config.get('API_HOST'), config.get('API_PORT')))
+    except ConnectionRefusedError:
+        return {"status": "error", "error": "Connection refused"}
 
     msg = json.dumps({"request": action, "payload": payload})
     connection.sendall(msg.encode("ascii", "ignore"))
 
-    try:
-        response = ""
-        while True:
-            bytes = connection.recv(2048)
-            if not bytes:
-                break
+    response_data = {
+        "status": None,
+        "response": None,
+        "error": None
+    }
 
-            response += bytes.decode("ascii", "ignore")
-    except (socket.timeout, TimeoutError):
-        response = "(Connection timed out)"
+    if wait_for_response:
+        try:
+            response = ""
+            while True:
+                bytes = connection.recv(2048)
+                if not bytes:
+                    break
+
+                response += bytes.decode("ascii", "ignore")
+        except (socket.timeout, TimeoutError):
+            response_data["status"] = "error"
+            response_data["error"] = "Connection timed out"
 
     try:
         connection.shutdown(socket.SHUT_RDWR)
@@ -447,13 +763,20 @@ def call_api(action, payload=None):
         pass
     connection.close()
 
-    try:
-        return json.loads(response)
-    except json.JSONDecodeError:
-        return response
+    if wait_for_response:
+        try:
+            json_response = json.loads(response)
+            response_data["response"] = json_response["response"]
+            response_data["error"] = json_response.get("error", None)
+            response_data["status"] = "error" if json_response.get("error") else "success"
+        except json.JSONDecodeError:
+            response_data["status"] = "error"
+            response_data["error"] = "Invalid JSON response"
+            response_data["response"] = response
+    
+    return response_data
 
-
-def get_interval_descriptor(item, interval):
+def get_interval_descriptor(item, interval, item_column="timestamp"):
     """
     Get interval descriptor based on timestamp
 
@@ -461,26 +784,28 @@ def get_interval_descriptor(item, interval):
     "timestamp" key
     :param str interval:  Interval, one of "all", "overall", "year",
     "month", "week", "day"
-    :return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
+    :param str item_column:  Column name in the item dictionary that contains
+    the timestamp. Defaults to "timestamp".
+    :return str:  Interval descriptor, e.g. "overall", "unknown_date", "2020", "2020-08",
     "2020-43", "2020-08-01"
     """
     if interval in ("all", "overall"):
         return interval
-
-    if "timestamp" not in item:
-        raise ValueError("No date available for item in dataset")
+    
+    if not item.get(item_column, None):
+        return "unknown_date"
 
     # Catch cases where a custom timestamp has an epoch integer as value.
     try:
-        timestamp = int(item["timestamp"])
+        timestamp = int(item[item_column])
         try:
             timestamp = datetime.datetime.fromtimestamp(timestamp)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
-    except:
+    except (TypeError, ValueError):
         try:
             timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
 
     if interval == "year":
@@ -512,7 +837,10 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     :return:
     """
     missing = 0
-    test_key = list(intervals.keys())[0]
+    try:
+        test_key = list(intervals.keys())[0]
+    except IndexError:
+        return 0, {}
 
     # first determine the boundaries of the interval
     # these may be passed as parameters, or they can be inferred from the
@@ -804,7 +1132,7 @@ def add_notification(db, user, notification, expires=None, allow_dismiss=True):
     }, safe=True)
 
 
-def send_email(recipient, message):
+def send_email(recipient, message, mail_config):
     """
     Send an e-mail using the configured SMTP settings
 
@@ -813,39 +1141,40 @@ def send_email(recipient, message):
 
     :param list recipient:  Recipient e-mail addresses
     :param MIMEMultipart message:  Message to send
+    :param mail_config:  Configuration reader
     """
     # Create a secure SSL context
     context = ssl.create_default_context()
 
     # Decide which connection type
-    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get(
-            'mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'),
-                                                   port=config.get('mail.port', 0)) as server:
-        if config.get('mail.ssl') == 'tls':
+    with smtplib.SMTP_SSL(mail_config.get('mail.server'), port=mail_config.get('mail.port', 0), context=context) if mail_config.get(
+            'mail.ssl') == 'ssl' else smtplib.SMTP(mail_config.get('mail.server'),
+                                                   port=mail_config.get('mail.port', 0)) as server:
+        if mail_config.get('mail.ssl') == 'tls':
             # smtplib.SMTP adds TLS context here
             server.starttls(context=context)
 
         # Log in
-        if config.get('mail.username') and config.get('mail.password'):
+        if mail_config.get('mail.username') and mail_config.get('mail.password'):
             server.ehlo()
-            server.login(config.get('mail.username'), config.get('mail.password'))
+            server.login(mail_config.get('mail.username'), mail_config.get('mail.password'))
 
         # Send message
-        if type(message) == str:
-            server.sendmail(config.get('mail.noreply'), recipient, message)
+        if type(message) is str:
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message)
         else:
-            server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+            server.sendmail(mail_config.get('mail.noreply'), recipient, message.as_string())
 
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     """
     Return a flattened dictionary where nested dictionary objects are given new
-    keys using the partent key combined using the seperator with the child key.
+    keys using the parent key combined using the seperator with the child key.
 
     Lists will be converted to json strings via json.dumps()
 
     :param MutableMapping d:  Dictionary like object
-    :param str partent_key: The original parent key prepending future nested keys
+    :param str parent_key: The original parent key prepending future nested keys
     :param str sep: A seperator string used to combine parent and child keys
     :return dict:  A new dictionary with the no nested values
     """
@@ -872,9 +1201,9 @@ def sets_to_lists(d: MutableMapping):
     :return dict:  A new dictionary with the no nested sets
     """
 
-    def _check_list(l):
+    def _check_list(lst):
         return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (
-        set, list)) else item for item in l]
+        set, list)) else item for item in lst]
 
     def _sets_to_lists_gen(d):
         for k, v in d.items():
@@ -887,6 +1216,192 @@ def sets_to_lists(d: MutableMapping):
 
     return dict(_sets_to_lists_gen(d))
 
+
+def url_to_hash(url, remove_scheme=True, remove_www=True):
+    """
+    Convert a URL to a hash. Allows removing scheme and www prefix before hashing.
+    
+    :param url: URL to hash
+    :param remove_scheme: If True, removes the scheme from URL before hashing
+    :param remove_www: If True, removes the www. prefix from URL before hashing
+    :return: Hash of the URL
+    """
+    parsed_url = urlparse(url.lower())
+    if parsed_url:
+        if remove_scheme:
+            parsed_url = parsed_url._replace(scheme="")
+        if remove_www:
+            netloc = re.sub(r"^www\.", "", parsed_url.netloc)
+            parsed_url = parsed_url._replace(netloc=netloc)
+        
+        # Hash the normalized URL directly
+        normalized_url = urlunparse(parsed_url).strip("/")
+    else:
+        # Unable to parse URL; use regex normalization
+        normalized_url = url.lower().strip("/")
+        if remove_scheme:
+            normalized_url = re.sub(r"^https?://", "", normalized_url)
+        if remove_www:
+            if not remove_scheme:
+                scheme_match = re.match(r"^https?://", normalized_url)
+                if scheme_match:
+                    scheme = scheme_match.group()
+                    temp_url = re.sub(r"^https?://", "", normalized_url)
+                    normalized_url = scheme + re.sub(r"^www\.", "", temp_url)
+            else:
+                normalized_url = re.sub(r"^www\.", "", normalized_url)
+
+    return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
+
+def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
+        """
+        Determine filenames for saved files
+
+        Prefer the original filename (extracted from the URL), but this may not
+        always be possible or be an actual filename. Also, avoid using the same
+        filename multiple times. Ensures filenames don't exceed max_bytes.
+
+        Check both in-memory existing filenames and on-disk filenames in the
+        staging area (if provided) to avoid collisions. Note: With a new staging
+        area, only in-memory checks are beneficial; leave as None to skip on-disk checks.
+
+        :param str url:  URLs to determine filenames for
+        :param Path staging_area:  Path to the staging area where files are saved
+        (to avoid collisions with existing files); if None, no disk checks are done.
+        :param str default_name:  Default name to use if no filename can be
+        extracted from the URL
+        :param str default_ext:  Default extension to use if no filename can be
+        extracted from the URL
+        :param int max_bytes:  Maximum number of bytes for the filename
+        :param set existing_filenames:  Set of existing filenames to avoid
+        collisions with (in addition to those in the staging area, if provided).
+        :return str:  Suitable file name
+        """
+        clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
+        if re.match(r"[^.]+\.[a-zA-Z0-9]{1,10}", clean_filename):
+            base_filename = clean_filename
+        else:
+            base_filename = default_name + default_ext
+
+        # remove some problematic characters
+        base_filename = re.sub(r"[:~]", "", base_filename)
+
+        if existing_filenames is None:
+            existing_filenames = set()
+        if type(existing_filenames) is not set:
+            # Could force set() here, but likely would be forcing in a loop
+            raise TypeError("existing_filenames must be a set")
+
+        # Split base filename into name and extension
+        if '.' in base_filename:
+            name_part, ext_part = base_filename.rsplit('.', 1)
+            ext_part = '.' + ext_part
+        else:
+            name_part = base_filename
+            ext_part = ''
+
+        # Truncate base filename if it exceeds max_bytes
+        if len(base_filename.encode('utf-8')) > max_bytes:
+            # Reserve space for extension
+            available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+            if available_bytes <= 0:
+                # If extension is too long, use minimal name
+                name_part = default_name
+                ext_part = default_ext
+                available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+            
+            # Truncate name part to fit
+            name_bytes = name_part.encode('utf-8')
+            if len(name_bytes) > available_bytes:
+                # Truncate byte by byte to ensure valid UTF-8
+                while len(name_bytes) > available_bytes:
+                    name_part = name_part[:-1]
+                    name_bytes = name_part.encode('utf-8')
+            
+            base_filename = name_part + ext_part
+
+        filename = base_filename
+
+        if staging_area or existing_filenames:
+            # Ensure the filename is unique in the staging area
+            file_index = 1
+
+            file_path = staging_area.joinpath(filename) if staging_area else None
+            
+            # Loop while collision in-memory OR on disk (if staging_area given)
+            while (filename in existing_filenames) or (staging_area and file_path.exists()):
+                # Calculate space needed for index suffix
+                index_suffix = f"-{file_index}"
+                
+                # Check if filename with index would exceed max_bytes
+                test_filename = name_part + index_suffix + ext_part
+                if len(test_filename.encode('utf-8')) > max_bytes:
+                    # Need to truncate name_part to make room for index
+                    available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
+                    if available_bytes <= 0:
+                        # Extreme case - use minimal name
+                        truncated_name = "f"
+                    else:
+                        # Truncate name_part to fit
+                        truncated_name = name_part
+                        name_bytes = truncated_name.encode('utf-8')
+                        while len(name_bytes) > available_bytes:
+                            truncated_name = truncated_name[:-1]
+                            name_bytes = truncated_name.encode('utf-8')
+                    
+                    filename = truncated_name + index_suffix + ext_part
+                else:
+                    filename = test_filename
+                
+                file_index += 1
+                if staging_area:
+                    file_path = staging_area.joinpath(filename)
+
+        return filename
+
+
+def split_urls(url_string, allowed_schemes=None):
+    """
+    Split URL text by \n and commas.
+
+    4CAT allows users to input lists by either separating items with a newline or a comma. This function will split URLs
+    and also check for commas within URLs using schemes.
+
+    Note: some urls may contain scheme (e.g., https://web.archive.org/web/20250000000000*/http://economist.com);
+    this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
+    """
+    if allowed_schemes is None:
+        allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
+    potential_urls = []
+    # Split the text by \n
+    for line in url_string.split('\n'):
+        # Handle commas that may exist within URLs
+        parts = line.split(',')
+        recombined_url = ""
+        for part in parts:
+            if part.startswith(allowed_schemes):  # Other schemes exist
+                # New URL start detected
+                if recombined_url:
+                    # Already have a URL, add to list
+                    potential_urls.append(recombined_url)
+                # Start new URL
+                recombined_url = part
+            elif part:
+                if recombined_url:
+                    # Add to existing URL
+                    recombined_url += "," + part
+                else:
+                    # No existing URL, start new
+                    recombined_url = part
+            else:
+                # Ignore empty strings
+                pass
+        if recombined_url:
+            # Add any remaining URL
+            potential_urls.append(recombined_url)
+    return potential_urls
+
+
 def folder_size(path='.'):
     """
     Get the size of a folder using os.scandir for efficiency
@@ -898,3 +1413,9 @@ def folder_size(path='.'):
         elif entry.is_dir():
             total += folder_size(entry.path)
     return total
+
+def hash_to_md5(string: str) -> str:
+    """
+    Hash a string with an md5 hash.
+    """
+    return hashlib.md5(string.encode("utf-8")).hexdigest()

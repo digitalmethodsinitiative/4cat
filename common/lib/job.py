@@ -7,7 +7,6 @@ import json
 import math
 from common.lib.exceptions import JobClaimedException, JobNotFoundException
 
-
 class Job:
 	"""
 	Job in queue

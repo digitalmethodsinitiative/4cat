@@ -3,12 +3,11 @@ Generate histogram of activity
 """
 import math
 
-from pathlib import Path
 from calendar import month_abbr
 
 from svgwrite.container import SVG
 from svgwrite.shapes import Line
-from svgwrite.path import Path
+from svgwrite.path import Path as SVGPath
 from svgwrite.text import Text
 
 from backend.lib.processor import BasicProcessor
@@ -29,21 +28,33 @@ class SVGHistogramRenderer(BasicProcessor):
 	description = "Generates a histogram (bar graph) from time frequencies."  # description displayed in UI
 	extension = "svg"
 
-	options = {
-		"header": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Graph header",
-			"tooltip": "The header may be truncated if it is too large to fit"
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"header": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "",
+				"help": "Graph header",
+				"tooltip": "The header may be truncated if it is too large to fit"
+			}
 		}
-	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.is_rankable(multiple_items=False)
 		
@@ -55,6 +66,7 @@ class SVGHistogramRenderer(BasicProcessor):
 		self.dataset.update_status("Reading source file")
 		header = self.parameters.get("header")
 		max_posts = 0
+		removed_non_date_intervals = False
 
 		# collect post numbers per month
 		intervals = {}
@@ -66,6 +78,13 @@ class SVGHistogramRenderer(BasicProcessor):
 
 			intervals[post["date"]] = value
 			max_posts = max(max_posts, value)
+
+		# Remove non-date intervals
+		for non_date in ["unknown_date", "all"]:
+			if non_date in intervals:
+				del intervals[non_date]
+				removed_non_date_intervals = True
+				self.dataset.log("Removed non-date interval: %s" % non_date)
 
 		if len(intervals) <= 1:
 			self.dataset.update_status("Not enough data available for a histogram; need more than one time series.")
@@ -146,7 +165,7 @@ class SVGHistogramRenderer(BasicProcessor):
 				x += item_width
 				continue
 
-			bar = Path(fill="#000")
+			bar = SVGPath(fill="#000")
 			bar.push("M %f %f" % (x, bar_bottom))
 			bar.push("L %f %f" % (x, bar_top + (arc_adjust if bar_height > arc_adjust else 0)))
 			if bar_height > arc_adjust > 0:
@@ -262,5 +281,7 @@ class SVGHistogramRenderer(BasicProcessor):
 
 		canvas.save(pretty=True)
 
+		if removed_non_date_intervals:
+			self.dataset.update_status("Finished; Removed non date intervals (e.g., \"unknown_date\").", is_final=True)
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(intervals))

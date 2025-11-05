@@ -21,7 +21,7 @@ class HatebaseRanker(BasicProcessor):
 	most-occurring country codes per month; overall top host names, etc
 	"""
 	type = "hatebase-frequencies"  # job type ID
-	category = "Post metrics"  # category
+	category = "Metrics"  # category
 	title = "Extract top hateful phrases"  # title displayed in UI
 	description = "Count frequencies for hateful words and phrases found in the dataset and rank the results (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
@@ -29,47 +29,57 @@ class HatebaseRanker(BasicProcessor):
 	followups = []
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on previous Hatebase analyses
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "hatebase-data"
 
-	# the following determines the options available to the user via the 4CAT
-	# interface.
-	options = {
-		"scope": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
-			"options": {
-				"all": "Ambigous and unambiguous hate terms",
-				"ambiguous": "Ambiguous hate terms terms only",
-				"unambiguous": "Unambiguous hate terms terms only"
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"scope": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "all",
+				"options": {
+					"all": "Ambigous and unambiguous hate terms",
+					"ambiguous": "Ambiguous hate terms terms only",
+					"unambiguous": "Unambiguous hate terms terms only"
+				},
+				"help": "Terms to consider"
 			},
-			"help": "Terms to consider"
-		},
-		"timeframe": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
-			"help": "Count frequencies per"
-		},
-		"top-style": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "per-item",
-			"options": {"per-item": "per timeframe (separate ranking per timeframe)",
-						"overall": "overall (only include overall top items in the timeframe)"},
-			"help": "Determine top items",
-			"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
-		},
-		"top": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 15,
-			"help": "Limit to this amount of top items (0 for unlimited)"
+			"timeframe": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "all",
+				"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
+				"help": "Count frequencies per"
+			},
+			"top-style": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "per-item",
+				"options": {"per-item": "per timeframe (separate ranking per timeframe)",
+							"overall": "overall (only include overall top items in the timeframe)"},
+				"help": "Determine top items",
+				"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
+			},
+			"top": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 15,
+				"help": "Limit to this amount of top items (0 for unlimited)"
+			}
 		}
-	}
 
 	def process(self):
 		"""
@@ -82,9 +92,6 @@ class HatebaseRanker(BasicProcessor):
 		scope = self.parameters.get("scope")
 		rank_style = self.parameters.get("top-style")
 		cutoff = convert_to_int(self.parameters.get("top"), 15)
-
-		# This is needed to check for URLs in the "domain" and "url" columns for Reddit submissions
-		datasource = self.source_dataset.parameters.get("datasource")
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")

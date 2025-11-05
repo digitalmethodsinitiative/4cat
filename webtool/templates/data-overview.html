@@ -45,7 +45,7 @@
                                         <li>The data for this data source are gathered and stored by this 4CAT instance.</li>
                                     {% elif label == "static" %}
                                         <li>The data for this datasource are not updated anymore and show a static snapshot.</li>
-                                    {% elif label == "extension" %}
+                                    {% elif label == "zeeschuimer" %}
                                         <li>The data for this datasource are collected with <a href="https://github.com/digitalmethodsinitiative/zeeschuimer">Zeeschuimer</a>.</li>
                                     {% elif label == "external" %}
                                         <li>The data for this datasource is collected externally (API or custom upload).</li>
@@ -95,6 +95,18 @@
                         </dd>
                     </div>
                     {% endif %}
+                    {% if example_keys %}
+                    <div class="fullwidth">
+                        <dt>DataSet keys</dt>
+                        <dd>
+                            <ul class="nobullet">
+                            {% for key in example_keys %}
+                                <span class="inline-label property-badge">{{ key }}</span>
+                            {% endfor %}
+                            </ul>
+                        </dd>
+                    </div>
+                    {% endif %}
                 </dl>
             </div>
             {% else %}
@@ -109,7 +121,7 @@
                 <h2 id="datasource-header"><span>Data sources</span></h2>
                 <ol id="datasource-list">
                     {% for datasource in datasources %}
-                        <li>{% if datasource_id != datasource %}<a href="{{ url_for('data_overview') }}{{ datasource }}">{% endif %}<h4>{{ datasources[datasource].name }}</h4>{% if datasource_id != datasource %}</a>{% endif %}</li>
+                        <li>{% if datasource_id != datasource %}<a href="{{ url_for('misc.data_overview') }}{{ datasource }}">{% endif %}<h4>{{ datasources[datasource].name }}</h4>{% if datasource_id != datasource %}</a>{% endif %}</li>
                     {% endfor %}
                 </ol>
             </div>

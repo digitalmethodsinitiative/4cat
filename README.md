@@ -5,12 +5,13 @@
 [![DOI: 10.5117/CCR2022.2.007.HAGE](https://zenodo.org/badge/DOI/10.5117/ccr2022.2.007.hage.svg)](https://doi.org/10.5117/CCR2022.2.007.HAGE)
 [![DOI: 10.5281/zenodo.4742622](https://zenodo.org/badge/DOI/10.5281/zenodo.4742622.svg)](https://doi.org/10.5281/zenodo.4742622)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
-[![Requires Python 3.8](https://img.shields.io/badge/py-v3.8-blue)](https://www.python.org/)
+[![Requires Python 3.11](https://img.shields.io/badge/py-v3.11-blue)](https://www.python.org/)
 [![Docker image status](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml)
 
-<p align="center">4CAT has a website at <a href="https://4cat.nl">4cat.nl</a>.</p>
 <p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>
 
+<p align="center">4CAT has a website at <a href="https://4cat.nl">4cat.nl</a>.</p>
+<p align="center"><a href="https://bsky.app/profile/4cat.nl">Follow 4CAT on Bluesky</a> for updates.</p>
 4CAT is a research tool that can be used to analyse and process data from
 online social platforms. Its goal is to make the capture and analysis of data
 from these platforms accessible to people through a web interface, without
@@ -31,25 +32,32 @@ using 4CAT's Python API. The following data sources are currently supported
 actively and can be used to collect data with 4CAT directly:
 
 * 4chan and 8kun
+* Bluesky
 * Telegram
+* TikTok (from a list of TikTok post URLs)
 * Tumblr
 
 The following platforms are supported through 
 [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer), with 
 which you can collect data to import into 4CAT for analysis:
 
-* Instagram (posts)
-* TikTok (posts and comments)
 * 9gag
-* Imgur
-* LinkedIn
-* Gab
 * Douyin
+* Gab
+* Imgur
+* Instagram (posts)
+* LinkedIn
+* Pinterest
+* Threads
+* Thruth.social
+* TikTok (posts and comments)
 * X/Twitter
+* Xiaohangshu
 
-It is also possible to upload data collected with other tools as CSV files. The
-following tools are explicitly supported but other data can also be uploaded as
-long as it is formatted as CSV:
+It is also possible to upload data collected with other tools as CSV files, or 
+zip archives of media files (i.e. video, images, and audio). The following 
+tools are explicitly supported but other data can also be uploaded as long as 
+it is formatted as CSV or uses a common media file format:
 
 * Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) or [Facepager](https://github.com/strohne/Facepager) exports)
 * YouTube videos and comments (via the [YouTube Data Tools](https://ytdt.digitalmethods.net/))

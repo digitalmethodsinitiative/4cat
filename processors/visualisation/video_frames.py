@@ -6,9 +6,8 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -34,37 +33,50 @@ class VideoFrames(BasicProcessor):
 
 	followups = ["video-timelines"] + VideoDownloaderPlus.followups
 
-	options = {
-		"frame_interval": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Number of frames extracted per second to extract from video",
-			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
-					   "pass 5, and so on. Use '0' to only capture the first frame of the video.",
-			"coerce_type": float,
-			"default": 1,
-			"min": 0,
-			"max": 5,
-		},
-		"frame_size": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "medium",
-			"options": {
-				"no_modify": "Do not modify",
-				"144x144": "Tiny (144x144)",
-				"432x432": "Medium (432x432)",
-				"1026x1026": "Large (1026x1026)",
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"frame_interval": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Number of frames extracted per second to extract from video",
+				"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
+						"pass 5, and so on. Use '0' to only capture the first frame of the video.",
+				"coerce_type": float,
+				"default": 1,
+				"min": 0,
+				"max": 5,
 			},
-			"help": "Size of extracted frames"
-		},
-	}
+			"frame_size": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "medium",
+				"options": {
+					"no_modify": "Do not modify",
+					"144x144": "Tiny (144x144)",
+					"432x432": "Medium (432x432)",
+					"1026x1026": "Large (1026x1026)",
+				},
+				"help": "Size of extracted frames"
+			},
+		}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on videos
+
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-			   config.get("video-downloader.ffmpeg_path", user=user) and \
+			   config.get("video-downloader.ffmpeg_path") and \
 			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):
@@ -94,7 +106,7 @@ class VideoFrames(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for path in self.iterate_archive_contents(self.source_file, staging_area):
+		for i, path in enumerate(self.iterate_archive_contents(self.source_file, staging_area)):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -109,7 +121,7 @@ class VideoFrames(BasicProcessor):
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", shlex.quote(str(path))
+				"-i", oslex.quote(str(path))
 			]
 
 			if frame_interval != 0:
@@ -118,8 +130,8 @@ class VideoFrames(BasicProcessor):
 				command += ["-vframes", "1"]
 
 			if frame_size != 'no_modify':
-				command += ['-s', shlex.quote(frame_size)]
-			command += [shlex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
+				command += ['-s', oslex.quote(frame_size)]
+			command += [oslex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
 
 			self.dataset.log(" ".join(command))
 
@@ -138,17 +150,21 @@ class VideoFrames(BasicProcessor):
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:
-				error = 'Error Return Code with video %s: %s' % (vid_name, str(result.returncode))
-				self.dataset.log(error)
+				self.dataset.update_status(f"Unable to extract frames from video {vid_name} (see logs for details)")
+				self.dataset.log('Error Return Code (%s) with video %s: %s' % (str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
+			else:
+				processed_videos += 1
+				self.dataset.update_status("Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
 
-			processed_videos += 1
-			self.dataset.update_status(
-				"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
-			self.dataset.update_progress(processed_videos / total_possible_videos)
+			self.dataset.update_progress(i / total_possible_videos)
 
 		# Finish up
 		# We've created a directory and folder structure here as opposed to a single folder with single files as
 		# expected by self.write_archive_and_finish() so we use make_archive instead
+		if not processed_videos:
+			self.dataset.finish_with_error("Unable to extract frames from any videos")
+			return
+
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
 

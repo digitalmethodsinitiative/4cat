@@ -2,6 +2,7 @@
 Detect scenes in videos
 """
 import json
+import os
 from scenedetect import open_video, SceneManager, VideoOpenFailure
 
 from backend.lib.processor import BasicProcessor
@@ -35,112 +36,130 @@ class VideoSceneDetector(BasicProcessor):
 		"[Detection Algorithms](https://scenedetect.com/projects/Manual/en/latest/api/detectors.html)"
 	]
 
-	options = {
-		"detector_type": {
-			"help": "Type of detection algorithm",
-			"type": UserInput.OPTION_CHOICE,
-			"default": "adaptive_detector",
-			"tooltip": "See the processor's reference on Detection Algorithms.",
-			"options": {
-				"content_detector": "ContentDetector: frame by frame detection using color and intensity change; "
-									"mainly detects fast cuts",
-				"adaptive_detector": "AdaptiveDetector: ContentDetector with rolling average of frame changes to "
-									 "mitigate fast camera motion falsely detected as scene changes",
-				"threshold_detector": "ThresholdDetector: compares multiple frame groups for both fast cuts and slow "
-									  "fades, but only uses pixel intensity (i.e. only detects hard cut or fade to "
-									  "black)",
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"detector_type": {
+				"help": "Type of detection algorithm",
+				"type": UserInput.OPTION_CHOICE,
+				"default": "adaptive_detector",
+				"tooltip": "See the processor's reference on Detection Algorithms.",
+				"options": {
+					"content_detector": "ContentDetector: frame by frame detection using color and intensity change; "
+										"mainly detects fast cuts",
+					"adaptive_detector": "AdaptiveDetector: ContentDetector with rolling average of frame changes to "
+										"mitigate fast camera motion falsely detected as scene changes",
+					"threshold_detector": "ThresholdDetector: compares multiple frame groups for both fast cuts and slow "
+										"fades, but only uses pixel intensity (i.e. only detects hard cut or fade to "
+										"black)",
+				},
 			},
-		},
-		"min_scene_len": {
-			"help": "Minimum length of scene in frames",
-			"type": UserInput.OPTION_TEXT,
-			"tooltip": "Note: this can vary length of scene in time based on video framerate (24fps in many cases, but "
-					   "not always)",
-			"coerce_type": int,
-			"default": 15,
-			"min": 1,
-		},
-		"luma_only": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Only consider changes in luminance/brightness of video",
-			"default": False,
-			"tooltip": "Applies to ContentDetector and AdaptiveDetector. If enabled, only considers changes in the "
-					   "luminance channel of the video. If disabled, also consider changes in hue and saturation."
-		},
-		"cd_info": {
-			"type": UserInput.OPTION_INFO,
-			"help": "*Content Detector settings*"
-		},
-		"cd_threshold": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Pixel intensity delta threshold",
-			"tooltip": "Only applies when using the ContentDetector algorithm. Average change in pixel intensity that "
-					   "must be exceeded to be detected as a scene change.",
-			"coerce_type": float,
-			"default": 27.0,
-			"min": 0,
-			"max": 5,
-		},
-		"ad_info": {
-			"type": UserInput.OPTION_INFO,
-			"help": "*Adaptive Detector settings*"
-		},
-		"ad_adaptive_threshold": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Change threshold",
-			"tooltip": "Only applies when using the AdaptiveDetector algorithm. Value (float) that the calculated "
-					   "frame change must exceed to be detected as a scene change.",
-			"coerce_type": float,
-			"default": 3.0,
-			"min": 0,
-		},
-		"ad_min_delta_hsv": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Colour change threshold",
-			"tooltip": "Only applies when using the AdaptiveDetector algorithm. Value (float) that the frame colour "
-					   "difference (in HSV) must exceed to be detected as a scene change.",
-			"coerce_type": float,
-			"default": 15.0,
-			"min": 0,
-		},
-		"ad_window_width": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Frame window size",
-			"tooltip": "Only applies when using the AdaptiveDetector algorithm. Number of frames before and after each "
-					   "frame to average together in order to detect deviations from the mean.",
-			"coerce_type": int,
-			"default": 2,
-			"min": 1,
-		},
-		"td_info": {
-			"type": UserInput.OPTION_INFO,
-			"help": "*Threshold Detector settings*"
-		},
-		"td_threshold": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Brightness threshold",
-			"tooltip": "Only applies when using the ThresholdDetector algorithm. 8-bit intensity value that each pixel "
-					   "value (R, G, and B) must be <= to in order to be detected as a fade in/out",
-			"coerce_type": float,
-			"default": 12.0,
-			"min": 0,
-		},
-		"td_fade_bias": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Fade eagerness",
-			"tooltip": "Only applies when using the ThresholdDetector algorithm. Float between -1.0 and +1.0 "
-					   "representing the percentage of timecode skew for the start of a scene. -1.0 causing a cut at "
-					   "the fade-to-black, 0.0 in the middle, and +1.0 causing the cut to be  right at the position "
-					   "where the threshold is passed",
-			"coerce_type": float,
-			"default": 0.0,
-			"min": -1.0,
-			"max": 1.0,
-		},
-	}
+			"min_scene_len": {
+				"help": "Minimum length of scene in frames",
+				"type": UserInput.OPTION_TEXT,
+				"tooltip": "Note: this can vary length of scene in time based on video framerate (24fps in many cases, but "
+						"not always)",
+				"coerce_type": int,
+				"default": 15,
+				"min": 1,
+			},
+			"luma_only": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Only consider changes in luminance/brightness of video",
+				"default": False,
+				"tooltip": "Applies to ContentDetector and AdaptiveDetector. If enabled, only considers changes in the "
+						"luminance channel of the video. If disabled, also consider changes in hue and saturation."
+			},
+			"cd_info": {
+				"type": UserInput.OPTION_INFO,
+				"help": "*Content Detector settings*"
+			},
+			"cd_threshold": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Pixel intensity delta threshold",
+				"tooltip": "Only applies when using the ContentDetector algorithm. Average change in pixel intensity that "
+						"must be exceeded to be detected as a scene change.",
+				"coerce_type": float,
+				"default": 27.0,
+				"min": 0,
+				"max": 5,
+			},
+			"ad_info": {
+				"type": UserInput.OPTION_INFO,
+				"help": "*Adaptive Detector settings*"
+			},
+			"ad_adaptive_threshold": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Change threshold",
+				"tooltip": "Only applies when using the AdaptiveDetector algorithm. Value (float) that the calculated "
+						"frame change must exceed to be detected as a scene change.",
+				"coerce_type": float,
+				"default": 3.0,
+				"min": 0,
+			},
+			"ad_min_delta_hsv": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Colour change threshold",
+				"tooltip": "Only applies when using the AdaptiveDetector algorithm. Value (float) that the frame colour "
+						"difference (in HSV) must exceed to be detected as a scene change.",
+				"coerce_type": float,
+				"default": 15.0,
+				"min": 0,
+			},
+			"ad_window_width": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Frame window size",
+				"tooltip": "Only applies when using the AdaptiveDetector algorithm. Number of frames before and after each "
+						"frame to average together in order to detect deviations from the mean.",
+				"coerce_type": int,
+				"default": 2,
+				"min": 1,
+			},
+			"td_info": {
+				"type": UserInput.OPTION_INFO,
+				"help": "*Threshold Detector settings*"
+			},
+			"td_threshold": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Brightness threshold",
+				"tooltip": "Only applies when using the ThresholdDetector algorithm. 8-bit intensity value that each pixel "
+						"value (R, G, and B) must be <= to in order to be detected as a fade in/out",
+				"coerce_type": float,
+				"default": 12.0,
+				"min": 0,
+			},
+			"td_fade_bias": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Fade eagerness",
+				"tooltip": "Only applies when using the ThresholdDetector algorithm. Float between -1.0 and +1.0 "
+						"representing the percentage of timecode skew for the start of a scene. -1.0 causing a cut at "
+						"the fade-to-black, 0.0 in the middle, and +1.0 causing the cut to be  right at the position "
+						"where the threshold is passed",
+				"coerce_type": float,
+				"default": 0.0,
+				"min": -1.0,
+				"max": 1.0,
+			},
+			"save_annotations": {
+				"type": UserInput.OPTION_ANNOTATION,
+				"label": "scene data",
+				"hidden_in_explorer": True,
+				"tooltip": "Add amount of scenes per video to top dataset",
+				"default": False
+			}
+		}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow on videos
 		"""
@@ -151,19 +170,25 @@ class VideoSceneDetector(BasicProcessor):
 		This takes a zipped set of videos, uses https://github.com/Breakthrough/PySceneDetect to detect scene breaks in
 		videos
 		"""
-		# Check processor able to run
-		if self.source_dataset.num_rows <= 1:
+		# Check processor able to run; metadata files are seen in Windows, not in UNIX
+		if (os.name != "nt" and self.source_dataset.num_rows <= 1 or
+				os.name == "nt" and self.source_dataset.num_rows < 1):
 			# 1 because there is always a metadata file
 			self.dataset.update_status("No videos from which to extract scenes.", is_final=True)
 			self.dataset.finish(0)
 			return
+		deduct_metadata = 0
+		if os.name == "nt":
+			deduct_metadata = 1
+
+		save_annotations = self.parameters.get("save_annotations", False)
 
 		self.dataset.update_status("Detecting video scenes")
-		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = self.source_dataset.num_rows - deduct_metadata  # exclude metadata file on UNIX
 		processed_videos = 0
 		video_metadata = None
 		collected_scenes = {}
-		for path in self.iterate_archive_contents(self.source_file):
+		for path in self.iterate_archive_contents(self.source_file, immediately_delete=False):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 
@@ -186,6 +211,7 @@ class VideoSceneDetector(BasicProcessor):
 			except VideoOpenFailure as e:
 				self.dataset.update_status(f'Skipping video; Unable to open {str(path.name)}: {str(e)}')
 				continue
+
 			total_frames = video.duration.get_frames()
 			total_duration = video.duration.get_timecode()
 
@@ -226,6 +252,7 @@ class VideoSceneDetector(BasicProcessor):
 					'total_video_duration': total_duration,
 				})
 
+
 			processed_videos += 1
 			self.dataset.update_status(
 				"Detected scenes for %i of %i videos" % (processed_videos, total_possible_videos))
@@ -235,6 +262,7 @@ class VideoSceneDetector(BasicProcessor):
 		self.dataset.update_status("Format data for output file")
 		num_posts = 0
 		rows = []
+		annotations = []
 		if video_metadata is None:
 			# Not good, but let's store the scenes and note the error
 			self.dataset.log("No metadata file found")
@@ -252,11 +280,13 @@ class VideoSceneDetector(BasicProcessor):
 				if video_data.get('success'):
 					files = video_data.get('files') if 'files' in video_data else [{"filename": video_data.get("filename"), "success":True}]
 					for file in files:
-						if not file.get("success"):
+						if not file.get("success") or file.get("filename") not in collected_scenes:
 							continue
+							
 						# List types are not super fun for CSV
 						if 'post_ids' in video_data:
-							video_data['post_ids'] = ','.join([str(i) for i in video_data['post_ids']])
+							video_data['post_ids'] = ','.join(video_data['post_ids'])
+
 
 						for i, scene in enumerate(collected_scenes[file.get('filename')]):
 							rows.append({
@@ -267,6 +297,21 @@ class VideoSceneDetector(BasicProcessor):
 								"post_ids": ','.join(video_data.get("post_ids", [])),
 							})
 							num_posts += 1
+
+							# Write amount of scenes for first scene detected
+							if save_annotations and i == 0:
+								item_ids = video_data.get("post_ids", [])
+								item_ids = [item_ids] if isinstance(item_ids, str) else item_ids
+								for item_id in item_ids:
+									annotation = {
+										"label": "scene_amount",
+										"value": scene.get("num_scenes_detected", ""),
+										"item_id": item_id
+									}
+									annotations.append(annotation)
+
+		if save_annotations and annotations:
+			self.save_annotations(annotations)
 
 		if rows:
 			self.dataset.update_status(
@@ -282,7 +327,7 @@ class VideoSceneDetector(BasicProcessor):
 		for every video. If multiple videos are to be combined, one SceneManager could be used.
 		"""
 		scene_manager = SceneManager()
-		if self.parameters.get("detector_type") == 'contenct_detector':
+		if self.parameters.get("detector_type") == 'content_detector':
 			from scenedetect.detectors import ContentDetector
 			scene_manager.add_detector(
 				ContentDetector(threshold=self.parameters.get("cd_threshold"),

@@ -17,12 +17,22 @@
                     <td>
                         {% if notification.timestamp_expires %}
                             <i class="fa fa-clock tooltip-trigger" aria-controls="tooltip-expires-{{ notification.id }}" aria-hidden="true"></i><span class="sr-only">Notification will expire at {{ notification.timestamp_expires|datetime("%-d %b %Y %H:%M", wrap=True) }}</span>
-                            <p role="tooltip" class="multiple" id="tooltip-expires-{{ notification.id }}" aria-hidden="true">Notification will expire at {{ notification.timestamp_expires|datetime("%-d %b %Y %H:%M", wrap=False) }}</p>
+                            <p role="tooltip" id="tooltip-expires-{{ notification.id }}" aria-hidden="true">Notification will expire at {{ notification.timestamp_expires|datetime("%-d %b %Y %H:%M", wrap=False) }}</p>
                         {% endif %}
                         <span class="has-more" data-max-length="75">{{ notification.notification|markdown|safe }}</span>
+                        {% if notification.notification_long %}
+                            (<a href="{{ url_for("user.view_notification", notification_id=notification.id) }}">read more...</a>)
+                        {% endif %}
                     </td>
-                    <td><a class="button-like" href="{{ url_for("delete_notification", notification_id=notification.id) }}"><i
+                    <td>
+                        {% if notification.canonical_id %}
+                            <i class="fa fa-globe tooltip-trigger" aria-hidden="true" aria-controls="tooltip-remote-{{ notification.id }}"></i>
+                            <p role="tooltip" id="tooltip-remote-{{ notification.id }}" aria-hidden="true">This notification was received from the 4CAT update server and cannot be deleted, only dismissed. It will disappear automatically when it is deleted remotely.</p>
+                        {% else %}
+                        <a class="button-like" href="{{ url_for("admin.delete_notification", notification_id=notification.id) }}"><i
                                     class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete notification</span></a>
+                        {% endif %}
+                    </td>
                 </tr>
             {% endfor %}
         {% else %}

@@ -5,7 +5,7 @@ import shutil
 
 from gensim.models import KeyedVectors
 
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int, convert_to_float
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -30,39 +30,51 @@ class SimilarWord2VecWords(BasicProcessor):
 
 	flawless = True
 
-	options = {
-		"words": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Words",
-			"tooltip": "Separate with commas."
-		},
-		"num-words": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Amount of similar words",
-			"min": 1,
-			"default": 10,
-			"max": 50
-		},
-		"threshold": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Similarity threshold",
-			"tooltip": "Decimal value between 0 and 1; only words with a higher similarity score than this will be included",
-			"default": "0.25"
-		},
-		"crawl_depth": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": 1,
-			"options": {"1": 1, "2": 2, "3": 3},
-			"help": "The crawl depth. 1 only gets the neighbours of the input word(s), 2 also their neighbours, etc."
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"words": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Words",
+				"tooltip": "Separate with commas."
+			},
+			"num-words": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Amount of similar words",
+				"min": 1,
+				"default": 10,
+				"max": 50
+			},
+			"threshold": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Similarity threshold",
+				"tooltip": "Decimal value between 0 and 1; only words with a higher similarity score than this will be included",
+				"default": "0.25"
+			},
+			"crawl_depth": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": 1,
+				"options": {"1": 1, "2": 2, "3": 3},
+				"help": "The crawl depth. 1 only gets the neighbours of the input word(s), 2 also their neighbours, etc."
+			}
 		}
-	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on word embedding models
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "generate-embeddings"
 
@@ -83,10 +95,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		input_words = input_words.split(",")
 
 		num_words = convert_to_int(self.parameters.get("num-words", 10))
-		try:
-			threshold = float(self.parameters.get("threshold", 0.25))
-		except ValueError:
-			threshold = float(self.get_options()["threshold"]["default"])
+		threshold = convert_to_float(self.parameters.get("threshold", 0.25), 0.25)
 
 		threshold = max(-1.0, min(1.0, threshold))
 

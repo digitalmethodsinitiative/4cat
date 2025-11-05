@@ -21,22 +21,33 @@ class WildcardFilter(BaseFilter):
     title = "Filter by wildcard"  # title displayed in UI
     description = "Retains only posts that contain certain words or phrases. Input may contain a wildcard *, which matches all text in between. This creates a new dataset."  # description displayed in UI
 
-    # the following determines the options available to the user via the 4CAT interface
-    options = {
-        "match": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Words or phrases to match. You can use * as a wildcard.",
-            "tooltip": "Separate with commas."
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "match": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Words or phrases to match. You can use * as a wildcard.",
+                "tooltip": "Separate with commas."
+            }
         }
-    }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on NDJSON and CSV files
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
@@ -49,7 +60,7 @@ class WildcardFilter(BaseFilter):
         :return generator:
         """
 
-        matches = [match.strip().replace("*", "[^\s]*") for match in self.parameters.get("match").split(",")]
+        matches = [match.strip().replace("*", r"[^\s]*") for match in self.parameters.get("match").split(",")]
 
         # load lexicons from word lists
 

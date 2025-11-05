@@ -17,7 +17,12 @@ from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
-from common.config_manager import config
+
+class RepeatedFailure(Exception):
+    """
+    Exception raised when a TikTok downloader repeatedly fails
+    """
+    pass
 
 class SearchTikTokByID(Search):
     """
@@ -49,22 +54,32 @@ class SearchTikTokByID(Search):
         }
     }
 
-    options = {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source can retrieve metadata for TikTok posts based on a list of URLs for those "
-                    "posts.\n\nEnter a list of TikTok post URLs. Metadata for each post will be extracted from "
-                    "each post's page in the browser interface "
-                    "([example](https://www.tiktok.com/@willsmith/video/7079929224945093934)). This includes a lot of "
-                    "details about the post itself such as likes, tags and stickers. Note that some of the metadata is "
-                    "only directly available when downloading the results as an .ndjson file."
-        },
-        "urls": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Post URLs",
-            "tooltip": "Separate by commas or new lines."
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get data source options
+
+        :param DataSet parent_dataset:  An object representing the dataset that
+            the processor would be or was run on and can be used to show some options
+            only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        """
+        return {
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "This data source can retrieve metadata for TikTok posts based on a list of URLs for those "
+                        "posts.\n\nEnter a list of TikTok post URLs. Metadata for each post will be extracted from "
+                        "each post's page in the browser interface "
+                        "([example](https://www.tiktok.com/@willsmith/video/7079929224945093934)). This includes a lot of "
+                        "details about the post itself such as likes, tags and stickers. Note that some of the metadata is "
+                        "only directly available when downloading the results as an .ndjson file."
+            },
+            "urls": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Post URLs",
+                "tooltip": "Separate by commas or new lines."
+            }
         }
-    }
 
     def get_items(self, query):
         """
@@ -77,15 +92,19 @@ class SearchTikTokByID(Search):
         return loop.run_until_complete(tiktok_scraper.request_metadata(query["urls"].split(",")))
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate TikTok query
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
+        if not query.get("urls"):
+            # no URLs provided
+            raise QueryParametersException("Missing \"Post URLs\" (\"urls\" parameter). Please provide a list of TikTok video URLs.")
+        
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
@@ -142,6 +161,7 @@ class TikTokScraper:
     last_proxy_update = 0
     last_time_proxy_available = None
     no_available_proxy_timeout = 600
+    consecutive_failures = 0
 
     VIDEO_NOT_FOUND = "oh no, sire, no video was found"
 
@@ -327,7 +347,6 @@ class TikTokScraper:
                 if response.status_code == 404:
                     failed += 1
                     self.processor.dataset.log("Video at %s no longer exists (404), skipping" % response.url)
-                    skip_to_next = True
                     continue
 
                 # haven't seen these in the wild - 403 or 429 might happen?
@@ -467,6 +486,31 @@ class TikTokScraper:
         video_requests = {}
         video_download_urls = []
 
+        # Failure policy thresholds: soft pause after 5 consecutive failures,
+        # hard stop after 10 consecutive failures.
+        soft_fail_limit = 5
+        hard_fail_limit = 10
+        soft_fail_pause_seconds = 30
+
+        # Helper: cancel in-flight requests and wait briefly before raising
+        async def abort_inflight_and_raise(message: str):
+            try:
+                for reqinfo in video_requests.values():
+                    try:
+                        reqinfo["request"].cancel()
+                    except Exception:
+                        pass
+                # wait up to 20s for pending requests to finish/cancel
+                max_timeout = time.time() + 20
+                while any(not r["request"].done() for r in video_requests.values()) and time.time() < max_timeout:
+                    await asyncio.sleep(0.5)
+            finally:
+                # If the processor was interrupted, surface that explicitly
+                if self.processor.interrupted:
+                    raise WorkerInterruptedException(message)
+                else:
+                    raise RepeatedFailure(message)
+
         while video_ids or video_download_urls or video_requests:
             # give tasks time to run
             await asyncio.sleep(0.1)
@@ -487,7 +531,7 @@ class TikTokScraper:
                              "https": available_proxy} if available_proxy != "__localhost__" else None
                     session.headers.update(video_download_headers)
                     video_requests[video_download_url] = {
-                        "request": session.get(video_download_url, proxies=proxy, timeout=30),
+                        "request": session.get(video_download_url, proxies=proxy, timeout=30), # not using stream=True here, as it seems slower; possibly due to short video lengths
                         "video_id": video_id,
                         "type": "download",
                     }
@@ -516,14 +560,10 @@ class TikTokScraper:
             # wait for async requests to end (after cancelling) before quitting
             # the worker
             if self.processor.interrupted:
-                for request in video_requests.values():
-                    request["request"].cancel()
+                await abort_inflight_and_raise("Interrupted while downloading TikTok videos")
 
-                max_timeout = time.time() + 20
-                while not all([r["request"] for r in video_requests.values() if r["request"].done()]) and time.time() < max_timeout:
-                    await asyncio.sleep(0.5)
-
-                raise WorkerInterruptedException("Interrupted while downloading TikTok videos")
+            # Determine whether to pause after processing the current batch
+            pause_after_this_iteration = False
 
             # Extract video download URLs
             for url in list(video_requests.keys()):
@@ -551,6 +591,14 @@ class TikTokScraper:
                     request_metadata["error"] = error_message
                     download_results[video_id] = request_metadata
                     self.processor.dataset.log(error_message)
+                    # Count failure and evaluate thresholds
+                    self.consecutive_failures += 1
+                    if self.consecutive_failures >= hard_fail_limit:
+                        await abort_inflight_and_raise(
+                            f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                        )
+                    if self.consecutive_failures == soft_fail_limit:
+                        pause_after_this_iteration = True
                     continue
                 finally:
                     del video_requests[url]
@@ -560,6 +608,14 @@ class TikTokScraper:
                     request_metadata["error"] = error_message
                     download_results[video_id] = request_metadata
                     self.processor.dataset.log(error_message)
+                    # Count failure and evaluate thresholds
+                    self.consecutive_failures += 1
+                    if self.consecutive_failures >= hard_fail_limit:
+                        await abort_inflight_and_raise(
+                            f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                        )
+                    if self.consecutive_failures == soft_fail_limit:
+                        pause_after_this_iteration = True
                     continue
 
                 if request_type == "metadata":
@@ -581,6 +637,13 @@ class TikTokScraper:
                         request_metadata["error"] = error_message
                         download_results[video_id] = request_metadata
                         self.processor.dataset.log(error_message)
+                        self.consecutive_failures += 1
+                        if self.consecutive_failures >= hard_fail_limit:
+                            await abort_inflight_and_raise(
+                                f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                            )
+                        if self.consecutive_failures == soft_fail_limit:
+                            pause_after_this_iteration = True
                         continue
 
                     try:
@@ -591,9 +654,16 @@ class TikTokScraper:
                         download_results[video_id] = request_metadata
                         self.processor.dataset.log(error_message)
                         self.processor.dataset.log(video_metadata["source"]["data"].values())
+                        # Count failure and evaluate thresholds
+                        self.consecutive_failures += 1
+                        if self.consecutive_failures >= hard_fail_limit:
+                            await abort_inflight_and_raise(
+                                f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                            )
                         continue
-
+                    
                     # Add new download URL to be collected
+                    self.consecutive_failures = 0
                     video_download_urls.append((video_id, url))
                     metadata_collected += 1
                     self.processor.dataset.update_status("Collected metadata for %i/%i videos" %
@@ -614,5 +684,12 @@ class TikTokScraper:
                     self.processor.dataset.update_status("Downloaded %i/%i videos" %
                                                     (downloaded_videos, max_videos))
                     self.processor.dataset.update_progress(downloaded_videos / max_videos)
+
+            # Soft backoff if we hit the soft limit and already had successes
+            if pause_after_this_iteration:
+                self.processor.dataset.update_status(
+                    f"Encountered {soft_fail_limit} consecutive failures after previous successes; pausing {soft_fail_pause_seconds}s before retrying"
+                )
+                await asyncio.sleep(soft_fail_pause_seconds)
 
         return download_results

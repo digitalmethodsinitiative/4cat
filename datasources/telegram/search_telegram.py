@@ -2,29 +2,26 @@
 Search Telegram via API
 """
 import traceback
-import datetime
 import hashlib
 import asyncio
 import json
+import ural
 import time
 import re
-
-from pathlib import Path
 
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, \
     FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
-from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.channels import GetFullChannelRequest, SearchPostsRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import User
+from telethon.tl.types import MessageEntityMention, InputPeerEmpty
 
 
 
@@ -80,7 +77,7 @@ class SearchTelegram(Search):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -89,11 +86,10 @@ class SearchTelegram(Search):
 
         :param DataSet parent_dataset:  An object representing the dataset that
           the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-          case they are requested for display in the 4CAT web interface. This can
-          be used to show some options only to privileges users.
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+
+        max_entities = config.get("telegram-search.max_entities", 25)
         options = {
             "intro": {
                 "type": UserInput.OPTION_INFO,
@@ -128,7 +124,8 @@ class SearchTelegram(Search):
             "query": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Entities to scrape",
-                "tooltip": "Separate with commas or line breaks."
+                "tooltip": "Separate with commas or line breaks. Entities can be channel or group names, or hashtags. "
+                           "For hashtags, always include the # prefix."
             },
             "max_posts": {
                 "type": UserInput.OPTION_TEXT,
@@ -161,10 +158,10 @@ class SearchTelegram(Search):
                 "type": UserInput.OPTION_INFO,
                 "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
                         "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                        "figure out where or who a message was forwarded from.\n\nHowever, this increases query time and "
-                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
-                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
-                        "data, so only enable this if you really need it!"
+                        "figure out where or who a message was forwarded from.\n\n"
+                        "However, this increases query time and for large datasets, increases the chance you will be "
+                        "rate-limited and your dataset isn't able to finish capturing. It will also dramatically "
+                        "increase the disk space needed to store the data, so only enable this if you really need it!"
             },
             "resolve-entities": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -175,9 +172,13 @@ class SearchTelegram(Search):
 
         if max_entities:
             options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
-                                              f"(channels or groups) at a time. Separate with line breaks or commas.")
+                                              f"(channels, hashtags, or groups) at a time. Separate with line breaks "
+                                              f"or commas. Date ranges have **no** effect for [hashtag "
+                                              f"searches](https://telegram.org/blog/message-effects-and-more), which "
+                                              f"will always simply return all matching messages in reverse "
+                                              f"chronological order.")
 
-        all_messages = config.get("telegram-search.can_query_all_messages", False, user=user)
+        all_messages = config.get("telegram-search.can_query_all_messages", False)
         if all_messages:
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
@@ -185,7 +186,7 @@ class SearchTelegram(Search):
             options["max_posts"]["help"] = (f"Messages to collect per entity. You can query up to "
                                              f"{options['max_posts']['max']:,} messages per entity.")
 
-        if config.get("telegram-search.max_crawl_depth", 0, user=user) > 0:
+        if config.get("telegram-search.max_crawl_depth", 0) > 0:
             options["crawl_intro"] = {
                 "type": UserInput.OPTION_INFO,
                 "help": "Optionally, 4CAT can 'discover' new entities via forwarded messages; for example, if a "
@@ -214,6 +215,14 @@ class SearchTelegram(Search):
                 "tooltip": "Entities need to be references at least this many times to be added to the query. Only "
                            "references discovered below the max crawl depth are taken into account."
             }
+            options["crawl-via-links"] = {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Extract new groups from links",
+                "tooltip": "Look for references to other groups in message content via t.me links and @references. "
+                           "This is more error-prone than crawling only via forwards, but can be a way to discover "
+                           "links that would otherwise remain undetected."
+            }
 
         return options
 
@@ -234,6 +243,7 @@ class SearchTelegram(Search):
 
         self.details_cache = {}
         self.failures_cache = set()
+        #TODO: This ought to yield as we're holding everything in memory; async generator? execute_queries() also needs to be modified for this
         results = asyncio.run(self.execute_queries())
 
         if not query.get("save-session"):
@@ -261,9 +271,11 @@ class SearchTelegram(Search):
         # order to avoid having to re-enter the security code
         query = self.parameters
 
-        session_id = SearchTelegram.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
+        session_id = SearchTelegram.create_session_id(query["api_phone"].strip(),
+                                                      query["api_id"].strip(),
+                                                      query["api_hash"].strip())
         self.dataset.log(f'Telegram session id: {session_id}')
-        session_path = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_SESSIONS"), session_id + ".session")
+        session_path = self.config.get("PATH_SESSIONS").joinpath(session_id + ".session")
 
         client = None
 
@@ -271,6 +283,7 @@ class SearchTelegram(Search):
             client = TelegramClient(str(session_path), int(query.get("api_id")), query.get("api_hash"),
                                     loop=self.eventloop)
             await client.start(phone=SearchTelegram.cancel_start)
+            self._client = client
         except RuntimeError:
             # session is no longer useable, delete file so user will be asked
             # for security code again. The RuntimeError is raised by
@@ -318,25 +331,25 @@ class SearchTelegram(Search):
 
         posts = []
         try:
-            async for post in self.gather_posts(client, queries, max_items, min_date, max_date):
+            async for post in self.gather_posts(queries, max_items, min_date, max_date):
                 posts.append(post)
             return posts
         except ProcessorInterruptedException as e:
             raise e
-        except Exception as e:
+        except Exception:
             # catch-all so we can disconnect properly
             # ...should we?
-            self.dataset.update_status("Error scraping posts from Telegram")
-            self.log.error(f"Telegram scraping error: {traceback.format_exc()}")
-            return []
+            self.dataset.update_status("Error scraping posts from Telegram; halting collection.")
+            self.log.error(f"Telegram scraping error (dataset {self.dataset.key}): {traceback.format_exc()}")
+            # May as well return what was captured, yes?
+            return posts
         finally:
             await client.disconnect()
 
-    async def gather_posts(self, client, queries, max_items, min_date, max_date):
+    async def gather_posts(self, queries, max_items, min_date, max_date):
         """
         Gather messages for each entity for which messages are requested
 
-        :param TelegramClient client:  Telegram Client
         :param list queries:  List of entities to query (as string)
         :param int max_items:  Messages to scrape per entity
         :param int min_date:  Datetime date to get posts after
@@ -356,6 +369,7 @@ class SearchTelegram(Search):
 
         crawl_max_depth = self.parameters.get("crawl-depth", 0)
         crawl_msg_threshold = self.parameters.get("crawl-threshold", 10)
+        crawl_via_links = self.parameters.get("crawl-via-links", False)
 
         self.dataset.log(f"Max crawl depth: {crawl_max_depth}")
         self.dataset.log(f"Crawl threshold: {crawl_msg_threshold}")
@@ -364,8 +378,8 @@ class SearchTelegram(Search):
         # has been mentioned. When crawling is enabled and this exceeds the
         # given threshold, the entity is added to the query
         crawl_references = {}
-        queried_entities = list(queries)
-        full_query = list(queries)
+        full_query = set(queries)
+        num_queries = len(queries)
 
         # we may not always know the 'entity username' for an entity ID, so
         # keep a reference map as we go
@@ -383,18 +397,21 @@ class SearchTelegram(Search):
             delay = 10
             retries = 0
             processed += 1
-            self.dataset.update_progress(processed / len(full_query))
+            self.dataset.update_progress(processed / num_queries)
 
             if no_additional_queries:
-                # Note that we are note completing this query
+                # Note that we are not completing this query
                 self.dataset.update_status(f"Rate-limited by Telegram; not executing query {entity_id_map.get(query, query)}")
                 continue
 
             while True:
                 self.dataset.update_status(f"Retrieving messages for entity '{entity_id_map.get(query, query)}'")
+                entity_posts = 0
+                discovered = 0
+                iter_method = self.iter_hashtag_messages if (type(query) is str and query.startswith("#")) else self._client.iter_messages
+
                 try:
-                    entity_posts = 0
-                    async for message in client.iter_messages(entity=query, offset_date=max_date):
+                    async for message in iter_method(entity=query, offset_date=max_date):
                         entity_posts += 1
                         total_messages += 1
                         if self.interrupted:
@@ -413,43 +430,105 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
-                        if "_chat" in serialized_message and query not in entity_id_map and serialized_message["_chat"]["id"] == query:
-                            # once we know what a channel ID resolves to, use the username instead so it is easier to
-                            # understand for the user
-                            entity_id_map[query] = serialized_message["_chat"]["username"]
-                            self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
+                        
+                        if "_chat" in serialized_message:
+                            chat_reference = serialized_message["_chat"] or serialized_message["_chat_peer"]
+                            chat_id = chat_reference.get("id", chat_reference.get("channel_id"))
+                            # Add query ID to check if queries have been crawled previously
+                            full_query.add(chat_id)
+                            if query not in entity_id_map and chat_id == query:
+                                # once we know what a channel ID resolves to, use the username instead so it is easier to
+                                # understand for the user, if the username is available
+                                entity_id_map[query] = chat_reference.get("username", "(unknown channel name)")
+                                self.dataset.update_status(f"Fetching messages for entity '{entity_id_map[query]}' (channel ID {query})")
 
                         if resolve_refs:
-                            serialized_message = await self.resolve_groups(client, serialized_message)
+                            serialized_message = await self.resolve_groups(serialized_message)
 
                         # Stop if we're below the min date
                         if min_date and serialized_message.get("date") < min_date:
                             break
 
                         # if crawling is enabled, see if we found something to add to the query
-                        if crawl_max_depth > 0 and (not crawl_msg_threshold or depth_map.get(query) < crawl_msg_threshold):
+                        linked_entities = set()
+                        if crawl_max_depth and (depth_map.get(query) < crawl_max_depth):
                             message_fwd = serialized_message.get("fwd_from")
                             fwd_from = None
-                            if message_fwd and message_fwd["from_id"] and message_fwd["from_id"].get("_type") == "PeerChannel":
-                                # even if we haven't resolved the ID, we can feed the numeric ID
-                                # to Telethon! this is nice because it means we don't have to
-                                # resolve entities to crawl iteratively
-                                fwd_from = int(message_fwd["from_id"]["channel_id"])
+                            fwd_source_type = None
+                            if message_fwd and message_fwd.get("from_id"):
+                                if message_fwd["from_id"].get("_type") == "PeerChannel":
+                                    # Legacy(?) data structure (pre 2024/7/22)
+                                    # even if we haven't resolved the ID, we can feed the numeric ID
+                                    # to Telethon! this is nice because it means we don't have to
+                                    # resolve entities to crawl iteratively
+                                    fwd_from = int(message_fwd["from_id"]["channel_id"])
+                                    fwd_source_type = "channel"
+                                elif message_fwd and message_fwd.get("from_id", {}).get('full_chat',{}):
+                                    # TODO: do we need a check here to only follow certain types of messages? this is similar to resolving, but the types do not appear the same to me
+                                    # Note: message_fwd["from_id"]["channel_id"] == message_fwd["from_id"]["full_chat"]["id"] in test cases so far
+                                    fwd_from = int(message_fwd["from_id"]["full_chat"]["id"])
+                                    fwd_source_type = "channel"
+                                elif message_fwd and (message_fwd.get("from_id", {}).get('full_user',{}) or message_fwd.get("from_id", {}).get("_type") == "PeerUser"):
+                                    # forwards can also come from users
+                                    # these can never be followed, so don't add these to the crawl, but do document them
+                                    fwd_source_type = "user"
+                                else:
+                                    print(json.dumps(message_fwd))
+                                    self.log.warning(f"Telegram (dataset {self.dataset.key}): Unknown fwd_from data structure; unable to crawl")
+                                    fwd_source_type = "unknown"
 
-                            if fwd_from and fwd_from not in queried_entities and fwd_from not in queries:
-                                # new entity discovered!
-                                # might be discovered (before collection) multiple times, so retain lowest depth
-                                depth_map[fwd_from] = min(depth_map.get(fwd_from, crawl_max_depth), depth_map[query] + 1)
-                                if depth_map[query] < crawl_max_depth:
-                                    if fwd_from not in crawl_references:
-                                        crawl_references[fwd_from] = 0
+                                if fwd_from:
+                                    linked_entities.add(fwd_from)
 
-                                    crawl_references[fwd_from] += 1
-                                    if crawl_references[fwd_from] >= crawl_msg_threshold and fwd_from not in queries:
-                                        queries.append(fwd_from)
-                                        full_query.append(fwd_from)
-                                        self.dataset.update_status(f"Discovered new entity {entity_id_map.get(fwd_from, fwd_from)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
 
+                            if crawl_via_links:
+                                # t.me links
+                                all_links = ural.urls_from_text(serialized_message["message"])
+                                all_links = [link.split("t.me/")[1] for link in all_links if ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
+                                for link in all_links:
+                                    if link.startswith("+"):
+                                        # invite links
+                                        continue
+
+                                    entity_name = link.split("/")[0].split("?")[0].split("#")[0]
+                                    linked_entities.add(entity_name)
+
+                                # @references
+                                references = [r for t, r in message.get_entities_text() if type(t) is MessageEntityMention]
+                                for reference in references:
+                                    if reference.startswith("@"):
+                                        reference = reference[1:]
+
+                                    reference = reference.split("/")[0]
+
+                                    linked_entities.add(reference)
+
+                            # Check if fwd_from or the resolved entity ID is already queued or has been queried
+                            for link in linked_entities:
+                                if link not in full_query and link not in queries and fwd_source_type not in ("user",):
+                                    # new entity discovered!
+                                    # might be discovered (before collection) multiple times, so retain lowest depth
+                                    # print(f"Potentially crawling {link}")
+                                    depth_map[link] = min(depth_map.get(link, crawl_max_depth), depth_map[query] + 1)
+                                    if link not in crawl_references:
+                                        crawl_references[link] = 0
+                                    crawl_references[link] += 1
+
+                                    # Add to queries if it has been referenced enough times
+                                    if crawl_references[link] >= crawl_msg_threshold:
+                                        queries.append(link)
+                                        full_query.add(link)
+                                        num_queries += 1
+                                        discovered += 1
+                                        self.dataset.update_status(f"Discovered new entity {entity_id_map.get(link, link)} in {entity_id_map.get(query, query)} at crawl depth {depth_map[query]}, adding to query")
+
+
+
+                        serialized_message["4CAT_metadata"] = {
+                            "collected_at": datetime.now().isoformat(), # this is relevant for rather long crawls
+                            "query": query, # possibly redundant, but we are adding non-user defined queries by crawling and may be useful to know exactly what query was used to collect an entity
+                            "query_depth": depth_map.get(query, 0)
+                        }
                         yield serialized_message
 
                         if entity_posts >= max_items:
@@ -502,9 +581,10 @@ class SearchTelegram(Search):
                     delay *= 2
                     continue
 
+                self.dataset.log(f"Completed {entity_id_map.get(query, query)} with {entity_posts} messages (discovered {discovered} new entities)")
                 break
 
-    async def resolve_groups(self, client, message):
+    async def resolve_groups(self, message):
         """
         Recursively resolve references to groups and users
 
@@ -526,7 +606,7 @@ class SearchTelegram(Search):
                         continue
 
                     if value["channel_id"] not in self.details_cache:
-                        channel = await client(GetFullChannelRequest(value["channel_id"]))
+                        channel = await self._client(GetFullChannelRequest(value["channel_id"]))
                         self.details_cache[value["channel_id"]] = SearchTelegram.serialize_obj(channel)
 
                     resolved_message[key] = self.details_cache[value["channel_id"]]
@@ -538,13 +618,13 @@ class SearchTelegram(Search):
                         continue
 
                     if value["user_id"] not in self.details_cache:
-                        user = await client(GetFullUserRequest(value["user_id"]))
+                        user = await self._client(GetFullUserRequest(value["user_id"]))
                         self.details_cache[value["user_id"]] = SearchTelegram.serialize_obj(user)
 
                     resolved_message[key] = self.details_cache[value["user_id"]]
                     resolved_message[key]["user_id"] = value["user_id"]
                 else:
-                    resolved_message[key] = await self.resolve_groups(client, value)
+                    resolved_message[key] = await self.resolve_groups(value)
 
             except (TypeError, ChannelPrivateError, UsernameInvalidError) as e:
                 self.failures_cache.add(value.get("channel_id", value.get("user_id")))
@@ -576,16 +656,22 @@ class SearchTelegram(Search):
         :param Message message:  Message to parse
         :return dict:  4CAT-compatible item object
         """
-        if message["_chat"]["username"]:
-            # chats can apparently not have usernames???
-            # truly telegram objects are way too lenient for their own good
-            thread = message["_chat"]["username"]
-        elif message["_chat"]["title"]:
-            thread = re.sub(r"\s", "", message["_chat"]["title"])
+        if message.get("_chat"):
+            thread_id = message["_chat"].get("username") or message["_chat"].get("id")
+            if not thread_id and "title" in message["_chat"]:
+                # chats can apparently not have usernames???
+                # truly telegram objects are way too lenient for their own good
+                thread_id = re.sub(r"\s", "", message["_chat"]["title"])
+        elif message.get("_chat_peer"):
+            if message["_chat_peer"].get("chats"):
+                thread_id = message["_chat_peer"]["chats"][0].get("username", message["_chat_peer"].get("channel_id"))
+            else:
+                thread_id = message["_chat_peer"].get("channel_id")
         else:
             # just give up
-            thread = "unknown"
+            thread_id = "unknown"
 
+        thread_id = str(thread_id)
         # determine username
         # API responses only include the user *ID*, not the username, and to
         # complicate things further not everyone is a user and not everyone
@@ -657,7 +743,7 @@ class SearchTelegram(Search):
                 "dc_id": attachment["dc_id"],
                 "file_reference": attachment["file_reference"],
             })
-            attachment_filename = thread + "-" + str(message["id"]) + ".jpeg"
+            attachment_filename = thread_id + "-" + str(message["id"]) + ".jpeg"
 
         elif attachment_type == "poll":
             # unfortunately poll results are only available when someone has
@@ -685,8 +771,7 @@ class SearchTelegram(Search):
         forwarded_name = ""
         forwarded_id = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (
-                type(message["fwd_from"]["from_id"]) is int):
+        if message.get("fwd_from") and "from_id" in message["fwd_from"] and type(message["fwd_from"]["from_id"]) is not int:
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not
@@ -702,6 +787,9 @@ class SearchTelegram(Search):
 
             if from_data and from_data.get("from_name"):
                 forwarded_name = message["fwd_from"]["from_name"]
+
+            if from_data and from_data.get("users") and len(from_data["users"]) > 0 and "user" not in from_data:
+                from_data["user"] = from_data["users"][0]
 
             if from_data and ("user" in from_data or "chats" in from_data):
                 # 'resolve entities' was enabled for this dataset
@@ -722,6 +810,13 @@ class SearchTelegram(Search):
                         if chat["id"] == channel_id or channel_id is None:
                             forwarded_username = chat["username"]
 
+            elif message.get("_forward") and message["_forward"].get("_chat"):
+                if message["_forward"]["_chat"].get("username"):
+                    forwarded_username = message["_forward"]["_chat"]["username"]
+
+                if message["_forward"]["_chat"].get("title"):
+                    forwarded_name = message["_forward"]["_chat"]["title"]
+
         link_title = ""
         link_attached = ""
         link_description = ""
@@ -734,20 +829,67 @@ class SearchTelegram(Search):
 
         if message.get("reactions") and message["reactions"].get("results"):
             for reaction in message["reactions"]["results"]:
-                reactions += reaction["reaction"] * reaction["count"]
+                if type(reaction["reaction"]) is dict and "emoticon" in reaction["reaction"]:
+                    # Updated to support new reaction datastructure
+                    reactions += reaction["reaction"]["emoticon"] * reaction["count"]
+                elif type(reaction["reaction"]) is str and "count" in reaction:
+                    reactions += reaction["reaction"] * reaction["count"]
+                else:
+                    # Failsafe; can be updated to support formatting of new datastructures in the future
+                    reactions += f"{reaction}, "
+
+        is_reply = False
+        reply_to = ""
+        if message.get("reply_to"):
+            is_reply = True
+            reply_to = message["reply_to"].get("reply_to_msg_id", "")
+
+        # t.me links
+        linked_entities = set()
+        all_links = ural.urls_from_text(message["message"])
+        all_links = [link.split("t.me/")[1] for link in all_links if
+                     ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
+
+        for link in all_links:
+            if link.startswith("+"):
+                # invite links
+                continue
+
+            entity_name = link.split("/")[0].split("?")[0].split("#")[0]
+            linked_entities.add(entity_name)
+
+        # @references
+        # in execute_queries we use MessageEntityMention to get these
+        # however, after serializing these objects we only have the offsets of
+        # the mentioned username, and telegram does weird unicode things to its
+        # offsets meaning we can't just substring the message. So use a regex
+        # as a 'good enough' solution
+        all_mentions = set(re.findall(r"@([^\s\W]+)", message["message"]))
+
+        # make this case-insensitive since people may use different casing in
+        # messages than the 'official' username for example
+        all_connections = set([v for v in [forwarded_username, *linked_entities, *all_mentions] if v])
+        all_ci_connections = set()
+        seen = set()
+        for connection in all_connections:
+            if connection.lower() not in seen:
+                all_ci_connections.add(connection)
+                seen.add(connection.lower())
 
         return MappedItem({
-            "id": f"{message['_chat']['username']}-{message['id']}",
-            "thread_id": thread,
-            "chat": message["_chat"]["username"],
+            "id": f"{thread_id}-{message['id']}",
+            "thread_id": thread_id,
+            "chat": thread_id,
             "author": user_id,
             "author_username": username,
             "author_name": fullname,
             "author_is_bot": "yes" if user_is_bot else "no",
             "body": message["message"],
-            "reply_to": message.get("reply_to_msg_id", ""),
+            "body_markdown": message.get("message_markdown", MissingMappedField("")),
+            "is_reply": is_reply,
+            "reply_to": reply_to,
             "views": message["views"] if message["views"] else "",
-            "forwards": message.get("forwards", MissingMappedField(0)),
+            # "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
             "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(message["date"]),
@@ -757,6 +899,9 @@ class SearchTelegram(Search):
             "author_forwarded_from_name": forwarded_name,
             "author_forwarded_from_username": forwarded_username,
             "author_forwarded_from_id": forwarded_id,
+            "entities_linked": ",".join(linked_entities),
+            "entities_mentioned": ",".join(all_mentions),
+            "all_connections": ",".join(all_ci_connections),
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
                 "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
@@ -837,16 +982,23 @@ class SearchTelegram(Search):
         # Add the _type if the original object was a telethon type
         if type(input_obj).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
             mapped_obj["_type"] = type(input_obj).__name__
+
+        # Store the markdown-formatted text
+        if type(input_obj).__name__ == "Message":
+            mapped_obj["message_markdown"] = input_obj.text
+
         return mapped_obj
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate Telegram query
 
+        :param config:
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
         :param User user:  User object of user who has submitted the query
+        :param ConfigManager config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # no query 4 u
@@ -856,10 +1008,11 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        all_posts = config.get("telegram-search.can_query_all_messages", False, user=user)
-        max_entities = config.get("telegram-search.max_entities", 25, user=user)
+        all_posts = config.get("telegram-search.can_query_all_messages", False)
+        max_entities = config.get("telegram-search.max_entities", 25)
 
-        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options()["max_posts"]["max"])
+        num_items = query.get("max_posts") if all_posts else min(query.get("max_posts"), SearchTelegram.get_options(
+            config=config)["max_posts"]["max"])
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
@@ -882,15 +1035,15 @@ class SearchTelegram(Search):
         min_date, max_date = query.get("daterange")
 
         # now check if there is an active API session
-        if not user or not user.is_authenticated or user.is_anonymous:
+        if not hasattr(config, "user") or not config.user.is_authenticated or config.user.is_anonymous:
             raise QueryParametersException("Telegram scraping is only available to logged-in users with personal "
                                            "accounts.")
 
         # check for the information we need
         session_id = SearchTelegram.create_session_id(query.get("api_phone"), query.get("api_id"),
                                                       query.get("api_hash"))
-        user.set_value("telegram.session", session_id)
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
+        config.user.set_value("telegram.session", session_id)
+        session_path = config.get('PATH_SESSIONS').joinpath(session_id + ".session")
 
         client = None
 
@@ -902,10 +1055,10 @@ class SearchTelegram(Search):
 
         # maybe we've entered a code already and submitted it with the request
         if "option-security-code" in request.form and request.form.get("option-security-code").strip():
-            code_callback = lambda: request.form.get("option-security-code")
+            code_callback = lambda: request.form.get("option-security-code")  # noqa: E731
             max_attempts = 1
         else:
-            code_callback = lambda: -1
+            code_callback = lambda: -1  # noqa: E731
             # max_attempts = 0 because authing will always fail: we can't wait for
             # the code to be entered interactively, we'll need to do a new request
             # but we can't just immediately return, we still need to call start()
@@ -926,17 +1079,17 @@ class SearchTelegram(Search):
                 # this happens if 2FA is required
                 raise QueryParametersException("Your account requires two-factor authentication. 4CAT at this time "
                                                f"does not support this authentication mode for Telegram. ({e})")
-            except RuntimeError as e:
+            except RuntimeError:
                 # A code was sent to the given phone number
                 needs_code = True
         except FloodWaitError as e:
             # uh oh, we got rate-limited
             raise QueryParametersException("You were rate-limited and should wait a while before trying again. " +
                                            str(e).split("(")[0] + ".")
-        except ApiIdInvalidError as e:
+        except ApiIdInvalidError:
             # wrong credentials
             raise QueryParametersException("Your API credentials are invalid.")
-        except PhoneNumberInvalidError as e:
+        except PhoneNumberInvalidError:
             # wrong phone number
             raise QueryParametersException(
                 "The phone number provided is not a valid phone number for these credentials.")
@@ -968,7 +1121,6 @@ class SearchTelegram(Search):
         return {
             "items": num_items,
             "query": ",".join(sanitized_items),
-            "board": "",  # needed for web interface
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
@@ -977,8 +1129,62 @@ class SearchTelegram(Search):
             "min_date": min_date,
             "max_date": max_date,
             "crawl-depth": query.get("crawl-depth"),
-            "crawl-threshold": query.get("crawl-threshold")
+            "crawl-threshold": query.get("crawl-threshold"),
+            "crawl-via-links": query.get("crawl-via-links")
         }
+
+    async def iter_hashtag_messages(self, entity, offset_date=None):
+        """
+        Iterate search results for a given hashtag
+
+        Telegram has a global hashtag search since 2024. Results are returned
+        in reverse chronological order; all messages contain the same hashtag.
+
+        :param str entity:  The hashtag; should start with '#'
+        :param offset_date:  Dummy for compatibility with `iter_messages()`;
+        does nothing when fetching search results
+        :return:  Yield one Message object per message
+        """
+        batch_size = 100  # higher has no effect
+        offset_peer = InputPeerEmpty()
+        offset_rate = 0
+        offset_id = 0
+
+        while True:
+            # this is a bit arcane, but Telegram does offsets in a complicated
+            # way. this mirrors what the Telegram desktop app does when
+            # searching for hashtags.
+            batch = await self._client(SearchPostsRequest(
+                offset_peer = offset_peer,
+                limit = batch_size,
+                offset_rate = offset_rate,
+                offset_id = offset_id,
+                hashtag = entity
+            ))
+
+            # chat metadata is stored separately from the messages
+            batch_chats = {c.id: c for c in batch.chats} if batch.chats else {}
+
+            i = 0
+            if batch.messages:
+                for message in batch.messages:
+                    offset_id = message.id
+                    offset_peer = message.peer_id
+                    if message._chat_peer.channel_id in batch_chats:
+                        # enrich...
+                        message._chat = batch_chats[message._chat_peer.channel_id]
+                        
+                    yield message
+                    i += 1
+
+                if not hasattr(batch, "next_rate"):
+                    break
+                    
+                offset_rate = batch.next_rate
+
+            if i == 0:
+                # get fewer than we asked for? results exhausted
+                break
 
     @staticmethod
     def create_session_id(api_phone, api_id, api_hash):

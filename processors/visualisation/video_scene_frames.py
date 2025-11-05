@@ -8,11 +8,10 @@ https://ffmpeg.org/
 """
 import shutil
 import subprocess
-import shlex
+import oslex
 
 from packaging import version
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_ffmpeg_version
@@ -37,22 +36,33 @@ class VideoSceneFrames(BasicProcessor):
 
     followups = ["video-timelines"]
 
-    options = {
-        "frame_size": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "medium",
-            "options": {
-                "no_modify": "Do not modify",
-                "144x144": "Tiny (144x144)",
-                "432x432": "Medium (432x432)",
-                "1026x1026": "Large (1026x1026)",
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "frame_size": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "medium",
+                "options": {
+                    "no_modify": "Do not modify",
+                    "144x144": "Tiny (144x144)",
+                    "432x432": "Medium (432x432)",
+                    "1026x1026": "Large (1026x1026)",
+                },
+                "help": "Size of extracted frames"
             },
-            "help": "Size of extracted frames"
-        },
-    }
+        }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -127,14 +137,14 @@ class VideoSceneFrames(BasicProcessor):
 
             command = [
                 ffmpeg_path,
-                "-i", shlex.quote(str(video)),
+                "-i", oslex.quote(str(video)),
                 "-vf", f"select='{vf_param}'",
                 fps_command, "passthrough",
-                shlex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
+                oslex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
             ]
 
             if frame_size != "no_modify":
-                command += ["-s", shlex.quote(frame_size)]
+                command += ["-s", oslex.quote(frame_size)]
 
             result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)

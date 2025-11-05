@@ -3,15 +3,15 @@ Create an PixPlot of downloaded images
 """
 import shutil
 import json
+import ural
 from datetime import datetime
 import csv
 import os
 from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 
-from common.config_manager import config
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, ellipsiate
 from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
@@ -65,7 +65,7 @@ class PixPlotGenerator(BasicProcessor):
 
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         # Update the amount max and help from config
         options = {
             "amount": {
@@ -121,7 +121,7 @@ class PixPlotGenerator(BasicProcessor):
             },
         }
 
-        max_number_images = int(config.get("dmi-service-manager.dc_pixplot_num_files", 10000, user=user))
+        max_number_images = int(config.get("dmi-service-manager.dc_pixplot_num_files", 10000))
         if max_number_images == 0:
             options["amount"]["help"] = options["amount"]["help"] + " (max: all available)"
             options["amount"]["min"] = 0
@@ -134,15 +134,15 @@ class PixPlotGenerator(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on token sets;
         Checks if pix-plot.server_url set
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return config.get("dmi-service-manager.db_pixplot_enabled", False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.db_pixplot_enabled", False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):
@@ -211,7 +211,7 @@ class PixPlotGenerator(BasicProcessor):
         data['timeout'] = (86400 * 7)
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "pixplot"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30, check_process=False)
@@ -228,7 +228,7 @@ class PixPlotGenerator(BasicProcessor):
         dmi_service_manager.process_results(output_dir)
 
         # Results HTML file redirects to output_dir/index.html
-        plot_url = ('https://' if config.get("flask.https") else 'http://') + config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
+        plot_url = ('https://' if self.config.get("flask.https") else 'http://') + self.config.get("flask.server_name") + '/result/' + f"{os.path.relpath(self.dataset.get_results_folder_path(), self.dataset.folder)}/index.html"
         html_file = self.get_html_page(plot_url)
 
         # Write HTML file
@@ -268,11 +268,17 @@ class PixPlotGenerator(BasicProcessor):
             # No metadata
             return False
 
+
+        top_dataset = self.dataset.top_parent()
         # Check that this is not already a top dataset
-        if self.dataset.top_parent().key == self.source_dataset.key:
-            # i.e. the source image dataset is not a top dataset that happens to have a metadata file from some export
+        if top_dataset.key == self.source_dataset.key:
+            # This is a top dataset; there is no additional metadata to be added from a source dataset
+            # i.e. there is a metadata file uploaded from some export, but we do not have the original source dataset
             # This can happen with the Upload Media datasource if the user uploads a 4CAT results zip with images and .metadata.json
-            # But there is not a top dataset with post data in this instance unfortunately
+            return False
+        elif top_dataset.get_media_type() != "text":
+            # Top dataset is not a text dataset; no additional metadata to be added
+            # e.g., image dataset uploaded as zip and later filtered via unique_images
             return False
 
         with open(os.path.join(temp_path, '.metadata.json')) as file:
@@ -303,7 +309,7 @@ class PixPlotGenerator(BasicProcessor):
                 # Add to metadata
                 images[url] = {'filename': filename,
                                     'permalink': url,
-                                    'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(data.get('post_ids'))),
+                                    'description': '<b>Number of posts with this image:</b> ' + str(len(data.get('post_ids'))),
                                     'tags': '',
                                     'number_of_posts': 0,
                                     }
@@ -321,36 +327,46 @@ class PixPlotGenerator(BasicProcessor):
 
                     # Update description
                     image['number_of_posts'] += 1
-                    image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
+                    image['description'] += '<br><br><b>Post ' + str(image['number_of_posts']) + '</b><br><br>'
                     # Order of Description elements
                     ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
                     for detail in ordered_descriptions:
                         if post.get(detail):
-                            image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
+                            image['description'] += '<p><span class="fieldname">' + detail + '</span>' + self.make_nice_link(post.get(detail)) + '</p>'
                     for key, value in post.items():
                         if key not in ordered_descriptions:
-                            image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
+                            image['description'] += '<p><span class="fieldname">' + key + '</span> ' + self.make_nice_link(value) + '</p>'
 
                     # Add tags or hashtags
                     if image['tags']:
                         image['tags'] += '|'
                     if 'tags' in post.keys():
-                        if type(post['tags']) == list:
+                        if type(post['tags']) is list:
                             image['tags'] += '|'.join(post['tags'])
                         else:
                             image['tags'] += '|'.join(post['tags'].split(','))
                     elif 'hashtags' in post.keys():
-                        if type(post['hashtags']) == list:
+                        if type(post['hashtags']) is list:
                             image['tags'] += '|'.join(post['hashtags'])
                         else:
                             image['tags'] += '|'.join(post['hashtags'].split(','))
 
                     # Category could perhaps be a user chosen column...
 
-                    # If images repeat this will overwrite prior value
-                    # I really dislike that the download images is not a one to one with posts...
+                    # Add year for Pixplot date view
                     if 'timestamp' in post.keys():
-                        image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+                        if not post['timestamp']:
+                            # no data
+                            pass 
+                        elif type(post['timestamp']) in [int, float]:
+                            image['year'] = datetime.fromtimestamp(post['timestamp']).year
+                        elif type(post['timestamp']) is str:
+                            try:
+                                image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
+                            except ValueError:
+                                # the timestamp field ought to be integers in 4CAT
+                                pass
+                        
         self.dataset.log(f"Image metadata added to {posts_with_images} posts")
 
         # Get path for metadata file
@@ -385,5 +401,27 @@ class PixPlotGenerator(BasicProcessor):
         """
         s = unquote(os.path.basename(s))
         invalid_chars = '<>:;,"/\\|?*[]'
-        for i in invalid_chars: s = s.replace(i, '')
+        for i in invalid_chars:
+            s = s.replace(i, '')
         return s
+
+    def make_nice_link(self, content):
+        """
+        Add HTML links to text
+
+        Replaces URLs with a clickable link
+
+        :param str content:  Text to parse
+        :return str:  Parsed text
+        """
+        try:
+            content = str(content)
+        except ValueError:
+            return content
+
+        for link in set(ural.urls_from_text(content)):
+            link_text = ellipsiate(link, 50, True, "[&hellip;]")
+            content = content.replace(link,
+                                      f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
+
+        return content

@@ -11,9 +11,9 @@
             <div class="user-panel">
                 <nav class="view-controls block">
                     Sort by
-                    <a class="button-like" href="{{ url_for("list_users") }}?sort=name"><i class="fa fa-arrow-down-a-z" aria-hidden="true"></i> Name</a>
-                    <a class="button-like" href="{{ url_for("list_users") }}?sort=age"><i class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Age</a>
-                    <a class="button-like" href="{{ url_for("list_users") }}?sort=status"><i class="fa fa-user-shield" aria-hidden="true"></i> Status</a>
+                    <a class="button-like" href="{{ url_for("admin.list_users") }}?sort=name"><i class="fa fa-arrow-down-a-z" aria-hidden="true"></i> Name</a>
+                    <a class="button-like" href="{{ url_for("admin.list_users") }}?sort=age"><i class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Age</a>
+                    <a class="button-like" href="{{ url_for("admin.list_users") }}?sort=status"><i class="fa fa-user-shield" aria-hidden="true"></i> Status</a>
                 </nav>
                 <table class="fullwidth user-table cp-table">
                     <colgroup>
@@ -50,7 +50,7 @@
                                     {% if user.tags %}
                                         {% for user_tag in user.tags %}
                                             <span class="property-badge"><a
-                                                    href="{{ url_for("list_users") }}?tag={{ user_tag }}">{{ user_tag }}</a></span>
+                                                    href="{{ url_for("admin.list_users") }}?tag={{ user_tag }}">{{ user_tag }}</a></span>
                                         {% endfor %}
                                     {% endif %}
                                 </div>
@@ -58,10 +58,10 @@
                             <td class="actions">
                                 {% if user.name not in ("anonymous", "autologin") %}
                                     <a class="button-like"
-                                       href="{{ url_for("manipulate_user", mode="edit") }}?name={{ user.name }}"><i
+                                       href="{{ url_for("admin.manipulate_user", mode="edit") }}?name={{ user.name }}"><i
                                             class="fa fa-edit" aria-hidden="true"></i><span
                                             class="sr-only">Edit user</span></a>
-                                    <form class="inline" action="{{ url_for("delete_user") }}" method="POST">
+                                    <form class="inline" action="{{ url_for("admin.delete_user") }}" method="POST">
                                         <input type="hidden" name="name" value="{{ user.name }}">
                                         <button class="confirm-first"><i class="fa fa-times"
                                                                          aria-hidden="true"></i><span class="sr-only">Delete user</span>
@@ -69,11 +69,11 @@
                                     </form>
                                 {% endif %}
                                 <a class="button-like tooltip-trigger" aria-controls="tooltip-user-datasets"
-                                   href="{{ url_for("show_results") }}?user={{ user.name }}&amp;depth=all"><i
+                                   href="{{ url_for("dataset.show_results") }}?user={{ user.name }}&amp;depth=all"><i
                                         class="fa fa-database" aria-hidden="true"></i><span class="sr-only">View datasets for user</span></a>
 
                                 <a class="button-like"
-                                   href="{{ url_for("manipulate_settings") }}?tag=user:{{ user.name }}"><i
+                                   href="{{ url_for("admin.manipulate_settings") }}?tag=user:{{ user.name }}"><i
                                         class="fa fa-user-gear" aria-hidden="true"></i><span
                                         class="sr-only">User settings</span></a>
                             </td>
@@ -96,17 +96,17 @@
             <h2><span>Manage</span></h2>
             <nav class="user-controls">
                 <div>
-                    <a href="{{ url_for("manipulate_user", mode="create") }}" class="button-like"><i
+                    <a href="{{ url_for("admin.manipulate_user", mode="create") }}" class="button-like"><i
                             class="fa fa-user-plus" aria-hidden="true"></i> Create user</a>
-                    <a href="{{ url_for("user_bulk") }}" class="button-like"><i
+                    <a href="{{ url_for("admin.user_bulk") }}" class="button-like"><i
                             class="fa fa-user-plus" aria-hidden="true"></i> Create users (bulk)</a>
                     {% if __user_config("privileges.admin.can_manage_tags") %}
-                    <a href="{{ url_for("manipulate_tags") }}" class="button-like"><i
+                    <a href="{{ url_for("admin.manipulate_tags") }}" class="button-like"><i
                             class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Manage tags</a>
                     {% endif %}
                 </div>
                 <hr>
-                <form action="{{ url_for("list_users") }}" method="GET">
+                <form action="{{ url_for("admin.list_users") }}" method="GET">
                     <input aria-label="User filter" placeholder="Search by username/notes" name="name"
                            value="{{ filter.name }}" list="all-users">
 
@@ -124,7 +124,7 @@
                 </datalist>
                 {% if filter.name or filter.tag %}
                     <hr>
-                    <form action="{{ url_for("list_users") }}" method="GET">
+                    <form action="{{ url_for("admin.list_users") }}" method="GET">
                         <button><i class="fa fa-times" aria-hidden="true"></i> Clear filter</button>
                     </form>
                 {% endif %}

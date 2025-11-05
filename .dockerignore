@@ -1,4 +1,5 @@
 data/
 .github/
 .ipynb_checkpoints/
-.gitignore
+.idea/
+__pycache__/

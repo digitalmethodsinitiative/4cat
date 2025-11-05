@@ -10,7 +10,7 @@ from pathlib import Path
 cli = argparse.ArgumentParser()
 cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
                  action="store_true")
-cli.add_argument("--log-level", "-l", default="INFO", help="Set log level (\"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
+cli.add_argument("--log-level", "-l", default=None, help="Set log level (\"DEBUG2\", \"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\", \"FATAL\").")
 cli.add_argument("--no-version-check", "-n", default=False,
                  help="Skip version check that may prompt the user to migrate first.", action="store_true")
 cli.add_argument("command")
@@ -38,8 +38,9 @@ if not args.no_version_check:
     current_version_file = Path("config/.current-version")
 
     if not current_version_file.exists():
-        # this is the latest version lacking version files
-        current_version = "1.9"
+        # 1.9 was the latest version lacking version files
+        # version files moved over time for various reasons
+        current_version = "unknown"
     else:
         with current_version_file.open() as handle:
             current_version = re.split(r"\s", handle.read())[0].strip()
@@ -60,12 +61,13 @@ if not args.no_version_check:
 # we can only import this here, because the version check above needs to be
 # done first, as it may detect that the user needs to migrate first before
 # the config manager can be run properly
-from common.config_manager import config
-from common.lib.helpers import call_api
+from common.config_manager import ConfigManager  # noqa: E402
+from common.lib.helpers import call_api  # noqa: E402
 # ---------------------------------------------
 #     Check validity of configuration file
 # (could be expanded to check for other values)
 # ---------------------------------------------
+config = ConfigManager()
 if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "REPLACE_THIS":
     print(
         "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
@@ -76,20 +78,21 @@ if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "
 #   POSIX-compatible systems - run interactive
 #                on Windows.
 # ---------------------------------------------
+    
 if os.name not in ("posix",):
     # if not, run the backend directly and quit
     print("Using '%s' to run the 4CAT backend is only supported on UNIX-like systems." % __file__)
     print("Running backend in interactive mode instead.")
     import backend.bootstrap as bootstrap
 
-    bootstrap.run(as_daemon=False, log_level=args.log_level)
+    bootstrap.run(as_daemon=False, log_level=args.log_level or "DEBUG")
     sys.exit(0)
 
 if args.interactive:
     print("Running backend in interactive mode.")
     import backend.bootstrap as bootstrap
 
-    bootstrap.run(as_daemon=False, log_level=args.log_level)
+    bootstrap.run(as_daemon=False, log_level=args.log_level or "DEBUG")
     sys.exit(0)
 else:
     # if so, import necessary modules
@@ -97,7 +100,7 @@ else:
     import daemon
 
 # determine PID file
-pidfile = config.get('PATH_ROOT').joinpath(config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
+pidfile = config.get('PATH_LOCKFILE').joinpath("4cat.pid")  # pid file location
 
 # ---------------------------------------------
 #   These functions start and stop the daemon
@@ -126,11 +129,11 @@ def start():
         with daemon.DaemonContext(
                 working_directory=os.path.abspath(os.path.dirname(__file__)),
                 umask=0x002,
-                stderr=open(Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), "4cat.stderr"), "w+"),
+                stderr=open(config.get('PATH_LOGS').joinpath("4cat.stderr"), "w+"),
                 detach_process=True
-        ) as context:
+        ):
             import backend.bootstrap as bootstrap
-            bootstrap.run(as_daemon=True, log_level=args.log_level)
+            bootstrap.run(as_daemon=True, log_level=args.log_level or "INFO")
 
         sys.exit(0)
 
@@ -192,7 +195,7 @@ def stop(force=False):
             nowtime = time.time()
             if nowtime - starttime > 60:
                 # give up if it takes too long
-                if force == True and not killed:
+                if force and not killed:
                     os.system("kill -9 %s" % str(pid))
                     print("...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL...")
                     killed = True
@@ -264,14 +267,20 @@ elif command == "status":
             sys.exit(0)
 
         print("\n     Active workers:\n-------------------------")
-        active_workers = call_api("workers")["response"]
-        active_workers = {worker: active_workers[worker] for worker in
-                          sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if
-                          active_workers[worker] > 0}
-        for worker in active_workers:
-            print("%s: %i" % (worker, active_workers[worker]))
+        api_response = call_api("workers")
+        if api_response["status"] == "success":
+            active_workers = api_response["response"]
+            active_workers = {worker: active_workers[worker] for worker in
+                            sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if
+                            active_workers[worker] > 0}
+            for worker in active_workers:
+                print("%s: %i" % (worker, active_workers[worker]))
 
-        print("\n")
+            print("\n")
+        else:
+            print("...error: could not fetch worker status.\n")
+            print(api_response["error"])
+            print("4CAT Backend Daemon may have crashed.")
 
 
     else:

@@ -24,69 +24,79 @@ class ColumnFilter(BaseFilter):
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. " \
                   "This will create a new dataset."
 
-    options = {
-        "column": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Column"
-        },
-        "match-style": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Match type",
-            "options": {
-                "exact": "is equal to",
-                "exact-not": "is not equal to",
-                "contains": "contains",
-                "contains-not": "does not contain",
-                "less-than": "is less than (numerical values only)",
-                "greater-than": "is greater than (numerical values only)",
-                "before": "is before (dates only)",
-                "after": "is after (dates only)",
-                "top": "is in the top n results for this attribute (use 'Match with' for n)",
-                "bottom": "is in the bottom n results for this attribute (use 'Match with' for n)"
-            },
-            "default": "exact"
-        },
-        "match-value": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Match with",
-            "default": "",
-            "tooltip": "If you want to match with multiple values, separate with commas. Items matching any of the "
-                       "provided values will be retained. Dates in 2023-03-25 08:30:00 format."
-        },
-        "match-multiple": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Match multiple values",
-            "default": "any",
-            "options": {
-                "any": "Retain if any value matches",
-                "all": "Retain if all values match"
-            },
-            "tooltip": "When matching on multiple values, you can choose to retain items if all provided values "
-                       "match, or if any single one matches. Ignored when matching on a single value or selecting top "
-                       "results."
-        },
-        "lowercase": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Convert all text to lowercase for comparison",
-            "default": False
-        }
-    }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
-        Allow processor on top datasets.
+        Allow processor on top datasets that are CSV or NDJSON.
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
-        
-        options = cls.options
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        options = {
+            "column": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Column"
+            },
+            "match-style": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Match type",
+                "options": {
+                    "exact": "is equal to",
+                    "exact-not": "is not equal to",
+                    "contains": "contains",
+                    "contains-not": "does not contain",
+                    "less-than": "is less than (numerical values only)",
+                    "greater-than": "is greater than (numerical values only)",
+                    "before": "is before (dates only)",
+                    "after": "is after (dates only)",
+                    "top": "is in the top n results for this attribute (use 'Match with' for n)",
+                    "bottom": "is in the bottom n results for this attribute (use 'Match with' for n)"
+                },
+                "default": "exact"
+            },
+            "match-value": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Match with",
+                "default": "",
+                "tooltip": "If you want to match with multiple values, separate with commas. Items matching any of the "
+                        "provided values will be retained. Dates in 2023-03-25 08:30:00 format."
+            },
+            "match-multiple": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Match multiple values",
+                "default": "any",
+                "options": {
+                    "any": "Retain if any value matches",
+                    "all": "Retain if all values match"
+                },
+                "tooltip": "When matching on multiple values, you can choose to retain items if all provided values "
+                        "match, or if any single one matches. Ignored when matching on a single value or selecting top "
+                        "results."
+            },
+            "lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Convert all text to lowercase for comparison",
+                "default": False
+            }
+        }
+
         if not parent_dataset:
             return options
+        
         parent_columns = parent_dataset.get_columns()
 
         if parent_columns:
@@ -175,7 +185,7 @@ class ColumnFilter(BaseFilter):
                         self.dataset.finish(0)
                         return
             elif match_style in ["exact", "exact-not", "contains", "contains-not"]:
-                if type(mapped_item.get(column)) == str:
+                if type(mapped_item.get(column)) is str:
                     # Text
                     column_value = mapped_item.get(column).lower() if force_lowercase else mapped_item.get(column)
                 elif mapped_item.get(column) is None:
@@ -260,13 +270,14 @@ class ColumnProcessorFilter(ColumnFilter):
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. "
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
-        Allow processor on top datasets.
+        Allow on child datasets and do not create a standalone dataset
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager config:  Configuration reader (context-aware)
         """
-        return module.get_extension() in ("csv", "ndjson") and not module.is_top_dataset()
+        return not module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
     def is_filter(cls):

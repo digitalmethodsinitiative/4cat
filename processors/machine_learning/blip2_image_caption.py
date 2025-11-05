@@ -1,15 +1,13 @@
 """
 OpenAI CLIP categorize images
 """
-import os
 import json
 
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, DsmConnectionError
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from common.config_manager import config
 from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
@@ -57,18 +55,19 @@ class CategorizeImagesCLIP(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on image archives if enabled in Control Panel
         """
-        return config.get("dmi-service-manager.fc_blip2_enabled", False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.fc_blip2_enabled", False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Collect maximum number of files from configuration and update options accordingly
+        :param config:
         """
         options = {
             "amount": {
@@ -92,7 +91,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("dmi-service-manager.fd_blip2_num_files", 100, user=user))
+        max_number_images = int(config.get("dmi-service-manager.fd_blip2_num_files", 100))
         if max_number_images == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of images"
             options["amount"]["default"] = 100
@@ -175,7 +174,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             data["args"].extend(["--prompt", self.parameters.get("prompt")])
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "blip2"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30)
@@ -183,8 +182,15 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error(
                 "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
             return
+        except DsmConnectionError as e:
+            self.dataset.log(str(e))
+            self.log.warning(f"DMI Service Manager connection error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error("DMI Service Manager connection error; please contact 4CAT admins.")
+            return
         except DmiServiceManagerException as e:
-            self.dataset.finish_with_error(str(e))
+            self.dataset.log(str(e))
+            self.log.warning(f"BLIP2 Error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error("Error with BLIP2 model; please contact 4CAT admins.")
             return
 
         # Load the video metadata if available
@@ -202,6 +208,9 @@ class CategorizeImagesCLIP(BasicProcessor):
                         data.update({"url": url})
                         # using the filename without extension as the key; since that is how the results form their filename
                         image_metadata[".".join(data['filename'].split(".")[:-1])] = data
+        else:
+            self.dataset.log("No image metadata found")
+
 
         self.dataset.update_status("Processing BLIP2 results...")
         # Download the result files
@@ -237,12 +246,12 @@ class CategorizeImagesCLIP(BasicProcessor):
         :param item:
         :return:
         """
-        image_metadata = item.get("image_metadata")
+        image_metadata = item.get("image_metadata", {})
         return MappedItem({
             "id": item.get("id"),
             "text": item.get("text"),
-            # "original_url": image_metadata.get("url", ""), # TODO: does not appear all image datasets are using URL properly...
-            "image_filename": image_metadata.get("filename", ""),
+            "image_filename": image_metadata.get("filename", "") if image_metadata else item.get("id"), # fallback to id which is filename
+            "original_url": image_metadata.get("url", "N/A"),
             "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
         })

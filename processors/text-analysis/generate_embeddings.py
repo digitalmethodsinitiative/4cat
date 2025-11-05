@@ -7,7 +7,6 @@ import json
 
 from gensim.models import Word2Vec, FastText
 from gensim.models.phrases import Phrases, Phraser
-from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
@@ -42,74 +41,86 @@ class GenerateWordEmbeddings(BasicProcessor):
 		"FastText: [Bojanowski, P., Grave, E., Joulin, A., & Mikolov, T. (2017). Enriching word vectors with subword information. *Transactions of the Association for Computational Linguistics*, 5, 135-146.](https://www.mitpressjournals.org/doi/abs/10.1162/tacl_a_00051)"
 	]
 
-	options = {
-		"model-type": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "Word2Vec",
-			"options": {
-				"Word2Vec": "Word2Vec",
-				"FastText": "FastText"
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"model-type": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "Word2Vec",
+				"options": {
+					"Word2Vec": "Word2Vec",
+					"FastText": "FastText"
+				},
+				"help": "Model type"
 			},
-			"help": "Model type"
-		},
-		"algorithm": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "cbow",
-			"options": {
-				"cbow": "Continuous Bag of Words (CBOW)",
-				"skipgram": "Skip-gram"
+			"algorithm": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "cbow",
+				"options": {
+					"cbow": "Continuous Bag of Words (CBOW)",
+					"skipgram": "Skip-gram"
+				},
+				"help": "Training algorithm",
+				"tooltip": "See processor references for a more detailed explanation."
 			},
-			"help": "Training algorithm",
-			"tooltip": "See processor references for a more detailed explanation."
-		},
-		"window": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "5",
-			"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
-			"help": "Window",
-			"tooltip": "This sets the length of word sequences taken as the context. For instance, " \
-					   "a window of 3 with the sentence \"the quick brown fox\" will \"slide\" over \"the quick brown\" " \
-					   "and \"quick brown fox\"."
-		},
-		"dimensionality": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 100,
-			"min": 50,
-			"max": 1000,
-			"help": "Dimensionality of the vectors"
-		},
-		"min_count": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 5,
-			"help": "Minimum word occurrence",
-			"tooltip": "How often a word should occur in the corpus to be included"
-		},
-		"max_words": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"min": 0,
-			"help": "Retain top n words",
-			"tooltip": "'0' retains all words, other values will discard less frequent words"
-		},
-		"negative": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Use negative sampling"
-		},
-		"detect-bigrams": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Detect bigrams",
-			"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
+			"window": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "5",
+				"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
+				"help": "Window",
+				"tooltip": "This sets the length of word sequences taken as the context. For instance, " \
+						"a window of 3 with the sentence \"the quick brown fox\" will \"slide\" over \"the quick brown\" " \
+						"and \"quick brown fox\"."
+			},
+			"dimensionality": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 100,
+				"min": 50,
+				"max": 1000,
+				"help": "Dimensionality of the vectors"
+			},
+			"min_count": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 5,
+				"help": "Minimum word occurrence",
+				"tooltip": "How often a word should occur in the corpus to be included"
+			},
+			"max_words": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"min": 0,
+				"help": "Retain top n words",
+				"tooltip": "'0' retains all words, other values will discard less frequent words"
+			},
+			"negative": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Use negative sampling"
+			},
+			"detect-bigrams": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Detect bigrams",
+				"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
+			}
 		}
-	}
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on token sets
 
 		:param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return module.type == "tokenise-posts"
 

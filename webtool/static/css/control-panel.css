@@ -44,6 +44,11 @@ table.cp-table td {
 table.cp-table .actions {
     width: 12em;
     vertical-align: middle;
+    text-align: center;
+}
+
+.extensions-table tr.disabled {
+    color: var(--gray-dark);
 }
 
 table td[colspan] {
@@ -89,14 +94,14 @@ table td[colspan] {
     max-width: 25em;
 }
 
-.settings .datasource-toggle-form table {
+.settings .broad-toggle-form table {
     position: relative;
     left: -15em;
     background: var(--always-white);
     width: calc(100% + 12em);
 }
 
-.settings .datasource-toggle-form input[type=text] {
+.settings .broad-toggle-form input[type=text] {
     width: 5em;
 }
 
@@ -258,6 +263,10 @@ article .stats-container h3:not(.blocktitle) {
 
 .stats-container .property-badge {
     margin-right: 0.5em;
+}
+
+.log-display.wrapped-log {
+    white-space: pre-line;
 }
 
 /**

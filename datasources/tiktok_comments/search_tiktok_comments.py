@@ -4,8 +4,7 @@ Import scraped TikTok comment data
 It's prohibitively difficult to scrape data from TikTok within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
-from datetime import datetime, timezone
-from urllib.parse import urlparse, parse_qs
+from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
@@ -20,7 +19,7 @@ class SearchTikTokComments(Search):
     title = "Import scraped Tiktok comment data"  # title displayed in UI
     description = "Import Tiktok comment data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -58,7 +57,7 @@ class SearchTikTokComments(Search):
             "post_url": item["share_info"]["url"].split(".html")[0],
             "post_body": item["share_info"]["title"],
             "comment_url": item["share_info"]["url"],
-            "is_liked_by_post_author": "yes" if bool(item["author_pin"]) else "no",
+            "is_liked_by_post_author": "yes" if bool(item.get("author_pin")) else "no",
             "is_sticky": "yes" if bool(item["stick_position"]) else "no",
             "is_comment_on_comment": "no" if bool(item["reply_id"] == "0") else "yes",
             "language_guess": item["comment_language"]

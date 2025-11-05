@@ -22,31 +22,43 @@ class TwitterHashtagStats(TwitterStatsBase):
 
     sorted = 'Number of Tweets from Source'
 
-    options = {
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
-        },
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
 
-        # Padding would require padding for all authors/users to make any sense! That's a bit more complex that existing code allows
-        # Disabling for now
-        # "pad": {
-        #     "type": UserInput.OPTION_TOGGLE,
-        #     "default": True,
-        #     "help": "Include dates where the count is zero",
-        #     "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
-        # }
-    }
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
+                            "hour": "Hour", "minute": "Minute"},
+                "help": "Produce counts per"
+            },
+
+            # Padding would require padding for all authors/users to make any sense! That's a bit more complex that existing code allows
+            # Disabling for now
+            # "pad": {
+            #     "type": UserInput.OPTION_TOGGLE,
+            #     "default": True,
+            #     "help": "Include dates where the count is zero",
+            #     "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
+            # }
+        }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type in ["twitterv2-search", "dmi-tcat-search"]
 

@@ -1,57 +1,76 @@
-<!DOCTYPE html>
-<head>
-	<title>4CAT Explorer &bull; {% if parameters and parameters.get("label") %}{{ parameters.get("label") }}{% elif key %}{{ key }}{% elif thread %}{{ thread }}{% endif %}</title>
+{% extends "layout.html" %}
 
-	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer.css')}}">
+{% block title %}Explorer: {{ dataset.get_label() }} • 4CAT{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "explorer" %}{% endblock %}
+
+{% block body %}
+
+<!-- standard CSS for post annotations -->
+<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer/generic-annotation.css')}}">
+
+<!-- Custom JavaScript for Explorer-specific functions -->
+<script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
+
+
+<!-- Load some variables for which we need Jinja2 -->
+<script type="text/javascript">
+
+// Annotation fields
+var annotation_fields = {{ annotation_fields | tojson | safe }}
+
+// We're getting the dataset column names to make sure that
+// new annotation fields cannot overwrite these.
+var original_columns = {{ dataset.get_columns() | safe }}
+for (a in annotation_fields) {
+	let annotation_label = annotation_fields[a]["label"]
+	if (original_columns.includes(annotation_label)) {
+		i = original_columns.indexOf(annotation_label)
+		original_columns.splice(i, 1)
+	}
+}
+
+</script>
+
+<span id="current-username" style="display: none">{{ current_user.get_name() }}</span>
+
+<!-- Don't show certain data if the dataset is pseudonymised -->
+{% set pseudonymised = True if dataset.parameters and dataset.parameters.get('pseudonymise', False) %}
+
+{% set key = dataset.data.key %}
+
+<!-- Control toolbox, with annotation editor -->
+{% include "explorer/controls.html" %}
+
+<!-- Page numbers -->
+{% include "explorer/pagination.html" %}
+
+<!-- CSS: Use generic or data source-specific template. -->
+<!-- Use a nested class so the style is only applied to posts. -->
+<style type="text/css">
+.explorer-content-container {
+	{{ posts_css | safe }}
+}
+</style>
+
+<!-- Flags for chan posts -->
+{% if datasource == '4chan' %}
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
-	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/fontawesome.css') }}">
-	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/regular.css') }}">
-	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/solid.css') }}">
-	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/brands.css') }}">
+{% endif %}
 
-	<!-- favicon -->
-	<link rel="shortcut icon" href="{{url_for('static', filename='img/favicon/favicon-bw.ico')}}">
-	<meta name="msapplication-TileColor" content="#485ba6">
-	<meta name="msapplication-config" content="static/img/favicon/browserconfig.xml">
-	<meta name="theme-color" content="#ffffff">
-
-	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.6.3.min.js')}}"></script>
-	<script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
-
-	<!-- Possible annotation fields -->
-	<script type="text/javascript">
-	var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}""{% endif %}
-	</script>
-
-	<!-- Include datasource-specific css if it exists -->
-	{% if custom_css %}
-		<style>
-			{{ custom_css | safe }}"
-		</style>
-	{% endif %}
-</head>
-<body data-url-root="{{ url_for("show_frontpage") }}">
-
-<header>
-	{% include "explorer/header.html" %}
-
-	{% if not thread %}
-		{% include "explorer/annotations.html" %}
-	{% endif %}
-</header>
-
-<div class="content">
-	{% include "explorer/nav-pages.html" %}
-	<ol class="posts">
-	{% for post in posts %}
-		{% include "explorer/post.html" %}
-	{% endfor %}
-	</ol>
-	{% include "explorer/nav-pages.html" %}
+<!-- The actual dataset posts -->
+<div class="explorer-content-container">
+	<div class="explorer-content">
+		<ol class="posts" id="explorer-posts">
+		{% for post in posts %}
+			{% set post_index = loop.index - 1 %}
+			{% include "explorer/post.html" %}
+		{% endfor %}
+		</ol>
+	</div>
 </div>
 
-<footer>
-	{% include "explorer/footer.html" %}
-</footer>
 
-</body>
+{% include "explorer/pagination.html" %}
+
+<div id="save-annotations-notice">Annotations saved</div>
+{% endblock %}

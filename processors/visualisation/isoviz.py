@@ -12,7 +12,7 @@ from math import sin, cos, tan, degrees, radians, copysign
 
 from svgwrite.container import SVG
 from svgwrite.shapes import Line
-from svgwrite.path import Path
+from svgwrite.path import Path as SVGPath
 from svgwrite.text import Text
 
 __author__ = "Stijn Peeters"
@@ -35,39 +35,6 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	options = {
-		"smooth": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Smooth curves"
-		},
-		"normalise": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Normalise values to 0-100% for each graph",
-			"tooltip": "This allows for easier trend comparison (but absolute counts cannot be compared anymore)."
-		},
-		"top": {
-			"type": UserInput.OPTION_TEXT,
-			"min": 1,
-			"max": 50,
-			"default": 10,
-			"help": "Cut-off for top list",
-			"tooltip": "Only the most-occuring items are retained. Sorted by total amount of occurences (i.e. all frequencies per item)."
-		},
-		"complete": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"help": "Data completeness required",
-			"tooltip": "At least this % of intervals should be present for an item to be graphed; 0 to disable"
-		},
-		"label": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Graph label (optional)"
-		}
-	}
-
 	# a palette generated with https://medialab.github.io/iwanthue/
 	colours = ["#eb010a", "#495dff", "#f35f00", "#5137e0", "#ffeb45", "#d05edf",
 			   "#00cb3a", "#b200c7", "#d8fd5d", "#a058ff", "#b90fd4", "#6fb300",
@@ -75,11 +42,56 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	colour_index = 0
 
 	@classmethod
-	def is_compatible_with(cls, module=None, user=None):
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"smooth": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Smooth curves"
+			},
+			"normalise": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Normalise values to 0-100% for each graph",
+				"tooltip": "This allows for easier trend comparison (but absolute counts cannot be compared anymore)."
+			},
+			"top": {
+				"type": UserInput.OPTION_TEXT,
+				"min": 1,
+				"max": 50,
+				"default": 10,
+				"help": "Cut-off for top list",
+				"tooltip": "Only the most-occuring items are retained. Sorted by total amount of occurences (i.e. all frequencies per item)."
+			},
+			"complete": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"help": "Data completeness required",
+				"tooltip": "At least this % of intervals should be present for an item to be graphed; 0 to disable"
+			},
+			"label": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "",
+				"help": "Graph label (optional)"
+			}
+		}
+
+	@classmethod
+	def is_compatible_with(cls, module=None, config=None):
 		"""
 		Allow processor on rankable items
 
 		:param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		if module.is_dataset():
 			return module.is_rankable(multiple_items=False)
@@ -112,6 +124,10 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 			# make sure the months and days are zero-padded
 			interval = row.get("date", "")
+			if interval == "unknown_date":
+				# this is a special case we cannot graph, so we can skip it
+				continue
+			
 			interval = "-".join([str(bit).zfill(2 if len(bit) != 4 else 4) for bit in interval.split("-")])
 			first_date = min(first_date, interval)
 			last_date = max(last_date, interval)
@@ -167,7 +183,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 				max_limit = max(max_limit, abs(graphs[graph][interval]))
 
 		# order graphs by highest (or lowest) value)
-		limits = {limit: limits[limit] for limit in sorted(limits, key=lambda l: limits[l])}
+		limits = {limit: limits[limit] for limit in sorted(limits, key=lambda i: limits[i])}
 		graphs = {graph: graphs[graph] for graph in limits}
 
 		if not graphs:
@@ -311,7 +327,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			self.dataset.update_status("Rendering graph for '%s'" % graph)
 
 			# path starting at lower left corner of graph
-			area_graph = Path(fill=self.colours[self.colour_index])
+			area_graph = SVGPath(fill=self.colours[self.colour_index])
 			area_graph.push("M %f %f" % (graph_start_x, graph_start_y))
 			previous_value = None
 

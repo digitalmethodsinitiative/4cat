@@ -2,11 +2,9 @@
 Filter posts by lexicon
 """
 import re
-from pathlib import Path
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
-from common.config_manager import config
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -29,48 +27,58 @@ class LexicalFilter(BaseFilter):
         "[Regex101](https://regex101.com/)"
     ]
 
-    # the following determines the options available to the user via the 4CAT
-    # interface.
-    options = {
-        "lexicon": {
-            "type": UserInput.OPTION_MULTI,
-            "default": [],
-            "options": {
-                "hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
-                "hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "lexicon": {
+                "type": UserInput.OPTION_MULTI,
+                "default": [],
+                "options": {
+                    "hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
+                    "hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
+                },
+                "help": "Filter items containing words in these lexicons. Note that they may be outdated."
             },
-            "help": "Filter items containing words in these lexicons. Note that they may be outdated."
-        },
-        "lexicon-custom": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Custom word list (separate with commas)"
-        },
-        "as_regex": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Interpret custom word list as a regular expression",
-            "tooltip": "Regular expressions are parsed with Python"
-        },
-        "exclude": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Should not include the above word(s)",
-            "tooltip": "Only posts that do not match the above words are retained"
-        },
-        "case-sensitive": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Case sensitive"
+            "lexicon-custom": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Custom word list (separate with commas)"
+            },
+            "as_regex": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Interpret custom word list as a regular expression",
+                "tooltip": "Regular expressions are parsed with Python"
+            },
+            "exclude": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Should not include the above word(s)",
+                "tooltip": "Only posts that do not match the above words are retained"
+            },
+            "case-sensitive": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Case sensitive"
+            }
         }
-    }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on NDJSON and CSV files
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
@@ -88,7 +96,7 @@ class LexicalFilter(BaseFilter):
         # load lexicons from word lists
         lexicons = {}
         for lexicon_id in self.parameters.get("lexicon", []):
-            lexicon_file = config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{lexicon_id}.txt")
+            lexicon_file = self.config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{lexicon_id}.txt")
             if not lexicon_file.exists():
                 continue
 

@@ -38,21 +38,32 @@ class VideoTimelines(BasicProcessor):
                   "collage of sequential frames). Timelines are then vertically stacked."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
-    options = {
-        "height": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Timeline height",
-            "tooltip": "In pixels. Each timeline will be this height; frames are resized proportionally to fit it. "
-                       "Must be between 25 and 200.",
-            "coerce_type": int,
-            "default": 100,
-            "min": 25,
-            "max": 200
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "height": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Timeline height",
+                "tooltip": "In pixels. Each timeline will be this height; frames are resized proportionally to fit it. "
+                        "Must be between 25 and 200.",
+                "coerce_type": int,
+                "default": 100,
+                "min": 25,
+                "max": 200
+            }
         }
-    }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
@@ -61,6 +72,7 @@ class VideoTimelines(BasicProcessor):
         archive. Each folder will be rendered as a separate timeline.
 
         :param str module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         return module.type in ["video-frames", "video-scene-frames"]
@@ -117,6 +129,9 @@ class VideoTimelines(BasicProcessor):
                 if previous_video is not None or not looping:
                     # draw the video filename/label on top of the rendered
                     # frame thumbnails
+                    if not previous_video:
+                        # This likely means no frames were found for the video and this processor should not have run
+                        continue
                     video_label = labels.get(previous_video, previous_video)
                     footersize = (fontsize * (len(video_label) + 2) * 0.5925, fontsize * 2)
                     footer_shape = SVG(insert=(0, base_height - footersize[1]), size=footersize)
@@ -165,6 +180,10 @@ class VideoTimelines(BasicProcessor):
                 timeline.add(frame_element)
                 timeline_widths[video] += frame_width
 
+        if not timeline_widths:
+            self.dataset.finish_with_error("No video frames found")
+            return
+
         # now we know all dimensions we can instantiate the canvas too
         canvas_width = max(timeline_widths.values())
         fontsize = 12
@@ -207,16 +226,16 @@ class VideoTimelines(BasicProcessor):
                     labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():
-            dataset = DataSet(key=dataset, db=self.db).nearest("*-search")
+            dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest("*-search")
 
             # determine appropriate label
             # is this the right place? should it be in the datasource?
             if dataset.type == "tiktok-search":
-                mapper = lambda item: item.get("tiktok_url")
+                mapper = lambda item: item.get("tiktok_url")  # noqa: E731
             elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
-                mapper = lambda item: item.get("youtube_url")
+                mapper = lambda item: item.get("youtube_url")  # noqa: E731
             else:
-                mapper = lambda item: item.get("id")
+                mapper = lambda item: item.get("id")  # noqa: E731
 
             for item in dataset.iterate_items(self):
                 for filename in urls:

@@ -26,14 +26,14 @@
             <p>The <span class="property-badge">admin</span> tag is always the first in the list, and the global
                 configuration always has the least priority.</p>
 
-            <ol id="tag-order" data-url="{{ url_for("manipulate_tags") }}">
+            <ol id="tag-order" data-url="{{ url_for("admin.manipulate_tags") }}">
                 <li data-tag="admin" class="default-tag">
                     <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
                     <div class="tag-container">
                         <span class="tag tag-itself">admin</span>
                         <span></span>
-                        <a class="button-like" href="{{ url_for("manipulate_settings") }}?tag=admin">Settings</a>
-                        <a class="button-like" href="{{ url_for("list_users") }}?tag=admin">{{ "{:,}".format(num_admins) }} admin{% if num_admins != 1 %}s{% endif %}</a>
+                        <a class="button-like" href="{{ url_for("admin.manipulate_settings") }}?tag=admin">Settings</a>
+                        <a class="button-like" href="{{ url_for("admin.list_users") }}?tag=admin">{{ "{:,}".format(num_admins) }} admin{% if num_admins != 1 %}s{% endif %}</a>
                     </div>
                 </li>
                 {% for tag in tags %}{% if tag.tag != "admin" %}
@@ -42,9 +42,9 @@
                     {% if tag.tag %}
                         <div class="tag-container">
                             <span class="tag-itself">{{ tag.tag }}</span>
-                            <a class="button-like confirm-first remove-tag" data-confirm-action="delete this tag from all users" href="{{ url_for("remove_tag") }}?redirect&amp;tag={{ tag.tag|urlencode }}"><i class="fa fa-fw fa-times" aria-hidden="true"></i><span class="sr-only"> Remove tag from all users</span></a>
-                            <a class="button-like" href="{{ url_for("manipulate_settings") }}?tag={{ tag.tag|urlencode }}">Settings</a>
-                            <a class="button-like" href="{{ url_for("list_users") }}?tag={{ tag.tag|urlencode }}">{{ "{:,}".format(tag.users) }} user{% if tag.users != 1 %}s{% endif %}</a>
+                            <a class="button-like confirm-first remove-tag" data-confirm-action="delete this tag from all users" href="{{ url_for("toolapi.remove_tag") }}?redirect&amp;tag={{ tag.tag|urlencode }}"><i class="fa fa-fw fa-times" aria-hidden="true"></i><span class="sr-only"> Remove tag from all users</span></a>
+                            <a class="button-like" href="{{ url_for("admin.manipulate_settings") }}?tag={{ tag.tag|urlencode }}">Settings</a>
+                            <a class="button-like" href="{{ url_for("admin.list_users") }}?tag={{ tag.tag|urlencode }}">{{ "{:,}".format(tag.users) }} user{% if tag.users != 1 %}s{% endif %}</a>
                         </div>
                     {% endif %}
                 </li>
@@ -53,7 +53,7 @@
                     <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
                     <div class="tag-container global-tag">
                         <span class="tag-itself">(global)</span>
-                        <a class="button-like" href="{{ url_for("manipulate_settings") }}">Global settings</a>
+                        <a class="button-like" href="{{ url_for("admin.manipulate_settings") }}">Global settings</a>
                     </div>
                 </li>
             </ol>

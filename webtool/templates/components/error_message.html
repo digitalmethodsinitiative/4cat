@@ -1,5 +1,18 @@
+<section>
+    <h2><span>{% if title %}{{ title }}{% else %}Notice{% endif %}</span></h2>
+    {% for notice in flashes %}
+        <p class="form-notice">{{ notice|safe }}</p>
+    {% endfor %}
 
-    <section>
-        <h2><span>{% if title %}{{ title }}{% else %}Notice{% endif %}</span></h2>
-        <p>{{ message|markdown|safe }}</p>
-    </section>
+    <p>{{ message|markdown|safe }}</p>
+
+    {% if redirect %}
+        <form action="{{ redirect }}" method="GET">
+            <div class="submit-container">
+                <button>
+                    Continue
+                </button>
+            </div>
+        </form>
+    {% endif %}
+</section>

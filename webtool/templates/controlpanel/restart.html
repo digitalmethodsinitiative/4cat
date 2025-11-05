@@ -38,13 +38,25 @@
                     No upgrades are currently available.
                 {% endif %}</p>
 
-            <form action="{{ url_for("trigger_restart") }}" method="POST">
+            {% if version_notes %}
+                <p>The following notifications may be relevant:</p>
+                <ul class="patch-notes">
+                {% for notification in version_notes %}
+                    <li>
+                        {{ notification.notification }}
+                        {% if notification.notification_long %}(<a href="{{ url_for("user.view_notification", notification_id=notification.id) }}">read more</a>){% endif %}
+                    </li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+
+            <form action="{{ url_for("restart.trigger_restart") }}" method="POST">
             <ul class="button-container">
                 <li><button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>
                     <i class="fa fa-power-off" aria-hidden="true"></i> Restart back-end & front-end
                 </button></li>
 
-                <li><button name="action" value="restart-frontend"{% if in_progress %} disabled="disabled"{% endif %} data-url="{{ url_for("trigger_restart_frontend") }}">
+                <li><button name="action" value="restart-frontend"{% if in_progress %} disabled="disabled"{% endif %} data-url="{{ url_for("restart.trigger_restart_frontend") }}">
                     <i class="fa fa-power-off" aria-hidden="true"></i> Restart front-end only
                 </button></li>
 
@@ -57,7 +69,7 @@
             </form>
         {% if __user_config("privileges.can_upgrade_to_dev") %}
             <hr>
-        <form action="{{ url_for("trigger_restart") }}" method="POST">
+        <form action="{{ url_for("restart.trigger_restart") }}" method="POST">
             <p>You can also upgrade to a development branch of the <a href="{{ __user_config("4cat.github_url") }}">
                 configured GitHub repository</a>. This way you can for example use new or experimental features
                 before they are officially released.</p>
@@ -81,7 +93,7 @@
             <h2><span>Process log</span></h2>
             <p>Below is the contents of <code>restart.log</code>. Check the timestamp at the top as this may also show
                 the log of a previous restart/upgrade attempt.</p>
-            <pre id="upgrade-log" class="content-container" data-source="{{ url_for("restart_log") }}" data-interval="3">
+            <pre id="upgrade-log" class="content-container" data-source="{{ url_for("restart.restart_log") }}" data-interval="3">
                 Process output will be logged here.
             </pre>
         </section>

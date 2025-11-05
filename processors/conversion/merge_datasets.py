@@ -29,38 +29,18 @@ class DatasetMerger(BasicProcessor):
     description = "Merge this dataset with other datasets of the same format. A new dataset is " \
                   "created containing a combination of items from the original datasets."  # description displayed in UI
 
-    options = {
-        "source": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Source dataset URLs",
-            "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
-                       "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "
-                       "commas."
-        },
-        "merge": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Merge strategy",
-            "options": {
-                "remove": "Remove duplicates",
-                "keep": "Keep duplicates"
-            },
-            "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their ID "
-                       "is identical, regardless of the value of other properties",
-            "default": "remove"
-        }
-    }
-
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on any top-level CSV or NDJSON file
 
         :param module: Module to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
 
     @staticmethod
-    def get_dataset_from_url(url, db):
+    def get_dataset_from_url(url, db, modules=None):
         """
         Get dataset object based on dataset URL
 
@@ -68,6 +48,7 @@ class DatasetMerger(BasicProcessor):
 
         :param str url:  Dataset URL
         :param db:  Database handler (to retrieve metadata)
+        :param modules:  Modules handler (pass through to DataSet)
         :return DataSet:  The dataset
         """
         if not url:
@@ -75,7 +56,50 @@ class DatasetMerger(BasicProcessor):
 
         source_url = ural.normalize_url(url)
         source_key = source_url.split("/")[-1]
-        return DataSet(key=source_key, db=db)
+        return DataSet(key=source_key, db=db, modules=modules)
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
+
+        Sets the default merged dataset name to a name based on the primary
+        dataset's current name.
+
+        :param DataSet parent_dataset:  Parent dataset
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Processor options
+        """
+        options = {
+            "source": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Source dataset URLs",
+                "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
+                        "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "
+                        "commas."
+            },
+            "merge": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Merge strategy",
+                "options": {
+                    "remove": "Remove duplicates",
+                    "keep": "Keep duplicates"
+                },
+                "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their "
+                        "`id` field is identical, regardless of the value of other properties.",
+                "default": "remove"
+            },
+            "label": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Dataset name",
+                "tooltip": "Name of the merged dataset. If left empty, a name will be generated."
+            }
+        }
+
+        if parent_dataset and isinstance(parent_dataset, DataSet):
+            options["label"]["default"] = f"(Merged) {parent_dataset.get_label()}"
+
+        return options
 
     def process(self):
         """
@@ -96,7 +120,7 @@ class DatasetMerger(BasicProcessor):
                 continue
 
             try:
-                source_dataset = self.get_dataset_from_url(source_dataset_url, self.db)
+                source_dataset = self.get_dataset_from_url(source_dataset_url, self.db, modules=self.modules)
             except DataSetException:
                 return self.dataset.finish_with_error(f"Dataset URL '{source_dataset_url} not found - cannot perform "
                                                       f"merge.")
@@ -124,7 +148,7 @@ class DatasetMerger(BasicProcessor):
                 source_datasets.append(source_dataset)
 
         if len(source_datasets) <= 1:
-            return self.dataset.finish_with_error(f"You need to provide at least one valid URL for a source dataset.")
+            return self.dataset.finish_with_error("You need to provide at least one valid URL for a source dataset.")
 
         # clean up parameters
         self.dataset.parameters = {**self.dataset.parameters, "source": ", ".join([d.key for d in source_datasets])}
@@ -256,6 +280,11 @@ class DatasetMerger(BasicProcessor):
         # merged dataset has the same type as the original
         if self.source_dataset.parameters.get("datasource"):
             standalone.change_datasource(self.source_dataset.parameters["datasource"])
+
+        if self.parameters.get("label"):
+            standalone.update_label(self.parameters.get("label"))
+        else:
+            standalone.update_label(f"(Merged) {self.source_dataset.get_label()}")
 
         standalone.parameters = {**self.dataset.parameters, "board": "merged"}
         standalone.type = self.source_dataset.type

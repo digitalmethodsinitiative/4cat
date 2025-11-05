@@ -3,7 +3,7 @@ Twitter APIv2 aggregated user statistics
 """
 import datetime
 import numpy as np
-from scipy import stats
+import statistics
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
@@ -27,43 +27,71 @@ class TwitterAggregatedStats(BasicProcessor):
 
     num_of_different_categories = None
 
-    options = {
-        "category": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "user",
-            "options": {
-                        "user": "Tweet Author",
-                        "type": "Tweet type (tweet, quote, retweet, reply)",
-                        "source": "Source of Tweet",
-                        "place": "Place Name (if known)",
-                        "language": "Language (Twitter's guess)",
-                        },
-            "help": "Group by"
-        },
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
-        },
-        "pad": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Include dates where the count is zero",
-            "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
-        }
-    }
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
 
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "category": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "user",
+                "options": {
+                            "user": "Tweet Author",
+                            "type": "Tweet type (tweet, quote, retweet, reply)",
+                            "source": "Source of Tweet",
+                            "place": "Place Name (if known)",
+                            "language": "Language (Twitter's guess)",
+                            },
+                "help": "Group by"
+            },
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
+                            "hour": "Hour", "minute": "Minute"},
+                "help": "Produce counts per"
+            },
+            "pad": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Include dates where the count is zero",
+                "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
+            }
+        }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine if processor is compatible with dataset
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
         return module.type in ["twitterv2-search", "dmi-tcat-search"]
+
+    def trim_mean(self, values, cut_pct):
+        """
+        Return mean of array after trimming a specified fraction of extreme values
+
+        Removes the specified proportion of elements from each end of the sorted
+        array, then computes the mean of the remaining elements.
+        
+        :param values:  Values to calculate mean of
+        :param float cut_pct:  Percentage to cut (0.0-1.0)
+        :return float:  Mean value
+        """
+        cuttable = int(len(values) * cut_pct)
+        if cuttable:
+            values = values[cuttable:-cuttable]
+
+        return statistics.mean(values)
 
     def process(self):
         """
@@ -104,7 +132,7 @@ class TwitterAggregatedStats(BasicProcessor):
                 row['Q1'] = np.percentile(values, 25)
                 row['Q2'] = np.median(values)
                 row['Q3'] = np.percentile(values, 75)
-                row['25%_trimmed_mean'] = stats.trim_mean(values, 0.25)
+                row['25%_trimmed_mean'] = self.trim_mean(values, 0.25)
 
                 rows.append({**{"date": interval, 'category': header_category, "data_type": data_type}, **row})
 
@@ -242,8 +270,8 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
     ]
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
-        options = cls.options.copy()
+    def get_options(cls, parent_dataset=None, config=None):
+        options = TwitterAggregatedStats.get_options(parent_dataset=parent_dataset, config=config)
 
         options["show_outliers"] = {
             "type": UserInput.OPTION_TOGGLE,

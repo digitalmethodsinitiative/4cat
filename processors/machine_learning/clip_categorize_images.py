@@ -6,10 +6,9 @@ import json
 
 
 from backend.lib.processor import BasicProcessor
-from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
+from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, DsmConnectionError
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from common.config_manager import config
 from common.lib.item_mapping import MappedItem
 
 __author__ = "Dale Wahl"
@@ -57,18 +56,19 @@ class CategorizeImagesCLIP(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow on image archives if enabled in Control Panel
         """
-        return config.get("dmi-service-manager.cc_clip_enabled", False, user=user) and \
-               config.get("dmi-service-manager.ab_server_address", False, user=user) and \
+        return config.get("dmi-service-manager.cc_clip_enabled", False) and \
+               config.get("dmi-service-manager.ab_server_address", False) and \
                (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Collect maximum number of files from configuration and update options accordingly
+        :param config:
         """
         options = {
             "amount": {
@@ -78,7 +78,7 @@ class CategorizeImagesCLIP(BasicProcessor):
             # TODO: Could limit model availability in conjunction with "amount"
             "model": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": f"[CLIP model](https://arxiv.org/pdf/2103.00020.pdf#page=40&zoom=auto,-457,754)",
+                "help": "[CLIP model](https://arxiv.org/pdf/2103.00020.pdf#page=40&zoom=auto,-457,754)",
                 "default": "ViT-B/32",
                 "tooltip": "More powerful models increase quality at expense of greatly increasing the amount of time to process. Recommend testing small amounts of images first.",
                 "options": {
@@ -101,7 +101,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_images = int(config.get("dmi-service-manager.cd_clip_num_files", 100, user=user))
+        max_number_images = int(config.get("dmi-service-manager.cd_clip_num_files", 100))
         if max_number_images == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of images"
             options["amount"]["default"] = 100
@@ -137,7 +137,18 @@ class CategorizeImagesCLIP(BasicProcessor):
         staging_area = self.unpack_archive_contents(self.source_file)
 
         # Collect filenames (skip .json metadata files)
-        image_filenames = [filename for filename in os.listdir(staging_area) if filename.split('.')[-1] not in ["json", "log"]]
+        image_filenames = []
+        skipped_images = 0
+        for filename in os.listdir(staging_area):
+            if filename.split('.')[-1] in ["json", "log"]:
+                continue
+            if filename.split('.')[-1] in ["svg"]:
+                skipped_images += 1
+                self.dataset.log(f"Skipping {filename} (SVG files cannot be processed currently)")
+                # Issues is with PIL; we could convert to PNG in future
+                continue
+            image_filenames.append(filename)
+
         if self.parameters.get("amount", 100) != 0:
             image_filenames = image_filenames[:self.parameters.get("amount", 100)]
         total_image_files = len(image_filenames)
@@ -184,7 +195,7 @@ class CategorizeImagesCLIP(BasicProcessor):
         data["args"].extend([f"data/{path_to_files.joinpath(dmi_service_manager.sanitize_filenames(filename))}" for filename in image_filenames])
 
         # Send request to DMI Service Manager
-        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
+        self.dataset.update_status("Requesting service from DMI Service Manager...")
         api_endpoint = "clip"
         try:
             dmi_service_manager.send_request_and_wait_for_results(api_endpoint, data, wait_period=30)
@@ -192,8 +203,15 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error(
                 "DMI Service Manager ran out of memory; Try decreasing the number of images or try again or try again later.")
             return
+        except DsmConnectionError as e:
+            self.dataset.log(str(e))
+            self.log.warning(f"DMI Service Manager connection error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error("DMI Service Manager connection error; please contact 4CAT admins.")
+            return
         except DmiServiceManagerException as e:
-            self.dataset.finish_with_error(str(e))
+            self.dataset.log(str(e))
+            self.log.warning(f"CLIP Error ({self.dataset.key}): {e}")
+            self.dataset.finish_with_error("Error with CLIP model; please contact 4CAT admins.")
             return
 
         # Load the video metadata if available
@@ -227,6 +245,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                     image_name = ".".join(result_filename.split(".")[:-1])
                     data = {
                         "id": image_name,
+                        "filename": result_data.get("filename"),
                         "categories": result_data,
                         "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
                     }
@@ -234,7 +253,7 @@ class CategorizeImagesCLIP(BasicProcessor):
 
                     processed += 1
 
-        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images")
+        self.dataset.update_status(f"Detected speech in {processed} of {total_image_files} images{'' if skipped_images == 0 else f' (skipped {skipped_images} SVG files)'}", is_final=True)
         self.dataset.finish(processed)
 
     @staticmethod
@@ -243,13 +262,18 @@ class CategorizeImagesCLIP(BasicProcessor):
         :param item:
         :return:
         """
-        image_metadata = item.get("image_metadata")
+        image_metadata = item.get("image_metadata", {})
         # Updates to CLIP output; categories used to be a list of categories, but now is a dict with: {"predictions": [[category_label, precent_float],]}
         categories = item.get("categories")
-        if type(categories) == list:
+        error = None
+        if type(categories) is list:
             pass
-        elif type(categories) == dict and "predictions" in categories:
-            categories = categories.get("predictions")
+        elif type(categories) is dict:
+            error = categories.get("error", "N/A")
+            if "predictions" in categories:
+                categories = categories.get("predictions")
+            else:
+                categories = []
         else:
             raise KeyError("Unexpected categories format; check NDJSON")
 
@@ -263,11 +287,12 @@ class CategorizeImagesCLIP(BasicProcessor):
         all_cats = {cat[0]: cat[1] for cat in categories}
         return MappedItem({
             "id": item.get("id"),
+            "image_filename": item.get("filename"),
             "top_categories": ", ".join([f"{cat[0]}: {100* cat[1]:.2f}%" for cat in top_cats]),
-            "original_url": image_metadata.get("url", ""),
-            "image_filename": image_metadata.get("filename", ""),
+            "original_url": image_metadata.get("url", "N/A"),
             "post_ids": ", ".join([str(post_id) for post_id in image_metadata.get("post_ids", [])]),
             "from_dataset": image_metadata.get("from_dataset", ""),
+            "error": error,
             **all_cats
         })
 

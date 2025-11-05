@@ -2,7 +2,6 @@
 VK keyword search
 """
 import datetime
-from pathlib import Path
 
 import vk_api
 
@@ -10,7 +9,6 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
-from common.config_manager import config
 
 
 class SearchVK(Search):
@@ -30,16 +28,16 @@ class SearchVK(Search):
         "[VK API documentation](https://vk.com/dev/first_guide)",
         "[Python API wrapper](https://github.com/python273/vk_api)"
     ]
-
+    
     expanded_profile_fields = "id,screen_name,first_name,last_name,name,deactivated,is_closed,is_admin,sex,city,country,photo_200,photo_100,photo_50,followers_count,members_count"  # https://vk.com/dev/objects/user & https://vk.com/dev/objects/group
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get VK data source options
 
+        :param config:
         :param parent_dataset:  Should always be None
-        :param user:  User to provide options for
         :return dict:  Data source options
         """
 
@@ -47,7 +45,7 @@ class SearchVK(Search):
                       "[wrapper](https://github.com/python273/vk_api) to request information from VK using your "
                       "username and password.")
 
-        options = {
+        return {
             "intro-1": {
                 "type": UserInput.OPTION_INFO,
                 "help": intro_text
@@ -111,8 +109,6 @@ class SearchVK(Search):
             },
         }
 
-        return options
-
     def get_items(self, query):
         """
         Use the VK API
@@ -126,7 +122,7 @@ class SearchVK(Search):
                 is_final=True)
             return []
 
-        self.dataset.update_status(f"Logging in to VK")
+        self.dataset.update_status("Logging in to VK")
         try:
             vk_session = self.login(self.parameters.get("username"), self.parameters.get("password"))
         except vk_api.exceptions.AuthError as e:
@@ -152,7 +148,7 @@ class SearchVK(Search):
 
             # Collect Newsfeed results
             num_results = 0
-            self.dataset.update_status(f"Submitting query...")
+            self.dataset.update_status("Submitting query...")
             for i, result_batch in enumerate(self.search_newsfeed(vk_helper, **query_parameters)):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while fetching newsfeed data from the VK API")
@@ -177,7 +173,7 @@ class SearchVK(Search):
         """
         vk_session = vk_api.VkApi(username,
                                   password,
-                                  config_filename=Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_SESSIONS"), username+"-vk_config.json"))
+                                  config_filename=self.config.get("PATH_SESSIONS").joinpath(username+"-vk_config.json"))
         vk_session.auth()
 
         return vk_session
@@ -328,7 +324,7 @@ class SearchVK(Search):
         return author_types
 
     @staticmethod
-    def validate_query(query, request, user):
+    def validate_query(query, request, config):
         """
         Validate input for a dataset query on the VK data source.
 
@@ -337,7 +333,7 @@ class SearchVK(Search):
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
         # Please provide something...

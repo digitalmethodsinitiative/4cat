@@ -2,7 +2,6 @@ import socket
 import time
 import json
 
-from common.config_manager import config
 from backend.lib.worker import BasicWorker
 
 
@@ -13,10 +12,20 @@ class InternalAPI(BasicWorker):
 	type = "api"
 	max_workers = 1
 
-	ensure_job = {"remote_id": "localhost"}
+	host = None
+	port = None
 
-	host = config.get('API_HOST')
-	port = config.get('API_PORT')
+	@classmethod
+	def ensure_job(cls, config=None):
+		"""
+		Ensure that the API worker is always running
+
+		This is used to ensure that the API worker is always running, and if it
+		is not, it will be started by the WorkerManager.
+
+		:return:  Job parameters for the worker
+		"""
+		return {"remote_id": "localhost"}
 
 	def work(self):
 		"""
@@ -27,6 +36,9 @@ class InternalAPI(BasicWorker):
 
 		:return:
 		"""
+		self.host = self.config.get('API_HOST')
+		self.port = self.config.get('API_PORT')
+
 		if self.port == 0:
 			# if configured not to listen, just loop until the backend shuts
 			# down we can't return here immediately, since this is a worker,
@@ -68,7 +80,7 @@ class InternalAPI(BasicWorker):
 		while not self.interrupted:
 			try:
 				client, address = server.accept()
-			except (socket.timeout, TimeoutError) as e:
+			except (socket.timeout, TimeoutError):
 				if self.interrupted:
 					break
 				# no problemo, just listen again - this only times out so it won't hang the entire app when
@@ -109,7 +121,7 @@ class InternalAPI(BasicWorker):
 
 				# start processing as soon as we have valid json
 				try:
-					test = json.loads(buffer)
+					json.loads(buffer)
 					break
 				except json.JSONDecodeError:
 					pass

@@ -8,12 +8,10 @@ assumes that ffprobe is also present in the same location.
 """
 import shutil
 import subprocess
-import shlex
-import re
+import oslex
 
 from packaging import version
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -39,53 +37,75 @@ class VideoStack(BasicProcessor):
                   "videos. Videos are stacked by length, i.e. the longest video is at the 'bottom' of the stack."  # description displayed in UI
     extension = "mp4"  # extension of result file, used internally and in UI
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": f"Number of videos to stack.",
-            "default": 10,
-            "max": 50,
-            "min": 2,
-        },
-        "transparency": {
-            "type": UserInput.OPTION_TEXT,
-            "coerce_tye": float,
-            "default": 0.15,
-            "min": 0,
-            "max": 1,
-            "help": "Layer transparency",
-            "tooltip": "Transparency of each layer in the stack, between 0 (opaque) and 1 (fully transparent). "
-                       "As a rule of thumb, for 10 videos use 90% opacity (0.10), for 20 use 80% (0.20), and so on."
-        },
-        "eof-action": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "pass": "Remove video from stack once it ends",
-                "repeat": "Keep displaying final frame until end of stack video",
-                "endall": "Stop stack video when first video ends"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Number of videos to stack.",
+                "default": 10,
+                "max": 50,
+                "min": 2,
             },
-            "help": "Length handling",
-            "tooltip": "How to handle videos of different length (i.e. when not all videos in the stack are equally "
-                       "long)",
-            "default": "pass"
-        },
-        "audio": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Audio handling",
-            "options": {
-                "longest": "Use audio from longest video in stack",
-                "none": "Remove audio"
+            "transparency": {
+                "type": UserInput.OPTION_TEXT,
+                "coerce_type": float,
+                "default": 0.15,
+                "min": 0,
+                "max": 1,
+                "help": "Layer transparency",
+                "tooltip": "Transparency of each layer in the stack, between 0 (opaque) and 1 (fully transparent). "
+                        "As a rule of thumb, for 10 videos use 90% opacity (0.10), for 20 use 80% (0.20), and so on."
             },
-            "default": "longest"
+            "eof-action": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "pass": "Remove video from stack once it ends",
+                    "repeat": "Keep displaying final frame until end of stack video",
+                    "endall": "Stop stack video when first video ends"
+                },
+                "help": "Length handling",
+                "tooltip": "How to handle videos of different length (i.e. when not all videos in the stack are equally "
+                        "long)",
+                "default": "pass"
+            },
+            "audio": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Audio handling",
+                "options": {
+                    "longest": "Use audio from longest video in stack",
+                    "none": "Remove audio"
+                },
+                "default": "longest"
+            },
+            "max-length": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Cut video after",
+                "default": 60,
+                "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
+                        "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
+                        "processor run times and is not recommended.",
+                "coerce_type": int,
+                "min": 0
+            }
         }
-    }
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
         :param DataSet module:  Module ID to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
         if not (module.get_media_type() == "video" or module.type.startswith("video-downloader")):
@@ -94,7 +114,7 @@ class VideoStack(BasicProcessor):
             # Only check these if we have a video dataset
             # also need ffprobe to determine video lengths
             # is usually installed in same place as ffmpeg
-            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path", user=user))
+            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
             ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
             return ffmpeg_path and ffprobe_path
 
@@ -113,10 +133,11 @@ class VideoStack(BasicProcessor):
         eof = self.parameters.get("eof-action")
         sound = self.parameters.get("audio")
         amount = self.parameters.get("amount")
+        video_length = self.parameters.get("max-length")
 
         # To figure out the length of a video we use ffprobe, if available
         with_errors = False
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
+        ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack
@@ -167,7 +188,7 @@ class VideoStack(BasicProcessor):
             if len(videos) >= max_videos:
                 break
 
-            video_path = shlex.quote(str(video))
+            video_path = oslex.quote(str(video))
 
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
@@ -191,10 +212,15 @@ class VideoStack(BasicProcessor):
         num_videos = len(videos)
         self.dataset.log(f"Collected {num_videos} videos to stack")
 
+        # longest video in set may be shorter than requested length
+        if video_length:
+            video_length = min(max(lengths.values()), video_length)
+            command.extend(["-t", str(video_length)])
+
         # loop again, this time to construct the ffmpeg command
         last_index = num_videos - 1
         for video in videos:
-            video_path = shlex.quote(str(video))
+            video_path = oslex.quote(str(video))
             # video to stack
             command += ["-i", video_path]
             if index > 0:
@@ -223,19 +249,21 @@ class VideoStack(BasicProcessor):
             self.dataset.update_status(f"Unpacked {index:,} of {num_videos:,} videos")
 
         # create final complex filter chain
-        ffmpeg_filter = shlex.quote(";".join(transparency_filter) + ";" + ";".join(merge_filter))[1:-1]
+        ffmpeg_filter = oslex.quote(";".join(transparency_filter) + ";" + ";".join(merge_filter))[1:-1]
         command += ["-filter_complex", ffmpeg_filter]
 
         # ensure mixed audio
         if sound == "none":
             command += ["-an"]
         elif sound == "longest":
-            command += ["-map", f"0:a"]
+            command += ["-map", "0:a"]
 
         command += ["-map", "[final]", *fps_params]
 
         # output file
-        command.append(shlex.quote(str(self.dataset.get_results_path())))
+        if video_length:
+            command.extend(["-t", str(video_length)])
+        command.append(oslex.quote(str(self.dataset.get_results_path())))
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
 
         if self.interrupted:

@@ -1,0 +1,170 @@
+.explorer-content {
+	--text-color-primary: black;
+	--text-color-secondary: rgb(66, 87, 108);
+	--text-color-tertiary: #8598ae;
+	--accent-color: #0085ff;
+	--border-color: rgb(228, 232, 236);
+	background-color: white;
+	padding-top: 30px;
+	padding-bottom: 30px;
+}
+
+.posts .post {
+	font-family: 'Inter', sans-serif;
+	font-size: 15px;
+	width: 600px;
+	margin: 0 auto;
+	background-color: white;
+	list-style-type: none;
+	border: 1px solid var(--border-color);
+	min-height: 50px;
+	padding: 20px;
+}
+
+.posts .post .post-table {
+	position: relative;
+	display: table;
+	table-layout: fixed;
+	width: 100%;
+}
+
+.posts .post .post-table-row {
+	display: table-row;
+}
+
+.posts .post .reply-to {
+	width: 0;
+	height: 12px;
+	border: 2px solid var(--text-color-tertiary);
+	position: absolute;
+	margin-left: 19px;
+	margin-top: -20px;
+}
+
+.posts .post .profile-picture {
+	display: table-cell;
+	width: 7%;
+	vertical-align: top;
+	padding-right: 12px;
+}
+
+.posts .post .profile-picture img {
+	border-radius: 100%;
+	width: 100%;
+}
+
+.posts .post .post-content {
+	display: table-cell;
+	width: 93%;
+}
+
+.posts .post header {
+	color: var(--text-color-primary);
+	margin-top: 5px;
+	margin-bottom: 5px;
+}
+
+.pseudonymous-author {
+	width: 100%;
+	background: var(--text-color-tertiary);
+	height: 42px;
+	border-radius: 100%;
+}
+
+.posts .post header .author strong a {
+	color: var(--text-color-primary);
+}
+
+.posts .post header a {
+	color: var(--text-color-secondary);
+}
+
+.posts .post .post-content {
+	display: inline-block;
+}
+
+.posts .post .media-container {
+	margin-top: 10px;
+	width: 100%;
+}
+
+.posts .post .media-container img {
+	width: 100%;
+	border-radius: 15px;
+	border: 1px solid var(--border-color);
+}
+
+.metrics {
+	margin-top: 20px;
+}
+
+.time, .metrics, .external-url a {
+	color: var(--text-color-secondary);
+}
+
+.body a, .external-url a {
+	color: var(--accent-color);
+}
+
+.posts .post .metrics {
+	display: flex;
+	justify-content: space-between;
+	color: var(--text-color-tertiary);
+}
+
+span.hashtag {
+	color: var(--accent-color);
+}
+
+.post .quote-post {
+	padding: 15px 20px 15px 20px;
+	border: 1px solid var(--border-color);
+	border-radius: 10px;
+	margin-top: 5px;
+}
+
+
+/** --------------------- *
+     Annotation post elements
+  * --------------------- */
+.post-annotations {
+    background: var(--accent-color);
+    margin-top: 10px;
+    color: white;
+    border-radius: 15px;
+}
+
+.post-annotation {
+    padding: 15px;
+}
+
+.post-annotation > .annotation-label {
+    display: inline-block;
+    text-align: right;
+    width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    position: relative;
+    word-break: break-all;
+}
+
+.post-annotation > .annotation-label, .post-annotation a {
+	color: white;
+}
+
+.post-annotation.checkbox > .post-annotation-options {
+    display: inline-block;
+}
+
+.post-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.post-annotation-options > input {
+    display: inline-block;
+}
+
+textarea.post-annotation-input {
+	width: 60%;
+}

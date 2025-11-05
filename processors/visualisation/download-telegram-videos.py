@@ -5,15 +5,13 @@ import asyncio
 import hashlib
 import json
 
-from pathlib import Path
-
 from telethon import TelegramClient
+from telethon.errors import FloodError, BadRequestError
 
-from common.config_manager import config
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from processors.visualisation.download_videos import VideoDownloaderPlus
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, timify
 from common.lib.dataset import DataSet
 
 __author__ = "Stijn Peeters"
@@ -56,7 +54,7 @@ class TelegramVideoDownloader(BasicProcessor):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
@@ -64,11 +62,11 @@ class TelegramVideoDownloader(BasicProcessor):
         TCAT servers are configured. Otherwise, no options are given since
         there is nothing to choose.
 
+        :param config:
         :param DataSet parent_dataset:  Dataset that will be uploaded
-        :param User user:  User that will be uploading it
-        :return dict:  Option definition
         """
-        max_videos = int(config.get('video-downloader-telegram.max_videos', 100, user=user))
+
+        max_videos = int(config.get('video-downloader-telegram.max_videos', 100))
 
         return {
             "amount": {
@@ -82,13 +80,14 @@ class TelegramVideoDownloader(BasicProcessor):
 
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Allow processor on Telegram datasets with required info
 
         :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        if not config.get("video-downloader-telegram.allow_videos", user=user):
+        if not config.get("video-downloader-telegram.allow_videos"):
             return False
 
         if type(module) is DataSet:
@@ -131,7 +130,7 @@ class TelegramVideoDownloader(BasicProcessor):
         query = self.source_dataset.top_parent().parameters
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
+        session_path = self.config.get('PATH_SESSIONS').joinpath(session_id + ".session")
         amount = self.parameters.get("amount")
 
         client = None
@@ -197,7 +196,7 @@ class TelegramVideoDownloader(BasicProcessor):
 
                         msg_id = message.id
                         success = True
-                    except (AttributeError, RuntimeError, ValueError, TypeError) as e:
+                    except (AttributeError, RuntimeError, ValueError, TypeError, BadRequestError) as e:
                         filename = f"{entity}-index-{media_done}"
                         msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
                         self.dataset.log(f"Could not download video for message {msg_id} ({e})")
@@ -210,6 +209,15 @@ class TelegramVideoDownloader(BasicProcessor):
                         "from_dataset": self.source_dataset.key,
                         "post_ids": [msg_id]
                     }
+
+            except FloodError as e:
+                later = "later"
+                if hasattr(e, "seconds"):
+                    later = f"in {timify(e.seconds)}"
+                self.dataset.update_status(f"Rate-limited by Telegram after downloading {media_done-1:,} image(s); "
+                                           f"halting download process. Try again {later}.", is_final=True)
+                self.flawless = False
+                break
                     
             except ValueError as e:
                 self.dataset.log(f"Couldn't retrieve video for {entity}, it probably does not exist anymore ({e})")

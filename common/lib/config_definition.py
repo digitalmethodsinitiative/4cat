@@ -4,38 +4,53 @@ Default 4CAT Configuration Options
 Possible options and their default values. Options are actually set in 4CAT"s
 Database. Additional options can be defined in Data sources or Processors as
 `config` objects.
+
+The order of th dictionary below determines the order of the settings in the interface.
+
 """
 from common.lib.user_input import UserInput
-import json
 
 config_definition = {
-    "datasources._intro": {
+    "datasources.intro": {
         "type": UserInput.OPTION_INFO,
         "help": "Data sources enabled below will be offered to people on the 'Create Dataset' page. Additionally, "
                 "people can upload datasets for these by for example exporting them with "
                 "[Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) to this 4CAT instance.\n\n"
                 "Some data sources offer further settings which may be configured on other tabs."
     },
-    "datasources.enabled": {
-        "type": UserInput.OPTION_DATASOURCES,
-        "default": ["ninegag", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
-                    "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
-        "help": "Data Sources",
-        "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
-    },
-    "datasources._intro2": {
+    "datasources.intro2": {
         "type": UserInput.OPTION_INFO,
         "help": "*Warning:* changes take effect immediately. Datasets that would have expired under the new settings "
                 "will be deleted. You can use the 'Dataset bulk management' module in the control panel to manage the "
                 "expiration status of existing datasets."
     },
+    "datasources.enabled": {
+        "type": UserInput.OPTION_DATASOURCES,
+        "default": ["ninegag", "bsky", "douban", "douyin", "imgur", "upload", "instagram", "import_4cat", "linkedin", "media-import",
+                    "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
+        "help": "Data Sources",
+        "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
+    },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "gab": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": False, "allow_optout": False, "timeout": 0}, "truthsocial": {"enabled": True, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
+        "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "bsky": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "import_4cat": {"enabled": True, "allow_optout": False, "timeout": 0},"gab": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "media-import": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": True, "allow_optout": False, "timeout": 0}, "truthsocial": {"enabled": True, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
         "help": "Data source-specific expiration",
         "tooltip": "Allows setting expiration settings per datasource. Configured by proxy via the 'data sources' "
                    "setting.",
         "indirect": True
+    },
+    # Extensions
+    "extensions._intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT extensions can be disabled and disabled via the control below. When enabled, extensions may "
+                "define further settings that can typically be configured via the extension's tab on the left side of "
+                "this page. **Note that 4CAT needs to be restarted for this to take effect!**"
+    },
+    "extensions.enabled": {
+        "type": UserInput.OPTION_EXTENSIONS,
+        "default": {},
+        "help": "Extensions",
+        "global": True
     },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
@@ -55,6 +70,13 @@ config_definition = {
         "tooltip": "Used in e.g. the interface header. The backend will always refer to '4CAT' - the name of the "
                    "software, and a 'powered by 4CAT' notice may also show up in the web interface regardless of the "
                    "value entered here."
+    },
+    "4cat.about_this_server": {
+        "type": UserInput.OPTION_TEXT_LARGE,
+        "default": "",
+        "help": "Server information",
+        "tooltip": "Custom server information that is displayed on the 'About' page. Can for instance be used to show "
+                   "information about who maintains the tool or what its intended purpose is. Accepts Markdown markup.",
     },
     "4cat.crash_message": {
         "type": UserInput.OPTION_TEXT_LARGE,
@@ -102,8 +124,8 @@ config_definition = {
     "privileges.can_use_explorer": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
-        "help": "Can use explorer",
-        "tooltip": "Controls whether users can use the Explorer feature to navigate datasets."
+        "help": "Can use Explorer",
+        "tooltip": "Controls whether users can use the Explorer feature to analyse and annotate datasets."
     },
     "privileges.can_export_datasets": {
         "type": UserInput.OPTION_TOGGLE,
@@ -132,7 +154,7 @@ config_definition = {
     "privileges.admin.can_manipulate_all_datasets": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
-        "help": "Can manipulate datasets",
+        "help": "Can manipulate all datasets",
         "tooltip": "Controls whether users can manipulate all datasets as if they were an owner, e.g. sharing it with "
                    "others, running processors, et cetera."
     },
@@ -140,7 +162,13 @@ config_definition = {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
         "help": "Can restart/upgrade",
-        "tooltip": "Controls whether users can restart and upgrade 4CAT via the Control Panel"
+        "tooltip": "Controls whether users can restart, upgrade, and manage extensions 4CAT via the Control Panel"
+    },
+    "privileges.admin.can_manage_extensions": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can manage extensions",
+        "tooltip": "Controls whether users can install and uninstall 4CAT extensions via the Control Panel"
     },
     "privileges.can_upgrade_to_dev": {
         # this is NOT an admin privilege, because all admins automatically
@@ -165,20 +193,10 @@ config_definition = {
         "help": "Can view worker status",
         "tooltip": "Controls whether users can view worker status via the Control Panel"
     },
-    # The following two options should be set to ensure that every analysis step can
+    # The following option should be set to ensure that every analysis step can
     # be traced to a specific version of 4CAT. This allows for reproducible
-    # research. You can however leave them empty with no ill effect. The version ID
-    # should be a commit hash, which will be combined with the Github URL to offer
-    # links to the exact version of 4CAT code that produced an analysis result.
-    # If no version file is available, the output of "git show" in PATH_ROOT will be used
-    # to determine the version, if possible.
-    "path.versionfile": {
-        "type": UserInput.OPTION_TEXT,
-        "default": ".git-checked-out",
-        "help": "Version file",
-        "tooltip": "Path to file containing GitHub commit hash. File containing a commit ID (everything after the first whitespace found is ignored)",
-        "global": True
-    },
+    # research. The output of "git show" in PATH_ROOT will be used to determine
+    # the version of a processor file, if possible.
     "4cat.github_url": {
         "type": UserInput.OPTION_TEXT,
         "default": "https://github.com/digitalmethodsinitiative/4cat",
@@ -190,9 +208,10 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "https://ping.4cat.nl",
         "help": "Phone home URL",
-        "tooltip": "This URL is called once - when 4CAT is installed. If the installing user consents, information "
-                   "is sent to this URL to help the 4CAT developers (the Digital Methods Initiative) keep track of how "
-                   "much it is used. There should be no need to change this URL after installation.",
+        "tooltip": "This URL is called when 4CAT is installed, if the user consents, to help the 4CAT developers (the "
+                   "Digital Methods Initiative) keep track of how much it is used. Later, notifications for 4CAT "
+                   "admins are fetched from this URL to inform them about important changes and update procedures. If "
+                   "you want to disable this functionality, leave this field empty.",
         "global": True
     },
     "4cat.phone_home_asked": {
@@ -232,6 +251,15 @@ config_definition = {
         "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
                    "provided e-mail settings are configured."
     },
+    "4cat.allow_access_request_limiter": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "100/day",
+        "help": "Access request limit",
+        "tooltip": "Limit the number of access requests per day. This is a rate limit for the number of requests "
+                   "that can be made per IP address. The format is a number followed by a time unit, e.g. '100/day', "
+                   "'10/hour', '5/minute'. You can also combine these, e.g. '100/day;10/hour'.",
+        "global": True
+    },
     "4cat.sphinx_host": {
         "type": UserInput.OPTION_TEXT,
         "default": "localhost",
@@ -239,6 +267,41 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
+    # proxy stuff
+    "proxies.urls": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": ["__localhost__"],
+        "help": "Proxy URLs",
+        "tooltip": "A JSON Array of full proxy URLs. Include any proxy login details in the URL itself (e.g. "
+                   "http://username:password@proxy:port). There is one special value, '__localhost__'; this means a " 
+                   "direct request, without using a proxy."
+    },
+    "proxies.cooloff": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": float,
+        "help": "Cool-off time",
+        "tooltip": "After a request has finished, do not use the proxy again for this many seconds.",
+        "default": 0.1,
+        "min": 0.0
+    },
+    "proxies.concurrent-overall": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": int,
+        "default": 1,
+        "min": 1,
+        "help": "Max concurrent requests (overall)",
+        "tooltip": "Per proxy, this many requests can run concurrently overall."
+    },
+    "proxies.concurrent-host": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": int,
+        "default": 1,
+        "min": 1,
+        "help": "Max concurrent requests (per host)",
+        "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
+                   "overall limit."
+    },
+    # logging
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
@@ -305,13 +368,18 @@ config_definition = {
         "global": True
     },
     # Explorer settings
-    # The maximum allowed amount of rows (prevents timeouts and memory errors)
+    "explorer.basic-explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT's Explorer feature lets you navigate and annotate datasets as if they "
+                "appared on their original platform. This is intended to facilitate qualitative "
+                "exploration and manual coding."
+    },
     "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
         "help": "Amount of posts",
         "coerce_type": int,
-        "tooltip": "Amount of posts to show in Explorer. The maximum allowed amount of rows (prevents timeouts and "
+        "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
     "explorer.posts_per_page": {
@@ -319,7 +387,20 @@ config_definition = {
         "default": 50,
         "help": "Posts per page",
         "coerce_type": int,
-        "tooltip": "Posts to display per page"
+        "tooltip": "Number of posts to display per page"
+    },
+    "explorer.config_explanation": {
+        "type": UserInput.OPTION_INFO,
+        "help": "Data sources use <em>Explorer templates</em> that determine how they look and what information is "
+                "displayed. Explorer templates consist of [custom HTML templates](https://github.com/"
+                "digitalmethodsinitiative/4cat/tree/master/webtool/templates/explorer/datasource-templates) and "
+                "[custom CSS files](https://github.com/digitalmethodsinitiative/4cat/tree/master/webtool/static/css/"
+                "explorer). If no template is available for a data source, a <em>generic</em> template is used "
+                "made of [this HTML file](https://github.com/digitalmethodsinitiative/4cat/blob/master/webtool/"
+                "templates/explorer/datasource-templates/generic.html) and [this CSS file](https://github.com/"
+                "digitalmethodsinitiative/4cat/tree/master/webtool/static/css/explorer/generic.css).\n\n"
+                "You can request a new data source Explorer template by [creating a GitHub issue](https://github.com/"
+                "digitalmethodsinitiative/4cat/issues) or adding them yourself and opening a pull request."
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
@@ -345,14 +426,17 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-listed hostnames",
-        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and "
+                   "Server Name. Front-end needs to be restarted for changed to apply.",
         "global": True
     },
     "flask.autologin.api": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": [],
         "help": "White-list for API",
-        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. "
+                   "Docker should include localhost and Server Name.  Front-end needs to be restarted for changed to "
+                   "apply.",
         "global": True
     },
     "flask.https": {
@@ -441,7 +525,12 @@ config_definition = {
     # it is used by a number of processors
     "dmi-service-manager.aa_DSM-intro-1": {
             "type": UserInput.OPTION_INFO,
-            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager#start-dmi-service-manager) is a support tool used to run some advanced processors. These processors generally require high CPU usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also possible for multiple 4CAT instances to use the same service manager. Please see the link for instructions on setting up your own instance of the DMI Service Manager.",
+            "help": "The [DMI Service Manager](https://github.com/digitalmethodsinitiative/dmi_service_manager) is a "
+                    "support tool used to run some advanced processors. These processors generally require high CPU "
+                    "usage, a lot of RAM, or a dedicated GPU and thus do not fit within 4CAT's arcitecture. It is also "
+                    "possible for multiple 4CAT instances to use the same service manager. Please see [this link]"
+                    "(https://github.com/digitalmethodsinitiative/dmi_service_manager?tab=readme-ov-file#installation) "
+                    "for instructions on setting up your own instance of the DMI Service Manager.",
         },
     "dmi-service-manager.ab_server_address": {
         "type": UserInput.OPTION_TEXT,
@@ -461,6 +550,69 @@ config_definition = {
         },
         "global": True
     },
+
+    # LLM Server settings
+    # allows 4CAT LLM processors to connect to a local or remote LLM server
+    "llm.intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT LLM processors allow users to utilize common APIs (e.g. OpenAI, Google, Anthropic) as well as connect "
+                "to local or remote LLM servers. You can also set up your own LLM server using open source software such as "
+                "[Ollama](https://ollama.com/) and connect 4CAT to it using the settings below for your users."
+    },
+    "llm.host_name": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "4CAT LLM Server",
+        "help": "Name of LLM Server in UI",
+        "tooltip": "The name that will be shown to users in the interface when selecting an LLM server (or API or custom).",
+        "global": True
+    },
+    "llm.provider_type": {
+        "type": UserInput.OPTION_CHOICE,
+        "help": "LLM Provider Type",
+        "default": "none",
+        "options": {
+            "ollama": "Ollama",
+            "none": "None",
+        },
+        "global": True,
+    },
+    "llm.server": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "LLM Server URL",
+        "tooltip": "The URL of the LLM server, e.g. http://localhost:5000",
+        "global": True
+    },
+    "llm.auth_type": {
+        "type": UserInput.OPTION_TEXT,
+        "help": "LLM Server Authentication Type",
+        "default": "",
+        "tooltip": "The authentication type required to connect to the server (e.g. 'X-API-KEY', 'Authorization'). Passed in the request header with the API key.",
+        "global": True,
+    },
+    "llm.api_key": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "LLM Server API Key",
+        "tooltip": "The API key to access the LLM server, if required.",
+        "global": True
+    },
+    "llm.available_models": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": [],
+        "help": "Available LLM models",
+        "tooltip": "A JSON array of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
+        "indirect": True,
+        "global": True
+    },
+    "llm.access": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "LLM Access",
+        "default": False,
+        "tooltip": "Use tags or individual users to allow access to the LLM server (or set True in global for all).",
+    },
+    # TODO: add setting to restrict models per user/group?
+    
     # UI settings
     # this configures what the site looks like
     "ui.homepage": {
@@ -479,6 +631,19 @@ config_definition = {
         "default": False,
         "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
     },
+    "ui.offer_anonymisation": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Offer anonymisation options",
+        "default": True,
+        "tooltip": "Offer users the option to anonymise their datasets at the time of creation. It is strongly "
+                   "recommended to leave this enabled."
+    },
+    "ui.advertise_install": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "Advertise local 4CAT",
+        "default": True,
+        "tooltip": "In the login form, remind users of the possibility to install their own 4CAT server."
+    },
     "ui.show_datasource": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Show data source",
@@ -489,11 +654,10 @@ config_definition = {
         "type": UserInput.OPTION_MULTI_SELECT,
         "help": "Pages in navigation",
         "options": {
-            "faq": "FAQ",
             "data-policy": "Data Policy",
             "citing": "How to cite",
         },
-        "default": ["faq"],
+        "default": [],
         "tooltip": "These pages will be included in the navigation bar at the top of the interface."
     },
     "ui.prefer_mapped_preview": {
@@ -502,6 +666,18 @@ config_definition = {
         "default": True,
         "tooltip": "If a dataset is a JSON file but it can be mapped to a CSV file, show the CSV in the preview instead"
                    "of the underlying JSON."
+    },
+    "ui.offer_hashing": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer pseudonymisation",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
+    },
+    "ui.offer_private": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer create as private",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
     },
     "ui.option_email": {
         "type": UserInput.OPTION_CHOICE,
@@ -515,6 +691,14 @@ config_definition = {
         "help": "Show email when complete option",
         "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
     },
+    "image-visuals.max_images": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 1000,
+        "coerce_type": int,
+        "help": "Maximum images to show",
+        "tooltip": "Maximum number of images to show in the image visualization tab of a dataset. This is to prevent "
+                   "issues with large datasets.",
+    }
 }
 
 # These are used in the web interface for more readable names
@@ -523,7 +707,7 @@ categories = {
     "4cat": "4CAT Tool settings",
     "api": "API credentials",
     "flask": "Flask settings",
-    "explorer": "Data Explorer",
+    "explorer": "Explorer",
     "datasources": "Data sources",
     "expire": "Dataset expiration settings",
     "mail": "Mail settings & credentials",
@@ -532,5 +716,8 @@ categories = {
     "privileges": "User privileges",
     "dmi-service-manager": "DMI Service Manager",
     "ui": "User interface",
+    "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
+    "extensions": "Extensions",
+    "llm": "LLM Server Settings"
 }

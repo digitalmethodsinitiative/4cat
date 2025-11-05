@@ -4,7 +4,7 @@ Import scraped Gab data
 import datetime
 
 from backend.lib.search import Search
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 
 
 class SearchGab(Search):
@@ -16,7 +16,7 @@ class SearchGab(Search):
     title = "Import scraped Gab data"  # title displayed in UI
     description = "Import Gab data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_from_extension = True
+    is_from_zeeschuimer = True
     fake = ""
 
     # not available as a processor for existing datasets
@@ -38,45 +38,78 @@ class SearchGab(Search):
         :param node:  Data as received from Gab
         :return dict:  Mapped item
         """
+        unknown_data = []
+        post_id = post.get("i", post["id"])
+        metadata = post.get("__import_meta", {})
+        timestamp_collected = datetime.datetime.fromtimestamp(metadata.get("timestamp_collected")/1000).strftime("%Y-%m-%d %H:%M:%S") if metadata.get("timestamp_collected") else MissingMappedField("Unknown")
+        # reaction_type seems to just be nummeric keys; unsure which reactions they map to
+        reactions =  post.get("rc", post.get("reactions_counts"))
+        if type(reactions) is not int:
+            reaction_count = sum([reaction_value for reaction_type, reaction_value in post.get("rc", post.get("reactions_counts")).items()])
+        else:
+            reaction_count = reactions
+
+        # Other dictionaries are nested in the post dictionary
+        group = post.get("g", post.get("group", {}))
+        author = post.get("author_info", post.get("account", {}))
+        mentions = post.get("m", post.get("mentions", []))
+        tags = post.get("tg", post.get("tags", []))
+        # card or link
+        card = post.get("card", post.get("link", {}))
+        # media or image_info
+        media_items = post.get("image_info", post.get("media_attachments", []))
+        image_urls = [media.get("u", media.get("url")) for media in media_items if media.get("t", media.get("type")) == "image"]
+        video_urls = [media.get("smp4", media.get("source_mp4")) for media in media_items if media.get("t", media.get("type")) == "video"]
+        if any([media_type not in ["image", "video"] for media_type in [media.get("t", media.get("type")) for media in media_items]]):
+            unknown_data.extend([f"Unknown media type: {media}" for media in media_items if media.get('t', media.get('type')) not in ['image', 'video']])
+        if any([True for vid in video_urls if vid is None]) or any([True for img in image_urls if img is None]):
+            unknown_data.extend([f"Media missing URL: {img}" for img in image_urls if img is None])
+            unknown_data.extend([f"Media missing URL: {vid}" for vid in video_urls if vid is None])
+            # remove None values from the lists
+            image_urls = [img for img in image_urls if img is not None]
+            video_urls = [vid for vid in video_urls if vid is not None]
         
-        post_time = datetime.datetime.strptime(post["ca"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        post_time = datetime.datetime.strptime(post.get("ca", post.get("created_at")), "%Y-%m-%dT%H:%M:%S.%fZ")
         mapped_item = {
-            "id": post["i"],
-            "created_at": post["ca"],
-            "body": post["c"],
-            "url": post["ul"],
-            "reaction_count": post.get("fc", 0),
-            "reposts_count": post["rbc"],
-            "replies_count": post["rc"],
-            "group_id": post["g"]["id"] if "g" in post else None,
-            "group_title": post["g"]["title"] if "g" in post else None,
-            "group_description": post["g"]["description"] if "g" in post else None,
-            "group_member_count": post["g"]["member_count"] if "g" in post else None,
-            "group_is_private": post["g"]["is_private"] if "g" in post else None,
-            "group_url": post["g"]["url"] if "g" in post else None,
-            "group_created_at": post["g"]["created_at"] if "g" in post else None,
+            "collected_at": timestamp_collected,
+            "source_url": metadata.get("source_platform_url", MissingMappedField("Unknown")), # URL from which post was collected
+            "id": post_id,
+            "created_at": post_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "body": post.get("c") if "c" in post else post["content"],
+            "url": post.get("ul") if "ul" in post else post["url"],
+            "reaction_count": reaction_count,
+            "favourites_count": post.get("fbc", post.get("favourites_count")),
+            "replies_count": post.get("rc", post.get("replies_count")),
+            "reblogs_count": post.get("rbc", post.get("reblogs_count")),
+            "mentions": ",".join([mention["username"] for mention in mentions]),
+            "tags": ",".join([tag["name"] for tag in tags]),	
 
-            "account_id": post["author_info"]["i"],
-            "account_username": post["author_info"]["un"],
-            "account_account": post["author_info"]["ac"],
-            "account_display_name": post["author_info"]["dn"],
-            "account_note": post["author_info"]["nt"] if "nt" in post["author_info"] else None,
+            "group_id": group["id"] if group else None,
+            "group_title": group["title"] if group else None,
+            "group_description": group["description"] if group else None,
+            "group_member_count": group["member_count"] if group else None,
+            "group_is_private": group["is_private"] if group else None,
+            "group_url": group["url"] if group else None,
+            "group_created_at": group.get("created_at") if group else None,
 
-            "link_id": post["link_info"]["id"] if post["link_info"] else None,
-            "link_url": post["link_info"]["url"] if post["link_info"] else None,
-            "link_title": post["link_info"]["title"] if post["link_info"] else None,
-            "link_description": post["link_info"]["description"] if post["link_info"] else None,
-            "link_type": post["link_info"]["type"] if post["link_info"] else None,
-            "link_image": post["link_info"]["image"] if post["link_info"] else None,
+            "account_id": author.get("i") if "i" in author else author["id"],
+            "account_username": author.get("un") if "un" in author else author["username"],
+            "account_account": author.get("ac") if "ac"in author else author["acct"],
+            "account_display_name": author.get("dn") if "dn" in author else author["display_name"],
+            "account_note": author.get("nt") if "nt" in author else author["note"],
 
+            "link_id": card["id"] if card else None,
+            "link_url": card["url"] if card else None,
+            "link_title": card["title"] if card else None,
+            "link_description": card["description"] if card else None,
+            "link_type": card["type"] if card else None,
+            "link_image": card["image"] if card else None,
 
-            "image_id": post["image_info"][0]["i"] if (len(post["image_info"]) > 0) else None,
-            "image_url": post["image_info"][0]["u"] if (len(post["image_info"]) > 0) else None,
-            "image_type": post["image_info"][0]["t"] if (len(post["image_info"]) > 0) else None,
+            "image_urls": ",".join(image_urls),
+            "video_urls": ",".join(video_urls),
 
-
-            "thread_id": post["i"],
+            "thread_id": post.get("i") if "i" in post else post["conversation_id"],
             "timestamp": post_time.strftime("%Y-%m-%d %H:%M:%S")
         }        
     
-        return MappedItem(mapped_item)
+        return MappedItem(mapped_item, message="".join(unknown_data)) if unknown_data else MappedItem(mapped_item)

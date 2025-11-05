@@ -27,33 +27,32 @@ class HashSimilarityNetworker(BasicProcessor):
     description = "Calculate similarity of hashes and create a GEXF network file."
     extension = "gexf"
 
-    options = {
-        "descriptor_column": {
-            "help": "Column containing ID or unique descriptor (e.g., URL, filename, etc.)",
-            "inline": True,
-        },
-        "choice_column": {
-            "help": "Column containing hashes",
-            "inline": True,
-            "tooltip": "Expects all hashes to be of the same length"
-        },
-        "percent_similar": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Minimum percentage for connection",
-            "tooltip": "Only create a connection if the two hashes are at least X percent similar (e.g. at least 75% of the two hashes must be identical). Use 0 to create weighted edges for all hash comparisons.",
-            "coerce_type": int,
-            "default": 90,
-            "min": 0,
-            "max": 100,
-        },
-    }
-
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Update column option with actual columns
+        :param config:
         """
-        options = cls.options
+        options = {
+            "descriptor_column": {
+                "help": "Column containing ID or unique descriptor (e.g., URL, filename, etc.)",
+                "inline": True,
+            },
+            "choice_column": {
+                "help": "Column containing hashes",
+                "inline": True,
+                "tooltip": "Expects all hashes to be of the same length"
+            },
+            "percent_similar": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Minimum percentage for connection",
+                "tooltip": "Only create a connection if the two hashes are at least X percent similar (e.g. at least 75% of the two hashes must be identical). Use 0 to create weighted edges for all hash comparisons.",
+                "coerce_type": int,
+                "default": 90,
+                "min": 0,
+                "max": 100,
+            },
+        }
 
         # Get the columns for the select columns option
         if parent_dataset and parent_dataset.get_columns():
@@ -69,7 +68,7 @@ class HashSimilarityNetworker(BasicProcessor):
         return options
 
     @classmethod
-    def is_compatible_with(cls, module=None, user=None):
+    def is_compatible_with(cls, module=None, config=None):
         """
         Currently only allowed on video-hashes, but technically any row of bit hashes will work. Could check for "hash"
         in columns, but... how to make that a check as a classmethod?
@@ -104,7 +103,7 @@ class HashSimilarityNetworker(BasicProcessor):
             # TODO: process other types of hashes; currently only supporting bit hashes
             original_hash = item.pop(column)
 
-            if type(original_hash) == str:
+            if type(original_hash) is str:
                 item_hash = original_hash
                 # Check if 0b starts string
                 if '0b' == original_hash[:2]:
@@ -116,7 +115,7 @@ class HashSimilarityNetworker(BasicProcessor):
 
             try:
                 item_hash = [int(bit) for bit in item_hash]
-            except ValueError as e:
+            except ValueError:
                 self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
                 self.dataset.finish(0)
                 return
@@ -146,9 +145,9 @@ class HashSimilarityNetworker(BasicProcessor):
 
                     # Append any metadata associated with hash for Gephi
                     for key, value in item.items():
-                        if type(value) == list:
+                        if type(value) is list:
                             item[key] = ','.join(value)
-                        elif type(value) == str:
+                        elif type(value) is str:
                             try:
                                 float(value)
                                 item[key] = float(value)
