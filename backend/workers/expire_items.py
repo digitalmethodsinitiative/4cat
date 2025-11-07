@@ -65,9 +65,13 @@ class ThingExpirer(BasicWorker):
                                     SELECT *
                                     FROM datasets
                                     WHERE parameters::json->>'keep' IS NULL
+                                    AND key_parent = ''
                                     """)
 
         for dataset in datasets:
+            # we only check datasets with no parent, because child datasets
+            # inherit the ownership of the parent, and child datasets are
+            # deleted when the parent is deleted
             if self.interrupted:
                 raise WorkerInterruptedException("Interrupted while expiring datasets")
 
