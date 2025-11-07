@@ -42,7 +42,7 @@ class ThingExpirer(BasicWorker):
 
         :return:  Job parameters for the worker
         """
-        return {"remote_id": "localhost", "interval": 300}
+        return {"remote_id": "localhost", "interval": 1800}
 
     def work(self):
         """
