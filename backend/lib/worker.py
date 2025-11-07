@@ -117,6 +117,13 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             self.db = Database(logger=self.log, appname=database_appname, dbname=self.config.DB_NAME, user=self.config.DB_USER, password=self.config.DB_PASSWORD, host=self.config.DB_HOST, port=self.config.DB_PORT)
             self.queue = JobQueue(logger=self.log, database=self.db) if not self.queue else self.queue
             self.work()
+
+            # workers should usually finish their jobs by themselves, but if
+            # the worker finished without errors, the job can be finished in
+            # any case
+            if not self.job.is_finished:
+                self.job.finish()
+
         except WorkerInterruptedException:
             self.log.info("Worker %s interrupted - cancelling." % self.type)
 
