@@ -29,7 +29,7 @@ class UpdateChecker(BasicWorker):
 
         :return:  Job parameters for the worker
         """
-        return {"remote_id": "", "interval": 10800}
+        return {"remote_id": "", "interval": 11100}
 
     def work(self):
         self.get_remote_notifications()
