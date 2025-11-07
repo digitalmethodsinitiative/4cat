@@ -98,5 +98,9 @@ class ViewMetadata(BasicProcessor):
 					num_posts += 1
 
 		# Finish up
-		self.dataset.update_status('Read metadata for %i items.' % num_posts)
-		self.write_csv_items_and_finish(rows)
+		self.dataset.update_status(f"Read metadata for {num_posts:,} item(s).")
+	
+		if rows:
+			self.write_csv_items_and_finish(rows)
+		else:
+			return self.dataset.finish_with_error("No valid metadata could be read from the dataset.")
