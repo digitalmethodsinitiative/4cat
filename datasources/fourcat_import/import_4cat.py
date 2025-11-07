@@ -307,7 +307,7 @@ class SearchImportFromFourcat(BasicProcessor):
                 metadata["parameters"].pop("copied_from")
             metadata["parameters"] = json.dumps(metadata["parameters"])
 
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError):
             # we don't need all this metadata but it still should be present,
             # otherwise something is wrong with the data format
             return None
