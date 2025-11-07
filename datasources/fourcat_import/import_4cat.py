@@ -288,20 +288,29 @@ class SearchImportFromFourcat(BasicProcessor):
     def process_metadata(metadata):
         """
         Process metadata for import
+
+        :param dict metadata:  Metadata of import
+        :return:  Relevant metadata, or `None` if parsing error
         """
         # get rid of some keys that are server-specific and don't need to
         # be stored (or don't correspond to database columns)
-        metadata.pop("current_4CAT_version")
-        metadata.pop("id")
-        metadata.pop("job")
-        metadata.pop("is_private")
-        metadata.pop("is_finished")  # we'll finish it ourselves, thank you!!!
+        try:
+            metadata.pop("current_4CAT_version")
+            metadata.pop("id")
+            metadata.pop("job")
+            metadata.pop("is_private")
+            metadata.pop("is_finished")  # we'll finish it ourselves, thank you!!!
 
-        # extra params are stored as JSON...
-        metadata["parameters"] = json.loads(metadata["parameters"])
-        if "copied_from" in metadata["parameters"]:
-            metadata["parameters"].pop("copied_from")
-        metadata["parameters"] = json.dumps(metadata["parameters"])
+            # extra params are stored as JSON...
+            metadata["parameters"] = json.loads(metadata["parameters"])
+            if "copied_from" in metadata["parameters"]:
+                metadata["parameters"].pop("copied_from")
+            metadata["parameters"] = json.dumps(metadata["parameters"])
+
+        except (ValueError, KeyError) as e:
+            # we don't need all this metadata but it still should be present,
+            # otherwise something is wrong with the data format
+            return None
 
         return metadata
 
@@ -442,6 +451,10 @@ class SearchImportFromFourcat(BasicProcessor):
                 continue
 
             metadata = self.process_metadata(metadata)
+            if metadata is None:
+                self.dataset.update_status(f"Metadata for dataset {dataset_key} incomplete, skipping")
+                failed_imports.append(dataset_key)
+                continue
 
             # create the new dataset
             new_dataset = self.create_dataset(metadata, dataset_key, primary=True if not imported else False)
