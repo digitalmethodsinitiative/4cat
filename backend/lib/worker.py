@@ -141,12 +141,29 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack]
             location = "->".join(frames)
             self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location), frame=stack)
+        finally:
+            # Clean up after work successfully completed or terminates
+            try:
+                self.clean_up()
+            except Exception as e:
+                self.log.error("Worker %s clean-up raised exception %s: %s" % (self.type, e.__class__.__name__, str(e)), frame=traceback.extract_tb(e.__traceback__))
 
-        # Clean up after work successfully completed or terminates
-        self.clean_up()
-
-        # explicitly close database connection as soon as it's possible
-        self.db.close()
+            try:
+                # explicitly close database connection as soon as it's possible
+                self.db.close()
+            except Exception as e:
+                try:
+                    self.log.error("Worker %s database close raised exception %s: %s" % (self.type, e.__class__.__name__, str(e)), frame=traceback.extract_tb(e.__traceback__))
+                except Exception:
+                    pass  # log likely broken already
+            
+            # Explicitly close this thread's memcache client to avoid lingering sockets
+            try:
+                cfg = getattr(self.modules, "config", None)
+                if cfg:
+                    cfg.close_memcache()
+            except Exception:
+                pass
 
     def clean_up(self):
         """
