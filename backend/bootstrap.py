@@ -66,7 +66,7 @@ def run(as_daemon=True, log_level="INFO"):
 
 	# test memcache and clear upon backend restart
 	if config.get("MEMCACHE_SERVER"):
-		if config.memcache:
+		if config.get_memcache():
 			log.debug("Memcache connection initialized - clearing")
 			config.clear_cache()
 		else:
