@@ -124,12 +124,30 @@ class ImageHasher(BasicProcessor):
         except FileNotFoundError:
             metadata_file = None
 
+        metadata_extra_fields = ["post_ids", "post_id", "url", "from_dataset"]
         image_data_by_filename = {}
         if metadata_file:
             with open(metadata_file) as file:
                 image_data = json.load(file)
                 for url, item in image_data.items():
-                    image_data_by_filename[item["filename"]] = item
+                    if "filename" in item:
+                        image_data_by_filename[item["filename"]] = item
+                    elif "files" in item:
+                        files = item.get('files')
+                        if not isinstance(files, list):
+                            self.log.warning(f"Invalid 'files' entry in metadata (expected list, got {type(files)}); cannot use file metadata")
+                            image_data_by_filename = {}
+                            break
+                        for file in files:
+                            if "filename" in file:
+                                # add extra fields from parent item if not present in file entry
+                                for key in metadata_extra_fields:
+                                    if key in file:
+                                        continue
+                                    elif key in item:
+                                        file[key] = item[key]
+                                image_data_by_filename[file["filename"]] = file
+                                
                 self.dataset.log("Found and loaded image metadata")
         else:
             self.dataset.log("No image metadata found")
@@ -140,7 +158,7 @@ class ImageHasher(BasicProcessor):
         fieldnames = (["group"] if group_by else []) + base_fields
         if image_data_by_filename:
             example = next(iter(image_data_by_filename.values()))
-            fieldnames.extend([key for key in ["post_ids", "post_id", "url", "from_dataset"] if key in example.keys()])
+            fieldnames.extend([key for key in metadata_extra_fields if key in example.keys()])
 
         processed = 0
         skipped = 0
