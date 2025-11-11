@@ -7,7 +7,8 @@ import ural
 import requests
 
 from collections import namedtuple
-from asyncio import CancelledError
+from asyncio import CancelledError as asyncioCancelledError
+from concurrent.futures import CancelledError as futureCancelledError
 
 class FailedProxiedRequest:
     """
@@ -349,7 +350,8 @@ class DelegatedRequestHandler:
 
                     except (
                         ConnectionError,
-                        CancelledError,
+                        asyncioCancelledError,
+                        futureCancelledError,
                         requests.exceptions.RequestException,
                         urllib3.exceptions.HTTPError,
                     ) as e:
