@@ -54,22 +54,32 @@ class SearchTikTokByID(Search):
         }
     }
 
-    options = {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source can retrieve metadata for TikTok posts based on a list of URLs for those "
-                    "posts.\n\nEnter a list of TikTok post URLs. Metadata for each post will be extracted from "
-                    "each post's page in the browser interface "
-                    "([example](https://www.tiktok.com/@willsmith/video/7079929224945093934)). This includes a lot of "
-                    "details about the post itself such as likes, tags and stickers. Note that some of the metadata is "
-                    "only directly available when downloading the results as an .ndjson file."
-        },
-        "urls": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Post URLs",
-            "tooltip": "Separate by commas or new lines."
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get data source options
+
+        :param DataSet parent_dataset:  An object representing the dataset that
+            the processor would be or was run on and can be used to show some options
+            only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        """
+        return {
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "This data source can retrieve metadata for TikTok posts based on a list of URLs for those "
+                        "posts.\n\nEnter a list of TikTok post URLs. Metadata for each post will be extracted from "
+                        "each post's page in the browser interface "
+                        "([example](https://www.tiktok.com/@willsmith/video/7079929224945093934)). This includes a lot of "
+                        "details about the post itself such as likes, tags and stickers. Note that some of the metadata is "
+                        "only directly available when downloading the results as an .ndjson file."
+            },
+            "urls": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Post URLs",
+                "tooltip": "Separate by commas or new lines."
+            }
         }
-    }
 
     def get_items(self, query):
         """

@@ -29,35 +29,47 @@ class SearchCustom(BasicProcessor):
     is_static = False  # Whether this datasource is still updated
 
     max_workers = 1
-    options = {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
-                    "and processing. Files need to be [UTF-8](https://en.wikipedia.org/wiki/UTF-8)-encoded and must "
-                    "contain a header row.\n\n"
-                    "You can indicate what format the file has or upload one with arbitrary structure. In the latter "
-                    "case, for each item, columns describing its ID, author, timestamp, and content are expected. You "
-                    "can select which column holds which value after uploading the file."
-        },
-        "data_upload": {
-            "type": UserInput.OPTION_FILE,
-            "help": "File"
-        },
-        "format": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "CSV format",
-            "options": {
-                tool: info["name"] for tool, info in import_formats.tools.items()
+    
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
+                        "and processing. Files need to be [UTF-8](https://en.wikipedia.org/wiki/UTF-8)-encoded and must "
+                        "contain a header row.\n\n"
+                        "You can indicate what format the file has or upload one with arbitrary structure. In the latter "
+                        "case, for each item, columns describing its ID, author, timestamp, and content are expected. You "
+                        "can select which column holds which value after uploading the file."
             },
-            "default": "custom"
-        },
-        "strip_html": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Strip HTML?",
-            "default": False,
-            "tooltip": "Removes HTML tags from the column identified as containing the item content ('body' by default)"
+            "data_upload": {
+                "type": UserInput.OPTION_FILE,
+                "help": "File"
+            },
+            "format": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "CSV format",
+                "options": {
+                    tool: info["name"] for tool, info in import_formats.tools.items()
+                },
+                "default": "custom"
+            },
+            "strip_html": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Strip HTML?",
+                "default": False,
+                "tooltip": "Removes HTML tags from the column identified as containing the item content ('body' by default)"
+            }
         }
-    }
 
     def process(self):
         """

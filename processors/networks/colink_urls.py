@@ -28,28 +28,39 @@ class URLCoLinker(BasicProcessor):
 				  "Edges are weighted by amount of co-links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
 
-	options = {
-		"detail": {
-			"type": UserInput.OPTION_CHOICE,
-			"help": "Use URL or domain name",
-			"options": {
-				"url": "Full URL",
-				"domain": "Domain name"
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"detail": {
+				"type": UserInput.OPTION_CHOICE,
+				"help": "Use URL or domain name",
+				"options": {
+					"url": "Full URL",
+					"domain": "Domain name"
+				},
+				"default": "url"
 			},
-			"default": "url"
-		},
-		"level": {
-			"type": UserInput.OPTION_CHOICE,
-			"help": "Set co-occurence by",
-			"options": {
-				"thread": "Thread (works best in full-thread datasets)",
-				"post": "Post"
-			},
-			"default": "thread",
-			"tooltip": "If 'thread' is selected, URLs are considered to co-occur if they appear within the same "
-					   "thread, even if they are in different posts."
+			"level": {
+				"type": UserInput.OPTION_CHOICE,
+				"help": "Set co-occurence by",
+				"options": {
+					"thread": "Thread (works best in full-thread datasets)",
+					"post": "Post"
+				},
+				"default": "thread",
+				"tooltip": "If 'thread' is selected, URLs are considered to co-occur if they appear within the same "
+						"thread, even if they are in different posts."
+			}
 		}
-	}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

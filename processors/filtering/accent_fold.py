@@ -27,31 +27,6 @@ class AccentFoldingFilter(BasicProcessor):
                   "to 'c', et cetera. Creates a new dataset."
     extension = "csv"  # extension of result file, used internally and in UI
 
-    options = {
-        "mode": {
-            "help": "What to replace?",
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "fold": "Fold only accented latin characters",
-                "transliterate": "Transliterate non-ASCII characters"
-            },
-            "default": "fold",
-            "tooltip": "Transliteration will ensure that only pure ASCII characters are left, but makes larger changes"
-                       " to the text (i.e. 北亰 is replaced with 'Bei Jing'). Folding will only replace accented "
-                       "characters with their closest un-accented ASCII equivalent, e.g. á -> a."
-        },
-        "case-fold": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Also convert all text to lowercase",
-            "default": False
-        },
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column(s) to apply folding on",
-            "inline": True,
-            "default": "body",
-        }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -118,22 +93,42 @@ class AccentFoldingFilter(BasicProcessor):
         self.create_standalone()
 
     @classmethod
-    def get_options(cls, parent_dataset=None, config=None):
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
         Get processor options
 
-        This method by default returns the class's "options" attribute, or an
-        empty dictionary. It can be redefined by processors that need more
-        fine-grained options, e.g. in cases where the availability of options
-        is partially determined by the parent dataset's parameters.
-
-        :param config:
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-can
-        be used to show some options only to privileges users.
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
         """
-        options = cls.options
+            
+        options = {
+            "mode": {
+                "help": "What to replace?",
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "fold": "Fold only accented latin characters",
+                    "transliterate": "Transliterate non-ASCII characters"
+                },
+                "default": "fold",
+                "tooltip": "Transliteration will ensure that only pure ASCII characters are left, but makes larger changes"
+                        " to the text (i.e. 北亰 is replaced with 'Bei Jing'). Folding will only replace accented "
+                        "characters with their closest un-accented ASCII equivalent, e.g. á -> a."
+            },
+            "case-fold": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Also convert all text to lowercase",
+                "default": False
+            },
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column(s) to apply folding on",
+                "inline": True,
+                "default": "body",
+            }
+        }
 
         if parent_dataset and parent_dataset.get_columns():
             columns = parent_dataset.get_columns()

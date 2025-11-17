@@ -45,54 +45,6 @@ class RankFlowRenderer(BasicProcessor):
         "[Rieder, B. RankFlow. *The Politics of Systems*](https://labs.polsys.net/tools/rankflow/)"
     ]
 
-    options = {
-        "colour_property": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "change": "Delta (rising or falling items are highlighted)",
-                "weight": "Value (more prevalent items are highlighted)",
-                "item": "Item (unique colour per item)",
-                "none": "None (same colour for everything)",
-            },
-            "default": "change",
-            "help": "Colour according to",
-        },
-        "size_property": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "weight": "Value (items with a higher value are bigger)",
-                "none": "None (same size for all elements)",
-            },
-            "default": "change",
-            "help": "Size according to",
-        },
-        "only_adjacent_flows": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Only draw flows between adjacent periods",
-            "tooltip": "This filters out flows across boxes that feature an absence in a period between them.",
-			"default": True
-        },
-        "normalise_size": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Normalise size per period",
-            "tooltip": "This makes the rankings have the same height per period regardless of the amount of items in "
-            "that period. Makes the graph more readable at the cost of over-representing periods with fewer "
-            "items.",
-            "default": False,
-        },
-        "show_value": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Include value in label",
-            "tooltip": "Make the value (e.g. number of occurrences) part of the label.",
-        },
-        "filter_incomplete": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Remove items that do not occur in all mapped periods.",
-        },
-    }
-
     # 25-colour palette via https://medialab.github.io/iwanthue/
     palette = [
         [0.081, 1.0, 0.902],
@@ -121,6 +73,65 @@ class RankFlowRenderer(BasicProcessor):
         [0.096, 1.0, 0.502],
         [0.123, 1.0, 0.69],
     ]
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "colour_property": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "change": "Delta (rising or falling items are highlighted)",
+                    "weight": "Value (more prevalent items are highlighted)",
+                    "item": "Item (unique colour per item)",
+                    "none": "None (same colour for everything)",
+                },
+                "default": "change",
+                "help": "Colour according to",
+            },
+            "size_property": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "weight": "Value (items with a higher value are bigger)",
+                    "none": "None (same size for all elements)",
+                },
+                "default": "change",
+                "help": "Size according to",
+            },
+            "only_adjacent_flows": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Only draw flows between adjacent periods",
+                "tooltip": "This filters out flows across boxes that feature an absence in a period between them.",
+                "default": True
+            },
+            "normalise_size": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Normalise size per period",
+                "tooltip": "This makes the rankings have the same height per period regardless of the amount of items in "
+                "that period. Makes the graph more readable at the cost of over-representing periods with fewer "
+                "items.",
+                "default": False,
+            },
+            "show_value": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Include value in label",
+                "tooltip": "Make the value (e.g. number of occurrences) part of the label.",
+            },
+            "filter_incomplete": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Remove items that do not occur in all mapped periods.",
+            },
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

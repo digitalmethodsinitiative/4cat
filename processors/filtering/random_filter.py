@@ -21,14 +21,24 @@ class RandomFilter(BaseFilter):
 	title = "Random sample"  # title displayed in UI
 	description = "Retain a pseudorandom set of posts. This creates a new dataset."  # description displayed in UI
 
-	# the following determines the options available to the user via the 4CAT interface
-	options = {
-		"sample_size": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Sample size",
-			"default": ""
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"sample_size": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Sample size",
+				"default": ""
+			}
 		}
-	}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

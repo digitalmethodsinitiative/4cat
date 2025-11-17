@@ -33,56 +33,6 @@ class TfIdf(BasicProcessor):
 
 	followups = ["wordcloud"]
 
-	options = {
-		"library": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "scikit-learn",
-			"options": {"scikit-learn": "scikit-learn", "gensim": "gensim"},
-			"help": "Library",
-			"tooltip": "Which Python library should do the calculations? Gensim is better in optimising memory, so should be used for large datasets. Check the documentation in this module's references."
-		},
-		"max_output": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 10,
-			"min": 1,
-			"max": 100,
-			"help": "Words to return per timeframe"
-		},
-		"min_occurrences": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"min": 0,
-			"max": 10000,
-			"help": "[scikit-learn] Ignore terms that appear in less than this amount of documents",
-			"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data).",
-			"requires": "library==scikit-learn"
-		},
-		"max_occurrences": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"min": 0,
-			"max": 10000,
-			"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
-			"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months.",
-			"requires": "library==scikit-learn"
-		},
-		"n_size": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "",
-			"options": {"1":"unigrams (1)", "2": "bigrams (2)", "3": "trigrams", "1-2": "uni- and bigrams (1-2)", "1-3": "uni-, bi-, and trigrams (1-3)"},
-			"help": "[scikit-learn] Amount of words to return",
-			"tooltip":  "Selecting a range can be useful to e.g. extract multi-word nouns like names.",
-			"requires": "library==scikit-learn"
-		},
-		"smartirs": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "nfc",
-			"help": "[gensim] SMART parameters",
-			"tooltip": "SMART is a mnemonic notation type for various tf-idf parameters. Check this module's references for more information.",
-			"requires": "library==gensim"
-		}
-	}
-
 	references = [
 		"[Spärck Jones, Karen. 1972. \"A statistical interpretation of term specificity and its application in retrieval.\" *Journal of Documentation* (28), 1: 11–21.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.115.8343&rep=rep1&type=pdf)",
 		"[Robertson, Stephen. 2004. \"Understanding Inverse Document value: On Theoretical arguments for IDF.\" *Journal of Documentation* (60), 5: 503–520](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.438.2284&rep=rep1&type=pdf)",
@@ -93,6 +43,67 @@ class TfIdf(BasicProcessor):
 		"[What is tf-idf? - William Scott](https://towardsdatascience.com/tf-idf-for-document-ranking-from-scratch-in-python-on-real-world-dataset-796d339a4089)",
 		"[SMART Information Retrieval System](https://en.wikipedia.org/wiki/SMART_Information_Retrieval_System)"
 	]
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"library": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "scikit-learn",
+				"options": {"scikit-learn": "scikit-learn", "gensim": "gensim"},
+				"help": "Library",
+				"tooltip": "Which Python library should do the calculations? Gensim is better in optimising memory, so should be used for large datasets. Check the documentation in this module's references."
+			},
+			"max_output": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 10,
+				"min": 1,
+				"max": 100,
+				"help": "Words to return per timeframe"
+			},
+			"min_occurrences": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"min": 0,
+				"max": 10000,
+				"help": "[scikit-learn] Ignore terms that appear in less than this amount of documents",
+				"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data).",
+				"requires": "library==scikit-learn"
+			},
+			"max_occurrences": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"min": 0,
+				"max": 10000,
+				"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
+				"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months.",
+				"requires": "library==scikit-learn"
+			},
+			"n_size": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "",
+				"options": {"1":"unigrams (1)", "2": "bigrams (2)", "3": "trigrams", "1-2": "uni- and bigrams (1-2)", "1-3": "uni-, bi-, and trigrams (1-3)"},
+				"help": "[scikit-learn] Amount of words to return",
+				"tooltip":  "Selecting a range can be useful to e.g. extract multi-word nouns like names.",
+				"requires": "library==scikit-learn"
+			},
+			"smartirs": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "nfc",
+				"help": "[gensim] SMART parameters",
+				"tooltip": "SMART is a mnemonic notation type for various tf-idf parameters. Check this module's references for more information.",
+				"requires": "library==gensim"
+			}
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

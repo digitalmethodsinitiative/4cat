@@ -34,7 +34,7 @@ class DatasourceMetrics(BasicWorker):
 
         :return:  Job parameters for the worker
         """
-        return {"remote_id": "localhost", "interval": 43200}
+        return {"remote_id": "localhost", "interval": 40000}
 
     def work(self):
         self.general_stats()

@@ -22,16 +22,9 @@ class DateFilter(BaseFilter):
     category = "Filtering"  # category
     title = "Filter by date"  # title displayed in UI
     description = "Retains posts between given dates. This will create a new dataset."
-
-    options = {
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range:"
-        }
-    }   
     
     @classmethod
-    def get_options(cls, parent_dataset=None, config=None):
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
         Get processor options
 
@@ -41,7 +34,12 @@ class DateFilter(BaseFilter):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Processor options
         """
-        options = cls.options
+        options = {
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Date range:"
+            }
+        }   
         if not parent_dataset:
             return options
         parent_columns = parent_dataset.get_columns()

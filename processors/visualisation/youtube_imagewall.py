@@ -31,18 +31,29 @@ class YouTubeImageWall(BasicProcessor):
 	description = "Make an image wall from YouTube video thumbnails."  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI
 
-	options = {
-		"max_amount": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"help": "Only use this amount of thumbnails (0 = all)"
-		},
-		"category_overlay": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Overlay video categories"
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"max_amount": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"help": "Only use this amount of thumbnails (0 = all)"
+			},
+			"category_overlay": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Overlay video categories"
+			}
 		}
-	}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

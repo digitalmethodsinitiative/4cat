@@ -31,45 +31,38 @@ class TopicModelWordExtractor(BasicProcessor):
 
     followups = []
 
-    options = {
-        "include_top_features": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Include top 5 words in topic header",
-            "tooltip": 'This may be useful in better understanding your topics.',
-        },
-        "columns": {
-            "type": UserInput.OPTION_MULTI,
-            "help": "Extra column(s) to include from original data",
-            "default": ["id"],
-            "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always "
-                       "included."
-        },
-        "save_annotations": {
-            "type": UserInput.OPTION_ANNOTATION,
-            "tooltip": "Outputs weights for each topic",
-            "label": "topic weights",
-            "default": False
-        }
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
-        This method by default returns the class's "options" attribute, or an
-        empty dictionary. It can be redefined by processors that need more
-        fine-grained options, e.g. in cases where the availability of options
-        is partially determined by the parent dataset's parameters.
-
-        :param config:
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-can
-        be used to show some options only to privileges users.
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
         """
-        options = cls.options
+        options = {
+            "include_top_features": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Include top 5 words in topic header",
+                "tooltip": 'This may be useful in better understanding your topics.',
+            },
+            "columns": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Extra column(s) to include from original data",
+                "default": ["id"],
+                "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always "
+                        "included."
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "tooltip": "Outputs weights for each topic",
+                "label": "topic weights",
+                "default": False
+            }
+        }
 
         if parent_dataset:
             top_dataset = parent_dataset.top_parent()

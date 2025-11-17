@@ -33,29 +33,6 @@ class URLFetcher(BasicProcessor):
 
     followups = []
 
-    options = {
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column(s) to get URLs from",
-            "default": "body"
-        },
-        "follow-redirects": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Follow redirects?",
-            "default": True,
-            "tooltip": "Follow HTTP redirects (status 301 or 302) and report on the URL redirected to instead of the "
-                       "original URL"
-        },
-        "ignore-duplicates": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Ignore duplicates?",
-            "default": True,
-            "tooltip": "If enabled, only include the first occurrence of a URL. Otherwise, a row will be included in "
-                       "the output CSV file for each separate occurrence of the URL. Note that each URL is only "
-                       "requested once regardless."
-        }
-    }
-
     config = {
         "url-metadata.timeout": {
             "type": UserInput.OPTION_TEXT,
@@ -82,18 +59,34 @@ class URLFetcher(BasicProcessor):
         """
         Get processor options
 
-        This method by default returns the class's "options" attribute, or an
-        empty dictionary. It can be redefined by processors that need more
-        fine-grained options, e.g. in cases where the availability of options
-        is partially determined by the parent dataset's parameters.
-
-        :param config:
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-can
-        be used to show some options only to privileges users.
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
         """
-        options = cls.options
+        options = {
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column(s) to get URLs from",
+                "default": "body"
+            },
+            "follow-redirects": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Follow redirects?",
+                "default": True,
+                "tooltip": "Follow HTTP redirects (status 301 or 302) and report on the URL redirected to instead of the "
+                        "original URL"
+            },
+            "ignore-duplicates": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Ignore duplicates?",
+                "default": True,
+                "tooltip": "If enabled, only include the first occurrence of a URL. Otherwise, a row will be included in "
+                        "the output CSV file for each separate occurrence of the URL. Note that each URL is only "
+                        "requested once regardless."
+            }
+        }
 
         if parent_dataset and parent_dataset.get_columns():
             columns = parent_dataset.get_columns()

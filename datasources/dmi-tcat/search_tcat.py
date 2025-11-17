@@ -32,93 +32,6 @@ class SearchWithinTCATBins(Search):
     additional_TCAT_fields = ["to_user_name", "filter_level", "favorite_count", "truncated", "from_user_favourites_count", "from_user_lang", "from_user_utcoffset",
                               "from_user_timezone"]
 
-    options = {
-        "intro-1": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source interfaces with a DMI-TCAT instance to allow subsetting of tweets from a tweet "
-                    "bin in that instance."
-        },
-        "divider-1": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "bin": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Query bin"
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Query text",
-            "tooltip": "Match all tweets containing this text."
-        },
-        "query-exclude": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Exclude text",
-            "tooltip": "Match all tweets that do NOT contain this text."
-        },
-        "user-name": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "From user",
-            "tooltip": "Match all tweets from this username."
-        },
-        "user-exclude": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Exclude user",
-            "tooltip": "Match all tweets NOT from this username."
-        },
-        "exclude-replies": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "exclude": "Exclude replies",
-                "include": "Include replies"
-            },
-            "help": "Reply tweets",
-            "default": "include",
-            "tooltip": "Choose to exclude or include tweets that are replies from the data"
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range"
-        },
-        # Advanced Options Section
-        "divider-2": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "advanced_options_info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Advanced Query Options can further refine your query"
-        },
-        "user-bio": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "User bio text",
-            "tooltip": "Match all tweets from users with biographies containing this text."
-        },
-        "user-language": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "User language",
-            "tooltip": "Match all tweets from users using this language (as detected by Twitter)."
-        },
-        "tweet-language": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Tweet language",
-            "tooltip": "Match all tweets from users with this language (as detected by Twitter)."
-        },
-        "tweet-client": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Twitter client URL/descr",
-            "tooltip": "Match all tweets from clients that match this text."
-        },
-        "url": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "(Part of) URL",
-            "tooltip": "Match all tweets containing this (partial) URL."
-        },
-        "url-media": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "(Part of) media URL",
-            "tooltip": "Match all tweets containing this (partial) media URL."
-        },
-    }
-
     config = {
         "dmi-tcat-search.instances": {
             "type": UserInput.OPTION_TEXT_JSON,
@@ -169,11 +82,95 @@ class SearchWithinTCATBins(Search):
 
         :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-can
+        the processor would be run on can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "intro-1": {
+                "type": UserInput.OPTION_INFO,
+                "help": "This data source interfaces with a DMI-TCAT instance to allow subsetting of tweets from a tweet "
+                        "bin in that instance."
+            },
+            "divider-1": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "bin": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Query bin"
+            },
+            "query": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Query text",
+                "tooltip": "Match all tweets containing this text."
+            },
+            "query-exclude": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Exclude text",
+                "tooltip": "Match all tweets that do NOT contain this text."
+            },
+            "user-name": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "From user",
+                "tooltip": "Match all tweets from this username."
+            },
+            "user-exclude": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Exclude user",
+                "tooltip": "Match all tweets NOT from this username."
+            },
+            "exclude-replies": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "exclude": "Exclude replies",
+                    "include": "Include replies"
+                },
+                "help": "Reply tweets",
+                "default": "include",
+                "tooltip": "Choose to exclude or include tweets that are replies from the data"
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Date range"
+            },
+            # Advanced Options Section
+            "divider-2": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "advanced_options_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Advanced Query Options can further refine your query"
+            },
+            "user-bio": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "User bio text",
+                "tooltip": "Match all tweets from users with biographies containing this text."
+            },
+            "user-language": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "User language",
+                "tooltip": "Match all tweets from users using this language (as detected by Twitter)."
+            },
+            "tweet-language": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Tweet language",
+                "tooltip": "Match all tweets from users with this language (as detected by Twitter)."
+            },
+            "tweet-client": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Twitter client URL/descr",
+                "tooltip": "Match all tweets from clients that match this text."
+            },
+            "url": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "(Part of) URL",
+                "tooltip": "Match all tweets containing this (partial) URL."
+            },
+            "url-media": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "(Part of) media URL",
+                "tooltip": "Match all tweets containing this (partial) media URL."
+            },
+        }
 
         cls.collect_all_bins(config)
         if all([data.get("failed", False) for instance, data in cls.bin_data["all_bins"].items()]):

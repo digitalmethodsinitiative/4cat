@@ -35,44 +35,55 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	options = {
-		"smooth": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Smooth curves"
-		},
-		"normalise": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Normalise values to 0-100% for each graph",
-			"tooltip": "This allows for easier trend comparison (but absolute counts cannot be compared anymore)."
-		},
-		"top": {
-			"type": UserInput.OPTION_TEXT,
-			"min": 1,
-			"max": 50,
-			"default": 10,
-			"help": "Cut-off for top list",
-			"tooltip": "Only the most-occuring items are retained. Sorted by total amount of occurences (i.e. all frequencies per item)."
-		},
-		"complete": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"help": "Data completeness required",
-			"tooltip": "At least this % of intervals should be present for an item to be graphed; 0 to disable"
-		},
-		"label": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Graph label (optional)"
-		}
-	}
-
 	# a palette generated with https://medialab.github.io/iwanthue/
 	colours = ["#eb010a", "#495dff", "#f35f00", "#5137e0", "#ffeb45", "#d05edf",
 			   "#00cb3a", "#b200c7", "#d8fd5d", "#a058ff", "#b90fd4", "#6fb300",
 			   "#ff40b5", "#9eff3b", "#022bc3"]
 	colour_index = 0
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"smooth": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Smooth curves"
+			},
+			"normalise": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Normalise values to 0-100% for each graph",
+				"tooltip": "This allows for easier trend comparison (but absolute counts cannot be compared anymore)."
+			},
+			"top": {
+				"type": UserInput.OPTION_TEXT,
+				"min": 1,
+				"max": 50,
+				"default": 10,
+				"help": "Cut-off for top list",
+				"tooltip": "Only the most-occuring items are retained. Sorted by total amount of occurences (i.e. all frequencies per item)."
+			},
+			"complete": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"help": "Data completeness required",
+				"tooltip": "At least this % of intervals should be present for an item to be graphed; 0 to disable"
+			},
+			"label": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "",
+				"help": "Graph label (optional)"
+			}
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

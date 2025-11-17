@@ -36,24 +36,6 @@ class HatebaseAnalyser(BasicProcessor):
         "[Hatebase.org](https://hatebase.org)"
     ]
 
-    options = {
-        "language": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "en",
-            "options": {
-                "en": "English",
-                "it": "Italian"
-            },
-            "help": "Language"
-        },
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Columns to analyse",
-            "default": "body",
-            "tooltip": "The content of these columns will be analysed for presence of hatebase-listed words."
-        }
-    }
-
     @staticmethod
     def is_compatible_with(module=None, config=None):
         """
@@ -64,6 +46,49 @@ class HatebaseAnalyser(BasicProcessor):
         :return bool:
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
+
+        This method by default returns the class's "options" attribute, or an
+        empty dictionary. It can be redefined by processors that need more
+        fine-grained options, e.g. in cases where the availability of options
+        is partially determined by the parent dataset's parameters.
+
+        :param config:
+        :param DataSet parent_dataset:  An object representing the dataset that
+        the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+        case they are requested for display in the 4CAT web interface. This can
+        be used to show some options only to privileges users.
+        """
+        options = {
+            "language": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "en",
+                "options": {
+                    "en": "English",
+                    "it": "Italian"
+                },
+                "help": "Language"
+            },
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Columns to analyse",
+                "default": "body",
+                "tooltip": "The content of these columns will be analysed for presence of hatebase-listed words."
+            }
+        }
+
+        if parent_dataset and parent_dataset.get_columns():
+            columns = parent_dataset.get_columns()
+            options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
+            options["columns"]["options"] = {v: v for v in columns}
+            options["columns"]["default"] = ["body"] if "body" in columns else (columns[0] if columns else [])
+
+        return options
 
     def process(self):
         """
@@ -170,30 +195,3 @@ class HatebaseAnalyser(BasicProcessor):
         self.dataset.log(f"Total terms matched: {matches}")
         self.dataset.update_status("Finished")
         self.dataset.finish(processed)
-
-    @classmethod
-    def get_options(cls, parent_dataset=None, config=None):
-        """
-        Get processor options
-
-        This method by default returns the class's "options" attribute, or an
-        empty dictionary. It can be redefined by processors that need more
-        fine-grained options, e.g. in cases where the availability of options
-        is partially determined by the parent dataset's parameters.
-
-        :param config:
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
-        be used to show some options only to privileges users.
-        """
-        options = cls.options
-
-        if parent_dataset and parent_dataset.get_columns():
-            columns = parent_dataset.get_columns()
-            options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
-            options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = ["body"] if "body" in columns else (columns[0] if columns else [])
-
-        return options

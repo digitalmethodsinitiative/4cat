@@ -26,20 +26,31 @@ class VectorRanker(BasicProcessor):
 
 	followups = ["wordcloud"]
 
-	options = {
-		"top": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 25,
-			"help": "Cut-off for top list"
-		},
-		"top-style": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "per-item",
-			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (only include overall top items in the timeframe)"},
-			"help": "Determine top items",
-			"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
-		},
-	}
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"top": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 25,
+				"help": "Cut-off for top list"
+			},
+			"top-style": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "per-item",
+				"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (only include overall top items in the timeframe)"},
+				"help": "Determine top items",
+				"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

@@ -45,42 +45,51 @@ class OvertimeHatefulAnalysis(BasicProcessor):
         """
         return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
 
-    # the following determines the options available to the user via the 4CAT
-    # interface.
-    options = {
-        "language": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "en",
-            "options": {
-                "en": "English",
-                "it": "Italian"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "language": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "en",
+                "options": {
+                    "en": "English",
+                    "it": "Italian"
+                },
+                "help": "Language"
             },
-            "help": "Language"
-        },
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "all",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-            "help": "Count frequencies per"
-        },
-        "scope": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "all",
-            "options": {
-                "all": "Ambigous and unambiguous hate terms",
-                "ambiguous": "Ambiguous hate terms only",
-                "unambiguous": "Unambiguous hate terms only"
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "all",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+                "help": "Count frequencies per"
             },
-            "help": "Hatebase-listed terms to consider"
-        },
-        "hatefulness-score": {
-            "type": UserInput.OPTION_TEXT,
-            "default": 0,
-            "help": "Minimum 'offensiveness score' (0-100) for Hatebase terms",
-            "min": 0,
-            "max": 100
+            "scope": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "all",
+                "options": {
+                    "all": "Ambigous and unambiguous hate terms",
+                    "ambiguous": "Ambiguous hate terms only",
+                    "unambiguous": "Unambiguous hate terms only"
+                },
+                "help": "Hatebase-listed terms to consider"
+            },
+            "hatefulness-score": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 0,
+                "help": "Minimum 'offensiveness score' (0-100) for Hatebase terms",
+                "min": 0,
+                "max": 100
+            }
         }
-    }
 
     def process(self):
         """

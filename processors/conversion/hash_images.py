@@ -35,53 +35,62 @@ class ImageHasher(BasicProcessor):
     # "whash-haar": "Wavelet (Haar) hash: similar to pHash but often more stable to brightness/exposure shifts. Robust to resize/compression/exposure; weaker to large crop/rotation. Hamming; size=16≈256-bit.",
     # "whash-db4": "Wavelet (Daubechies-4) hash: more resistant to noise/compression and slight geometric changes than Haar; a bit slower. Hamming; size=16≈256-bit (use ~20–40 threshold).",
     # "crhash": "Crop-resistant perceptual hash: survives moderate crops, borders, overlays, and aspect changes; slowest. Returns multiple sub-hashes; compare with crop_resistant distance (not simple Hamming)."
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
 
-
-    options = {
-        "hash-type-info": {
-                "type": UserInput.OPTION_INFO,
-                "help": "The following hash types are available: "
-                        "**Perceptual (DCT) hash**: strong general-purpose near-duplicate. "
-                        "**Wavelet (Daubechies-4) hash**: often more stable to brightness/exposure shifts; weaker to large crop/rotation. "
-                        "**Crop-resistant perceptual hash**: survives moderate crops, borders, overlays, and aspect changes; slowest. Returns multiple sub-hashes (not simple Hamming).",
-        },
-        "hash-type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Comparison method",
-            "default": "phash",
-            "options": {
-                "phash": "Perceptual (DCT)",
-                "whash-db4": "Wavelet (Daubechies-4)",
-                "crhash": "Crop-resistant perceptual"
-                }
-        },
-        "hash-size": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Hash size",
-            "default": "16",
-            "options": {
-                "16": "16 (fast, accurate)",
-                "32": "32 (slower, more accurate)"
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """ 
+        return {
+            "hash-type-info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": "The following hash types are available: "
+                            "**Perceptual (DCT) hash**: strong general-purpose near-duplicate. "
+                            "**Wavelet (Daubechies-4) hash**: often more stable to brightness/exposure shifts; weaker to large crop/rotation. "
+                            "**Crop-resistant perceptual hash**: survives moderate crops, borders, overlays, and aspect changes; slowest. Returns multiple sub-hashes (not simple Hamming).",
             },
-            "requires": "hash-type!=crhash"
-        },
-        "group-by": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Group similar images together",
-            "default": False,
-            "tooltip": "If enabled, images with similar hashes will be grouped together in the output. Single-link clustering (A similar to B, B similar to C => A, B, C in same group)."
-        },
-        "similarity-threshold": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Similarity threshold (percent)",
-            "coerce_type": int,
-            "default": 5,
-            "min": 0,
-            "max": 100,
-            "requires": "group-by==true",
-            "tooltip": "Maximum difference as a percentage of hash bits (0–100). Examples: ~4% ≈ 10/256 for size=16; ~4% ≈ 40/1024 for size=32. For crop-resistant, the % applies to each component hash."
+            "hash-type": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Comparison method",
+                "default": "phash",
+                "options": {
+                    "phash": "Perceptual (DCT)",
+                    "whash-db4": "Wavelet (Daubechies-4)",
+                    "crhash": "Crop-resistant perceptual"
+                    }
+            },
+            "hash-size": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Hash size",
+                "default": "16",
+                "options": {
+                    "16": "16 (fast, accurate)",
+                    "32": "32 (slower, more accurate)"
+                },
+                "requires": "hash-type!=crhash"
+            },
+            "group-by": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Group similar images together",
+                "default": False,
+                "tooltip": "If enabled, images with similar hashes will be grouped together in the output. Single-link clustering (A similar to B, B similar to C => A, B, C in same group)."
+            },
+            "similarity-threshold": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Similarity threshold (percent)",
+                "coerce_type": int,
+                "default": 5,
+                "min": 0,
+                "max": 100,
+                "requires": "group-by==true",
+                "tooltip": "Maximum difference as a percentage of hash bits (0–100). Examples: ~4% ≈ 10/256 for size=16; ~4% ≈ 40/1024 for size=32. For crop-resistant, the % applies to each component hash."
+            }
         }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -115,12 +124,30 @@ class ImageHasher(BasicProcessor):
         except FileNotFoundError:
             metadata_file = None
 
+        metadata_extra_fields = ["post_ids", "post_id", "url", "from_dataset"]
         image_data_by_filename = {}
         if metadata_file:
             with open(metadata_file) as file:
                 image_data = json.load(file)
                 for url, item in image_data.items():
-                    image_data_by_filename[item["filename"]] = item
+                    if "filename" in item:
+                        image_data_by_filename[item["filename"]] = item
+                    elif "files" in item:
+                        files = item.get('files')
+                        if not isinstance(files, list):
+                            self.log.warning(f"Invalid 'files' entry in metadata (expected list, got {type(files)}); cannot use file metadata")
+                            image_data_by_filename = {}
+                            break
+                        for file in files:
+                            if "filename" in file:
+                                # add extra fields from parent item if not present in file entry
+                                for key in metadata_extra_fields:
+                                    if key in file:
+                                        continue
+                                    elif key in item:
+                                        file[key] = item[key]
+                                image_data_by_filename[file["filename"]] = file
+                                
                 self.dataset.log("Found and loaded image metadata")
         else:
             self.dataset.log("No image metadata found")
@@ -131,7 +158,7 @@ class ImageHasher(BasicProcessor):
         fieldnames = (["group"] if group_by else []) + base_fields
         if image_data_by_filename:
             example = next(iter(image_data_by_filename.values()))
-            fieldnames.extend([key for key in ["post_ids", "post_id", "url", "from_dataset"] if key in example.keys()])
+            fieldnames.extend([key for key in metadata_extra_fields if key in example.keys()])
 
         processed = 0
         skipped = 0

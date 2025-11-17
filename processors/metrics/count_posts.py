@@ -22,21 +22,6 @@ class CountPosts(BasicProcessor):
 
 	followups = ["histogram"]
 
-	options = {
-		"timeframe": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "month",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "hour": "Hour", "minute": "Minute"},
-			"help": "Produce counts per"
-		},
-		"pad": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Include dates where the count is zero",
-			"tooltip": "Makes the counts continuous. For example, if there are items from May and July but not June, June will be included with 0 items."
-		}
-	}
-
 	@staticmethod
 	def is_compatible_with(module=None, config=None):
 		"""
@@ -47,6 +32,38 @@ class CountPosts(BasicProcessor):
         :return bool:
         """
 		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+	
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None):
+		
+		options = {
+			"timeframe": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "month",
+				"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "hour": "Hour", "minute": "Minute"},
+				"help": "Produce counts per"
+			},
+			"pad": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Include dates where the count is zero",
+				"tooltip": "Makes the counts continuous. For example, if there are items from May and July but not June, June will be included with 0 items."
+			}
+		}
+
+		# We give an option to add relative trends for local datasources
+		if not parent_dataset:
+			return options
+	
+		if parent_dataset.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun"):
+			options["add_relative"] = {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Add relative counts",
+				"tooltip": "Divides the absolute count by the total amount of items for this timeframe."
+			}
+		
+		return options
 
 	def process(self):
 		"""
@@ -179,22 +196,3 @@ class CountPosts(BasicProcessor):
 			self.write_csv_items_and_finish(rows)
 		else:
 			return self.dataset.finish_with_error("No items could be counted. See dataset log for details")
-
-	@classmethod
-	def get_options(cls, parent_dataset=None, config=None):
-		
-		options = cls.options
-
-		# We give an option to add relative trends for local datasources
-		if not parent_dataset:
-			return options
-	
-		if parent_dataset.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun"):
-			options["add_relative"] = {
-				"type": UserInput.OPTION_TOGGLE,
-				"default": False,
-				"help": "Add relative counts",
-				"tooltip": "Divides the absolute count by the total amount of items for this timeframe."
-			}
-		
-		return options
