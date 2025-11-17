@@ -335,6 +335,7 @@ def setting_required(setting, required_value=True):
 
 
 def parse_markdown(text, trim_container=False):
+	text = text if text else ""
 	val = markdown2.markdown(text)
 	if trim_container:
 		val = re.sub(r"^<p>", "", val)
