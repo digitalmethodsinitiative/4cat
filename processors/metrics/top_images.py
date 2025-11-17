@@ -7,7 +7,6 @@ import re
 
 from collections import Counter, OrderedDict
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"

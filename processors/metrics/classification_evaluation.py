@@ -114,7 +114,6 @@ class ClassificationEvaluation(BasicProcessor):
     def process(self):
 
         skip_empty = self.parameters.get("skip_empty", False)
-        to_lowercase = self.parameters.get("to_lowercase", True)
         multi_label = self.parameters.get("multi_label", False)
         metrics = self.parameters.get("metrics", [])
         if not metrics:
