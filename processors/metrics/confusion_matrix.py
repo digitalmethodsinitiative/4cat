@@ -20,7 +20,7 @@ class ConfusionMatrix(BasicProcessor):
     Create a confusion matrix with values from two columns
     """
     type = "confusion-matrix"  # job type ID
-    category = "Metrics"  # category
+    category = "Statistics"  # category
     title = "Confusion matrix"  # title displayed in UI
     description = "Create a confusion matrix with data from two columns."  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI

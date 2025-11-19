@@ -20,7 +20,7 @@ class RegressionEvaluation(BasicProcessor):
     Generate MAE, MSE, R2, and RMSE scores for numerical predictions.
     """
     type = "regression_evaluation"  # job type ID
-    category = "Metrics"  # category
+    category = "Statistics"  # category
     title = "Regression evaluation"  # title displayed in UI
     description = ("Calculate regression metrics (MAE, MSE, R2, RMSE) between two numerical columns.")
     extension = "csv"  # extension of result file, used internally in UI

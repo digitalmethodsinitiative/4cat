@@ -20,7 +20,7 @@ class ClassificationEvaluation(BasicProcessor):
     Generate accuracy, F1, recall, and precision scores for labels in two columns.
     """
     type = "classification_evaluation"  # job type ID
-    category = "Metrics"  # category
+    category = "Statistics"  # category
     title = "Classification evaluation"  # title displayed in UI
     description = ("Use labels from two columns to calculate evaluation metrics (accuracy, precision, recall, F1, "
                    "and Cohen's Kappa). Produces overall and per-label metrics. Also supports multi-label values.")
