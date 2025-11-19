@@ -7,7 +7,6 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 
 import numpy as np
-from scipy import stats as scipy_stats
 
 __author__ = "4CAT"
 __credits__ = ["4CAT"]
