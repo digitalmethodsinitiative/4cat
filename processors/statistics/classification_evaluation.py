@@ -109,7 +109,7 @@ class ClassificationEvaluation(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
 
