@@ -3,7 +3,6 @@ Download videos
 
 First attempt to download via request, but if that fails use yt-dlp
 """
-import os
 import json
 import re
 import time
@@ -17,6 +16,7 @@ from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
 from backend.lib.processor import BasicProcessor
+from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
 from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
@@ -50,6 +50,7 @@ class VideoDownloaderPlus(BasicProcessor):
     ]
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
+    DIRECT_DOWNLOAD_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0"
 
     config = {
         "video-downloader.ffmpeg_path": {
@@ -347,7 +348,10 @@ class VideoDownloaderPlus(BasicProcessor):
         last_domains = []
         self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
         yt_dlp_archive_map = {}
-        for url in urls:
+        direct_requests = []
+        fallback_queue = []
+
+        for url in list(urls.keys()):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
@@ -364,7 +368,6 @@ class VideoDownloaderPlus(BasicProcessor):
                         copied_videos += num_copied
                         continue
                     except FailedToCopy as e:
-                        # Unable to copy
                         self.dataset.log(f"{str(e)}; attempting to download again")
                 elif previous_vid_metadata.get("retry", True) is False:
                     urls[url] = previous_vid_metadata
@@ -373,40 +376,8 @@ class VideoDownloaderPlus(BasicProcessor):
 
             urls[url]["success"] = False
             urls[url]["retry"] = True
-            last_domains = last_domains[-4:] + [urlparse(url).netloc]
 
-            # Stop processing if worker has been asked to stop or max downloads reached
-            if self.downloaded_videos >= amount and amount != 0:
-                urls[url]["error"] = "Max video download limit already reached."
-                continue
-
-            # Check for repeated timeouts
-            if consecutive_errors >= 5:
-                if also_indirect != "none":
-                    message = "Downloaded %i videos. Errors %i consecutive times; try " \
-                              "deselecting the non-direct videos setting" % (self.downloaded_videos, consecutive_errors)
-                else:
-                    message = "Downloaded %i videos. Errors %i consecutive times; check logs to ensure " \
-                              "video URLs are working links and you are not being blocked." % (self.downloaded_videos, consecutive_errors)
-                self.dataset.update_status(message, is_final=True)
-                if self.downloaded_videos == 0:
-                    self.dataset.finish(0)
-                    return
-                else:
-                    # Finish processor with already downloaded videos
-                    break
-            if not_a_video >= 10 and last_domains.count(urlparse(url).netloc) == 5:
-                # This processor can be used to extract all links from text body and attempt to download any with videos
-                # If the same domain is encountered 5 times in a row and no links are to videos, we are assuming the user has poorly chosen their columns and no videos will be found
-                self.dataset.update_status(f"Too many consecutive non-video URLs encountered; {'try again with Non-direct videos option selected' if self.config.get('video-downloader.allow-indirect') else 'try extracting URLs and filtering dataset first'}.", is_final=True)
-                if self.downloaded_videos == 0:
-                    self.dataset.finish(0)
-                    return
-                else:
-                    # Finish processor with already downloaded videos
-                    break
-
-            # Reject known channels; unknown will still download!
+            # Skip known channels if not downloading channels (yt_dlp can download entire channels/playlists)
             if not download_channels and any([sub_url in url for sub_url in self.known_channels]):
                 message = 'Skipping known channel: %s' % url
                 urls[url]['error'] = message
@@ -414,145 +385,267 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.dataset.log(message)
                 continue
 
-            self.videos_downloaded_from_url = set()
             # First we'll try to see if we can directly download the URL
+            direct_requests.append({
+                "original_url": url,
+                "request_url": self._normalize_direct_url(url)
+            })
+
+        stop_processing = False
+        stop_reason = None
+        processed_direct = 0
+        direct_user_agent = self.DIRECT_DOWNLOAD_UA
+
+        if direct_requests:
+            request_urls = [entry["request_url"] for entry in direct_requests]
+            task_iter = iter(direct_requests)
             try:
-                filename = self.download_video_with_requests(url, results_path, max_video_size)
-                urls[url]["downloader"] = "direct_link"
-                urls[url]["files"] = [{
-                    "filename": filename,
-                    "metadata": {},
-                    "success": True
-                }]
-                success = True
-                self.videos_downloaded_from_url.add(filename)
-            except (requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects, FilesizeException, FailedDownload, NotAVideo) as e:
-                # FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
-                # FailedDownload raised when response other than 200 received
-                # NotAVideo raised due to specific Content-Type known to not be a video (and not a webpage/html that could lead to a video via YT-DLP)
-                self.dataset.log(f"Request Error: {str(e)}")
-                urls[url]["error"] = str(e)
-                if type(e) is requests.exceptions.Timeout:
-                    # TODO: retry timeouts?
-                    consecutive_errors += 1
-                if type(e) in [requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, FilesizeException, FailedDownload]:
-                    failed_downloads += 1
-                if type(e) in [NotAVideo]:
-                    # No need to retry non videos
-                    urls[url]["retry"] = False
-                continue
-            except VideoStreamUnavailable as e:
-                def is_youtube_link(u):
-                    """
-                    Helper to determine if a URL is a YouTube link
-                    Only used if also_indirect is "yt_only"
-                    :param u: URL to check
-                    :return: True if YouTube link, else False
-                    """
-                    netloc = urlparse(u).netloc.lower()
-                    return (
-                        netloc == 'youtu.be' or
-                        netloc == 'youtube.com' or
-                        netloc.endswith('.youtube.com')
-                    )
-                if also_indirect == "all" or (also_indirect == "yt_only" and is_youtube_link(url)):
-                    # Take it away yt-dlp
-                    # Update filename
-                    ydl_opts["outtmpl"] = str(results_path) + '/' + re.sub(r"[^0-9a-z]+", "_", url.lower())[
-                                                                    :100] + '_%(autonumber)s.%(ext)s'
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        # Count and use self.yt_dlp_monitor() to ensure sure we don't download videos forever...
-                        self.url_files = {}
-                        self.last_dl_status = {}
-                        self.last_post_process_status = {}
-                        self.dataset.update_status("Downloading %i/%i via yt-dlp: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
-                        try:
-                            ydl.extract_info(url)
-                        except MaxVideosDownloaded:
-                            self.dataset.log("Max videos for URL reached.")
-                            # Raised when already downloaded max number of videos per URL as defined in self.max_videos_per_url
-                            pass
-                        except ExistingVideoReached:
-                            self.dataset.log("Already downloaded video associated with: %s" % url)
-                            # Video already downloaded; grab from archive
-                            # TODO: with multiple videos per URL, this may not capture the desired video and would instead repeat the first video; Need more feedback from yt-dlp!
-                            with yt_dlp.YoutubeDL({"socket_timeout": 30}) as ydl2:
-                                info2 = ydl2.extract_info(url, download=False)
-                                if info2:
-                                    self.url_files[info2.get('_filename', {})] = yt_dlp_archive_map[info2.get('extractor') + info2.get('id')]
-                                    self.dataset.log("Already downloaded video associated with: %s" % url)
-                                else:
-                                    message = f"Video identified, but unable to identify which video from {url}"
-                                    self.dataset.log(message)
-                                    self.log.warning(message)
-                                    if len(self.videos_downloaded_from_url) == 0:
-                                        # No videos downloaded for this URL
-                                        urls[url]['error'] = message
-                                        continue
-                        except (DownloadError, LiveVideoException) as e:
-                            # LiveVideoException raised when a video is known to be live
-                            if "Requested format is not available" in str(e):
-                                self.dataset.log(f"Format Error: {str(e)}")
-                                message = "No format available for video (check max size/resolution settings and try again)"
-                            elif "Unable to download webpage: The read operation timed out" in str(e):
-                                # Certain sites fail repeatedly (22-12-8 TikTok has this issue)
-                                message = 'DownloadError: %s' % str(e)
-                            elif "Sign in to confirm you’re not a bot." in str(e):
-                                # Youtube blocks YT-DLP; need to sign in
-                                message = 'Sign in required: %s' % str(e)
-                            elif "HTTP Error 429: Too Many Requests" in str(e):
-                                # Oh no, https://github.com/yt-dlp/yt-dlp/wiki/FAQ#http-error-429-too-many-requests-or-402-payment-required
-                                message = 'Too Many Requests: %s' % str(e)
-                                # TODO: Add url back to end?
-                            else:
-                                message = 'DownloadError: %s' % str(e)
-                            time.sleep(10 * consecutive_errors)
-                            consecutive_errors += 1
-                            urls[url]['error'] = message
-                            failed_downloads += 1
-                            self.dataset.log(message)
+                for _, response in self.iterate_proxied_requests(
+                        request_urls,
+                        preserve_order=True,
+                        headers={"User-Agent": direct_user_agent},
+                        stream=True,
+                        timeout=20,
+                ):
+                    task = next(task_iter)
+                    processed_direct += 1
+                    url = task["original_url"]
+                    success = False
+                    self.videos_downloaded_from_url = set()
+
+                    if self.interrupted:
+                        self.flush_proxied_requests()
+                        raise ProcessorInterruptedException("Interrupted while downloading videos.")
+
+                    domain = urlparse(url).netloc
+                    last_domains = last_domains[-4:] + [domain]
+                    proxy_used = response.proxy_url if isinstance(response, FailedProxiedRequest) else getattr(response, "_4cat_proxy", None)
+
+                    try:
+                        if isinstance(response, FailedProxiedRequest):
+                            error_context = response.context
+                            self.dataset.log(f"Request Error: {error_context}")
+                            urls[url]["error"] = str(error_context)
+                            if isinstance(error_context, requests.exceptions.Timeout):
+                                consecutive_errors += 1
+                                failed_downloads += 1
+                                action = self._handle_consecutive_error_stop(consecutive_errors, also_indirect)
+                                if action == "finish":
+                                    self.flush_proxied_requests()
+                                    return
+                                if action == "break":
+                                    stop_processing = True
+                                    stop_reason = "errors"
+                                    break
+                            elif isinstance(error_context, (requests.exceptions.SSLError, requests.exceptions.ConnectionError)):
+                                failed_downloads += 1
                             continue
-                        except Exception as e:
-                            self.dataset.log(f"YT-DLP raised unexpected error: {str(e)}")
-                            # Catch all other issues w/ yt-dlp
-                            message = "YT-DLP raised unexpected error: %s" % str(e)
-                            urls[url]['error'] = message
+
+                        filename, proxy_used = self._write_direct_response(url, response, results_path, max_video_size)
+                        urls[url]["downloader"] = "direct_link"
+                        urls[url]["files"] = [{
+                            "filename": filename,
+                            "metadata": {"proxy": proxy_used} if proxy_used else {},
+                            "success": True
+                        }]
+                        success = True
+                        self.videos_downloaded_from_url.add(filename)
+
+                    except VideoStreamUnavailable as e:
+                        if self._should_use_yt_dlp(url, also_indirect):
+                            fallback_queue.append(url)
+                        else:
+                            self.dataset.log(f"NotVideoLinkError: {str(e)}")
+                            not_a_video += 1
+                            urls[url]["error"] = str(e)
+                            urls[url]["retry"] = False
+                            if last_domains.count(domain) >= 2:
+                                time.sleep(5 * not_a_video)
+                            action = self._handle_non_video_stop(not_a_video, domain, last_domains)
+                            if action == "finish":
+                                self.flush_proxied_requests()
+                                return
+                            if action == "break":
+                                stop_processing = True
+                                stop_reason = "no-videos"
+                                break
+                        continue
+
+                    except NotAVideo as e:
+                        self.dataset.log(f"Request Error: {str(e)}")
+                        not_a_video += 1
+                        urls[url]["error"] = str(e)
+                        urls[url]["retry"] = False
+                        if last_domains.count(domain) >= 2:
+                            time.sleep(5 * not_a_video)
+                        action = self._handle_non_video_stop(not_a_video, domain, last_domains)
+                        if action == "finish":
+                            self.flush_proxied_requests()
+                            return
+                        if action == "break":
+                            stop_processing = True
+                            stop_reason = "no-videos"
+                            break
+                        continue
+
+                    except FilesizeException as e:
+                        self.dataset.log(f"Request Error: {str(e)}")
+                        urls[url]["error"] = str(e)
+                        failed_downloads += 1
+                        continue
+
+                    except FailedDownload as e:
+                        self.dataset.log(f"Request Error: {str(e)}")
+                        urls[url]["error"] = str(e)
+                        failed_downloads += 1
+                        continue
+
+                    except requests.exceptions.Timeout as e:
+                        self.dataset.log(f"Request Error: {str(e)}")
+                        urls[url]["error"] = str(e)
+                        consecutive_errors += 1
+                        failed_downloads += 1
+                        action = self._handle_consecutive_error_stop(consecutive_errors, also_indirect)
+                        if action == "finish":
+                            self.flush_proxied_requests()
+                            return
+                        if action == "break":
+                            stop_processing = True
+                            stop_reason = "errors"
+                            break
+                        continue
+
+                    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects) as e:
+                        self.dataset.log(f"Request Error: {str(e)}")
+                        urls[url]["error"] = str(e)
+                        if not isinstance(e, requests.exceptions.TooManyRedirects):
                             failed_downloads += 1
+                        continue
+
+                    finally:
+                        if hasattr(response, "close") and callable(response.close):
+                            try:
+                                response.close()
+                            except Exception:
+                                pass
+
+                    urls[url]["success"] = success
+                    if success:
+                        consecutive_errors = 0
+                        not_a_video = 0
+                        self.downloaded_videos += len(self.videos_downloaded_from_url)
+                        self._update_download_status(copied_videos, failed_downloads)
+                        if amount != 0 and self.downloaded_videos >= amount:
+                            stop_processing = True
+                            stop_reason = "limit"
+                            break
+
+            except ProcessorInterruptedException:
+                self.flush_proxied_requests()
+                raise
+            finally:
+                if stop_processing:
+                    self.flush_proxied_requests()
+
+        if stop_processing and stop_reason == "limit":
+            for pending in direct_requests[processed_direct:]:
+                urls[pending["original_url"]]["error"] = "Max video download limit already reached."
+            for url in fallback_queue:
+                urls[url]["error"] = "Max video download limit already reached."
+            fallback_queue = []
+
+        if stop_processing and stop_reason in {"errors", "no-videos"}:
+            fallback_queue = []
+
+        for url in fallback_queue:
+            if stop_processing:
+                break
+
+            self.videos_downloaded_from_url = set()
+            ydl_opts["outtmpl"] = str(results_path) + '/' + re.sub(r"[^0-9a-z]+", "_", url.lower())[:100] + '_%(autonumber)s.%(ext)s'
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                self.url_files = {}
+                self.last_dl_status = {}
+                self.last_post_process_status = {}
+                self.dataset.update_status("Downloading %i/%i via yt-dlp: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
+                try:
+                    ydl.extract_info(url)
+                except MaxVideosDownloaded:
+                    self.dataset.log("Max videos for URL reached.")
+                except ExistingVideoReached:
+                    self.dataset.log("Already downloaded video associated with: %s" % url)
+                    with yt_dlp.YoutubeDL({"socket_timeout": 30}) as ydl2:
+                        info2 = ydl2.extract_info(url, download=False)
+                        if info2:
+                            archive_key = info2.get('extractor') + info2.get('id')
+                            if archive_key in yt_dlp_archive_map:
+                                self.url_files[info2.get('_filename', {})] = yt_dlp_archive_map[archive_key]
+                                self.dataset.log("Already downloaded video associated with: %s" % url)
+                            else:
+                                message = f"Video identified, but unable to identify which video from {url}"
+                                self.dataset.log(message)
+                                self.log.warning(message)
+                                if len(self.videos_downloaded_from_url) == 0:
+                                    urls[url]['error'] = message
+                                    continue
+                        else:
+                            message = f"Video identified, but unable to identify which video from {url}"
                             self.dataset.log(message)
-
-                    # Add file data collected by YT-DLP
-                    urls[url]["downloader"] = "yt_dlp"
-                    urls[url]['files'] = list(self.url_files.values())
-                    # Add to archive mapping in case needed
-                    for file in self.url_files.values():
-                        yt_dlp_archive_map[
-                            file.get('metadata').get('extractor') + file.get('metadata').get('id')] = file
-
-                    # Check that download and processing finished
-                    success = all([self.last_dl_status.get('status') == 'finished',
-                                   self.last_post_process_status.get('status') == 'finished'])
-
-                else:
-                    # No YT-DLP; move on
-                    self.dataset.log(f"NotVideoLinkError: {str(e)}")
-                    not_a_video += 1
-                    urls[url]["error"] = str(e)
-                    if last_domains.count(urlparse(url).netloc) >= 2:
-                        # Same domain encountered at least twice; let's wait before getting blocked
-                        time.sleep(5 * not_a_video)
+                            self.log.warning(message)
+                            if len(self.videos_downloaded_from_url) == 0:
+                                urls[url]['error'] = message
+                                continue
+                except (DownloadError, LiveVideoException) as e:
+                    if "Requested format is not available" in str(e):
+                        self.dataset.log(f"Format Error: {str(e)}")
+                        message = "No format available for video (check max size/resolution settings and try again)"
+                    elif "Unable to download webpage: The read operation timed out" in str(e):
+                        message = 'DownloadError: %s' % str(e)
+                    elif "Sign in to confirm you’re not a bot." in str(e):
+                        message = 'Sign in required: %s' % str(e)
+                    elif "HTTP Error 429: Too Many Requests" in str(e):
+                        message = 'Too Many Requests: %s' % str(e)
+                    else:
+                        message = 'DownloadError: %s' % str(e)
+                    time.sleep(10 * consecutive_errors)
+                    consecutive_errors += 1
+                    urls[url]['error'] = message
+                    failed_downloads += 1
+                    self.dataset.log(message)
+                    action = self._handle_consecutive_error_stop(consecutive_errors, also_indirect)
+                    if action == "finish":
+                        return
+                    if action == "break":
+                        stop_processing = True
+                        break
+                    continue
+                except Exception as e:
+                    self.dataset.log(f"YT-DLP raised unexpected error: {str(e)}")
+                    message = "YT-DLP raised unexpected error: %s" % str(e)
+                    urls[url]['error'] = message
+                    failed_downloads += 1
+                    self.dataset.log(message)
                     continue
 
+            urls[url]["downloader"] = "yt_dlp"
+            urls[url]['files'] = list(self.url_files.values())
+            for file in self.url_files.values():
+                yt_dlp_archive_map[file.get('metadata').get('extractor') + file.get('metadata').get('id')] = file
+
+            success = all([
+                self.last_dl_status.get('status') == 'finished',
+                self.last_post_process_status.get('status') == 'finished'
+            ])
             urls[url]["success"] = success
             if success:
                 consecutive_errors = 0
                 not_a_video = 0
 
-            # Update status
             self.downloaded_videos += len(self.videos_downloaded_from_url)
-            self.dataset.update_status(f"Downloaded {self.downloaded_videos}/{self.total_possible_videos} videos" +
-                                       (f"; videos copied from {copied_videos} previous downloads" if copied_videos > 0 else "") +
-                                       (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""))
-            self.dataset.update_progress(self.downloaded_videos / self.total_possible_videos)
+            self._update_download_status(copied_videos, failed_downloads)
+            if amount != 0 and self.downloaded_videos >= amount:
+                stop_processing = True
+                break
 
         self.dataset.update_status("Updating and saving metadata")
         # Save some metadata to be able to connect the videos to their source
@@ -620,67 +713,142 @@ class VideoDownloaderPlus(BasicProcessor):
             # Currently, only allow 1 retry with newly formatted URL via InvalidSchema/MissingSchema exception
             raise FailedDownload('Retries exceeded')
         # Open stream
-        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0"
+        user_agent = self.DIRECT_DOWNLOAD_UA
         try:
-            with requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent}) as response:
-                if 400 <= response.status_code < 500:
-                    raise FailedDownload(
-                        f"Website denied download request (Code {response.status_code} / Reason {response.reason}): {url}")
-                elif response.status_code != 200:
-                    raise FailedDownload(f"Unable to obtain URL (Code {response.status_code} / Reason {response.reason}): {url}")
-
-                # Verify video
-                # YT-DLP will download images; so we raise them differently
-                # TODO: test/research other possible ways to verify video links; watch for additional YT-DLP oddities
-                content_type = response.headers.get("Content-Type")
-                if not content_type:
-                    raise VideoStreamUnavailable(f"Unable to verify video; no Content-Type provided: {url}")
-                elif "image" in content_type.lower():
-                    raise NotAVideo("Not a Video (%s): %s" % (response.headers["Content-Type"], url))
-                elif "video" not in content_type.lower():
-                    raise VideoStreamUnavailable(f"Does not appear to be a direct to video link: {url}; "
-                                                 f"Content-Type: {response.headers['Content-Type']}")
-
-                extension = response.headers["Content-Type"].split("/")[-1]
-                # DEBUG Content-Type
-                if extension not in ["mp4", "mp3"]:
-                    self.dataset.log(f"DEBUG: Odd extension type {extension}; Notify 4CAT maintainers if video. "
-                                     f"Content-Type for url {url}: {response.headers['Content-Type']}")
-
-                # Ensure unique filename
-                unique_filename = url_to_filename(url, staging_area=results_path, default_ext="."+extension)
-                save_location = results_path.joinpath(unique_filename)
-
-                # Check video size (after ensuring it is actually a video above)
-                if not max_video_size == 0:
-                    if response.headers.get("Content-Length", False):
-                        if int(response.headers.get("Content-Length")) > (max_video_size * 1000000):  # Use Bytes!
-                            raise FilesizeException(
-                                f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT")
-                    # Size unknown
-                    elif not self.config.get("video-downloader.allow-unknown-size", False):
-                        raise FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
-
-                # Download video
-                self.dataset.update_status(
-                    "Downloading %i/%i via requests: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
-                with open(results_path.joinpath(save_location), "wb") as f:
-                    try:
-                        for chunk in response.iter_content(chunk_size=1024 * 1024):
-                            if not max_video_size == 0 and f.tell() > (max_video_size * 1000000):
-                                    # File size too large; stop download and remove file
-                                    os.remove(f.name)
-                                    raise FilesizeException("Video size larger than maximum allowed per 4CAT")
-                            if chunk:
-                                f.write(chunk)
-                    except requests.exceptions.ChunkedEncodingError as e:
-                        raise FailedDownload(f"Failed to complete download: {e}")
-
-                # Return filename to add to metadata
-                return save_location.name
+            normalized_url = self._normalize_direct_url(url)
+            with requests.get(normalized_url, stream=True, timeout=20, headers={"User-Agent": user_agent}) as response:
+                filename, _ = self._write_direct_response(url, response, results_path, max_video_size)
+                return filename
         except (requests.exceptions.InvalidSchema, requests.exceptions.MissingSchema):
             # Reformat URLs that are missing or have invalid schema
             return self.download_video_with_requests('https://' + url.lstrip(' :/'), results_path, max_video_size, retries=retries+1)
+
+    def _normalize_direct_url(self, url):
+        cleaned = (url or "").strip()
+        if cleaned.startswith("//"):
+            cleaned = f"https:{cleaned}"
+        parsed = urlparse(cleaned)
+        if not parsed.scheme:
+            cleaned = f"https://{cleaned.lstrip(' :/')}"
+        return cleaned
+
+    def _write_direct_response(self, original_url, response, results_path, max_video_size):
+        try:
+            max_video_size = int(max_video_size)
+        except (TypeError, ValueError):
+            max_video_size = 0
+        if 400 <= response.status_code < 500:
+            raise FailedDownload(
+                f"Website denied download request (Code {response.status_code} / Reason {response.reason}): {original_url}")
+        if response.status_code != 200:
+            raise FailedDownload(
+                f"Unable to obtain URL (Code {response.status_code} / Reason {response.reason}): {original_url}")
+
+        content_type = response.headers.get("Content-Type")
+        if not content_type:
+            raise VideoStreamUnavailable(f"Unable to verify video; no Content-Type provided: {original_url}")
+        lowered_type = content_type.lower()
+        if "image" in lowered_type:
+            raise NotAVideo("Not a Video (%s): %s" % (content_type, original_url))
+        if "video" not in lowered_type:
+            raise VideoStreamUnavailable(f"Does not appear to be a direct to video link: {original_url}; "
+                                         f"Content-Type: {content_type}")
+
+        extension = content_type.split(";")[0].split("/")[-1]
+        if extension not in ["mp4", "mp3"]:
+            self.dataset.log(f"DEBUG: Odd extension type {extension}; Notify 4CAT maintainers if video. "
+                             f"Content-Type for url {original_url}: {content_type}")
+
+        unique_filename = url_to_filename(original_url, staging_area=results_path, default_ext="." + extension)
+        save_location = results_path.joinpath(unique_filename)
+
+        if max_video_size != 0:
+            content_length = response.headers.get("Content-Length")
+            if content_length:
+                try:
+                    if int(content_length) > (max_video_size * 1000000):
+                        raise FilesizeException(
+                            f"Video size {content_length} larger than maximum allowed per 4CAT")
+                except ValueError:
+                    pass
+            elif not self.config.get("video-downloader.allow-unknown-size", False):
+                raise FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
+
+        self.dataset.update_status(
+            "Downloading %i/%i via requests: %s" % (self.downloaded_videos + 1, self.total_possible_videos, original_url))
+        bytes_written = 0
+        max_bytes = max_video_size * 1000000 if max_video_size else 0
+        with save_location.open("wb") as outfile:
+            try:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    outfile.write(chunk)
+                    bytes_written += len(chunk)
+                    if max_bytes and bytes_written > max_bytes:
+                        raise FilesizeException("Video size larger than maximum allowed per 4CAT")
+            except FilesizeException:
+                outfile.close()
+                save_location.unlink(missing_ok=True)
+                raise
+            except requests.exceptions.ChunkedEncodingError as e:
+                outfile.close()
+                save_location.unlink(missing_ok=True)
+                raise FailedDownload(f"Failed to complete download: {e}")
+            except Exception:
+                outfile.close()
+                save_location.unlink(missing_ok=True)
+                raise
+        return save_location.name, getattr(response, "_4cat_proxy", None)
+
+    def _should_use_yt_dlp(self, url, also_indirect):
+        if also_indirect == "all":
+            return True
+        if also_indirect == "yt_only":
+            netloc = urlparse(url).netloc.lower()
+            return netloc == 'youtu.be' or netloc == 'youtube.com' or netloc.endswith('.youtube.com')
+        return False
+
+    def _handle_non_video_stop(self, not_a_video, domain, last_domains):
+        if not_a_video < 10:
+            return None
+        if last_domains.count(domain) < 5:
+            return None
+        allow_indirect = self.config.get('video-downloader.allow-indirect')
+        message = "Too many consecutive non-video URLs encountered; " + (
+            "try again with Non-direct videos option selected" if allow_indirect else "try extracting URLs and filtering dataset first"
+        )
+        self.dataset.update_status(message, is_final=True)
+        if self.downloaded_videos == 0:
+            self.dataset.finish(0)
+            return "finish"
+        return "break"
+
+    def _handle_consecutive_error_stop(self, consecutive_errors, also_indirect):
+        if consecutive_errors < 5:
+            return None
+        if also_indirect != "none":
+            message = "Downloaded %i videos. Errors %i consecutive times; try deselecting the non-direct videos setting" % (
+                self.downloaded_videos, consecutive_errors)
+        else:
+            message = "Downloaded %i videos. Errors %i consecutive times; check logs to ensure video URLs are working links and you are not being blocked." % (
+                self.downloaded_videos, consecutive_errors)
+        self.dataset.update_status(message, is_final=True)
+        if self.downloaded_videos == 0:
+            self.dataset.finish(0)
+            return "finish"
+        return "break"
+
+    def _update_download_status(self, copied_videos, failed_downloads):
+        status = f"Downloaded {self.downloaded_videos}/{self.total_possible_videos} videos"
+        if copied_videos > 0:
+            status += f"; videos copied from {copied_videos} previous downloads"
+        if failed_downloads > 0:
+            status += f"; {failed_downloads} URLs failed."
+        self.dataset.update_status(status)
+        if self.total_possible_videos:
+            progress = min(1, self.downloaded_videos / self.total_possible_videos)
+            self.dataset.update_progress(progress)
 
     def collect_video_urls(self):
         """
