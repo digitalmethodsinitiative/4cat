@@ -94,10 +94,13 @@ class UpdateChecker(BasicWorker):
 
         current_version = get_software_version()[:16]
         docker = "yes" if self.config.get("USING_DOCKER") else "no"
+        docker_bit = " (Docker)" if self.config.get("USING_DOCKER") else ""
         phonehome_url += f"/get-notifications/?version={current_version}&docker={docker}"
 
         try:
-            notifications = requests.get(phonehome_url).json()
+            notifications = requests.get(phonehome_url, headers={
+				"User-Agent": f"4cat/{current_version}{docker_bit}"
+			}).json()
         except (requests.RequestException, json.JSONDecodeError) as e:
             self.log.warning(f"Cannot retrieve notifications from notifications server ({e})")
             return
