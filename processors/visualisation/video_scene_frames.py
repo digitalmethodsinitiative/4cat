@@ -36,19 +36,30 @@ class VideoSceneFrames(BasicProcessor):
 
     followups = ["video-timelines"]
 
-    options = {
-        "frame_size": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "medium",
-            "options": {
-                "no_modify": "Do not modify",
-                "144x144": "Tiny (144x144)",
-                "432x432": "Medium (432x432)",
-                "1026x1026": "Large (1026x1026)",
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "frame_size": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "medium",
+                "options": {
+                    "no_modify": "Do not modify",
+                    "144x144": "Tiny (144x144)",
+                    "432x432": "Medium (432x432)",
+                    "1026x1026": "Large (1026x1026)",
+                },
+                "help": "Size of extracted frames"
             },
-            "help": "Size of extracted frames"
-        },
-    }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

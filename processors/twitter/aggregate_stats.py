@@ -27,34 +27,44 @@ class TwitterAggregatedStats(BasicProcessor):
 
     num_of_different_categories = None
 
-    options = {
-        "category": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "user",
-            "options": {
-                        "user": "Tweet Author",
-                        "type": "Tweet type (tweet, quote, retweet, reply)",
-                        "source": "Source of Tweet",
-                        "place": "Place Name (if known)",
-                        "language": "Language (Twitter's guess)",
-                        },
-            "help": "Group by"
-        },
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
-        },
-        "pad": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Include dates where the count is zero",
-            "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
-        }
-    }
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
 
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "category": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "user",
+                "options": {
+                            "user": "Tweet Author",
+                            "type": "Tweet type (tweet, quote, retweet, reply)",
+                            "source": "Source of Tweet",
+                            "place": "Place Name (if known)",
+                            "language": "Language (Twitter's guess)",
+                            },
+                "help": "Group by"
+            },
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
+                            "hour": "Hour", "minute": "Minute"},
+                "help": "Produce counts per"
+            },
+            "pad": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Include dates where the count is zero",
+                "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
+            }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -261,7 +271,7 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
-        options = cls.options.copy()
+        options = TwitterAggregatedStats.get_options(parent_dataset=parent_dataset, config=config)
 
         options["show_outliers"] = {
             "type": UserInput.OPTION_TOGGLE,

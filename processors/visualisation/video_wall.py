@@ -35,80 +35,6 @@ class VideoWallGenerator(BasicProcessor):
     description = "Put all videos in a single combined video, side by side. Videos can be sorted and resized."
     extension = "mp4"  # extension of result file, used internally and in UI
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of items (max 500)",
-            "default": 25,
-            "min": 0,
-            "max": 500,
-            "tooltip": "'0' uses as many files as available in the archive (up to 500)"
-        },
-        "backfill": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Add more items if there is room",
-            "default": True,
-            "tooltip": "If there are more items than the given number and "
-                       "there is space left to add them to the wall, do so"
-        },
-        "tile-size": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "square": "Square",
-                "average": "Average item in set",
-                "median": "Median item in set",
-                "fit-height": "Fit height"
-            },
-            "default": "median",
-            "help": "Tile size",
-            "tooltip": "'Fit height' retains width/height ratios but makes all tiles have the same height"
-        },
-        "sort-mode": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Sort by",
-            "options": {
-                "": "Do not sort",
-                "random": "Random",
-                "shortest": "Length (shortest first)",
-                "longest": "Length (longest first)"
-            },
-            "default": "shortest"
-        },
-        "aspect-ratio": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Wall aspect ratio",
-            "options": {
-                "4:3": "4:3 (Oldschool)",
-                "16:9": "16:9 (Widescreen)",
-                "16:10": "16:10 (Golden ratio)",
-                "1:1": "1:1 (Square)"
-            },
-            "default": "16:10",
-            "tooltip": "Approximation. Final aspect ratio will depend on the size of each item."
-        },
-
-        # the next two are video-specific (not applicable to images)
-        "audio": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Audio handling",
-            "options": {
-                "longest": "Use audio from longest video in video wall",
-                "none": "Remove audio"
-            },
-            "default": "longest"
-        },
-        "max-length": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Cut video after",
-            "default": 60,
-            "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
-                       "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
-                       "processor run times and is not recommended.",
-            "coerce_type": int,
-            "min": 0
-        }
-    }
-
     # videos will be arranged and resized to fit these image wall dimensions
     # note that video aspect ratio may not allow for a precise fit
     TARGET_DIMENSIONS = {
@@ -117,6 +43,91 @@ class VideoWallGenerator(BasicProcessor):
         "16:9": (2560, 1440),
         "16:10": (2560, 1600)
     }
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of items (max 500)",
+                "default": 25,
+                "min": 0,
+                "max": 500,
+                "tooltip": "'0' uses as many files as available in the archive (up to 500)"
+            },
+            "backfill": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Add more items if there is room",
+                "default": True,
+                "tooltip": "If there are more items than the given number and "
+                        "there is space left to add them to the wall, do so"
+            },
+            "tile-size": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "square": "Square",
+                    "average": "Average item in set",
+                    "median": "Median item in set",
+                    "fit-height": "Fit height"
+                },
+                "default": "median",
+                "help": "Tile size",
+                "tooltip": "'Fit height' retains width/height ratios but makes all tiles have the same height"
+            },
+            "sort-mode": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Sort by",
+                "options": {
+                    "": "Do not sort",
+                    "random": "Random",
+                    "shortest": "Length (shortest first)",
+                    "longest": "Length (longest first)"
+                },
+                "default": "shortest"
+            },
+            "aspect-ratio": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Wall aspect ratio",
+                "options": {
+                    "4:3": "4:3 (Oldschool)",
+                    "16:9": "16:9 (Widescreen)",
+                    "16:10": "16:10 (Golden ratio)",
+                    "1:1": "1:1 (Square)"
+                },
+                "default": "16:10",
+                "tooltip": "Approximation. Final aspect ratio will depend on the size of each item."
+            },
+
+            # the next two are video-specific (not applicable to images)
+            "audio": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Audio handling",
+                "options": {
+                    "longest": "Use audio from longest video in video wall",
+                    "none": "Remove audio"
+                },
+                "default": "longest"
+            },
+            "max-length": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Cut video after",
+                "default": 60,
+                "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
+                        "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
+                        "processor run times and is not recommended.",
+                "coerce_type": int,
+                "min": 0
+            }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -150,7 +161,7 @@ class VideoWallGenerator(BasicProcessor):
         amount = self.parameters.get("amount")
         if amount == 0:
             # user requests max number of video/images
-            max_number_images = self.get_options(config=self.config).get("amount").get("max")
+            max_number_images = self.get_options(parent_dataset=self.source_dataset, config=self.config).get("amount").get("max")
             if max_number_images:
                 # server defined max
                 amount = max_number_images

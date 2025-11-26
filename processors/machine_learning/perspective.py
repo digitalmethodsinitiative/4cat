@@ -79,12 +79,10 @@ class Perspective(BasicProcessor):
 		if not api_key:
 			api_key = self.config.get("api.google.api_key")
 		if not api_key:
-			self.dataset.finish_with_error("You need to provide a valid API key")
-			return
+			return self.dataset.finish_with_error("You need to provide a valid API key")
 
 		if not self.parameters.get("attributes"):
-			self.dataset.finish_with_error("You need to provide a at least one attribute to score")
-			return
+			return self.dataset.finish_with_error("You need to provide a at least one attribute to score")
 
 		save_annotations = self.parameters.get("save_annotations", False)
 
@@ -98,7 +96,7 @@ class Perspective(BasicProcessor):
 			)
 		except HttpError as e:
 			error = json.loads(e.content)["error"]["message"]
-			self.dataset.finish_with_error(error)
+			return self.dataset.finish_with_error(error)
 
 		results = []
 		annotations = []

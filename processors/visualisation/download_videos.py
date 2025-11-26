@@ -51,36 +51,6 @@ class VideoDownloaderPlus(BasicProcessor):
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of videos (max 1000)",
-            "default": 100,
-            "min": 0,
-        },
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column to get video links from",
-            "inline": True,
-            "tooltip": "If the column contains a single URL, use that URL; else, try to find image URLs in the "
-                       "column's content"
-        },
-        "max_video_size": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Max videos size (in MB/Megabytes)",
-            "default": 100,
-            "min": 1,
-            "tooltip": "Max of 100 MB set by 4CAT administrators",
-        },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Split column values by comma",
-            "default": True,
-            "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-                       "separately"
-        },
-    }
-
     config = {
         "video-downloader.ffmpeg_path": {
             "type": UserInput.OPTION_TEXT,
@@ -145,7 +115,35 @@ class VideoDownloaderPlus(BasicProcessor):
         the max number of images allowed.
         :param config:
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of videos (max 1000)",
+                "default": 100,
+                "min": 0,
+            },
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column to get video links from",
+                "inline": True,
+                "tooltip": "If the column contains a single URL, use that URL; else, try to find image URLs in the "
+                        "column's content"
+            },
+            "max_video_size": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Max videos size (in MB/Megabytes)",
+                "default": 100,
+                "min": 1,
+                "tooltip": "Max of 100 MB set by 4CAT administrators",
+            },
+            "split-comma": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Split column values by comma",
+                "default": True,
+                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+                        "separately"
+            },
+        }
 
         # Update the amount max and help from config
         max_number_videos = int(config.get('video-downloader.max', 100))

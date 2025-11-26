@@ -20,7 +20,7 @@ class ConfusionMatrix(BasicProcessor):
     Create a confusion matrix with values from two columns
     """
     type = "confusion-matrix"  # job type ID
-    category = "Metrics"  # category
+    category = "Statistics"  # category
     title = "Confusion matrix"  # title displayed in UI
     description = "Create a confusion matrix with data from two columns."  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
@@ -60,7 +60,7 @@ class ConfusionMatrix(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
 

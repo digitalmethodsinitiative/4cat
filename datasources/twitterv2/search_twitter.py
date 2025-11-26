@@ -463,7 +463,7 @@ class SearchWithTwitterAPIv2(Search):
         to enter a list of tweet IDs as their query. Hence the method.
 
         :param config:
-        :param parent_dataset:  Should always be None
+        :param parent_dataset:  Should always be None (top-level data source)
         :return dict:  Data source options
         """
         have_api_key = config.get("twitterv2-search.academic_api_key")

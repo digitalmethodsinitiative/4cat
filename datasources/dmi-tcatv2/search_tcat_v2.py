@@ -25,40 +25,6 @@ class SearchWithinTCATBinsV2(Search):
     extension = "csv"
     title = "TCAT Search (SQL)"
 
-    options = {
-        "intro-1": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source interfaces with a DMI-TCAT instance to allow subsetting of tweets from a tweet "
-                    "bin in that instance."
-        },
-        "divider-1": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "bin": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Query bin"
-        },
-        "query_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Basic or Advanced Query",
-            "options": {
-                "basic": "Basic query all bin tweets for specific text (Query) and date (Date range)",
-                "advanced": "Select queries on any TCAT twitter tables"
-            },
-            "default": "basic",
-            "tooltip": "Advanced queries do not provide scaffolding, so understanding TCAT database structure is necessary"
-        },
-        "query": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Query text",
-            "tooltip": "Match all tweets containing this text."
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range"
-        }
-    }
-
     config = {
         "dmi-tcatv2-search.database_instances": {
             "type": UserInput.OPTION_TEXT_JSON,
@@ -81,11 +47,42 @@ class SearchWithinTCATBinsV2(Search):
 
         :param config:
         :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-can
+        the processor would be run on can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "intro-1": {
+                "type": UserInput.OPTION_INFO,
+                "help": "This data source interfaces with a DMI-TCAT instance to allow subsetting of tweets from a tweet "
+                        "bin in that instance."
+            },
+            "divider-1": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "bin": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Query bin"
+            },
+            "query_type": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Basic or Advanced Query",
+                "options": {
+                    "basic": "Basic query all bin tweets for specific text (Query) and date (Date range)",
+                    "advanced": "Select queries on any TCAT twitter tables"
+                },
+                "default": "basic",
+                "tooltip": "Advanced queries do not provide scaffolding, so understanding TCAT database structure is necessary"
+            },
+            "query": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Query text",
+                "tooltip": "Match all tweets containing this text."
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Date range"
+            }
+        }
 
         # Collect Metadata from TCAT instances
         all_bins = cls.collect_tcat_metadata(config)

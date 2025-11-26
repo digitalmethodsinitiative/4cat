@@ -37,7 +37,7 @@ jobs:
         run: |
           sleep 30
           echo "::group::Running module tests"
-          docker exec 4cat_backend pytest -v tests/test_modules.py
+          docker exec -e PYTHONPATH=/usr/src/app 4cat_backend pytest -v tests/test_modules.py
           echo "::endgroup::"
       - name: Print log on failure
         if: failure()

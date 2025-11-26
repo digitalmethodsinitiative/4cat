@@ -33,7 +33,6 @@ class ImageGrapher(BasicProcessor):
                    "'Image Preview' plugin.")
     extension = "gexf"  # extension of result file, used internally and in UI
 
-    options = {}
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

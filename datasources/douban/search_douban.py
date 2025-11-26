@@ -32,48 +32,59 @@ class SearchDouban(Search):
 
     max_workers = 1
 
-    options = {
-        "intro": {
-            "type": UserInput.OPTION_INFO,
-            "help": "You can enter the groups to scrape as group IDs (e.g. `687802`) or URLs (e.g. "
-                    "`https://www.douban.com/group/687802/`. Separate multiple groups with commas or new lines. If "
-                    "you enter more than 25 groups, only the first 25 will be scraped."
-        },
-        "groups": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Groups",
-            "tooltip": "Enter group IDs or URLs, separate with commas or new lines"
-        },
-        "divider": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Threads per group",
-            "min": 1,
-            "max": 200,
-            "default": 10
-        },
-        "strip": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Strip HTML?",
-            "default": True
-        },
-        "divider-2": {
-            "type": UserInput.OPTION_DIVIDER
-        },
-        "daterange-info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Note that Douban severely limits the retrieval of older content. Therefore this data source "
-                    "can only scrape the most recent topics in a given group. You can optionally limit the scraped "
-                    "topics to a given date range, but note that typically only the 500 or so most recent topics in a "
-                    "group will be available for scraping."
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Last post between"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "intro": {
+                "type": UserInput.OPTION_INFO,
+                "help": "You can enter the groups to scrape as group IDs (e.g. `687802`) or URLs (e.g. "
+                        "`https://www.douban.com/group/687802/`. Separate multiple groups with commas or new lines. If "
+                        "you enter more than 25 groups, only the first 25 will be scraped."
+            },
+            "groups": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Groups",
+                "tooltip": "Enter group IDs or URLs, separate with commas or new lines"
+            },
+            "divider": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Threads per group",
+                "min": 1,
+                "max": 200,
+                "default": 10
+            },
+            "strip": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Strip HTML?",
+                "default": True
+            },
+            "divider-2": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "daterange-info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "Note that Douban severely limits the retrieval of older content. Therefore this data source "
+                        "can only scrape the most recent topics in a given group. You can optionally limit the scraped "
+                        "topics to a given date range, but note that typically only the 500 or so most recent topics in a "
+                        "group will be available for scraping."
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Last post between"
+            }
         }
-    }
 
     def get_items(self, query):
         """

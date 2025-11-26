@@ -78,6 +78,13 @@
 	border-radius: 0px 20px 20px 5px;
 }
 
+.posts .post h1 {
+	background-color: transparent;
+	color: black;
+	text-align: left;
+	font-weight: bold;
+}
+
 .bubble-left {
 	position: relative;
 	margin-right: -5px;

@@ -50,7 +50,7 @@ class AudioExtractor(BasicProcessor):
         Collect maximum number of audio files from configuration and update options accordingly
         :param config:
         """
-        options = {
+        return {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Number of audio files to extract (0 will extract all)",
@@ -58,8 +58,6 @@ class AudioExtractor(BasicProcessor):
                 "min": 0,
             }
         }
-
-        return options
 
     def process(self):
         """

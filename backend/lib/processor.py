@@ -911,7 +911,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
 
     @classmethod
-    def get_options(cls, parent_dataset=None, config=None):
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
         Get processor options
 
@@ -920,9 +920,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         fine-grained options, e.g. in cases where the availability of options
         is partially determined by the parent dataset's parameters.
 
-        :param config:
-        :param DataSet parent_dataset:  An object representing the dataset that
-          the processor would be run on
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
         """
 
         return cls.options if hasattr(cls, "options") else {}

@@ -20,7 +20,7 @@ class ClassificationEvaluation(BasicProcessor):
     Generate accuracy, F1, recall, and precision scores for labels in two columns.
     """
     type = "classification_evaluation"  # job type ID
-    category = "Metrics"  # category
+    category = "Statistics"  # category
     title = "Classification evaluation"  # title displayed in UI
     description = ("Use labels from two columns to calculate evaluation metrics (accuracy, precision, recall, F1, "
                    "and Cohen's Kappa). Produces overall and per-label metrics. Also supports multi-label values.")
@@ -88,12 +88,7 @@ class ClassificationEvaluation(BasicProcessor):
                 "help": "Skip empty values",
                 "default": True,
                 "tooltip": "Selecting this will skip rows where one or both columns do not contain a value",
-            },
-            "to_lowercase": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Convert labels to lowercase",
-                "default": True
-            },
+            }
         }
 
         # Get the columns for the select columns option
@@ -114,12 +109,11 @@ class ClassificationEvaluation(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
 
         skip_empty = self.parameters.get("skip_empty", False)
-        to_lowercase = self.parameters.get("to_lowercase", True)
         multi_label = self.parameters.get("multi_label", False)
         metrics = self.parameters.get("metrics", [])
         if not metrics:
@@ -162,20 +156,15 @@ class ClassificationEvaluation(BasicProcessor):
                                                "empty values'")
                 return
 
-            if type(label_true) not in (str, float, int, bool) or type(label_pred) not in (str, float, int, bool):
+            # Categories always need to be categorical values represented as strings
+            if not isinstance(label_true, str) and not isinstance(label_pred, str):
                 try:
-                    label_true = str(label_true)
-                    label_pred = str(label_pred)
+                    label_true = str(label_true).lower().strip()
+                    label_pred = str(label_pred).lower().strip()
                 except ValueError:
                     self.dataset.update_status(f"Labels '{label_true}' and '{label_pred}' could not be converted to "
                                                f"text (types: {type(label_true)}, {type(label_pred)}), skipping")
                     continue
-
-            if to_lowercase:
-                label_true = label_true.lower()
-                label_pred = label_pred.lower()
-            label_true = label_true.strip()
-            label_pred = label_pred.strip()
 
             # Add labels independently in the case of multi-label values
             if label_true and label_pred:

@@ -52,42 +52,53 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         """
         return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Images to process (0 = all)",
-            "default": 0
-        },
-        "api_key": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API Key",
-            "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
-                       "key on console.cloud.google.com. You also need to enable billing and Vision API."
-        },
-        "features": {
-            "type": UserInput.OPTION_MULTI,
-            "help": "Features",
-            "options": {
-                "LABEL_DETECTION": "Label Detection",
-                "TEXT_DETECTION": "Text Detection",
-                "DOCUMENT_TEXT_DETECTION": "Document Text Detection",
-                "SAFE_SEARCH_DETECTION": "Safe Search Detection",
-                "FACE_DETECTION": "Facial Detection",
-                "LANDMARK_DETECTION": "Landmark Detection",
-                "LOGO_DETECTION": "Logo Detection",
-                "IMAGE_PROPERTIES": "Image Properties",
-                "CROP_HINTS": "Crop Hints",
-                "WEB_DETECTION": "Web Detection",
-                "OBJECT_LOCALIZATION": "Object Localization"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Images to process (0 = all)",
+                "default": 0
             },
-            "default": ["LABEL_DETECTION"]
-        },
-        "annotation_info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "The output can be made human-readable through the following `Convert Vision results to CSV` "
-                    "processor. This also lets you write the labels as annotations to the original dataset."
+            "api_key": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API Key",
+                "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
+                        "key on console.cloud.google.com. You also need to enable billing and Vision API."
+            },
+            "features": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Features",
+                "options": {
+                    "LABEL_DETECTION": "Label Detection",
+                    "TEXT_DETECTION": "Text Detection",
+                    "DOCUMENT_TEXT_DETECTION": "Document Text Detection",
+                    "SAFE_SEARCH_DETECTION": "Safe Search Detection",
+                    "FACE_DETECTION": "Facial Detection",
+                    "LANDMARK_DETECTION": "Landmark Detection",
+                    "LOGO_DETECTION": "Logo Detection",
+                    "IMAGE_PROPERTIES": "Image Properties",
+                    "CROP_HINTS": "Crop Hints",
+                    "WEB_DETECTION": "Web Detection",
+                    "OBJECT_LOCALIZATION": "Object Localization"
+                },
+                "default": ["LABEL_DETECTION"]
+            },
+            "annotation_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "The output can be made human-readable through the following `Convert Vision results to CSV` "
+                        "processor. This also lets you write the labels as annotations to the original dataset."
+            }
         }
-    }
 
     def process(self):
         """

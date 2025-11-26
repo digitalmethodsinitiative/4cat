@@ -53,6 +53,9 @@ class TempFileCleaner(BasicWorker):
         else:
             tracked_files = json.loads(tracking_file.read_text())
 
+        # Get 4CAT paths to avoid if they are mapped inside PATH_DATA
+        fourcat_paths = [self.config.get(p) for p in self.config.get_all_setting_names() if p.startswith('PATH_')]
+
         result_files = Path(self.config.get('PATH_DATA')).glob("*")
         for file in result_files:
             if file.stem.startswith("."):
@@ -62,6 +65,10 @@ class TempFileCleaner(BasicWorker):
             if self.interrupted:
                 tracking_file.write_text(json.dumps(tracked_files))
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
+            
+            # Check if the file is inside any of the 4CAT paths
+            if any(file == fourcat_path or file.is_relative_to(fourcat_path) for fourcat_path in fourcat_paths):
+                continue
 
             # the key of the dataset files belong to can be extracted from the
             # file name in a predictable way.

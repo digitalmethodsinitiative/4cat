@@ -45,7 +45,7 @@ class SearchVK(Search):
                       "[wrapper](https://github.com/python273/vk_api) to request information from VK using your "
                       "username and password.")
 
-        options = {
+        return {
             "intro-1": {
                 "type": UserInput.OPTION_INFO,
                 "help": intro_text
@@ -108,8 +108,6 @@ class SearchVK(Search):
                 "help": "Date range"
             },
         }
-
-        return options
 
     def get_items(self, query):
         """

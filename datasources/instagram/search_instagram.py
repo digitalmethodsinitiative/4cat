@@ -130,7 +130,10 @@ class SearchInstagram(Search):
         user = node.get("user")
         owner = node.get("owner")
         if node.get("user") and node.get("owner"):
-            if user.get("username") != owner.get("username"):
+            if owner.get("id") == user.get("id"):
+                # Same id; owner may contain less info (e.g. no full name, username, etc.), so prefer user
+                pass
+            elif user.get("username") != owner.get("username"):
                 raise MapItemException("Unable to parse item: different user and owner")
 
         mapped_item = {
@@ -248,7 +251,10 @@ class SearchInstagram(Search):
         user = node.get("user", {})
         owner = node.get("owner", {})
         if user and owner:
-            if user.get("username") != owner.get("username"):
+            if owner.get("id") == user.get("id"):
+                # Same id; owner may contain less info (e.g. no full name, username, etc.), so prefer user
+                pass
+            elif user.get("username") != owner.get("username"):
                 raise MapItemException("Unable to parse item: different user and owner")
 
         # Instagram posts also allow 'Collabs' with up to one co-author

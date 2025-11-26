@@ -37,56 +37,67 @@ class VideoStack(BasicProcessor):
                   "videos. Videos are stacked by length, i.e. the longest video is at the 'bottom' of the stack."  # description displayed in UI
     extension = "mp4"  # extension of result file, used internally and in UI
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Number of videos to stack.",
-            "default": 10,
-            "max": 50,
-            "min": 2,
-        },
-        "transparency": {
-            "type": UserInput.OPTION_TEXT,
-            "coerce_type": float,
-            "default": 0.15,
-            "min": 0,
-            "max": 1,
-            "help": "Layer transparency",
-            "tooltip": "Transparency of each layer in the stack, between 0 (opaque) and 1 (fully transparent). "
-                       "As a rule of thumb, for 10 videos use 90% opacity (0.10), for 20 use 80% (0.20), and so on."
-        },
-        "eof-action": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "pass": "Remove video from stack once it ends",
-                "repeat": "Keep displaying final frame until end of stack video",
-                "endall": "Stop stack video when first video ends"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Number of videos to stack.",
+                "default": 10,
+                "max": 50,
+                "min": 2,
             },
-            "help": "Length handling",
-            "tooltip": "How to handle videos of different length (i.e. when not all videos in the stack are equally "
-                       "long)",
-            "default": "pass"
-        },
-        "audio": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Audio handling",
-            "options": {
-                "longest": "Use audio from longest video in stack",
-                "none": "Remove audio"
+            "transparency": {
+                "type": UserInput.OPTION_TEXT,
+                "coerce_type": float,
+                "default": 0.15,
+                "min": 0,
+                "max": 1,
+                "help": "Layer transparency",
+                "tooltip": "Transparency of each layer in the stack, between 0 (opaque) and 1 (fully transparent). "
+                        "As a rule of thumb, for 10 videos use 90% opacity (0.10), for 20 use 80% (0.20), and so on."
             },
-            "default": "longest"
-        },
-        "max-length": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Cut video after",
-            "default": 60,
-            "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
-                       "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
-                       "processor run times and is not recommended.",
-            "coerce_type": int,
-            "min": 0
+            "eof-action": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "pass": "Remove video from stack once it ends",
+                    "repeat": "Keep displaying final frame until end of stack video",
+                    "endall": "Stop stack video when first video ends"
+                },
+                "help": "Length handling",
+                "tooltip": "How to handle videos of different length (i.e. when not all videos in the stack are equally "
+                        "long)",
+                "default": "pass"
+            },
+            "audio": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Audio handling",
+                "options": {
+                    "longest": "Use audio from longest video in stack",
+                    "none": "Remove audio"
+                },
+                "default": "longest"
+            },
+            "max-length": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Cut video after",
+                "default": 60,
+                "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
+                        "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
+                        "processor run times and is not recommended.",
+                "coerce_type": int,
+                "min": 0
+            }
         }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

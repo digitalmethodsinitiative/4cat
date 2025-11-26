@@ -7,7 +7,6 @@ import re
 
 from collections import Counter, OrderedDict
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -41,6 +40,28 @@ class TopImageCounter(BasicProcessor):
 
         return module.is_top_dataset() and module.type != "telegram-search" and module.get_extension() in ("csv", "ndjson")
 
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None):
+        """
+        Get processor options
+
+        The feature of this processor that overwrites the parent dataset can
+        only work properly on csv datasets so check the extension before
+        showing it.
+
+        :param config:
+        :param parent_dataset:  Dataset to get options for
+        :return dict:
+        """
+
+        return {
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "label": "image_urls",
+                "default": False,
+            }
+        }
+
     def process(self):
         """
         This takes a 4CAT results file as input, and outputs a new CSV file
@@ -50,6 +71,7 @@ class TopImageCounter(BasicProcessor):
         images = {}
 
         all_links = []  # Used for overwrite
+        save_annotations = self.parameters.get("save_annotations", False)
 
         # 4chan data has specific columns for image information, so treat this a bit differently.
         if self.source_dataset.parameters["datasource"] == "4chan":
@@ -164,35 +186,15 @@ class TopImageCounter(BasicProcessor):
             return
 
         # Also add the data to the original file, if indicated.
-        if self.parameters.get("overwrite"):
-            try:
-                self.add_field_to_parent(field_name='img_url',
-                                         new_data=[", ".join(link[1]) for link in all_links],
-                                         which_parent=self.source_dataset)
-            except ProcessorException as e:
-                self.dataset.update_status("Error updating parent dataset: %s" % e)
+        if save_annotations:
+            annotations = []
+            for link in all_links:
+                annotation = {
+                    "label": "image_urls",
+                    "value": ",".join(link[1]),
+                    "item_id": link[0]
+                }
+                annotations.append(annotation)
+            self.save_annotations(annotations)
 
         self.write_csv_items_and_finish(results)
-
-    @classmethod
-    def get_options(cls, parent_dataset=None, config=None):
-        """
-        Get processor options
-
-        The feature of this processor that overwrites the parent dataset can
-        only work properly on csv datasets so check the extension before
-        showing it.
-
-        :param config:
-        :param parent_dataset:  Dataset to get options for
-        :return dict:
-        """
-
-        return {
-            "overwrite": {
-                "type": UserInput.OPTION_TOGGLE,
-                "default": False,
-                "help": "Add extracted image URLs to dataset file",
-                "tooltip": "This will add a new column, \"img_url\", to the dataset's csv file."
-            }
-        }

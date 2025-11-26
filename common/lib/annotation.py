@@ -217,28 +217,40 @@ class Annotation:
 
 
     @staticmethod
-    def get_annotations_for_dataset(db: Database, dataset_key: str, item_id=None) -> list:
+    def get_annotations_for_dataset(db: Database, dataset_key: str, item_id=None, before=0) -> list:
         """
         Returns all annotations for a dataset.
         :param db:                  Database object.
         :param str dataset_key:     A dataset key.
         :param str item_id:         An optional item ID or multiple item IDs to only get annotations from specific
                                     items
+        :param int before:          The upper timestamp for annotations to retrieve.
 
         :return list: List with annotations.
         """
         if not dataset_key:
             return []
 
+        if not before:
+            before = int(time.time())
+
         if item_id:
-            if isinstance(item_id, str):
-                item_id = [item_id]
+            # Normalise to strings so the ANY operator receives a proper text[]
+            if isinstance(item_id, (list, tuple, set)):
+                iterable_ids = item_id
+            else:
+                iterable_ids = [item_id]
+
+            item_ids = [str(i) for i in iterable_ids if i is not None]
+            if not item_ids:
+                return []
+
             data = db.fetchall(
-                "SELECT * FROM annotations WHERE dataset = %s AND item_id = ANY(%s)",
-                (dataset_key, item_id,)
+                "SELECT * FROM annotations WHERE dataset = %s AND item_id = ANY(%s::text[]) AND timestamp <= %s",
+                (dataset_key, item_ids, before,)
             )
         else:
-            data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s", (dataset_key,))
+            data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s AND timestamp <= %s", (dataset_key, before,))
         if not data:
             return []
 
