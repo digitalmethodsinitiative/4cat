@@ -595,7 +595,7 @@ class TikTokScraper:
                     self.consecutive_failures += 1
                     if self.consecutive_failures >= hard_fail_limit:
                         await abort_inflight_and_raise(
-                            f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                            f"Too many consecutive failures ({self.consecutive_failures}), stopping dataset {self.dataset.key}"
                         )
                     if self.consecutive_failures == soft_fail_limit:
                         pause_after_this_iteration = True
@@ -612,7 +612,7 @@ class TikTokScraper:
                     self.consecutive_failures += 1
                     if self.consecutive_failures >= hard_fail_limit:
                         await abort_inflight_and_raise(
-                            f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                            f"Too many consecutive failures ({self.consecutive_failures}), stopping dataset {self.dataset.key}"
                         )
                     if self.consecutive_failures == soft_fail_limit:
                         pause_after_this_iteration = True
@@ -640,7 +640,7 @@ class TikTokScraper:
                         self.consecutive_failures += 1
                         if self.consecutive_failures >= hard_fail_limit:
                             await abort_inflight_and_raise(
-                                f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                                f"Too many consecutive failures ({self.consecutive_failures}), stopping dataset {self.dataset.key}"
                             )
                         if self.consecutive_failures == soft_fail_limit:
                             pause_after_this_iteration = True
@@ -658,7 +658,7 @@ class TikTokScraper:
                         self.consecutive_failures += 1
                         if self.consecutive_failures >= hard_fail_limit:
                             await abort_inflight_and_raise(
-                                f"Too many consecutive failures ({self.consecutive_failures}), stopping"
+                                f"Too many consecutive failures ({self.consecutive_failures}), stopping dataset {self.dataset.key}"
                             )
                         continue
                     
