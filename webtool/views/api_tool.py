@@ -1275,7 +1275,24 @@ def check_processor():
 		if not current_user.can_access_dataset(dataset):
 			continue
 
-		genealogy = dataset.get_genealogy()
+		if dataset.is_top_dataset():
+			if dataset.parameters.get("copied_from", None):
+				# Filter dataset - get original dataset for display
+				original_key = dataset.parameters.get("copied_from", None)
+				try:
+					original_dataset = DataSet(key=original_key, db=g.db, modules=g.modules)
+				except DataSetException:
+					# Cannot find original dataset; no longer has parent and cannot render child view
+					g.log.warning(f"Dataset {dataset.key} is a filter but original dataset {original_key} not found. Skipping...")
+					continue
+				genealogy = original_dataset.get_genealogy()
+			else:
+				# Top-level dataset; not a child, cannot render child view
+				g.log.warning(f"Dataset {dataset.key} is top-level; cannot render child view. Skipping...")
+				continue
+		else:
+			genealogy = dataset.get_genealogy()
+
 		parent = genealogy[-2]
 		top_parent = genealogy[0]
 
