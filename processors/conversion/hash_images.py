@@ -4,6 +4,8 @@ Hash images
 import csv
 import json
 
+from PIL import UnidentifiedImageError
+
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_image, stringify_hash
@@ -181,6 +183,10 @@ class ImageHasher(BasicProcessor):
             except FileNotFoundError as e:
                 skipped += 1
                 self.dataset.log(f"Warning: Could not hash image {image_file.name}: {e}")
+                continue
+            except UnidentifiedImageError as e:
+                skipped += 1
+                self.dataset.log(f"Warning: Could not identify image {image_file.name}: {e}")
                 continue
         
             processed += 1
