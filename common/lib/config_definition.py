@@ -414,10 +414,11 @@ config_definition = {
     },
     "flask.server_name": {
         "type": UserInput.OPTION_TEXT,
-        "default": "localhost",
+        "default": "localhost:5000",
         "help": "Host name",
-        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost. Include port if not using default ports (80 for HTTP, 443 for HTTPS)."
-                   "This is passed to Flask's SERVER_NAME setting. Front-end needs to be restarted for changed to apply.",
+        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Include a port when not using 80 (HTTP) or 443 (HTTPS), or "
+                   "when your reverse proxy forwards on a non-standard port. This value is passed to Flask’s SERVER_NAME. "
+                   "Restart the front-end for changes to apply.",
         "global": True
     },
     "flask.autologin.hostnames": {
