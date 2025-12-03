@@ -137,7 +137,7 @@ class TikTokVideoDownloader(BasicProcessor):
             if self.source_dataset.type == "upload-search":
                 self.dataset.finish_with_error(f"TikTok video downloader failed repeatedly. Please check that the column '{column}' contains valid TikTok post IDs. Error: {e}")
             else:
-                self.log.warning(f"TikTok video downloader failed repeatedly; may be parsing issue: {e}")
+                self.log.warning(f"TikTok video downloader ({self.dataset.key}) failed repeatedly; may be parsing issue: {e}")
                 self.dataset.finish_with_error(f"TikTok video downloader failed repeatedly: {e}")
             return
 
