@@ -58,7 +58,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 # this is also done in the backend, but the frontend may not be able to connect
 # while the backend is, for example
 if config.get("MEMCACHE_SERVER"):
-    if config.memcache:
+    if config.get_memcache():
         log.debug("Memcache connection initialized")
     else:
         log.warning(
@@ -139,7 +139,7 @@ app.login_manager.login_view = "user.show_login"
 
 # initialize rate limiter - memcache can serve as the storage backend, if not
 # available, direct memory storage will be used
-if config.memcache:
+if config.get_memcache():
     app.limiter = Limiter(app=app, key_func=get_remote_address, storage_uri=f"memcached://{config.get('MEMCACHE_SERVER')}")
 else:
     app.limiter = Limiter(app=app, key_func=get_remote_address)
@@ -163,7 +163,6 @@ with app.app_context():
     app.log = log
     app.db = db
     app.fourcat_config = config
-    app._memcache_initialized = False  # flag to check if memcache was initialized
     app.fourcat_modules = ModuleCollector(app.fourcat_config)
 
     # import all views; these can only be imported here because they rely on
@@ -201,11 +200,6 @@ with app.app_context():
             # in contexts where we're serving static files through slack, save
             # some overhead
             return
-        
-         # Initialize memcache once per worker
-        if not app._memcache_initialized:
-            app.fourcat_config.memcache = app.fourcat_config.load_memcache()
-            app._memcache_initialized = True
 
         g.queue = queue
         g.db = db
