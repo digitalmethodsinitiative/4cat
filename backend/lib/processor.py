@@ -207,8 +207,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
                 print("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
                     self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
-                # remove any result files that have been created so far
-                self.remove_files()
+                
+                # Clean up partially created datasets/files
+                self.clean_up_on_error()
 
                 raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
                     self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
@@ -394,15 +395,22 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # Remove any staging areas with temporary data
         self.dataset.remove_staging_areas()
 
+    def clean_up_on_error(self):
+        try:
+            # ensure proxied requests are stopped
+            self.flush_proxied_requests()
+            # delete annotations that have been generated as part of this processor
+            self.db.delete("annotations", where={"from_dataset": self.dataset.key}, commit=True)
+            # remove any result files that have been created so far
+            self.remove_files()
+        except Exception as e:
+            self.log.error("Error during processor cleanup after error: %s" % str(e))
+
     def abort(self):
         """
         Abort dataset creation and clean up so it may be attempted again later
         """
-
-        # delete annotations that have been generated as part of this processor
-        self.db.delete("annotations", where={"from_dataset": self.dataset.key}, commit=True)
-        # remove any result files that have been created so far
-        self.remove_files()
+        self.clean_up_on_error()
 
         # we release instead of finish, since interrupting is just that - the
         # job should resume at a later point. Delay resuming by 10 seconds to
