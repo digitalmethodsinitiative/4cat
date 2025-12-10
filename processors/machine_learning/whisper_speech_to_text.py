@@ -206,10 +206,6 @@ class AudioToText(BasicProcessor):
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text,
         or calls the OpenAI API.
         """
-        if self.source_dataset.num_rows <= 1:
-            # 1 because there is always a metadata file
-            self.dataset.finish_with_error("No audio files found.")
-            return
 
         model_host = self.parameters.get("model_host", "external")
 
@@ -420,8 +416,8 @@ class AudioToText(BasicProcessor):
                             "item_id": item_id,
                             "value": result_data.get("text", "")
                         })
-                    #annotated += 1
-                    processed += 1
+
+                processed += 1
 
         if save_annotations:
             self.save_annotations(annotations)
