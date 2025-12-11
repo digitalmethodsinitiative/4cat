@@ -321,7 +321,7 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
 			"mention": "https://linkedin.com/in/"
 		},
 		"telegram": {
-			"markdown": True
+			"mention": "https://t.me/"
 		},
 		"bsky": {
 			"hashtag": "https://bsky.app/hashtag/",

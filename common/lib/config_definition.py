@@ -414,12 +414,11 @@ config_definition = {
     },
     "flask.server_name": {
         "type": UserInput.OPTION_TEXT,
-        "default": "4cat.local:5000",
+        "default": "localhost:5000",
         "help": "Host name",
-        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; when running 4CAT in Docker this "
-                   "setting is ignored as any domain/port binding should be handled outside of the Docker container"
-                   "; the Docker container itself will serve on any domain name on the port configured in the .env "
-                   "file.",
+        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Include a port when not using 80 (HTTP) or 443 (HTTPS), or "
+                   "when your reverse proxy forwards on a non-standard port. This value is passed to Flask’s SERVER_NAME. "
+                   "Restart the front-end for changes to apply.",
         "global": True
     },
     "flask.autologin.hostnames": {

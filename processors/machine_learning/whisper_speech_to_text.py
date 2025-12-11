@@ -206,10 +206,6 @@ class AudioToText(BasicProcessor):
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text,
         or calls the OpenAI API.
         """
-        if self.source_dataset.num_rows <= 1:
-            # 1 because there is always a metadata file
-            self.dataset.finish_with_error("No audio files found.")
-            return
 
         model_host = self.parameters.get("model_host", "external")
 
@@ -349,21 +345,25 @@ class AudioToText(BasicProcessor):
 
             for i, audio_filename in enumerate(audio_filenames):
                 with open(os.path.join(staging_area, audio_filename), "rb") as f:
-
-                    if not translate:
-                        response = self.get_openai_api_transcription(
-                            f,
-                            model=external_model,
-                            prompt=prompt,
-                            language=language,
-                            client=client
-                        )
-                    else:
-                        response = self.get_openai_api_translation(
-                            f,
-                            prompt=prompt,
-                            client=client
-                        )
+                    try:
+                        if not translate:
+                            response = self.get_openai_api_transcription(
+                                f,
+                                model=external_model,
+                                prompt=prompt,
+                                language=language,
+                                client=client
+                            )
+                        else:
+                            response = self.get_openai_api_translation(
+                                f,
+                                prompt=prompt,
+                                client=client
+                            )
+                    except (openai.NotFoundError, openai.BadRequestError, openai.AuthenticationError,
+                            openai.RateLimitError, openai.APIConnectionError) as e:
+                        self.dataset.finish_with_error(e.message)
+                        return
 
                     transcription = {
                         "text": response.text,
@@ -416,8 +416,8 @@ class AudioToText(BasicProcessor):
                             "item_id": item_id,
                             "value": result_data.get("text", "")
                         })
-                    #annotated += 1
-                    processed += 1
+
+                processed += 1
 
         if save_annotations:
             self.save_annotations(annotations)
@@ -438,32 +438,15 @@ class AudioToText(BasicProcessor):
 
         returns: response
         """
-        try:
-            # Get response
-            response = client.audio.transcriptions.create(
-                file=input_file,
-                model=model,
-                temperature=0,
-                language=language,
-                response_format="json",
-                prompt=prompt
-            )
-        except openai.NotFoundError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.BadRequestError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.AuthenticationError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.RateLimitError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.APIConnectionError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-
+        # Get response
+        response = client.audio.transcriptions.create(
+            file=input_file,
+            model=model,
+            temperature=0,
+            language=language,
+            response_format="json",
+            prompt=prompt
+        )
         return response
 
     def get_openai_api_translation(self, input_file, client, language="",
@@ -480,31 +463,14 @@ class AudioToText(BasicProcessor):
 
         returns: response
         """
-        try:
-            # Get response
-            response = client.audio.translations.create(
-                file=input_file,
-                model="whisper-1",
-                temperature=0,
-                response_format="json",
-                prompt=prompt
-            )
-        except openai.NotFoundError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.BadRequestError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.AuthenticationError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.RateLimitError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.APIConnectionError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-
+        # Get response
+        response = client.audio.translations.create(
+            file=input_file,
+            model="whisper-1",
+            temperature=0,
+            response_format="json",
+            prompt=prompt
+        )
         return response
 
     @staticmethod

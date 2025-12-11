@@ -79,6 +79,10 @@ class URLCoLinker(BasicProcessor):
 		* or " in the query
 		"""
 		start_time = time.time()
+		if self.parameters.get("level") == "thread" and "thread_id" not in self.source_dataset.get_columns():
+			self.dataset.finish_with_error("Thread-level co-linking requires a 'thread_id' column in the dataset.")
+			return
+		
 		# we use these to extract URLs and host names if needed
 		link_regex = re.compile(r"https?://[^\s\]()]+")
 		www_regex = re.compile(r"^www\.")

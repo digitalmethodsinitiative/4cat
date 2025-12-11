@@ -3,7 +3,7 @@ Refresh items
 """
 from backend.lib.worker import BasicWorker
 
-class ThingExpirer(BasicWorker):
+class ItemUpdater(BasicWorker):
     """
     Refresh 4CAT items
 
