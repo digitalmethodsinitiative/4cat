@@ -398,6 +398,21 @@ def _jinja2_filter_parameter_str(url):
 
 	return params
 
+@current_app.template_filter('idify')
+def _jinja2_filter_idify(value):
+	"""
+	Turn string into safe ID string
+
+	:param str value:
+	:return str:
+	"""
+	value = str(value).lower()
+
+	value = re.sub(r"\s+", "-", "")
+	value = re.sub(r"[^a-z0-9-]", "", value)
+
+	return value
+
 @current_app.template_filter('hasattr')
 def _jinja2_filter_hasattr(obj, attribute):
 	return hasattr(obj, attribute)

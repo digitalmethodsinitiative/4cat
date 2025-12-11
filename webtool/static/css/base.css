@@ -1,0 +1,36 @@
+html {
+    width: 100%;
+    background: var(--bright);
+}
+
+body {
+    margin: 0 auto;
+    font-family: Roboto, serif;
+    font-size: var(--font-body);
+    border-top: 0;
+    border-bottom: 0;
+    padding-bottom: calc(var(--spacing-xlarge) * 2);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+ul, ol, dt, dd {
+    padding: 0;
+    margin: 0;
+}
+
+ul, ol, dl {
+    list-style: none;
+}
+
+nav li {
+    display: inline-block;
+}
+
+.center-stage {
+    width: var(--max-width);
+    margin: 0 auto;
+}

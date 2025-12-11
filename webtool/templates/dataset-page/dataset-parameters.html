@@ -1,13 +1,13 @@
 {% from "components/parameter.html" import format_parameter %}
 
-{% if dataset.is_private %}
+{% if not dataset.key_parent and dataset.is_private %}
     {# Special case: dataset is private #}
     {% call format_parameter(dataset, "Private", "This dataset is private and can only be viewed by your user and instance maintainers") %}
         <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
     {% endcall %}
 {% endif %}
 
-{% if dataset.is_expiring(config=__config) %}
+{% if dataset.key_parent and dataset.is_expiring(config=__config) %}
     {# Special case: dataset expires #}
     {% call format_parameter(dataset, "Expires", "This dataset will automatically be deleted at this date") %}
         {{ dataset.is_expiring(config=__config)|datetime|safe }}

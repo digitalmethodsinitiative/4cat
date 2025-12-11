@@ -1,0 +1,286 @@
+:root {
+    --journey-width: 54px;
+}
+
+/** base tree container **/
+.analysis-results {
+    position: relative;
+    padding-left: var(--journey-width);
+    box-sizing: border-box;
+    margin-top: var(--spacing-large)
+}
+
+/** very first item of analysis tree root level **/
+.analysis-results > ul > li:first-child::before {
+    /** block top of border that extends above journey marker **/
+    content: '';
+    position: absolute;
+    top: 0;
+    left: calc((var(--journey-width) * 0.5) + (var(--stroke-journey) * 0.5));
+    border-bottom: calc(var(--stroke-journey) * 2) solid var(--dark);
+    background: var(--bright);
+    width: var(--journey-width);
+    height: 0;
+}
+
+/** very last item of analysis tree root level **/
+.analysis-results > ul > li:last-child {
+    border-left-style: dashed;
+}
+
+/** any item **/
+.analysis-results .tree > li {
+    border-left: var(--stroke-journey) solid var(--dark);
+    padding-left: calc(var(--spacing-xlarge) / 2);
+}
+
+/** last item of sub-tree **/
+.analysis-results .tree .tree > li:last-child {
+    border-left-color: transparent;
+}
+
+/** any processor card wrapper **/
+.analysis-results article {
+    border-left: var(--stroke-journey) solid transparent;
+    padding-left: calc(var(--spacing-xlarge) / 2);
+}
+
+/** processor card wrappers of processors with children **/
+.analysis-results li.with-children > article {
+    border-left-color: var(--dark);
+}
+
+/** processor datetime **/
+.analysis-results .timestamp {
+    position: absolute;
+    left: 0;
+    font-size: var(--font-body);
+}
+
+.analysis-results .timestamp .date {
+    font-weight: bold;
+}
+
+.analysis-results .timestamp .time {
+    color: var(--stroke-bright)
+}
+
+.analysis-results .timestamp span {
+    display: block;
+    text-align: right;
+    text-transform: uppercase;
+}
+
+.journey-marker {
+    font-family: 'Font Awesome 6 Free', monospace;
+    font-weight: 900;
+    background: var(--dark);
+    color: var(--bright);
+    border: 0;
+    border-radius: var(--font-body);
+    width: calc(var(--font-body) * 2);
+    height: calc(var(--font-body) * 2);
+    display: block;
+    text-align: center;
+
+    position: absolute;
+    top: calc((var(--font-body) * 2.25) + (var(--stroke-journey) / 2) - var(--font-body));
+    left: calc((-0.5 * var(--spacing-xlarge)) - (var(--stroke-journey) / 2) - var(--font-body));
+    z-index: var(--z-journey-marker);
+
+    /** this is to get the glyph in exactly the center **/
+    padding: 0;
+    padding-top: 1px;
+}
+
+.journey-marker.end::after {
+    content: '';
+    width: var(--stroke-journey);
+    background: var(--dark);
+    height: 100%;
+    position: absolute;
+    right: calc(-1 * var(--stroke-journey));
+    top: 0;
+}
+
+@keyframes spin {
+    from {transform:rotate(0deg);}
+    to {transform:rotate(360deg);}
+}
+
+.in-progress > article > div > .journey-marker {
+    animation: spin 2s infinite linear;
+}
+
+/** journey marker of first item in tree, and any item with children **/
+:first-child > article > .processor-card > .journey-marker::before, .with-children > article > .processor-card > .journey-marker::before {
+    /** block top of border that extends above journey marker **/
+    content: '';
+    display: block;
+    position: absolute;
+    top: calc(-1 * (var(--spacing-regular) + 0.5em));
+    left: calc(50% - var(--stroke-journey));
+    background: var(--bright);
+    width: calc((var(--stroke-journey) * 2) + var(--stroke-light));
+    height: calc(var(--spacing-regular) + 0.5em);
+}
+
+/** any processor card **/
+.processor-card {
+    position: relative;
+    padding-bottom: var(--spacing-large);
+}
+
+.processor-card > header::before {
+    /** curve towards journey marker **/
+    border: var(--stroke-journey) solid var(--dark);
+    border-bottom-left-radius: var(--double-radius);
+    border-top-width: 0;
+    border-right-width: 0;
+    width: calc(var(--font-body) * 1.5);
+    height: calc(var(--font-body) * 2.25);
+
+    position: absolute;
+    top: 0;
+    background: transparent;
+    display: block;
+    content: '';
+    left: calc((-1 * var(--spacing-xlarge)) - (2 * var(--stroke-journey)));
+}
+
+.processor-card header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: var(--stroke-light) solid var(--dark);
+    border-bottom-width: var(--stroke-journey);
+    border-radius: var(--radius);
+    background: var(--panel-bg-0);
+    padding: var(--spacing-regular);
+}
+
+/** badge list container **/
+.processor-card .status {
+    border: var(--stroke-light) dashed var(--dark);
+    border-top: 0;
+    border-radius: var(--radius);
+    border-top-right-radius: 0;
+    border-top-left-radius: 0;
+}
+
+.processor-card .badge-list {
+    padding: var(--spacing-small) var(--spacing-regular);
+}
+
+/** any badge list in a processor card that is not the last one **/
+.processor-card .badge-list.dataset-status:not(:last-child) {
+    border-bottom: var(--stroke-light) dashed var(--dark);
+}
+
+.processor-card .badge-list dd {
+    border: var(--stroke) solid var(--button-grey);
+    box-sizing: content-box;
+}
+
+.processor-card .with-overflow {
+    background: linear-gradient(90deg, transparent 0%, transparent 90%, var(--panel-bg-1) 100%);
+    overflow-y: auto;
+    white-space: nowrap;
+    border-bottom-right-radius: var(--radius);
+}
+
+.processor-card h3 {
+    font-family: Chivo;
+    font-weight: normal;
+    font-size: var(--font-h1);
+    flex-grow: 0;
+    padding: 0 var(--spacing-regular);
+    margin: 0;
+}
+
+.processor-card .quick-links {
+    flex-grow: 1;
+}
+
+.processor-card .quick-links li:hover {
+    background: var(--button-bg-regular);
+    color: var(--panel-bg-0);
+}
+
+.processor-card header > i {
+    font-size: calc(var(--font-h1) * 1.5);
+}
+
+.analysis-results .dataset-actions li {
+    background: var(--panel-bg-1);
+    color: var(--semidark);
+    border-bottom-color: var(--semidark);
+}
+
+/** colours for dropdown button in processor cards **/
+.processor-card .with-dropdown .button-like {
+    color: var(--button-bg-regular);
+    background-color: transparent;
+    outline-color: var(--button-bg-regular);
+}
+
+.processor-card .dropdown-action-button::before {;
+    outline-color: var(--button-bg-regular);
+    background-color: var(--button-bg-regular);
+}
+
+.processor-card .button-like:hover, .processor-card .with-dropdown ul li:hover, .processor-card .with-dropdown:hover .dropdown-action-button::before {
+    color: var(--panel-bg-0);
+    background: var(--button-bg-regular);
+    outline-color: var(--button-bg-regular);
+}
+
+.processor-card .with-dropdown:hover ul {
+    outline-color: var(--button-bg-regular);
+}
+
+.processor-card .with-dropdown ul li {
+    background-color: var(--panel-bg-0);
+    border-color: var(--button-bg-regular);
+    color: var(--button-bg-regular);
+}
+
+/** 'run new processor' button at bottom **/
+.big-button-wrap {
+    position: relative;
+    width: 100%;
+    padding-left: var(--spacing-xlarge);
+    box-sizing: border-box;
+}
+
+.big-processor-button {
+    border-radius: var(--radius);
+    border: var(--stroke-light) solid var(--dark);
+    border-bottom-width: var(--stroke-journey);
+    background: transparent;
+    padding: var(--spacing-small);
+    font-size: var(--font-h1);
+    text-align: center;
+    width: 100%;
+}
+
+.big-processor-button:hover {
+    cursor: pointer;
+    background: var(--button-bg-regular);
+    color: var(--bright);
+}
+
+.big-processor-button::before {
+    /** curve towards button **/
+    content: '';
+    display: block;
+    position: absolute;
+    left: 0;
+    top: calc(-1 * var(--spacing-large));
+    border: var(--stroke-journey) dashed var(--dark);
+    border-bottom-left-radius: var(--double-radius);
+    border-top-width: 0;
+    border-right-width: 0;
+    width: calc(var(--spacing-xlarge) - var(--stroke-journey));
+    height: calc(var(--spacing-xlarge) + var(--spacing-small));
+}

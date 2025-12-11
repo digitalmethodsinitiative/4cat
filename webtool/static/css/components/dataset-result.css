@@ -1,0 +1,83 @@
+.dataset-metadata {
+    background: var(--semidark);
+    padding: var(--spacing-large) 0;
+}
+
+.dataset-metadata > * {
+    max-width: var(--max-width);
+    margin: 0 auto var(--spacing-regular) auto;
+}
+
+.dataset-metadata nav > ul, .dataset-actions {
+    display: flex;
+    column-gap: var(--spacing-regular);
+}
+
+.dataset-metadata > nav > ul > li, .dataset-metadata .dropdown-action-button::before {
+    outline-color: var(--button-grey);
+    background: transparent;
+}
+
+.dataset-metadata .badge-list dt {
+    color: var(--button-grey);
+}
+
+.dataset-metadata .badge-list dd {
+    color: var(--bright);
+}
+
+.dataset-metadata header {
+    background: var(--brighten-12);
+    color: var(--bright);
+    display: flex;
+    align-content: center;
+    padding: 0 var(--spacing-regular);
+    box-sizing: border-box;
+}
+
+.dataset-metadata h1 {
+    font-family: Chivo;
+    font-weight: normal;
+    font-size: var(--font-h1);
+    border-bottom: var(--stroke) solid var(--button-grey);
+    margin-right: var(--spacing-regular);
+    height: var(--font-normal);
+    padding: var(--spacing-small) var(--spacing-tiny);
+    line-height: var(--font-normal);
+}
+
+.dataset-metadata header nav {
+    position: relative;
+    align-items: center;
+    display: flex;
+    flex-grow: 1;
+    justify-content: space-between;
+}
+
+.dataset-actions li {
+    border-bottom: var(--stroke) solid var(--button-grey);
+    background: var(--brighten-12);
+    height: calc(var(--font-normal) + 2 * var(--spacing-small));
+}
+
+.dataset-actions li a {
+    padding: var(--spacing-small);
+    display: block;
+    animation: 200ms;
+    height: var(--font-normal);
+}
+
+.dataset-actions li:hover {
+    color: var(--button-bg-regular);
+    background: var(--button-grey);
+}
+
+.dataset-metadata header nav ul.dataset-fetch {
+    text-align: right;
+    column-gap: 0;
+    position: relative;
+}
+
+.dataset-fetch .button-like {
+    outline-color: var(--button-grey);
+}

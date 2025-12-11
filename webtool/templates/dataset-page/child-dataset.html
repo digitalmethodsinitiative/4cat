@@ -1,0 +1,70 @@
+<li class="{% if not dataset.is_finished %}in-progress{% endif %}{% if dataset.get_children() %} with-children{% endif %}">
+    <article>
+        <aside class="subway-station">
+            <p class="timestamp">
+                <span class="date">{{ dataset.timestamp|datetime(fmt="%-d %b")|safe }}</span>
+                <span class="time">{{ dataset.timestamp|datetime(fmt="%H:%M")|safe }}</span>
+            </p>
+        </aside>
+        <div class="processor-card">
+            <button class="journey-marker{% if not dataset.get_children() %} end{% endif %}">
+            {% if not dataset.is_finished %}
+                &#62193; {# spinner #}
+            {% elif not dataset.num_rows %}
+                &#62796; {# skull #}
+            {% endif %}
+            </button>
+            <header>
+                <i class="fa fa-{% if dataset.get_own_processor().icon %}{{ dataset.get_own_processor().icon }}{% else %}puzzle-piece{% endif %}" aria-hidden="true"></i>
+                <h3>{% if dataset.get_label(default=None) %}{{ dataset.get_label() }}{% else %}{{ processors[dataset.type].title if not deprecated else "(Deprecated analysis) " + dataset.type }}{% endif %}</h3>
+                <nav class="quick-links">
+                    <ul class="dataset-actions">
+                    {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
+                        <li><a href="#"><i class="fa fa-fw fa-edit" aria-hidden="true"></i>
+                            <span class="sr-only is-icon-tooltip">Edit dataset label</span></a></li>
+                    {% endif %}
+                        <li><a href="#"><i class="fa fa-fw fa-mortar-board" aria-hidden="true"></i>
+                            <span class="sr-only is-icon-tooltip">Processor references</span></a>
+                        </li>
+                        {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+                        <li><a href="{{ url_for('dataset.view_log', key=dataset.key) }}"><i class="fa fa-fw fa-clipboard-list" aria-hidden="true"></i>
+                            <span class="sr-only is-icon-tooltip">View dataset log</span></a></li>
+                        {% endif %}
+                        <li><a href="{{ dataset.get_version_url("backend/processors/" + dataset.get_own_processor().filepath) }}"><i class="fab fa-fw fa-github" aria-hidden="true"></i>
+                            <span class="sr-only is-icon-tooltip">View processor source code</span></a>
+                        </li>
+                    </ul>
+                </nav>
+                <nav class="actions">
+                    {% include "dataset-page/dropdown-button.html" %}
+                </nav>
+            </header>
+            <section class="status">
+                <dl class="badge-list dataset-status">
+                    <div class="status-badge-annotated status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
+                        <dt>{% if not dataset.is_finished %}Processing{% elif dataset.num_rows %}Completed{% else %}No results{% endif %}</dt>
+                        <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
+                    </div>
+                {% if dataset.num_rows %}
+                    <div>
+                        <dt>Items</dt>
+                        <dd>{{ dataset.num_rows|commafy }}</dd>
+                    </div>
+                {% endif %}
+                </dl>
+            {% if dataset.parameters %}
+                <dl class="badge-list parameters with-overflow">
+                {% include "dataset-page/dataset-parameters.html" %}
+                </dl>
+            {% endif %}
+            </section>
+        </div>
+    </article>
+{% if dataset.get_children() %}
+    <ul class="sub tree">
+    {% for child in dataset.get_children() %}
+        {% with dataset=child %}{% include "dataset-page/child-dataset.html" %}{% endwith %}
+    {% endfor %}
+    </ul>
+{% endif %}
+</li>
