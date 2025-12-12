@@ -62,7 +62,7 @@ else:
 	sys.exit(1)
 
 # Headers for csv writing
-headers =  ("num","resto","board","sub","com","time","time_utc","name","deleted","deleted_on","replies_to","id","capcode","tripcode","filename","tim","md5","w","h","tw","th","fsize","country","country_name","op","replies","images","semantic_url","sticky","closed","archived_on","scraped_on","modified_on","unique_ips","bumplimit","imagelimit","index_positions","unsorted_data")
+headers = ("num","resto","board","sub","com","time","time_utc","name","deleted","deleted_on","replies_to","id","capcode","tripcode","filename","tim","md5","w","h","tw","th","fsize","country","country_name","op","replies","images","semantic_url","sticky","closed","archived_on","scraped_on","modified_on","unique_ips","bumplimit","imagelimit","index_positions","unsorted_data")
 
 # Check board validity
 if args.board:

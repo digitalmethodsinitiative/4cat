@@ -143,7 +143,7 @@ class DateFilter(BaseFilter):
 
             # Must be a good date!
             matching_items += 1
-            yield mapped_item.original
+            yield mapped_item
         
         if matching_items == 0:
             self.dataset.update_status("No items matched your criteria (%i invalid dates)" % invalid_dates, is_final=True)

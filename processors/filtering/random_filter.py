@@ -101,7 +101,7 @@ class RandomFilter(BaseFilter):
 				if count != (dataset_size - 1) and written < sample_size:
 					match_row = posts_to_keep[written]
 
-				yield mapped_item.original
+				yield mapped_item
 
 				if written % max(int(sample_size/10), 1) == 0:
 					self.dataset.update_status("Wrote %i posts" % written)
