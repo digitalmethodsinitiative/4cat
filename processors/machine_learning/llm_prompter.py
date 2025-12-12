@@ -6,6 +6,7 @@ import re
 import time
 import json
 import jsonschema
+import requests
 
 from json import JSONDecodeError
 from jsonschema.exceptions import ValidationError, SchemaError
@@ -24,8 +25,8 @@ class LLMPrompter(BasicProcessor):
     type = "llm-prompter"  # job type ID
     category = "Machine learning"  # category
     title = "LLM prompting"  # title displayed in UI
-    description = ("Use LLMs for analysis, via APIs or locally. This can be used for tasks like classification or "
-                   "entity extraction. Supported APIs include OpenAI, Google, Anthropic, and Mistral.")
+    description = ("Use LLMs for analysis, via APIs or locally. This can be used for tasks like classification, "
+                   "entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, Mistral, and DeepSeek.")
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
 
     references = [
@@ -52,12 +53,14 @@ class LLMPrompter(BasicProcessor):
             "ethics_warning1": {
                 "type": UserInput.OPTION_INFO,
                 "help": "Always <strong>test your prompt</strong> on a sample of rows, for instance by first using the "
-                        "<strong>Random filter</strong> processor.",
+                "<strong>Random filter</strong> processor.",
             },
             "api_or_local": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Local or API",
-                "options": {"api": "API", "local": "Local"} if not shared_llm_name else {"hosted": shared_llm_name, "api": "API", "local": "Local"},
+                "options": {"api": "API", "local": "Local"}
+                if not shared_llm_name
+                else {"hosted": shared_llm_name, "api": "API", "local": "Local"},
                 "default": "api" if not shared_llm_name else "hosted",
                 "tooltip": "You can use 'local' models through Ollama and LM Studio as long as you have a valid "
                 "and accessible URL through which the model can be reached.",
@@ -66,7 +69,7 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_CHOICE,
                 "help": "API model",
                 "options": LLMAdapter.get_model_options(config),
-                "default": "mistral-small-2503",
+                "default": "none",
                 "tooltip": "Select from the predefined model list or insert manually",
                 "requires": "api_or_local==api",
             },
@@ -75,7 +78,7 @@ class LLMPrompter(BasicProcessor):
                 "default": "",
                 "help": "API key",
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
-                           "/api-keys). Note that this often involves billing.",
+                "/api-keys). Note that this often involves billing.",
                 "requires": "api_or_local==api",
                 "sensitive": True,
             },
@@ -84,28 +87,33 @@ class LLMPrompter(BasicProcessor):
                 "help": "Model provider",
                 "requires": "api_model==custom",
                 "options": LLMAdapter.get_model_providers(config),
-                "tooltip": "Company that hosts this model. Currently limited to this list."
+                "tooltip": "API provider. Currently limited to this list.",
             },
             "api_custom_model_id": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Model ID",
                 "requires": "api_model==custom",
                 "tooltip": "E.g. 'mistral-small-2503'. Check the API provider's documentation on what model ID to use. "
-                           "Fine-tuned models often require more info; OpenAI for instance requires the following "
-                           "format: ft:[modelname]:[org_id]:[custom_suffix]:",
-                "default": ""
+                "Fine-tuned models often require more info; OpenAI for instance requires the following "
+                "format: ft:[modelname]:[org_id]:[custom_suffix]:",
+                "default": "",
             },
             "local_info": {
                 "type": UserInput.OPTION_INFO,
                 "requires": "api_or_local==local",
-                "help": "You can use local LLMs with LM Studio and Ollama. These applications need to be reachable by "
-                        "this 4CAT server, e.g. by running them on the same machine. You can also set the provider to "
-                        "LM Studio and use the Base URL to interface with any OpenAI-like API endpoint.",
+                "help": "You can use local LLMs with LM Studio, Ollama, and vLLM. These applications need to be reachable by "
+                "this 4CAT server, e.g. by running them on the same machine. For LM Studio and vLLM, "
+                "use the Base URL to interface with any OpenAI-like API endpoint.",
             },
             "local_provider": {
                 "type": UserInput.OPTION_CHOICE,
                 "requires": "api_or_local==local",
-                "options": {"none": "", "lmstudio": "LM Studio", "ollama": "Ollama"},
+                "options": {
+                    "none": "",
+                    "lmstudio": "LM Studio",
+                    "ollama": "Ollama",
+                    "vllm": "vLLM",
+                },
                 "default": "none",
                 "help": "Local LLM provider",
             },
@@ -122,8 +130,23 @@ class LLMPrompter(BasicProcessor):
                 "type": UserInput.OPTION_INFO,
                 "requires": "local_provider==ollama",
                 "help": "Ollama is a simple command-line application that lets you interface with a range of open-"
-                        "source LLMs and that you can run as a local server. See [this link]"
-                        "(https://github.com/ollama/ollama/blob/main/README.md#quickstart) for instructions.",
+                "source LLMs and that you can run as a local server. See [this link]"
+                "(https://github.com/ollama/ollama/blob/main/README.md#quickstart) for instructions.",
+            },
+            "vllm-info": {
+                "type": UserInput.OPTION_INFO,
+                "requires": "local_provider==ollama",
+                "help": "[vLLM](https://docs.vllm.ai/en/latest/getting_started/quickstart/) is a framework for Linux "
+                "systems capable of fast inference with a single LLM. Communication is done through an "
+                "OpenAI-like API endpoint. Just change the base URL below and insert an optional API key.",
+            },
+            "local_base_url": {
+                "type": UserInput.OPTION_TEXT,
+                "requires": "api_or_local==local",
+                "default": "",
+                "help": "Base URL",
+                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1` or `http://host.docker.internal:1234/v1` for LM "
+                "Studio, `http://localhost:11434` or `http://host.docker.internal:11434` for Ollama, `http://localhost:8000` or `http://host.docker.internal:8000` for vLLM ).",
             },
             "lmstudio_api_key": {
                 "type": UserInput.OPTION_TEXT,
@@ -133,13 +156,13 @@ class LLMPrompter(BasicProcessor):
                 "requires": "local_provider==lmstudio",
                 "sensitive": True,
             },
-            "local_base_url": {
+            "vllm_api_key": {
                 "type": UserInput.OPTION_TEXT,
-                "requires": "api_or_local==local",
                 "default": "",
-                "help": "Base URL for local models",
-                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1`  or `http://host.docker.internal:1234/v1` for LM "
-                           "Studio, `http://localhost:11434` or `http://host.docker.internal:11434` for Ollama).",
+                "help": "vLLM API key",
+                "tooltip": "[optional] Empty by default.",
+                "requires": "local_provider==vllm",
+                "sensitive": True,
             },
             "ollama_model": {
                 "type": UserInput.OPTION_TEXT,
@@ -155,55 +178,69 @@ class LLMPrompter(BasicProcessor):
                 "default": shared_llm_default,
                 "requires": "api_or_local==hosted",
             },
+            "prompt_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "<strong>How to prompt</strong><br>"
+                "Use `[brackets]` with column names to insert dataset items in the prompt. You "
+                "can place column brackets in different parts of the prompt or use multiple column names within"
+                ' a single column bracket to merge items.<br>Example 1: "Describe the topic '
+                'of this social media post in max. 3 words: `[body, tags]`"<br>Example 2: '
+                "\"Given the following hashtags: `[tags]`, answer whether they are 'related' or 'unrelated' "
+                'to the following text: `[body]`"<br><strong>Prompting is a delicate art</strong>. See '
+                "processor references on best prompting practices.<br>For predefined research prompts, see "
+                "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
+                "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
+                "library).",
+            },
             "system_prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "System prompt",
                 "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
-                           "on the tone of the text. This processor may edit the system prompt to "
-                           "ensure correct output. Full system prompts are included in the results file.",
-                "default": ""
-            },
-            "prompt_info": {
-                "type": UserInput.OPTION_INFO,
-                "help": "<strong>How to prompt on 4CAT</strong><br>"
-                        "Use `[brackets]` with column names to insert dataset items in the prompt. You "
-                        "can place column brackets in different parts of the prompt or use multiple column names within"
-                        " a single column bracket to merge items.<br>Example 1: \"Describe the topic "
-                        "of this social media post in max. 3 words: `[body, tags]`\"<br>Example 2: "
-                        "\"Given the following hashtags: `[tags]`, answer whether they are 'related' or 'unrelated' "
-                        "to the following text: `[body]`\"<br><strong>Prompting is a delicate art</strong>. See "
-                        "processor references on best prompting practices.<br>For predefined research prompts, see "
-                        "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
-                        "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
-                        "library)."
+                "on the tone of the text. This processor may edit the system prompt to "
+                "ensure correct output. System prompts are included in the results file.",
+                "default": "",
             },
             "prompt": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "User prompt",
                 "tooltip": "Use [brackets] with columns names.",
-                "default": ""
+                "default": "",
+            },
+            "use_media": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Add images",
+                "tooltip": "Add media URLs for multi-modal processing. Requires a model that supports vision.",
+                "default": False,
+            },
+            "media_columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Columns with image URL(s)",
+                "default": "",
+                "inline": True,
+                "tooltip": "Multiple columns can be selected.",
+                "requires": "use_media==true",
             },
             "structured_output": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Output structured JSON",
-                "tooltip": "Output in a JSON format instead of CSV text. Note that your chosen model may not support "
-                           "structured output.",
-                "default": False
+                "tooltip": "Output in a JSON format instead of text. Note that your chosen model may not support "
+                "structured output.",
+                "default": False,
             },
             "json_schema_info": {
                 "type": UserInput.OPTION_INFO,
                 "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
-                        "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
-                        "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
-                        "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
-                "requires": "structured_output==true"
+                "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
+                "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
+                "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
+                "requires": "structured_output==true",
             },
             "json_schema": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "JSON schema",
                 "tooltip": "[required] A JSON schema that the structured output will adhere to",
                 "requires": "structured_output==true",
-                "default": ""
+                "default": "",
             },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
@@ -221,6 +258,7 @@ class LLMPrompter(BasicProcessor):
                 "default": 0,
                 "coerce_type": int,
                 "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
+                "requires": "use_media==false",
             },
             "max_tokens": {
                 "type": UserInput.OPTION_TEXT,
@@ -236,15 +274,17 @@ class LLMPrompter(BasicProcessor):
                 "coerce_type": int,
                 "default": 1,
                 "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
-                           "wherever the column brackets are used (e.g. '[body]')."
+                "wherever the column brackets are used (e.g. '[body]').",
+                "requires": "use_media==false",
             },
             "batch_info": {
                 "type": UserInput.OPTION_INFO,
                 "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Models "
-                        "need to support structured output for batching. This processor uses JSON schemas to ensure "
-                        "symmetry between input and output lengths, but models may struggle to match input and output "
-                        "values. Describe the dataset values in plurals in your prompt when batching. If you use "
-                        "multiple column brackets in your prompt, rows with any empty values are skipped."
+                "need to support structured output for batching. This processor uses JSON schemas to ensure "
+                "symmetry between input and output lengths, but models may struggle to match input and output "
+                "values. Describe the dataset values in plurals in your prompt when batching. If you use "
+                "multiple column brackets in your prompt, rows with any empty values are skipped.",
+                "requires": "use_media==false",
             },
             "ethics_warning3": {
                 "type": UserInput.OPTION_INFO,
@@ -268,7 +308,7 @@ class LLMPrompter(BasicProcessor):
                 "help": "Hide reasoning",
                 "default": False,
                 "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
-                           "removes this tag and its contents from the output."
+                "removes this tag and its contents from the output.",
             },
             "limit": {
                 "type": UserInput.OPTION_TEXT,
@@ -276,15 +316,22 @@ class LLMPrompter(BasicProcessor):
                 "default": 0,
                 "coerce_type": int,
                 "min": 0,
-                "delegated": True
+                "delegated": True,
             },
             "annotation_label": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Label for the annotations to add to the dataset",
                 "default": "",
-                "delegated": True
-            }
+                "delegated": True,
+            },
         }
+
+        # Get the media columns for the select media columns option
+        if parent_dataset and parent_dataset.get_columns():
+            columns = parent_dataset.get_columns()
+            options["media_columns"]["type"] = UserInput.OPTION_MULTI
+            options["media_columns"]["options"] = {v: v for v in columns}
+
         return options
 
     @classmethod
@@ -294,7 +341,6 @@ class LLMPrompter(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-
         return module.get_extension() in ["csv", "ndjson"]
 
     def process(self):
@@ -302,7 +348,11 @@ class LLMPrompter(BasicProcessor):
         self.dataset.update_status("Validating settings")
 
         api_consent = self.parameters.get("consent", False)
+
         api_model = self.parameters.get("api_model")
+        if api_model == "none":
+            api_model = ""
+
         modal_location = self.parameters.get("api_or_local", "api") 
         hide_think = self.parameters.get("hide_think", False)
 
@@ -312,7 +362,12 @@ class LLMPrompter(BasicProcessor):
             return
 
         self.dataset.delete_parameter("consent")
-        
+
+        # Optional media columns for files
+        media_columns = self.parameters.get("media_columns", []) if self.parameters.get("use_media") else []
+        if type(media_columns) is str:
+            media_columns = [media_columns]
+
         temperature = float(self.parameters.get("temperature", 0.1))
         temperature = min(max(temperature, 0), 2)
         max_input_len = int(self.parameters.get("truncate_input", 0))
@@ -324,6 +379,8 @@ class LLMPrompter(BasicProcessor):
         # Set value for batch length in prompts
         batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
         use_batches = batches > 1
+        if media_columns:  # no batching for media files
+            use_batches = False
         if not use_batches:
             self.dataset.delete_parameter("batches")
 
@@ -353,9 +410,15 @@ class LLMPrompter(BasicProcessor):
                     return
                 if not base_url:
                     base_url = "http://localhost:11434" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:11434"
+            elif provider == "vllm":
+                model = "vllm_model"
+                api_key = self.parameters.get("vllm_api_key", "")
+                if not base_url:
+                    base_url = "http://localhost:8000/v1"
             else:
                 self.dataset.finish_with_error("Local provider not supported, choose either lmstudio or ollama")
                 return
+
         elif modal_location == "hosted":
             base_url = self.config.get("llm.server", "")
             provider = self.config.get("llm.provider_type", "none").lower()
@@ -372,6 +435,9 @@ class LLMPrompter(BasicProcessor):
                 self.dataset.finish_with_error("4CAT LLM server not properly configured; contact the administrator")
                 return
         else:
+            if not api_model:
+               self.dataset.finish_with_error("Select an API model or insert one manually")
+               return
             # Models can be set manually already
             if api_model == "custom":
                 model = self.parameters.get("api_custom_model_id", "")
@@ -394,17 +460,16 @@ class LLMPrompter(BasicProcessor):
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
-        self.dataset.update_status("Prompt: %s" % base_prompt)
-
-        if not base_prompt:
-            self.dataset.finish_with_error("You need to insert a valid prompt")
+        if not base_prompt and not (system_prompt and media_columns):
+            self.dataset.finish_with_error("You need to insert a valid user prompt")
             return
+        self.dataset.update_status("Prompt: %s" % base_prompt)
 
         # Get column values in prompt. These can be one or multiple, and multiple within a bracket as well.
         columns_to_use = re.findall(r"\[.*?]", base_prompt)
-        if not columns_to_use:
+        if not columns_to_use and not media_columns:
             self.dataset.finish_with_error(
-                "You need to insert column name(s) in the prompts within brackets (e.g. '[body]' "
+                "You need to insert column name(s) in the user prompt within brackets (e.g. '[body]' "
                 "or '[timestamp, author]')"
             )
             return
@@ -555,10 +620,25 @@ class LLMPrompter(BasicProcessor):
                     else:
                         item_values[column_to_use] = item_value
 
-                if not any(v for v in item_values.values()):
+                # Get media URL values; split links on comma.
+                media_urls = []
+                for media_column in media_columns:
+                    media_url = item.get(media_column, [])
+                    if media_url:
+                        if isinstance(media_url, list):
+                            media_urls += media_url
+                        else:
+                            media_urls += [url.strip() for url in media_url.split(",")]
+
+                # Skip with empty items
+                empty_items = True if not any(v for v in item_values.values()) and columns_to_use else False
+                if (empty_items and not media_urls) or (media_columns and not media_urls):
                     if item_values.keys():
                         missing_columns = andify(columns_to_use) if len(columns_to_use) > 1 else columns_to_use[0]
                         self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {missing_columns}")
+                    if media_columns and not media_urls:
+                        missing_media_columns = andify(media_columns) if len(media_columns) > 1 else media_columns[0]
+                        self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {missing_media_columns}")
                     skipped += 1
                     # (but not if we've reached the end of the dataset; we want to process the last batch)
                     if row != self.source_dataset.num_rows:
@@ -615,12 +695,22 @@ class LLMPrompter(BasicProcessor):
                         response = llm.generate_text(
                             prompt,
                             system_prompt=system_prompt,
-                            temperature=temperature
+                            temperature=temperature,
+                            files=media_urls
                         )
 
+                    # Catch 404 errors with media URLs, we simply skip these
+                    except requests.exceptions.HTTPError as e:
+                        if e.response.status_code == 404 and media_urls:
+                            self.dataset.log(f"Skipping row {row} because of media URL is not reachable, ({e})")
+                            skipped += 1
+                            continue
+                        else:
+                            self.dataset.finish_with_error(f"{e}")
+                            return
                     # Broad exception, but necessary with all the different LLM providers and options...
                     except Exception as e:
-                        self.dataset.finish_with_error(f"`{e}`")
+                        self.dataset.finish_with_error(f"{e}")
                         return
 
                     # Set model name from the response for more details

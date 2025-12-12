@@ -1,9 +1,14 @@
 {
-    "custom": {
-        "name": "[manual]",
+    "none": {
+        "name": "",
         "model_card": "",
         "provider": "",
         "default": true
+    },
+    "custom": {
+        "name": "[custom]",
+        "model_card": "",
+        "provider": ""
     },
     "gpt-5.2": {
         "name": "[OpenAI] GPT-5.2",
