@@ -663,9 +663,23 @@ class LLMPrompter(BasicProcessor):
 
                     # Else we'll just store the output in a list
                     else:
+
                         output = response.content
+
                         if not isinstance(output, list):
                             output = [output]
+
+                        # More cleaning
+                        # Magistral gives back an annoying nested dict with 'thinking' and 'text', flatten it
+                        if len(output) > 0 and isinstance(output[0], dict) and output[0].get("type") == "thinking":
+                            output_flat = {"thinking": "", "text": []}
+                            for output_part in output:
+                                if output_part.get("type") == "thinking":
+                                    output_flat["thinking"] += "\n".join([think["text"] for think in output_part["thinking"]])
+                                else:
+                                    output_flat["text"].append(output_part.get("text", ""))
+                            output_flat["text"] = "\n".join(output_flat["text"])
+                            output = [output_flat]
 
                     for n, output_item in enumerate(output):
 
@@ -679,7 +693,11 @@ class LLMPrompter(BasicProcessor):
 
                         # remove reasoning if so desired
                         if hide_think:
-                            output_item = re.sub(r"<think>.*</think>", "", output_item, flags=re.DOTALL).strip()
+                            if isinstance(output_item, str):
+                                output_item = re.sub(r"<think>.*</think>", "", output_item, flags=re.DOTALL).strip()
+                            elif isinstance(output_item, dict):
+                                if "thinking" in output_item:
+                                    del output_item["thinking"]
 
                         result = {
                             "id": batched_ids[n],

@@ -9,6 +9,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_mistralai import ChatMistralAI
+from langchain_deepseek import ChatDeepSeek
 
 
 class LLMAdapter:
@@ -80,6 +81,15 @@ class LLMAdapter:
                 base_url=self.base_url,  # Optional override
                 max_tokens=self.max_tokens,
             )
+        elif self.provider == "deepseek":
+
+            return ChatDeepSeek(
+                model=self.model,
+                temperature=self.temperature,
+                api_key=SecretStr(self.api_key),
+                base_url=self.base_url,
+                max_tokens=self.max_tokens if self.max_tokens <= 8192 else 8192,
+            )
         elif self.provider == "ollama":
             ollama_adapter = ChatOllama(
                 model=self.model,
@@ -130,7 +140,7 @@ class LLMAdapter:
             response = self.llm.invoke(lc_messages, **kwargs)
         except Exception as e:
             raise e
-        
+
         return response
 
     def set_structure(self, json_schema):
