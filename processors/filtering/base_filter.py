@@ -24,6 +24,8 @@ class BaseFilter(BasicProcessor):
     title = "Base Filter"  # title displayed in UI
     description = "This should not be available."
 
+    item_ids = []
+
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -43,31 +45,39 @@ class BaseFilter(BasicProcessor):
         parent_extension = self.source_dataset.get_extension()
 
         # Filter posts
-        matching_posts = self.filter_items()
+        matching_items = self.filter_items()
 
-        # If this source dataset has less than n annotations, just retrieve them all before iterating
-        
         # Write the posts
         num_posts = 0
         kwargs = {"newline": ""} if parent_extension == "ndjson" else {}
+
+        # Check if we need to copy over annotations
+        copy_annotations = True if self.source_dataset.num_annotations() > 0 else False
 
         with self.dataset.get_results_path().open("w", encoding="utf-8", **kwargs) as outfile:
 
             writer = None
             # Loop through all filtered posts. These ought to be the `original` object in case of a MappedItem; we're
             # filtering, not changing the data (at least in principle).
-            for post in matching_posts:
+            for item in matching_items:
+
+                # We're only storing the original items here.
+                # We still need the mapped data for annotations.
+                item_original = item.original
 
                 # Save the actual item
                 if parent_extension == "csv":
                     if not writer:
-                        writer = csv.DictWriter(outfile, fieldnames=post.keys())
+                        writer = csv.DictWriter(outfile, fieldnames=item_original.keys())
                         writer.writeheader()
-                    writer.writerow(post)
+                    writer.writerow(item_original)
                 elif parent_extension == "ndjson":
-                    outfile.write(json.dumps(post) + "\n")
+                    outfile.write(json.dumps(item_original) + "\n")
                 else:
                     raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
+
+                if copy_annotations:
+                    self.item_ids.append(item.get("id", ""))
 
                 num_posts += 1
 
@@ -85,7 +95,7 @@ class BaseFilter(BasicProcessor):
         super().after_process()
 
         # Request standalone
-        self.create_standalone()
+        self.create_standalone(item_ids=self.item_ids)
 
     @classmethod
     def is_filter(cls):
