@@ -290,7 +290,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             time.sleep(0.1)
 
         stdout, stderr = process.communicate()
-        return subprocess.CompletedProcess("", process.returncode, stdout, stderr)
+        return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
     @abc.abstractmethod
     def work(self):
