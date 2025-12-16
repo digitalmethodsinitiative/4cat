@@ -12,7 +12,7 @@ from typing import Iterable
 
 from common.lib.queue import JobQueue
 from common.lib.database import Database
-from common.lib.exceptions import WorkerInterruptedException, ProcessorException, ProcessorInterruptedException
+from common.lib.exceptions import WorkerInterruptedException, ProcessorException
 from common.config_manager import ConfigWrapper
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -121,12 +121,6 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             self.db = Database(logger=self.log, appname=database_appname, dbname=self.config.DB_NAME, user=self.config.DB_USER, password=self.config.DB_PASSWORD, host=self.config.DB_HOST, port=self.config.DB_PORT)
             self.queue = JobQueue(logger=self.log, database=self.db) if not self.queue else self.queue
             self.work()
-
-            # workers should usually finish their jobs by themselves, but if
-            # the worker finished without errors, the job can be finished in
-            # any case
-            if not self.job.is_finished:
-                self.job.finish()
 
         except WorkerInterruptedException:
             self.log.info("Worker %s interrupted - cancelling." % self.type)
@@ -258,10 +252,14 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
                     try:
                         process.wait(wait_time)
+                        self.log.debug(f"Process {command[0]} for worker {self.type} terminated successfully")
                     except subprocess.TimeoutExpired:
                         process.kill()
+
                         try:
                             process.wait(wait_time)
+                            self.log.debug(f"Process {command[0]} for worker {self.type} ended after sending kill "
+                                           f"signal")
                         except subprocess.TimeoutExpired:
                             self.log.error(f"Sent SIGKILL to process {process.pid} but process did not terminate! "
                                            f"Process was started by worker {self.type} with command "
@@ -276,7 +274,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
                         for path in cleanup_paths:
                             shutil.rmtree(path, ignore_errors=True)
 
-                    raise ProcessorInterruptedException(exception_message)
+                    raise WorkerInterruptedException(exception_message)
             
             time.sleep(0.1)
 

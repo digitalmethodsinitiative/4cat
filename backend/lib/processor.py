@@ -190,6 +190,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             try:
                 self.process()
                 self.after_process()
+                
+                # processors should usually finish their jobs by themselves, but if
+                # the worker finished without errors, the job can be finished in
+                # any case
+                if not self.job.is_finished:
+                    self.job.finish()
             except WorkerInterruptedException as e:
                 self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
                 self.abort()
