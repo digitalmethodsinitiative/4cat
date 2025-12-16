@@ -8,9 +8,6 @@ import shutil
 import oslex
 import math
 import re
-import signal
-import time
-import os
 
 from packaging import version
 
@@ -588,38 +585,13 @@ class VideoWallGenerator(BasicProcessor):
 
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
         self.dataset.update_status("Creating collage with ffmpeg (this may take a while)")
-        # Start ffmpeg in a new session so we can signal/kill the whole group on POSIX
-        proc = subprocess.Popen(
-            command,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True
-        )
 
-        # Poll loop to respond to interrupts and terminate ffmpeg promptly
-        while proc.poll() is None:
-            if self.interrupted:
-                # Try graceful stop first
-                try:
-                    os.killpg(proc.pid, signal.SIGTERM)
-                except Exception:
-                    pass
-                # Wait briefly, then force kill if needed
-                deadline = time.time() + 5
-                while time.time() < deadline and proc.poll() is None:
-                    time.sleep(0.1)
-                if proc.poll() is None:
-                    try:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                    except Exception:
-                        pass
-                shutil.rmtree(collage_staging_area, ignore_errors=True)
-                return ProcessorInterruptedException("Interrupted while running ffmpeg")
-            time.sleep(0.2)
+        # run ffmpeg as an interruptable process so it can be quit when the
+        # processor is interrupted
+        process = self.run_interruptable_process(command, wait_time=10, cleanup_paths=(collage_staging_area,))
 
         # Capture logs
-        ffmpeg_error = (proc.stderr.read() or b"").decode("utf-8", errors="replace")
+        ffmpeg_error = (process.stderr.read() or b"").decode("utf-8", errors="replace")
         if ffmpeg_error:
             self.dataset.log("ffmpeg returned the following errors:")
             for line in ffmpeg_error.split("\n"):
@@ -638,7 +610,7 @@ class VideoWallGenerator(BasicProcessor):
                     self.dataset.log(f"The error message indicates the file {included_media[erroneous_stream]} cannot be read; it may be corrupt.")
 
        
-        ffmpeg_output = (proc.stdout.read() or b"").decode("utf-8", errors="replace")
+        ffmpeg_output = (process.stdout.read() or b"").decode("utf-8", errors="replace")
         if ffmpeg_output:
             self.dataset.log("ffmpeg returned the following output:")
             for line in ffmpeg_output.split("\n"):
@@ -646,7 +618,7 @@ class VideoWallGenerator(BasicProcessor):
 
         shutil.rmtree(collage_staging_area, ignore_errors=True)
 
-        if proc.returncode != 0:
+        if process.returncode != 0:
             if have_old_ffmpeg_version:
                 self.dataset.log("You may be able to prevent this error by updating to a newer version of ffmpeg.")
             if ffmpeg_error:
@@ -654,7 +626,7 @@ class VideoWallGenerator(BasicProcessor):
                 ffmpeg_error = ffmpeg_error.strip().split("\n")[-1]
                 self.log.warning(f"ffmpeg error (see dataset {self.dataset.key} log for full details): {ffmpeg_error}")
             return self.dataset.finish_with_error(
-                f"Could not make collage (error {proc.returncode}); check the dataset log for details.")
+                f"Could not make collage (error {process.returncode}); check the dataset log for details.")
 
         if skipped:
              self.dataset.update_status(f"Rendering finished. {skipped} item(s) were skipped; see dataset log for details.", is_final=True)

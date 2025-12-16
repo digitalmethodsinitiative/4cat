@@ -1,14 +1,18 @@
 """
 Worker class that all workers should implement
 """
+import subprocess
 import traceback
 import threading
+import shutil
 import time
 import abc
 
+from typing import Iterable
+
 from common.lib.queue import JobQueue
 from common.lib.database import Database
-from common.lib.exceptions import WorkerInterruptedException, ProcessorException
+from common.lib.exceptions import WorkerInterruptedException, ProcessorException, ProcessorInterruptedException
 from common.config_manager import ConfigWrapper
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -196,6 +200,84 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         """
         self.log.debug("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
         self.interrupted = level
+
+    def run_interruptable_process(self, command, exception_message: str="", wait_time: int=5, timeout: int=0, cleanup_paths: Iterable=[]) -> subprocess.Popen:
+        """
+        Run a process and monitor while worker is active
+
+        This runs the process and, while it is running, monitors the
+        worker's interrupt status; if the worker is interrupted, the process
+        is stopped or killed. An optional timeout can also be given after which
+        the process will be stopped or killed even if the worker has not been
+        interrupted.
+
+        The process is stopped by sending a SIGTERM, and then if that does not
+        end the process, a SIGKILL.
+
+        :param Iterable command:  Command to run
+        :param exception_message:  Message for the
+        ProcessorInterruptedException that is raised if the worker is
+        interrupted while the process is running.
+        :param int wait_time:  Seconds to wait for the process after sending
+        SIGTERM before sending a SIGKILL, and then to wait before logging an
+        error if SIGKILL does not end the process.
+        :param int timeout:  Optional timeout, in seconds. 0 for no timeout.
+        :param Iterable cleanup_paths:  Paths to delete before raising a
+        ProcessorInterruptedException. Will be deleted with shutil.rmtree.
+        :return:
+        """
+        if type(command) is str:
+            raise TypeError("Command for run_interruptable_process must be a list or tuple")
+
+        if not exception_message:
+            exception_message = f"Interrupted while running {command[0]}"
+
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+
+        start_time = time.time()
+        while process.poll() is None:
+            if self.interrupted > self.INTERRUPT_NONE or (timeout and time.time() > start_time + timeout):
+                if self.interrupted == self.INTERRUPT_NONE:
+                    self.log.warning(f"Interruptable process {command[0]} for worker of type {self.type} timed out, "
+                                     f"killing")
+
+                # Try graceful stop first with SIGTERM
+                # Wait briefly, then force kill if needed
+                self.log.debug(f"Asking interruptable process {command[0]} for worker {self.type} to terminate...")
+                try:
+                    process.terminate()
+
+                    try:
+                        process.wait(wait_time)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        try:
+                            process.wait(wait_time)
+                        except subprocess.TimeoutExpired:
+                            self.log.error(f"Sent SIGKILL to process {process.pid} but process did not terminate! "
+                                           f"Process was started by worker {self.type} with command "
+                                           f"{' '.join(command)}")
+
+                except Exception as e:
+                    self.log.error(f"Failed to kill process {process.pid}: got exception {e}. Cleaning up and "
+                                   f"interrupting worker anyway.")
+
+                finally:
+                    if cleanup_paths:
+                        for path in cleanup_paths:
+                            shutil.rmtree(path, ignore_errors=True)
+
+                raise ProcessorInterruptedException(exception_message)
+            
+            time.sleep(0.1)
+
+        return process
 
     @abc.abstractmethod
     def work(self):
