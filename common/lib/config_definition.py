@@ -598,9 +598,9 @@ config_definition = {
     },
     "llm.available_models": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": [],
+        "default": {},
         "help": "Available LLM models",
-        "tooltip": "A JSON array of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
+        "tooltip": "A JSON dictionary of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
         "indirect": True,
         "global": True
     },

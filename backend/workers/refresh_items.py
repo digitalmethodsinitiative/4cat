@@ -1,6 +1,8 @@
 """
 Refresh items
 """
+import json
+
 import requests
 
 from backend.lib.worker import BasicWorker
@@ -48,11 +50,25 @@ class ItemUpdater(BasicWorker):
             if llm_api_key and llm_auth_type:
                 headers[llm_auth_type] = llm_api_key
 
+            available_models = {}
             try:
                 response = requests.get(f"{llm_server}/api/tags", headers=headers, timeout=10)
                 if response.status_code == 200:
                     settings = response.json()
-                    self.config.set("llm.available_models", settings.get("models", []))
+                    for model in settings.get("models", []):
+                        model = model["name"]
+                        try:
+                            model_metadata = requests.post(f"{llm_server}/api/show", headers=headers, json={"model": model}, timeout=10).json()
+                            available_models[model] = {
+                                "name": f"{model_metadata['model_info']['general.basename']} ({model_metadata['details']['parameter_size']} parameters)",
+                                "model_card": f"https://ollama.com/library/{model}",
+                                "provider": "local"
+                            }
+                            
+                        except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
+                            self.log.debug(f"Could not get metadata for model {model} from Ollama - skipping (error: {e})")
+
+                    self.config.set("llm.available_models", available_models)
                     self.log.debug("Refreshed LLM server settings cache")
                 else:
                     self.log.warning(f"Could not refresh LLM server settings cache - server returned status code {response.status_code}")

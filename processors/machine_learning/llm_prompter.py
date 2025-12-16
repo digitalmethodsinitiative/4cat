@@ -42,7 +42,7 @@ class LLMPrompter(BasicProcessor):
         # Check if 4CAT wide LLM server is available
         if config.get("llm.access", False) and config.get("llm.server", ""):
             shared_llm_name = config.get("llm.host_name", "4CAT LLM Server")
-            shared_llm_models = {model.get("model"): model.get("name") for model in config.get("llm.available_models", [])}
+            shared_llm_models = {model: model_metadata.get("name") for model, model_metadata in config.get("llm.available_models", {}).items()}
             shared_llm_default = list(shared_llm_models.keys())[0] if shared_llm_models else ""
         else:
             shared_llm_name = False
