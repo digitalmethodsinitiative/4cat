@@ -704,7 +704,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if finish:
             self.dataset.finish(num_items)
 
-    def create_standalone(self):
+    def create_standalone(self, item_ids=None):
         """
         Copy this dataset and make that copy standalone.
 
@@ -713,8 +713,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         
         This also transfers annotations and annotation fields.
 
+        :param list item_ids:   The item_ids that are copied-over. Used to check what annotations need to be copied.
+
         :return DataSet:  The new standalone dataset
         """
+
         top_parent = self.source_dataset
 
         finished = self.dataset.check_dataset_finished()
@@ -728,30 +731,34 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         standalone = self.dataset.copy(shallow=False)
         standalone.body_match = "(Filtered) " + top_parent.query
         standalone.datasource = top_parent.parameters.get("datasource", "custom")
-        
-        # Copy over annotations
+
         if top_parent.annotation_fields and top_parent.num_annotations() > 0:
-            
             # Get column names dynamically
             annotation_cols = self.db.fetchone("SELECT * FROM annotations LIMIT 1")
             annotation_cols = list(annotation_cols.keys())
             annotation_cols.remove("id")  # Set by the DB
             cols_str = ",".join(annotation_cols)
-            select_str = ",".join(["a."+col for col in annotation_cols if col != "dataset"])
-            
-            self.db.execute(f"INSERT INTO annotations ({cols_str}) "
-                            f"OVERRIDING USER VALUE "
-                            f"SELECT '{standalone.key}', {select_str} "
-                            f"FROM annotations AS a WHERE a.dataset = '{top_parent.key}' ")
-    
-        # Copy over annotation fields and update annotations with new IDs
+
+            cols_list = ["a." + col for col in annotation_cols if col != "dataset"]
+            query = f"INSERT INTO annotations ({cols_str}) OVERRIDING USER VALUE " \
+                    f"SELECT %s, {', '.join(cols_list)} " \
+                    f"FROM annotations AS a WHERE a.dataset = %s"
+
+            # Copy over all annotations if no item_ids are given
+            if not item_ids or top_parent.num_rows == standalone.num_rows:
+                self.db.execute(query, replacements=(standalone.key, top_parent.key))
+            else:
+                query += " AND a.item_id = ANY(%s)"
+                self.db.execute(query, replacements=(standalone.key, top_parent.key, item_ids))
+
+        # Copy over annotation fields and update annotations with new field IDs
         if top_parent.annotation_fields:
             # New field IDs based on the new dataset key
             annotation_fields = {
                 hash_to_md5(old_field_id + standalone.key): field_values
                 for old_field_id, field_values in top_parent.annotation_fields.items()
             }
-            standalone.annotation_fields = {}  # So we're not checking changes with old annotation fields
+            standalone.annotation_fields = {}  # Reset to insert everything without checking for changes
             standalone.save_annotation_fields(annotation_fields)  # Save to db
 
             # Also update field IDs in annotations

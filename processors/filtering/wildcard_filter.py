@@ -87,4 +87,4 @@ class WildcardFilter(BaseFilter):
                 continue
 
             matching_items += 1
-            yield mapped_item.original
+            yield mapped_item
