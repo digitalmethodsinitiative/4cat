@@ -653,8 +653,8 @@ class VideoWallGenerator(BasicProcessor):
         """
         probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
                          "stream=width,height,duration", "-of", "csv=p=0", oslex.quote(str(file_path))]
-        probe = subprocess.run(probe_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+
+        probe = self.run_interruptable_process(probe_command)
 
         probe_output = probe.stdout.decode("utf-8")
         probe_error = probe.stderr.decode("utf-8")

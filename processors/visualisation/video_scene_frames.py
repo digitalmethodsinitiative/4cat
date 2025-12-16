@@ -7,7 +7,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import shutil
-import subprocess
 import oslex
 
 from packaging import version
@@ -146,8 +145,7 @@ class VideoSceneFrames(BasicProcessor):
             if frame_size != "no_modify":
                 command += ["-s", oslex.quote(frame_size)]
 
-            result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+            result = self.run_interruptable_process(command, cleanup_paths=(video_staging_area, staging_area))
 
             # some ffmpeg error - log but continue
             if result.returncode != 0:

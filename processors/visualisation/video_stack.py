@@ -193,8 +193,7 @@ class VideoStack(BasicProcessor):
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
                               "default=noprint_wrappers=1:nokey=1", video_path]
-            length = subprocess.run(length_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+            length = self.run_interruptable_process(length_command, cleanup_paths=(video_staging_area,))
 
             length_output = length.stdout.decode("utf-8")
             length_error = length.stderr.decode("utf-8")
