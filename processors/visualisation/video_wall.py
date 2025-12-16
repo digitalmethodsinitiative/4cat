@@ -590,7 +590,7 @@ class VideoWallGenerator(BasicProcessor):
         process = self.run_interruptable_process(command, wait_time=10, cleanup_paths=(collage_staging_area,))
 
         # Capture logs
-        ffmpeg_error = (process.stderr.read() or b"").decode("utf-8", errors="replace")
+        ffmpeg_error = (process.stderr or b"").decode("utf-8", errors="replace")
         if ffmpeg_error:
             self.dataset.log("ffmpeg returned the following errors:")
             for line in ffmpeg_error.split("\n"):
@@ -609,7 +609,7 @@ class VideoWallGenerator(BasicProcessor):
                     self.dataset.log(f"The error message indicates the file {included_media[erroneous_stream]} cannot be read; it may be corrupt.")
 
        
-        ffmpeg_output = (process.stdout.read() or b"").decode("utf-8", errors="replace")
+        ffmpeg_output = (process.stdout or b"").decode("utf-8", errors="replace")
         if ffmpeg_output:
             self.dataset.log("ffmpeg returned the following output:")
             for line in ffmpeg_output.split("\n"):

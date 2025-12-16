@@ -195,7 +195,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         self.log.debug("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
         self.interrupted = level
 
-    def run_interruptable_process(self, command, exception_message: str="", wait_time: int=5, timeout: int=0, cleanup_paths: Iterable=[]) -> subprocess.Popen:
+    def run_interruptable_process(self, command, exception_message: str="", wait_time: int=5, timeout: int=0, cleanup_paths: Iterable=[]) -> subprocess.CompletedProcess:
         """
         Run a process and monitor while worker is active
 
@@ -289,7 +289,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             
             time.sleep(0.1)
 
-        return process
+        return subprocess.CompletedProcess("", process.returncode, process.stdout.read(), process.stderr.read())
 
     @abc.abstractmethod
     def work(self):
