@@ -205,8 +205,17 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         the process will be stopped or killed even if the worker has not been
         interrupted.
 
+        When interrupted, a WorkerInterruptedException will be raised after
+        killing the process and, optionally, deleting any paths provided via
+        the `cleanup_paths` parameter. If the worker is not interrupted and the
+        command terminates normally, nothing is deleted.
+
+        Note that the WorkerInterruptedException will also be raised if the
+        worker times out - so processor code after it times out will not run
+        (unless the processor catches and handles the exception).
+
         The process is stopped by sending a SIGTERM, and then if that does not
-        end the process, a SIGKILL.
+        end the process after a brief wait (`wait_time`), a SIGKILL.
 
         :param command:  Command to run
         :param exception_message:  Message for the
@@ -217,7 +226,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         an error if SIGKILL does not end the process.
         :param int timeout:  Optional timeout, in seconds. 0 for no timeout.
         :param Iterable cleanup_paths:  Paths to delete before raising a
-        ProcessorInterruptedException. Will be deleted with shutil.rmtree.
+        WorkerInterruptedException. Will be deleted with shutil.rmtree.
+        :raise WorkerInterruptedException:  When the command cannot or does not
+        complete.
         :return:
         """
         if type(command) is str:
