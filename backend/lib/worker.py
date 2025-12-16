@@ -253,8 +253,8 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
                     self.log.info(f"Interruptable process {command[0]} for worker of type {self.type} timed out, "
                                   f"terminating")
                 else:
-                    self.log.info(f"Worker interrupted, asking interruptable process {command[0]} for worker "
-                                   f"{self.type} to terminate...")
+                    self.log.info(f"Worker of type {self.type} interrupted, asking interruptable process {command[0]} "
+                                  f"to terminate...")
 
                 # Try graceful stop first with SIGTERM
                 # Wait briefly, then force kill if needed
