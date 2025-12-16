@@ -2,7 +2,6 @@
 Create a collage of items in a grid
 """
 import statistics
-import subprocess
 import random
 import shutil
 import oslex
