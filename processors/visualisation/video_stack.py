@@ -7,7 +7,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend, and
 assumes that ffprobe is also present in the same location.
 """
 import shutil
-import subprocess
 import oslex
 
 from packaging import version
@@ -193,8 +192,7 @@ class VideoStack(BasicProcessor):
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
                               "default=noprint_wrappers=1:nokey=1", video_path]
-            length = subprocess.run(length_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+            length = self.run_interruptable_process(length_command, cleanup_paths=(video_staging_area,))
 
             length_output = length.stdout.decode("utf-8")
             length_error = length.stderr.decode("utf-8")
@@ -271,7 +269,7 @@ class VideoStack(BasicProcessor):
             return ProcessorInterruptedException("Interrupted while stacking videos")
 
         self.dataset.update_status("Merging video files with ffmpeg (this can take a while)")
-        result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = self.run_interruptable_process(command, cleanup_paths=(video_staging_area,))
 
         # Capture logs
         ffmpeg_output = result.stdout.decode("utf-8")
