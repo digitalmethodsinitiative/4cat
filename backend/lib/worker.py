@@ -214,20 +214,21 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         The process is stopped by sending a SIGTERM, and then if that does not
         end the process, a SIGKILL.
 
-        :param Iterable command:  Command to run
+        :param command:  Command to run
         :param exception_message:  Message for the
         ProcessorInterruptedException that is raised if the worker is
         interrupted while the process is running.
         :param int wait_time:  Seconds to wait for the process after sending
-        SIGTERM before sending a SIGKILL, and then to wait before logging an
-        error if SIGKILL does not end the process.
+        SIGTERM before sending a SIGKILL, and then to wait again before logging
+        an error if SIGKILL does not end the process.
         :param int timeout:  Optional timeout, in seconds. 0 for no timeout.
         :param Iterable cleanup_paths:  Paths to delete before raising a
         ProcessorInterruptedException. Will be deleted with shutil.rmtree.
         :return:
         """
         if type(command) is str:
-            raise TypeError("Command for run_interruptable_process must be a list or tuple")
+            raise TypeError("Command for run_interruptable_process must be an iterable (see documentation for "
+                            "subprocess.Popen)")
 
         if not exception_message:
             exception_message = f"Interrupted while running {command[0]}"
@@ -244,12 +245,14 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         while process.poll() is None:
             if self.interrupted > self.INTERRUPT_NONE or (timeout and time.time() > start_time + timeout):
                 if self.interrupted == self.INTERRUPT_NONE:
-                    self.log.warning(f"Interruptable process {command[0]} for worker of type {self.type} timed out, "
-                                     f"killing")
+                    self.log.info(f"Interruptable process {command[0]} for worker of type {self.type} timed out, "
+                                  f"terminating")
+                else:
+                    self.log.info(f"Worker interrupted, asking interruptable process {command[0]} for worker "
+                                   f"{self.type} to terminate...")
 
                 # Try graceful stop first with SIGTERM
                 # Wait briefly, then force kill if needed
-                self.log.debug(f"Asking interruptable process {command[0]} for worker {self.type} to terminate...")
                 try:
                     process.terminate()
 
@@ -273,7 +276,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
                         for path in cleanup_paths:
                             shutil.rmtree(path, ignore_errors=True)
 
-                raise ProcessorInterruptedException(exception_message)
+                    raise ProcessorInterruptedException(exception_message)
             
             time.sleep(0.1)
 
