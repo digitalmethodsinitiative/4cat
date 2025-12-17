@@ -5,7 +5,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import shutil
-import subprocess
 import oslex
 
 from backend.lib.processor import BasicProcessor
@@ -100,7 +99,7 @@ class AudioExtractor(BasicProcessor):
                 oslex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
             ]
 
-            result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = self.run_interruptable_process(command, cleanup_paths=(staging_area, output_dir))
 
             # Capture logs
             ffmpeg_output = result.stdout.decode("utf-8")

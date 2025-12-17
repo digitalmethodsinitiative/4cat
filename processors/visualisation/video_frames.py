@@ -5,7 +5,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import shutil
-import subprocess
 import oslex
 
 from backend.lib.processor import BasicProcessor
@@ -135,7 +134,7 @@ class VideoFrames(BasicProcessor):
 
 			self.dataset.log(" ".join(command))
 
-			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			result = self.run_interruptable_process(command, cleanup_paths=(staging_area,))
 
 			# Capture logs
 			ffmpeg_output = result.stdout.decode("utf-8")

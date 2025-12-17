@@ -22,8 +22,13 @@ class CacheMiss:
     """
     pass
 
+class BaseConfigReader:
+    """
+    Helper class to unify various types of configuration readers
+    """
+    pass
 
-class ConfigManager:
+class ConfigManager(BaseConfigReader):
     db = None
     dbconn = None
     cache = {}
@@ -641,7 +646,7 @@ class ConfigManager:
             return self.get(attr)
 
 
-class ConfigWrapper:
+class ConfigWrapper(BaseConfigReader):
     """
     Wrapper for the config manager
 
