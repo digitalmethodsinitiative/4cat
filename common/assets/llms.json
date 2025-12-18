@@ -106,12 +106,12 @@
         "provider": "anthropic"
     },
     "magistral-small-2509": {
-        "name": "[Mistral] Magistral Small 1.2 (25.05)",
+        "name": "[Mistral] Magistral Small 1.2 (25.09)",
         "model_card": "https://docs.mistral.ai/models/magistral-small-1-2-25-09",
         "provider": "mistral"
     },
     "magistral-medium-2509": {
-        "name": "[Mistral] Magistral Medium 1.2 (25.06)",
+        "name": "[Mistral] Magistral Medium 1.2 (25.09)",
         "model_card": "https://docs.mistral.ai/models/magistral-medium-1-2-25-09",
         "provider": "mistral"
     },
