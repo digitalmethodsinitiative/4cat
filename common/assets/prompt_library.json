@@ -1,0 +1,510 @@
+[
+  {
+    "name": "sentiment detection",
+    "label": "sentiment",
+    "prompt": [
+      "System prompt: You are an advanced classifying AI. You are tasked with classifying the sentiment of a text. Sentiment can be either positive , negative or neutral.",
+      "",
+      "Prompt: Classify the following social media comment into either 'negative', 'neutral' or 'positive'. Your answer MUST be either one of ['negative', 'neutral', 'positive']. Your answer must be lowercase.",
+      "",
+      "Text: [body]",
+      "",
+      "Answer:"
+    ],
+    "authors": "Møller et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2304.13861",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "social dimensions",
+    "prompt": [
+      "System prompt: You are an advanced classifying AI. You are tasked with classifying the social dimension of a text. The social dimensions are: social support, conflict, trust, neutral, fun, respect, knowledge, power, and similarity/identity.",
+      "",
+      "Prompt: Based on the following social media text, classify the social dimension of the text. You answer MUST only be one of the social dimensions. Your answer MUST be exactly one of ['social_support', 'conflict', 'trust', 'neutral', 'fun', 'respect', 'knowledge', 'power', 'similarity_identity']. The answer must be lowercase.",
+      "",
+      "Text: [body]",
+      "",
+      "Answer:"
+    ],
+    "authors": "Møller et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2304.13861",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "hate speech",
+    "prompt": [
+      "System prompt: You are an advanced classifying AI. You are tasked with classifying whether a text is offensive or not.",
+      "",
+      "Prompt: The following is a comment on a social media post. Classify whether the post is offensive (OFF) or not (NOT). Your answer must be one of ['OFF', 'NOT'].",
+      "",
+      "Text: [body]",
+      "",
+      "Answer:"
+    ],
+    "authors": "Møller et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2304.13861",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "named entity classification",
+    "label": "named entities",
+    "prompt": [
+      "System prompt: You are a named entity recognition expert. You only answer in lowercase. You only classify names as 'company' or 'person'.",
+      "",
+      "Examples:",
+      "google: company",
+      "john smith: person",
+      "openai: company",
+      "pedro tabacof: person",
+      "",
+      "Classify the following names into company or person: [body]"
+    ],
+    "authors": "Tabacof (2023)",
+    "paper": "https://tabacof.github.io/posts/name_classification/name_classification.html",
+    "location_of_input": "after"
+  },
+  {
+    "name": "annotate political Twitter messages",
+    "label": "political",
+    "prompt": [
+      "You will be given a set of Twitter posts from different US politicians, sent during the two months preceding the 2020 US presidential election, that is, between September 3rd, 2020, and November 3rd, 2020. Your task is to use your knowledge of US politics to make an educated guess on whether the poster is a Democrat or Republican. Respond either ‘Democrat’ or ‘Republican’. If the message does not have enough information for an educated guess, just make your best guess."
+    ],
+    "authors": "Törnberg (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2304.06588",
+    "location_of_input": "after"
+  },
+  {
+    "name": "discourse acts",
+    "label": "discourse",
+    "authors": "Ziems et al. (2023)",
+    "prompt": [
+      "Which of the following best characterizes the discourse type of the previous statement?",
+      "",
+      "A: Question",
+      "B: Answer",
+      "C: Agreement",
+      "D: Disagreement",
+      "E: Appreciation",
+      "F: Elaboration",
+      "G: Humor",
+      "",
+      "Constraint: Answer with only the option above that is most accurate and nothing else.",
+      "",
+      "[body]"
+    ],
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "latent hatred",
+    "prompt": [
+      "[body]\n\nWhich of the following categories of hate speech best describes the sentence above?",
+      "",
+      "A: White Grievance (frustration over a minority group's perceived privilege and casting majority groups as the real victims of racism)",
+      "B: Incitement to Violence (flaunting in−group unity and power or elevating known hate groups and ideologies)",
+      "C: Inferiority Language (implies one group or individual is inferior to another, including dehumanization and toxification)",
+      "D: Irony (the use of sarcasm, humor, and satire to attack or demean a protected class or individual)",
+      "E: Stereotypes and Misinformation (associating a protected class with negative attributes)",
+      "F: Threatening and Intimidation (conveys a speaker commitment to a target's pain, injury, damage, loss, or violation of rights)",
+      "",
+      "Constraint: Answer with one or more of the options above that is most accurate and nothing else. Always choose at least one of the options."
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "event surprisal",
+    "label": "news event",
+    "prompt": [
+      "[body]\n\nThis is an Event Extraction task . Does the above sentence indicate a news event?",
+      "",
+      "Constraint: only answer with 'yes' or 'no'"
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "utterance ideology",
+    "label": "ideology",
+    "prompt": [
+      "[body]\n\nWhich of the following leanings would a political scientist say that the above article has?",
+      "",
+      "A: Liberal",
+      "B: Conservative",
+      "C: Neutral",
+      "",
+      "Constraint: Answer with only the option above that is most accurate and nothing else."
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "humor classification",
+    "label": "humorous",
+    "prompt": [
+      "[body]\n\nIs the above joke humorous to most of the people?",
+      "",
+      "Constraint: You must pick between 'True' or 'False'. You cannot use any other words except for 'True' or 'False'"
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "misinformation detection",
+    "label": "misinformation",
+    "prompt": [
+      "[body]\n\nWhich of the following describes the above news headline?",
+      "",
+      "A: Misinformation",
+      "B: Trustworthy",
+      "",
+      "Constraint: Answer with only the option above that is most accurate and nothing else."
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "implied misinformation explanation",
+    "label": "message",
+    "prompt": [
+      "[body]\n\nWhat is the implied message of the above news headline?",
+      "",
+      "Constraint: Answer with a short phrase like 'some masks are better than others.'"
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "stance detection",
+    "label": "stance",
+    "prompt": [
+      "[body]\n\nIf a political scientist considered the above sentence, which stance would she say it held towards Donald Trump?",
+      "",
+      "A: Against",
+      "B: Favor",
+      "C: None",
+      "",
+      "Constraint: Answer with only the option above that is most accurate and nothing else."
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "politeness",
+    "prompt": [
+      "[body]\n\nBased on formal workplace social norms, which of the following best describes the above conversation?",
+      "",
+      "A: Polite",
+      "B: Neutral",
+      "C: Impolite",
+      "",
+      "Constraint: Answer with only the option above that is most accurate and nothing else."
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "positive reframing",
+    "prompt": [
+      "[body]\n\nRephrase the above sentence to be more positive using the following strategies: ['growth', 'neutralizing'].",
+      "",
+      "Strategies are defined below",
+      "growth: viewing a challenges as an opportunities for the author to grow or improve themselves",
+      "impermanence: saying bad things don't last forever, will get better soon and/or that others have experienced similar struggles",
+      "neutralizing: replacing a negative word with a neutral word",
+      "optimism: focusing on things about the situation itself, in that moment, that are good",
+      "self-affirmation: talking about what strengths the author already has, or the values they admire",
+      "thankfulness: expressing gratitude"
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "persuasion strategies",
+    "label": "persuasion",
+    "prompt": [
+      "[body]\n\nIf a user in a community for giving away free pizza saw the above sentence, they would consider it to use which of the following persuasion strategies?",
+      "",
+      "A: Evidence (Providing concrete facts or evidence for the narrative or request, like 'There is a Pizza Hut and a Dominos near me.'",
+      "B: Politeness (The usage of polite language in requests, like 'Thank you so much!')",
+      "C: Reciprocity (Responding to a positive action with another positive action). People are more likely to help if they have received help themselves . Example messages are like 'I’ll pay it forward with my first check')",
+      "D: Impact (Emphasizing the importance or impact of the request, like 'I’ ll use this pizza to celebrate')",
+      "E: Emotion (Making requests full of emotional valence and arousal affect to influence others, like 'I’ve been in the lowest depressive state of my life')",
+      "F: Scarcity (People emphasizing on the urgency, rare of their needs, like 'I haven’t eaten a meal in two days')",
+      "G: Other",
+      "",
+      "Constraint: Answer with only the option above that is most accurate and nothing else."
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "social bias inference",
+    "label": "stereotype",
+    "prompt": [
+      "[body]\n\nExplain the stereotype that this sentence communicates. Please use a single sentence like '[GROUP] are ______'"
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "toxicity prediction",
+    "label": "toxic",
+    "prompt": [
+      "[body]\n\nWill the previous conversation eventually derail into a personal attack?",
+      "",
+      "Constraint: Even if you are uncertain, you must pick either 'True' or 'False' with without using any other words."
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "character tropes",
+    "label": "trope",
+    "prompt": [
+      "[body]\n\nGiven quotes from the character above, which of the following tropes would you say this character represents?",
+      "",
+      "A: Absent Minded Professor",
+      "B: Adventurer Archaeologist",
+      "C: Arrogant Kungfu Guy",
+      "D: Big Man On Campus",
+      "E: Bounty Hunter",
+      "F: Brainless Beauty",
+      "G: Broken Bird",
+      "H: Bromantic Foil",
+      "I : Bruiser With A Soft Center",
+      "J : Bully",
+      "K: Byronic Hero",
+      "L: Casanova",
+      "M: Chanteuse",
+      "N: Charmer",
+      "O: Child Prodigy",
+      "P: Classy Cat Burglar"
+    ],
+    "authors": "Ziems et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2305.03514",
+    "location_of_input": "before"
+  },
+  {
+    "name": "genre classification",
+    "label": "genre",
+    "prompt": [
+      "Please classify the following text according to genre (defined by function of the text, author’s purpose and form of the text) and explain your decision. You can choose from the following classes: News, Legal, Promotion, Opinion/Argumentation, Instruction, Information/Explanation, Prose/Lyrical, Forum, Other.",
+      "",
+      "Constraint: Answer with only the option above that is most accurate and nothing else.",
+      "",
+      "The text to classify: [body]"
+    ],
+    "authors": "Kuzman et al. (2023)",
+    "paper": "https://doi.org/10.48550/arXiv.2303.03953",
+    "location_of_input": "after"
+  },
+  {
+    "name": "summarization",
+    "label": "summary",
+    "prompt": [
+      "Article: [body]",
+      "",
+      "You will generate increasingly concise, entity-dense summaries of the above Article.",
+      "",
+      "Repeat the following 2 steps 5 times:",
+      "",
+      "Step 1: Identify 1-3 informative entities (\";\" delimited) from the Article which are missing from the previously generated summary.",
+      "Step 2: Write a new denser summary of identical length which covers every entity and detail from the previous summary plus the Missing Entities.",
+      "",
+      "A Missing Entity is:",
+      "- Relevant: to the main story",
+      "- Specific: descriptive yet concise (5 words or fewer).",
+      "- Novel: not in the previous summary.",
+      "- Faithful: present in the Article.",
+      "- Anywhere: located anywhere in the Article.",
+      "",
+      "Guidelines:",
+      "- The first summary should be long (4-5 sentences, ~80 words), yet highly non-specific, containing little information beyond the entities marked as missing. Use overly verbose language and fillers (e.g., \"this article discusses\") to reach ~80 words.",
+      "- Make every word count: re-write the previous summary to improve flow and make space for additional entities.",
+      "- Make space with fusion, compression, and removal of uninformative phrases like \"the article discusses\".",
+      "- The summaries should become highly dense and concise, yet self-contained, e.g., easily understood without the Article.",
+      "- Missing entities can appear anywhere in the new summary.",
+      "- Never drop entities from the previous summary. If space cannot be made, add fewer new entities.",
+      "",
+      "Remember: Use the exact same number of words for each summary.",
+      "",
+      "Answer in JSON. The JSON should be a list (length 5) of dictionaries whose keys are \"Missing_Entities\" and \"Denser_Summary\"."
+    ],
+    "authors": "Adams et al. (2023)",
+    "paper": "http://arxiv.org/abs/2309.04269",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "BiasBlocker",
+    "label": "unbiased",
+    "prompt": [
+      "Transform the following biased sentence into an unbiased sentence from a news article by removing any subjective language or discriminatory undertones without changing its semantic meaning:",
+      "",
+      "Biased sentence:",
+      "[body]",
+      "",
+      "Unbiased sentence:"
+    ],
+    "authors": "Nguyen et al. (2023)",
+    "paper": "https://www.journalismai.info/blog/we-asked-a-language-model-to-identify-racism-and-it-tried-to-erase-baby-hitler",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "Social network inference from literary texts",
+    "label": "participants",
+    "prompt": [
+      "List all pairs of named characters who directly converse in this Text. Format as TSV, no heading. Solve pronoun references, merge references to the same person into name, standardize names. List each pair ONLY once, do NOT repeat listed pairs. Omit people who are just mentioned but do not converse. ONLY list pairs who directly interact.",
+      "",
+      "Text: [body]"
+    ],
+    "authors": "Karjus (2023)",
+    "paper": "https://arxiv.org/abs/2309.14379",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "rumour stance",
+    "prompt": [
+      "You need to annotate a response into one of four rumour stance categories: support, deny, query, or comment. Support: the author of the response supports the veracity of the rumour. Deny: the author of the response denies the veracity of the rumour. Query: the author of the response asks for additional evidence in relation to the veracity of the rumour. Comment: the author of the response makes their own comment without a clear contribution to assessing the veracity of the rumour.",
+      "",
+      "Response: [body]"
+    ],
+    "authors": "Mu et al. (2023)",
+    "paper": "https://arxiv.org/pdf/2305.14310.pdf",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "vaccine Stance",
+    "prompt": [
+      "You need to annotate a tweet into one of three stance categoies: pro vaccine, anti vaccine, or neutral. Tweets that have been assigned to the class pro vaccine express a positive opinion regarding the vaccination. Tweets belonging to the anti vaccine vaccination class express a negative opinion towards COVID-19 vaccination. The neutral class mainly includes news related to the development of vaccines, tweets that do not express a clear opinion, such as questions regarding the vaccine, informative tweets concerning vaccination.",
+      "",
+      "Tweet: [body]"
+    ],
+    "authors": "Mu et al. (2023)",
+    "paper": "https://arxiv.org/pdf/2305.14310.pdf",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "complaint",
+    "prompt": [
+      "Complaining is a basic speech act used to express a negative mismatch between reality and expectations towards a state of affairs, product, organization or event. Key to the definition of complaints is the expression of the breach of expectations. Is the following text a complaint?",
+      "",
+      "Text: [body]"
+    ],
+    "authors": "Mu et al. (2023)",
+    "paper": "https://arxiv.org/pdf/2305.14310.pdf",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "bragging",
+    "prompt": [
+      "You need to identify whether or not a tweet includes a bragging statement. Only reply yes or no. Bragging is a speech act which explicitly or implicitly attributes credit to the speaker for some ‘good’ (possession, accomplishment, skill, etc.) which is positively valued by the speaker and the potential audience. As such, bragging includes announcements of accomplishments, and explicit positive evaluations of some aspect of self. A bragging statement should clearly express what the author is bragging about (i.e. the target of bragging).",
+      "",
+      "Statement: [body]"
+    ],
+    "authors": "Mu et al. (2023)",
+    "paper": "https://arxiv.org/pdf/2305.14310.pdf",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "sarcasm",
+    "prompt": [
+      "Annotate whether a tweet is Sarcasm or non-Sarcasm. Sarcasm is a form of verbal irony that occurs when there is a discrepancy between the literal and intended meanings of an utterance. Through this discrepancy, the speaker expresses their position towards a prior proposition, often in the form of surface contempt or derogation.",
+      "",
+      "Tweet: [body]"
+    ],
+    "authors": "Mu et al. (2023)",
+    "paper": "https://arxiv.org/pdf/2305.14310.pdf",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "hate speech",
+    "prompt": [
+      "Annotate a tweet into one of three categories: racism, sexism, non-offensive . A tweet is offensive if it: 1. uses a sexist or racial slur. 2. attacks a minority. 3. seeks to silence a minority. 4. criticizes a minority (without a well founded argument). 5. promotes, but does not directly use, hate speech or violent crime. 6. criticizes a minority and uses a straw man argument. 7. blatantly misrepresents truth or seeks to distort views on a minority with unfounded claims. 8. shows support of problematic hash tags. E.g. “#BanIslam”, “#whoriental”, “#whitegenocide”. 9. negatively stereotypes a minority. 10. defends xenophobia or sexism. 11. contains a screen name that is offensive, as per the previous criteria, the tweet is ambiguous (at best), and the tweet is on a topic that satisfies any of the above criteria.",
+      "",
+      "Tweet: [body]"
+    ],
+    "authors": "Mu et al. (2023)",
+    "paper": "https://arxiv.org/pdf/2305.14310.pdf",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "conspiracy theories on tiktok",
+    "label": "conspiracy",
+    "prompt": [
+      "Objective: As a media studies scholar specializing in conspiracy theories, your task is to classify entities and themes in TikTok posts to, ultimately, classify them into categories. You will be presented with a transcript of a TikTok video which you need to process as follows.",
+      "Task Steps:",
+      "- Extract Geographical Entities: Identify all continent and country names, including acronyms (e.g., \"USA\").",
+      "- Extract Organizational Names: Include NGOs (e.g., \"World Economic Forum\"), government institutions (e.g. \"NASA\"), religious institutions (e.g., \"the Vatican\"), and secret societies (e.g., \"the Illuminati\").",
+      "- Extract Names of Individuals: Include names, full names, first names, last names, and artistic names.",
+      "- Extract Thematic Terms: Focus on scientific, technological, religious, and supernatural terms (e.g., \"vaccine\",\"bitcoin\", \"Islam\", \"UFO\").",
+      "- Determine whether it is a conspiracy: Determine if the post fits any of the three criteria that define a conspiracy theory: \"everything is connected\", \"everything happens for a reason\", \"nothing is as it seems\", Answer with the word conspiracy if you determine it a conspiracy or an empty string if no conspiracy is found.",
+      "- Classify the conspiracy: Bearing the above information in mind, classify each TikTok post into one of the following conspiracy categories: \"Spirituality and religion\", \"Governments and institutions\", \"Supernatural and fantasy\", \"Popular culture and entertainment\", and \"Technology\". If the post doesn't fit into any of these categories, classify as \"Other\". If there is no conspiracy, classify as \"None\".",
+      "",
+      "Output Format: Generate JSON with columns \"transcript\", \"Geographical entities\", \"Organizational Names\", \"Individual Names\", \"Thematic terms\", \"Conspiracy Classification\", \"Category\".",
+      "",
+      "Note: Apply critical analysis to categorize underlying themes and narratives. Do not provide explanations, only labels.",
+      "",
+      "Transcript:",
+      "##＃",
+      "[body]",
+      "###"
+    ],
+    "authors": "Fuentes and Borra (2024",
+    "paper": "https://digitalmethods.net/",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "extract narratives",
+    "label": "narrative",
+    "prompt": [
+      "You're an expert in narratology. Narrative is a series of claims that make up a story that serves a specific purpose. Below is an example of a narrative:",
+      "{",
+      "\"Title\": \"The West controls Ukraine and uses it to its advantage\",",
+      "\"Characters\": {",
+      "\"West\": \"Potentially referring to Western countries or alliances like NATO\",",
+      "\"Ukraine\": \"The nation caught in the implied manipulation or control\"",
+      "},",
+      "\"Plot\": \"A suggestion that Ukraine is not acting independently but is being manipulated or controlled by Western powers\",",
+      "\"Point_of_View\": \"The narrative may be presented from a perspective that is critical of the West and sympathetic to others who oppose Western influence\"",
+      "}",
+      "Extract narratives for each of the paragraphs below. For each narrative, attribute post ids that talk about it. Generate a JSON with one narrative per line, with columns \"Title\", \"Characters\", \"Plot\", \"Point of View\".\",",
+      "",
+      "Text: [body]"
+    ],
+    "authors": "Dasha et al. (2023)",
+    "paper": "https://github.com/haruspeks/narratives-detection",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "extract entities",
+    "label": "entities",
+    "prompt": [
+      "Extract the important entities mentioned in the text below. First extract all country names, then extract all organizations, then extract all people names, then extract specific topics which fit the content and finally extract general overarching themes",
+      "",
+      "Desired format:",
+      "Country names: <comma_separated_list_of_country_names>",
+      "Organization names: <comma_separated_list_of_organization_names>",
+      "People names: -||-",
+      "Specific topics: -||-",
+      "General themes: -||-",
+      "",
+      "Text: [body]"
+    ],
+    "authors": "OpenAI (2023)",
+    "paper": "https://help.openai.com/en/articles/6654000-best-practices-for-prompt-engineering-with-openai-api",
+    "location_of_input": "replace"
+  }
+]
