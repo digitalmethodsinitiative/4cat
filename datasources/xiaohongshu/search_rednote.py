@@ -139,7 +139,7 @@ class SearchRedNote(Search):
         image = note["imageList"][0]["urlDefault"]
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={note['xsecToken']}"
-        timestamp = item.get("time", None)
+        timestamp = note.get("time", None)
 
         if "interactInfo" in note:
             likes = note["interactInfo"]["likedCount"]
