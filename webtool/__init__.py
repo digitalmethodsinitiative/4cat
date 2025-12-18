@@ -4,6 +4,7 @@ from collections import namedtuple
 import sys
 import os
 
+from jinja2 import ChoiceLoader, FileSystemLoader, FunctionLoader
 from functools import partial
 from pathlib import Path
 
@@ -150,6 +151,21 @@ app.autologin = namedtuple("AutologinSettings", ("hostnames", "api"))
 app.autologin.hostnames = config.get("flask.autologin.hostnames")
 app.autologin.api = config.get("flask.autologin.api")
 
+# Load Explorer HTML templates from extensions
+extension_explorer_templates = {}
+def get_explorer_templates_from_extensions():
+    extensions_path = config.get("PATH_ROOT").joinpath("config/extensions")
+    if extensions_path.exists():
+        # We have to use os.walk with followlinks=True to reliably follow symlinks
+        for root, dirs, files in os.walk(extensions_path, followlinks=True):
+            for filename in files:
+                if filename.endswith("explorer.html"):
+                    file_path = Path(root) / filename
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        extension_explorer_templates[filename] = f.read()
+
+get_explorer_templates_from_extensions()
+
 # now create an app context to import Blueprints into
 # the app context allows us to pass some values for use inside the Blueprints
 # which they can access via `current_app` - this eliminates the need for
@@ -210,8 +226,22 @@ with app.app_context():
 
         current_user.with_config(g.config)
 
-    # import custom jinja2 template filters
+    # We want Explorer extensions to also be able to be located in config/extensions.
+    # If a template is loaded from explorer/datasource-templates, also check extensions!
+    def load_extension_template(name):
+        if not name.startswith("explorer/datasource-templates/"):
+            return None
 
+        filename = name.split("/")[-1]
+        return extension_explorer_templates.get(filename)
+
+    template_paths = [os.path.join(app.root_path, "templates"),]
+    app.jinja_loader = ChoiceLoader([
+        FileSystemLoader(template_paths),  # Check standard locations first
+        FunctionLoader(load_extension_template)  # Then check extensions
+    ])
+
+    # import custom jinja2 template filters
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402
 
