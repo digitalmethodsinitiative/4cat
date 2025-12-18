@@ -254,7 +254,7 @@ class ColumnFilter(BaseFilter):
         for item in self.source_dataset.iterate_items(processor=self):
             if item.get(column) in top_values:
                 ranked_items = 0
-                yield item.original
+                yield item
 
             if ranked_items >= top_n:
                 return
