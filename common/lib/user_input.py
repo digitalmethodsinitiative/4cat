@@ -250,13 +250,13 @@ class UserInput:
                         # condition doesn't make sense for a list, so assume it's not True
                         raise RequirementsNotMetException()
 
-                if (operator == "^=" and not str(other_value).startswith(value)) != negated:
+                if operator == "^=" and str(other_value).startswith(value) == negated:
                     raise RequirementsNotMetException()
-                elif (operator == "$=" and not str(other_value).endswith(value)) != negated:
+                elif operator == "$=" and str(other_value).endswith(value) == negated:
                     raise RequirementsNotMetException()
-                elif (operator == "~=" and value not in str(other_value)) != negated:
+                elif operator == "~=" and (value in str(other_value)) == negated:
                     raise RequirementsNotMetException()
-                elif (operator in ("==", "=") and value != other_value) != negated:
+                elif operator in ("==", "=") and (value == other_value) == negated:
                     raise RequirementsNotMetException()
 
         input_type = settings.get("type", "")
