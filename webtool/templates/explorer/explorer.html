@@ -16,12 +16,12 @@
 <script type="text/javascript">
 
 // Annotation fields
-var annotation_fields = {{ annotation_fields | tojson | safe }}
+let annotation_fields = {{ annotation_fields | tojson | safe }}
 
 // We're getting the dataset column names to make sure that
 // new annotation fields cannot overwrite these.
-var original_columns = {{ dataset.get_columns() | safe }}
-for (a in annotation_fields) {
+let original_columns = {{ dataset.get_columns() | safe }}
+for (const a in annotation_fields) {
 	let annotation_label = annotation_fields[a]["label"]
 	if (original_columns.includes(annotation_label)) {
 		i = original_columns.indexOf(annotation_label)
