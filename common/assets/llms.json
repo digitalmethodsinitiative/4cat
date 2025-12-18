@@ -70,6 +70,16 @@
         "model_card": "https://platform.openai.com/docs/models/o3-mini",
         "provider": "openai"
     },
+    "gemini-3-pro-preview": {
+        "name": "[Google] Gemini 3 Pro",
+        "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro",
+        "provider": "google"
+    },
+    "gemini-3-flash-preview": {
+        "name": "[Google] Gemini 3 Flash",
+        "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-flash",
+        "provider": "google"
+    },
     "gemini-2.5-flash": {
         "name": "[Google] Gemini 2.5 Flash",
         "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-0-flash",
@@ -79,11 +89,6 @@
         "name": "[Google] Gemini 2.5 Flash Lite",
         "provider": "google",
         "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash-lite"
-    },
-    "gemini-3-pro-preview": {
-        "name": "[Google] Gemini 3 Pro",
-        "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro",
-        "provider": "google"
     },
     "claude-opus-4-5": {
         "name": "[Anthropic] Claude Opus 4.5 (latest)",
