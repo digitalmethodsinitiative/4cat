@@ -243,7 +243,7 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 
             # Set non-required, non-OP specific data
             if row["author_type"]:
-                post["author_type"] = row[
+                post["id"] = row[
                     "author_type"
                 ]  # The per-thread ID of posters (not always set)
             if row["author_type_id"]:
