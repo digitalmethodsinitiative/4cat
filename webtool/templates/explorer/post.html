@@ -1,14 +1,8 @@
 <li id="post-{{ post.id }}" class="post{% if post.thread_id == post.id %} op{% endif %}">    
 
-	<!-- Data sources may have a custom template (Jinja2) -->
-	{% if template == "datasource" %}
-		{% include "explorer/datasource-templates/" + datasource + ".html" %}
-
-	<!-- Else, use a generic template that shows common fields -->
-	{% else %}
-		{% include "explorer/datasource-templates/generic.html" %}
-		
-	{% endif %}
+	<!-- Template location as defined by the API endpoint. May be custom or generic. -->
+	{% include ["explorer/datasource-templates/" + datasource + "-explorer.html",
+                "explorer/datasource-templates/generic-explorer.html"] %}
 
 	<!-- Annotations are always shown -->
 	{% include "explorer/post-annotations.html" %}
