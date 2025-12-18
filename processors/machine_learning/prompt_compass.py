@@ -25,6 +25,11 @@ class PromptCompassRunner(ProcessorPreset):
                    "original dataset as a new column.")
     extension = "ndjson"
 
+    references = [
+	    "This processor is an implementation of the stand-alone tool [PromptCompass](https://github.com/ErikBorra/PromptCompass) by Erik Borra.",
+	    "See the processor options for references to the sources of each prompt in the library."
+    ]
+
     @staticmethod
     def get_prompt_library(config):
         """
