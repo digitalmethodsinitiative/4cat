@@ -20,9 +20,9 @@ class PromptCompassRunner(ProcessorPreset):
     """
     type = "preset-prompt-compass"  # job type ID
     category = "Machine learning"  # category. 'Combined processors' are always listed first in the UI.
-    title = "PromptCompass: test task-specific prompts"  # title displayed in UI
-    description = ("Choose prompts from a library sourced from LLM-based research articles and test them with this "
-                   "dataset. Outcomes are added to the original dataset as a new column.")
+    title = "PromptCompass"  # title displayed in UI
+    description = ("Choose task-specific prompts sourced from academic articles that use LLMs for research. Outcomes "
+                   "are added to the original dataset as a new column.")
     extension = "ndjson"
 
     @staticmethod
@@ -36,7 +36,7 @@ class PromptCompassRunner(ProcessorPreset):
         if not prompt_library_file.exists():
             return []
         
-        with prompt_library_file.open() as infile:
+        with open(prompt_library_file, "r", encoding="utf-8") as infile:
             prompt_library = json.load(infile)
 
         prompt_library = sorted(prompt_library, key=lambda k: k["name"])
@@ -63,13 +63,14 @@ class PromptCompassRunner(ProcessorPreset):
         """
         Get available model providers
 
-        Combine the list defined by the LLMAdapter with two known local models.
+        Combine the list defined by the LLMAdapter with known local models.
 
         :param config:  Configuration reader
         :return dict:  Models and metadata
         """
         # get cached local models
         models = config.get("llm.available_models", {})
+        models = {} if not models else models  # returns an empty list if not set
         models.update({k: v for k, v in LLMAdapter.get_models(config).items() if k not in ("none", "custom")})
 
         models = {k: v for k, v in models.items() if "model_card" in v}
@@ -213,7 +214,8 @@ class PromptCompassRunner(ProcessorPreset):
             task = prompt_library[int(self.parameters.get("task").split("-")[1]) - 1]
             short_name = task.get("label", task["name"])
             label = short_name.lower().replace(" ", "_")
-            label = f"{label}:{self.parameters['model'].split("/")[1]}"
+            model_name = self.parameters['model'].split("/")[1]
+            label = f"{label}:{model_name}"
         except (TypeError, IndexError):
             pass
 
@@ -266,6 +268,7 @@ class PromptCompassRunner(ProcessorPreset):
         :param config:
         :return:
         """
+
         if not query["model"].startswith("local") and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
 
