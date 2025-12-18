@@ -1,6 +1,7 @@
 """
 The heart of the app - manages jobs and workers
 """
+import threading
 import signal
 import time
 
@@ -62,7 +63,7 @@ class WorkerManager:
 				if job_params:
 					self.queue.add_job(jobtype=worker_name, **job_params)
 
-
+		self.ident = threading.get_ident()
 		self.log.info("4CAT Started")
 
 		# flush module collector log buffer
