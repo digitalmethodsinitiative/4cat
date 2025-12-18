@@ -16,13 +16,13 @@ import json
 
 class PromptCompassRunner(ProcessorPreset):
     """
-    Run processor pipeline to annotate images
+    Run processor pipeline to feed prompts to LLM Prompter
     """
     type = "preset-prompt-compass"  # job type ID
-    category = "Machine learning"  # category. 'Combined processors' are always listed first in the UI.
-    title = "PromptCompass"  # title displayed in UI
-    description = ("Choose task-specific prompts sourced from academic articles that use LLMs for research. Outcomes "
-                   "are added to the original dataset as a new column.")
+    category = "Machine learning"  # category
+    title = "PromptCompass: Test task-specific prompts"  # title displayed in UI
+    description = ("Choose prompts used in other LLM-based research to test on this dataset. Outcomes are added to the "
+                   "original dataset as a new column.")
     extension = "ndjson"
 
     @staticmethod
@@ -36,7 +36,7 @@ class PromptCompassRunner(ProcessorPreset):
         if not prompt_library_file.exists():
             return []
         
-        with open(prompt_library_file, "r", encoding="utf-8") as infile:
+        with prompt_library_file.open(encoding="utf-8") as infile:
             prompt_library = json.load(infile)
 
         prompt_library = sorted(prompt_library, key=lambda k: k["name"])
@@ -70,7 +70,6 @@ class PromptCompassRunner(ProcessorPreset):
         """
         # get cached local models
         models = config.get("llm.available_models", {})
-        models = {} if not models else models  # returns an empty list if not set
         models.update({k: v for k, v in LLMAdapter.get_models(config).items() if k not in ("none", "custom")})
 
         models = {k: v for k, v in models.items() if "model_card" in v}
@@ -268,7 +267,6 @@ class PromptCompassRunner(ProcessorPreset):
         :param config:
         :return:
         """
-
         if not query["model"].startswith("local") and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
 
