@@ -212,7 +212,7 @@ with app.app_context():
 
     def get_datasource_explorer_templates(name):
         """ Load Explorer templates from datasources """
-        if not name.startswith("explorer-template/") or not "-explorer" in name:
+        if not name.startswith("explorer-template/") or "-explorer" not in name:
             return None
 
         datasources = current_app.fourcat_modules.datasources
