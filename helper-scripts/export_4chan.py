@@ -303,9 +303,6 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
             if count % 100000 == 0:
                 print("Wrote %s lines " % count)
 
-        if count > 100000:
-            break
-
         # Write leftover thread data
         if thread_data:
             # Wrap in posts dict
