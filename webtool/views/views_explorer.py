@@ -4,9 +4,6 @@ format and lets users annotate the data.
 """
 
 import collections
-import os
-
-from pathlib import Path
 
 from flask import Blueprint, current_app, request, render_template, jsonify, g
 from flask_login import login_required, current_user
@@ -154,10 +151,6 @@ def explorer_dataset(dataset_key: str, page=1):
             for annotation in annotations:
                 post_annotations[annotation.item_id][annotation.field_id] = annotation
 
-    # We can use either a generic or a pre-made, data source-specific CSS.
-    # This is handled in __init__ and the post.html template for HTML.
-    css_template = read_css_template(datasource)
-
     # Generate the HTML page
     return render_template(
         "explorer/explorer.html",
@@ -168,7 +161,6 @@ def explorer_dataset(dataset_key: str, page=1):
         annotations=post_annotations,
         processors=current_app.fourcat_modules.processors,
         from_datasets=from_datasets,
-        posts_css=css_template,
         page=page,
         offset=offset,
         posts_per_page=posts_per_page,
@@ -319,36 +311,3 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
     # Use dataset's sort_and_iterate_items function which can accept chunk_size and
     # creates a sorted temporary file (thus not using so much memory).
     yield from dataset.sort_and_iterate_items(sort=sort, reverse=reverse, **kwargs)
-
-def read_css_template(datasource: str) -> str:
-    """
-    Return CSS template. Uses a default one if datasource-specific ones can't be found.
-    CSS files should be placed in `webtool/static/css/explorer/<datasource name>-explorer.css`.
-    For extensions, place the CSS template in the config/extensions folder and name it [datasource name]-explorer.css.
-
-    :param datasource: Datasource name.
-
-    :returns: str: The css text or None if not present.
-    """
-    # Check standard location first
-    standard_path = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer", f"{datasource}-explorer.css")
-    if standard_path.exists():
-        with open(standard_path, "r", encoding="utf-8") as f:
-            return f.read()
-
-    # Check extensions folder
-    extensions_path = Path(g.config.get('PATH_ROOT'), "config/extensions")
-    if extensions_path.exists():
-        target_filename = f"{datasource}-explorer.css"
-        for root, dirs, files in os.walk(extensions_path, followlinks=True):
-            for filename in files:
-                if filename == target_filename:
-                    # Found matching CSS file
-                    file_path = Path(root) / filename
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        return f.read()
-
-    # Fallback to generic
-    generic_path = Path(g.config.get("PATH_ROOT"), "webtool/static/css/explorer/generic-explorer.css")
-    with open(generic_path, "r", encoding="utf-8") as f:
-        return f.read()

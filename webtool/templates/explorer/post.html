@@ -1,8 +1,8 @@
 <li id="post-{{ post.id }}" class="post{% if post.thread_id == post.id %} op{% endif %}">    
 
 	<!-- Template location as defined by the API endpoint. May be custom or generic. -->
-	{% include ["explorer/datasource-templates/" + datasource + "-explorer.html",
-                "explorer/datasource-templates/generic-explorer.html"] %}
+	{% include ["explorer-template/" + datasource + "-explorer.html",
+                "explorer/generic-explorer.html"] %}
 
 	<!-- Annotations are always shown -->
 	{% include "explorer/post-annotations.html" %}

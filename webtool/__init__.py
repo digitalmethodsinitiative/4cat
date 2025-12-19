@@ -151,21 +151,6 @@ app.autologin = namedtuple("AutologinSettings", ("hostnames", "api"))
 app.autologin.hostnames = config.get("flask.autologin.hostnames")
 app.autologin.api = config.get("flask.autologin.api")
 
-# Load Explorer HTML templates from extensions
-extension_explorer_templates = {}
-def get_explorer_templates_from_extensions():
-    extensions_path = config.get("PATH_ROOT").joinpath("config/extensions")
-    if extensions_path.exists():
-        # We have to use os.walk with followlinks=True to reliably follow symlinks
-        for root, dirs, files in os.walk(extensions_path, followlinks=True):
-            for filename in files:
-                if filename.endswith("explorer.html"):
-                    file_path = Path(root) / filename
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        extension_explorer_templates[filename] = f.read()
-
-get_explorer_templates_from_extensions()
-
 # now create an app context to import Blueprints into
 # the app context allows us to pass some values for use inside the Blueprints
 # which they can access via `current_app` - this eliminates the need for
@@ -223,23 +208,36 @@ with app.app_context():
         g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request)
         g.modules = current_app.fourcat_modules
         g.request = request
-
         current_user.with_config(g.config)
 
-    # We want Explorer extensions to also be able to be located in config/extensions.
-    # If a template is loaded from explorer/datasource-templates, also check extensions!
-    def load_extension_template(name):
-        if not name.startswith("explorer/datasource-templates/"):
+    def get_datasource_explorer_templates(name):
+        """ Load Explorer templates from datasources """
+        if not name.startswith("explorer-template/") or not "-explorer" in name:
             return None
 
-        filename = name.split("/")[-1]
-        return extension_explorer_templates.get(filename)
+        datasources = current_app.fourcat_modules.datasources
+        if not datasources:
+            return None
 
-    template_paths = [os.path.join(app.root_path, "templates"),]
-    app.jinja_loader = ChoiceLoader([
-        FileSystemLoader(template_paths),  # Check standard locations first
-        FunctionLoader(load_extension_template)  # Then check extensions
-    ])
+        filename = name.split("/", 1)[1]
+        datasource = filename.split("-")[0]
+        datasource_templates = datasources.get(datasource, {}).get("explorer-templates", {})
+        if datasource_templates:
+            if datasource_templates.get("css") and datasource_templates["css"].name == filename:
+                with open(datasource_templates["css"], "r", encoding="utf-8") as f:
+                    return f.read()
+            if datasource_templates.get("html") and datasource_templates["html"].name == filename:
+                with open(datasource_templates["html"], "r", encoding="utf-8") as f:
+                    return f.read()
+
+        return None
+
+    template_paths = [
+        os.path.join(app.root_path, "templates"),
+    ]
+    app.jinja_loader = ChoiceLoader(
+        [FileSystemLoader(template_paths), FunctionLoader(get_datasource_explorer_templates)]
+    )
 
     # import custom jinja2 template filters
     # these also benefit from current_app
