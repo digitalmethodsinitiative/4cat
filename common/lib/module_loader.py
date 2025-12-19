@@ -222,7 +222,8 @@ class ModuleCollector:
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
-                "config": {} if not hasattr(datasource, "config") else datasource.config
+                "config": {} if not hasattr(datasource, "config") else datasource.config,
+                "explorer-templates": self.load_datasource_explorer_templates(datasource_id, subdirectory)
             }
 
         expiration = self.config.get("datasources.expiration", {})
@@ -267,6 +268,57 @@ class ModuleCollector:
                                                                       "%s-search" % datasource_id].get_options(
                                                                  config=self.config))
             self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
+
+    def load_datasource_explorer_templates(self, datasource_id, datasource_path):
+        """
+        Find CSS and HTML template file paths for a datasource
+        
+        Looks for templates in multiple locations:
+        - Within the datasource folder itself
+        - In config/extensions/ (for extensions)
+        
+        :param datasource_id: The datasource identifier
+        :param datasource_path: Path to the datasource folder
+        :return: Dictionary with 'css' and 'html' keys containing template file paths
+        """
+        templates = {"css": None, "html": None}
+        
+        # Look for CSS template
+        css_filename = f"{datasource_id}-explorer.css"
+        
+        # Check within datasource folder
+        datasource_css = datasource_path / css_filename
+        if datasource_css.exists():
+            templates["css"] = datasource_css
+        
+        # Check extensions folder
+        if not templates["css"]:
+            extensions_path = self.config.get('PATH_EXTENSIONS')
+            if extensions_path.exists():
+                for root, dirs, files in os.walk(extensions_path, followlinks=True):
+                    if css_filename in files:
+                        templates["css"] = Path(root) / css_filename
+                        break
+        
+        # Look for HTML template
+        html_filename = f"{datasource_id}-explorer.html"
+        
+        # Check within datasource folder
+        datasource_html = datasource_path / html_filename
+        if datasource_html.exists():
+            templates["html"] = datasource_html
+            return templates
+
+        # Check extensions folder
+        if not templates["html"]:
+            extensions_path = self.config.get('PATH_EXTENSIONS')
+            if extensions_path.exists():
+                for root, dirs, files in os.walk(extensions_path, followlinks=True):
+                    if html_filename in files:
+                        templates["html"] = Path(root) / html_filename
+                        break
+        
+        return templates
 
     def load_worker_class(self, worker):
         """
