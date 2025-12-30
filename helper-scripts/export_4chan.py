@@ -63,7 +63,7 @@ else:
     sys.exit(1)
 
 # Headers for csv writing
-headers =  ("num","resto","board","sub","com","time","time_utc","name","deleted","deleted_on","replies_to","id","capcode","tripcode","filename","tim","md5","w","h","tw","th","fsize","country","country_name","op","replies","images","semantic_url","sticky","closed","archived_on","scraped_on","modified_on","unique_ips","bumplimit","imagelimit","index_positions","unsorted_data")
+headers =  ("num","thread","board","sub","com","time","time_utc","name","deleted","deleted_on","replies_to","id","capcode","tripcode","filename","tim","md5","w","h","tw","th","fsize","country","country_name","op","replies","images","semantic_url","sticky","closed","archived_on","scraped_on","modified_on","unique_ips","bumplimit","imagelimit","index_positions","unsorted_data")
 
 # Check board validity
 if args.board:
@@ -225,7 +225,7 @@ with open(args.output, "w", newline="", encoding="utf-8") as out_file:
 
             # Set required non OP-specific data
             post["no"] = row["id"]
-            post["resto"] = row["thread_id"]
+            post["thread"] = row["thread_id"]
             post["board"] = row["board"]
             post["com"] = row["body"] if row["body"] is not None else ""
             post["time"] = row["timestamp"]
