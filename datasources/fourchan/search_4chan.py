@@ -53,7 +53,7 @@ class Search4Chan(SearchWithScope):
                 "type": UserInput.OPTION_CHOICE,
                 "options": {b: b for b in config.get("fourchan-search.boards", [])},
                 "help": "Board",
-                "default": config.get("fourchan-search.boards", [""])[0]
+                "default": config.get("fourchan-search.boards", [""])[0] if config.get("fourchan-search.boards") else ""
             },
             "body_match": {
                 "type": UserInput.OPTION_TEXT,
