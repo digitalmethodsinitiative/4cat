@@ -103,6 +103,10 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     max-width: 300px;
 }
 
+.media-container video, .media-container audio, .media-container img {
+    max-width: 100%;
+}
+
 span.divider {
     font-size: 16px;
     color: var(--gray-darker);

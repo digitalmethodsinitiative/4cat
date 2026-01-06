@@ -1,7 +1,9 @@
 <li id="post-{{ post.id }}" class="post{% if post.thread_id == post.id %} op{% endif %}">    
 
 	<!-- Data sources may have a custom template (Jinja2) -->
-	{% if template == "datasource" %}
+	{% if datasource == 'media-import' %}
+        {% include "explorer/datasource-templates/media.html" %}
+    {% elif template == "datasource" %}
 		{% include "explorer/datasource-templates/" + datasource + ".html" %}
 
 	<!-- Else, use a generic template that shows common fields -->

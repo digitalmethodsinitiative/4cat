@@ -4,6 +4,7 @@ import datetime
 import fnmatch
 import random
 import shutil
+import zipfile
 import json
 import time
 import csv
@@ -355,6 +356,55 @@ class DataSet(FourcatModule):
 
                     yield json.loads(line)
 
+        elif path.suffix.lower() == ".zip":
+            # Iterate through files in a zip archive
+            if not path.exists():
+                return
+
+            staging_area = self.get_staging_area()
+            if not staging_area.exists() or not staging_area.is_dir():
+                raise RuntimeError("Staging area %s is not a valid folder" % staging_area)
+
+            with zipfile.ZipFile(path, "r") as archive_file:
+                # sorting is important because it ensures .metadata.json is read first
+                archive_contents = sorted(archive_file.namelist())
+                item_count = 0
+
+                for archived_file in archive_contents:
+                    info = archive_file.getinfo(archived_file)
+                    if info.is_dir():
+                        continue
+
+                    if hasattr(processor, "interrupted") and processor.interrupted:
+                        raise ProcessorInterruptedException(
+                            "Processor interrupted while iterating through zip file contents"
+                        )
+
+                    if item_count < offset:
+                        item_count += 1
+                        continue
+
+                    temp_file = staging_area.joinpath(archived_file)
+                    archive_file.extract(archived_file, staging_area)
+
+                    # Read file data before cleanup for web display
+                    file_data = temp_file.read_bytes()
+                    
+                    # Create a file info object that includes both path and data
+                    file_info = {
+                        'path': temp_file,
+                        'data': file_data,
+                        'name': archived_file,
+                        'size': len(file_data)
+                    }
+                    
+                    # Yield the file info (for media files, processors need access to data)
+                    yield file_info
+                    
+                    # Clean up temporary file immediately after reading data
+                    temp_file.unlink()
+                    item_count += 1
+
         else:
             raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
@@ -447,64 +497,75 @@ class DataSet(FourcatModule):
         # Loop through items
         for i, item in enumerate(self._iterate_items(processor, offset=offset)):
 
-            # Save original to yield
-            original_item = item.copy()
-
-            # Map item
-            if item_mapper:
-                try:
-                    mapped_item = own_processor.get_mapped_item(item)
-                except MapItemException as e:
-                    if warn_unmappable:
-                        self.warn_unmappable_item(
-                            i, processor, e, warn_admins=unmapped_items is False
-                        )
-
-                    unmapped_items += 1
-                    if max_unmappable and unmapped_items > max_unmappable:
-                        break
-                    else:
-                        continue
-
-                # check if fields have been marked as 'missing' in the
-                # underlying data, and treat according to the chosen strategy
-                if mapped_item.get_missing_fields():
-                    for missing_field in mapped_item.get_missing_fields():
-                        strategy = map_missing.get(missing_field, default_strategy)
-
-                        if callable(strategy):
-                            # delegate handling to a callback
-                            mapped_item.data[missing_field] = strategy(
-                                mapped_item.data, missing_field
-                            )
-                        elif strategy == "abort":
-                            # raise an exception to be handled at the processor level
-                            raise MappedItemIncompleteException(
-                                f"Cannot process item, field {missing_field} missing in source data."
-                            )
-                        elif strategy == "default":
-                            # use whatever was passed to the object constructor
-                            mapped_item.data[missing_field] = mapped_item.data[
-                                missing_field
-                            ].value
-                        else:
-                            raise ValueError(
-                                "map_missing must be 'abort', 'default', or a callback."
-                            )
+            if self.get_extension() == "zip":
+                zip_items = {"id": f"{self.key}_{item['name']}",
+                                "filename": item['name'],
+                                "filepath": str(item['path']),
+                                "file_size": item['size']}
+                dataset_item = DatasetItem(
+                                mapper=False,
+                                original=item["data"],
+                                mapped_object=None,
+                                **zip_items)
             else:
-                mapped_item = original_item
+                # Save original to yield
+                original_item = item.copy()
 
-            # yield a DatasetItem, which is a dict with some special properties
-            dataset_item = DatasetItem(
-                mapper=item_mapper,
-                original=original_item,
-                mapped_object=mapped_item,
-                **(
-                    mapped_item.get_item_data()
-                    if type(mapped_item) is MappedItem
-                    else mapped_item
-                ),
-            )
+                # Map item
+                if item_mapper:
+                    try:
+                        mapped_item = own_processor.get_mapped_item(item)
+                    except MapItemException as e:
+                        if warn_unmappable:
+                            self.warn_unmappable_item(
+                                i, processor, e, warn_admins=unmapped_items is False
+                            )
+
+                        unmapped_items += 1
+                        if max_unmappable and unmapped_items > max_unmappable:
+                            break
+                        else:
+                            continue
+
+                    # check if fields have been marked as 'missing' in the
+                    # underlying data, and treat according to the chosen strategy
+                    if mapped_item.get_missing_fields():
+                        for missing_field in mapped_item.get_missing_fields():
+                            strategy = map_missing.get(missing_field, default_strategy)
+
+                            if callable(strategy):
+                                # delegate handling to a callback
+                                mapped_item.data[missing_field] = strategy(
+                                    mapped_item.data, missing_field
+                                )
+                            elif strategy == "abort":
+                                # raise an exception to be handled at the processor level
+                                raise MappedItemIncompleteException(
+                                    f"Cannot process item, field {missing_field} missing in source data."
+                                )
+                            elif strategy == "default":
+                                # use whatever was passed to the object constructor
+                                mapped_item.data[missing_field] = mapped_item.data[
+                                    missing_field
+                                ].value
+                            else:
+                                raise ValueError(
+                                    "map_missing must be 'abort', 'default', or a callback."
+                                )
+                else:
+                    mapped_item = original_item
+
+                # yield a DatasetItem, which is a dict with some special properties
+                dataset_item = DatasetItem(
+                    mapper=item_mapper,
+                    original=original_item,
+                    mapped_object=mapped_item,
+                    **(
+                        mapped_item.get_item_data()
+                        if type(mapped_item) is MappedItem
+                        else mapped_item
+                    ),
+                )
 
             # If we're getting annotations, yield in items batches so we don't need to get annotations per item.
             if get_annotations:
