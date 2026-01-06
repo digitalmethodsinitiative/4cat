@@ -33,7 +33,7 @@
         </a>
         <p role="tooltip" id="tooltip-get-result-{{ dataset.key }}" aria-hidden="true">Download original data as provided by the data source</p>
     </li>
-    {% if (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
+    {% if not dataset.is_filter() and (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
         <li>
             <a href="{{ url_for('dataset.preview_items', key=dataset.key) }}"
                data-load-from="{{ url_for('dataset.preview_items', key=dataset.key) }}" class="popup-trigger"
