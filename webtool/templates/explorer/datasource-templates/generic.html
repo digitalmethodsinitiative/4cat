@@ -76,7 +76,7 @@ set all_known_fields = {
 	<!-- Media item -->
 	{% if fields.get("media") %}
 	<!-- Split media urls if there's commas in the field -->
-	{% if "," in fields["media"] %}
+	{% if fields["media"] is string and "," in fields["media"] %}
 		{% set media_urls = fields["media"].split(",") %}
 	{% else %}
 		{% set media_urls = [fields.get("media")] %}

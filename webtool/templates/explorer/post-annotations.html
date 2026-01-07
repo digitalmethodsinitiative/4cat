@@ -1,9 +1,8 @@
 <div class="post-annotations">
 	
 	{% if annotation_fields %}
-
-		{% set post_annotations = annotations.get(post.id, {}) %}
-
+        {% set post_id = post.id|string %}
+		{% set post_annotations = annotations.get(post_id, {}) %}
         {% for field_id in annotation_fields %}
             {% if not annotation_fields[field_id].hide_in_explorer %}
                 {% set type = annotation_fields[field_id]["type"] %}
@@ -65,7 +64,6 @@
                             {% elif type == "checkbox" %}
                                 <div class="post-annotation-options">
                                 {% for option_id, option_label in annotation_fields[field_id]["options"].items() %}
-                                    <div class="post-annotation-checkbox-container">
                                     <div class="post-annotation-checkbox-container">
                                         {% set checked = "checked" if option_label in annotation.value else "" %}
                                         <input type="checkbox" class="post-annotation-input option-{{ option_id }}" id="option-{{ post.id }}-{{ option_id }}" value="{{ option_label }}" {{ checked }}><label for="option-{{ post.id }}-{{ option_id }}">{{ option_label }}</label>

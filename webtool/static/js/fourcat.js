@@ -1140,15 +1140,20 @@ const tooltip = {
             parent = this;
         }
 
+        // safe-get aria-controls
+        const ariaControls = $(parent).attr('aria-controls') || '';
+        if (!ariaControls) { return; }
+
         //determine target - last aria-controls value starting with 'tooltip-'
-        let targets = $(parent).attr('aria-controls').split(' ');
-        let tooltip_container = '';
+        let targets = ariaControls.split(' ');
+        let tooltip_container_id = '';
         targets.forEach(function (target) {
             if (target.split('-')[0] === 'tooltip') {
-                tooltip_container = target;
+                tooltip_container_id = target;
             }
         });
-        tooltip_container = $(document.getElementById(tooltip_container));
+
+        let tooltip_container = $(document.getElementById(tooltip_container_id));
         let is_standalone = tooltip_container.hasClass('multiple');
 
         if (tooltip_container.is(':hidden')) {
@@ -1180,7 +1185,7 @@ const tooltip = {
             let hor_position = Math.max(window.scrollX, position.left + (parent_width / 2) - (width / 2));
             if(hor_position + tooltip_container.width() - window.scrollX > document.documentElement.clientWidth) {
                 const scrollbar_width = window.innerWidth - document.documentElement.clientWidth;
-                console.log(scrollbar_width);
+                //console.log(scrollbar_width);
                 hor_position = document.documentElement.clientWidth + window.scrollX - tooltip_container.width() - 5 - scrollbar_width;
             }
             tooltip_container.css('left', hor_position + 'px');
@@ -1198,14 +1203,19 @@ const tooltip = {
         if (!parent) {
             parent = this;
         }
-        let targets = $(parent).attr('aria-controls');
-        let tooltip_container = '';
-        targets.split(' ').forEach(function (target) {
+
+        // safe-get aria-controls
+        const ariaControls = $(parent).attr('aria-controls') || '';
+        if (!ariaControls) { return; }
+
+        let tooltip_container_id = '';
+        ariaControls.split(' ').forEach(function (target) {
             if (target.split('-')[0] === 'tooltip') {
-                tooltip_container = target;
+                tooltip_container_id = target;
             }
         });
-        tooltip_container = $(document.getElementById(tooltip_container));
+
+        let tooltip_container = $(document.getElementById(tooltip_container_id));
         tooltip_container.hide();
     },
     /**
@@ -1213,7 +1223,16 @@ const tooltip = {
      * @param e  Event that triggered the toggle
      */
     toggle: function (e) {
-        let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
+        const ariaControls = $(this).attr('aria-controls') || '';
+        if (!ariaControls) { return; }
+
+        // pick last tooltip- id if multiple
+        let tooltip_id = '';
+        ariaControls.split(' ').forEach(function (t) {
+            if (t.split('-')[0] === 'tooltip') { tooltip_id = t; }
+        });
+
+        let tooltip_container = $(document.getElementById(tooltip_id));
         if (tooltip_container.is(':hidden')) {
             tooltip.show(e, this);
         } else {
@@ -1693,28 +1712,32 @@ const ui_helpers = {
         });
 
         // special case - admin user tags sorting
-        $('#tag-order').sortable({
-            cursor: 'ns-resize',
-            handle: '.handle',
-            items: '.implicit, .explicit',
-            axis: 'y',
-            update: function(e, ui) {
-                let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
-                let body = new FormData();
-                body.append('order', tag_order);
-                fetch(document.querySelector('#tag-order').getAttribute('data-url'), {
-                    method: 'POST',
-                    body: body
-                }).then(response => {
-                    if(response.ok) {
-                        ui.item.addClass('flash-once');
-                    } else {
-                        ui.item.addClass('flash-once-error');
-                    }
-                });
-            }
-        });
-
+        const $tagOrder = $('#tag-order');
+        // Check tagOrder present and jQuery UI loaded
+        if ($tagOrder.length && $.fn && $.fn.sortable) {
+            $tagOrder.sortable({
+                cursor: 'ns-resize',
+                handle: '.handle',
+                items: '.implicit, .explicit',
+                axis: 'y',
+                update: function(e, ui) {
+                    let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
+                    let body = new FormData();
+                    body.append('order', tag_order);
+                    fetch(document.querySelector('#tag-order').getAttribute('data-url'), {
+                        method: 'POST',
+                        body: body
+                    }).then(response => {
+                        if(response.ok) {
+                            ui.item.addClass('flash-once');
+                        } else {
+                            ui.item.addClass('flash-once-error');
+                        }
+                    });
+                }
+            });
+        }
+        
         // special case - restart 4cat front-end
         $('button[name=action][value=restart-frontend]').on('click', function(e) {
             e.preventDefault();

@@ -2093,6 +2093,18 @@ class DataSet(FourcatModule):
             return self.get_results_path().suffix[1:]
 
         return False
+    
+    def is_filter(self):
+        """
+        Check whether a dataset is a filter dataset.
+
+        :return bool:  True if the dataset is a filter dataset, False otherwise. None if deprecated (i.e., filter status unknown).
+        """
+        own_processor = self.get_own_processor()
+        if own_processor is None:
+            # Deprecated datasets do not have a processor
+            return None
+        return own_processor.is_filter()
 
     def get_media_type(self):
         """
