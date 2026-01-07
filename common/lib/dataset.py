@@ -770,7 +770,7 @@ class DataSet(FourcatModule):
             return
 
         if not staging_area:
-            staging_area = self.config.get("PATH_TEMP")
+            staging_area = self.get_staging_area()
 
         if not staging_area.exists() or not staging_area.is_dir():
             raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
