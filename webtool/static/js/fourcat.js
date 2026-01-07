@@ -284,17 +284,22 @@ const processor = {
         }
     },
 
-    delete: function (e) {
+    delete: async function (e) {
         e.preventDefault();
+        let parent_with_key = $(this);
 
-        if (!confirm('Are you sure? Deleted data cannot be restored.')) {
-            return;
-        }
+        popup.confirm('Are you sure? Deleted data cannot be restored.', 'Confirm', function () {
+            while (!parent_with_key.attr('data-dataset-key') && parent_with_key.parent()) {
+                parent_with_key = parent_with_key.parent();
+            }
 
-        $.ajax(getRelativeURL('api/delete-dataset/' + $(this).attr('data-key') + '/'), {
-            method: 'DELETE',
-            data: {key: $(this).attr('data-key')},
-            success: function (json) {
+            const url = getRelativeURL('api/delete-dataset/' + parent_with_key.attr('data-dataset-key') + '/');
+            fetch(url, {
+                method: 'DELETE',
+                body: {key: parent_with_key.attr('data-dataset-key')}
+            }).then(function (response) {
+                return response.json();
+            }).then((json) => {
                 $('li#child-' + json.key).animate({height: 0}, 200, function () {
                     $(this).remove();
                 });
@@ -302,10 +307,9 @@ const processor = {
                     $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
                 }
                 query.reset_form();
-            },
-            error: function (json) {
-                popup.alert('Could not delete dataset: ' + json.status, 'Error');
-            }
+            }).catch((e) => {
+                popup.alert('Could not delete dataset: ' + e, 'Error');
+            });
         });
     }
 };
@@ -514,7 +518,7 @@ const query = {
                     query.query_key = response['key'];
                     query.check(query.query_key);
 
-                    $('#query-status').append($('<button class="delete-link" data-key="' + query.query_key + '">Cancel</button>'));
+                    $('#query-status').append($('<button class="delete-link" data-dataset-key="' + query.query_key + '">Cancel</button>'));
 
                     // poll results every 2000 ms after submitting
                     query.poll_interval = setInterval(function () {
@@ -595,7 +599,7 @@ const query = {
             $.getJSON({
                 url: getRelativeURL('api/check-query/'),
                 data: {
-                    key: $(this).attr('data-key'),
+                    key: $(this).attr('data-dataset-key'),
                     block: block_type
                 },
                 success: function (json) {
