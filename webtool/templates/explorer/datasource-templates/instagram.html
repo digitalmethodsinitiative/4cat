@@ -28,7 +28,12 @@
 
 <div class="media-container">
 	<!-- Media item -->
-	<a href="{{ post.media_url }}" target="_blank"><img alt="Go to media" src="{{ url_for('static', filename='img/go-to-media.jpg') }}">
+    {% if pseudonymised %}
+        <a href="{{ post.media_urls.split(",")|first if post.media_urls else post.url }}" target="_blank">
+    {% else %}
+        <a href="{{ post.media_urls.split(",")|first if post.media_urls else ""}}" target="_blank">
+    {% endif %}
+	<img alt="Go to media" src="{{ url_for('static', filename='img/go-to-media.jpg') }}">
 	<div class="media-bullets">
 		{% for i in range(post.get("num_media", 0) | int) %}
 			•
