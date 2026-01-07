@@ -2331,17 +2331,17 @@ class DataSet(FourcatModule):
         # Add some dataset data to annotations, if not present
         for annotation_data in annotations:
             # Check if the required fields are present
-            if "item_id" not in annotation_data:
+            if not annotation_data.get("item_id"):
                 raise AnnotationException(
                     "Can't save annotations; annotation must have an `item_id` referencing "
                     "the item it annotated, got %s" % annotation_data
                 )
-            if "field_id" not in annotation_data:
+            if not annotation_data.get("field_id"):
                 raise AnnotationException(
                     "Can't save annotations; annotation must have a `field_id` field, "
                     "got %s" % annotation_data
                 )
-            if "label" not in annotation_data or not isinstance(
+            if not annotation_data.get("label") or not isinstance(
                     annotation_data["label"], str
             ):
                 raise AnnotationException(

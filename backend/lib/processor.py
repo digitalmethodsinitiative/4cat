@@ -18,7 +18,7 @@ from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
-                                   DataSetException, MapItemException)
+                                   DataSetException, MapItemException, AnnotationException)
 from common.config_manager import ConfigWrapper
 from common.lib.user import User
 
@@ -779,8 +779,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         seen_fields = {(field_items["from_dataset"], field_items["label"]): field_id
                        for field_id, field_items in annotation_fields.items() if "from_dataset" in field_items}
 
+        annotations_saved = 0
+        failed = 0
+
         # Loop through all annotations. This may be batched.
         for annotation in annotations:
+
+            # item_id always needs to be present
+            if not annotation.get("item_id"):
+                failed += 1
+                continue
 
             # Keep track of what dataset generated this annotation
             annotation["from_dataset"] = self.dataset.key
@@ -816,7 +824,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # Add field ID to the annotation
             annotation["field_id"] = field_id
 
-        annotations_saved = source_dataset.save_annotations(annotations)
+        try:
+            annotations_saved = source_dataset.save_annotations(annotations)
+        except AnnotationException as e:
+            self.source_dataset.update_status(str(e))
+        if failed:
+            self.dataset.update_status("Could not save all annotations, make sure that all items have an `id` value.")
+
         source_dataset.save_annotation_fields(annotation_fields)
 
         return annotations_saved
