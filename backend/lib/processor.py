@@ -90,8 +90,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     filepath = None
 
     #: This will be a list; files added to it are deleted after the processor
-    #: terminates, even on failure, if they still exist at that point
-    disposable_files = None
+    #: terminates, even on failure, if they still exist at that point. Add
+    #: path objects or dataset objects; for datasets, the
+    #: `remove_disposable_files()` method will be called.
+    for_cleanup = None
 
     def work(self):
         """
@@ -169,7 +171,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         self.dataset.update_status("Processing data")
         self.dataset.update_version(get_software_commit(self))
 
-        self.disposable_files = []
+        # we may create temporary files with the processor; anything in here
+        # will be deleted after the processor ends (or crashes!).
+        self.for_cleanup = []
 
         # get parameters
         # if possible, fill defaults where parameters are not provided
@@ -216,9 +220,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     parent_key = " (via " + self.dataset.get_genealogy()[0].key + ")"
                 else:
                     parent_key = ""
-
-                print("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
-                    self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
                 
                 # Clean up partially created datasets/files
                 self.clean_up_on_error()
@@ -228,7 +229,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
             finally:
                 # clean up files that have been created and marked as disposable
+                self.source_dataset.remove_disposable_files()
                 self.dataset.remove_disposable_files()
+                for item in self.for_cleanup:
+                    if type(item) is DataSet:
+                        item.remove_disposable_files()
+                    elif item.exists():
+                        shutil.rmtree(item, ignore_errors=True)
         else:
             # dataset already finished, job shouldn't be open anymore
             self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (

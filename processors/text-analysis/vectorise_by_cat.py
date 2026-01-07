@@ -170,6 +170,7 @@ class VectoriseByCategory(BasicProcessor):
 
 		# Get source dataset for categories
 		category_dataset = self.get_category_dataset(self.source_dataset)
+		self.for_cleanup.append(category_dataset)
 		if not category_dataset:
 			self.dataset.finish_with_error("No top dataset found; unable to identify categories")
 			return

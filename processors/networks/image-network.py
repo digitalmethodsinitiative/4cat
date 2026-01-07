@@ -155,6 +155,7 @@ class ImageGrapher(BasicProcessor):
                 id_file_map[item_id] = details["filename"]
 
         root_dataset = self.get_root_dataset(self.dataset)
+        self.for_cleanup.append(root_dataset)
         if not root_dataset:
             return self.dataset.finish_with_error("No suitable parent dataset found - this processor can only "
                                                   "be run on sets of images sourced from another 4CAT dataset.")

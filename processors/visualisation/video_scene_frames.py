@@ -98,6 +98,8 @@ class VideoSceneFrames(BasicProcessor):
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
             return self.dataset.finish_with_error("Video data missing for scene metadata. Cannot extract frames.")
 
+        self.for_cleanup.append(video_dataset)
+
         # map scenes to filenames
         scenes = {}
         for scene in self.source_dataset.iterate_items(self):
@@ -114,10 +116,10 @@ class VideoSceneFrames(BasicProcessor):
         errors = 0
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
-        for video in self.dataset.items():
+        for video in video_dataset.iterate_items():
             # Check for 4CAT's metadata JSON and copy it
             if video.file.name == '.metadata.json':
-                shutil.copy(video, staging_area)
+                shutil.copy(video.file, staging_area)
 
             if video.file.name not in scenes:
                 continue

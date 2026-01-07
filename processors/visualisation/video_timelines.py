@@ -86,7 +86,7 @@ class VideoTimelines(BasicProcessor):
         previous_video = None
         offset_y = -base_height
         timeline = None
-        iterator = self.dataset.iterate_items()
+        iterator = self.source_dataset.iterate_items()
         looping = True
         timelines = []
         timeline_widths = {}

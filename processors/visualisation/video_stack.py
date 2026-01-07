@@ -149,6 +149,8 @@ class VideoStack(BasicProcessor):
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
             return self.dataset.finish_with_error("Video data missing. Cannot stack videos.")
 
+        self.for_cleanup.append(video_dataset)
+        
         # determine ffmpeg version
         # -fps_mode is not in older versions and we can use -vsync instead
         # but -vsync will be deprecated so only use it if needed

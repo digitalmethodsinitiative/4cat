@@ -219,6 +219,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
         # Organize posts into categories
         category_type = None
         mixed_types = False
+        self.for_cleanup.append(category_dataset)
         self.dataset.update_status("Collecting categories")
         for _i in range(2):
             if mixed_types or category_type is None:

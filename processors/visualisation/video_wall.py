@@ -190,6 +190,7 @@ class VideoWallGenerator(BasicProcessor):
             # assume it's just the parent dataset
             base_dataset = self.source_dataset
 
+        self.for_cleanup.append(base_dataset)
         lengths = {}
         dimensions = {}
         sort_values = {}
@@ -226,6 +227,8 @@ class VideoWallGenerator(BasicProcessor):
             # when we have as many as we need
             if not sort_mode and len(media) == amount:
                 break
+
+        raise RuntimeError("uh oh!")
 
         if sort_mode:
             media = {k: media[k] for k in sorted(media, key=lambda k: sort_values[k])}
