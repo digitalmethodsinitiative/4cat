@@ -152,8 +152,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		models = 0
-		for temp_file in self.dataset.iterate_archive_contents():
-			if temp_file.name == '.token_metadata.json':
+		for tokens in self.dataset.iterate_items():
+			if tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
 			# use the "list of lists" as input for the word2vec model
@@ -161,13 +161,13 @@ class GenerateWordEmbeddings(BasicProcessor):
 			# post... which may actually be preferable for short
 			# 4chan-style posts. But alternatively it could generate one
 			# list per sentence - this processor is agnostic in that regard
-			token_set_name = temp_file.name
+			token_set_name = tokens.file.name
 			self.dataset.update_status("Extracting bigrams from token set %s..." % token_set_name)
 			self.dataset.update_progress(models / self.source_dataset.num_rows)
 
 			try:
 				if detect_bigrams:
-					bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
+					bigram_transformer = Phrases(self.tokens_from_file(tokens.file, staging_area))
 					bigram_transformer = Phraser(bigram_transformer)
 				else:
 					bigram_transformer = None
@@ -180,8 +180,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 					# because we are using a generator, which exhausts, while
 					# Word2Vec needs to iterate over the sentences twice
 					# https://stackoverflow.com/a/57632747
-					model.build_vocab(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer))
-					model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=1, total_examples=model.corpus_count)
+					model.build_vocab(self.tokens_from_file(tokens.file, staging_area, phraser=bigram_transformer))
+					model.train(self.tokens_from_file(tokens.file, staging_area, phraser=bigram_transformer), epochs=1, total_examples=model.corpus_count)
 
 				except RuntimeError as e:
 					if "you must first build vocabulary before training the model" in str(e):

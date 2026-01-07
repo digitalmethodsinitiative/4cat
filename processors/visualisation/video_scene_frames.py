@@ -114,15 +114,15 @@ class VideoSceneFrames(BasicProcessor):
         errors = 0
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
-        for video in self.dataset.iterate_archive_contents():
+        for video in self.dataset.items():
             # Check for 4CAT's metadata JSON and copy it
-            if video.name == '.metadata.json':
+            if video.file.name == '.metadata.json':
                 shutil.copy(video, staging_area)
 
-            if video.name not in scenes:
+            if video.file.name not in scenes:
                 continue
 
-            video_folder = staging_area.joinpath(video.stem)
+            video_folder = staging_area.joinpath(video.file.stem)
             video_folder.mkdir(exist_ok=True)
 
             ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
@@ -130,15 +130,15 @@ class VideoSceneFrames(BasicProcessor):
 
             # we use a single command per video and get all frames in one go
             # previously we had a separate command per frame, which is slower
-            frames = [s["start_frame"] for s in scenes[video.name]]
+            frames = [s["start_frame"] for s in scenes[video.file.name]]
             vf_param = "+".join([f"eq(n\\,{frame})" for frame in frames])
 
             command = [
                 ffmpeg_path,
-                "-i", oslex.quote(str(video)),
+                "-i", oslex.quote(str(video.file)),
                 "-vf", f"select='{vf_param}'",
                 fps_command, "passthrough",
-                oslex.quote(str(video_folder.joinpath(f"{video.stem}_frame_%d.jpeg")))
+                oslex.quote(str(video_folder.joinpath(f"{video.file.stem}_frame_%d.jpeg")))
             ]
 
             if frame_size != "no_modify":
@@ -149,17 +149,17 @@ class VideoSceneFrames(BasicProcessor):
             # some ffmpeg error - log but continue
             if result.returncode != 0:
                 self.dataset.log(
-                    f"Error extracting frames for video file {video.name}, skipping.")
+                    f"Error extracting frames for video file {video.file.name}, skipping.")
 
                 errors += 1
 
             # the default filenames can be improved - use scene ID instead of frame #
-            for i in range(0, len(scenes[video.name])):
-                frame_file = video_folder.joinpath(f"{video.stem}_frame_{i+1}.jpeg")
-                scene_id = scenes[video.name][i]["id"].split("_").pop()
-                frame_file.rename(frame_file.with_stem(f"{video.stem}_scene_{scene_id}"))
+            for i in range(0, len(scenes[video.file.name])):
+                frame_file = video_folder.joinpath(f"{video.file.stem}_frame_{i+1}.jpeg")
+                scene_id = scenes[video.file.name][i]["id"].split("_").pop()
+                frame_file.rename(frame_file.with_stem(f"{video.file.stem}_scene_{scene_id}"))
 
-            processed_frames += len(scenes[video.name])
+            processed_frames += len(scenes[video.file.name])
 
             self.dataset.update_status(f"Captured frames for {processed_frames:,} of {num_scenes:,} scenes")
             self.dataset.update_progress(processed_frames / num_scenes)

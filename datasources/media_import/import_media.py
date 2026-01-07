@@ -250,11 +250,11 @@ class SearchMedia(BasicProcessor):
         # Check for SVG files
         svg_warning = 0
         if self.parameters.get("media_type") == "image":
-            for file in self.dataset.iterate_archive_contents():
-                if file.suffix == ".svg":
+            for item in self.dataset.iterate_items():
+                if item.file.suffix == ".svg":
                     if svg_warning == 0:
                         self.dataset.log("SVG files may not be processed correctly by some 4CAT processors.")
-                    self.dataset.log(f"SVG file detected: {file.name}")
+                    self.dataset.log(f"SVG file detected: {item.file.name}")
                     svg_warning += 1
         self.dataset.update_status(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}{'' if svg_warning == 0 else f' ({svg_warning} SVG files; see log)'}", is_final=True)
         self.dataset.finish(self.parameters.get("num_files"))

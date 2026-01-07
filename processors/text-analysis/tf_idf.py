@@ -141,27 +141,27 @@ class TfIdf(BasicProcessor):
 		dates = []
 
 		# Go through all archived token sets and generate collocations for each
-		for token_file in self.dataset.iterate_archive_contents():
-			if token_file.name == '.token_metadata.json':
+		for token_file in self.dataset.iterate_items():
+			if token_file.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
 			# Get the date
-			date_string = token_file.stem
+			date_string = token_file.file.stem
 			dates.append(date_string)
 
 			# we support both pickle and json dumps of vectors
-			token_unpacker = pickle if token_file.suffix == "pb" else json
+			token_unpacker = pickle if token_file.file.suffix == "pb" else json
 
 			try:
-				with token_file.open("rb") as binary_tokens:
+				with token_file.file.open("rb") as binary_tokens:
 					# these were saved as pickle dumps so we need the binary mode
-					post_tokens = token_unpacker.load(binary_tokens)
+					item_tokens = token_unpacker.load(binary_tokens)
 
 					# Flatten the list of list of tokens - we're treating the whole time series as one document.
-					post_tokens = list(itertools.chain.from_iterable(post_tokens))
+					item_tokens = list(itertools.chain.from_iterable(item_tokens))
 
 					# Add to all date's tokens
-					tokens.append(post_tokens)
+					tokens.append(item_tokens)
 
 			except UnicodeDecodeError:
 				self.dataset.update_status("Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.", is_final=True)

@@ -120,9 +120,9 @@ class ImageGrapher(BasicProcessor):
         seen_hashes = set()
         id_file_map = {}
 
-        for file in self.dataset.iterate_archive_contents(filename_filter=filename_filter):
-            if file.name == ".metadata.json":
-                with file.open() as infile:
+        for image in self.dataset.iterate_items(filename_filter=filename_filter):
+            if image.file.name == ".metadata.json":
+                with image.file.open() as infile:
                     try:
                         metadata = json.load(infile)
                         file_hash_map = {i: v["filename"] for i, v in metadata.items()} if self.parameters.get("image-value") == "url" else {i["filename"]: i["filename"] for i in metadata.values()}
@@ -134,10 +134,10 @@ class ImageGrapher(BasicProcessor):
                     if hashed % 100 == 0:
                         self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows-1:,} item(s)")
                     self.dataset.update_progress(hashed / (self.source_dataset.num_rows-1) * 0.5)
-                    file_hash = hash_file(file, hash_type)
-                    file_hash_map[file.name] = file_hash
+                    file_hash = hash_file(image.file, hash_type)
+                    file_hash_map[image.file.name] = file_hash
                     if file_hash not in hash_file_map:
-                        hash_file_map[file_hash] = file.name
+                        hash_file_map[file_hash] = image.file.name
 
                 except (FileNotFoundError, ValueError):
                     continue

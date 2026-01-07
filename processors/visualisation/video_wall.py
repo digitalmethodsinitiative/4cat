@@ -198,30 +198,29 @@ class VideoWallGenerator(BasicProcessor):
 
         # unpack items and determine length of the item (for sorting)
         self.dataset.update_status("Unpacking files and reading metadata")
-        for item in base_dataset.iterate_archive_contents(immediately_delete=False):
-            self.disposable_files.append(item)
+        for item in base_dataset.iterate_items(immediately_delete=False):
             if self.interrupted:
                 return ProcessorInterruptedException("Interrupted while unpacking files")
 
             # skip metadata and log files
             self.dataset.update_status(f"Determined dimensions of {len(media):,} of {self.source_dataset.num_rows:,} file(s)")
-            if item.suffix.lower() in (".json", ".log"):
+            if item.file.suffix.lower() in (".json", ".log"):
                 continue
 
             try:
-                dimensions[item.name], lengths[item.name], sort_values[item.name] = \
-                    self.get_signature(item, sort_mode, ffprobe_path)
+                dimensions[item.file.name], lengths[item.file.name], sort_values[item.file.name] = \
+                    self.get_signature(item.file, sort_mode, ffprobe_path)
             except MediaSignatureException as e:
-                self.dataset.log(f"Cannot read dimensions of file {item.name}, skipping ({e})")
+                self.dataset.log(f"Cannot read dimensions of file {item.file.name}, skipping ({e})")
                 skipped += 1
                 continue
 
-            if any([d == 0 for d in dimensions[item.name]]):
-                self.dataset.log(f"Dimensions of file {item.name} read as 0 pixels; skipping")
+            if any([d == 0 for d in dimensions[item.file.name]]):
+                self.dataset.log(f"Dimensions of file {item.file.name} read as 0 pixels; skipping")
                 skipped += 1
                 continue
 
-            media[item.name] = item
+            media[item.file.name] = item.file
 
             # if not sorting, we don't need to probe everything and can stop
             # when we have as many as we need

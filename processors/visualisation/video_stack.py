@@ -171,18 +171,18 @@ class VideoStack(BasicProcessor):
         videos = []
 
         # unpack videos and determine length of the video (for sorting)
-        for video in video_dataset.iterate_archive_contents(immediately_delete=False):
+        for video in video_dataset.iterate_items(immediately_delete=False):
             if self.interrupted:
                 return ProcessorInterruptedException("Interrupted while unpacking videos")
 
             # skip JSON
-            if video.name == '.metadata.json':
+            if video.file.name == '.metadata.json':
                 continue
 
             if len(videos) >= max_videos:
                 break
 
-            video_path = oslex.quote(str(video))
+            video_path = oslex.quote(str(video.file))
 
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
@@ -195,9 +195,9 @@ class VideoStack(BasicProcessor):
                 return self.dataset.finish_with_error("Cannot determine length of video {video.name}. Cannot stack "
                                                       "videos without knowing the video lengths.")
             else:
-                lengths[video.name] = float(length_output)
+                lengths[video.file.name] = float(length_output)
 
-            videos.append(video)
+            videos.append(video.file)
 
         # sort videos by length
         videos = sorted(videos, key=lambda v: lengths[v.name], reverse=True)

@@ -165,24 +165,24 @@ class GetCollocations(BasicProcessor):
 		annotations = {}
 
 		# Go through all archived token sets and generate collocations for each
-		for token_file in self.dataset.iterate_archive_contents():
-			if token_file.name == '.token_metadata.json':
+		for token_file in self.dataset.iterate_items():
+			if token_file.file.name == '.token_metadata.json':
 
 				# Get metadata if we write annotations
 				if save_annotations:
-					with token_file.open("rb") as metadata_file:
+					with token_file.file.open("rb") as metadata_file:
 						metadata = json.load(metadata_file)
 
 				# Don't get co-words from metadata
 				continue
 			# we support both pickle and json dumps of vectors
-			token_unpacker = pickle if token_file.suffix == "pb" else json
+			token_unpacker = pickle if token_file.file.suffix == "pb" else json
 
-			with token_file.open("rb") as binary_tokens:
+			with token_file.file.open("rb") as binary_tokens:
 				tokens = token_unpacker.load(binary_tokens)
 
 			# Get the date
-			date_string = token_file.stem
+			date_string = token_file.file.stem
 
 			# Get the collocations. Returns a tuple.
 			self.dataset.update_status("Generating collocations for " + date_string)

@@ -77,23 +77,23 @@ class AudioExtractor(BasicProcessor):
         processed_videos = 0
 
         self.dataset.update_status("Extracting video audio")
-        for path in self.dataset.iterate_archive_contents():
+        for item in self.dataset.iterate_items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
             # Check for 4CAT's metadata JSON and copy it
-            if path.name == '.metadata.json':
-                shutil.copy(path, output_dir.joinpath(".video_metadata.json"))
+            if item.file.name == '.metadata.json':
+                shutil.copy(item.file, output_dir.joinpath(".video_metadata.json"))
                 continue
 
             if max_files != 0 and processed_videos >= max_files:
                 break
 
-            vid_name = path.stem
+            vid_name = item.file.stem
             # ffmpeg -i video.mkv -map 0:a -acodec libmp3lame audio.mp4
             command = [
                 shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-                "-i", oslex.quote(str(path)),
+                "-i", oslex.quote(str(item.file)),
                 "-ar", str(16000),
                 oslex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
             ]
