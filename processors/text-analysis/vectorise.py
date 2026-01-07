@@ -48,12 +48,12 @@ class Vectorise(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		index = 0
-		for token_file in self.dataset.iterate_archive_contents():
-			if token_file.name == '.token_metadata.json':
+		for packed_tokens in self.source_dataset.iterate_items():
+			if packed_tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
 			index += 1
-			vector_set_name = token_file.stem  # we don't need the full path
+			vector_set_name = packed_tokens.file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
 			self.dataset.update_progress(index / self.source_dataset.num_rows)
 
@@ -62,7 +62,7 @@ class Vectorise(BasicProcessor):
 			write_mode = "wb" if token_unpacker is pickle else "w"
 
 			# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-			with token_file.open("rb") as binary_tokens:
+			with packed_tokens.file.open("rb") as binary_tokens:
 				# these were saved as pickle dumps so we need the binary mode
 				tokens = token_unpacker.load(binary_tokens)
 
