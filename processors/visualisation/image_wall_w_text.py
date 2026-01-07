@@ -191,13 +191,13 @@ class ImageTextWallGenerator(BasicProcessor):
         load_errors = []
         self.dataset.update_status("Creating Image wall")
         self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
-        for image_path in self.iterate_archive_contents(image_dataset.get_results_path()):
+        for image_path in self.dataset.iterate_archive_contents():
             if image_path.name in [".metadata.json"]:
                 if convert_to_int(self.parameters.get("amount"), 100) == 0:
                     max_images = max_images - 1
                 continue
 
-			# Check image loads prior to any modifications to canvas space
+            # Check image loads prior to any modifications to canvas space
             try:
                 frame = Image.open(str(image_path))
             except UnidentifiedImageError as e:

@@ -105,7 +105,7 @@ class VideoFrames(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for i, path in enumerate(self.iterate_archive_contents(self.source_file, staging_area)):
+		for i, path in enumerate(self.dataset.iterate_archive_contents()):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -166,8 +166,5 @@ class VideoFrames(BasicProcessor):
 
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
-
-		# Remove staging area
-		shutil.rmtree(staging_area)
 
 		self.dataset.finish(processed_videos)

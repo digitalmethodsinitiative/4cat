@@ -130,7 +130,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         img_metadata = []
 
         # Loop through images
-        for image_file in self.iterate_archive_contents(self.source_file):
+        for image_file in self.dataset.iterate_archive_contents():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
 

@@ -190,8 +190,6 @@ class VideoWallGenerator(BasicProcessor):
             # assume it's just the parent dataset
             base_dataset = self.source_dataset
 
-        collage_staging_area = base_dataset.get_staging_area()
-
         lengths = {}
         dimensions = {}
         sort_values = {}
@@ -200,10 +198,9 @@ class VideoWallGenerator(BasicProcessor):
 
         # unpack items and determine length of the item (for sorting)
         self.dataset.update_status("Unpacking files and reading metadata")
-        for item in self.iterate_archive_contents(base_dataset.get_results_path(), staging_area=collage_staging_area,
-                                                   immediately_delete=False):
+        for item in base_dataset.iterate_archive_contents(immediately_delete=False):
+            self.disposable_files.append(item)
             if self.interrupted:
-                shutil.rmtree(collage_staging_area, ignore_errors=True)
                 return ProcessorInterruptedException("Interrupted while unpacking files")
 
             # skip metadata and log files
@@ -587,7 +584,7 @@ class VideoWallGenerator(BasicProcessor):
 
         # run ffmpeg as an interruptable process so it can be quit when the
         # processor is interrupted
-        process = self.run_interruptable_process(command, wait_time=10, cleanup_paths=(collage_staging_area,))
+        process = self.run_interruptable_process(command, wait_time=10)
 
         # Capture logs
         ffmpeg_error = (process.stderr or b"").decode("utf-8", errors="replace")
@@ -614,8 +611,6 @@ class VideoWallGenerator(BasicProcessor):
             self.dataset.log("ffmpeg returned the following output:")
             for line in ffmpeg_output.split("\n"):
                 self.dataset.log("  " + line)
-
-        shutil.rmtree(collage_staging_area, ignore_errors=True)
 
         if process.returncode != 0:
             if have_old_ffmpeg_version:

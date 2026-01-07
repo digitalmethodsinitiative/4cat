@@ -209,7 +209,7 @@ class VideoHasher(BasicProcessor):
         processed_videos = 0
 
         self.dataset.update_status("Creating video hashes")
-        for path in self.iterate_archive_contents(self.source_file, staging_area):
+        for path in self.dataset.iterate_archive_contents(staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while creating video hashes")
 
@@ -394,7 +394,6 @@ class VideoHashNetwork(BasicProcessor):
 
             # Prepare staging area for videos and video tracking
             staging_area = self.dataset.get_staging_area()
-            self.dataset.log('Staging directory location: %s' % staging_area)
             # Extract file
             archive_file.extract("video_hashes.csv", staging_area)
 

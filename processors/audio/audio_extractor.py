@@ -71,14 +71,13 @@ class AudioExtractor(BasicProcessor):
         max_files = self.parameters.get("amount", 100)
 
         # Prepare staging areas for videos and video tracking
-        staging_area = self.dataset.get_staging_area()
         output_dir = self.dataset.get_staging_area()
 
         total_possible_videos = max(max_files if max_files != 0 else self.source_dataset.num_rows - 1, 1)  # for the metadata file that is included in archives
         processed_videos = 0
 
         self.dataset.update_status("Extracting video audio")
-        for path in self.iterate_archive_contents(self.source_file, staging_area):
+        for path in self.dataset.iterate_archive_contents():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -99,7 +98,7 @@ class AudioExtractor(BasicProcessor):
                 oslex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
             ]
 
-            result = self.run_interruptable_process(command, cleanup_paths=(staging_area, output_dir))
+            result = self.run_interruptable_process(command, cleanup_paths=(output_dir,))
 
             # Capture logs
             ffmpeg_output = result.stdout.decode("utf-8")

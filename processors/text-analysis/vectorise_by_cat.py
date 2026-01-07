@@ -211,7 +211,7 @@ class VectoriseByCategory(BasicProcessor):
 		index = 0
 		# Each file is a token set (Tokenize processor separates tokens by dates or all) and contains a list of tokens for each document
 		# A single item/post may have multiple documents (e.g., if it was seperated by sentance)
-		for token_file in self.iterate_archive_contents(self.source_file):
+		for token_file in self.dataset.iterate_archive_contents():
 			if token_file.name == '.token_metadata.json':
 				# Skip metadata
 				continue

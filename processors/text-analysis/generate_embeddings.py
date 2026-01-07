@@ -152,7 +152,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		models = 0
-		for temp_file in self.iterate_archive_contents(self.source_file):
+		for temp_file in self.dataset.iterate_archive_contents():
 			if temp_file.name == '.token_metadata.json':
 				# Skip metadata
 				continue

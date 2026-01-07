@@ -112,7 +112,7 @@ class TopicModeler(BasicProcessor):
         model_metadata = {'parameters': self.parameters}
         # go through all archived token sets and vectorise them
         index = 0
-        for token_file in self.iterate_archive_contents(self.source_file):
+        for token_file in self.dataset.iterate_archive_contents():
             # Check for and open token metadata file
             if token_file.name == '.token_metadata.json':
                 # Copy the token metadata into our staging area

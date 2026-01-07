@@ -116,10 +116,10 @@ class CategorizeImagesCLIP(BasicProcessor):
 
         # Unpack the image files into a staging_area
         self.dataset.update_status("Unzipping image files")
-        staging_area = self.dataset.get_staging_area()
         total_image_files = 0
         image_filenames = []
-        for file in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+        staging_area = self.dataset.get_staging_area()
+        for file in self.dataset.iterate_archive_contents(immediately_delete=False, staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unpacking archive")
 

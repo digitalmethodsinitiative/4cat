@@ -120,7 +120,7 @@ class ImageGrapher(BasicProcessor):
         seen_hashes = set()
         id_file_map = {}
 
-        for file in self.iterate_archive_contents(self.source_file, filename_filter=filename_filter):
+        for file in self.dataset.iterate_archive_contents(filename_filter=filename_filter):
             if file.name == ".metadata.json":
                 with file.open() as infile:
                     try:

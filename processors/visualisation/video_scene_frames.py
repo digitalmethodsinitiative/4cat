@@ -109,13 +109,12 @@ class VideoSceneFrames(BasicProcessor):
         # two separate staging areas:
         # one to store the videos we're reading from
         # one to store the frames we're capturing
-        video_staging_area = self.dataset.get_staging_area()
         staging_area = self.dataset.get_staging_area()
 
         errors = 0
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
-        for video in self.iterate_archive_contents(video_dataset.get_results_path(), staging_area=video_staging_area):
+        for video in self.dataset.iterate_archive_contents():
             # Check for 4CAT's metadata JSON and copy it
             if video.name == '.metadata.json':
                 shutil.copy(video, staging_area)
@@ -145,7 +144,7 @@ class VideoSceneFrames(BasicProcessor):
             if frame_size != "no_modify":
                 command += ["-s", oslex.quote(frame_size)]
 
-            result = self.run_interruptable_process(command, cleanup_paths=(video_staging_area, staging_area))
+            result = self.run_interruptable_process(command, cleanup_paths=(staging_area,))
 
             # some ffmpeg error - log but continue
             if result.returncode != 0:
@@ -174,9 +173,5 @@ class VideoSceneFrames(BasicProcessor):
         if errors:
             self.dataset.update_status("Finished, but not all scenes could be captured. See dataset log for "
                                        "details.", is_final=True)
-
-        # Remove staging areas
-        shutil.rmtree(staging_area)
-        shutil.rmtree(video_staging_area)
 
         self.dataset.finish(processed_frames)

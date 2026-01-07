@@ -1,6 +1,7 @@
 import collections
 import itertools
 import datetime
+import zipfile
 import fnmatch
 import random
 import shutil
@@ -54,7 +55,7 @@ class DataSet(FourcatModule):
     is_new = True
 
     no_status_updates = False
-    staging_areas = None
+    disposable_files = None
     _queue_position = None
 
     def __init__(
@@ -105,7 +106,7 @@ class DataSet(FourcatModule):
         self.parameters = {}
         self.available_processors = {}
         self._genealogy = None
-        self.staging_areas = []
+        self.disposable_files = []
         self.modules = modules
 
         if key is not None:
@@ -740,6 +741,64 @@ class DataSet(FourcatModule):
             if staging_area.is_dir():
                 shutil.rmtree(staging_area)
 
+    def iterate_archive_contents(
+        self, staging_area=None, immediately_delete=True, filename_filter=None, config=None
+    ):
+        """
+        A generator that iterates through files in an archive
+
+        With every iteration, the processor's 'interrupted' flag is checked,
+        and if set a ProcessorInterruptedException is raised, which by default
+        is caught and subsequently stops execution gracefully.
+
+        Files are temporarily unzipped and deleted after use.
+
+        :param Path staging_area:  Where to store the files while they're
+          being worked with. If omitted, a temporary folder is created and
+          deleted after all files have been yielded
+        :param bool immediately_delete:  Temporary files are removed after
+          yielding; False keeps files until the staging_area is removed
+          (automatically after yielding, or manually)
+        :param list filename_filter:  Whitelist of filenames to iterate.
+        :param ConfigReader config:  Configuration reader, to determine path
+        of temp folder if no staging area is given
+        Other files will be ignored. If empty, do not ignore anything.
+        :return:  An iterator with a Path item for each file
+        """
+        path = self.get_results_path()
+        if not path.exists():
+            return
+
+        if not staging_area:
+            staging_area = self.config.get("PATH_TEMP")
+
+        if not staging_area.exists() or not staging_area.is_dir():
+            raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
+
+        with zipfile.ZipFile(path, "r") as archive_file:
+            # sorting is important because it ensures .metadata.json is read
+            # first
+            archive_contents = sorted(archive_file.namelist())
+
+            for archived_file in archive_contents:
+                if filename_filter and archived_file not in filename_filter:
+                    continue
+
+                info = archive_file.getinfo(archived_file)
+                if info.is_dir():
+                    # do not yield folders - we'll get to the files in them
+	                # too
+                    continue
+
+                temp_file = staging_area.joinpath(archived_file)
+                archive_file.extract(archived_file, staging_area)
+
+                yield temp_file
+                if immediately_delete:
+                    # this, effectively, triggers when the *next* item is
+	                # asked for, or immediately if it is the last file
+                    temp_file.unlink()
+
     def get_staging_area(self):
         """
         Get path to a temporary folder in which files can be stored before
@@ -765,19 +824,21 @@ class DataSet(FourcatModule):
         results_path.mkdir()
 
         # Storing the staging area with the dataset so that it can be removed later
-        self.staging_areas.append(results_path)
+        self.disposable_files.append(results_path)
 
         return results_path
 
-    def remove_staging_areas(self):
+    def remove_disposable_files(self):
         """
-        Remove any staging areas that were created and all files contained in them.
+        Remove any disposable files and folders, such as staging areas
+
+        Called from BasicProcessor after processing a dataset finishes.
         """
         # Remove DataSet staging areas
-        if self.staging_areas:
-            for staging_area in self.staging_areas:
-                if staging_area.is_dir():
-                    shutil.rmtree(staging_area)
+        if self.disposable_files:
+            for disposable_file in self.disposable_files:
+                if disposable_file.exists():
+                    shutil.rmtree(disposable_file)
 
     def finish(self, num_rows=0):
         """

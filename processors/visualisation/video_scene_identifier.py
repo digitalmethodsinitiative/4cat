@@ -188,7 +188,7 @@ class VideoSceneDetector(BasicProcessor):
 		processed_videos = 0
 		video_metadata = None
 		collected_scenes = {}
-		for path in self.iterate_archive_contents(self.source_file, immediately_delete=False):
+		for path in self.dataset.iterate_archive_contents(immediately_delete=False):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 

@@ -147,7 +147,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
         # send batched requests per model
         for model_id in models:
-            iterator = self.iterate_archive_contents(self.source_file)
+            iterator = self.dataset.iterate_archive_contents()
             batch = []
             images_names = {}
             looping = True
