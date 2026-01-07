@@ -302,10 +302,10 @@ const processor = {
             }).then((json) => {
                 $('li#child-' + json.key).animate({height: 0}, 200, function () {
                     $(this).remove();
+                    if ($('.child-list.top-level li').length === 0) {
+                        $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
+                    }
                 });
-                if ($('.child-list.top-level li').length === 0) {
-                    $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
-                }
                 query.reset_form();
             }).catch((e) => {
                 popup.alert('Could not delete dataset: ' + e, 'Error');
