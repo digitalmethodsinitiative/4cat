@@ -494,6 +494,16 @@ class DataSet(FourcatModule):
         :param get_annotations: Whether to also fetch annotations from the database.
           This can be disabled to help speed up iteration.
         :param offset: After how many rows we should yield items.
+        :param bool immediately_delete:  Only used when iterating a file
+          archive. Defaults to `True`, if set to `False`, files are not deleted
+          from the staging area after the iteration, so they can be re-used.
+        :param staging_area:  Only used when iterating a file archive. Where to
+          store the files while they're being worked with. If omitted, a
+          temporary folder is created and marked for deletion after all files
+          have been yielded.
+        :param list filename_filter:  Only used when iterating a file archive.
+          Whitelist of filenames to iterate, others are skipped. If empty, do
+          not filter.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0
@@ -2113,7 +2123,7 @@ class DataSet(FourcatModule):
 
     def get_extension(self):
         """
-        Gets the file extention this dataset produces.
+        Gets the file extension this dataset produces.
         Also checks whether the results file exists.
         Used for checking processor and dataset compatibility.
 
