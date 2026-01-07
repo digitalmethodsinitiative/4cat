@@ -77,7 +77,7 @@ class AudioExtractor(BasicProcessor):
         processed_videos = 0
 
         self.dataset.update_status("Extracting video audio")
-        for item in self.dataset.iterate_items():
+        for item in self.source_dataset.iterate_items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while determining image wall order")
 

@@ -191,7 +191,7 @@ class ImageTextWallGenerator(BasicProcessor):
         load_errors = []
         self.dataset.update_status("Creating Image wall")
         self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
-        for image in self.dataset.iterate_items():
+        for image in self.source_dataset.iterate_items():
             if image.file.name in [".metadata.json"]:
                 if convert_to_int(self.parameters.get("amount"), 100) == 0:
                     max_images = max_images - 1

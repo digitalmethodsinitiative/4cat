@@ -359,7 +359,7 @@ class DataSet(FourcatModule):
                     yield json.loads(line)
 
         else:
-            raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+            raise NotImplementedError(f"Cannot iterate through {path.suffix} file")
 
     def _iterate_archive_contents(
             self,

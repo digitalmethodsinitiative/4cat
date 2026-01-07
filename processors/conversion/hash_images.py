@@ -168,7 +168,7 @@ class ImageHasher(BasicProcessor):
         items = []  # each item: {filename, hash_obj, hash_type, hash_size}
         self.dataset.update_status("Processing images and creating hashes")
 
-        for item in self.dataset.iterate_items():
+        for item in self.source_dataset.iterate_items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while hashing images")
 

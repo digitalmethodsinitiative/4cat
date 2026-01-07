@@ -94,7 +94,7 @@ class VectorRanker(BasicProcessor):
 		# now rank the vectors by most prevalent per "file" (i.e. interval)
 		overall_top = {}
 		index = 0
-		for packed_vectors in self.dataset.iterate_items():
+		for packed_vectors in self.source_dataset.iterate_items():
 			# we support both pickle and json dumps of vectors
 			vector_unpacker = pickle if packed_vectors.file.suffix == "pb" else json
 

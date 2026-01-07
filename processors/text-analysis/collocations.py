@@ -165,7 +165,7 @@ class GetCollocations(BasicProcessor):
 		annotations = {}
 
 		# Go through all archived token sets and generate collocations for each
-		for token_file in self.dataset.iterate_items():
+		for token_file in self.source_dataset.iterate_items():
 			if token_file.file.name == '.token_metadata.json':
 
 				# Get metadata if we write annotations

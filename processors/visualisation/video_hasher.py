@@ -209,7 +209,7 @@ class VideoHasher(BasicProcessor):
         processed_videos = 0
 
         self.dataset.update_status("Creating video hashes")
-        for video in self.dataset.iterate_items(staging_area=staging_area):
+        for video in self.source_dataset.iterate_items(staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while creating video hashes")
 

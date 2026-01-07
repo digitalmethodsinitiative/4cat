@@ -124,7 +124,7 @@ class ImageTextDetector(BasicProcessor):
         skipped_images = 0
         metadata_file = None
         staging_area = self.dataset.get_staging_area()
-        for image in self.dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
+        for image in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unzipping images")
 
