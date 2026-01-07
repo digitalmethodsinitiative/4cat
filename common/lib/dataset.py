@@ -9,8 +9,7 @@ import json
 import time
 import csv
 import re
-
-from pathlib import Path
+import os
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -597,7 +596,7 @@ class DataSet(FourcatModule):
                 mapper=item_mapper,
                 original=original_item,
                 mapped_object=mapped_item,
-                data_file=original_item["path"] if "path" in original_item and issubclass(type(original_item["path"]), Path) else None,
+                data_file=original_item["path"] if "path" in original_item and issubclass(type(original_item["path"]), os.PathLike) else None,
                 **(
                     mapped_item.get_item_data()
                     if type(mapped_item) is MappedItem
