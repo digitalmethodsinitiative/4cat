@@ -407,16 +407,17 @@ class DataSet(FourcatModule):
             # sorting is important because it ensures .metadata.json is read
             # first
             archive_contents = sorted(archive_file.infolist(), key=lambda x: x.filename)
-
             for archived_file in archive_contents:
-                if iterations < offset:
-                    continue
 
                 if filename_filter and archived_file.filename not in filename_filter:
                     continue
 
                 if archived_file.is_dir():
                     # do not yield folders - we'll get to the files in them
+                    continue
+
+                if iterations < offset:
+                    iterations += 1
                     continue
 
                 if hasattr(processor, "interrupted") and processor.interrupted:
@@ -434,7 +435,6 @@ class DataSet(FourcatModule):
                 yield {
                     "id": archived_file.filename,
                     "path": temp_file,
-                    "staging_area": temp_file.parent.name,
                     **{
                         attribute: getattr(archived_file, attribute) for attribute in dir(archived_file) if not attribute.startswith("_")
                     }
