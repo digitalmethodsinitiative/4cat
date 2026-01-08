@@ -30,7 +30,7 @@
 		<!-- Image files -->
 		{% if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'ico', 'heic', 'heif'] %}
 			<div class="media-item image-item">
-                <img src="{{ url_for('dataset.show_archive_file', key=dataset.key, staging_area=item.staging_area, filename=item.filename) }}"
+                <img src="{{ url_for('dataset.show_archive_file', key=dataset.key, filename=item.filename) }}"
                      alt="{{ item.filename }}"
                      class="media-image"
                      {#loading="lazy"#}
@@ -50,7 +50,7 @@
 			<div class="media-item video-item">
 				{% set file_data = item.original %}
 				<video controls class="media-video" preload="metadata">
-					<source src="{{ url_for('dataset.show_archive_file', key=dataset.key, staging_area=item.staging_area, filename=item.filename) }}"
+					<source src="{{ url_for('dataset.show_archive_file', key=dataset.key, filename=item.filename) }}"
 							type="video/{{ file_ext }}">
 					Your browser does not support the video tag.
 				</video>
@@ -72,7 +72,7 @@
 			<div class="media-item audio-item">
 				{% set file_data = item.original %}
 				<audio controls class="media-audio" preload="metadata">
-					<source src="{{ url_for('dataset.show_archive_file', key=dataset.key, staging_area=item.staging_area, filename=item.filename) }}"
+					<source src="{{ url_for('dataset.show_archive_file', key=dataset.key, filename=item.filename) }}"
 							type="audio/{{ file_ext }}">
 					Your browser does not support the audio tag.
 				</audio>

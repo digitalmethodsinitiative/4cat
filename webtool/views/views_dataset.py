@@ -4,10 +4,10 @@
 import json
 import csv
 import io
-
+import zipfile
 import json_stream
 from pathlib import Path
-from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, send_file, flash,
+from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, Response, flash,
                    get_flashed_messages, url_for, stream_with_context, g)
 from flask_login import login_required, current_user
 
@@ -373,14 +373,14 @@ def preview_items(key):
             message="No preview is available for this file.",
         )
 
-
-@component.route("/result/<string:key>/archive/<string:staging_area>/<string:filename>")
-def show_archive_file(key: str, staging_area:str, filename: str):
+@component.route(
+    "/result/<string:key>/archive/<string:filename>"
+)
+def show_archive_file(key: str, filename: str):
     """
-    Return the media of an archive media file. The staging area should already exist.
-    :param str, key:            The dataset key
-    :param str, staging_area:   The staging area
-    :param str, filename:       The name of the archive file
+    Return a file from within a zip archive.
+    :param str, key:                The dataset key
+    :param str, filename:           The path to the file within the archive
     """
     try:
         dataset = DataSet(key=key, db=g.db, modules=g.modules)
@@ -390,18 +390,50 @@ def show_archive_file(key: str, staging_area:str, filename: str):
     if not current_user.can_access_dataset(dataset):
         return error(403, error="This dataset is private.")
 
-    if not staging_area:
-        return error(404, error="No staging area for media file given.")
     if not filename:
-        return error(404, error="No filename for media file given.")
+        return error(404, error="No filename given.")
 
-    staging_area = Path(g.config.get("PATH_DATA")) / staging_area
-    file_path = staging_area / filename
-    if file_path and file_path.is_file():
-        return send_file(file_path)
-    else:
-        return error(404, error="Media file not found.")
+    # Locate the archive file
+    archive_path = (
+        Path(g.config.get("PATH_DATA")) / dataset.get_results_path()
+    )
 
+    if not archive_path.is_file():
+        return error(404, error="Archive not found.")
+
+    try:
+
+        with zipfile.ZipFile(archive_path, "r") as zip_file:
+            # Check if file exists in archive
+            if filename not in zip_file.namelist():
+                return error(404, error="File not found in archive.")
+
+            # Read file from archive into memory
+            file_data = zip_file.read(filename)
+
+            # Determine mime type based on extension
+            import mimetypes
+
+            mime_type, _ = mimetypes.guess_type(filename)
+            if mime_type is None:
+                mime_type = "application/octet-stream"
+
+            # Return as a response with appropriate headers
+            return Response(
+                file_data,
+                mimetype=mime_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{Path(filename).name}"',
+                    "Content-Length": str(len(file_data)),
+                },
+            )
+
+    except zipfile.BadZipFile:
+        return error(400, error="Invalid zip archive.")
+    except KeyError:
+        return error(404, error="File not found in archive.")
+    except Exception as e:
+        return error(500, error=f"Error reading archive: {str(e)}")
 
 """
 Individual result pages
