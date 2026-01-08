@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../
 from common.lib.database import Database
 from common.lib.logger import Logger
 
-import configparser
+import configparser  # noqa: E402
 
 log = Logger(output=True)
 ini = configparser.ConfigParser()
@@ -27,12 +27,18 @@ db = Database(
 )
 
 # Add new admin privilege to manage extensions
-print("  Deleting background jobs from queue to be re-added on next restart...")
-db.execute("DELETE FROM jobs WHERE jobtype IN ('datasource-metrics', 'clean-temp-files', 'check-for-updates')")
+print("  Checking for `queue_id` column in jobs table...")
+has_column = db.fetchone(
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'queue_id'"
+)
 
-print("  Updating default value for llm.available_models setting...")
-# this does not check the current value - it will be updated anyway by the
-# refresh_items worker if an LLM server is configured
-db.execute("UPDATE settings SET value = '{}' WHERE name = 'llm.available_models'")
+if has_column["num"] > 0:
+    print("    Jobs table already has column 'queue_id'")
+else:
+    print("    Adding column 'queue_id' to jobs table...")
+    db.execute("ALTER TABLE jobs ADD queue_id TEXT DEFAULT ''")
+
+print("  Creating `jobs_queue` index on jobs table...")
+db.execute("CREATE INDEX IF NOT EXISTS job_queue ON jobs (queue_id)")
 
 print("  - done!")
