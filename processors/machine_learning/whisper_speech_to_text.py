@@ -302,7 +302,7 @@ class AudioToText(BasicProcessor):
                              '--output_format', "json",
                              "--model", self.parameters.get("local_model")],
                     }
-            if not self.parameters.get("dmi-service-manager.be_whisper_gpu", True):
+            if not self.config.get("dmi-service-manager.be_whisper_gpu", True):
                 data["args"].append("--device cpu")
             if prompt:
                 data["args"].extend(["--initial_prompt", prompt])
