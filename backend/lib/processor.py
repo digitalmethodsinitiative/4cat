@@ -172,8 +172,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         self.dataset.update_version(get_software_commit(self))
 
         # we may create temporary files with the processor; anything in here
-        # will be deleted after the processor ends (or crashes!).
-        self.for_cleanup = []
+        # will be deleted after the processor ends (or crashes!). dataset
+        # objects will have their cleanup methods called
+        self.for_cleanup = [self.dataset, self.source_dataset]
 
         # get parameters
         # if possible, fill defaults where parameters are not provided
@@ -229,8 +230,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
             finally:
                 # clean up files that have been created and marked as disposable
-                self.source_dataset.remove_disposable_files()
-                self.dataset.remove_disposable_files()
                 for item in self.for_cleanup:
                     if type(item) is DataSet:
                         item.remove_disposable_files()
