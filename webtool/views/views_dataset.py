@@ -6,8 +6,9 @@ import csv
 import io
 
 import json_stream
-from flask import Blueprint, current_app, render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
-    url_for, stream_with_context, g
+from pathlib import Path
+from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, send_file, flash,
+                   get_flashed_messages, url_for, stream_with_context, g)
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import Pagination, error, setting_required
@@ -371,6 +372,35 @@ def preview_items(key):
             title="Preview not available",
             message="No preview is available for this file.",
         )
+
+
+@component.route("/result/<string:key>/archive/<string:staging_area>/<string:filename>")
+def show_archive_file(key: str, staging_area:str, filename: str):
+    """
+    Return the media of an archive media file. The staging area should already exist.
+    :param str, key:            The dataset key
+    :param str, staging_area:   The staging area
+    :param str, filename:       The name of the archive file
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    if not staging_area:
+        return error(404, error="No staging area for media file given.")
+    if not filename:
+        return error(404, error="No filename for media file given.")
+
+    staging_area = Path(g.config.get("PATH_DATA")) / staging_area
+    file_path = staging_area / filename
+    if file_path and file_path.is_file():
+        return send_file(file_path)
+    else:
+        return error(404, error="Media file not found.")
 
 
 """

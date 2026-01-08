@@ -434,6 +434,7 @@ class DataSet(FourcatModule):
                 yield {
                     "id": archived_file.filename,
                     "path": temp_file,
+                    "staging_area": temp_file.parent.name,
                     **{
                         attribute: getattr(archived_file, attribute) for attribute in dir(archived_file) if not attribute.startswith("_")
                     }

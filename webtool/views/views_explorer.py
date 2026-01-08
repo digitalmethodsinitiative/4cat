@@ -101,7 +101,7 @@ def explorer_dataset(dataset_key: str, page=1):
 	if not sort or (sort == "dataset-order" and not reverse):
 		count = offset
 		# Not getting annotations here because we want to separate them from regular fields
-		for row in dataset.iterate_items(warn_unmappable=False, get_annotations=False, offset=offset):
+		for row in dataset.iterate_items(warn_unmappable=False, get_annotations=False, offset=offset, immediately_delete=False):
 
 			count += 1
 			# Attribute column names and collect dataset's items.
@@ -114,12 +114,13 @@ def explorer_dataset(dataset_key: str, page=1):
 	else:
 		count = 0
 		get_annotations = True if sort in dataset.get_annotation_field_labels() else False
-		for row in sort_and_iterate_items(dataset, sort, reverse=reverse, warn_unmappable=False, get_annotations=get_annotations):
+		for row in sort_and_iterate_items(dataset, sort, reverse=reverse, warn_unmappable=False, get_annotations=get_annotations, immediately_delete=False):
 			count += 1
 			if count <= offset:
 				continue
 			item_ids.append(row["id"])
 			items.append(row)
+
 			if count >= (offset + items_per_page) or count > max_items:
 				break
 
