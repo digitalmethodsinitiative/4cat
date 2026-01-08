@@ -15,9 +15,13 @@
             {% if is_filtered %}
             <i class="fa fa-filter" aria-hidden="true"></i> <span class="sr-only">Filter</span>
             {% elif item.is_finished() and item.num_rows > 0 %}
-                {% if item.get_own_processor().map_item and item.get_extension() != "csv" %}<a href="{{ url_for('dataset.get_mapped_result', key=item.key) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> csv</a>
+                {% if item.get_results_path().exists() %}
+                    {% if item.get_own_processor().map_item and item.get_extension() != "csv" %}<a href="{{ url_for('dataset.get_mapped_result', key=item.key) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> csv</a>
+                    {% endif %}
+                    <a href="{{ url_for('dataset.get_result', query_file=item.result_file) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ processors[item.type].extension if item.type in processors else "" }}, {{ item.get_results_path()|filesize_short }}</a>
+                {% else %}
+                   <i class="fa fa-circle-check" aria-hidden="true"></i> 
                 {% endif %}
-                <a href="{{ url_for('dataset.get_result', query_file=item.result_file) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ processors[item.type].extension if item.type in processors else "" }}, {{ item.get_results_path()|filesize_short }}</a>
             {% elif item.is_finished() %}
             <i class="fa fa-skull" aria-hidden="true"></i>
             {% elif "queued" in item.status|lower %}
@@ -34,10 +38,10 @@
                 {% elif is_filtered %}
                     Filtered
                 {% else %}
-                <span class="tooltip-trigger" aria-controls="tooltip-metadata-{{ item.key }}" aria-hidden="true">
-                <i class="fa fa-file-alt" aria-hidden="true"></i> <span class="sr-only" id="dataset-{{ item.key }}-result-count" data-num-results="{{ item.num_rows }}">Items:</span> {{ "{:,}".format(item.num_rows) }}
-                </span>
-                <p role="tooltip" id="tooltip-metadata-{{ item.key }}" aria-hidden="true">{{ "{:,}".format(item.num_rows) }} {{processors[item.type].extension|ext2noun if not deprecated else ""}}{% if item.num_rows != 1 %}s{% endif %}</p>
+                    <span class="tooltip-trigger" aria-controls="tooltip-metadata-{{ item.key }}" aria-hidden="true">
+                    <i class="fa fa-file-alt" aria-hidden="true"></i> <span class="sr-only" id="dataset-{{ item.key }}-result-count" data-num-results="{{ item.num_rows }}">Items:</span> {{ "{:,}".format(item.num_rows) }}
+                    </span>
+                    <p role="tooltip" id="tooltip-metadata-{{ item.key }}" aria-hidden="true">{{ "{:,}".format(item.num_rows) }} {{processors[item.type].extension|ext2noun if not deprecated else ""}}{% if item.num_rows != 1 %}s{% endif %}</p>
                 {% endif %}
             {% elif item.is_finished() %}
                 {% if is_filtered %}{% if item.num_rows == 0 %}No posts left{% else %}Filter failed{% endif %}{% else %}No results{% endif %}
