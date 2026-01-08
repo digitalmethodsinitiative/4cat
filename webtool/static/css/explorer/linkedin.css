@@ -6,7 +6,7 @@ body {
 	background-color: rgb(244, 242, 238);
 }
 
-.posts li.post {
+.items li.item {
 	position: relative;
 	margin: 0 auto;
 	margin-top: 5px;
@@ -23,7 +23,7 @@ body {
 	list-style-type: none;
 }
 
-.posts li.post a {
+.items li.item a {
 	color: #1069c3;
 	text-decoration: none;
 	font-weight: bold;
@@ -66,7 +66,7 @@ header .author .author-description, header .author .time, .metrics span {
 	color: #707070;
 }
 
-.posts .external-url {
+.items .external-url {
     position: absolute;
     top: 0;
     right: 0;
@@ -74,7 +74,7 @@ header .author .author-description, header .author .time, .metrics span {
 }
 
 /* Media  */
-.posts li.post .media-container {
+.items li.item .media-container {
 	position: relative;
 	width: 100%;
 	height: 100%;
@@ -82,12 +82,12 @@ header .author .author-description, header .author .time, .metrics span {
 	margin-bottom: 5px;
 }
 
-.posts li.post .media-container img {
+.items li.item .media-container img {
 	width: 49.5%;
 	display: inline-block;
 }
 
-.posts li.post .media-container img:first-of-type {
+.items li.item .media-container img:first-of-type {
 	width: 100%;
 }
 
@@ -124,19 +124,19 @@ header .author .author-description, header .author .time, .metrics span {
 
 
 /** --------------------- *
-     Annotation post elements
+     Annotation item elements
   * --------------------- */
-.post-annotations {
+.item-annotations {
 	background-color: #f2f2f2;
 	margin-top: 10px;
 	border-radius: 8px;
 }
 
-.post-annotation {
+.item-annotation {
     padding: 15px;
 }
 
-.post-annotation > .annotation-label {
+.item-annotation > .annotation-label {
     display: inline-block;
     vertical-align: middle;
     text-align: right;
@@ -146,15 +146,15 @@ header .author .author-description, header .author .time, .metrics span {
     overflow-x: hidden;
 }
 
-.post-annotation.checkbox > .post-annotation-options {
+.item-annotation.checkbox > .item-annotation-options {
     display: inline-block;
 }
 
-.post-annotation-options {
+.item-annotation-options {
     display: inline-block;
     vertical-align: top;
 }
 
-.post-annotation-options > input {
+.item-annotation-options > input {
     display: inline-block;
 }

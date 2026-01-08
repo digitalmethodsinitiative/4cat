@@ -377,17 +377,17 @@ config_definition = {
     "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
-        "help": "Amount of posts",
+        "help": "Amount of items",
         "coerce_type": int,
-        "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
+        "tooltip": "Maximum number of items to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
     "explorer.posts_per_page": {
         "type": UserInput.OPTION_TEXT,
         "default": 50,
-        "help": "Posts per page",
+        "help": "Items per page",
         "coerce_type": int,
-        "tooltip": "Number of posts to display per page"
+        "tooltip": "Number of items to display per page"
     },
     "explorer.config_explanation": {
         "type": UserInput.OPTION_INFO,
