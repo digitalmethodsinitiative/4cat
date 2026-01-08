@@ -59,7 +59,7 @@ class WorkerManager:
 				except Exception as e:
 					self.log.error(f"Error while ensuring job for worker {worker_name}: {e}")
 					job_params = None
-				
+
 				if job_params:
 					self.queue.add_job(jobtype=worker_name, **job_params)
 
@@ -85,45 +85,48 @@ class WorkerManager:
 		"""
 		jobs = self.queue.get_all_jobs()
 
-		num_active = sum([len(self.worker_pool[jobtype]) for jobtype in self.worker_pool])
-		self.log.debug2("Running workers: %i" % num_active)
+		num_active = len(list(self.iterate_active_workers()))
+		self.log.debug2(f"Running {num_active} active workers")
 
 		# clean up workers that have finished processing
-		for jobtype in self.worker_pool:
-			all_workers = self.worker_pool[jobtype]
+		# not using iterate_active_workers() here because we're going to change
+		# the dictionary while iterating through it
+		for queue_id in self.worker_pool:
+			all_workers = self.worker_pool[queue_id]
 			for worker in all_workers:
 				if not worker.is_alive():
 					self.log.debug(f"Terminating worker {worker.job.data['jobtype']}/{worker.job.data['remote_id']}")
 					worker.join()
-					self.worker_pool[jobtype].remove(worker)
+					self.worker_pool[queue_id].remove(worker)
 
 			del all_workers
 
 		# check if workers are available for unclaimed jobs
 		for job in jobs:
+			queue_id = job.data["queue_id"]
 			jobtype = job.data["jobtype"]
 
 			if jobtype in self.modules.workers:
 				worker_class = self.modules.workers[jobtype]
-				if jobtype not in self.worker_pool:
-					self.worker_pool[jobtype] = []
+				if queue_id not in self.worker_pool:
+					self.worker_pool[queue_id] = []
 
 				# if a job is of a known type, and that job type has open
 				# worker slots, start a new worker to run it
-				if len(self.worker_pool[jobtype]) < worker_class.max_workers:
+				if len(self.worker_pool[queue_id]) < 1:
 					try:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=self.modules)
 						worker.start()
 						log_level = self.log.levels["DEBUG"] if job.data["interval"] else self.log.levels["INFO"]
 						self.log.log(f"Starting new worker for job {job.data['jobtype']}/{job.data['remote_id']}", log_level)
-						self.worker_pool[jobtype].append(worker)
+						self.worker_pool[queue_id].append(worker)
 					except JobClaimedException:
 						# it's fine
 						pass
 			else:
 				if jobtype not in self.unknown_jobs:
-					self.log.error("Unknown job type: %s" % jobtype)
+					self.log.error(f"Unknown job type: {jobtype}")
 					self.unknown_jobs.add(jobtype)
 
 		time.sleep(1)
@@ -147,27 +150,26 @@ class WorkerManager:
 		# request shutdown from all workers except the API
 		# this allows us to use the API to figure out if a certain worker is
 		# hanging during shutdown, for example
-		for jobtype in self.worker_pool:
-			if jobtype == "api":
+		for queue_id, worker in self.iterate_active_workers():
+			if worker.type == "api":
 				continue
 
-			for worker in self.worker_pool[jobtype]:
-				if hasattr(worker, "request_interrupt"):
-					worker.request_interrupt()
-				else:
-					worker.abort()
+			if hasattr(worker, "request_interrupt"):
+				worker.request_interrupt()
+			else:
+				worker.abort()
 
 		# wait for all workers that we just asked to quit to finish
 		self.log.info("Waiting for all workers to finish...")
-		for jobtype in self.worker_pool:
-			if jobtype == "api":
+		for queue_id, worker in self.iterate_active_workers():
+			if worker.type == "api":
 				continue
-			for worker in self.worker_pool[jobtype]:
-				self.log.info("Waiting for worker %s..." % jobtype)
-				worker.join()
 
-		# shut down API last
-		for worker in self.worker_pool.get("api", []):
+			self.log.info(f"Waiting for worker of type {worker.type}...")
+			worker.join()
+
+		# shut down any remaining workers (i.e. the API)
+		for queue_id, worker in self.iterate_active_workers():
 			worker.request_interrupt()
 			worker.join()
 
@@ -233,10 +235,6 @@ class WorkerManager:
 		if job:
 			jobtype = job.data["jobtype"]
 
-		if jobtype not in self.worker_pool:
-			# no jobs of this type currently known
-			return
-
 		for worker in self.worker_pool[jobtype]:
 			if (job and worker.job.data["id"] == job.data["id"]) or (worker.job.data["jobtype"] == jobtype and worker.job.data["remote_id"] == remote_id):
 				# first cancel any interruptable queries for this job's worker
@@ -261,3 +259,8 @@ class WorkerManager:
 				self.log.info(f"Requesting interrupt of job {worker.job.data['id']} ({worker.job.data['jobtype']}/{worker.job.data['remote_id']})")
 				worker.request_interrupt(interrupt_level)
 				return
+
+	def iterate_active_workers(self):
+		for queue_id in self.worker_pool:
+			for worker in self.worker_pool[queue_id]:
+				yield queue_id, worker
