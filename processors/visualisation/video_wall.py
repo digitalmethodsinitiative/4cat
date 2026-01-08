@@ -228,8 +228,6 @@ class VideoWallGenerator(BasicProcessor):
             if not sort_mode and len(media) == amount:
                 break
 
-        raise RuntimeError("uh oh!")
-
         if sort_mode:
             media = {k: media[k] for k in sorted(media, key=lambda k: sort_values[k])}
 
