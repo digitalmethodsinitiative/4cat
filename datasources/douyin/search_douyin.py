@@ -8,6 +8,7 @@ from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.helpers import normalize_url_encoding
 
 class SearchDouyin(Search):
     """
@@ -216,12 +217,12 @@ class SearchDouyin(Search):
             mix_info_key] and collection_id != "N/A" else "no"
 
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url", "")),
             "id": item[aweme_id_key],
             "thread_id": item[group_id_key],
             "subject": subject,
             "body": video_description,
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),
             # Adding this as different Douyin pages contain different data
             "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}" if subject == "Post" else f"https://live.douyin.com/{author.get('web_rid')}",
             "region": item.get("region", ""),

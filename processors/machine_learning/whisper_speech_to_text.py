@@ -303,7 +303,7 @@ class AudioToText(BasicProcessor):
                              "--model", self.parameters.get("local_model")],
                     }
             if not self.config.get("dmi-service-manager.be_whisper_gpu", True):
-                data["args"].append("--device cpu")
+                data["args"].append(["--device", "cpu"])
             if prompt:
                 data["args"].extend(["--initial_prompt", prompt])
             if translate:
