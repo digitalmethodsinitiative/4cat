@@ -10,7 +10,7 @@
 		<div class="item-content">
 			<header>
 				{% if not pseudonymised %}
-					<span class="author"><strong><a href="https://twitter.com/{{ item.get('author') }}">{{ item.get("author_fullname")}}</strong> {% if item.get("verified") %} <i class="fa-solid fa-circle-check verified"></i> {% endif %}<span class="atname">@{{ item.get("author") }}</span></a>
+                    <span class="author"><strong><a href="https://twitter.com/{{ item.get('author') }}">{{ item.get("author_fullname")}}</a></strong> {% if item.get("verified") %} <i class="fa-solid fa-circle-check verified"></i> {% endif %}<span class="atname">@{{ item.get("author") }}</span></a>
 						</span>
 				{% else %}
 					<span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
