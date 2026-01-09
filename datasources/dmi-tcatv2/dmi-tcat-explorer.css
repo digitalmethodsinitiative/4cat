@@ -1,8 +1,14 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
 body {
 	background-color: white;
 }
 
-.items .item {
+.posts .post {
 	position: relative;
 	background-color: white;
 	max-width: 620px;
@@ -11,7 +17,7 @@ body {
 	min-height: 50px;
 }
 
-.items .item header {
+.posts .post header {
 	display: inline-block;
 	line-height: 1.7em;
 	margin-bottom: 5px;
@@ -19,55 +25,55 @@ body {
 	color: rgb(104, 119, 130);
 }
 
-.items .item header .item_id {
+.posts .post header .post_id {
 	display: none;
 }
 
-.items .item header .author {
+.posts .post header .author {
 	color: black;
 }
 
-.items .item header .author_picture {
+.posts .post header .profile_picture {
 	float: left;
 	margin-right: 15px;
 }
 
-.items .item header .author_picture img {
+.posts .post header .profile_picture img {
 	border-radius: 100px;
 	width: 50px;
 }
 
-.items .item header .author_picture:after {
+.posts .post header .profile_picture:after {
 	display: none;
 }
 
-.items .item article {
+.posts .post article {
 	margin: 0;
 	padding: 0;
 }
 
-.items .item.op {
+.posts .post.op {
 	background-color: white;
 	color: black;
 }
 
-.items .item .item-content {
+.posts .post .post-content {
 	display: inline-block;
 }
 
-.items .item .item-image {
+.posts .post .post-image {
 	margin-bottom: 10px;
 }
 
-.items .item .item-image img {
+.posts .post .post-image img {
 	border-radius: 10px;
 }
 
-.items .external-url {
+.posts .external-url {
 	color: rgb(104, 119, 130);
 }
 
-.items .item.op .item-annotations, .items .item .item-annotations {
+.posts .post.op .post-annotations, .posts .post .post-annotations {
 	border-radius: 10px;
 	background-color: rgb(241, 249, 255);
 	color: #474747;

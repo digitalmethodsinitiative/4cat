@@ -1,13 +1,10 @@
 <li id="item-{{ item.id }}" class="item{% if item.thread_id == item.id %} op{% endif %}">
-	<!-- Data sources may have a custom template (Jinja2) -->
-	{% if template == "datasource" %}
-		{% include "explorer/datasource-templates/" + datasource + ".html" %}
-
-	<!-- Else, use a generic template that shows common fields -->
-	{% elif datasource == "media-import" %}
+	{% if datasource == "media-import" %}
         {% include "explorer/datasource-templates/media.html" %}
     {% else %}
-		{% include "explorer/datasource-templates/generic.html" %}
+		<!-- Template location as defined by the API endpoint. May be custom or generic. -->
+	{% include ["explorer-template/" + datasource + "-explorer.html",
+                "explorer/generic-explorer.html"] %}
 	{% endif %}
 
 	<!-- Annotations are always shown -->
