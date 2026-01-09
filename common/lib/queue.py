@@ -184,7 +184,7 @@ class JobQueue:
 			remote_id = remote_id.key
 		elif not remote_id:
 			remote_id = ""
-			
+
 		data = {
 			"jobtype": jobtype,
 			"details": json.dumps(details),

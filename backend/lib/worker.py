@@ -316,8 +316,8 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         :param dict parameters:  Job or dataset parameters that may be used to
           determine the appropriate queue ID
 
-	    :return str:  Queue ID
-	    """
+        :return str:  Queue ID
+        """
         return cls.type
 
     @staticmethod

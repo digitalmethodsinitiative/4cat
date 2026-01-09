@@ -255,7 +255,7 @@ def process_standalone(processor):
 	metadata = processors[processor]
 	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=g.db, modules=g.modules)
 
-	job = g.queue.add_job(jobtype=g.modules[processor], details={}, remote_id=processed)
+	job = g.queue.add_job(jobtype=g.modules.processors[processor], details={}, remote_id=processed)
 	place_in_queue = job.get_place_in_queue()
 	if place_in_queue > 5:
 		job.finish()

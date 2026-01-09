@@ -238,7 +238,8 @@ class WorkerManager:
 		if job:
 			jobtype = job.data["jobtype"]
 
-		for worker in self.worker_pool[jobtype]:
+		# worker_pool is keyed by queue_id, so iterate through all workers
+		for queue_id, worker in self.iterate_active_workers():
 			if (job and worker.job.data["id"] == job.data["id"]) or (worker.job.data["jobtype"] == jobtype and worker.job.data["remote_id"] == remote_id):
 				# first cancel any interruptable queries for this job's worker
 				while True:
