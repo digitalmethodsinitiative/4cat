@@ -68,14 +68,16 @@ class JobQueue:
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
-	def get_all_jobs(self, jobtype="*", limit=None, offset=None, remote_id=False, restrict_claimable=True):
+	def get_all_jobs(self, jobtype="*", queue_id="*", limit=None, offset=None, remote_id=False, restrict_claimable=True):
 		"""
 		Get all unclaimed (and claimable) jobs
 
-		:param string jobtype:  Type of job, "*" for all types
-		:param string remote_id:  Remote ID, takes precedence over `jobtype`
+		:param str jobtype:  Type of job, "*" for all types
+		:param str queue_id:  ID of queue, "*" for all queues
+		:param str remote_id:  Remote ID, takes precedence over `jobtype` and
+		  `queue_id`
 		:param bool restrict_claimable:  Only return jobs that may be claimed
-		according to their parameters
+		  according to their parameters
 		:return list:
 		"""
 		replacements = []
@@ -87,6 +89,10 @@ class JobQueue:
 			replacements = [jobtype]
 		else:
 			filter = "WHERE jobtype != ''"
+
+		if queue_id != "*" and not remote_id:
+			filter += " AND queue_id = %s"
+			replacements.append(queue_id)
 
 		query = "SELECT * FROM jobs %s" % filter
 
@@ -126,26 +132,50 @@ class JobQueue:
 
 		return int(count["count"])
 
-	def add_job(self, jobtype, details=None, remote_id=0, claim_after=0, interval=0):
+	def add_job(self, jobtype, details=None, remote_id=None, claim_after=0, interval=0, queue_id=None):
 		"""
 		Add a new job to the queue
 
 		There can only be one job for any combination of job type and remote id. If a job
 		already exists for the given combination, no new job is added.
 
-		:param jobtype:  Job type
+		:param jobtype:  Job type, or a Worker object; in the latter case the
+		  worker type ID is used
 		:param details:  Job details - may be empty, will be stored as JSON
-		:param remote_id:  Remote ID of object to work on. For example, a post or thread ID
+		:param remote_id:  ID of object to work on. For example, a post or
+		  thread ID, or a dataset key. If a DataSet object is passed, the
+		  DataSet key is used
 		:param claim_after:  Absolute timestamp after which job may be claimed
+		:param queue_id:  ID of the queue the job is in. When `None`, set to
+		  job type ID. If empty, and a `BasicWorker` is passed as `jobtype`
+		  and `DataSet` object is passed as remote_id, use the result of
+		  `jobtype.get_queue_id(remote_id.parameters)`
 		:param interval:  If this is not zero, the job is made a repeating job,
-		                  which will be repeated at most every `interval` seconds.
+		  which will be repeated at most every `interval` seconds.
 
 		:return Job: A job that matches the input type and remote ID. This may
-		             be a newly added job or an existing that matched the same
-		             combination (which is required to be unique, so no new job
-		             with those parameters could be queued, and the old one is
-		             just as valid).
+		  be a newly added job or an existing that matched the same combination
+		  (which is required to be unique, so no new job with those parameters
+		  could be queued, and the old one is just as valid).
 		"""
+		# we cannot import BasicWorker or DataSet here for a direct class check
+		# due to circular imports, so use this heuristic instead
+		have_worker = type(jobtype) is not str and hasattr(jobtype, "type")
+		have_dataset = type(remote_id) is not str and hasattr(remote_id, "key")
+
+		if not queue_id and have_worker and have_dataset:
+			queue_id = jobtype.get_queue_id(remote_id.parameters)
+		elif not queue_id:
+			queue_id = jobtype
+
+		if have_worker:
+			jobtype = jobtype.type
+
+		if have_dataset:
+			remote_id = remote_id.key
+		elif not remote_id:
+			remote_id = ""
+			
 		data = {
 			"jobtype": jobtype,
 			"details": json.dumps(details),
@@ -155,6 +185,7 @@ class JobQueue:
 			"remote_id": remote_id,
 			"timestamp_after": claim_after,
 			"interval": interval,
+			"queue_id": queue_id,
 			"attempts": 0
 		}
 
@@ -169,21 +200,3 @@ class JobQueue:
 		All claimed jobs are released. This is useful to run when the backend is restarted.
 		"""
 		self.db.execute("UPDATE jobs SET timestamp_claimed = 0")
-
-	def get_place_in_queue(self, job):
-		"""
-		What is the place of this job in the queue?
-
-		:param Job job:  Job to get place in queue for
-
-		:return int: Place in queue. 0 means the job is currently being
-		processed; 1+ means the job is queued, with 1 corresponding to the
-		front of the queue.
-		"""
-		if job.data["timestamp_claimed"] > 0:
-			return 0
-
-		all_queued = self.get_all_jobs(jobtype=job.data["jobtype"])
-		our_timestamp = job.data["timestamp"]
-		return len(
-			[queued_job for queued_job in all_queued if queued_job.data["timestamp"] < our_timestamp or queued_job.data["timestamp_claimed"] > 0])

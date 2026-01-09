@@ -38,7 +38,7 @@ class ProcessorPreset(BasicProcessor):
 		analysis_pipeline.copy_ownership_from(self.dataset)
 
 		# this starts the pipeline
-		self.queue.add_job(pipeline[0]["type"], remote_id=analysis_pipeline.key)
+		self.queue.add_job(self.modules.processors[pipeline[0]["type"]], remote_id=analysis_pipeline)
 
 	def after_process(self):
 		"""

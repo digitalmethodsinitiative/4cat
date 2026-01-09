@@ -303,6 +303,23 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         """
         pass
 
+    @classmethod
+    def get_queue_id(cls, parameters=None):
+        """
+        Get queue ID for this worker
+
+        The queue ID determines what other worker types are considered to see
+        if a job of this worker can run. By default it is set to the worker's
+        type (so all workers of the same type are in the same queue) but this
+        can be overridden by subclasses.
+
+        :param dict parameters:  Job or dataset parameters that may be used to
+          determine the appropriate queue ID
+
+	    :return str:  Queue ID
+	    """
+        return cls.type
+
     @staticmethod
     def is_4cat_class():
         """

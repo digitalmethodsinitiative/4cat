@@ -99,7 +99,7 @@ class Job:
 										"timestamp_claimed": 0})
 
 		if updated == 0:
-			raise JobClaimedException
+			raise JobClaimedException()
 
 		self.data["timestamp_claimed"] = claim_time
 		self.data["timestamp_lastclaimed"] = claim_time
@@ -160,8 +160,8 @@ class Job:
 
 		:return int: Place in queue
 		"""
-		query = "SELECT COUNT(*) as queue_ahead FROM jobs WHERE jobtype = %s"
-		replacements = [self.data["jobtype"]]
+		query = "SELECT COUNT(*) as queue_ahead FROM jobs WHERE queue_id = %s"
+		replacements = [self.data["queue_id"]]
 		if self.data["timestamp_after"] == 0:
 			# Job can be claimed immediately
 			query += (
@@ -182,6 +182,11 @@ class Job:
 
 	@property
 	def details(self):
+		"""
+		Getter for the job details
+
+		:return dict:
+		"""
 		try:
 			details = json.loads(self.data["details"])
 			if details:

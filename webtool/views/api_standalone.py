@@ -255,8 +255,8 @@ def process_standalone(processor):
 	metadata = processors[processor]
 	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=g.db, modules=g.modules)
 
-	job = g.queue.add_job(processor, {}, processed.key)
-	place_in_queue = g.queue.get_place_in_queue(job)
+	job = g.queue.add_job(jobtype=g.modules[processor], details={}, remote_id=processed)
+	place_in_queue = job.get_place_in_queue()
 	if place_in_queue > 5:
 		job.finish()
 		return error(code=503, error="Your request could not be handled as there are currently %i other jobs of this type in the queue. Please try again later." % place_in_queue)
@@ -270,7 +270,7 @@ def process_standalone(processor):
 			job.finish()
 			return error(code=503, error="The server is currently too busy to handle your request. Please try again later.")
 
-		if g.queue.get_place_in_queue(job) != 0:
+		if job.get_place_in_queue() != 0:
 			time.sleep(2)
 			continue
 		else:
