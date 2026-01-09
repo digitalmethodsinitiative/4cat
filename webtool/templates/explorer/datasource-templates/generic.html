@@ -13,21 +13,21 @@ set all_known_fields = {
 	"likes": ["likes", "num_likes", "notes"],
 	"comments": ["num_comments", "reactions"],
 	"shares": ["shares", "num_shares"],
-	"url": ["url", "link_url", "post_url", "link"]
+	"url": ["url", "link_url", "item_url", "link"]
 }
 %}
 
 {% set fields = {} %}
 
-<!-- Post ID and thread ID are always included -->
-{% set x=fields.__setitem__("id", post["id"]) %}
-{% set x=fields.__setitem__("thread_id", post["thread_id"]) %}
+<!-- item ID and thread ID are always included -->
+{% set x=fields.__setitem__("id", item["id"]) %}
+{% set x=fields.__setitem__("thread_id", item["thread_id"]) %}
 
-<!-- Set all default field names for a post, as registered above -->
+<!-- Set all default field names for a item, as registered above -->
 {% for field, known_fields in all_known_fields.items() %}
 	{% for known_field in known_fields %}
-		{% if known_field in post and post[known_field] %}
-			{% set x=fields.__setitem__(field, post[known_field]) %}
+		{% if known_field in item and item[known_field] %}
+			{% set x=fields.__setitem__(field, item[known_field]) %}
 		{% endif %}
 	{% endfor %}
 {% endfor %}
@@ -36,10 +36,10 @@ set all_known_fields = {
 {% if fields.get("url") and pseudonymised %}
 	<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
 {% elif fields.get("url") and not pseudonymised %}
-	<a href="{{ fields.url }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
+	<a href="{{ fields.url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 {% endif %}
 
-<!-- Post header -->
+<!-- item header -->
 <header>
 	<span title="ID" class="id">{{ fields.get("id") }}</span>
 	{% if fields.get("thread_id") and fields["thread_id"] != fields.get("id") %}
@@ -56,12 +56,12 @@ set all_known_fields = {
 	{% endif %}
 	</span>
 
-	<!-- Post title -->
-	{% if "title" in post and post["title"] %}
-		<span class="title">{{post.title}}</span>
+	<!-- item title -->
+	{% if "title" in item and item["title"] %}
+		<span class="title">{{item.title}}</span>
 	{% endif %}
 
-	<!-- Post time -->
+	<!-- item time -->
 	{% if fields.get("time") is integer %}
 		<span title="Date" class="datetime">{{ fields.get("time")|datetime('%Y-%m-%d %H:%M')|safe }}</span>
 	{% else %}
@@ -70,7 +70,7 @@ set all_known_fields = {
 
 </header>
 
-<!-- Post content-->
+<!-- item content-->
 <article>
 
 	<!-- Media item -->
@@ -81,7 +81,7 @@ set all_known_fields = {
 	{% else %}
 		{% set media_urls = [fields.get("media")] %}
 	{% endif %}
-	<div class="post-media">
+	<div class="item-media">
 		{% for media_url in media_urls %}
 	        <a href="{{ media_url }}" target="_blank" rel="external">
                 <img src="{{ media_url }}"></a>
@@ -90,8 +90,8 @@ set all_known_fields = {
 	</div>
 	{% endif %}
 
-	<!-- Post body -->
-	<div class="post-content">
+	<!-- item body -->
+	<div class="item-content">
 		{{ fields.body }}
 	</div>
 

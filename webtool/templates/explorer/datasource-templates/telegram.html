@@ -1,10 +1,10 @@
-<!-- We need to access the previous posts's info to show the feed data correctly
+<!-- We need to access the previous items's info to show the feed data correctly
 	i.e. to group multiple messages by the same user and show days only once -->
 
-	{% set day = post.unix_timestamp | datetime(fmt="%d %B", wrap=False)  %}
-	{% set prev_post = posts[post_index - 1] if post_index > 0 else {} %}
-	{% set new_day = day if not prev_post or prev_post.get("unix_timestamp", 0) | datetime(fmt="%d %B", wrap=False) != day else False %}
-	{% set new_author = True if not prev_post or prev_post.author != post.author else False %}
+	{% set day = item.unix_timestamp | datetime(fmt="%d %B", wrap=False)  %}
+	{% set prev_item = items[item_index - 1] if item_index > 0 else {} %}
+	{% set new_day = day if not prev_item or prev_item.get("unix_timestamp", 0) | datetime(fmt="%d %B", wrap=False) != day else False %}
+	{% set new_author = True if not prev_item or prev_item.author != item.author else False %}
 
 	{% if new_day %}
 	<div class="day">
@@ -12,12 +12,12 @@
 	</div>
 	{% endif %}
 
-	<div class="post-container{% if new_author or new_day %} new-group{% endif %}">
+	<div class="item-container{% if new_author or new_day %} new-group{% endif %}">
 		<div class="profile-picture-container">
 		{% if new_author or new_day %}
 			<div class="profile-picture">
 				<span class="initials">
-				{% set author = post.author_username if not post.author_name else post.author_name %}
+				{% set author = item.author_username if not item.author_name else item.author_name %}
 				{% if not pseudonymised and author %}
 					<!-- Initials -->
 					{% for name in author.split()[:2] %}{{ name[0] }}{% endfor %}
@@ -38,7 +38,7 @@
 				</svg>
 			</span>
 		</div>
-		<div class="post-content {% if new_author or new_day %}new-group{% endif %}">
+		<div class="item-content {% if new_author or new_day %}new-group{% endif %}">
 			<div class="author">
 			{% if not pseudonymised %}
 				<a href="https://t.me/{{ author }}" target="_blank">{{ author }}</a>
@@ -48,43 +48,43 @@
 			</div>
 		{% else %}
 		</div>
-		<div class="post-content {% if new_author or new_day %}new-group{% endif %}">
+		<div class="item-content {% if new_author or new_day %}new-group{% endif %}">
 		{% endif %}
-			{% if post.attachment_type %}
+			{% if item.attachment_type %}
 			<div class="media-container">
 				<!-- Media item -->
-				<a href="https://t.me/{{ post.chat }}/{{ post.id.split('-')[-1] }}" target="_blank"><img src="{{ url_for('static', filename='img/go-to-media.jpg') }}">
+				<a href="https://t.me/{{ item.chat }}/{{ item.id.split('-')[-1] }}" target="_blank"><img src="{{ url_for('static', filename='img/go-to-media.jpg') }}">
 				</a>
 			</div>
 			{% endif %}
 			<div class="body">
-				{% if post.reply_to %}
-					<div class="reply_to">{% if not pseudonymised %}<a href="https://t.me/{{ post.chat }}/{{ post.reply_to }}" target="_blank">{% endif %}#{{ post.reply_to }}{% if not pseudonymised %}</a>{% endif %}</div>
+				{% if item.reply_to %}
+					<div class="reply_to">{% if not pseudonymised %}<a href="https://t.me/{{ item.chat }}/{{ item.reply_to }}" target="_blank">{% endif %}#{{ item.reply_to }}{% if not pseudonymised %}</a>{% endif %}</div>
 				{% endif %}
-				{{ post.body | markdown | social_mediafy(datasource="telegram") | safe }}
+				{{ item.body | markdown | social_mediafy(datasource="telegram") | safe }}
 			</div>
 
-			{% if post.reactions %}
+			{% if item.reactions %}
 			<div class="reactions">
-				{% set reactions = post.reactions|string_counter(emoji=True) %}
+				{% set reactions = item.reactions|string_counter(emoji=True) %}
 				{% for reaction, count in reactions.items() %}
 					<span class="reaction">{{ reaction }}<span class="reaction-count">{{ count }}</span></span>
 				{% endfor %}
 			</div>
 			{% endif %}
 			<div class="metrics">
-				{% if post.views %}<span class="views"><i class="fas fa-eye"></i> {{ post.views|numberify }}</span>{% endif %}
-				{% if post.forwards %}<span class="forwards"><i class="fas fa-share"></i> {{ post.forwards|numberify }}</span>{% endif %}
+				{% if item.views %}<span class="views"><i class="fas fa-eye"></i> {{ item.views|numberify }}</span>{% endif %}
+				{% if item.forwards %}<span class="forwards"><i class="fas fa-share"></i> {{ item.forwards|numberify }}</span>{% endif %}
 				<span class="time">
-				{{ post.unix_timestamp | datetime(fmt="%H:%M", wrap=False) }} UTC
+				{{ item.unix_timestamp | datetime(fmt="%H:%M", wrap=False) }} UTC
 				</span>
-				{% if post.unix_timestamp_edited %}
+				{% if item.unix_timestamp_edited %}
 				<span class="time-edited">
-				| edited {{ post.unix_timestamp_edited | datetime(fmt="%H:%M", wrap=False) }} UTC
+				| edited {{ item.unix_timestamp_edited | datetime(fmt="%H:%M", wrap=False) }} UTC
 				</span>
 				{% endif %}
 				{% if not pseudonymised %}
-				<span class="external-url" title="Go to original message"><a href="https://t.me/{{ post.chat }}/{{ post.id.split('-')[-1] }}" target="_blank"><i class="fas fa-external-link-alt"></i></a></span>
+				<span class="external-url" title="Go to original message"><a href="https://t.me/{{ item.chat }}/{{ item.id.split('-')[-1] }}" target="_blank"><i class="fas fa-external-link-alt"></i></a></span>
 				{% endif %}
 			</div>
 		</div>

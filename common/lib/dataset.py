@@ -1,6 +1,7 @@
 import collections
 import itertools
 import datetime
+import zipfile
 import fnmatch
 import random
 import shutil
@@ -8,6 +9,7 @@ import json
 import time
 import csv
 import re
+import os
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -54,7 +56,7 @@ class DataSet(FourcatModule):
     is_new = True
 
     no_status_updates = False
-    staging_areas = None
+    disposable_files = None
     _queue_position = None
 
     def __init__(
@@ -105,7 +107,7 @@ class DataSet(FourcatModule):
         self.parameters = {}
         self.available_processors = {}
         self._genealogy = None
-        self.staging_areas = []
+        self.disposable_files = []
         self.modules = modules
 
         if key is not None:
@@ -289,7 +291,7 @@ class DataSet(FourcatModule):
         with log_path.open("a", encoding="utf-8") as outfile:
             outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
 
-    def _iterate_items(self, processor=None, offset=0):
+    def _iterate_items(self, processor=None, offset=0, *args, **kwargs):
         """
         A generator that iterates through a CSV or NDJSON file
 
@@ -356,11 +358,96 @@ class DataSet(FourcatModule):
                     yield json.loads(line)
 
         else:
-            raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+            raise NotImplementedError(f"Cannot iterate through {path.suffix} file")
+
+    def _iterate_archive_contents(
+            self,
+            staging_area=None,
+            immediately_delete=True,
+            filename_filter=None,
+            processor=None,
+            offset=0,
+            *args, **kwargs
+        ):
+        """
+        A generator that iterates through files in an archive
+
+        With every iteration, the processor's 'interrupted' flag is checked,
+        and if set a ProcessorInterruptedException is raised, which by default
+        is caught and subsequently stops execution gracefully.
+
+        Files are temporarily unzipped and deleted after use.
+
+        :param Path staging_area:  Where to store the files while they're
+          being worked with. If omitted, a temporary folder is created and
+          marked for deletion after all files have been yielded
+        :param bool immediately_delete:  Temporary files are removed after
+          yielding; False keeps files until the staging_area is removed
+        :param list filename_filter:  Whitelist of filenames to iterate. If
+          empty, do not filter
+        :param BasicProcessor processor:  A reference to the processor
+          iterating the dataset.
+        :param int offset:  Skip this many files before yielding (warning: may
+          skip a metadata file too!)
+        :return:  An iterator with a dictionary for each file, containing an
+          `id`, a `path`, and all attributes of the `ZipInfo` object as keys
+        """
+        path = self.get_results_path()
+        if not path.exists():
+            return
+
+        if not staging_area:
+            staging_area = self.get_staging_area()
+
+        if not staging_area.exists() or not staging_area.is_dir():
+            raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
+
+        iterations = 0
+        with zipfile.ZipFile(path, "r") as archive_file:
+            # sorting is important because it ensures .metadata.json is read
+            # first
+            archive_contents = sorted(archive_file.infolist(), key=lambda x: x.filename)
+            for archived_file in archive_contents:
+
+                if filename_filter and archived_file.filename not in filename_filter:
+                    continue
+
+                if archived_file.is_dir():
+                    # do not yield folders - we'll get to the files in them
+                    continue
+
+                if iterations < offset:
+                    iterations += 1
+                    continue
+
+                if hasattr(processor, "interrupted") and processor.interrupted:
+                    raise ProcessorInterruptedException(
+                        "Processor interrupted while iterating through Zip archive"
+                    )
+
+                iterations += 1
+                temp_file = staging_area.joinpath(archived_file.filename)
+                archive_file.extract(archived_file.filename, staging_area)
+
+                # iterated items are expected as a dictionary
+                # we thus make a dictionary from the ZipInfo object
+                # and use the path (inside the archive) as a unique ID
+                yield {
+                    "id": archived_file.filename,
+                    "path": temp_file,
+                    **{
+                        attribute: getattr(archived_file, attribute) for attribute in dir(archived_file) if not attribute.startswith("_")
+                    }
+                }
+
+                if immediately_delete:
+                    # this, effectively, triggers when the *next* item is
+                    # asked for, or if it is the last file
+                    temp_file.unlink()
 
     def iterate_items(
             self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None,
-            offset=0
+            offset=0, *args, **kwargs
     ):
         """
         Generate mapped dataset items
@@ -407,6 +494,16 @@ class DataSet(FourcatModule):
         :param get_annotations: Whether to also fetch annotations from the database.
           This can be disabled to help speed up iteration.
         :param offset: After how many rows we should yield items.
+        :param bool immediately_delete:  Only used when iterating a file
+          archive. Defaults to `True`, if set to `False`, files are not deleted
+          from the staging area after the iteration, so they can be re-used.
+        :param staging_area:  Only used when iterating a file archive. Where to
+          store the files while they're being worked with. If omitted, a
+          temporary folder is created and marked for deletion after all files
+          have been yielded.
+        :param list filename_filter:  Only used when iterating a file archive.
+          Whitelist of filenames to iterate, others are skipped. If empty, do
+          not filter.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0
@@ -444,9 +541,10 @@ class DataSet(FourcatModule):
             default_strategy = map_missing
             map_missing = {}
 
-        # Loop through items
-        for i, item in enumerate(self._iterate_items(processor, offset=offset)):
+        iterator = self._iterate_items if self.get_extension() != "zip" else self._iterate_archive_contents
 
+        # Loop through items
+        for i, item in enumerate(iterator(processor=processor, offset=offset, *args, **kwargs)):
             # Save original to yield
             original_item = item.copy()
 
@@ -499,6 +597,7 @@ class DataSet(FourcatModule):
                 mapper=item_mapper,
                 original=original_item,
                 mapped_object=mapped_item,
+                data_file=original_item["path"] if "path" in original_item and issubclass(type(original_item["path"]), os.PathLike) else None,
                 **(
                     mapped_item.get_item_data()
                     if type(mapped_item) is MappedItem
@@ -765,19 +864,21 @@ class DataSet(FourcatModule):
         results_path.mkdir()
 
         # Storing the staging area with the dataset so that it can be removed later
-        self.staging_areas.append(results_path)
+        self.disposable_files.append(results_path)
 
         return results_path
 
-    def remove_staging_areas(self):
+    def remove_disposable_files(self):
         """
-        Remove any staging areas that were created and all files contained in them.
+        Remove any disposable files and folders, such as staging areas
+
+        Called from BasicProcessor after processing a dataset finishes.
         """
         # Remove DataSet staging areas
-        if self.staging_areas:
-            for staging_area in self.staging_areas:
-                if staging_area.is_dir():
-                    shutil.rmtree(staging_area)
+        if self.disposable_files:
+            for disposable_file in self.disposable_files:
+                if disposable_file.exists():
+                    shutil.rmtree(disposable_file)
 
     def finish(self, num_rows=0):
         """
@@ -2022,7 +2123,7 @@ class DataSet(FourcatModule):
 
     def get_extension(self):
         """
-        Gets the file extention this dataset produces.
+        Gets the file extension this dataset produces.
         Also checks whether the results file exists.
         Used for checking processor and dataset compatibility.
 

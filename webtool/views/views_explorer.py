@@ -44,7 +44,7 @@ def explorer_dataset(dataset_key: str, page=1):
 	# Load some variables
 	parameters = dataset.get_parameters()
 	datasource = parameters["datasource"]
-	post_count = int(dataset.data["num_rows"])
+	item_count = int(dataset.data["num_rows"])
 	annotation_fields = dataset.annotation_fields
 	# Don't pass fields hidden in explorer
 	annotation_fields = {field_id: field_items for field_id, field_items in annotation_fields.items()
@@ -77,14 +77,14 @@ def explorer_dataset(dataset_key: str, page=1):
 				else:
 					return error(404, error="Processor-generated dataset not found.")
 
-	# The amount of posts to show on a page
-	posts_per_page = g.config.get("explorer.posts_per_page", 50)
+	# The amount of items to show on a page
+	items_per_page = g.config.get("explorer.posts_per_page", 50)
 
-	# The amount of posts that may be included (limit for large datasets)
-	max_posts = g.config.get('explorer.max_posts', 500000)
+	# The amount of items that may be included (limit for large datasets)
+	max_items = g.config.get('explorer.max_posts', 500000)
 
-	# The offset for posts depending on the current page
-	offset = ((int(page) - 1) * posts_per_page) if page else 0
+	# The offset for items depending on the current page
+	offset = ((int(page) - 1) * items_per_page) if page else 0
 
 	# Check if we have to sort the data.
 	sort = request.args.get("sort")
@@ -92,9 +92,9 @@ def explorer_dataset(dataset_key: str, page=1):
 	# Check if we have to reverse the order.
 	reverse = True if request.args.get("order") == "reverse" else False
 
-	# Load posts
-	post_ids = []
-	posts = []
+	# Load items
+	item_ids = []
+	items = []
 
 	# We don't need to sort if we're showing the existing dataset order (default).
 	# If we're sorting, we need to iterate over the entire dataset first.
@@ -104,12 +104,12 @@ def explorer_dataset(dataset_key: str, page=1):
 		for row in dataset.iterate_items(warn_unmappable=False, get_annotations=False, offset=offset):
 
 			count += 1
-			# Attribute column names and collect dataset's posts.
-			post_ids.append(row["id"])
-			posts.append(row)
+			# Attribute column names and collect dataset's items.
+			item_ids.append(row["id"])
+			items.append(row)
 
-			# Stop if we exceed the allowed posts per page or max posts.
-			if count >= (offset + posts_per_page) or count > max_posts:
+			# Stop if we exceed the allowed items per page or max items.
+			if count >= (offset + items_per_page) or count > max_items:
 				break
 	else:
 		count = 0
@@ -118,54 +118,55 @@ def explorer_dataset(dataset_key: str, page=1):
 			count += 1
 			if count <= offset:
 				continue
-			post_ids.append(row["id"])
-			posts.append(row)
-			if count >= (offset + posts_per_page) or count > max_posts:
+			item_ids.append(row["id"])
+			items.append(row)
+
+			if count >= (offset + items_per_page) or count > max_items:
 				break
 
-	if not posts:
-		return error(404, error="No posts or posts could not be displayed")
+	if not items:
+		return error(404, error="No items or items could not be displayed")
 
-	# Check whether there's already annotations made for these posts.
+	# Check whether there's already annotations made for these items.
 	# We're not using `get_annotations()` because we don't need *all* annotations.
-	# If there's annotations made, pass these to the template and set the post ID
+	# If there's annotations made, pass these to the template and set the item ID
 	# as key so we can easily retrieve them later.
-	post_annotations = {}
+	item_annotations = {}
 	if dataset.annotation_fields:
-		annotations = dataset.get_annotations_for_item(post_ids)
-		post_annotations = collections.defaultdict(dict)
+		annotations = dataset.get_annotations_for_item(item_ids)
+		item_annotations = collections.defaultdict(dict)
 		if annotations:
 			for annotation in annotations:
-				post_annotations[annotation.item_id][annotation.field_id] = annotation
+				item_annotations[annotation.item_id][annotation.field_id] = annotation
 
 	# We can use either a generic or a pre-made, data source-specific template.
 	template = "datasource" if has_datasource_template(datasource) else "generic"
 	if template == "generic":
-		posts_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/generic.css")
+		items_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/generic.css")
 	else:
-		posts_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css")
+		items_css = Path(g.config.get('PATH_ROOT'), "webtool/static/css/explorer/" + datasource + ".css")
 
 	# Read CSS and pass as a string
-	with open(posts_css, "r", encoding="utf-8") as css:
-		posts_css = css.read()
+	with open(items_css, "r", encoding="utf-8") as css:
+		items_css = css.read()
 
 	# Generate the HTML page
 	return render_template(
 		"explorer/explorer.html",
 		dataset=dataset,
 		datasource=datasource,
-		posts=posts,
+		items=items,
 		annotation_fields=annotation_fields,
-		annotations=post_annotations,
+		annotations=item_annotations,
 		processors=current_app.fourcat_modules.processors,
 		from_datasets=from_datasets,
 		template=template,
-		posts_css=posts_css,
+		items_css=items_css,
 		page=page,
 		offset=offset,
-		posts_per_page=posts_per_page,
-		post_count=post_count,
-		max_posts=max_posts,
+		items_per_page=items_per_page,
+		item_count=item_count,
+		max_items=max_items,
 		warning=warning
 	)
 
@@ -298,12 +299,12 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
 	:param sort:				The item key that determines the sort order.
 	:param reverse:				Whether to sort by largest values first.
 
-	:returns dict:				Yields iterated post
+	:returns dict:				Yields iterated items
 	"""
 
 	# Resort to regular iteration if the dataset is larger than the maximum
-	# allowed posts for the Explorer.
-	if dataset.data["num_rows"] > g.config.get("explorer.max_posts", 500000):
+	# allowed items for the Explorer.
+	if dataset.data["num_rows"] > g.config.get("explorer.max_items", 500000):
 		yield from dataset.iterate_items(**kwargs)
 		return
 

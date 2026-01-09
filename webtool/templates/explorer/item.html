@@ -1,16 +1,16 @@
-<li id="post-{{ post.id }}" class="post{% if post.thread_id == post.id %} op{% endif %}">    
-
+<li id="item-{{ item.id }}" class="item{% if item.thread_id == item.id %} op{% endif %}">
 	<!-- Data sources may have a custom template (Jinja2) -->
 	{% if template == "datasource" %}
 		{% include "explorer/datasource-templates/" + datasource + ".html" %}
 
 	<!-- Else, use a generic template that shows common fields -->
-	{% else %}
+	{% elif datasource == "media-import" %}
+        {% include "explorer/datasource-templates/media.html" %}
+    {% else %}
 		{% include "explorer/datasource-templates/generic.html" %}
-		
 	{% endif %}
 
 	<!-- Annotations are always shown -->
-	{% include "explorer/post-annotations.html" %}
+	{% include "explorer/item-annotations.html" %}
 	
 </li>
