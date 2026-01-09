@@ -226,8 +226,6 @@ class ModuleCollector:
                 "explorer-templates": self.load_datasource_explorer_templates(datasource_id, subdirectory)
             }
 
-        expiration = self.config.get("datasources.expiration", {})
-
         # Load 4CAT core datasources
         expiration = self.config.get("datasources.expiration", {})
         for subdirectory in self.config.get('PATH_ROOT').joinpath("datasources").iterdir():
