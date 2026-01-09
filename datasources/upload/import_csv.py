@@ -249,6 +249,7 @@ class SearchCustom(BasicProcessor):
         encoding = sniff_encoding(file)
         tool_format = import_formats.tools.get(query.get("format"))
 
+
         try:
             # try reading the file as csv here
             # never read more than 128 kB (to keep it quick)
@@ -256,13 +257,30 @@ class SearchCustom(BasicProcessor):
             wrapped_file = io.TextIOWrapper(file, encoding=encoding)
             sample = wrapped_file.read(sample_size)
 
+            # sometimes more is actually worse, and the sniffer gets confused
+            # so as a back-up sample, use just the header row, which might give
+            # results if the full sample fails
+            samples = [sample, sample.split("\n")[0]]
+
             if not csv.Sniffer().has_header(sample) and not query.get("frontend-confirm"):
                 # this may be intended, or the check may be bad, so allow user to continue
                 raise QueryNeedsExplicitConfirmationException(
                     "The uploaded file does not seem to have a header row. Continue anyway?")
 
             wrapped_file.seek(0)
-            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+            errors = []
+            dialect = None
+            while samples:
+                sample = samples.pop(0)
+                try:
+                    dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+                except csv.Error as e:
+                    errors.append(str(e))
+                    # try next sample
+                    continue
+
+            if not dialect:
+                raise csv.Error(", ".join(errors))
 
             # override the guesses for specific formats if defined so in
             # import_formats.py

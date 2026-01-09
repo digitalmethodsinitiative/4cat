@@ -1,0 +1,117 @@
+<!-- Media template for displaying images, videos, and audio files -->
+<!-- Extract file extension for media type detection -->
+{% set filename = item.get("filename", "") %}
+{% set file_ext = filename.split(".")[-1].lower() if "." in filename else "" %}
+
+<!-- Media header -->
+<header>
+	<span title="ID" class="id">{{ item.get("id") }}</span>
+	
+	<!-- Filename -->
+	{% if item.get("filename") %}
+		<span title="Filename" class="filename">
+			<i class="fa fa-file"></i> {{ item["filename"] }}
+		</span>
+	{% endif %}
+
+	<!-- File size -->
+	{% if item.get("file_size") %}
+		<span title="File size" class="file-size">
+			{{ item["file_size"] | filesizeformat }}
+		</span>
+	{% endif %}
+
+</header>
+
+<!-- Media content -->
+<article>
+	<div class="media-container">
+		
+		<!-- Image files -->
+		{% if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'ico', 'heic', 'heif'] %}
+			<div class="media-item image-item">
+                <img src="{{ url_for('dataset.show_archive_file', key=dataset.key, filename=item.filename) }}"
+                     alt="{{ item.filename }}"
+                     class="media-image"
+                     {#loading="lazy"#}
+                >
+				<div class="media-info">
+					<span class="media-type">
+						<i class="fa fa-image"></i> Image
+					</span>
+					{% if item.get("dimensions") %}
+						<span class="dimensions">{{ item["dimensions"] }}</span>
+					{% endif %}
+				</div>
+			</div>
+		
+		<!-- Video files -->
+		{% elif file_ext in ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v'] %}
+			<div class="media-item video-item">
+				{% set file_data = item.original %}
+				<video controls class="media-video" preload="metadata">
+					<source src="{{ url_for('dataset.show_archive_file', key=dataset.key, filename=item.filename) }}"
+							type="video/{{ file_ext }}">
+					Your browser does not support the video tag.
+				</video>
+				<div class="media-info">
+					<span class="media-type">
+						<i class="fa fa-video"></i> Video
+					</span>
+					{% if item.get("duration") %}
+						<span class="duration">{{ item["duration"] }}</span>
+					{% endif %}
+					{% if item.get("dimensions") %}
+						<span class="dimensions">{{ item["dimensions"] }}</span>
+					{% endif %}
+				</div>
+			</div>
+		
+		<!-- Audio files -->
+		{% elif file_ext in ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'] %}
+			<div class="media-item audio-item">
+				{% set file_data = item.original %}
+				<audio controls class="media-audio" preload="metadata">
+					<source src="{{ url_for('dataset.show_archive_file', key=dataset.key, filename=item.filename) }}"
+							type="audio/{{ file_ext }}">
+					Your browser does not support the audio tag.
+				</audio>
+				<div class="media-info">
+					<span class="media-type">
+						<i class="fa fa-music"></i> Audio
+					</span>
+					{% if item.get("duration") %}
+						<span class="duration">{{ item["duration"] }}</span>
+					{% endif %}
+				</div>
+			</div>
+		
+		<!-- Other/Unknown file types -->
+		{% else %}
+			<div class="media-item unknown-item">
+				<div class="file-icon">
+					<i class="fa fa-file-o fa-3x"></i>
+				</div>
+				<div class="media-info">
+					<span class="media-type">
+						<i class="fa fa-file"></i> {{ file_ext.upper() if file_ext else 'Unknown' }} File
+					</span>
+					<span class="file-size">
+						{{ item.file_size | filesizeformat }}
+					</span>
+				</div>
+			</div>
+		{% endif %}
+
+	</div>
+
+	<!-- File metadata -->
+	<div class="file-metadata">
+		{% if item.get("file_type") %}
+			<span class="file-type">
+				<strong>Type:</strong> {{ item["file_type"] }}
+			</span>
+		{% endif %}
+	</div>
+
+</article>

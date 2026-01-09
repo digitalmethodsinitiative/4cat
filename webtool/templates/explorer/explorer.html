@@ -5,7 +5,7 @@
 
 {% block body %}
 
-<!-- standard CSS for post annotations -->
+<!-- standard CSS for item annotations -->
 <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer-annotation-generic.css')}}">
 
 <!-- Custom JavaScript for Explorer-specific functions -->
@@ -44,23 +44,25 @@ for (const a in annotation_fields) {
 {% include "explorer/pagination.html" %}
 
 <!-- CSS: Use generic or data source-specific template. -->
-<!-- Use a nested class so the style is only applied to posts. -->
+<!-- Use a nested class so the style is only applied to items. -->
 <style type="text/css">
-{{ datasource|explorer_css|safe }}
+.explorer-content-container {
+	{{ datasource|explorer_css|safe }}
+}
 </style>
 
-<!-- Flags for chan posts -->
+<!-- Flags for chan items -->
 {% if datasource == '4chan' %}
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
 {% endif %}
 
-<!-- The actual dataset posts -->
+<!-- The actual dataset items -->
 <div class="explorer-content-container">
 	<div class="explorer-content">
-		<ol class="posts" id="explorer-posts">
-		{% for post in posts %}
-			{% set post_index = loop.index - 1 %}
-			{% include "explorer/post.html" %}
+		<ol class="items" id="explorer-items">
+		{% for item in items %}
+			{% set item_index = loop.index - 1 %}
+			{% include "explorer/item.html" %}
 		{% endfor %}
 		</ol>
 	</div>

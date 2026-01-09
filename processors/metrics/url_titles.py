@@ -239,7 +239,13 @@ class URLFetcher(BasicProcessor):
                 break
 
             preamble += chunk
-            soup = BeautifulSoup(preamble, "lxml")
+            try:
+                soup = BeautifulSoup(preamble, "lxml")
+            except Exception:
+                try:
+                    soup = BeautifulSoup(preamble, "html.parser")
+                except Exception:
+                    break
             if soup.title and soup.title.text:
                 response.page_title = soup.title.text
                 break

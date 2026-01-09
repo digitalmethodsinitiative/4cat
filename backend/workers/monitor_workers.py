@@ -60,7 +60,7 @@ class WorkerMonitor(BasicWorker):
                 )
                 frame = frame.f_back
 
-            stack = " ← ".join(stack[:-1]) # ignore the very first frame which is never relevant
+            stack = " <-- ".join(stack[:-1]) # ignore the very first frame which is never relevant
             
             if thread_id in thread_id_map:
                 monitor_msg += f"\n  4CAT worker {thread_id_map[thread_id]} :: {stack}"

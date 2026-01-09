@@ -9,6 +9,7 @@ from urllib.parse import urlparse, parse_qs
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
+from common.lib.helpers import normalize_url_encoding
 
 
 class SearchTikTok(Search):
@@ -39,6 +40,9 @@ class SearchTikTok(Search):
 
     @staticmethod
     def map_item(post):
+        # Zeeschuimer metadata
+        metadata = post.get("__import_meta")
+
         challenges = [challenge["title"] for challenge in post.get("challenges", [])]
 
         hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if
@@ -77,6 +81,7 @@ class SearchTikTok(Search):
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url", "")),
             "id": post["id"],
             "thread_id": post["id"],
             "author": user_nickname,

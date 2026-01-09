@@ -42,7 +42,7 @@ def explorer_dataset(dataset_key: str, page=1):
     # Load some variables
     parameters = dataset.get_parameters()
     datasource = parameters["datasource"]
-    post_count = int(dataset.data["num_rows"])
+    item_count = int(dataset.data["num_rows"])
     annotation_fields = dataset.annotation_fields
     # Don't pass fields hidden in explorer
     annotation_fields = {
@@ -81,14 +81,14 @@ def explorer_dataset(dataset_key: str, page=1):
                 else:
                     return error(404, error="Processor-generated dataset not found.")
 
-    # The number of posts to show on a page
-    posts_per_page = g.config.get("explorer.posts_per_page", 50)
+	# The number of items to show on a page
+	items_per_page = g.config.get("explorer.posts_per_page", 50)
 
-    # The number of posts that may be included (limit for large datasets)
-    max_posts = g.config.get("explorer.max_posts", 500000)
+	# The number of items that may be included (limit for large datasets)
+	max_items = g.config.get('explorer.max_posts', 500000)
 
-    # The offset for posts depending on the current page
-    offset = ((int(page) - 1) * posts_per_page) if page else 0
+	# The offset for items depending on the current page
+	offset = ((int(page) - 1) * items_per_page) if page else 0
 
     # Check if we have to sort the data.
     sort = request.args.get("sort")
@@ -96,9 +96,9 @@ def explorer_dataset(dataset_key: str, page=1):
     # Check if we have to reverse the order.
     reverse = True if request.args.get("order") == "reverse" else False
 
-    # Load posts
-    post_ids = []
-    posts = []
+	# Load items
+	item_ids = []
+	items = []
 
     # We don't need to sort if we're showing the existing dataset order (default).
     # If we're sorting, we need to iterate over the entire dataset first.
@@ -299,14 +299,14 @@ def sort_and_iterate_items(dataset: DataSet, sort="", reverse=False, **kwargs):
     :param sort:				The item key that determines the sort order.
     :param reverse:				Whether to sort by largest values first.
 
-    :returns dict:				Yields iterated post
-    """
+	:returns dict:				Yields iterated items
+	"""
 
-    # Resort to regular iteration if the dataset is larger than the maximum
-    # allowed posts for the Explorer.
-    if dataset.data["num_rows"] > g.config.get("explorer.max_posts", 500000):
-        yield from dataset.iterate_items(**kwargs)
-        return
+	# Resort to regular iteration if the dataset is larger than the maximum
+	# allowed items for the Explorer.
+	if dataset.data["num_rows"] > g.config.get("explorer.max_posts", 500000):
+		yield from dataset.iterate_items(**kwargs)
+		return
 
     # Use dataset's sort_and_iterate_items function which can accept chunk_size and
     # creates a sorted temporary file (thus not using so much memory).

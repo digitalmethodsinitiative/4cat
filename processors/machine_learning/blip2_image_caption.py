@@ -116,15 +116,15 @@ class CategorizeImagesCLIP(BasicProcessor):
 
         # Unpack the image files into a staging_area
         self.dataset.update_status("Unzipping image files")
-        staging_area = self.dataset.get_staging_area()
         total_image_files = 0
         image_filenames = []
-        for file in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+        staging_area = self.dataset.get_staging_area()
+        for item in self.source_dataset.iterate_items(immediately_delete=False, staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unpacking archive")
 
-            if file.name.split('.')[-1] not in ["json", "log"]:
-                image_filenames.append(file.name)
+            if item.file.suffix not in (".json", ".log"):
+                image_filenames.append(item.file.name)
                 total_image_files += 1
 
             if self.parameters.get("amount", 100) != 0 and total_image_files >= self.parameters.get("amount", 100):

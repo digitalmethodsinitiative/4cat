@@ -25,7 +25,7 @@ class AuthorInfoRemover(BasicProcessor):
     Retain only posts where a given column matches a given value
     """
     type = "author-info-remover"  # job type ID
-    category = "Filtering"  # category
+    category = "Conversion"  # category
     title = "Pseudonymise or anonymise"  # title displayed in UI
     description = "Removes or replaces data from the dataset in fields identified as containing personal information"
 
@@ -169,5 +169,5 @@ class AuthorInfoRemover(BasicProcessor):
         # replace original dataset with updated one
         shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
 
-        self.dataset.update_status("Data filtered, parent dataset updated.", is_final=True)
+        self.dataset.update_status(f"Data {mode}d, original dataset updated.", is_final=True)
         self.dataset.finish(processed_items)

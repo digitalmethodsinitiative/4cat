@@ -18,7 +18,7 @@ from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
-                                   DataSetException, MapItemException)
+                                   DataSetException, MapItemException, AnnotationException)
 from common.config_manager import ConfigWrapper
 from common.lib.user import User
 
@@ -88,6 +88,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: This will be defined automatically upon loading the processor. There is
     #: no need to override manually
     filepath = None
+
+    #: This will be a list; files added to it are deleted after the processor
+    #: terminates, even on failure, if they still exist at that point. Add
+    #: path objects or dataset objects; for datasets, the
+    #: `remove_disposable_files()` method will be called.
+    for_cleanup = None
 
     def work(self):
         """
@@ -165,6 +171,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         self.dataset.update_status("Processing data")
         self.dataset.update_version(get_software_commit(self))
 
+        # we may create temporary files with the processor; anything in here
+        # will be deleted after the processor ends (or crashes!). dataset
+        # objects will have their cleanup methods called
+        self.for_cleanup = [self.dataset, self.source_dataset]
+
         # get parameters
         # if possible, fill defaults where parameters are not provided
         given_parameters = self.dataset.parameters.copy()
@@ -210,15 +221,20 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     parent_key = " (via " + self.dataset.get_genealogy()[0].key + ")"
                 else:
                     parent_key = ""
-
-                print("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
-                    self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
                 
                 # Clean up partially created datasets/files
                 self.clean_up_on_error()
 
                 raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
                     self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=stack)
+
+            finally:
+                # clean up files that have been created and marked as disposable
+                for item in self.for_cleanup:
+                    if type(item) is DataSet:
+                        item.remove_disposable_files()
+                    elif item.exists():
+                        shutil.rmtree(item, ignore_errors=True)
         else:
             # dataset already finished, job shouldn't be open anymore
             self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (
@@ -238,8 +254,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         if not self.dataset.is_finished():
             self.dataset.finish()
-
-        self.dataset.remove_staging_areas()
 
         # see if we have anything else lined up to run next
         for next in self.parameters.get("next", []):
@@ -387,28 +401,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 except (SMTPException, ConnectionRefusedError, socket.timeout):
                     self.log.error("Error sending email to %s" % owner)
 
-    def remove_files(self):
-        """
-        Clean up result files and any staging files for processor to be attempted
-        later if desired.
-        """
-        # Remove the results file that was created
-        if self.dataset.get_results_path().exists():
-            self.dataset.get_results_path().unlink()
-        if self.dataset.get_results_folder_path().exists():
-            shutil.rmtree(self.dataset.get_results_folder_path())
-
-        # Remove any staging areas with temporary data
-        self.dataset.remove_staging_areas()
-
     def clean_up_on_error(self):
         try:
             # ensure proxied requests are stopped
             self.flush_proxied_requests()
             # delete annotations that have been generated as part of this processor
             self.db.delete("annotations", where={"from_dataset": self.dataset.key}, commit=True)
-            # remove any result files that have been created so far
-            self.remove_files()
+            # Remove the results file that was created
+            if self.dataset.get_results_path().exists():
+                self.dataset.get_results_path().unlink()
+            if self.dataset.get_results_folder_path().exists():
+                shutil.rmtree(self.dataset.get_results_folder_path())
+
         except Exception as e:
             self.log.error("Error during processor cleanup after error: %s" % str(e))
 
@@ -511,60 +515,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :return str:
         """
         return f"{self.type}-{self.dataset.key}"
-
-    def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True, filename_filter=[]):
-        """
-        A generator that iterates through files in an archive
-
-        With every iteration, the processor's 'interrupted' flag is checked,
-        and if set a ProcessorInterruptedException is raised, which by default
-        is caught and subsequently stops execution gracefully.
-
-        Files are temporarily unzipped and deleted after use.
-
-        :param Path path:     Path to zip file to read
-        :param Path staging_area:  Where to store the files while they're
-          being worked with. If omitted, a temporary folder is created and
-          deleted after use
-        :param bool immediately_delete:  Temporary files are removed after yielded;
-          False keeps files until the staging_area is removed (usually during processor
-          cleanup)
-        :param list filename_filter:  Whitelist of filenames to iterate.
-        Other files will be ignored. If empty, do not ignore anything.
-        :return:  An iterator with a Path item for each file
-        """
-
-        if not path.exists():
-            return
-
-        if not staging_area:
-            staging_area = self.dataset.get_staging_area()
-
-        if not staging_area.exists() or not staging_area.is_dir():
-            raise RuntimeError("Staging area %s is not a valid folder")
-
-        with zipfile.ZipFile(path, "r") as archive_file:
-            # sorting is important because it ensures .metadata.json is read
-            # first
-            archive_contents = sorted(archive_file.namelist())
-
-            for archived_file in archive_contents:
-                if filename_filter and archived_file not in filename_filter:
-                    continue
-
-                info = archive_file.getinfo(archived_file)
-                if info.is_dir():
-                    continue
-
-                if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
-
-                temp_file = staging_area.joinpath(archived_file)
-                archive_file.extract(archived_file, staging_area)
-
-                yield temp_file
-                if immediately_delete:
-                    temp_file.unlink()
 
     def unpack_archive_contents(self, path, staging_area=None):
         """
@@ -828,8 +778,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         seen_fields = {(field_items["from_dataset"], field_items["label"]): field_id
                        for field_id, field_items in annotation_fields.items() if "from_dataset" in field_items}
 
+        annotations_saved = 0
+        failed = 0
+
         # Loop through all annotations. This may be batched.
         for annotation in annotations:
+
+            # item_id always needs to be present
+            if not annotation.get("item_id"):
+                failed += 1
+                continue
 
             # Keep track of what dataset generated this annotation
             annotation["from_dataset"] = self.dataset.key
@@ -865,7 +823,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # Add field ID to the annotation
             annotation["field_id"] = field_id
 
-        annotations_saved = source_dataset.save_annotations(annotations)
+        try:
+            annotations_saved = source_dataset.save_annotations(annotations)
+        except AnnotationException as e:
+            self.source_dataset.update_status(str(e))
+        if failed:
+            self.dataset.update_status("Could not save all annotations, make sure that all items have an `id` value.")
+
         source_dataset.save_annotation_fields(annotation_fields)
 
         return annotations_saved

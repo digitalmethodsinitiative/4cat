@@ -2,25 +2,25 @@
 
 	{%- if not pseudonymised %}
 		<!-- Possible external link, if not pseudonymised -->
-		<a href="{{ post.url }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
+		<a href="{{ item.url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 		<!-- Author and co-author -->
-		<span class="author"><strong><a href="https://instagram.com/{{ post.get('author') }}">{{ post.get("author") }}</a></strong>
-		{%- if post.get("is_verified") -%} <i class="fa-solid fa-circle-check verified"></i>{% endif %}</span>
-		{%- if post.get("coauthors") %}
-            {%- set coauthors = post["coauthors"].split(",") -%}
+		<span class="author"><strong><a href="https://instagram.com/{{ item.get('author') }}">{{ item.get("author") }}</a></strong>
+		{%- if item.get("is_verified") -%} <i class="fa-solid fa-circle-check verified"></i>{% endif %}</span>
+		{%- if item.get("coauthors") %}
+            {%- set coauthors = item["coauthors"].split(",") -%}
             {%- for coauthor in coauthors %}{%- if loop.index == coauthors | length %}<span> and </span>{%- else %}<span>, </span>{% endif %}
                 <span class="author"><strong><a href="https://instagram.com/{{ coauthor }}">{{ coauthor }}</a></strong></span>
 		    {%- endfor -%}
         {%- endif -%}
-		<span class="time"> {{ post.get("timestamp") }}</span>
+		<span class="time"> {{ item.get("timestamp") }}</span>
 	{% else %}
 		<span title="Pseudonymous author" class="author">
             <i class="fa fa-user-secret tooltip-trigger"></i>
         </span>
 	{% endif %}
-	{% if post.get("location_name") %}
+	{% if item.get("location_name") %}
 	<div class="location">
-		<a href="https://instagram.com/explore/locations/{{ post.get('location_id') }}/{{ post.get('location_name')}}" target="_blank">{{ post.location_name }}</a>
+		<a href="https://instagram.com/explore/locations/{{ item.get('location_id') }}/{{ item.get('location_name')}}" target="_blank">{{ item.location_name }}</a>
 	</div>
 	{% endif %}
 
@@ -28,24 +28,29 @@
 
 <div class="media-container">
 	<!-- Media item -->
-	<a href="{{ post.media_url }}" target="_blank"><img alt="Go to media" src="{{ url_for('static', filename='img/go-to-media.jpg') }}">
+    {% if pseudonymised %}
+        <a href="{{ item.media_urls.split(",")|first if item.media_urls else item.url }}" target="_blank">
+    {% else %}
+        <a href="{{ item.media_urls.split(",")|first if item.media_urls else ""}}" target="_blank">
+    {% endif %}
+	<img alt="Go to media" src="{{ url_for('static', filename='img/go-to-media.jpg') }}">
 	<div class="media-bullets">
-		{% for i in range(post.get("num_media", 0) | int) %}
+		{% for i in range(item.get("num_media", 0) | int) %}
 			•
 		{% endfor %}
 	</div>
 	</a>
 </div>
-<article class="post-content">
-	{% if post.num_likes %} 
-	<div class="likes"><strong>{{ post.get("num_likes") | commafy }} likes</strong></div>
+<article class="item-content">
+	{% if item.num_likes %}
+	<div class="likes"><strong>{{ item.get("num_likes") | commafy }} likes</strong></div>
 	{% endif %}
-	<div class="body">{{ post.get("body") | social_mediafy(datasource='instagram') | safe }}</div>
-	{% if post.num_comments %}
+	<div class="body">{{ item.get("body") | social_mediafy(datasource='instagram') | safe }}</div>
+	{% if item.num_comments %}
 		{% if pseudonymised %}
-		<div class="comments">{{ post.get("num_comments") | commafy }} comments</div>
+		<div class="comments">{{ item.get("num_comments") | commafy }} comments</div>
 		{% else %}
-		<div class="comments"><a href="{{ post.url }}/comments" target="_blank">View all {{ post.get("num_comments") | commafy }} comments</a></div>
+		<div class="comments"><a href="{{ item.url }}/comments" target="_blank">View all {{ item.get("num_comments") | commafy }} comments</a></div>
 		{% endif %}
 	{% endif %}
 </article>

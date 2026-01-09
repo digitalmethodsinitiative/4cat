@@ -82,7 +82,7 @@ class UniqueImageFilter(BasicProcessor):
         staging_area = self.dataset.get_staging_area()
 
         self.dataset.update_status("Processing images and looking for duplicates")
-        for image_file in self.iterate_archive_contents(self.source_file):
+        for image in self.source_dataset.iterate_items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while filtering for unique images")
 
@@ -92,19 +92,19 @@ class UniqueImageFilter(BasicProcessor):
                                              f"found {dupes:,} duplicate(s)")
             processed += 1
 
-            if image_file.name == ".metadata.json":
-                with image_file.open() as infile:
+            if image.file.name == ".metadata.json":
+                with image.file.open() as infile:
                     metadata = json.load(infile)
                 continue
 
-            image_hash = hash_file(image_file, self.parameters.get("hash-type"))
+            image_hash = hash_file(image.file, self.parameters.get("hash-type"))
 
             if image_hash not in seen_hashes:
                 seen_hashes.add(image_hash)
-                shutil.copy2(image_file, staging_area)
-                hash_map[image_hash] = image_file.name
+                shutil.copy2(image.file, staging_area)
+                hash_map[image_hash] = image.file.name
             else:
-                self.dataset.log(f"{image_file.name} is a duplicate of {hash_map[image_hash]} - skipping")
+                self.dataset.log(f"{image.file.name} is a duplicate of {hash_map[image_hash]} - skipping")
                 dupes += 1
 
         new_metadata = {}

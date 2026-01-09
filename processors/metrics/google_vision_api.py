@@ -130,26 +130,26 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         img_metadata = []
 
         # Loop through images
-        for image_file in self.iterate_archive_contents(self.source_file):
+        for image in self.source_dataset.iterate_items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
 
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
             self.dataset.update_progress(done / total)
 
-            if image_file.name.startswith(".") or image_file.suffix in (".json", ".log"):
+            if image.file.name.startswith(".") or image.file.suffix in (".json", ".log"):
 
                 # Get the .metadata.json file so we can also save post IDs.
-                if image_file.name == ".metadata.json":
-                    img_metadata = json.load(image_file.open())
+                if image.file.name == ".metadata.json":
+                    img_metadata = json.load(image.file.open())
                     if img_metadata:
                         img_metadata = {v["filename"]: v.get("post_ids", []) for v in img_metadata.values()}
                 else:
-                    self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
+                    self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
                 continue
 
             try:
-                annotations = self.annotate_image(image_file, api_key, features)
+                annotations = self.annotate_image(image.file, api_key, features)
             except RuntimeError:
                 # cannot continue fetching, e.g. when API key is invalid
                 break
@@ -158,8 +158,8 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                 continue
 
             annotations = {
-                "file_name": image_file.name,
-                "post_ids": img_metadata[image_file.name],
+                "file_name": image.file.name,
+                "post_ids": img_metadata[image.file.name],
                 **annotations}
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:

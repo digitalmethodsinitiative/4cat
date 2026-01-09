@@ -1,0 +1,107 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+body {
+	background: #ffe;
+}
+
+*, body {
+	font-family: arial;
+}
+
+.content {
+	color: maroon;
+	font-family: arial;
+	font-size: 10pt;
+	margin-left: 0;
+	margin-right: 0;
+	margin-top: 5px;
+}
+
+.content article {
+	font-size: 10pt;
+}
+
+.items li.item {
+	display: table;
+	margin-left: 10px;
+	background-color: #f0e0d6;
+	border: 1px solid #d9bfb7;
+	width: auto;
+	min-width: 10px;
+	max-width: 100%;
+	border-left: none;
+	border-top: none;
+	padding: 10px;
+}
+
+.items li.item.op {
+	background-color: #ffe;
+	color: maroon;
+	border: none;
+	border-left: none;
+	border-top: none;
+}
+
+.items li.item header {
+	border: none;
+}
+
+.items li.item.op header {
+	font-weight: bold;
+}
+
+.items li.item .author {
+	font-weight: 700;
+}
+
+.items li.item .subject {
+	color: #cc1105;
+	font-weight: 700;
+}
+
+.items li.item .deleted {
+	
+}
+
+.items li.item .item-content {
+	display: block;
+	margin: 15px;
+	margin-left: 35px;
+}
+
+.items li.item .quote, .items li.item .quote a {
+	color: navy;
+	text-decoration: underline;
+}
+.items li.item .greentext {
+	color: #789922;
+}
+
+.items li.item.op .greentext {
+	color: #63b563;
+}
+
+.items li.item .item-annotations {
+	background-color: #e2c6b5;
+}
+
+.items li.item.op .item-annotations {
+	background-color: #f0e0d6;
+}
+
+.item-image {
+    background: #FFF;
+    float: left;
+    color: #000;
+    height: 5em;
+    text-align: center;
+    margin-right: 1em;
+}
+
+.item-image img {
+    height: 100%;
+}

@@ -20,6 +20,7 @@
 	position: relative;
 	display: table;
 	table-layout: fixed;
+	width: 100%;
 }
 
 .items .item .item-table-row {
@@ -30,12 +31,10 @@
 	display: table-cell;
 	width: 11%;
 	vertical-align: top;
-	padding: 10px;
 }
 
 .items .item .profile-picture img {
 	border-radius: 100%;
-	width: 100%;
 }
 
 .items .item .item-content {
@@ -57,35 +56,39 @@
 	display: inline-block;
 }
 
-.items .item .item-media {
+.items .item .media-container {
 	margin-top: 10px;
 	width: 100%;
 }
 
-.items .item .item-media img {
+.items .item .media-container img {
 	width: 100%;
-	border-radius: 10px;
+	border-radius: 15px;
+	border: 1px solid #e1e7ea;
 }
 
 .metrics {
-	display: table-cell;
-	width: 5%;
-	vertical-align: top;
-	margin-top: 40px;
+	margin-top: 20px;
 }
 
-.metrics span {
-	display: inline-block;
-	width: 100%;
-	margin-bottom: 20px;
+.time, .metrics, .atname, .external-url a {
+	color: #7a8a97;
 }
 
-.items .external-url {
-	color: rgb(104, 119, 130);
+.items .item .metrics {
+	display: flex;
+	justify-content: space-between;
 }
 
 span.hashtag {
 	color: rgb(29, 155, 240);
+}
+
+.item .quote-item {
+	padding: 15px 20px 15px 20px;
+	border: 1px solid #efefef;
+	border-radius: 10px;
+	margin-top: 5px;
 }
 
 
@@ -93,10 +96,10 @@ span.hashtag {
      Annotation item elements
   * --------------------- */
 .item-annotations {
-    background-color: rgb(254, 44, 85);
+    background-color: rgb(29, 155, 240);
     margin-top: 10px;
     color: white;
-    border-radius: 10px;
+    border-radius: 15px;
 }
 
 .item-annotation {
@@ -105,16 +108,16 @@ span.hashtag {
 
 .item-annotation > .annotation-label {
     display: inline-block;
-    vertical-align: middle;
     text-align: right;
-    min-width: 150px;
+    width: 150px;
     margin-right: 5px;
     line-height: 1.6em;
-    overflow-x: hidden;
+    position: relative;
+    word-break: break-all;
 }
 
-.item-annotation > .annotation-label, .item-annotation > .annotation-label > a {
-	color: black;
+.item-annotation > .annotation-label, .item-annotation a {
+	color: white;
 }
 
 .item-annotation.checkbox > .item-annotation-options {
@@ -128,4 +131,8 @@ span.hashtag {
 
 .item-annotation-options > input {
     display: inline-block;
+}
+
+textarea.item-annotation-input {
+	width: 60%;
 }

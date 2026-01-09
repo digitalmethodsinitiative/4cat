@@ -10,6 +10,7 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.exceptions import MapItemException
+from common.lib.helpers import normalize_url_encoding
 
 
 class SearchInstagram(Search):
@@ -278,8 +279,8 @@ class SearchInstagram(Search):
 
         mapped_item = {
             # Post and caption
+            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url")),  # Zeeschuimer metadata
             "id": node["code"],
-            "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"), # Zeeschuimer metadata
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "thread_id": node["code"],
             "parent_id": node["code"],
