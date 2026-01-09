@@ -5,7 +5,10 @@ import threading
 import signal
 import time
 
+from collections.abc import Generator
+
 from backend.lib.proxied_requests import DelegatedRequestHandler
+from backend.lib.worker import BasicWorker
 from common.lib.exceptions import JobClaimedException
 
 # for now, this is hardcoded - could be dynamic or depending on the queue ID in
@@ -46,7 +49,6 @@ class WorkerManager:
 
 		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)
-			signal.signal(signal.SIGINT, self.request_interrupt)
 
 		# datasources are initialized here; the init_datasource functions found in their respective __init__.py files
 		# are called which, in the case of scrapers, also adds the scrape jobs to the queue.
@@ -58,13 +60,14 @@ class WorkerManager:
 				# ensure_job is a class method that returns a dict with job parameters if job should be added
 				# pass config for some workers (e.g., web studies extensions)
 				try:
+					self.log.debug(f"Ensuring job exists for worker {worker_name}")
 					job_params = worker.ensure_job(config=self.modules.config)
 				except Exception as e:
 					self.log.error(f"Error while ensuring job for worker {worker_name}: {e}")
 					job_params = None
 
 				if job_params:
-					self.queue.add_job(jobtype=worker_name, **job_params)
+					self.queue.add_job(jobtype=worker, **job_params)
 
 		self.ident = threading.get_ident()
 		self.log.info("4CAT Started")
@@ -187,10 +190,10 @@ class WorkerManager:
 		Logs warnings if not all information is precent for the configured data
 		sources.
 		"""
-
 		for datasource in self.modules.datasources:
 			if datasource + "-search" not in self.modules.workers and datasource + "-import" not in self.modules.workers:
-				self.log.error("No search worker defined for datasource %s or its modules are missing. Search queries will not be executed." % datasource)
+				self.log.error(f"No search worker defined for data source {datasource} or its modules are missing. "
+				               f"Datasets cannot be created for it.")
 
 			self.modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource, self.modules.config)
 
@@ -219,28 +222,20 @@ class WorkerManager:
 		# now stop looping (i.e. accepting new jobs)
 		self.looping = False
 
-	def request_interrupt(self, interrupt_level, job=None, remote_id=None, jobtype=None):
+	def request_interrupt(self, interrupt_level, job):
 		"""
-		Interrupt a job
+		Interrupt a specific job
 
 		This method can be called via e.g. the API, to interrupt a specific
-		job's worker. The worker can be targeted either with a Job object or
-		with a combination of job type and remote ID, since those uniquely
-		identify a job.
+		job's worker. The worker for the given Job object is searched for and
+		if it exists, its `request_interrupt()` method is called.
 
 		:param int interrupt_level:  Retry later or cancel?
 		:param Job job:  Job object to cancel worker for
-		:param str remote_id:  Remote ID for worker job to cancel
-		:param str jobtype:  Job type for worker job to cancel
 		"""
-
-		# find worker for given job
-		if job:
-			jobtype = job.data["jobtype"]
-
-		for worker in self.worker_pool[jobtype]:
-			if (job and worker.job.data["id"] == job.data["id"]) or (worker.job.data["jobtype"] == jobtype and worker.job.data["remote_id"] == remote_id):
-				# first cancel any interruptable queries for this job's worker
+		for worker in self.iterate_active_workers():
+			if worker.job.data["id"] == job.data["id"]:
+				# first cancel any interruptable postgres queries for this job's worker
 				while True:
 					active_queries = self.queue.get_all_jobs("cancel-pg-query", remote_id=worker.db.appname, restrict_claimable=False)
 					if not active_queries:
@@ -251,7 +246,7 @@ class WorkerManager:
 						if cancel_job.is_claimed:
 							continue
 
-						# this will make the job be run asap
+						# this will cause the job be run asap
 						cancel_job.claim()
 						cancel_job.release(delay=0, claim_after=0)
 
@@ -263,7 +258,15 @@ class WorkerManager:
 				worker.request_interrupt(interrupt_level)
 				return
 
-	def iterate_active_workers(self):
+	def iterate_active_workers(self) -> Generator[tuple[str, BasicWorker]]:
+		"""
+		Return all active workers
+
+		Convenience function to avoid having to always use two nested for
+		loops.
+
+		:return:  Generator that yields tuples of (queue_id, worker)
+		"""
 		for queue_id in self.worker_pool:
 			for worker in self.worker_pool[queue_id]:
 				yield queue_id, worker
