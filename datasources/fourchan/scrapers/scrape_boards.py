@@ -86,7 +86,7 @@ class BoardScraper4chan(BasicJSONScraper):
 		# schedule a job for scraping the thread's posts
 		try:
 			jobtype = self.type.replace("-board", "-thread")
-			self.queue.add_job(jobtype=jobtype, remote_id=thread["no"], details={"board": board_id})
+			self.queue.add_job(job_or_type=jobtype, remote_id=thread["no"], details={"board": board_id})
 		except JobAlreadyExistsException:
 			# this might happen if the workers can't keep up with the queue
 			pass
@@ -152,7 +152,7 @@ class BoardScraper4chan(BasicJSONScraper):
 					remote_id = self.db.fetchone(query)
 					
 					if not remote_id:
-						self.queue.add_job(jobtype=jobtype, remote_id=str(thread["id"]), details={"board": board_id})
+						self.queue.add_job(job_or_type=jobtype, remote_id=str(thread["id"]), details={"board": board_id})
 						to_check += 1
 
 				except JobAlreadyExistsException:

@@ -67,7 +67,7 @@ class WorkerManager:
 					job_params = None
 
 				if job_params:
-					self.queue.add_job(jobtype=worker, **job_params)
+					self.queue.add_job(job_or_type=worker, **job_params)
 
 		self.ident = threading.get_ident()
 		self.log.info("4CAT Started")

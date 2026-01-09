@@ -348,7 +348,7 @@ def import_dataset():
 
 			outfile.write(chunk)
 
-	job = g.queue.add_job(jobtype=worker, details={"file": str(temporary_path)}, dataset=dataset)
+	job = g.queue.add_job(job_or_type=worker, details={"file": str(temporary_path)}, dataset=dataset)
 	dataset.link_job(job)
 
 	return jsonify({
@@ -467,7 +467,7 @@ def queue_dataset():
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
-	g.queue.add_job(jobtype=search_worker, dataset=dataset, interval=0)
+	g.queue.add_job(job_or_type=search_worker, dataset=dataset, interval=0)
 	new_job = Job.get_by_remote_ID(dataset.key, g.db)
 	dataset.link_job(new_job)
 
@@ -1204,7 +1204,7 @@ def queue_processor(key=None, processor=None):
 
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
-		g.queue.add_job(jobtype=g.modules.processors[processor], dataset=analysis)
+		g.queue.add_job(job_or_type=g.modules.processors[processor], dataset=analysis)
 		job = Job.get_by_remote_ID(analysis.key, database=g.db)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
