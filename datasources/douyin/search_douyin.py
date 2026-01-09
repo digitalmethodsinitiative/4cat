@@ -1,7 +1,6 @@
 """
 Import scraped Douyin data
 """
-import urllib
 import json
 import re
 from datetime import datetime

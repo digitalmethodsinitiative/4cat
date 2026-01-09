@@ -6,7 +6,6 @@ import uuid
 import math
 import os
 import re
-import requests
 import regex
 
 from urllib.parse import urlencode, urlparse
