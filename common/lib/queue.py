@@ -132,14 +132,14 @@ class JobQueue:
 
 		return int(count["count"])
 
-	def add_job(self, job_or_type, details=None, remote_id=None, dataset=None, claim_after=0, interval=0, queue_id=None):
+	def add_job(self, worker_or_type, details=None, remote_id=None, dataset=None, claim_after=0, interval=0, queue_id=None):
 		"""
 		Add a new job to the queue
 
 		There can only be one job for any combination of job type and remote id. If a job
 		already exists for the given combination, no new job is added.
 
-		:param job_or_type:  Job type, or a Worker object; in the latter case the
+		:param worker_or_type:  Job type, or a Worker object; in the latter case the
 		  worker type ID is used
 		:param details:  Job details - may be empty, will be stored as JSON
 		:param remote_id:  ID of object to work on. For example, a post or
@@ -165,19 +165,19 @@ class JobQueue:
 
 		# we cannot import BasicWorker or DataSet here for a direct class check
 		# due to circular imports, so use this heuristic instead
-		have_worker = type(job_or_type) is not str and hasattr(job_or_type, "type")
+		have_worker = type(worker_or_type) is not str and hasattr(worker_or_type, "type")
 
 		if dataset:
 			remote_id = dataset.key
 
 		if have_worker:
-			queue_id = job_or_type.get_queue_id(remote_id=remote_id, details=details, dataset=dataset)
-			job_or_type = job_or_type.type
+			queue_id = worker_or_type.get_queue_id(remote_id=remote_id, details=details, dataset=dataset)
+			worker_or_type = worker_or_type.type
 		else:
-			queue_id = job_or_type
+			queue_id = worker_or_type
 			
 		data = {
-			"jobtype": job_or_type,
+			"jobtype": worker_or_type,
 			"details": json.dumps(details),
 			"timestamp": int(time.time()),
 			"timestamp_claimed": 0,
