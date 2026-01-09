@@ -4,8 +4,6 @@ A job queue, to divide work over the workers
 import time
 import json
 
-from backend.lib.worker import BasicWorker
-from common.lib.dataset import DataSet
 from common.lib.job import Job
 
 
@@ -160,15 +158,20 @@ class JobQueue:
 		  (which is required to be unique, so no new job with those parameters
 		  could be queued, and the old one is just as valid).
 		"""
-		if not queue_id and issubclass(type(jobtype), BasicWorker) and issubclass(type(remote_id), DataSet):
+		# we cannot import BasicWorker or DataSet here for a direct class check
+		# due to circular imports, so use this heuristic instead
+		have_worker = type(jobtype) is not str and hasattr(jobtype, "type")
+		have_dataset = type(remote_id) is not str and hasattr(remote_id, "key")
+
+		if not queue_id and have_worker and have_dataset:
 			queue_id = jobtype.get_queue_id(remote_id.parameters)
 		elif not queue_id:
 			queue_id = jobtype
 
-		if issubclass(type(jobtype), BasicWorker):
+		if have_worker:
 			jobtype = jobtype.type
 
-		if issubclass(type(remote_id), DataSet):
+		if have_dataset:
 			remote_id = remote_id.key
 		elif not remote_id:
 			remote_id = ""
