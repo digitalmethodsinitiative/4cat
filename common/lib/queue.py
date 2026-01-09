@@ -146,10 +146,11 @@ class JobQueue:
 		  thread ID, or a dataset key. If a DataSet object is passed, the
 		  DataSet key is used
 		:param claim_after:  Absolute timestamp after which job may be claimed
-		:param queue_id:  ID of the queue the job is in. When `None`, set to
-		  job type ID. If empty, and a `BasicWorker` is passed as `jobtype`
-		  and `DataSet` object is passed as remote_id, use the result of
-		  `jobtype.get_queue_id(remote_id.parameters)`
+		:param queue_id:  ID of the queue the job is in. When `None`, the value
+		  is automatically determined: if both `BasicWorker` and `DataSet` objects
+		  are passed, use `jobtype.get_queue_id(remote_id.parameters)`; if only
+		  a `BasicWorker` is passed, use its type ID; otherwise use the jobtype
+		  string directly.
 		:param interval:  If this is not zero, the job is made a repeating job,
 		  which will be repeated at most every `interval` seconds.
 
