@@ -147,7 +147,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
         # send batched requests per model
         for model_id in models:
-            iterator = self.iterate_archive_contents(self.source_file)
+            iterator = self.source_dataset.iterate_items()
             batch = []
             images_names = {}
             looping = True
@@ -165,15 +165,15 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     send_batch = True
 
                 if image:
-                    if image.name == ".metadata.json":
+                    if image.file.name == ".metadata.json":
                         # Metadata, we keep this for writing annotations
-                        image_metadata = json.load(open(image, "r"))
+                        image_metadata = json.load(image.file.open("r"))
 
-                    if image.suffix in (".json", ".log"):
+                    if image.file.suffix in (".json", ".log"):
                         continue
 
                     # we can attach the image as a binary file
-                    with image.open("rb") as infile:
+                    with image.file.open("rb") as infile:
                         encoded_image = infile.read()
 
                     batch.append(resources_pb2.Input(
@@ -182,7 +182,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                         ))
                     ))
 
-                    images_names[len(batch) - 1] = image.name
+                    images_names[len(batch) - 1] = image.file.name
 
                 # send batch of images to the Clarifai API
                 if send_batch and batch:

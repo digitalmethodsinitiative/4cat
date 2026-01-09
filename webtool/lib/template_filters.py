@@ -8,6 +8,7 @@ import os
 import re
 import regex
 
+from pathlib import Path
 from urllib.parse import urlencode, urlparse
 from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify, ellipsiate
@@ -340,6 +341,38 @@ def _jinja2_filter_string_counter(string, emoji=False):
 		counter[s] += 1
 
 	return counter
+
+@current_app.template_filter('media_url_from_filepath')
+def _jinja2_filter_media_url_from_filepath(filepath):
+    # Returns a relative URL to a media file from an absolute URL
+
+    root = g.config.get("PATH_ROOT")
+
+    # Convert inputs to Path objects
+    if not isinstance(filepath, Path):
+        filepath = Path(filepath)
+    if not isinstance(root, Path):
+        root = Path(root)
+
+    # Resolve to absolute paths for reliable comparison
+    try:
+        filepath = filepath.resolve()
+        root = root.resolve()
+    except (OSError, RuntimeError):
+        # If resolve fails, continue with original paths
+        pass
+
+    # Remove root from filepath
+    try:
+        # This works cross-platform
+        relative_path = filepath.relative_to(root)
+    except ValueError:
+        # filepath is not relative to root, return as-is
+        relative_path = filepath
+
+    # Convert to forward slashes for URL (works on both Windows and Linux)
+    return relative_path.as_posix()
+
 
 @current_app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):

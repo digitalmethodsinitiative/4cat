@@ -9,7 +9,7 @@
 	padding-bottom: 30px;
 }
 
-.posts .post {
+.items .item {
 	font-family: 'Inter', sans-serif;
 	font-size: 15px;
 	width: 600px;
@@ -21,18 +21,18 @@
 	padding: 20px;
 }
 
-.posts .post .post-table {
+.items .item .item-table {
 	position: relative;
 	display: table;
 	table-layout: fixed;
 	width: 100%;
 }
 
-.posts .post .post-table-row {
+.items .item .item-table-row {
 	display: table-row;
 }
 
-.posts .post .reply-to {
+.items .item .reply-to {
 	width: 0;
 	height: 12px;
 	border: 2px solid var(--text-color-tertiary);
@@ -41,24 +41,24 @@
 	margin-top: -20px;
 }
 
-.posts .post .profile-picture {
+.items .item .profile-picture {
 	display: table-cell;
 	width: 7%;
 	vertical-align: top;
 	padding-right: 12px;
 }
 
-.posts .post .profile-picture img {
+.items .item .profile-picture img {
 	border-radius: 100%;
 	width: 100%;
 }
 
-.posts .post .post-content {
+.items .item .item-content {
 	display: table-cell;
 	width: 93%;
 }
 
-.posts .post header {
+.items .item header {
 	color: var(--text-color-primary);
 	margin-top: 5px;
 	margin-bottom: 5px;
@@ -71,24 +71,24 @@
 	border-radius: 100%;
 }
 
-.posts .post header .author strong a {
+.items .item header .author strong a {
 	color: var(--text-color-primary);
 }
 
-.posts .post header a {
+.items .item header a {
 	color: var(--text-color-secondary);
 }
 
-.posts .post .post-content {
+.items .item .item-content {
 	display: inline-block;
 }
 
-.posts .post .media-container {
+.items .item .media-container {
 	margin-top: 10px;
 	width: 100%;
 }
 
-.posts .post .media-container img {
+.items .item .media-container img {
 	width: 100%;
 	border-radius: 15px;
 	border: 1px solid var(--border-color);
@@ -106,7 +106,7 @@
 	color: var(--accent-color);
 }
 
-.posts .post .metrics {
+.items .item .metrics {
 	display: flex;
 	justify-content: space-between;
 	color: var(--text-color-tertiary);
@@ -116,7 +116,7 @@ span.hashtag {
 	color: var(--accent-color);
 }
 
-.post .quote-post {
+.item .quote-item {
 	padding: 15px 20px 15px 20px;
 	border: 1px solid var(--border-color);
 	border-radius: 10px;
@@ -125,20 +125,20 @@ span.hashtag {
 
 
 /** --------------------- *
-     Annotation post elements
+     Annotation item elements
   * --------------------- */
-.post-annotations {
+.item-annotations {
     background: var(--accent-color);
     margin-top: 10px;
     color: white;
     border-radius: 15px;
 }
 
-.post-annotation {
+.item-annotation {
     padding: 15px;
 }
 
-.post-annotation > .annotation-label {
+.item-annotation > .annotation-label {
     display: inline-block;
     text-align: right;
     width: 150px;
@@ -148,23 +148,23 @@ span.hashtag {
     word-break: break-all;
 }
 
-.post-annotation > .annotation-label, .post-annotation a {
+.item-annotation > .annotation-label, .item-annotation a {
 	color: white;
 }
 
-.post-annotation.checkbox > .post-annotation-options {
+.item-annotation.checkbox > .item-annotation-options {
     display: inline-block;
 }
 
-.post-annotation-options {
+.item-annotation-options {
     display: inline-block;
     vertical-align: top;
 }
 
-.post-annotation-options > input {
+.item-annotation-options > input {
     display: inline-block;
 }
 
-textarea.post-annotation-input {
+textarea.item-annotation-input {
 	width: 60%;
 }

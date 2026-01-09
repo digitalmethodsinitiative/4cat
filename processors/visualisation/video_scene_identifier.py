@@ -188,17 +188,17 @@ class VideoSceneDetector(BasicProcessor):
 		processed_videos = 0
 		video_metadata = None
 		collected_scenes = {}
-		for path in self.iterate_archive_contents(self.source_file, immediately_delete=False):
+		for original_video in self.source_dataset.iterate_items(immediately_delete=False):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 
 			# Check for 4CAT's metadata JSON and copy it
-			if path.name == ".metadata.json":
+			if original_video.file.name == ".metadata.json":
 				# Keep it and move on
-				with open(path) as file:
+				with open(original_video.file) as file:
 					video_metadata = json.load(file)
 				continue
-			elif path.name == "video_archive":
+			elif original_video.file.name == "video_archive":
 				# yt-dlp file
 				continue
 
@@ -207,9 +207,9 @@ class VideoSceneDetector(BasicProcessor):
 
 			# Open video
 			try:
-				video = open_video(str(path))
+				video = open_video(str(original_video.file))
 			except VideoOpenFailure as e:
-				self.dataset.update_status(f'Skipping video; Unable to open {str(path.name)}: {str(e)}')
+				self.dataset.update_status(f'Skipping video; Unable to open {video.file.name}: {e}')
 				continue
 
 			total_frames = video.duration.get_frames()
@@ -221,11 +221,11 @@ class VideoSceneDetector(BasicProcessor):
 			num_scenes_detected = len(scene_list)
 
 			# Collect scene information for mapping to metadata
-			collected_scenes[path.name] = []
+			collected_scenes[original_video.file.name] = []
 			if num_scenes_detected == 0:
 				# No scenes detected; record as one scene
 				# TODO: any reason to make this optional?
-				collected_scenes[path.name].append({
+				collected_scenes[original_video.file.name].append({
 					'start_frame': video.base_timecode.get_frames(),
 					'start_time': video.base_timecode.get_timecode(),
 					'start_fps': video.base_timecode.get_framerate(),
@@ -239,7 +239,7 @@ class VideoSceneDetector(BasicProcessor):
 				})
 
 			for i, scene in enumerate(scene_list):
-				collected_scenes[path.name].append({
+				collected_scenes[original_video.file.name].append({
 					'start_frame': scene[0].get_frames(),
 					'start_time': scene[0].get_timecode(),
 					'start_fps': scene[0].get_framerate(),

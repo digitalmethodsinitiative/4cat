@@ -25,7 +25,7 @@
 	background: none;
 }
 
-.posts .post {
+.items .item {
 	font-family: "Open Sans", Arial;
 	display: block;
 	position: relative;
@@ -34,12 +34,12 @@
 	margin: 0 auto;
 }
 
-.posts .post .post-container.new-group {
+.items .item .item-container.new-group {
 	margin-top: 6px;
 }
 
 /* Profile picture  */
-.posts .post .profile-picture-container {
+.items .item .profile-picture-container {
 	display: inline-block;
 	width: 60px;
 	vertical-align: top;
@@ -62,8 +62,8 @@
     height: 100%;
 }
 
-/* Post content */
-.posts .post .post-content {
+/* item content */
+.items .item .item-content {
 	display: inline-block;
 	max-width: 80%;
 	list-style-type: none;
@@ -74,11 +74,11 @@
 	overflow: hidden;
 }
 
-.posts .post .post-content.new-group {
+.items .item .item-content.new-group {
 	border-radius: 0px 20px 20px 5px;
 }
 
-.posts .post h1 {
+.items .item h1 {
 	background-color: transparent;
 	color: black;
 	text-align: left;
@@ -99,17 +99,17 @@
 	text-decoration: none;
 }
 
-.posts .post .body {
+.items .item .body {
 	display: inline;
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
 
-.posts .post .body a {
+.items .item .body a {
 	color: #2984cd;
 }
 
-.posts .post .reply_to {
+.items .item .reply_to {
 	height: 20px;
 	padding: 5px;
 	margin-bottom: 2px;
@@ -132,11 +132,11 @@
 	width: 100%;
 }
 
-.post-content.new-group .media-container {
+.item-content.new-group .media-container {
 	margin-top: 10px;
 }
 
-.post-content.new-group .media-container img {
+.item-content.new-group .media-container img {
 	margin-top: -155px;
 	border-radius: 0px;
 }
@@ -166,7 +166,7 @@
 	font-size: 14px;
 }
 
-/* TOD on the bottom of the post */
+/* TOD on the bottom of the item */
 .metrics {
 	display: inline-block;
 	padding-left: 10px;
@@ -185,7 +185,7 @@
 	color: #168acd;
 }
 
-/* Day indicator between posts  */
+/* Day indicator between items  */
 .day {
 	margin: 15px;
 	text-align: center;
@@ -201,20 +201,20 @@
 }
 
 /** --------------------- *
-     Annotation post elements
+     Annotation item elements
   * --------------------- */
-.post-annotations {
+.item-annotations {
 	background-image: linear-gradient(#389ed5, #59c8e2);
     color: white;
     border-radius: 5px 20px 20px 5px;
     margin-left: 63px;
 }
 
-.post-annotation {
+.item-annotation {
     padding: 15px;
 }
 
-.post-annotation > .annotation-label {
+.item-annotation > .annotation-label {
     display: inline-block;
     vertical-align: middle;
     text-align: right;
@@ -224,15 +224,15 @@
     overflow-x: hidden;
 }
 
-.post-annotation.checkbox > .post-annotation-options {
+.item-annotation.checkbox > .item-annotation-options {
     display: inline-block;
 }
 
-.post-annotation-options {
+.item-annotation-options {
     display: inline-block;
     vertical-align: top;
 }
 
-.post-annotation-options > input {
+.item-annotation-options > input {
     display: inline-block;
 }
