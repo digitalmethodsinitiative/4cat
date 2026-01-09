@@ -75,6 +75,7 @@ class PromptCompassRunner(ProcessorPreset):
         """
         # get cached local models
         models = config.get("llm.available_models", {})
+        models = {} if models == [] else models
         models.update({k: v for k, v in LLMAdapter.get_models(config).items() if k not in ("none", "custom")})
 
         models = {k: v for k, v in models.items() if "model_card" in v}
