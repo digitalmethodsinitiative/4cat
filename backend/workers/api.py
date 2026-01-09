@@ -3,6 +3,8 @@ import time
 import json
 
 from backend.lib.worker import BasicWorker
+from common.lib.job import Job
+from common.lib.exceptions import JobNotFoundException
 
 
 class InternalAPI(BasicWorker):
@@ -169,11 +171,13 @@ class InternalAPI(BasicWorker):
 		if request == "cancel-job":
 			# cancel a running job
 			payload = payload.get("payload", {})
-			remote_id = payload.get("remote_id")
-			jobtype = payload.get("jobtype")
 			level = payload.get("level", BasicWorker.INTERRUPT_RETRY)
+			try:
+				job = Job.get_by_remote_ID(jobtype=payload.get("jobtype"), remote_id=payload.get("remote_id"), database=self.db)
+			except JobNotFoundException:
+				return {"error": "Job not found"}
 
-			self.manager.request_interrupt(remote_id=remote_id, jobtype=jobtype, interrupt_level=level)
+			self.manager.request_interrupt(job=job, interrupt_level=level)
 			return "OK"
 
 		elif request == "workers":

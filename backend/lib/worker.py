@@ -304,7 +304,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         pass
 
     @classmethod
-    def get_queue_id(cls, parameters=None):
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
         """
         Get queue ID for this worker
 
@@ -313,8 +313,11 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         type (so all workers of the same type are in the same queue) but this
         can be overridden by subclasses.
 
-        :param dict parameters:  Job or dataset parameters that may be used to
-          determine the appropriate queue ID
+        :param str remote_id:  Item reference for the job, e.g. a dataset key
+          or URL
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset object; if the worker does not work
+          with a dataset (e.g. if it is a processor) this is `None`.
 
 	    :return str:  Queue ID
 	    """

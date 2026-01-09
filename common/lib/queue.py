@@ -132,7 +132,7 @@ class JobQueue:
 
 		return int(count["count"])
 
-	def add_job(self, jobtype, details=None, remote_id=None, claim_after=0, interval=0, queue_id=None):
+	def add_job(self, jobtype, details=None, remote_id=None, dataset=None, claim_after=0, interval=0, queue_id=None):
 		"""
 		Add a new job to the queue
 
@@ -145,6 +145,8 @@ class JobQueue:
 		:param remote_id:  ID of object to work on. For example, a post or
 		  thread ID, or a dataset key. If a DataSet object is passed, the
 		  DataSet key is used
+		:param dataset:  DataSet object to work on. If passed, `remote_id` is
+		  set to the dataset's `key` attribute.
 		:param claim_after:  Absolute timestamp after which job may be claimed
 		:param queue_id:  ID of the queue the job is in. When `None`, set to
 		  job type ID. If empty, and a `BasicWorker` is passed as `jobtype`
@@ -158,23 +160,21 @@ class JobQueue:
 		  (which is required to be unique, so no new job with those parameters
 		  could be queued, and the old one is just as valid).
 		"""
+		if remote_id is None and dataset is None:
+			raise ValueError("You must specify either remote_id or dataset for add_job().")
+
 		# we cannot import BasicWorker or DataSet here for a direct class check
 		# due to circular imports, so use this heuristic instead
 		have_worker = type(jobtype) is not str and hasattr(jobtype, "type")
-		have_dataset = type(remote_id) is not str and hasattr(remote_id, "key")
 
-		if not queue_id and have_worker and have_dataset:
-			queue_id = jobtype.get_queue_id(remote_id.parameters)
-		elif not queue_id:
-			queue_id = jobtype
+		if dataset:
+			remote_id = dataset.key
 
 		if have_worker:
+			queue_id = jobtype.get_queue_id(remote_id=remote_id, details=details, dataset=dataset)
 			jobtype = jobtype.type
-
-		if have_dataset:
-			remote_id = remote_id.key
-		elif not remote_id:
-			remote_id = ""
+		else:
+			queue_id = jobtype
 			
 		data = {
 			"jobtype": jobtype,
