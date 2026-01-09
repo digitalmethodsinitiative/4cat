@@ -163,11 +163,19 @@ class JobQueue:
 		have_worker = type(jobtype) is not str and hasattr(jobtype, "type")
 		have_dataset = type(remote_id) is not str and hasattr(remote_id, "key")
 
-		if not queue_id and have_worker and have_dataset:
-			queue_id = jobtype.get_queue_id(remote_id.parameters)
-		elif not queue_id:
-			queue_id = jobtype
+		# Determine queue_id before extracting values from objects
+		if not queue_id:
+			if have_worker and have_dataset:
+				# Use worker's custom queue ID logic with dataset parameters
+				queue_id = jobtype.get_queue_id(remote_id.parameters)
+			elif have_worker:
+				# Use worker's type as queue ID (same as default behavior)
+				queue_id = jobtype.type
+			else:
+				# jobtype is already a string, use it directly
+				queue_id = jobtype
 
+		# Extract actual values from worker and dataset objects
 		if have_worker:
 			jobtype = jobtype.type
 
