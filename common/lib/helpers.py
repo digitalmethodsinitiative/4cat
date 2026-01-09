@@ -1253,6 +1253,56 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
 
     return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
+def normalize_url_encoding(url):
+    """
+    Normalize URL encoding for display and linking
+
+    Takes a URL that may or may not already be percent-encoded and returns
+    a properly encoded version suitable for both display and use as a link.
+    Only query parameters and fragments are encoded; the scheme, domain, and
+    path remain human-readable.
+
+    Examples:
+        - "https://example.com/search?q=hello world" → "https://example.com/search?q=hello%20world"
+        - "https%3A//example.com/search%3Fq%3Dhello" → "https://example.com/search?q=hello"
+        - "https://example.com/search?q=hello%20world" → "https://example.com/search?q=hello%20world"
+
+    :param str url: URL to normalize (may be encoded or not)
+    :return str: Properly encoded URL, or empty string if invalid
+    """
+    from urllib.parse import unquote, urlencode, parse_qs
+
+    if not url:
+        return ""
+
+    try:
+        # Unquote the entire URL first to normalize
+        decoded_url = unquote(url)
+        # Parse the URL into components
+        parsed = urlparse(decoded_url)
+
+        # Re-encode the query string properly
+        if parsed.query:
+            query_params = parse_qs(parsed.query, keep_blank_values=True)
+            # Flatten single-value lists and encode
+            encoded_query = urlencode({k: v[0] if len(v) == 1 else v for k, v in query_params.items()})
+            # Reconstruct URL with encoded query
+            result = urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                encoded_query,
+                parsed.fragment
+            ))
+        else:
+            result = decoded_url
+
+        return result
+    except (ValueError, AttributeError):
+        # If URL parsing fails, return the original URL
+        return url
+
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
         Determine filenames for saved files

@@ -8,7 +8,7 @@ body {
 	background-color: white;
 }
 
-.posts .post {
+.items .item {
 	position: relative;
 	background-color: white;
 	max-width: 620px;
@@ -17,7 +17,7 @@ body {
 	min-height: 50px;
 }
 
-.posts .post header {
+.items .item header {
 	display: inline-block;
 	line-height: 1.7em;
 	margin-bottom: 5px;
@@ -25,55 +25,55 @@ body {
 	color: rgb(104, 119, 130);
 }
 
-.posts .post header .post_id {
+.items .item header .item_id {
 	display: none;
 }
 
-.posts .post header .author {
+.items .item header .author {
 	color: black;
 }
 
-.posts .post header .author_picture {
+.items .item header .author_picture {
 	float: left;
 	margin-right: 15px;
 }
 
-.posts .post header .author_picture img {
+.items .item header .author_picture img {
 	border-radius: 100px;
 	width: 50px;
 }
 
-.posts .post header .author_picture:after {
+.items .item header .author_picture:after {
 	display: none;
 }
 
-.posts .post article {
+.items .item article {
 	margin: 0;
 	padding: 0;
 }
 
-.posts .post.op {
+.items .item.op {
 	background-color: white;
 	color: black;
 }
 
-.posts .post .post-content {
+.items .item .item-content {
 	display: inline-block;
 }
 
-.posts .post .post-image {
+.items .item .item-image {
 	margin-bottom: 10px;
 }
 
-.posts .post .post-image img {
+.items .item .item-image img {
 	border-radius: 10px;
 }
 
-.posts .external-url {
+.items .external-url {
 	color: rgb(104, 119, 130);
 }
 
-.posts .post.op .post-annotations, .posts .post .post-annotations {
+.items .item.op .item-annotations, .items .item .item-annotations {
 	border-radius: 10px;
 	background-color: rgb(241, 249, 255);
 	color: #474747;

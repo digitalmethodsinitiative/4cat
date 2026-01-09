@@ -85,25 +85,37 @@ class DatasetItem(dict):
     :todo: consider just-in-time mapping by only storing the original and
     calling the mapper only when the object is accessed as a dict
     """
-    def __init__(self, mapper, original, mapped_object, *args, **kwargs):
+    def __init__(self, mapper, original, mapped_object, data_file, *args, **kwargs):
         """
         DatasetItem init
 
         :param callable mapper:  Mapper for this item. Currently unused, could
-        be used for above-mentioned just-in-time mapping.
+          be used for above-mentioned just-in-time mapping.
         :param dict original:  Original item, e.g. from the csv or ndjson
         :param MappedItem mapped_object:  Mapped item, before resolving any
-        potential missing data
+          potential missing data
+        :param Path data_file:  Path to the file this item represents, if any,
+          else `None`
         """
         super().__init__(*args, **kwargs)
 
         self._mapper = mapper
         self._original = original
         self._mapped_object = mapped_object
+        self._file = data_file
 
         if hasattr(mapped_object, "get_missing_fields"):
             self.missing_fields = mapped_object.get_missing_fields()
             self["missing_fields"] = ", ".join(self.missing_fields)
+
+    @property
+    def file(self):
+        """
+        Return file path object, if relevant
+
+        :return Path:
+        """
+        return self._file
 
     @property
     def original(self):

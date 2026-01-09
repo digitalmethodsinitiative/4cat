@@ -105,22 +105,22 @@ class VideoFrames(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for i, path in enumerate(self.iterate_archive_contents(self.source_file, staging_area)):
+		for i, video in enumerate(self.dataset.items()):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
 			# Check for 4CAT's metadata JSON and copy it
-			if path.name == '.metadata.json':
-				shutil.copy(path, output_directory)
+			if video.file.name == '.metadata.json':
+				shutil.copy(video.file, output_directory)
 				continue
 
-			vid_name = path.stem
+			vid_name = video.file.stem
 			video_dir = output_directory.joinpath(vid_name)
 			video_dir.mkdir(exist_ok=True)
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", oslex.quote(str(path))
+				"-i", oslex.quote(str(video.file))
 			]
 
 			if frame_interval != 0:
@@ -166,8 +166,5 @@ class VideoFrames(BasicProcessor):
 
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
-
-		# Remove staging area
-		shutil.rmtree(staging_area)
 
 		self.dataset.finish(processed_videos)

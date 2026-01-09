@@ -25,7 +25,7 @@ body {
 	font-size: 10pt;
 }
 
-.posts li.post {
+.items li.item {
 	display: table;
 	margin-left: 10px;
 	background-color: #f0e0d6;
@@ -38,7 +38,7 @@ body {
 	padding: 10px;
 }
 
-.posts li.post.op {
+.items li.item.op {
 	background-color: #ffe;
 	color: maroon;
 	border: none;
@@ -46,54 +46,54 @@ body {
 	border-top: none;
 }
 
-.posts li.post header {
+.items li.item header {
 	border: none;
 }
 
-.posts li.post.op header {
+.items li.item.op header {
 	font-weight: bold;
 }
 
-.posts li.post .author {
+.items li.item .author {
 	font-weight: 700;
 }
 
-.posts li.post .subject {
+.items li.item .subject {
 	color: #cc1105;
 	font-weight: 700;
 }
 
-.posts li.post .deleted {
+.items li.item .deleted {
 	
 }
 
-.posts li.post .post-content {
+.items li.item .item-content {
 	display: block;
 	margin: 15px;
 	margin-left: 35px;
 }
 
-.posts li.post .quote, .posts li.post .quote a {
+.items li.item .quote, .items li.item .quote a {
 	color: navy;
 	text-decoration: underline;
 }
-.posts li.post .greentext {
+.items li.item .greentext {
 	color: #789922;
 }
 
-.posts li.post.op .greentext {
+.items li.item.op .greentext {
 	color: #63b563;
 }
 
-.posts li.post .post-annotations {
+.items li.item .item-annotations {
 	background-color: #e2c6b5;
 }
 
-.posts li.post.op .post-annotations {
+.items li.item.op .item-annotations {
 	background-color: #f0e0d6;
 }
 
-.post-image {
+.item-image {
     background: #FFF;
     float: left;
     color: #000;
@@ -102,6 +102,6 @@ body {
     margin-right: 1em;
 }
 
-.post-image img {
+.item-image img {
     height: 100%;
 }

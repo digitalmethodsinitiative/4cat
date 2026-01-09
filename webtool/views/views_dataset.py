@@ -4,10 +4,11 @@
 import json
 import csv
 import io
-
+import zipfile
 import json_stream
-from flask import Blueprint, current_app, render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
-    url_for, stream_with_context, g
+from pathlib import Path
+from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, Response, flash,
+                   get_flashed_messages, url_for, stream_with_context, g)
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import Pagination, error, setting_required
@@ -372,6 +373,67 @@ def preview_items(key):
             message="No preview is available for this file.",
         )
 
+@component.route(
+    "/result/<string:key>/archive/<string:filename>"
+)
+def show_archive_file(key: str, filename: str):
+    """
+    Return a file from within a zip archive.
+    :param str, key:                The dataset key
+    :param str, filename:           The path to the file within the archive
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    if not filename:
+        return error(404, error="No filename given.")
+
+    # Locate the archive file
+    archive_path = (
+        Path(g.config.get("PATH_DATA")) / dataset.get_results_path()
+    )
+
+    if not archive_path.is_file():
+        return error(404, error="Archive not found.")
+
+    try:
+
+        with zipfile.ZipFile(archive_path, "r") as zip_file:
+            # Check if file exists in archive
+            if filename not in zip_file.namelist():
+                return error(404, error="File not found in archive.")
+
+            # Read file from archive into memory
+            file_data = zip_file.read(filename)
+
+            # Determine mime type based on extension
+            import mimetypes
+
+            mime_type, _ = mimetypes.guess_type(filename)
+            if mime_type is None:
+                mime_type = "application/octet-stream"
+
+            # Return as a response with appropriate headers
+            return Response(
+                file_data,
+                mimetype=mime_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{Path(filename).name}"',
+                    "Content-Length": str(len(file_data)),
+                },
+            )
+
+    except zipfile.BadZipFile:
+        return error(400, error="Invalid zip archive.")
+    except KeyError:
+        return error(404, error="File not found in archive.")
+    except Exception as e:
+        return error(500, error=f"Error reading archive: {str(e)}")
 
 """
 Individual result pages
