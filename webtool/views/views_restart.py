@@ -96,7 +96,7 @@ def trigger_restart():
 
         # from here on, the back-end takes over
         details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
-        g.queue.add_job("restart-4cat", details, mode)
+        g.queue.add_job("restart-4cat", details=details, remote_id=mode)
         flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
 
     version_notes = []

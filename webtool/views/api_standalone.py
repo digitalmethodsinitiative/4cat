@@ -154,7 +154,7 @@ def get_standalone_processors():
 @login_required
 @setting_required("privileges.can_run_processors")
 @current_app.openapi.endpoint("standalone")
-def process_standalone(processor):
+def process_standalone(processor_type):
 	"""
 	Run a standalone processor
 
@@ -165,7 +165,7 @@ def process_standalone(processor):
 
 	Requires authentication.
 
-	:param str processor:  ID of the processor to run on incoming data
+	:param str processor_type:  ID of the processor to run on incoming data
 
 	:request-body object data:  Data to process, a JSON-formatted list of
 	objects with each object having at least they keys `post_id`,
@@ -199,8 +199,8 @@ def process_standalone(processor):
 	"""
 	processors = get_standalone_processors().get_json()
 
-	if processor not in processors:
-		return error(402, error="Processor '%s' is not available" % processor)
+	if processor_type not in processors:
+		return error(402, error="Processor '%s' is not available" % processor_type)
 
 	if not request.is_json:
 		return error(402, error="This API endpoint only accepts JSON-formatted data as input")
@@ -227,7 +227,7 @@ def process_standalone(processor):
 	temp_dataset = DataSet(
 		extension="csv",
 		type="standalone",
-		parameters={"next": [processor]},
+		parameters={"next": [processor_type]},
 		db=g.db,
 		owner=current_user.get_id(),
 		is_private=True,
@@ -252,11 +252,11 @@ def process_standalone(processor):
 			writer.writerow({field: row[field] for field in required})
 
 	# queue the postprocessor
-	metadata = processors[processor]
-	processed = DataSet(extension=metadata["extension"], type=processor, parent=temp_dataset.key, db=g.db, modules=g.modules)
+	metadata = processors[processor_type]
+	processed = DataSet(extension=metadata["extension"], type=processor_type, parent=temp_dataset.key, db=g.db, modules=g.modules)
 
-	job = g.queue.add_job(processor, {}, processed.key)
-	place_in_queue = g.queue.get_place_in_queue(job)
+	job = g.queue.add_job(worker_or_type=g.modules.processors[processor_type], details={}, dataset=processed)
+	place_in_queue = job.get_place_in_queue()
 	if place_in_queue > 5:
 		job.finish()
 		return error(code=503, error="Your request could not be handled as there are currently %i other jobs of this type in the queue. Please try again later." % place_in_queue)
@@ -270,7 +270,7 @@ def process_standalone(processor):
 			job.finish()
 			return error(code=503, error="The server is currently too busy to handle your request. Please try again later.")
 
-		if g.queue.get_place_in_queue(job) != 0:
+		if job.get_place_in_queue() != 0:
 			time.sleep(2)
 			continue
 		else:
@@ -279,7 +279,7 @@ def process_standalone(processor):
 	# job currently being processed, wait for it to finish
 	while True:
 		try:
-			job = Job.get_by_remote_ID(job.data["remote_id"], g.db, processor)
+			job = Job.get_by_remote_ID(job.data["remote_id"], g.db, processor_type)
 		except JobNotFoundException:
 			break
 
