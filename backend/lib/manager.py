@@ -8,6 +8,9 @@ import time
 from backend.lib.proxied_requests import DelegatedRequestHandler
 from common.lib.exceptions import JobClaimedException
 
+# for now, this is hardcoded - could be dynamic or depending on the queue ID in
+# the future
+MAX_JOBS_PER_QUEUE = 1
 
 class WorkerManager:
 	"""
@@ -113,7 +116,7 @@ class WorkerManager:
 
 				# if a job is of a known type, and that job type has open
 				# worker slots, start a new worker to run it
-				if len(self.worker_pool[queue_id]) < 1:
+				if len(self.worker_pool[queue_id]) < MAX_JOBS_PER_QUEUE:
 					try:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=self.modules)
