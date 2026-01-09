@@ -46,9 +46,7 @@ for (const a in annotation_fields) {
 <!-- CSS: Use generic or data source-specific template. -->
 <!-- Use a nested class so the style is only applied to items. -->
 <style type="text/css">
-.explorer-content-container {
-	{{ datasource|explorer_css|safe }}
-}
+{{ datasource|explorer_css|safe }}
 </style>
 
 <!-- Flags for chan items -->
