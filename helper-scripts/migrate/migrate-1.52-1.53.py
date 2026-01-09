@@ -26,7 +26,7 @@ db = Database(
     appname="4cat-migrate",
 )
 
-# Add new admin privilege to manage extensions
+# Add queue_id column to jobs table
 print("  Checking for `queue_id` column in jobs table...")
 has_column = db.fetchone(
     "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'queue_id'"
