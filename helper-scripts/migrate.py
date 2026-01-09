@@ -183,6 +183,7 @@ cli.add_argument("--release", "-l", default=False, action="store_true", help="Pu
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
+cli.add_argument("--no-pip", "-p", default=False, action="store_true", help="Do not update dependencies with pip.")
 cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
 cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate ('both', 'backend', 'frontend'). Skips check for if 4CAT is running when set to 'frontend'. Also used by extensions w/ fourcat_install.py")
@@ -251,7 +252,7 @@ logger.info("\nWARNING: Migration can take quite a while. 4CAT will not be avail
 logger.info("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
 
 if not args.yes:
-	print("  ...do you want to continue [y/n]? ", end="")
+	print("  ...do you want to continue [y/N]? ", end="")
 	if input("").lower() != "y":
 		exit(0)
 
@@ -434,25 +435,28 @@ if config and config.get("USING_DOCKER"):
 # ---------------------------------------------
 #                    Run pip
 # ---------------------------------------------
-def log_pip_output(logger, output):
-	for line in output.decode("utf-8").split("\n"):
-		if line.startswith("Requirement already satisfied:"):
-			# eliminate some noise in the output
-			continue
-		logger.info("  " + line)
+if args.no_pip:
+	print("- Skipping dependencie update with pip")
+else:
+	def log_pip_output(logger, output):
+		for line in output.decode("utf-8").split("\n"):
+			if line.startswith("Requirement already satisfied:"):
+				# eliminate some noise in the output
+				continue
+			logger.info("  " + line)
 
-logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
-logger.info("  (this could take a moment)...")
-try:
-	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
-								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
-	log_pip_output(logger, pip.stdout)
-	pip_ran = True
-except subprocess.CalledProcessError as e:
-	log_pip_output(logger, e.output)
-	logger.info(f"\n Error running pip: {e}")
-	exit(1)
-logger.info("  ...done")
+	logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
+	logger.info("  (this could take a moment)...")
+	try:
+		pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
+									stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
+		log_pip_output(logger, pip.stdout)
+		pip_ran = True
+	except subprocess.CalledProcessError as e:
+		log_pip_output(logger, e.output)
+		logger.info(f"\n Error running pip: {e}")
+		exit(1)
+	logger.info("  ...done")
 
 # ---------------------------------------------
 #       Run individual migration scripts
