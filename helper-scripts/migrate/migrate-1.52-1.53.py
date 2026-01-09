@@ -37,6 +37,8 @@ if has_column["num"] > 0:
 else:
     print("    Adding column 'queue_id' to jobs table...")
     db.execute("ALTER TABLE jobs ADD queue_id TEXT DEFAULT ''")
+    print("    Giving all existing jobs a queue ID...")
+    db.execute("UPDATE jobs SET queue_id = jobtype WHERE queue_id = ''")
 
 print("  Creating `jobs_queue` index on jobs table...")
 db.execute("CREATE INDEX IF NOT EXISTS job_queue ON jobs (queue_id)")
