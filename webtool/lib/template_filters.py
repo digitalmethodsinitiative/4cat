@@ -164,6 +164,29 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
 
     return content
 
+
+@current_app.template_filter("add_base_url")
+def _jinja2_filter_add_base_url(content, base_url):
+    """
+    Prepends a base url to relative HTML links (href and src).
+    Only modifies URLs that start with / and don't already have a scheme.
+    """
+    try:
+        content = str(content)
+    except ValueError:
+        return content
+
+    base_url = base_url.rstrip('/')
+
+    # Replace relative src/href attributes with double quotes
+    # Matches src="/..." or href="/..." but not src="http..." or href="//..."
+    content = re.sub(r'(\s+(?:src|href)=")(/[^/])', rf'\1{base_url}\2', content)
+
+    # Single quotes
+    content = re.sub(r"(\s+(?:src|href)=')(/[^/])", rf"\1{base_url}\2", content)
+
+    return content
+
 @current_app.template_filter('markdown',)
 def _jinja2_filter_markdown(text, trim_container=False):
     return parse_markdown(text, trim_container)
@@ -229,13 +252,13 @@ def _jinja2_filter_ellipsiate(*args, **kwargs):
 @current_app.template_filter('chan_image')
 def _jinja2_filter_chan_image(tim, ext, board):
 
-	plebs_boards = ["adv","f","hr","mlpol","mo","o","pol","s4s","sp","tg","trv","tv","x"]
+    plebs_boards = ["adv", "f", "hr", "mlpol", "mo", "o", "pol", "s4s", "sp", "tg", "trv", "tv", "x"]
 
-	tim = str(tim)
-	if board in plebs_boards:
-		return f"https://i.4pcdn.org/{board}/{tim}s{ext}"
-	else:
-		return f"https://desu-usergeneratedcontent.xyz/{board}/image/{tim[:4]}/{tim[4:6]}/{tim}{ext}"
+    tim = str(tim)
+    if board in plebs_boards:
+        return f"https://i.4pcdn.org/{board}/{tim}s{ext}"
+    else:
+        return f"https://desu-usergeneratedcontent.xyz/{board}/image/{tim[:4]}/{tim[4:6]}/{tim}{ext}"
 
 @current_app.template_filter('social_mediafy')
 def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
