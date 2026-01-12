@@ -38,6 +38,24 @@ class LLMPrompter(BasicProcessor):
     ]
 
     @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Get Queue ID
+
+        Assigns a job for this worker to a different queue depending on whether
+        it is interfacing with a 'local' LLM server or a 3d party API.
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return:
+        """
+        if not dataset:
+            return cls.type
+
+        return f"{cls.type}-{dataset.parameters.get('api_or_local', 'api')}"
+
+    @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         # Check if 4CAT wide LLM server is available
         if config.get("llm.access", False) and config.get("llm.server", ""):
