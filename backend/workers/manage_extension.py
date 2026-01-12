@@ -81,7 +81,7 @@ class ExtensionManipulator(BasicWorker):
                         outfile.write("Telling 4CAT to upgrade via job queue...\n")
                     
                     # add job to restart 4CAT
-                    self.queue.add_job("restart-4cat", {}, "upgrade")
+                    self.queue.add_job(worker_or_type="restart-4cat", details={}, remote_id="upgrade")
                 
         elif task == "uninstall":
             self.uninstall_extension(extension_reference)
