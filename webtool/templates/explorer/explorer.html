@@ -6,22 +6,21 @@
 {% block body %}
 
 <!-- standard CSS for item annotations -->
-<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer/generic-annotation.css')}}">
+<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer-annotation-generic.css')}}">
 
 <!-- Custom JavaScript for Explorer-specific functions -->
 <script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
-
 
 <!-- Load some variables for which we need Jinja2 -->
 <script type="text/javascript">
 
 // Annotation fields
-var annotation_fields = {{ annotation_fields | tojson | safe }}
+let annotation_fields = {{ annotation_fields | tojson | safe }}
 
 // We're getting the dataset column names to make sure that
 // new annotation fields cannot overwrite these.
-var original_columns = {{ dataset.get_columns() | safe }}
-for (a in annotation_fields) {
+let original_columns = {{ dataset.get_columns() | safe }}
+for (const a in annotation_fields) {
 	let annotation_label = annotation_fields[a]["label"]
 	if (original_columns.includes(annotation_label)) {
 		i = original_columns.indexOf(annotation_label)
@@ -47,9 +46,7 @@ for (a in annotation_fields) {
 <!-- CSS: Use generic or data source-specific template. -->
 <!-- Use a nested class so the style is only applied to items. -->
 <style type="text/css">
-.explorer-content-container {
-	{{ items_css | safe }}
-}
+{{ datasource|explorer_css|safe }}
 </style>
 
 <!-- Flags for chan items -->

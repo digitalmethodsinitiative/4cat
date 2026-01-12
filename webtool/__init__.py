@@ -4,6 +4,7 @@ from collections import namedtuple
 import sys
 import os
 
+from jinja2 import ChoiceLoader, FileSystemLoader, FunctionLoader
 from functools import partial
 from pathlib import Path
 
@@ -207,11 +208,38 @@ with app.app_context():
         g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request)
         g.modules = current_app.fourcat_modules
         g.request = request
-
         current_user.with_config(g.config)
 
-    # import custom jinja2 template filters
+    def get_datasource_explorer_templates(name):
+        """ Load Explorer templates from datasources """
+        if not name.startswith("explorer-template/") or "-explorer" not in name:
+            return None
 
+        datasources = current_app.fourcat_modules.datasources
+        if not datasources:
+            return None
+
+        filename = name.split("/", 1)[1]
+        datasource = filename.split("-")[0]
+        datasource_templates = datasources.get(datasource, {}).get("explorer-templates", {})
+        if datasource_templates:
+            if datasource_templates.get("css") and datasource_templates["css"].name == filename:
+                with open(datasource_templates["css"], "r", encoding="utf-8") as f:
+                    return f.read()
+            if datasource_templates.get("html") and datasource_templates["html"].name == filename:
+                with open(datasource_templates["html"], "r", encoding="utf-8") as f:
+                    return f.read()
+
+        return None
+
+    template_paths = [
+        os.path.join(app.root_path, "templates"),
+    ]
+    app.jinja_loader = ChoiceLoader(
+        [FileSystemLoader(template_paths), FunctionLoader(get_datasource_explorer_templates)]
+    )
+
+    # import custom jinja2 template filters
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402
 
