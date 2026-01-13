@@ -174,7 +174,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # we may create temporary files with the processor; anything in here
         # will be deleted after the processor ends (or crashes!). dataset
         # objects will have their cleanup methods called
-        self.for_cleanup = [self.dataset, self.source_dataset]
+        self.for_cleanup = [self.dataset]
+        if self.source_dataset is not None:
+            # Add source dataset to cleanup list to remove disposable files
+            self.for_cleanup.append(self.source_dataset)
 
         # get parameters
         # if possible, fill defaults where parameters are not provided
