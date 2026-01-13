@@ -77,7 +77,11 @@ class SearchPinterest(Search):
         if "imageSpec_orig" in post:
             image_url = post["imageSpec_orig"]["url"]
         else:
-            image_url = post["images"]["orig"]["url"]
+            # pre 2026-01
+            if "orig" in post["images"]:
+                image_url = post["images"]["orig"]["url"]
+            else:
+                image_url = post["images"]["url"]
 
         return MappedItem({
             "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
