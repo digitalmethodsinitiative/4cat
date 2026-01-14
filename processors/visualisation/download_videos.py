@@ -51,6 +51,9 @@ class VideoDownloaderPlus(BasicProcessor):
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 
+    # Some datasets have known mixed media types; do not stop due to many "Not a video" errors
+    mixed_media_dataset_types = ["instagram-search"]
+
     config = {
         "video-downloader.ffmpeg_path": {
             "type": UserInput.OPTION_TEXT,
@@ -95,6 +98,13 @@ class VideoDownloaderPlus(BasicProcessor):
             "help": "Allow multiple videos per item",
             "tooltip": "Allow users to choose to download videos from links that refer to multiple videos. For "
                        "example, for a given link to a YouTube channel all videos for that channel are downloaded."
+        },
+        # Allow overriding error limit
+        "video-downloader.ignore-errors": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Allow option to ignore \"Not a video\" limit",
+            "tooltip": "If links are not videos, continue attempts. Useful for mixed datasets (e.g. Instagram \"media_urls\" where many are images)."
         },
     }
 
@@ -142,7 +152,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 "default": True,
                 "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
                         "separately"
-            },
+            }
         }
 
         # Update the amount max and help from config
@@ -178,6 +188,19 @@ class VideoDownloaderPlus(BasicProcessor):
             priority = ["video_url", "video_link", "video", "media_url", "media_link", "media", "final_url", "url", "link", "body"]
             columns.sort(key=lambda col: next((i for i, p in enumerate(priority) if p in col.lower()), len(priority)))
             options["columns"]["default"] = [columns.pop(0)]
+
+        # Allow overriding error limit
+        if parent_dataset and parent_dataset.type in cls.mixed_media_dataset_types: 
+            # Override is automatic
+            pass
+        elif config.get("video-downloader.ignore-errors", False):
+            # Allow user to choose to ignore "Not a video" errors
+            options["ignore_not_video"] = {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Ignore \"Not a video\" limit",
+                "default": False,
+                "tooltip": "If blocked or links are not videos, continue attempts. Useful for mixed datasets (e.g. Instagram \"media_urls\" where many are images)."
+            }
 
         # these two options are likely to be unwanted on instances with many
         # users, so they are behind an admin config options
@@ -337,14 +360,21 @@ class VideoDownloaderPlus(BasicProcessor):
                 ydl_opts["format"] += "/best/bestvideo+bestaudio"
 
             self.dataset.log(f"YT-DLP format filter: {ydl_opts['format']}")
+        
+        # Ignore not a video limit
+        ignore_not_video = self.source_dataset.type in self.mixed_media_dataset_types or self.parameters.get("ignore_not_video", False)
 
         # Loop through video URLs and download
         self.downloaded_videos = 0
         failed_downloads = 0
         copied_videos = 0
         consecutive_errors = 0
-        not_a_video = 0
+        not_a_video = 0  # Consecutive counter for breaking early
+        total_not_a_video = 0  # Total count of non-video URLs
+        skipped_urls = 0  # URLs skipped (already failed before, known channels, etc.)
+        processed_urls = 0  # URLs actually attempted (download or copy)
         last_domains = []
+        total_urls = len(urls)
         self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
         yt_dlp_archive_map = {}
         for url in urls:
@@ -362,6 +392,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         urls[url] = previous_vid_metadata
                         self.dataset.update_status("Copied previously downloaded video to current dataset.")
                         copied_videos += num_copied
+                        processed_urls += 1
                         continue
                     except FailedToCopy as e:
                         # Unable to copy
@@ -369,6 +400,8 @@ class VideoDownloaderPlus(BasicProcessor):
                 elif previous_vid_metadata.get("retry", True) is False:
                     urls[url] = previous_vid_metadata
                     self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
+                    skipped_urls += 1
+                    total_not_a_video += 1
                     continue
 
             urls[url]["success"] = False
@@ -378,6 +411,7 @@ class VideoDownloaderPlus(BasicProcessor):
             # Stop processing if worker has been asked to stop or max downloads reached
             if self.downloaded_videos >= amount and amount != 0:
                 urls[url]["error"] = "Max video download limit already reached."
+                skipped_urls += 1
                 continue
 
             # Check for repeated timeouts
@@ -395,7 +429,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 else:
                     # Finish processor with already downloaded videos
                     break
-            if not_a_video >= 10 and last_domains.count(urlparse(url).netloc) == 5:
+            if not ignore_not_video and not_a_video >= 10 and last_domains.count(urlparse(url).netloc) == 5:
                 # This processor can be used to extract all links from text body and attempt to download any with videos
                 # If the same domain is encountered 5 times in a row and no links are to videos, we are assuming the user has poorly chosen their columns and no videos will be found
                 self.dataset.update_status(f"Too many consecutive non-video URLs encountered; {'try again with Non-direct videos option selected' if self.config.get('video-downloader.allow-indirect') else 'try extracting URLs and filtering dataset first'}.", is_final=True)
@@ -411,6 +445,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 message = 'Skipping known channel: %s' % url
                 urls[url]['error'] = message
                 failed_downloads += 1
+                skipped_urls += 1
                 self.dataset.log(message)
                 continue
 
@@ -426,6 +461,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 }]
                 success = True
                 self.videos_downloaded_from_url.add(filename)
+                processed_urls += 1
             except (requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects, FilesizeException, FailedDownload, NotAVideo) as e:
                 # FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
                 # FailedDownload raised when response other than 200 received
@@ -437,9 +473,13 @@ class VideoDownloaderPlus(BasicProcessor):
                     consecutive_errors += 1
                 if type(e) in [requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, FilesizeException, FailedDownload]:
                     failed_downloads += 1
+                    processed_urls += 1
                 if type(e) in [NotAVideo]:
                     # No need to retry non videos
                     urls[url]["retry"] = False
+                    not_a_video += 1
+                    total_not_a_video += 1
+                    processed_urls += 1
                 continue
             except VideoStreamUnavailable as e:
                 def is_youtube_link(u):
@@ -531,11 +571,14 @@ class VideoDownloaderPlus(BasicProcessor):
                     # Check that download and processing finished
                     success = all([self.last_dl_status.get('status') == 'finished',
                                    self.last_post_process_status.get('status') == 'finished'])
+                    processed_urls += 1
 
                 else:
                     # No YT-DLP; move on
                     self.dataset.log(f"NotVideoLinkError: {str(e)}")
                     not_a_video += 1
+                    total_not_a_video += 1
+                    processed_urls += 1
                     urls[url]["error"] = str(e)
                     if last_domains.count(urlparse(url).netloc) >= 2:
                         # Same domain encountered at least twice; let's wait before getting blocked
@@ -566,12 +609,31 @@ class VideoDownloaderPlus(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
+        # Log comprehensive statistics
+        self.dataset.log("=" * 60)
+        self.dataset.log("VIDEO DOWNLOAD SUMMARY")
+        self.dataset.log(f"Total URLs collected: {total_urls}")
+        self.dataset.log(f"URLs processed (download attempted or copied): {processed_urls}")
+        self.dataset.log(f"URLs skipped (previously failed, max limit, known channels): {skipped_urls}")
+        self.dataset.log(f"URLs not reviewed: {total_urls - processed_urls - skipped_urls}")
+        self.dataset.log(f"Videos successfully downloaded (new): {self.downloaded_videos}")
+        self.dataset.log(f"Videos copied from previous downloads: {copied_videos}")
+        self.dataset.log(f"Total videos in dataset: {self.downloaded_videos + copied_videos}")
+        self.dataset.log(f"Download failures: {failed_downloads}")
+        self.dataset.log(f"Not a video (URLs that don't lead to videos): {total_not_a_video}")
+        self.dataset.log(f"URL review rate: {processed_urls}/{total_urls} ({100*processed_urls/total_urls if total_urls > 0 else 0:.1f}%)")
+        self.dataset.log(f"Success rate (of processed URLs): {(self.downloaded_videos + copied_videos)}/{processed_urls} ({100*(self.downloaded_videos + copied_videos)/processed_urls if processed_urls > 0 else 0:.1f}%)")
+        self.dataset.log("=" * 60)
+
         # Finish up
         self.dataset.update_status("Writing downloaded videos to zip archive")
         self.write_archive_and_finish(results_path, self.downloaded_videos+copied_videos)
-        self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos" + (
-                                       f"; videos copied from {copied_videos} previous downloads" if copied_videos > 0 else "") +
-                                   (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""),
+        
+        self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos" + 
+                                   (f"; {copied_videos} videos copied from previous downloads" if copied_videos > 0 else "") +
+                                   (f"; {failed_downloads} downloads failed." if failed_downloads > 0 else "") + 
+                                   (f"; {total_not_a_video} URLs were not videos." if total_not_a_video > 0 else "") +
+                                   (f"; Processed {processed_urls} URLs of {total_urls}." if processed_urls > 0 else ""),
                                    is_final=True)
 
     def yt_dlp_monitor(self, d):
