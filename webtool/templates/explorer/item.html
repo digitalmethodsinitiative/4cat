@@ -1,0 +1,13 @@
+<li id="item-{{ item.id }}" class="item{% if item.thread_id == item.id %} op{% endif %}">
+	{% if datasource == "media-import" %}
+        {% include "explorer/datasource-templates/media.html" %}
+    {% else %}
+		<!-- Template location as defined by the API endpoint. May be custom or generic. -->
+	{% include ["explorer-template/" + datasource + "-explorer.html",
+                "explorer/generic-explorer.html"] %}
+	{% endif %}
+
+	<!-- Annotations are always shown -->
+	{% include "explorer/item-annotations.html" %}
+	
+</li>

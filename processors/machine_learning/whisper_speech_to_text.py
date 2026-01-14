@@ -60,6 +60,11 @@ class AudioToText(BasicProcessor):
             "default": 0,
             "help": "Max number of audio files",
             "tooltip": "Use '0' to allow unlimited number"
+        },
+        "dmi-service-manager.be_whisper_gpu": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": True,
+            "help": "Use GPU for Whisper processing",
         }
     }
 
@@ -206,10 +211,6 @@ class AudioToText(BasicProcessor):
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text,
         or calls the OpenAI API.
         """
-        if self.source_dataset.num_rows <= 1:
-            # 1 because there is always a metadata file
-            self.dataset.finish_with_error("No audio files found.")
-            return
 
         model_host = self.parameters.get("model_host", "external")
 
@@ -253,7 +254,8 @@ class AudioToText(BasicProcessor):
         audio_filenames = [filename for filename in os.listdir(staging_area)
                            if filename.split('.')[-1] not in ["json", "log"]]
         if self.parameters.get("amount", 100) != 0:
-            audio_filenames = audio_filenames[:self.parameters.get("amount", 100)]
+            max_files = min(self.parameters.get("amount", 100), len(audio_filenames))
+            audio_filenames = audio_filenames[:max_files]
         total_audio_files = len(audio_filenames)
 
         prompt = self.parameters.get("prompt", "")
@@ -300,6 +302,8 @@ class AudioToText(BasicProcessor):
                              '--output_format', "json",
                              "--model", self.parameters.get("local_model")],
                     }
+            if not self.config.get("dmi-service-manager.be_whisper_gpu", True):
+                data["args"].append(["--device", "cpu"])
             if prompt:
                 data["args"].extend(["--initial_prompt", prompt])
             if translate:
@@ -420,8 +424,8 @@ class AudioToText(BasicProcessor):
                             "item_id": item_id,
                             "value": result_data.get("text", "")
                         })
-                    #annotated += 1
-                    processed += 1
+
+                processed += 1
 
         if save_annotations:
             self.save_annotations(annotations)

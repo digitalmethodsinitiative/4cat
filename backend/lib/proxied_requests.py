@@ -251,11 +251,42 @@ class DelegatedRequestHandler:
                 "UrlForDelegatedRequest", ("url", "args", "status", "proxied")
             )
             url_metadata.url = url
-            url_metadata.kwargs = kwargs
+            # Make a per-URL copy of kwargs to avoid shared mutation across entries
+            per_kwargs = {**kwargs} if kwargs else {}
             url_metadata.index = self.index
             url_metadata.proxied = None
             url_metadata.status = self.REQUEST_STATUS_QUEUED
             self.index += 1
+
+            # If a response hook is provided, wrap it to inject the original URL
+            try:
+                hooks = per_kwargs.get("hooks")
+                if hooks and "response" in hooks:
+                    # Copy hooks dict to avoid shared mutation
+                    hooks = {**hooks}
+                    original_hook = hooks["response"]
+                    # Support a single callable or a list of callables
+                    def wrap(h, original_url):
+                        def _wrapped(resp, *a, **k):
+                            # Inject FourCAT-specific original URL in kwargs once
+                            if "fourcat_original_url" not in k:
+                                k["fourcat_original_url"] = original_url
+                            return h(resp, *a, **k)
+                        return _wrapped
+
+                    if isinstance(original_hook, list):
+                        hooks["response"] = [wrap(h, url) for h in original_hook]
+                    else:
+                        hooks["response"] = wrap(original_hook, url)
+
+                    # Persist modified hooks back into per-URL kwargs
+                    per_kwargs["hooks"] = hooks
+            except Exception:
+                # If wrapping fails for any reason, proceed without modification
+                pass
+
+            # Assign the isolated kwargs to this metadata entry
+            url_metadata.kwargs = per_kwargs
 
             if position == -1:
                 self.queue[queue_name].append(url_metadata)

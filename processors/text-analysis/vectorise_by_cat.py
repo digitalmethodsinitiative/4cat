@@ -170,6 +170,7 @@ class VectoriseByCategory(BasicProcessor):
 
 		# Get source dataset for categories
 		category_dataset = self.get_category_dataset(self.source_dataset)
+		self.for_cleanup.append(category_dataset)
 		if not category_dataset:
 			self.dataset.finish_with_error("No top dataset found; unable to identify categories")
 			return
@@ -211,13 +212,13 @@ class VectoriseByCategory(BasicProcessor):
 		index = 0
 		# Each file is a token set (Tokenize processor separates tokens by dates or all) and contains a list of tokens for each document
 		# A single item/post may have multiple documents (e.g., if it was seperated by sentance)
-		for token_file in self.iterate_archive_contents(self.source_file):
-			if token_file.name == '.token_metadata.json':
+		for packed_tokens in self.source_dataset.iterate_items():
+			if packed_tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
 
 			index += 1
-			vector_set_name = token_file.stem  # we don't need the full path
+			vector_set_name = packed_tokens.file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
 			self.dataset.update_progress(index / self.source_dataset.num_rows)
 
@@ -232,19 +233,19 @@ class VectoriseByCategory(BasicProcessor):
 				vector_sets[vector_set_name] = {}
 
 			# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-			with token_file.open("rb") as binary_tokens:
+			with packed_tokens.file.open("rb") as binary_tokens:
 				# these were saved as pickle dumps so we need the binary mode
 				documents = token_unpacker.load(binary_tokens)
 
 				# Cycle through tokens
 				for i, document in enumerate(documents):
-					if (token_file.name, i) not in file_to_category_mapping:
+					if (packed_tokens.file.name, i) not in file_to_category_mapping:
 						# No category for this document
-						self.dataset.log("No category found for document %s-%s" % (token_file.name, i))
+						self.dataset.log("No category found for document %s-%s" % (packed_tokens.file.name, i))
 						continue
 
 					# Allow for multiple categories
-					categories = file_to_category_mapping[(token_file.name, i)]
+					categories = file_to_category_mapping[(packed_tokens.file.name, i)]
 					for category in categories:
 						if category not in vector_sets[vector_set_name]:
 							vector_sets[vector_set_name][category] = {}

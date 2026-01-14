@@ -4,6 +4,7 @@ from collections import namedtuple
 import sys
 import os
 
+from jinja2 import ChoiceLoader, FileSystemLoader, FunctionLoader
 from functools import partial
 from pathlib import Path
 
@@ -58,7 +59,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 # this is also done in the backend, but the frontend may not be able to connect
 # while the backend is, for example
 if config.get("MEMCACHE_SERVER"):
-    if config.memcache:
+    if config.get_memcache():
         log.debug("Memcache connection initialized")
     else:
         log.warning(
@@ -139,7 +140,7 @@ app.login_manager.login_view = "user.show_login"
 
 # initialize rate limiter - memcache can serve as the storage backend, if not
 # available, direct memory storage will be used
-if config.memcache:
+if config.get_memcache():
     app.limiter = Limiter(app=app, key_func=get_remote_address, storage_uri=f"memcached://{config.get('MEMCACHE_SERVER')}")
 else:
     app.limiter = Limiter(app=app, key_func=get_remote_address)
@@ -163,7 +164,6 @@ with app.app_context():
     app.log = log
     app.db = db
     app.fourcat_config = config
-    app._memcache_initialized = False  # flag to check if memcache was initialized
     app.fourcat_modules = ModuleCollector(app.fourcat_config)
 
     # import all views; these can only be imported here because they rely on
@@ -201,11 +201,6 @@ with app.app_context():
             # in contexts where we're serving static files through slack, save
             # some overhead
             return
-        
-         # Initialize memcache once per worker
-        if not app._memcache_initialized:
-            app.fourcat_config.memcache = app.fourcat_config.load_memcache()
-            app._memcache_initialized = True
 
         g.queue = queue
         g.db = db
@@ -213,11 +208,38 @@ with app.app_context():
         g.config = ConfigWrapper(app.fourcat_config, user=current_user, request=request)
         g.modules = current_app.fourcat_modules
         g.request = request
-
         current_user.with_config(g.config)
 
-    # import custom jinja2 template filters
+    def get_datasource_explorer_templates(name):
+        """ Load Explorer templates from datasources """
+        if not name.startswith("explorer-template/") or "-explorer" not in name:
+            return None
 
+        datasources = current_app.fourcat_modules.datasources
+        if not datasources:
+            return None
+
+        filename = name.split("/", 1)[1]
+        datasource = filename.split("-")[0]
+        datasource_templates = datasources.get(datasource, {}).get("explorer-templates", {})
+        if datasource_templates:
+            if datasource_templates.get("css") and datasource_templates["css"].name == filename:
+                with open(datasource_templates["css"], "r", encoding="utf-8") as f:
+                    return f.read()
+            if datasource_templates.get("html") and datasource_templates["html"].name == filename:
+                with open(datasource_templates["html"], "r", encoding="utf-8") as f:
+                    return f.read()
+
+        return None
+
+    template_paths = [
+        os.path.join(app.root_path, "templates"),
+    ]
+    app.jinja_loader = ChoiceLoader(
+        [FileSystemLoader(template_paths), FunctionLoader(get_datasource_explorer_templates)]
+    )
+
+    # import custom jinja2 template filters
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402
 

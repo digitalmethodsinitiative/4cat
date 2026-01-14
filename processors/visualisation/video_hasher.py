@@ -209,44 +209,44 @@ class VideoHasher(BasicProcessor):
         processed_videos = 0
 
         self.dataset.update_status("Creating video hashes")
-        for path in self.iterate_archive_contents(self.source_file, staging_area):
+        for video in self.source_dataset.iterate_items(staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while creating video hashes")
 
             if max_videos != 0 and processed_videos >= max_videos:
                 break
 
-            if path.name == '.metadata.json':
+            if video.file.name == '.metadata.json':
                 # Keep it and move on
-                with open(path) as file:
+                with video.file.open() as file:
                     video_metadata = json.load(file)
                 continue
-            elif path.name == "video_archive":
+            elif video.file.name == "video_archive":
                 # yt-dlp file
                 continue
 
             try:
-                videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
+                videohash = VideoHash(path=str(video.file), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
             except FFmpegNotFound:
                 self.log.error('ffmpeg must be installed for video_hash.py processor to be used.')
                 self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
                 self.dataset.finish(0)
                 return
             except FileNotFoundError:
-                self.dataset.update_status(f"Unable to find file {path.name}")
+                self.dataset.update_status(f"Unable to find file {video.file.name}")
                 continue
             except FFmpegFailedToExtractFrames as e:
-                self.dataset.update_status(f"Unable to extract frame for {path.name} (see log for details)")
-                self.dataset.log(f"Unable to extract frame for {str(path)}: {e}")
+                self.dataset.update_status(f"Unable to extract frame for {video.file.name} (see log for details)")
+                self.dataset.log(f"Unable to extract frame for {str(video.file)}: {e}")
                 continue
             except OSError:
                 self.dataset.finish_with_error("4CAT does not have the right privileges to access the video files.")
                 return
 
-            video_hashes[path.name] = {'videohash': videohash}
+            video_hashes[video.file.name] = {'videohash': videohash}
 
-            shutil.copy(videohash.collage_path, output_dir.joinpath(path.stem + '.jpg'))
-            video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
+            shutil.copy(videohash.collage_path, output_dir.joinpath(video.file.stem + '.jpg'))
+            video_hashes[video.file.name]['video_collage_filename'] = video.file.stem + '.jpg'
 
             processed_videos += 1
             self.dataset.update_status(
@@ -394,7 +394,6 @@ class VideoHashNetwork(BasicProcessor):
 
             # Prepare staging area for videos and video tracking
             staging_area = self.dataset.get_staging_area()
-            self.dataset.log('Staging directory location: %s' % staging_area)
             # Extract file
             archive_file.extract("video_hashes.csv", staging_area)
 

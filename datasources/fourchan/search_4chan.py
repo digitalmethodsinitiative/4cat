@@ -42,6 +42,11 @@ class Search4Chan(SearchWithScope):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
+
+        board_config = config.get("fourchan-search.boards", [])
+        if not isinstance(board_config, list) or not len(board_config) > 0:
+            board_config = []
+
         return {
             "intro": {
                 "type": UserInput.OPTION_INFO,
@@ -51,9 +56,9 @@ class Search4Chan(SearchWithScope):
             },
             "board": {
                 "type": UserInput.OPTION_CHOICE,
-                "options": {b: b for b in config.get("fourchan-search.boards", [])},
+                "options": {b: b for b in board_config} if board_config else {},
                 "help": "Board",
-                "default": config.get("fourchan-search.boards", [""])[0]
+                "default": board_config[0] if len(board_config) > 0 else ""
             },
             "body_match": {
                 "type": UserInput.OPTION_TEXT,

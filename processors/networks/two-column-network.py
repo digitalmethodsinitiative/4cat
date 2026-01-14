@@ -129,6 +129,14 @@ class ColumnNetworker(BasicProcessor):
                 "tooltip": "Name of the column of values at which edges terminate"
             }
 
+        options["detect-communities"] = {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Detect communities",
+			"tooltip": "Assign nodes to communities using two separate community detection algorithms (see processor "
+					   "references). Will never be done for networks with more than 50.000 edges."
+		}
+
         return options
 
     @classmethod
@@ -156,6 +164,7 @@ class ColumnNetworker(BasicProcessor):
         interval_type = self.parameters.get("interval")
         to_lower = self.parameters.get("to-lowercase", False)
         ignoreable = [n.strip() for n in self.parameters.get("ignore-nodes", "").split(",") if n.strip()]
+        detect_communities = self.parameters.get("detect-communities", False)
 
         processed = 0
 
@@ -364,6 +373,14 @@ class ColumnNetworker(BasicProcessor):
             "louvain_community": partial(nx.community.louvain_communities, seed=0),
             "greedy_modularity_class": partial(nx.community.greedy_modularity_communities, weight="weight"),
         }
+
+        if network.number_of_edges() > 50_000:
+            self.dataset.log("Network has more than 50.000 edges; skipping community detection.")
+            detect_communities = False
+
+        if not detect_communities:
+            community_types = {}
+
         for community_prop, community_function in community_types.items():
             self.dataset.update_status(f"Calculating node communities ({community_prop})")
             community_id = 0

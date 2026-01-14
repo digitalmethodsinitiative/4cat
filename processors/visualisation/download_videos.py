@@ -50,6 +50,9 @@ class VideoDownloaderPlus(BasicProcessor):
     ]
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
+
+    # Some datasets have known mixed media types; do not stop due to many "Not a video" errors
+    mixed_media_dataset_types = ["instagram-search"]
     DIRECT_DOWNLOAD_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0"
 
     config = {
@@ -97,6 +100,13 @@ class VideoDownloaderPlus(BasicProcessor):
             "tooltip": "Allow users to choose to download videos from links that refer to multiple videos. For "
                        "example, for a given link to a YouTube channel all videos for that channel are downloaded."
         },
+        # Allow overriding error limit
+        "video-downloader.ignore-errors": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Allow option to ignore \"Not a video\" limit",
+            "tooltip": "If links are not videos, continue attempts. Useful for mixed datasets (e.g. Instagram \"media_urls\" where many are images)."
+        },
     }
 
     def __init__(self, logger, job, queue=None, manager=None, modules=None):
@@ -143,7 +153,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 "default": True,
                 "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
                         "separately"
-            },
+            }
         }
 
         # Update the amount max and help from config
@@ -179,6 +189,19 @@ class VideoDownloaderPlus(BasicProcessor):
             priority = ["video_url", "video_link", "video", "media_url", "media_link", "media", "final_url", "url", "link", "body"]
             columns.sort(key=lambda col: next((i for i, p in enumerate(priority) if p in col.lower()), len(priority)))
             options["columns"]["default"] = [columns.pop(0)]
+
+        # Allow overriding error limit
+        if parent_dataset and parent_dataset.type in cls.mixed_media_dataset_types: 
+            # Override is automatic
+            pass
+        elif config.get("video-downloader.ignore-errors", False):
+            # Allow user to choose to ignore "Not a video" errors
+            options["ignore_not_video"] = {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Ignore \"Not a video\" limit",
+                "default": False,
+                "tooltip": "If blocked or links are not videos, continue attempts. Useful for mixed datasets (e.g. Instagram \"media_urls\" where many are images)."
+            }
 
         # these two options are likely to be unwanted on instances with many
         # users, so they are behind an admin config options
@@ -338,14 +361,21 @@ class VideoDownloaderPlus(BasicProcessor):
                 ydl_opts["format"] += "/best/bestvideo+bestaudio"
 
             self.dataset.log(f"YT-DLP format filter: {ydl_opts['format']}")
+        
+        # Ignore not a video limit
+        ignore_not_video = self.source_dataset.type in self.mixed_media_dataset_types or self.parameters.get("ignore_not_video", False)
 
         # Loop through video URLs and download
         self.downloaded_videos = 0
         failed_downloads = 0
         copied_videos = 0
         consecutive_errors = 0
-        not_a_video = 0
+        not_a_video = 0  # Consecutive counter for breaking early
+        total_not_a_video = 0  # Total count of non-video URLs
+        skipped_urls = 0  # URLs skipped (already failed before, known channels, etc.)
+        processed_urls = 0  # URLs actually attempted (download or copy)
         last_domains = []
+        total_urls = len(urls)
         self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
         yt_dlp_archive_map = {}
         direct_requests = []
@@ -366,12 +396,15 @@ class VideoDownloaderPlus(BasicProcessor):
                         urls[url] = previous_vid_metadata
                         self.dataset.update_status("Copied previously downloaded video to current dataset.")
                         copied_videos += num_copied
+                        processed_urls += 1
                         continue
                     except FailedToCopy as e:
                         self.dataset.log(f"{str(e)}; attempting to download again")
                 elif previous_vid_metadata.get("retry", True) is False:
                     urls[url] = previous_vid_metadata
                     self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
+                    skipped_urls += 1
+                    total_not_a_video += 1
                     continue
 
             urls[url]["success"] = False
@@ -382,6 +415,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 message = 'Skipping known channel: %s' % url
                 urls[url]['error'] = message
                 failed_downloads += 1
+                skipped_urls += 1
                 self.dataset.log(message)
                 continue
 
@@ -429,6 +463,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             if isinstance(error_context, requests.exceptions.Timeout):
                                 consecutive_errors += 1
                                 failed_downloads += 1
+                                processed_urls += 1
                                 action = self._handle_consecutive_error_stop(consecutive_errors, also_indirect)
                                 if action == "finish":
                                     self.flush_proxied_requests()
@@ -437,8 +472,9 @@ class VideoDownloaderPlus(BasicProcessor):
                                     stop_processing = True
                                     stop_reason = "errors"
                                     break
-                            elif isinstance(error_context, (requests.exceptions.SSLError, requests.exceptions.ConnectionError)):
+                            else:
                                 failed_downloads += 1
+                                processed_urls += 1
                             continue
 
                         filename, proxy_used = self._write_direct_response(url, response, results_path, max_video_size)
@@ -450,6 +486,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         }]
                         success = True
                         self.videos_downloaded_from_url.add(filename)
+                        processed_urls += 1
 
                     except VideoStreamUnavailable as e:
                         if self._should_use_yt_dlp(url, also_indirect):
@@ -457,11 +494,13 @@ class VideoDownloaderPlus(BasicProcessor):
                         else:
                             self.dataset.log(f"NotVideoLinkError: {str(e)}")
                             not_a_video += 1
+                            total_not_a_video += 1
                             urls[url]["error"] = str(e)
                             urls[url]["retry"] = False
+                            processed_urls += 1
                             if last_domains.count(domain) >= 2:
                                 time.sleep(5 * not_a_video)
-                            action = self._handle_non_video_stop(not_a_video, domain, last_domains)
+                            action = self._handle_non_video_stop(not_a_video, domain, last_domains, ignore_not_video)
                             if action == "finish":
                                 self.flush_proxied_requests()
                                 return
@@ -474,11 +513,13 @@ class VideoDownloaderPlus(BasicProcessor):
                     except NotAVideo as e:
                         self.dataset.log(f"Request Error: {str(e)}")
                         not_a_video += 1
+                        total_not_a_video += 1
                         urls[url]["error"] = str(e)
                         urls[url]["retry"] = False
+                        processed_urls += 1
                         if last_domains.count(domain) >= 2:
                             time.sleep(5 * not_a_video)
-                        action = self._handle_non_video_stop(not_a_video, domain, last_domains)
+                        action = self._handle_non_video_stop(not_a_video, domain, last_domains, ignore_not_video)
                         if action == "finish":
                             self.flush_proxied_requests()
                             return
@@ -492,12 +533,14 @@ class VideoDownloaderPlus(BasicProcessor):
                         self.dataset.log(f"Request Error: {str(e)}")
                         urls[url]["error"] = str(e)
                         failed_downloads += 1
+                        processed_urls += 1
                         continue
 
                     except FailedDownload as e:
                         self.dataset.log(f"Request Error: {str(e)}")
                         urls[url]["error"] = str(e)
                         failed_downloads += 1
+                        processed_urls += 1
                         continue
 
                     except requests.exceptions.Timeout as e:
@@ -505,6 +548,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         urls[url]["error"] = str(e)
                         consecutive_errors += 1
                         failed_downloads += 1
+                        processed_urls += 1
                         action = self._handle_consecutive_error_stop(consecutive_errors, also_indirect)
                         if action == "finish":
                             self.flush_proxied_requests()
@@ -520,6 +564,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         urls[url]["error"] = str(e)
                         if not isinstance(e, requests.exceptions.TooManyRedirects):
                             failed_downloads += 1
+                        processed_urls += 1
                         continue
 
                     finally:
@@ -640,7 +685,8 @@ class VideoDownloaderPlus(BasicProcessor):
             if success:
                 consecutive_errors = 0
                 not_a_video = 0
-
+            
+            processed_urls += 1
             self.downloaded_videos += len(self.videos_downloaded_from_url)
             self._update_download_status(copied_videos, failed_downloads)
             if amount != 0 and self.downloaded_videos >= amount:
@@ -659,12 +705,31 @@ class VideoDownloaderPlus(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
+        # Log comprehensive statistics
+        self.dataset.log("=" * 60)
+        self.dataset.log("VIDEO DOWNLOAD SUMMARY")
+        self.dataset.log(f"Total URLs collected: {total_urls}")
+        self.dataset.log(f"URLs processed (download attempted or copied): {processed_urls}")
+        self.dataset.log(f"URLs skipped (previously failed, max limit, known channels): {skipped_urls}")
+        self.dataset.log(f"URLs not reviewed: {total_urls - processed_urls - skipped_urls}")
+        self.dataset.log(f"Videos successfully downloaded (new): {self.downloaded_videos}")
+        self.dataset.log(f"Videos copied from previous downloads: {copied_videos}")
+        self.dataset.log(f"Total videos in dataset: {self.downloaded_videos + copied_videos}")
+        self.dataset.log(f"Download failures: {failed_downloads}")
+        self.dataset.log(f"Not a video (URLs that don't lead to videos): {total_not_a_video}")
+        self.dataset.log(f"URL review rate: {processed_urls}/{total_urls} ({100*processed_urls/total_urls if total_urls > 0 else 0:.1f}%)")
+        self.dataset.log(f"Success rate (of processed URLs): {(self.downloaded_videos + copied_videos)}/{processed_urls} ({100*(self.downloaded_videos + copied_videos)/processed_urls if processed_urls > 0 else 0:.1f}%)")
+        self.dataset.log("=" * 60)
+
         # Finish up
         self.dataset.update_status("Writing downloaded videos to zip archive")
         self.write_archive_and_finish(results_path, self.downloaded_videos+copied_videos)
-        self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos" + (
-                                       f"; videos copied from {copied_videos} previous downloads" if copied_videos > 0 else "") +
-                                   (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""),
+        
+        self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos" + 
+                                   (f"; {copied_videos} videos copied from previous downloads" if copied_videos > 0 else "") +
+                                   (f"; {failed_downloads} downloads failed." if failed_downloads > 0 else "") + 
+                                   (f"; {total_not_a_video} URLs were not videos." if total_not_a_video > 0 else "") +
+                                   (f"; Processed {processed_urls} URLs of {total_urls}." if processed_urls > 0 else ""),
                                    is_final=True)
 
     def yt_dlp_monitor(self, d):
@@ -737,7 +802,10 @@ class VideoDownloaderPlus(BasicProcessor):
             max_video_size = int(max_video_size)
         except (TypeError, ValueError):
             max_video_size = 0
-        if 400 <= response.status_code < 500:
+        if response.status_code == 403:
+            # Using VideoStreamUnavailable here as 403 often indicates blocking and ytdlp may be able to handle
+            raise VideoStreamUnavailable(f"Website denied download request (Code 403): {original_url}")
+        elif 400 <= response.status_code < 500:
             raise FailedDownload(
                 f"Website denied download request (Code {response.status_code} / Reason {response.reason}): {original_url}")
         if response.status_code != 200:
@@ -809,7 +877,9 @@ class VideoDownloaderPlus(BasicProcessor):
             return netloc == 'youtu.be' or netloc == 'youtube.com' or netloc.endswith('.youtube.com')
         return False
 
-    def _handle_non_video_stop(self, not_a_video, domain, last_domains):
+    def _handle_non_video_stop(self, not_a_video, domain, last_domains, ignore_not_video=False):
+        if ignore_not_video:
+            return None
         if not_a_video < 10:
             return None
         if last_domains.count(domain) < 5:

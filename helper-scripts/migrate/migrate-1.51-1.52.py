@@ -30,4 +30,9 @@ db = Database(
 print("  Deleting background jobs from queue to be re-added on next restart...")
 db.execute("DELETE FROM jobs WHERE jobtype IN ('datasource-metrics', 'clean-temp-files', 'check-for-updates')")
 
+print("  Updating default value for llm.available_models setting...")
+# this does not check the current value - it will be updated anyway by the
+# refresh_items worker if an LLM server is configured
+db.execute("UPDATE settings SET value = '{}' WHERE name = 'llm.available_models'")
+
 print("  - done!")

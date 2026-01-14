@@ -31,15 +31,16 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 }
 
 /** --------------------- *
-     Posts
+     items
   * --------------------- */
-.post {
+.item {
     font-family: "Open Sans", sans-serif;
     list-style: none;
     padding: 0;
+    line-height: 1.25px;
 }
 
-.posts li.post {
+.items li.item {
     position: relative;
     background: var(--gray-light);
     padding: 1em;
@@ -48,30 +49,29 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     margin: 0 auto 1em auto;
 }
 
-.posts header {
+.items header {
     display: inline;
     border-bottom: 1px solid #000;
     cursor: default;
 }
 
-.posts article {
+.items article {
     margin-top: 0.5em;
 }
 
-.posts article .post-content {
+.items article .item-content {
     margin: 10px 0;
-    white-space: pre-wrap;
 }
 
-.posts header .author {
+.items header .author {
     font-weight: bold;
 }
 
-.posts header span {
+.items header span {
     display: inline-block;
 }
 
-.posts header span:not(:last-child)::after {
+.items header span:not(:last-child)::after {
     content: '\2022';
     margin-left: 0.5em;
 }
@@ -82,25 +82,31 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 
 }
 
-.posts li.post .post-content a {
+.items li.item .item-content a {
 
 }
 
-.posts .external-url {
+.items .external-url {
     position: absolute;
     top: 0;
     right: 0;
     padding: 10px;
 }
 
-.posts .external-url.deactivated {
+.items .external-url.deactivated {
     color: #cbcbcb;
     cursor: not-allowed;
 }
 
-.post-media img {
+.item-media img {
     width: 100%;
     max-width: 300px;
+}
+
+.media-item > img, .media-item > audio, .media-item > video {
+    max-width: 100%;
+    max-height: 500px;
+    margin: 0 auto;
 }
 
 span.divider {

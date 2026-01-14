@@ -348,7 +348,7 @@ def import_dataset():
 
 			outfile.write(chunk)
 
-	job = g.queue.add_job(worker_type, {"file": str(temporary_path)}, dataset.key)
+	job = g.queue.add_job(worker_or_type=worker, details={"file": str(temporary_path)}, dataset=dataset)
 	dataset.link_job(job)
 
 	return jsonify({
@@ -467,7 +467,7 @@ def queue_dataset():
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
-	g.queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=0)
+	g.queue.add_job(worker_or_type=search_worker, dataset=dataset, interval=0)
 	new_job = Job.get_by_remote_ID(dataset.key, g.db)
 	dataset.link_job(new_job)
 
@@ -1204,7 +1204,7 @@ def queue_processor(key=None, processor=None):
 
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
-		g.queue.add_job(jobtype=processor, remote_id=analysis.key)
+		g.queue.add_job(worker_or_type=g.modules.processors[processor], dataset=analysis)
 		job = Job.get_by_remote_ID(analysis.key, database=g.db)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
@@ -1275,7 +1275,24 @@ def check_processor():
 		if not current_user.can_access_dataset(dataset):
 			continue
 
-		genealogy = dataset.get_genealogy()
+		if dataset.is_top_dataset():
+			if dataset.parameters.get("copied_from", None):
+				# Filter dataset - get original dataset for display
+				original_key = dataset.parameters.get("copied_from", None)
+				try:
+					original_dataset = DataSet(key=original_key, db=g.db, modules=g.modules)
+				except DataSetException:
+					# Cannot find original dataset; no longer has parent and cannot render child view
+					g.log.warning(f"Dataset {dataset.key} is a filter but original dataset {original_key} not found. Skipping...")
+					continue
+				genealogy = original_dataset.get_genealogy()
+			else:
+				# Top-level dataset; not a child, cannot render child view
+				g.log.warning(f"Dataset {dataset.key} is top-level; cannot render child view. Skipping...")
+				continue
+		else:
+			genealogy = dataset.get_genealogy()
+
 		parent = genealogy[-2]
 		top_parent = genealogy[0]
 

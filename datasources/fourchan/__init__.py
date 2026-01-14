@@ -37,6 +37,6 @@ def init_datasource(database, logger, queue, name, config):
 			if config.get(name + "-search.no_scrape") and board in config.get(name + "-search.no_scrape"):
 				continue
 			else:
-				queue.add_job(name + "-board", {}, board, 0, interval)
+				queue.add_job(worker_or_type=name + "-board", details={}, remote_id=board, claim_after=0, interval=interval)
 
 	base_init_datasource(database, logger, queue, name, config)

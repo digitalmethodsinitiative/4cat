@@ -8,6 +8,7 @@ from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.helpers import normalize_url_encoding
 
 
 class SearchPinterest(Search):
@@ -76,9 +77,14 @@ class SearchPinterest(Search):
         if "imageSpec_orig" in post:
             image_url = post["imageSpec_orig"]["url"]
         else:
-            image_url = post["images"]["orig"]["url"]
+            # pre 2026-01
+            if "orig" in post["images"]:
+                image_url = post["images"]["orig"]["url"]
+            else:
+                image_url = post["images"]["url"]
 
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": post_id,
             "thread_id": post_id,
             "author": post["pinner"]["username"],
@@ -117,6 +123,7 @@ class SearchPinterest(Search):
         :return MappedItem:  Mapped item
         """
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": int(post["id"]),
             "thread_id": int(post["id"]),
             "author": MissingMappedField(""),

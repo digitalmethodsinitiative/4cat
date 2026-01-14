@@ -235,11 +235,19 @@ class Annotation:
             before = int(time.time())
 
         if item_id:
-            if isinstance(item_id, str):
-                item_id = [item_id]
+            # Normalise to strings so the ANY operator receives a proper text[]
+            if isinstance(item_id, (list, tuple, set)):
+                iterable_ids = item_id
+            else:
+                iterable_ids = [item_id]
+
+            item_ids = [str(i) for i in iterable_ids if i is not None]
+            if not item_ids:
+                return []
+
             data = db.fetchall(
-                "SELECT * FROM annotations WHERE dataset = %s AND item_id = ANY(%s) AND timestamp <= %s",
-                (dataset_key, item_id, before,)
+                "SELECT * FROM annotations WHERE dataset = %s AND item_id = ANY(%s::text[]) AND timestamp <= %s",
+                (dataset_key, item_ids, before,)
             )
         else:
             data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s AND timestamp <= %s", (dataset_key, before,))

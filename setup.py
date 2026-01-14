@@ -24,11 +24,12 @@ core_packages = {
 	"langchain_ollama",
 	"langchain_openai",
 	"langchain_mistralai",
+	"langchain_deepseek",
 	"markdown2==2.4.2",
 	"oslex",
 	"packaging",
 	"psutil~=5.0",
-	"Pillow>=10.3",  
+	"Pillow>=10.3",
 	"pydantic",
 	"pymemcache",
 	"PyMySQL~=1.0",
@@ -55,7 +56,7 @@ processor_packages = {
 	"google_api_python_client",  # perspective, youtube_metadata
 	"jieba",  # word-trees, tokenise
 	"jsonschema",  # llm_prompter
-	"lxml",  # dowload_images_4chan, wikipedia_network, url_titles
+	"lxml",  # download_images_4chan, wikipedia_network, url_titles
 	"nltk~=3.9.1",  # similar-words, word-trees, collocations, split_sentences, tokenise
 	"networkx>=3.0",  # networks/*
 	"numpy",  # image_wall, histwords, video_hasher, hash_similarity_network, aggregate_stats, tf_idf

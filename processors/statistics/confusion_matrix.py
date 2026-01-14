@@ -103,6 +103,13 @@ class ConfusionMatrix(BasicProcessor):
             y_pred.append(val_pred)
             count += 1
 
+            if len(y_true) > 500:
+                self.dataset.finish_with_error("More than 500 labels found, unable to generate a usable "
+                                               "confusion matrix. Your column values should contain less than 500 "
+                                               "unique categories. Reduce the labels or use a different evaluation "
+                                               "technique.")
+                return
+
         # Create confusion matrix
         matplotlib.use('agg')
         fig, ax = plt.subplots(figsize=(8, 6))
