@@ -25,6 +25,7 @@ from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
 from urllib.parse import urlparse, urlunparse
+from dateutil import parser as dateutil_parser
 from calendar import monthrange
 from packaging import version
 from PIL import Image
@@ -800,13 +801,18 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
         timestamp = int(item[item_column])
         try:
             timestamp = datetime.datetime.fromtimestamp(timestamp)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            print(e)
             raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
     except (TypeError, ValueError):
         try:
-            timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.datetime.strptime(item[item_column], "%Y-%m-%d %H:%M:%S")
         except (ValueError, TypeError):
-            raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
+            try:
+                # Brute force with dateutil
+                timestamp = dateutil_parser.parse(item[item_column])
+            except (ValueError, TypeError, dateutil_parser.ParserError):
+                raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
 
     if interval == "year":
         return str(timestamp.year)
