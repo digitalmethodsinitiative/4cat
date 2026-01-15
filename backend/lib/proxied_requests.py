@@ -207,6 +207,11 @@ class DelegatedRequestHandler:
         pool = ThreadPoolExecutor()
         self.session = FuturesSession(executor=pool)
         self.log = log
+        
+        # Proxy health tracking
+        self.proxy_health = {}
+        self.proxy_warnings_logged = set()
+        self.all_proxies_failed_logged = False
 
         self.refresh_settings(config)
 
@@ -220,10 +225,18 @@ class DelegatedRequestHandler:
 
         :param config:  Configuration reader
         """
+        # Reset proxy health tracking when settings are refreshed
+        num_proxies_restored = len([p for p in self.proxy_health if not self.proxy_health[p]])
+        self.proxy_health = {}
+        self.proxy_warnings_logged = set()
+        self.all_proxies_failed_logged = False
+        
+        if num_proxies_restored > 0:
+            self.log.debug(f"Proxy health reset: {num_proxies_restored} proxies restored")
 
         self.proxy_settings = {
             k: config.get(k) for k in ("proxies.urls", "proxies.cooloff", "proxies.concurrent-overall",
-                                            "proxies.concurrent-host", "proxies.concurrent-host")
+                                            "proxies.concurrent-host", "proxies.allow-localhost-fallback")
         }
 
     def add_urls(self, urls, queue_name="_", position=-1, **kwargs):
@@ -313,7 +326,10 @@ class DelegatedRequestHandler:
         Finds a `SophisticatedFuturesProxy` that has an open slot for this URL.
 
         :param str url:  URL to proxy a request for
-        :return SophisticatedFuturesProxy or False:
+        :return SophisticatedFuturesProxy, False, or None:
+            - SophisticatedFuturesProxy if a proxy is available
+            - False if proxies exist but are busy (try again later)
+            - None if all proxies are unhealthy (need fallback)
         """
         if not self.proxy_pool:
             # this will trigger the first time this method is called
@@ -331,12 +347,21 @@ class DelegatedRequestHandler:
                     self.proxy_settings["proxies.concurrent-host"],
                 )
                 self.proxy_pool[proxy_url].last_used = 0
+                # Initialize all proxies as healthy
+                self.proxy_health[proxy_url] = True
 
             self.log.debug(f"Proxy pool has {len(self.proxy_pool)} available proxies.")
 
-        # within the pool, find the least recently used proxy that is available
+        # Filter out unhealthy proxies
+        healthy_proxies = [p for p in self.proxy_pool if self.proxy_health.get(p, True)]
+        
+        # If we have proxies configured but none are healthy, return None
+        if self.proxy_pool and not healthy_proxies:
+            return None
+        
+        # within the pool, find the least recently used healthy proxy that is available
         sorted_by_cooloff = sorted(
-            self.proxy_pool, key=lambda p: self.proxy_pool[p].last_used
+            healthy_proxies, key=lambda p: self.proxy_pool[p].last_used
         )
         for proxy_id in sorted_by_cooloff:
             claimed_proxy = self.proxy_pool[proxy_id].proxy.claim_for(url)
@@ -379,6 +404,25 @@ class DelegatedRequestHandler:
                         response = url_metadata.proxied.request.result()
                         url_metadata.proxied.result = response
 
+                    except requests.exceptions.ProxyError as e:
+                        # Proxy connection issue - mark proxy as unhealthy and requeue
+                        proxy_url = url_metadata.proxied.proxy.proxy_url
+                        
+                        # Mark this proxy as unhealthy
+                        self.proxy_health[proxy_url] = False
+                        
+                        # Log warning once per proxy
+                        if proxy_url not in self.proxy_warnings_logged:
+                            self.proxy_warnings_logged.add(proxy_url)
+                            self.log.warning(
+                                f"Proxy {proxy_url} marked as unhealthy due to connection failure: {str(e)}"
+                            )
+                        
+                        # Reset URL to queued so it will retry with a different proxy
+                        url_metadata.status = self.REQUEST_STATUS_QUEUED
+                        url_metadata.proxied = None
+                        # Don't set to WAITING_FOR_YIELD - let it retry in the normal flow
+                    
                     except (
                         ConnectionError,
                         asyncioCancelledError,
@@ -391,7 +435,9 @@ class DelegatedRequestHandler:
 
                     finally:
                         # success or fail, we can pass it on
-                        url_metadata.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
+                        # Only set to waiting if not requeued by ProxyError handler
+                        if url_metadata.status != self.REQUEST_STATUS_QUEUED:
+                            url_metadata.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
 
                 else:
                     # running - ignore for now
@@ -404,8 +450,62 @@ class DelegatedRequestHandler:
                 ):
                     # no request running for this URL yet, try to start one
                     proxy = self.claim_proxy(url)
-                    if not proxy:
-                        # no available proxies, try again next loop
+                    
+                    if proxy is None:
+                        # All proxies are unhealthy - check if localhost fallback is allowed
+                        allow_localhost = self.proxy_settings.get("proxies.allow-localhost-fallback", True)
+                        
+                        if allow_localhost:
+                            # Log once that we're falling back to localhost
+                            if not self.all_proxies_failed_logged:
+                                self.all_proxies_failed_logged = True
+                                self.log.error(
+                                    "All configured proxies are unhealthy. Falling back to localhost "
+                                    "(direct connection) for remaining requests."
+                                )
+                            
+                            # Create/use localhost proxy
+                            if self.PROXY_LOCALHOST not in self.proxy_pool:
+                                self.proxy_pool[self.PROXY_LOCALHOST] = namedtuple(
+                                    "ProxyEntry", ("proxy", "last_used")
+                                )
+                                self.proxy_pool[self.PROXY_LOCALHOST].proxy = SophisticatedFuturesProxy(
+                                    self.PROXY_LOCALHOST,
+                                    self.log,
+                                    self.proxy_settings["proxies.cooloff"],
+                                    self.proxy_settings["proxies.concurrent-overall"],
+                                    self.proxy_settings["proxies.concurrent-host"],
+                                )
+                                self.proxy_pool[self.PROXY_LOCALHOST].last_used = 0
+                                self.proxy_health[self.PROXY_LOCALHOST] = True
+                            
+                            proxy = self.proxy_pool[self.PROXY_LOCALHOST].proxy.claim_for(url)
+                            if not proxy:
+                                # Localhost proxy busy, try again later
+                                continue
+                            self.proxy_pool[self.PROXY_LOCALHOST].last_used = time.time()
+                        else:
+                            # Localhost fallback not allowed - fail the request
+                            if not self.all_proxies_failed_logged:
+                                self.all_proxies_failed_logged = True
+                                self.log.error(
+                                    "All configured proxies are unhealthy and localhost fallback is disabled. "
+                                    "Remaining requests will fail."
+                                )
+                            
+                            url_metadata.proxied = namedtuple(
+                                "DelegatedRequest",
+                                ("request", "created", "result", "proxy", "url", "index"),
+                            )
+                            url_metadata.proxied.result = FailedProxiedRequest(
+                                Exception("All proxies unhealthy and localhost fallback disabled"),
+                                None
+                            )
+                            url_metadata.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
+                            self.queue[queue_name][i] = url_metadata
+                            continue
+                    elif proxy is False:
+                        # Proxies exist but are busy, try again next loop
                         continue
 
                     proxy_url = proxy.proxy_url

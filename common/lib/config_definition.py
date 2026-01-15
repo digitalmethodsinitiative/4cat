@@ -301,6 +301,12 @@ config_definition = {
         "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
                    "overall limit."
     },
+    "proxies.allow-localhost-fallback": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Fall back to localhost",
+        "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy)."
+    },
     # logging
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
