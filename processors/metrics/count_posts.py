@@ -89,10 +89,11 @@ class CountPosts(BasicProcessor):
         intervals = {}
 
         timeframe = self.parameters.get("timeframe")
-        column = self.parameters.get("column")[0]
+        column = self.parameters.get("column")
         if not column:
             self.dataset.update_status("No column selected", is_final=True)
             return
+        column = column[0] if isinstance(column, list) else column
 
         unknown_dates = (
             0  # separate counter as padding will not interpret this correctly
