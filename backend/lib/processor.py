@@ -291,7 +291,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 # copy ownership from parent dataset
                 next_analysis.copy_ownership_from(self.dataset)
                 # add to queue
-                self.queue.add_job(self.modules.processors[next_type], remote_id=next_analysis)
+                self.queue.add_job(self.modules.processors[next_type], dataset=next_analysis)
             else:
                 can_run_next = False
                 self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (
