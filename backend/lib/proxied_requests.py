@@ -15,13 +15,16 @@ class FailedProxiedRequest:
     A delegated request that has failed for whatever reason
 
     The failure context (usually the exception) is stored in the `context`
-    property.
+    property. We also keep track of the proxy URL that serviced the request so
+    downstream consumers can make informed retry decisions.
     """
 
     context = None
+    proxy_url = None
 
-    def __init__(self, context=None):
+    def __init__(self, context=None, proxy_url=None):
         self.context = context
+        self.proxy_url = proxy_url
 
 
 class NoProxiesAvailableError(Exception):
@@ -561,6 +564,13 @@ class DelegatedRequestHandler:
                             self.log.info(f"Removed proxy {proxy_url} (completed all active requests)")
                     try:
                         response = url_metadata.proxied.request.result()
+                        # annotate the response so processors can see which
+                        # proxy (if any) handled the request
+                        setattr(
+                            response,
+                            "_4cat_proxy",
+                            url_metadata.proxied.proxy.proxy_url,
+                        )
                         url_metadata.proxied.result = response
 
                     except requests.exceptions.ProxyError as e:
@@ -590,7 +600,9 @@ class DelegatedRequestHandler:
                         urllib3.exceptions.HTTPError,
                     ) as e:
                         # this is where timeouts, etc, go
-                        url_metadata.proxied.result = FailedProxiedRequest(e)
+                        url_metadata.proxied.result = FailedProxiedRequest(
+                            e, url_metadata.proxied.proxy.proxy_url
+                        )
 
                     finally:
                         # success or fail, we can pass it on
