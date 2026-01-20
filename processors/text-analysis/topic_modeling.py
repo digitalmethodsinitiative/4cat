@@ -112,25 +112,25 @@ class TopicModeler(BasicProcessor):
         model_metadata = {'parameters': self.parameters}
         # go through all archived token sets and vectorise them
         index = 0
-        for token_file in self.dataset.iterate_archive_contents():
+        for token in self.source_dataset.iterate_items():
             # Check for and open token metadata file
-            if token_file.name == '.token_metadata.json':
+            if token.file.name == '.token_metadata.json':
                 # Copy the token metadata into our staging area
-                shutil.copyfile(token_file, staging_area.joinpath(".token_metadata.json"))
+                shutil.copyfile(token.file, staging_area.joinpath(".token_metadata.json"))
                 continue
 
             index += 1
-            self.dataset.update_status("Processing token set %i (%s)" % (index, token_file.stem))
+            self.dataset.update_status("Processing token set %i (%s)" % (index, token.file.stem))
             self.dataset.update_progress(index / self.source_dataset.num_rows)
 
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while topic modeling")
 
             # temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-            with token_file.open("rb") as binary_tokens:
+            with token.file.open("rb") as binary_tokens:
                 tokens = json.load(binary_tokens)
 
-            self.dataset.update_status("Vectorising token set '%s'" % token_file.stem)
+            self.dataset.update_status("Vectorising token set '%s'" % token.file.stem)
             vectoriser = vectoriser_class(tokenizer=token_helper, lowercase=False, min_df=min_df, max_df=max_df)
 
             try:
@@ -143,7 +143,7 @@ class TopicModeler(BasicProcessor):
 
             features = vectoriser.get_feature_names_out()
 
-            self.dataset.update_status("Fitting token clusters for token set '%s'" % token_file.stem)
+            self.dataset.update_status("Fitting token clusters for token set '%s'" % token.file.stem)
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fitting LDA model")
 
@@ -152,19 +152,19 @@ class TopicModeler(BasicProcessor):
 
             # store features too, because we need those to later know what
             # tokens the modeled weights correspond to
-            self.dataset.update_status("Storing model for token set '%s'" % token_file.stem)
-            with staging_area.joinpath("%s.features" % token_file.stem).open("wb") as outfile:
+            self.dataset.update_status("Storing model for token set '%s'" % token.file.stem)
+            with staging_area.joinpath("%s.features" % token.file.stem).open("wb") as outfile:
                 pickle.dump(features, outfile)
 
-            with staging_area.joinpath("%s.model" % token_file.stem).open("wb") as outfile:
+            with staging_area.joinpath("%s.model" % token.file.stem).open("wb") as outfile:
                 pickle.dump(model, outfile)
 
             # Storing vectors and vectoriser for LDA visualisation
-            self.dataset.update_status("Storing vectors and vectoriser for token set '%s'" % token_file.stem)
-            with staging_area.joinpath("%s.vectors" % token_file.stem).open("wb") as outfile:
+            self.dataset.update_status("Storing vectors and vectoriser for token set '%s'" % token.file.stem)
+            with staging_area.joinpath("%s.vectors" % token.file.stem).open("wb") as outfile:
                 pickle.dump(vectors, outfile)
 
-            with staging_area.joinpath("%s.vectoriser" % token_file.stem).open("wb") as outfile:
+            with staging_area.joinpath("%s.vectoriser" % token.file.stem).open("wb") as outfile:
                 pickle.dump(vectoriser, outfile)
 
             # Collect Metadata
@@ -177,17 +177,17 @@ class TopicModeler(BasicProcessor):
                                             'topic_index': topic_index,
                                             'top_five_features': top_five_features,
                                             }
-            model_metadata[token_file.name] = {
-                                          'model_file': "%s.model" % token_file.stem,
-                                          'feature_file': "%s.features" % token_file.stem,
-                                          'source_token_file': token_file.name,
+            model_metadata[token.file.name] = {
+                                          'model_file': "%s.model" % token.file.stem,
+                                          'feature_file': "%s.features" % token.file.stem,
+                                          'source_token_file': token.file.name,
                                           'model_topics': model_topics,
                                           }
 
             # Make predictions
             # This could be done in another processor, but we have the model right here
             predicted_topics = model.transform(vectors)
-            model_metadata[token_file.name]['predictions'] = {i:{topic:unnormalized_distribution for topic, unnormalized_distribution in enumerate(doc_predictions)} for i, doc_predictions in enumerate(predicted_topics)}
+            model_metadata[token.file.name]['predictions'] = {i:{topic:unnormalized_distribution for topic, unnormalized_distribution in enumerate(doc_predictions)} for i, doc_predictions in enumerate(predicted_topics)}
 
         # Save the model metadata in our staging area
         with staging_area.joinpath(".model_metadata.json").open("w", encoding="utf-8") as outfile:

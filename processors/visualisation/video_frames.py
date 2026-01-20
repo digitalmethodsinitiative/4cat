@@ -105,7 +105,7 @@ class VideoFrames(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for i, video in enumerate(self.dataset.items()):
+		for i, video in enumerate(self.source_dataset.iterate_items()):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
