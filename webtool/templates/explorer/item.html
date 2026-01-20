@@ -1,6 +1,6 @@
 <li id="item-{{ item.id }}" class="item{% if item.thread_id == item.id %} op{% endif %}">
 	{% if datasource == "media-import" %}
-        {% include "explorer/datasource-templates/media.html" %}
+        {% include "explorer/media.html" %}
     {% else %}
 		<!-- Template location as defined by the API endpoint. May be custom or generic. -->
 	{% include ["explorer-template/" + datasource + "-explorer.html",
