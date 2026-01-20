@@ -233,7 +233,7 @@ class WorkerManager:
 		:param int interrupt_level:  Retry later or cancel?
 		:param Job job:  Job object to cancel worker for
 		"""
-		for worker in self.iterate_active_workers():
+		for queue_id, worker in self.iterate_active_workers():
 			if worker.job.data["id"] == job.data["id"]:
 				# first cancel any interruptable postgres queries for this job's worker
 				while True:
