@@ -13,7 +13,7 @@ from jsonschema.exceptions import ValidationError, SchemaError
 from datetime import datetime, timedelta
 
 from common.lib.item_mapping import MappedItem
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
 from common.lib.llm import LLMAdapter
 from backend.lib.processor import BasicProcessor
@@ -310,12 +310,6 @@ class LLMPrompter(BasicProcessor):
                 "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
                 "whether local open-source LLMs are also an option.</strong>",
             },
-            "consent": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "I understand that my data is sent to the API provider and that they may incur costs.",
-                "requires": "api_or_local==api",
-                "default": False,
-            },
             "save_annotations": {
                 "type": UserInput.OPTION_ANNOTATION,
                 "label": "prompt outputs",
@@ -365,21 +359,12 @@ class LLMPrompter(BasicProcessor):
         
         self.dataset.update_status("Validating settings")
 
-        api_consent = self.parameters.get("consent", False)
-
         api_model = self.parameters.get("api_model")
         if api_model == "none":
             api_model = ""
 
         modal_location = self.parameters.get("api_or_local", "api") 
         hide_think = self.parameters.get("hide_think", False)
-
-        # Add some friction if an API is used.
-        if modal_location not in ["local", "hosted"] and not api_consent:
-            self.dataset.finish_with_error("You must consent to your data being sent to the LLM provider first")
-            return
-
-        self.dataset.delete_parameter("consent")
 
         # Optional media columns for files
         media_columns = self.parameters.get("media_columns", []) if self.parameters.get("use_media") else []
@@ -945,6 +930,37 @@ class LLMPrompter(BasicProcessor):
                 parsed_response = dict(sorted(parsed_response.items(), key=lambda item: int(item[0])))
 
         return list(parsed_response.values())
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Validate input
+
+        Checks if everything needed is filled in.
+
+        :param query:
+        :param request:
+        :param config:
+        :return:
+        """
+        if query["api_or_local"] == "api" and not query.get("api_key"):
+            raise QueryParametersException("You need to enter an API key when using third-party models.")
+
+        if not query["prompt"].strip():
+            raise QueryParametersException("The user prompt cannot be empty.")
+
+        # Get column values in prompt. These can be one or multiple, and multiple within a bracket as well.
+        columns_to_use = re.findall(r"\[.*?]", query["prompt"])
+        if not columns_to_use and not query["use_media"]:
+            raise QueryParametersException("You need to insert column name(s) in the user prompt within brackets "
+                                           "(e.g. '[body]' or '[timestamp, author]')")
+
+        if query["api_or_local"] == "api" and not query.get("frontend-confirm"):
+            raise QueryNeedsExplicitConfirmationException("Your data will be sent to a third-party service for "
+                                                          "processing, which will share your data with them and is "
+                                                          "likely to incur costs. Do you want to continue?")
+
+        return query
 
     @staticmethod
     def map_item(item):
