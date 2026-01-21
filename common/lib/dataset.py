@@ -1654,14 +1654,21 @@ class DataSet(FourcatModule):
 
     def finish_with_warning(self, num_rows: int, warning: str) -> None:
         """
-        Set warning as final status.
+        Indicate this dataset has finished with a warning. This needs
+        the number of completed rows. If `num_rows` is zero, warning
+        will be set to False as the dataset did not write anything and
+        is considered failed.
 
         :param str num_rows:  How many rows succeeded.
         :param str warning:  Warning message for final dataset status.
         :return:
         """
+        warning_bool = True
+        if num_rows <= 0:
+            warning_bool = False
+
         self.update_status(warning, is_final=True)
-        self.finish(num_rows, warning=True)
+        self.finish(num_rows, warning=warning_bool)
 
         return None
 
