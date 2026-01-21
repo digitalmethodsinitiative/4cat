@@ -184,10 +184,11 @@ class SearchMedia(BasicProcessor):
         skipped_files = []
         with zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as new_zip_archive:
             for file in request.files.getlist("option-data_upload"):
-                # Check if file is zip archive
+                # Trusts extension or mimetype
+                is_zip = file.filename.lower().endswith(".zip")
                 file_mime_type = mimetypes.guess_type(file.filename)[0]
-                if file_mime_type is not None and file_mime_type.split('/')[0] == "application" and \
-                        file_mime_type.split('/')[1] == "zip":
+
+                if is_zip or (file_mime_type is not None and file_mime_type == "application/zip"):
                     # Save inner files from zip archive to new zip archive with all files
                     file.seek(0)
                     zip_file_data = BytesIO(file.read())
