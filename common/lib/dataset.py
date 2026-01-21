@@ -880,7 +880,7 @@ class DataSet(FourcatModule):
                 if disposable_file.exists():
                     shutil.rmtree(disposable_file)
 
-    def finish(self, num_rows=0):
+    def finish(self, num_rows=0, warning=False):
         """
         Declare the dataset finished
         """
@@ -894,6 +894,7 @@ class DataSet(FourcatModule):
                 "is_finished": True,
                 "num_rows": num_rows,
                 "progress": 1.0,
+                "warning": warning,
                 "timestamp_finished": int(time.time()),
             },
         )
@@ -1648,6 +1649,19 @@ class DataSet(FourcatModule):
         """
         self.update_status(error, is_final=True)
         self.finish(0)
+
+        return None
+
+    def finish_with_warning(self, num_rows: int, warning: str) -> None:
+        """
+        Set warning as final status.
+
+        :param str num_rows:  How many rows succeeded.
+        :param str warning:  Warning message for final dataset status.
+        :return:
+        """
+        self.update_status(warning, is_final=True)
+        self.finish(num_rows, warning=True)
 
         return None
 
@@ -2486,7 +2500,6 @@ class DataSet(FourcatModule):
         :param attr:  Data key to get
         :return:  Value
         """
-
         if attr in dir(self):
             # an explicitly defined attribute should always be called in favour
             # of this passthrough
@@ -2495,7 +2508,7 @@ class DataSet(FourcatModule):
         elif attr in self.data:
             return self.data[attr]
         else:
-            raise AttributeError("DataSet instance has no attribute %s" % attr)
+           raise AttributeError("DataSet instance has no attribute %s" % attr)
 
     def __setattr__(self, attr, value):
         """

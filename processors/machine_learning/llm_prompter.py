@@ -540,7 +540,7 @@ class LLMPrompter(BasicProcessor):
         save_annotations = self.parameters.get("save_annotations", False)
 
         i = 0
-        outputs = 0
+        outputs = 0  # How many items we've written
         skipped = 0  # We'll skip empty values
 
         # Save items if we're batching prompts
@@ -726,11 +726,11 @@ class LLMPrompter(BasicProcessor):
                             skipped += 1
                             continue
                         else:
-                            self.dataset.finish_with_error(f"{e}")
+                            self.dataset.finish_with_warning(outputs, f"{e}")
                             return
                     # Broad exception, but necessary with all the different LLM providers and options...
                     except Exception as e:
-                        self.dataset.finish_with_error(f"{e}")
+                        self.dataset.finish_with_warning(outputs, f"Not all items processed: {e}")
                         return
 
                     # Set model name from the response for more details
@@ -741,8 +741,8 @@ class LLMPrompter(BasicProcessor):
 
                     if not response:
                         structured_warning = " with your specified JSON schema" if structured_output else ""
-                        self.dataset.finish_with_error(f"{model} could not return text{structured_warning}. Consider "
-                                                       f"editing your prompt or changing settings.")
+                        warning = f"{model} could not return text{structured_warning}. Consider editing your prompt or changing settings."
+                        self.dataset.finish_with_warning(outputs, warning)
                         return
 
                     # Always parse JSON outputs in the case of batches.
@@ -757,7 +757,7 @@ class LLMPrompter(BasicProcessor):
                             if len(output) != n_batched:
                                 self.dataset.update_status(f"Output did not result in {n_batched} item(s).\nInput:\n"
                                                            f"{prompt}\nOutput:\n{response}")
-                                self.dataset.finish_with_error("Model could not output as many values as the batch. See log "
+                                self.dataset.finish_with_warning(outputs, "Model could not output as many values as the batch. See log "
                                                                "for incorrect output. Try lowering the batch size, "
                                                                "editing the prompt, or using a different model.")
                                 return

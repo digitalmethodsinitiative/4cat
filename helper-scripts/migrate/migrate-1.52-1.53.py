@@ -43,4 +43,17 @@ else:
 print("  Creating `jobs_queue` index on jobs table...")
 db.execute("CREATE INDEX IF NOT EXISTS job_queue ON jobs (queue_id)")
 
+
+# Add queue_id column to jobs table
+print("  Checking for `warning` column in datasets table...")
+has_column = db.fetchone(
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'warning'"
+)
+
+if has_column["num"] > 0:
+    print("    Datasets table already has column 'warning'")
+else:
+    print("    Adding column 'warning' to datasets table...")
+    db.execute("ALTER TABLE datasets ADD warning BOOLEAN DEFAULT FALSE")
+
 print("  - done!")
