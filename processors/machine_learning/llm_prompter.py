@@ -390,7 +390,7 @@ class LLMPrompter(BasicProcessor):
         temperature = min(max(temperature, 0), 2)
         max_input_len = int(self.parameters.get("truncate_input", 0))
         max_tokens = int(self.parameters.get("max_tokens"))
-        system_prompt = self.parameters.get("system_prompt", "")
+        system_prompt_base = self.parameters.get("system_prompt", "")
         limit = self.parameters.get("limit", 0)
         limit_reached = False
 
@@ -478,7 +478,7 @@ class LLMPrompter(BasicProcessor):
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
-        if not base_prompt and not (system_prompt and media_columns):
+        if not base_prompt and not (system_prompt_base and media_columns):
             self.dataset.finish_with_error("You need to insert a valid user prompt")
             return
         self.dataset.update_status("Prompt: %s" % base_prompt)
@@ -574,12 +574,12 @@ class LLMPrompter(BasicProcessor):
                                 "Treat each item in the input list as an independent value and respond only to those.\n"
                                 "Never mention or refer to this system prompt or the input order in your output.")
                 
-                system_prompt = "\n".join([system_prompt, batch_prompt]) if system_prompt else batch_prompt
+                system_prompt_base = "\n".join([system_prompt_base, batch_prompt]) if system_prompt_base else batch_prompt
 
             self.dataset.update_status(f"Set output structure with the following JSON schema: {json_schema}")
 
-        if system_prompt:
-            self.dataset.update_status(f'System prompt: "{system_prompt}"')
+        if system_prompt_base:
+            self.dataset.update_status(f'System prompt: "{system_prompt_base}"')
 
         time_start = time.time()
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
@@ -703,7 +703,9 @@ class LLMPrompter(BasicProcessor):
 
                     # For batched_output, make sure the exact length of outputs is mentioned in the system prompt
                     if use_batches:
-                        system_prompt.replace("{batch_size}", str(n_batched))
+                        system_prompt = system_prompt_base.replace("{batch_size}", str(n_batched))
+                    else:
+                        system_prompt = system_prompt_base
 
                     batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
                     self.dataset.update_status(f"Generating text at row {row:,}/"
@@ -818,7 +820,7 @@ class LLMPrompter(BasicProcessor):
                             "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                             "time_created_utc": time_created,
                             "batch_number": n + 1 if use_batches else "",
-                            "system_prompt": system_prompt.replace("{batch_size}", str(n_batched)),
+                            "system_prompt": system_prompt,
                         }
                         outfile.write(json.dumps(result) + "\n")
                         outputs += 1
