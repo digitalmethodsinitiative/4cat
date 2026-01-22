@@ -187,7 +187,7 @@ class WorkerManager:
 		"""
 		Validate data sources
 
-		Logs warnings if not all information is precent for the configured data
+		Logs warnings if not all information is present for the configured data
 		sources.
 		"""
 		for datasource in self.modules.datasources:
