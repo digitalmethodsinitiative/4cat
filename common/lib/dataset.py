@@ -518,7 +518,7 @@ class DataSet(FourcatModule):
         # If we're getting annotations, we're caching items so we don't need to retrieve annotations one-by-one.
         get_annotations = True if self.annotation_fields and get_annotations else False
         if get_annotations:
-            annotation_fields = self.annotation_fields
+            annotation_fields = self.annotation_fields.copy()
             item_batch_size = 500
             dataset_item_cache = []
             annotations_before = int(time.time())
