@@ -41,7 +41,7 @@ class SearchTikTok(Search):
     @staticmethod
     def map_item(post):
         # Zeeschuimer metadata
-        metadata = post.get("__import_meta")
+        metadata = post.get("__import_meta", {})
 
         challenges = [challenge["title"] for challenge in post.get("challenges", [])]
 
@@ -81,7 +81,7 @@ class SearchTikTok(Search):
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url", "")),
+            "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url")) if metadata.get("source_platform_url") else "",
             "id": post["id"],
             "thread_id": post["id"],
             "author": user_nickname,
