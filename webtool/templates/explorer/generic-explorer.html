@@ -39,6 +39,10 @@ set all_known_fields = {
 	<a href="{{ fields.url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 {% endif %}
 
+
+<!-- item content-->
+<article>
+
 <!-- item header -->
 <header>
 	<span title="ID" class="id">{{ fields.get("id") }}</span>
@@ -69,10 +73,6 @@ set all_known_fields = {
 	{% endif %}
 
 </header>
-
-<!-- item content-->
-<article>
-
 	<!-- Media item -->
 	{% if fields.get("media") %}
 	<!-- Split media urls if there's commas in the field -->
@@ -92,7 +92,9 @@ set all_known_fields = {
 
 	<!-- item body -->
 	<div class="item-content">
+        <p>
 		{{ fields.body }}
+        </p>
 	</div>
 
 	<!-- Tags -->
