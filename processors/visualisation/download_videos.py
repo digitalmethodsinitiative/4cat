@@ -170,6 +170,7 @@ class VideoDownloaderPlus(BasicProcessor):
         self.url_files = None
         self.last_dl_status = None
         self.last_post_process_status = None
+        self.warning_message = None
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -325,19 +326,17 @@ class VideoDownloaderPlus(BasicProcessor):
         """
         # Check processor able to run
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No data from which to extract video URLs.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No data from which to extract video URLs.")
             return
 
         # Collect URLs
         try:
             urls = self.collect_video_urls()
         except ProcessorException as e:
-            self.dataset.update_status(str(e), is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error(str(e))
             return
 
-        self.dataset.log('Collected %i urls.' % len(urls))
+        self.dataset.update_status('Collected %i urls.' % len(urls))
 
         vid_lib = DatasetVideoLibrary(self.dataset, modules=self.modules)
 
@@ -387,9 +386,10 @@ class VideoDownloaderPlus(BasicProcessor):
         ytdlp_fallback_queue = []
 
         # Tier 1: Library check and queue preparation
+        self.dataset.update_status("Copying existing videos")
         for url in list(urls.keys()):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while downloading videos.")
+                raise ProcessorInterruptedException("Interrupted while collecting videos.")
 
             # Try to copy from library
             copy_result = self._try_copy_from_library(url, urls, vid_lib, results_path)
@@ -422,46 +422,56 @@ class VideoDownloaderPlus(BasicProcessor):
         stop_processing = False
         stop_reason = None
         
-        if direct_download_queue:
-            direct_results = self._process_direct_downloads(
-                direct_download_queue, urls, results_path, max_video_size,
-                also_indirect, amount, last_domains, ignore_not_video
-            )
-            
-            processed_urls += direct_results["processed"]
-            failed_downloads += direct_results["failed"]
-            # Track not_a_video for logging purposes
-            _ = direct_results["not_a_video_consecutive"]  # noqa: F841
-            total_not_a_video += direct_results["not_a_video_total"]
-            consecutive_errors = direct_results["consecutive_errors"]
-            ytdlp_fallback_queue = direct_results["ytdlp_queue"]
-            stop_processing = direct_results["stop_processing"]
-            stop_reason = direct_results["stop_reason"]
-            # Note: self.downloaded_videos already updated in real-time during processing
+        try:
+            if direct_download_queue:
+                self.dataset.update_status("Downloading videos directly")
+                direct_results = self._process_direct_downloads(
+                    direct_download_queue, urls, results_path, max_video_size,
+                    also_indirect, amount, last_domains, ignore_not_video
+                )
+                
+                processed_urls += direct_results["processed"]
+                failed_downloads += direct_results["failed"]
+                # Track not_a_video for logging purposes
+                _ = direct_results["not_a_video_consecutive"]  # noqa: F841
+                total_not_a_video += direct_results["not_a_video_total"]
+                consecutive_errors = direct_results["consecutive_errors"]
+                ytdlp_fallback_queue = direct_results["ytdlp_queue"]
+                stop_processing = direct_results["stop_processing"]
+                stop_reason = direct_results["stop_reason"]
+                # Note: self.downloaded_videos already updated in real-time during processing
 
-        # Handle stop conditions
-        if stop_processing and stop_reason == "limit":
-            for url in ytdlp_fallback_queue:
-                urls[url]["error"] = "Max video download limit already reached."
-            ytdlp_fallback_queue = []
-        elif stop_processing and stop_reason in {"errors", "no-videos"}:
-            ytdlp_fallback_queue = []
+            # Handle stop conditions
+            if stop_processing and stop_reason == "limit":
+                for url in ytdlp_fallback_queue:
+                    urls[url]["error"] = "Max video download limit already reached."
+                ytdlp_fallback_queue = []
+            elif stop_processing and stop_reason in {"errors", "no-videos"}:
+                ytdlp_fallback_queue = []
 
-        # Tier 3: YT-DLP fallback for indirect/complex URLs
-        if ytdlp_fallback_queue and not stop_processing:
-            ytdlp_results = self._process_ytdlp_downloads(
-                ytdlp_fallback_queue, urls, ydl_opts, results_path,
-                amount, also_indirect, yt_dlp_archive_map, consecutive_errors
-            )
-            
-            failed_downloads += ytdlp_results["failed"]
-            processed_urls += ytdlp_results["processed"]
-
-            
-        # Save metadata and finish
-        self._save_metadata(urls, results_path)
-        self._log_statistics(total_urls, processed_urls, skipped_urls, copied_videos, failed_downloads, total_not_a_video)
-        self._finish_processing(results_path, copied_videos, failed_downloads, total_not_a_video, processed_urls, total_urls)
+            # Tier 3: YT-DLP fallback for indirect/complex URLs
+            if ytdlp_fallback_queue and not stop_processing:
+                self.dataset.update_status("Downloading videos with YT-DLP")
+                ytdlp_results = self._process_ytdlp_downloads(
+                    ytdlp_fallback_queue, urls, ydl_opts, results_path,
+                    amount, also_indirect, yt_dlp_archive_map, consecutive_errors
+                )
+                
+                failed_downloads += ytdlp_results["failed"]
+                processed_urls += ytdlp_results["processed"]
+        except ProcessorInterruptedException as e:
+            # Interrupted; ensure we save metadata and finish with warning
+            self.warning_message = str(e)
+        except Exception as e:
+            # This ensures dataset is finished_with_warning below in finally block
+            self.warning_message = str(e)
+            # Re-raise for logging and notification
+            raise e
+        finally:
+            # Save metadata and finish
+            self._save_metadata(urls, results_path)
+            self._log_statistics(total_urls, processed_urls, skipped_urls, copied_videos, failed_downloads, total_not_a_video)
+            self._finish_processing(results_path, copied_videos, failed_downloads, total_not_a_video, processed_urls, total_urls)
 
     def _setup_ytdlp_options(self, results_path, max_video_size, max_video_res, allow_unknown_sizes):
         """
@@ -625,12 +635,8 @@ class VideoDownloaderPlus(BasicProcessor):
                         results["consecutive_errors"] += 1
                 
                 # Check stop conditions
-                if download_result.get("stop_action") == "finish":
+                if download_result.get("stop_action"):
                     self.flush_proxied_requests()
-                    results["stop_processing"] = True
-                    results["stop_reason"] = download_result.get("stop_reason", "errors")
-                    break
-                elif download_result.get("stop_action") == "break":
                     results["stop_processing"] = True
                     results["stop_reason"] = download_result.get("stop_reason", "errors")
                     break
@@ -928,7 +934,7 @@ class VideoDownloaderPlus(BasicProcessor):
     def _finish_processing(self, results_path, copied_videos, failed_downloads, total_not_a_video, processed_urls, total_urls):
         """Finish processing and create result archive"""
         self.dataset.update_status("Writing downloaded videos to zip archive")
-        self.write_archive_and_finish(results_path, self.downloaded_videos + copied_videos)
+        self.write_archive_and_finish(results_path, self.downloaded_videos + copied_videos, finish=False)
         
         status_msg = f"Downloaded {self.downloaded_videos} videos"
         if copied_videos > 0:
@@ -939,8 +945,13 @@ class VideoDownloaderPlus(BasicProcessor):
             status_msg += f"; {total_not_a_video} URLs were not videos."
         if processed_urls > 0:
             status_msg += f"; Processed {processed_urls} URLs of {total_urls}."
-            
-        self.dataset.update_status(status_msg, is_final=True)
+        
+        if self.warning_message:
+            self.dataset.update_status(status_msg)
+            self.dataset.finish_with_warning(self.downloaded_videos, f"Incomplete: {self.warning_message}")
+        else:
+            self.dataset.update_status(status_msg, is_final=True)
+            self.dataset.finish(self.downloaded_videos)
 
     def yt_dlp_monitor(self, d):
         """Can be used to gather information from yt-dlp while downloading"""
@@ -1066,12 +1077,9 @@ class VideoDownloaderPlus(BasicProcessor):
         message = "Too many consecutive non-video URLs encountered; " + (
             "try again with Non-direct videos option selected" if allow_indirect else "try extracting URLs and filtering dataset first"
         )
-        self.dataset.update_status(message, is_final=True)
-        
-        if self.downloaded_videos == 0:
-            self.dataset.finish(0)
-            return "finish"
-        return "break"
+        self.warning_message = message
+        self.dataset.update_status(message)
+        return message 
 
     def _handle_consecutive_error_stop(self, consecutive_errors, also_indirect):
         """Handle stopping condition for too many consecutive errors"""
@@ -1082,13 +1090,9 @@ class VideoDownloaderPlus(BasicProcessor):
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; try deselecting the non-direct videos setting"
         else:
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; check logs to ensure video URLs are working links and you are not being blocked."
-            
-        self.dataset.update_status(message, is_final=True)
-        
-        if self.downloaded_videos == 0:
-            self.dataset.finish(0)
-            return "finish"
-        return "break"
+        self.warning_message = message
+        self.dataset.update_status(message)
+        return message 
 
     def _update_download_status(self):
         """Update download progress status"""
@@ -1111,6 +1115,8 @@ class VideoDownloaderPlus(BasicProcessor):
 
         self.dataset.update_status("Reading source file")
         for index, post in enumerate(self.source_dataset.iterate_items(self)):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while collecting video URLs.")
             item_urls = set()
             if index + 1 % 250 == 0:
                 self.dataset.update_status(f"Extracting video links from item {index + 1}/{self.source_dataset.num_rows}")
