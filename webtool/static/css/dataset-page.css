@@ -350,6 +350,11 @@ article.result > section:first-child {
     color: var(--always-white);
 }
 
+.warning {
+    background: var(--accent-warning);
+    color: var(--always-white);
+}
+
 .child-wrapper .button-wrap.processor-result-indicator a {
     display: inline-block;
     color: inherit;
