@@ -14,7 +14,7 @@ import time
 from pathlib import PurePath
 
 from backend.lib.worker import BasicWorker
-from common.lib.dataset import DataSet
+from common.lib.dataset import DataSet, StatusType
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
@@ -167,8 +167,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         self.dataset.clear_log()
         self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
 
-        # start log file
-        self.dataset.update_status("Processing data")
+        # start log file; update dataset status_type to processing
+        self.dataset.update_status("Processing data", status_type=StatusType.PROCESSING)
         self.dataset.update_version(get_software_commit(self))
 
         # we may create temporary files with the processor; anything in here
@@ -211,10 +211,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 if not self.job.is_finished:
                     self.job.finish()
             except WorkerInterruptedException as e:
-                self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
+                self.dataset.log("Processing interrupted: %s" % str(e))
+                self.dataset.update_status("Processing interrupted, trying again later", status_type=StatusType.QUEUED)
                 self.abort()
             except Exception as e:
-                self.dataset.log("Processor crashed (%s), trying again later" % str(e))
+                self.dataset.log("Processor crashed: %s" % str(e))
+                self.dataset.update_status("Processor error, trying again later", status_type=StatusType.QUEUED)
                 stack = traceback.extract_tb(e.__traceback__)
                 frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack[1:]]
                 location = "->".join(frames)

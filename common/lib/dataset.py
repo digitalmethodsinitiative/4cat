@@ -10,6 +10,7 @@ import time
 import csv
 import re
 import os
+from enum import Enum
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -20,6 +21,14 @@ from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
                                    MapItemException, MappedItemIncompleteException, AnnotationException)
 
+
+class StatusType(Enum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    SUCCESS = "finished"
+    EMPTY = "empty"
+    WARNING = "warning"
+    ERROR = "error"
 
 class DataSet(FourcatModule):
     """
@@ -172,6 +181,7 @@ class DataSet(FourcatModule):
                 "parameters": json.dumps(parameters),
                 "result_file": "",
                 "creator": owner,
+                "status_type": StatusType.QUEUED.value,
                 "status": "",
                 "type": type,
                 "timestamp": int(time.time()),
@@ -880,12 +890,21 @@ class DataSet(FourcatModule):
                 if disposable_file.exists():
                     shutil.rmtree(disposable_file)
 
-    def finish(self, num_rows=0, warning=False):
+    def finish(self, num_rows=0, status_type=None):
         """
         Declare the dataset finished
+
+        :param int num_rows:  Number of rows in the dataset
+        :param StatusType status_type:  Status type to set the dataset to.
+          If omitted, set to SUCCESS if num_rows > 0, else EMPTY
         """
         if self.data["is_finished"]:
             raise RuntimeError("Cannot finish a finished dataset again")
+        
+        if status_type is None:
+            status_type = StatusType.SUCCESS if num_rows > 0 else StatusType.EMPTY
+        elif not isinstance(status_type, StatusType):
+            raise ValueError("status_type must be a StatusType enum value")
 
         self.db.update(
             "datasets",
@@ -894,13 +913,13 @@ class DataSet(FourcatModule):
                 "is_finished": True,
                 "num_rows": num_rows,
                 "progress": 1.0,
-                "warning": warning,
+                "status_type": status_type.value,
                 "timestamp_finished": int(time.time()),
             },
         )
         self.data["is_finished"] = True
         self.data["num_rows"] = num_rows
-
+        self.data["status_type"] = status_type.value
     def copy(self, shallow=True):
         """
         Copies the dataset, making a new version with a unique key
@@ -1564,7 +1583,7 @@ class DataSet(FourcatModule):
         """
         return self.data["status"]
 
-    def update_status(self, status, is_final=False):
+    def update_status(self, status, is_final=False, status_type=None):
         """
         Update dataset status
 
@@ -1579,10 +1598,15 @@ class DataSet(FourcatModule):
         :param bool is_final:  If this is `True`, subsequent calls to this
         method while the object is instantiated will not update the dataset
         status.
+        :param StatusType|None status_type:  Type of status. If provided, this updates
+        the `status_type` field of the dataset as well.
         :return bool:  Status update successful?
         """
         if self.no_status_updates:
             return
+        
+        if status_type is not None and not isinstance(status_type, StatusType):
+            raise ValueError("status_type must be a StatusType enum value")
 
         # for presets, copy the updated status to the preset(s) this is part of
         if self.preset_parent is None:
@@ -1595,11 +1619,16 @@ class DataSet(FourcatModule):
         if self.preset_parent:
             for preset_parent in self.preset_parent:
                 if not preset_parent.is_finished():
-                    preset_parent.update_status(status)
+                    preset_parent.update_status(status, status_type=status_type)
 
+        # Update own status
+        status_data = {"status": status}
+        if status_type is not None:
+            self.data["status_type"] = status_type.value
+            status_data["status_type"] = status_type.value
         self.data["status"] = status
         updated = self.db.update(
-            "datasets", where={"key": self.data["key"]}, data={"status": status}
+            "datasets", where={"key": self.data["key"]}, data=status_data
         )
 
         if is_final:
@@ -1637,7 +1666,7 @@ class DataSet(FourcatModule):
         """
         return self.data["progress"]
 
-    def finish_with_error(self, error):
+    def finish_with_error(self, error: str) -> None:
         """
         Set error as final status, and finish with 0 results
 
@@ -1648,27 +1677,25 @@ class DataSet(FourcatModule):
         :return:
         """
         self.update_status(error, is_final=True)
-        self.finish(0)
+        self.finish(0, status_type=StatusType.ERROR)
 
         return None
 
     def finish_with_warning(self, num_rows: int, warning: str) -> None:
         """
         Indicate this dataset has finished with a warning. This needs
-        the number of completed rows. If `num_rows` is zero, warning
-        will be set to False as the dataset did not write anything and
+        the number of completed rows. If `num_rows` is zero, status_type
+        will be set to "error" as the dataset did not write anything and
         is considered failed.
 
         :param str num_rows:  How many rows succeeded.
         :param str warning:  Warning message for final dataset status.
         :return:
         """
-        warning_bool = True
-        if num_rows <= 0:
-            warning_bool = False
+        status_type = StatusType.ERROR if num_rows <= 0 else StatusType.WARNING
 
         self.update_status(warning, is_final=True)
-        self.finish(num_rows, warning=warning_bool)
+        self.finish(num_rows, status_type=status_type)
 
         return None
 
