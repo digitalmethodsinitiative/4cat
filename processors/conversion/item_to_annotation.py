@@ -17,6 +17,7 @@ class ItemToAnnotation(BasicProcessor):
     """
     type = "item-to-annotation"  # job type ID
     category = "Conversion"  # category
+    filter = True  # to indicate we're filtering the top dataset
     title = "Convert items to annotations"  # title displayed in UI
     description = ("Convert a regular dataset item to an annotation. This will show it as a separate value in the "
                    "Explorer. Item values must be numbers or strings.")  # description displayed in UI

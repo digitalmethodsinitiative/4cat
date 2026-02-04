@@ -137,6 +137,7 @@ class ClassificationEvaluation(BasicProcessor):
 
         # Prepare list of labels
         count = 1
+        skipped = 0
 
         self.dataset.update_status("Preparing labels")
         for item in self.source_dataset.iterate_items():
@@ -149,6 +150,7 @@ class ClassificationEvaluation(BasicProcessor):
             count += 1
 
             if skip_empty and (not label_pred or not label_true):
+                skipped += 1
                 self.dataset.update_status(f"Skipping row {count}, no input value(s)")
                 continue
             elif not skip_empty and (not label_pred or not label_true):
@@ -162,6 +164,7 @@ class ClassificationEvaluation(BasicProcessor):
                     label_true = str(label_true).lower().strip()
                     label_pred = str(label_pred).lower().strip()
                 except ValueError:
+                    skipped += 1
                     self.dataset.update_status(f"Labels '{label_true}' and '{label_pred}' could not be converted to "
                                                f"text (types: {type(label_true)}, {type(label_pred)}), skipping")
                     continue
@@ -229,4 +232,5 @@ class ClassificationEvaluation(BasicProcessor):
 
         # Finish up
         self.dataset.update_status("Saving results")
-        self.write_csv_items_and_finish(results)
+        warning = None if not skipped else f"Skipped {skipped} rows that were empty or could not be converted"
+        self.write_csv_items_and_finish(results, warning=warning)

@@ -187,4 +187,5 @@ class RegressionEvaluation(BasicProcessor):
 
         # Finish up
         self.dataset.update_status("Saving results")
-        self.write_csv_items_and_finish(results)
+        warning = None if not skipped_rows else f"Skipped {skipped_rows} rows with missing or invalid values"
+        self.write_csv_items_and_finish(results, warning=warning)

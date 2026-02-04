@@ -78,8 +78,7 @@ class DateFilter(BaseFilter):
 
         # Should not be None
         if not min_date or not max_date:
-            self.dataset.update_status("No date range provided", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No date range provided")
             return
 
         # Convert to datetime for easy comparison
