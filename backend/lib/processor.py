@@ -590,7 +590,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 archive_file.extract(filename, staging_area)
                 return staging_area.joinpath(filename)
 
-    def write_csv_items_and_finish(self, data):
+    def write_csv_items_and_finish(self, data, warning=None):
         """
         Write data as csv to results file and finish dataset
 
@@ -600,6 +600,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         processor is set while iterating.
 
         :param data: A list or tuple of dictionaries, all with the same keys
+        :param warning: An optional warning. Will set the dataset type to 'warning'.
         """
         if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data, str):
             raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
@@ -621,8 +622,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
                 writer.writerow(row)
 
-        self.dataset.update_status("Finished")
-        self.dataset.finish(len(data))
+        if not warning:
+            self.dataset.update_status("Finished")
+            self.dataset.finish(len(data))
+        else:
+            self.dataset.finish_with_warning(len(data), warning)
 
     def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
         """
@@ -898,7 +902,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :todo: Make this a bit more robust than sniffing the processor category
         :return bool:
         """
-        return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
+        return (hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()) or (hasattr(cls, "filter") and cls.filter)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -355,6 +355,11 @@ article.result > section:first-child {
     color: var(--always-white);
 }
 
+.empty {
+    background: var(--gray-light);
+    color: var(--gray-darker);
+}
+
 .child-wrapper .button-wrap.processor-result-indicator a {
     display: inline-block;
     color: inherit;
@@ -427,8 +432,8 @@ article.result > section:first-child {
     display: inline-block;
 }
 
-.child-list:not(.processor-list) li:not(.inline) > .processor-header header:after {
-    content: ':';
+.child-list:not(.processor-list) li:not(.inline) > .processor-header header {
+    margin-right: 0.2em;
 }
 
 .child-list .processor-details {

@@ -1692,10 +1692,9 @@ class DataSet(FourcatModule):
         :param str warning:  Warning message for final dataset status.
         :return:
         """
-        status_type = StatusType.ERROR if num_rows <= 0 else StatusType.WARNING
 
         self.update_status(warning, is_final=True)
-        self.finish(num_rows, status_type=status_type)
+        self.finish(num_rows, status_type=StatusType.WARNING)
 
         return None
 

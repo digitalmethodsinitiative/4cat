@@ -6,33 +6,37 @@
 <li id="child-{{ item.key }}" data-dataset-key="{{ item.key }}" class="child-wrapper{% if not item.is_finished() or (is_filtered and "copied_to" not in item.parameters) %} running{% endif %}" data-status="{{ item.status }}">
     {# The status button for this processor #}
 
-    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if item.status_type == 'queued' %} queued-button{% endif %} {% if not item.is_finished() %} pending {% elif item.status_type == 'error' or item.status_type == 'empty' %} failed {% elif item.status_type %} warning {% else %} finished {% endif %}{% if item.progress and item.progress > 0 and not item.is_finished() %} progress progress-{{ (item.progress * 100)|round(0)|int }}{% endif %}">
+    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if item.status_type == 'queued' %} queued-button{% endif %} {% if not item.is_finished() %} pending {% elif item.status_type == 'error' %} failed {% elif item.status_type == 'empty' %} empty {% elif item.status_type == 'warning' %} warning {% else %} finished {% endif %}{% if item.progress and item.progress > 0 and not item.is_finished() %} progress progress-{{ (item.progress * 100)|round(0)|int }}{% endif %}">
 
     <div class="button-object">
 
         <span class="headline">
             {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('dataset.show_result', key=item.parameters.copied_to) }}">{% endif %}
-            {% if is_filtered %}
-            <i class="fa fa-filter" aria-hidden="true"></i> <span class="sr-only">Filter</span>
-            {% elif item.is_finished() and item.num_rows > 0 %}
-                {% if item.get_results_path().exists() %}
-                    {% if item.get_own_processor().map_item and item.get_extension() != "csv" %}<a href="{{ url_for('dataset.get_mapped_result', key=item.key) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> csv</a>
+            {% if item.is_finished() %}
+                {% if item.status_type == "empty" %}
+                    <i class="fa fa-xmark" aria-hidden="true"></i>
+                {% elif item.status_type == "error" %}
+                    <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                {% elif is_filtered and "copied_to" in item.parameters %}
+                    <i class="fa fa-check" aria-hidden="true"></i>
+                {% elif is_filtered %}
+                   <i class="fa fa-filter" aria-hidden="true"></i> <span class="sr-only">Filter</span>
+                {% elif item.get_results_path().exists() and item.num_rows > 0 %}
+                    {% if item.get_own_processor().map_item and item.get_extension() != "csv" %}
+                        <a href="{{ url_for('dataset.get_mapped_result', key=item.key) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> csv</a>
                     {% endif %}
-                    <a href="{{ url_for('dataset.get_result', query_file=item.result_file) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ processors[item.type].extension if item.type in processors else "" }}, {{ item.get_results_path()|filesize_short }}</a>
-                {% else %}
-                   <i class="fa fa-circle-check" aria-hidden="true"></i> 
+                    <a href="{{ url_for('dataset.get_result', query_file=item.result_file) }}"><i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ item.get_results_path()|filesize_short }} {{ processors[item.type].extension if item.type in processors else "" }}</a>
                 {% endif %}
-            {% elif item.is_finished() %}
-            <i class="fa fa-skull" aria-hidden="true"></i>
             {% elif "queued" in item.status|lower %}
-            <i class="fa fa-hourglass-half" aria-hidden="true"></i>
+                <i class="fa fa-hourglass-half" aria-hidden="true"></i>
             {% else %}
-            <i class="fa fa-spin fa-sync-alt" aria-hidden="true"></i>
+                <i class="fa fa-spin fa-sync-alt" aria-hidden="true"></i>
             {% endif %}
         </span>
         <span class="byline">
-            {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('dataset.show_result', key=item.parameters.copied_to) }}">{% endif %}
-            {% if item.is_finished() and item.num_rows >= 0 %}
+            {% set filter_dataset_created = item.is_finished() and is_filtered and "copied_to" in item.parameters %}
+            {% if filter_dataset_created %}<a href="{{ url_for('dataset.show_result', key=item.parameters.copied_to) }}">{% endif %}
+            {% if item.is_finished() and item.num_rows > 0 %}
                 {% if is_filtered and "copied_to" in item.parameters %}
                     New dataset
                 {% elif is_filtered %}
@@ -43,14 +47,15 @@
                     </span>
                     <p role="tooltip" id="tooltip-metadata-{{ item.key }}" aria-hidden="true">{{ "{:,}".format(item.num_rows) }} {{processors[item.type].extension|ext2noun if not deprecated else ""}}{% if item.num_rows != 1 %}s{% endif %}</p>
                 {% endif %}
-            {% elif item.is_finished() %}
-                {% if is_filtered %}{% if item.num_rows == 0 %}No posts left{% else %}Filter failed{% endif %}{% else %}No results{% endif %}
+            {% elif item.is_finished() and item.status_type == "empty" %}
+                {% if is_filtered %}No items left{% else %}No results{% endif %}
+            {% elif item.is_finished() and item.status_type == "error" %}Failed
             {% elif "queued" in item.status|lower %}
                 {% if is_filtered %}Filter queued{% else %}Queued{% endif %}
             {% else %}
                 {% if is_filtered %}Filtering...{% else %}In progress{% endif %}
             {% endif %}
-            {% if item.is_finished() and ("copied_to" in item.parameters or not is_filtered) %}</a>{% endif %}
+            {% if filter_dataset_created %}</a>{% endif %}
         </span>
         <span class="queue-notice"></span>
 
@@ -66,10 +71,9 @@
         </header>
 
         <span class="processor-status">
-            {% if item.is_finished() and item.num_rows == 0 %}No results.{% endif %}
-        {% with dataset=item, no_icons=True %}
-            {% include "components/result-status.html" %}
-        {% endwith %}
+            {% with dataset=item, no_icons=True %}
+                {% include "components/result-status.html" %}
+            {% endwith %}
         </span>
 
         {# Parameters #}
