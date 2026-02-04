@@ -192,10 +192,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 						raise e
 
 			except UnicodeDecodeError:
-				self.dataset.update_status(
-					"Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.",
-					is_final=True)
-				self.dataset.finish(0)
+				self.dataset.finish_with_error(
+					"Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.")
 				return
 
 			# save - we only save the KeyedVectors for the model, this
@@ -208,9 +206,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 			models += 1
 
 		if models == 0:
-			self.dataset.update_status("Not enough data in source file to train %s models." % model_builder.__name__)
 			shutil.rmtree(staging_area)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Not enough data in source file to train %s models." % model_builder.__name__)
 			return
 
 		# create another archive with all model files in it

@@ -135,8 +135,7 @@ class LexicalFilter(BaseFilter):
                     lexicon_regexes[lexicon_id] = re.compile(
                         r"\b(" + "|".join(phrases) + r")\b")
             except re.error:
-                self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error("Invalid regular expression, cannot use as filter")
                 return
 
         # now for the real deal

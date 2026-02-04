@@ -118,7 +118,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
         # is there anything for us to download?
         if self.source_dataset.num_rows == 0:
-            self.dataset.finish_with_error("No images to download.")
+            self.dataset.finish_as_empty("No images to download.")
             return
 
         max_images = convert_to_int(self.parameters.get("amount", 0), 100)

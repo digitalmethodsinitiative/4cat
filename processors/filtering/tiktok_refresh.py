@@ -47,8 +47,8 @@ class UpdateTikTok(BasicProcessor):
                 urls.append(mapped_item.get("tiktok_url"))
 
         if not urls:
-            self.dataset.update_status("Unable to extract TikTok URLs", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Unable to extract TikTok URLs")
+            return
 
         self.dataset.update_status(f"Collected {len(urls)} to refresh.")
         tiktok_scraper = TikTokScraper(processor=self, config=self.config)

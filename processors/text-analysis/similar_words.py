@@ -88,8 +88,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		depth = max(1, min(3, convert_to_int(self.parameters.get("crawl_depth"))))
 		input_words = self.parameters.get("words", "")
 		if not input_words or not input_words.split(","):
-			self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("No input words provided, cannot look for similar words.")
 			return
 
 		input_words = input_words.split(",")
@@ -171,10 +170,10 @@ class SimilarWord2VecWords(BasicProcessor):
 		shutil.rmtree(staging_area)
 
 		if not result:
-			self.dataset.update_status("None of the words were found in the word embedding model.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("None of the words were found in the word embedding model.")
+			return
 		else:
-			if not self.flawless:
-				self.dataset.update_status(
-					"Dataset complete, but some input words were not found in the embedding models (0 occurances in model due to chosen thresholds). Similar words are still identified; check log for specifics.", is_final=True)
-			self.write_csv_items_and_finish(result)
+			warning = None if self.flawless else ("Dataset complete, but some input words were not found in the "
+												  "embedding models (0 occurances in model due to chosen thresholds). "
+												  "Similar words are still identified; check log for specifics.")
+			self.write_csv_items_and_finish(result, warning=warning)

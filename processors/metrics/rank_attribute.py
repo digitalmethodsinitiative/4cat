@@ -170,8 +170,7 @@ class AttributeRanker(BasicProcessor):
             else:
                 filter = None
         except (TypeError, re.error):
-            self.dataset.update_status("Could not complete: regular expression invalid")
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Could not complete: regular expression invalid")
             return
 
         # we need to be able to order the values later, chronologically, so use
@@ -275,8 +274,7 @@ class AttributeRanker(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.update_status("No items contain the requested attributes.")
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No items contain the requested attributes.")
 
     def get_values(self, post, attributes, filter, split_comma, extract):
         """

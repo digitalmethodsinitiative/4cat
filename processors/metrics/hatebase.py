@@ -104,8 +104,7 @@ class HatebaseAnalyser(BasicProcessor):
         self.dataset.log(f"Language: {language}; Columns: {columns}")
 
         if not columns:
-            self.dataset.update_status("No columns selected; no data analysed.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No columns selected; no data analysed.")
             return
 
         # read and convert to a way we can easily match whether any word occurs
@@ -118,8 +117,7 @@ class HatebaseAnalyser(BasicProcessor):
         hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase]) + r")\b")
 
         if not hatebase or not hatebase_regex:
-            self.dataset.update_status("No hatebase data found for the selected language.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No hatebase data found for the selected language.")
             return
 
         processed = 0
@@ -188,8 +186,7 @@ class HatebaseAnalyser(BasicProcessor):
                     writer.writerow(row)
                 except ValueError as e:
                     self.log.error(str(e))
-                    self.dataset.update_status("Cannot write results. Your input file may contain invalid CSV data.")
-                    self.dataset.finish(0)
+                    self.dataset.finish_with_error("Cannot write results. Your input file may contain invalid CSV data.")
                     return
 
         self.dataset.log(f"Total terms matched: {matches}")

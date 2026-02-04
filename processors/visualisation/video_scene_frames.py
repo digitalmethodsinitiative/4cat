@@ -81,8 +81,7 @@ class VideoSceneFrames(BasicProcessor):
         """
         # Check processor able to run
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No videos from which to extract frames.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No videos from which to extract frames.")
             return
 
         # Collect parameters

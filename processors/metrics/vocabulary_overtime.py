@@ -96,7 +96,7 @@ class OvertimeAnalysis(BasicProcessor):
 
     def process(self):
         """
-        Reads a CSV file, counts occurences of chosen values over all posts,
+        Reads a CSV file, counts occurrences of chosen values over all posts,
         and aggregates the results per chosen time frame
         """
 
@@ -177,8 +177,7 @@ class OvertimeAnalysis(BasicProcessor):
                 try:
                     interval = get_interval_descriptor(post, timeframe)
                 except ValueError as e:
-                    self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
-                    self.dataset.update_status(0)
+                    self.dataset.finish_with_error("%s, cannot count posts per %s" % (str(e), timeframe))
                     return
 
                 if interval not in activity[vocabulary_id]:
@@ -203,4 +202,4 @@ class OvertimeAnalysis(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No word counts")

@@ -151,8 +151,8 @@ class FourcatToDmiTcatUploader(BasicProcessor):
 
             # TODO: try a new TCAT server if there are more than one
             # TODO: save point: converted date could be saved and processor resumed here at a later point
-            self.dataset.update_status("TCAT server currently busy; please try again later")
-            return self.dataset.finish(0)
+            self.dataset.finish_with_warning(0, "TCAT server currently busy; please try again later")
+            return
         elif response.status_code != 200:
             return self.dataset.finish_with_error(
                 "Cannot upload dataset to DMI-TCAT server: server responded with %i %s." % (

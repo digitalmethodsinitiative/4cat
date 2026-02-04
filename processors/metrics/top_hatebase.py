@@ -177,4 +177,4 @@ class HatebaseRanker(BasicProcessor):
 		if rows:
 			self.write_csv_items_and_finish(rows)
 		else:
-			self.dataset.finish(0)
+			self.dataset.finish()

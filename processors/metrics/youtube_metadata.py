@@ -225,7 +225,7 @@ class YouTubeMetadata(BasicProcessor):
 
 		# Finish if there's no YouTube IDs
 		if not youtube_ids:
-			self.dataset.finish_with_error("No YouTube IDs found")
+			self.dataset.finish_as_empty("No YouTube IDs found")
 			return
 
 		# Start client

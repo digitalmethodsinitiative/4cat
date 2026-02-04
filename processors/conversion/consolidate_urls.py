@@ -262,8 +262,7 @@ class ConsolidateURLs(BasicProcessor):
         url_parsing_issues = []
         column = self.parameters.get("column", False)
         if not method or not column:
-            self.dataset.update_status("Invalid parameters; ensure column and method are correct", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Invalid parameters; ensure column and method are correct")
             return
         expand_urls = self.parameters.get("expand_urls", False)
 

@@ -174,8 +174,7 @@ class ColumnNetworker(BasicProcessor):
         for item in self.source_dataset.iterate_items(self):
             if column_a not in item or column_b not in item:
                 missing = "'" + "' and '".join([c for c in (column_a, column_b) if c not in item]) + "'"
-                self.dataset.update_status(f"Column(s) {missing} not found in dataset", is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error(f"Column(s) {missing} not found in dataset")
                 return
 
             processed += 1
@@ -292,8 +291,7 @@ class ColumnNetworker(BasicProcessor):
                         processed_edges.add(edge)
 
         if not network.edges():
-            self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No edges could be created for the given parameters")
             return
 
         # If the network is dynamic, now we calculate spells from the intervals

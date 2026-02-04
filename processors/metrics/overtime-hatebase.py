@@ -120,8 +120,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
         elif "likes" in fieldnames:
             engagement_field = "likes"
         else:
-            self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No engagement metric available for dataset, cannot chart over-time engagement.")
             return
             
         # now for the real deal
@@ -225,4 +224,4 @@ class OvertimeHatefulAnalysis(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.finish(0)
+            self.dataset.finish()

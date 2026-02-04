@@ -124,8 +124,7 @@ class VideoStack(BasicProcessor):
         """
         # Check processor able to run
         if self.source_dataset.num_rows < 3:
-            self.dataset.update_status("Not enough videos to stack (need at least 2)", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Not enough videos to stack (need at least 2)")
             return
 
         # Collect parameters

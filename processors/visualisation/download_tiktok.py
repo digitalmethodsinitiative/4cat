@@ -93,8 +93,7 @@ class TikTokVideoDownloader(BasicProcessor):
         creates a new dataset containing the matching values
         """
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No videos to download.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No videos to download.")
             return
 
         # Process parameters
@@ -243,8 +242,7 @@ class TikTokImageDownloader(BasicProcessor):
         creates a new dataset containing the matching values
         """
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No images to download.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No images to download.")
             return
 
         # Process parameters
@@ -257,8 +255,7 @@ class TikTokImageDownloader(BasicProcessor):
         elif self.parameters.get("thumb_type") == "author_avatar":
             url_column = "author_avatar"
         else:
-            self.dataset.update_status("No image column selected.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No image column selected.")
             return
 
         # Prepare staging area for downloads

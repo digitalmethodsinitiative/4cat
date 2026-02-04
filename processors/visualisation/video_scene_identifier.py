@@ -174,8 +174,7 @@ class VideoSceneDetector(BasicProcessor):
 		if (os.name != "nt" and self.source_dataset.num_rows <= 1 or
 				os.name == "nt" and self.source_dataset.num_rows < 1):
 			# 1 because there is always a metadata file
-			self.dataset.update_status("No videos from which to extract scenes.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_as_empty("No videos from which to extract scenes.")
 			return
 		deduct_metadata = 0
 		if os.name == "nt":
