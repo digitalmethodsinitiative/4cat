@@ -920,6 +920,7 @@ class DataSet(FourcatModule):
         self.data["is_finished"] = True
         self.data["num_rows"] = num_rows
         self.data["status_type"] = status_type.value
+
     def copy(self, shallow=True):
         """
         Copies the dataset, making a new version with a unique key
@@ -1695,6 +1696,18 @@ class DataSet(FourcatModule):
 
         self.update_status(warning, is_final=True)
         self.finish(num_rows, status_type=StatusType.WARNING)
+
+        return None
+
+    def finish_as_empty(self, status_message):
+        """
+        Indicate this dataset has finished with no results and a message
+
+        :param str status_message: The message to show.
+        :return:
+        """
+        self.update_status(status_message, is_final=True)
+        self.finish(0, status_type=StatusType.EMPTY)
 
         return None
 
