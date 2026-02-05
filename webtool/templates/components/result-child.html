@@ -50,6 +50,7 @@
             {% elif item.is_finished() and item.status_type == "empty" %}
                 {% if is_filtered %}No items left{% else %}No results{% endif %}
             {% elif item.is_finished() and item.status_type == "error" %}Failed
+            {% elif item.is_finished() and item.status_type == "warning" %}Partially completed
             {% elif "queued" in item.status|lower %}
                 {% if is_filtered %}Filter queued{% else %}Queued{% endif %}
             {% else %}
