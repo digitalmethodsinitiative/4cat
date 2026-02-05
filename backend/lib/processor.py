@@ -600,7 +600,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         processor is set while iterating.
 
         :param data: A list or tuple of dictionaries, all with the same keys
-        :param warning: An optional warning. Will set the dataset type to 'warning'.
+        :param str | None warning: An optional warning. Will set the dataset type to 'warning'.
         """
         if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data, str):
             raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
@@ -628,7 +628,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         else:
             self.dataset.finish_with_warning(len(data), warning)
 
-    def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
+    def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True, warning=None):
         """
         Archive a bunch of files into a zip archive and finish processing
 
@@ -640,6 +640,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :param int compression:  Type of compression to use. By default, files
           are not compressed, to speed up unarchiving.
         :param bool finish:  Finish the dataset/job afterwards or not?
+        :param str | None warning: An optional warning. Will set the dataset type to 'warning'.
         """
         is_folder = False
         if issubclass(type(files), PurePath):
@@ -662,12 +663,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if is_folder:
             shutil.rmtree(is_folder)
 
-        self.dataset.update_status("Finished")
         if num_items is None:
             num_items = done
 
-        if finish:
+        if finish and not warning:
+            self.dataset.update_status("Finished")
             self.dataset.finish(num_items)
+        elif finish and warning:
+            self.dataset.finish_with_warning(num_items, warning)
 
     def create_standalone(self, item_ids=None):
         """
