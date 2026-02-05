@@ -933,7 +933,7 @@ body.image-preview {
 
 
 #edit-annotation-fields #input-warning {
-    color: var(--accent-warning)
+    color: var(--accent-error)
 }
 
 /* Remove all styles for Explorer posts */
@@ -963,7 +963,7 @@ body.image-preview {
 }
 
 .annotation-field-label.invalid, .option-field > input.invalid {
-    border: 1px solid var(--accent-warning);
+    border: 1px solid var(--accent-error);
 }
 
 #edit-annotation-fields {
