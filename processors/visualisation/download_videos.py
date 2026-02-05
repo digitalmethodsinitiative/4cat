@@ -940,11 +940,11 @@ class VideoDownloaderPlus(BasicProcessor):
         if copied_videos > 0:
             status_msg += f"; {copied_videos} videos copied from previous downloads"
         if failed_downloads > 0:
-            status_msg += f"; {failed_downloads} downloads failed."
+            status_msg += f"; {failed_downloads} downloads failed"
         if total_not_a_video > 0:
-            status_msg += f"; {total_not_a_video} URLs were not videos."
+            status_msg += f"; {total_not_a_video} URLs were not videos"
         if processed_urls > 0:
-            status_msg += f"; Processed {processed_urls} URLs of {total_urls}."
+            status_msg += f"; Processed {processed_urls} URLs of {total_urls}"
         
         if self.warning_message:
             self.dataset.update_status(status_msg)
