@@ -64,4 +64,9 @@ else:
     print("    Setting 'status_type' to 'queued' for unfinished datasets...")
     db.execute("UPDATE datasets SET status_type = 'queued' WHERE is_finished = FALSE")
 
+print("  Removing colours.css file to force update")
+if os.path.exists("webtool/static/css/colours.css"):
+    os.remove("webtool/static/css/colours.css")
+    print("    Removed colours.css file")
+
 print("  - done!")

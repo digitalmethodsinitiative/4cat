@@ -7,7 +7,7 @@
     --accent-alternate: {{ opposite_colour }};
     --accent-okay: #26b018;
     --accent-okay-light: #bee0ba;
-    --accent-warning: #fd8a24;
+    --accent-warning: #ffcf13;
     --accent-error: #ff2231;
     --gray-dark: #DFDFDF;
     --gray-darker: #6C6C6C;
