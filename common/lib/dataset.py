@@ -1694,6 +1694,10 @@ class DataSet(FourcatModule):
         :return:
         """
 
+        if num_rows <= 0:
+            self.finish_with_error(warning)
+            return
+
         self.update_status(warning, is_final=True)
         self.finish(num_rows, status_type=StatusType.WARNING)
 
