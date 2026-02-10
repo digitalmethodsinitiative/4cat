@@ -20,7 +20,7 @@ class VectorRanker(BasicProcessor):
 	type = "vector-ranker"  # job type ID
 	category = "Metrics" # category
 	title = "Extract top words"  # title displayed in UI
-	description = "Ranks most used tokens per tokenset (overall or per timeframe). " \
+	description = "Ranks most used tokens per token set (overall or per timeframe). " \
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 

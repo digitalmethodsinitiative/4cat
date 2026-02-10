@@ -20,8 +20,7 @@ class VectoriseByCategory(BasicProcessor):
 	type = "vectorise-tokens-by-category"  # job type ID
 	category = "Text analysis"  # category
 	title = "Count words by category"  # title displayed in UI
-	description = "Counts all tokens and categorizes them so they are transformed into category => token => frequency counts. " \
-				  "This is also known as a bag of words."  # description displayed in UI
+	description = "Counts all tokens per category."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	followups = ["wordcloud", "render-graphs-isometric", "render-rankflow"]
@@ -263,7 +262,7 @@ class VectoriseByCategory(BasicProcessor):
 				sets_of_categories += 1
 
 		if not sets_of_categories:
-			self.dataset.finish_with_error("No tokens found")
+			self.dataset.finish_as_empty("No tokens found")
 			return
 
 		# Write vectors to file

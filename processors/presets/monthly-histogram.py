@@ -12,7 +12,7 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	type = "preset-histogram"  # job type ID
 	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
 	title = "Histogram"  # title displayed in UI
-	description = "Visualize graphically the number of posts over time."  # description displayed in UI
+	description = "Create a histogram that shows the number of items over time."  # description displayed in UI
 	extension = "svg"
 
 	@staticmethod

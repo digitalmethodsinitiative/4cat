@@ -22,7 +22,7 @@ class HatebaseRanker(BasicProcessor):
 	"""
 	type = "hatebase-frequencies"  # job type ID
 	category = "Metrics"  # category
-	title = "Extract top hateful phrases"  # title displayed in UI
+	title = "Extract most hateful phrases"  # title displayed in UI
 	description = "Count frequencies for hateful words and phrases found in the dataset and rank the results (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
@@ -177,4 +177,4 @@ class HatebaseRanker(BasicProcessor):
 		if rows:
 			self.write_csv_items_and_finish(rows)
 		else:
-			self.dataset.finish()
+			self.dataset.finish_as_empty()

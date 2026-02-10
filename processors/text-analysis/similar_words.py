@@ -22,9 +22,8 @@ class SimilarWord2VecWords(BasicProcessor):
 	type = "similar-word2vec"  # job type ID
 	category = "Text analysis"  # category
 	title = "Extract similar words"  # title displayed in UI
-	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
+	description = "Uses a word2vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-
 
 	followups = ["wordcloud"]
 
@@ -102,70 +101,70 @@ class SimilarWord2VecWords(BasicProcessor):
 		result = []
 		staging_area = self.unpack_archive_contents(self.source_file)
 		for model_file in staging_area.glob("*.model"):
-				interval = model_file.stem
+			interval = model_file.stem
 
-				# for each separate model, calculate top similar words for each
-				# input word, giving us at most
-				#   [max amount] * [number of input] * [number of intervals]
-				# items
-				self.dataset.update_status("Running model %s..." % model_file.name)
-				model = KeyedVectors.load(str(model_file))
-				word_queue = set()
-				checked_words = set()
-				level = 1
+			# for each separate model, calculate top similar words for each
+			# input word, giving us at most
+			#   [max amount] * [number of input] * [number of intervals]
+			# items
+			self.dataset.update_status("Running model %s..." % model_file.name)
+			model = KeyedVectors.load(str(model_file))
+			word_queue = set()
+			checked_words = set()
+			level = 1
 
-				words = input_words.copy()
-				while words:
-					if self.interrupted:
-						shutil.rmtree(staging_area)
-						raise ProcessorInterruptedException("Interrupted while extracting similar words")
+			words = input_words.copy()
+			while words:
+				if self.interrupted:
+					shutil.rmtree(staging_area)
+					raise ProcessorInterruptedException("Interrupted while extracting similar words")
 
-					word = words.pop()
-					checked_words.add(word)
+				word = words.pop()
+				checked_words.add(word)
 
-					try:
-						similar_words = model.most_similar(positive=[word], topn=num_words)
-					except KeyError:
+				try:
+					similar_words = model.most_similar(positive=[word], topn=num_words)
+				except KeyError:
+					continue
+
+				# Some words may have been excluded from the embedding model due to thresholds
+				excluded_words = set()
+				for similar_word in similar_words:
+					if similar_word[1] < threshold:
 						continue
 
-					# Some words may have been excluded from the embedding model due to thresholds
-					excluded_words = set()
-					for similar_word in similar_words:
-						if similar_word[1] < threshold:
-							continue
+					try:
+						input_occurrences = model.get_vecattr(word, "count")
+					except KeyError:
+						if word not in excluded_words:
+							excluded_words.add(word)
+							self.dataset.log(f"'{word}' outside thresholds used for embedding model {model_file.name}; no occurrences")
+						input_occurrences = 0
+						self.flawless = False
 
-						try:
-							input_occurrences = model.get_vecattr(word, "count")
-						except KeyError:
-							if word not in excluded_words:
-								excluded_words.add(word)
-								self.dataset.log(f"'{word}' outside thresholds used for embedding model {model_file.name}; no occurrences")
-							input_occurrences = 0
-							self.flawless = False
+					item_occurrences = model.get_vecattr(similar_word[0], "count")
 
-						item_occurrences = model.get_vecattr(similar_word[0], "count")
+					result.append({
+						"date": interval,
+						"input": word,
+						"item": similar_word[0],
+						"value": similar_word[1],
+						"input_occurrences": input_occurrences,
+						"item_occurrences": item_occurrences,
+						"depth": level
+					})
 
-						result.append({
-							"date": interval,
-							"input": word,
-							"item": similar_word[0],
-							"value": similar_word[1],
-							"input_occurrences": input_occurrences,
-							"item_occurrences": item_occurrences,
-							"depth": level
-						})
+					# queue word for the next iteration if there is one and
+					# it hasn't been seen yet
+					if level < depth and similar_word[0] not in checked_words:
+						word_queue.add(similar_word[0])
 
-						# queue word for the next iteration if there is one and
-						# it hasn't been seen yet
-						if level < depth and similar_word[0] not in checked_words:
-							word_queue.add(similar_word[0])
-
-					# if all words have been checked, but we still have an
-					# iteration to go, load the queued words into the list
-					if not words and word_queue and level < depth:
-						level += 1
-						words = word_queue.copy()
-						word_queue = set()
+				# if all words have been checked, but we still have an
+				# iteration to go, load the queued words into the list
+				if not words and word_queue and level < depth:
+					level += 1
+					words = word_queue.copy()
+					word_queue = set()
 
 		shutil.rmtree(staging_area)
 
@@ -174,6 +173,6 @@ class SimilarWord2VecWords(BasicProcessor):
 			return
 		else:
 			warning = None if self.flawless else ("Dataset complete, but some input words were not found in the "
-												  "embedding models (0 occurances in model due to chosen thresholds). "
+												  "embedding models (0 occurrences in model due to chosen thresholds). "
 												  "Similar words are still identified; check log for specifics.")
 			self.write_csv_items_and_finish(result, warning=warning)

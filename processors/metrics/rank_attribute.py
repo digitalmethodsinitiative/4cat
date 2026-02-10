@@ -274,7 +274,7 @@ class AttributeRanker(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.finish_as_empty("No items contain the requested attributes.")
+            self.dataset.finish_as_empty("No items contain the requested values.")
 
     def get_values(self, post, attributes, filter, split_comma, extract):
         """

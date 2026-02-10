@@ -111,24 +111,6 @@ class OvertimeHatefulAnalysis(BasicProcessor):
         hateful = {}
         views = {}
         intervals = set()
-
-        fieldnames = self.source_dataset.get_columns()
-        if "views" in fieldnames:
-            engagement_field = "views"
-        elif "score" in fieldnames:
-            engagement_field = "score"
-        elif "likes" in fieldnames:
-            engagement_field = "likes"
-        else:
-            self.dataset.finish_with_error("No engagement metric available for dataset, cannot chart over-time engagement.")
-            return
-            
-        # now for the real deal
-        self.dataset.update_status("Reading source file")
-        activity = {}
-        hateful = {}
-        views = {}
-        intervals = set()
         unknown_dates = 0
 
         fieldnames = self.source_dataset.get_columns()
@@ -224,4 +206,4 @@ class OvertimeHatefulAnalysis(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.finish()
+            self.dataset.finish_as_empty()

@@ -21,8 +21,8 @@ class ColumnFilter(BaseFilter):
     type = "column-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by value"  # title displayed in UI
-    description = "A generic filter that checks whether a value in a selected column matches a custom requirement. " \
-                  "This will create a new dataset."
+    description = ("A flexible and customizable filter that lets you retain items in selected column that match a "
+                   "custom requirement. This creates a new dataset.")
 
 
     @classmethod
@@ -176,7 +176,7 @@ class ColumnFilter(BaseFilter):
                     try:
                         date_compare = int(mapped_item.get(column))
                     except ValueError:
-                        self.dataset.update_status(
+                        self.dataset.finish_with_error(
                             f"Invalid date value '{mapped_item.get(column)}', cannot determine if before or after")
                         return
             elif match_style in ["exact", "exact-not", "contains", "contains-not"]:

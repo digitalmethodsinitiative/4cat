@@ -7,6 +7,7 @@ from datetime import datetime
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -21,7 +22,7 @@ class DateFilter(BaseFilter):
     type = "date-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by date"  # title displayed in UI
-    description = "Retains posts between given dates. This will create a new dataset."
+    description = "Retains posts between given dates. This creates a new dataset."
     
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -148,3 +149,25 @@ class DateFilter(BaseFilter):
             self.dataset.update_status("No items matched your criteria (%i invalid dates)" % invalid_dates, is_final=True)
         elif invalid_dates > 0:
             self.dataset.update_status("Matched %i items (%i processed, %i invalid dates)" % (matching_items, processed_items, invalid_dates), is_final=True)
+
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Validate input
+
+        Checks if everything needed is filled in.
+
+        :param query:
+        :param request:
+        :param config:
+        :return:
+        """
+
+        if not query["daterange"] or (not query["daterange"][0] or not query["daterange"][1]):
+            raise QueryParametersException("Please enter a valid date range.")
+
+        if "column" in query and not query["column"]:
+            raise QueryParametersException("Please enter a valid timestamp column.")
+
+        return query

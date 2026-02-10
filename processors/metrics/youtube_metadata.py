@@ -31,7 +31,7 @@ class YouTubeMetadata(BasicProcessor):
 
 	type = "youtube-metadata"  # job type ID
 	category = "Metrics"  # category
-	title = "Extract metadata from YouTube URLs"  # title displayed in UI
+	title = "Fetch metadata from YouTube URLs"  # title displayed in UI
 	description = "Collect metadata from YouTube videos, channels, and playlists with the YouTube API"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
@@ -254,10 +254,11 @@ class YouTubeMetadata(BasicProcessor):
 
 			self.save_annotations(annotations)
 
+		warning = None
 		if failed_ids:
-			self.dataset.update_status(f"Could not parse IDs from {failed_ids} URLs.")
+			warning = f"Could not parse IDs from {failed_ids} URLs."
 		self.dataset.update_status("Writing results to csv.")
-		self.write_csv_items_and_finish(youtube_items)
+		self.write_csv_items_and_finish(youtube_items, warning=warning)
 
 	def get_youtube_metadata(self, yt_ids: list[tuple]) -> list:
 		"""

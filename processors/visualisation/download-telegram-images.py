@@ -30,7 +30,7 @@ class TelegramImageDownloader(BasicProcessor):
     type = "image-downloader-telegram"  # job type ID
     category = "Visual"  # category
     title = "Download Telegram images"  # title displayed in UI
-    description = "Download images and store in a zip file. Downloads through the Telegram API might take a while. " \
+    description = "Download images and store in a ZIP file. Downloads through the Telegram API might take a while. " \
                   "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI

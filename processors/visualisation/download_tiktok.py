@@ -28,7 +28,7 @@ __email__ = "4cat@oilab.eu"
 class TikTokVideoDownloader(BasicProcessor):
     type = "video-downloader-tiktok"  # job type ID
     category = "Visual"  # category
-    title = "Download TikTok Videos"  # title displayed in UI
+    title = "Download TikTok videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
     media_type = "video"
@@ -170,7 +170,7 @@ class TikTokVideoDownloader(BasicProcessor):
 class TikTokImageDownloader(BasicProcessor):
     type = "image-downloader-tiktok"  # job type ID
     category = "Visual"  # category
-    title = "Download TikTok Images"  # title displayed in UI
+    title = "Download TikTok images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
     media_type = "image"

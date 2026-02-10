@@ -22,7 +22,7 @@ class ThreadSplitter(BasicProcessor):
 	type = "split-threads"  # job type ID
 	category = "Conversion" # category
 	title = "Split by thread"  # title displayed in UI
-	description = "Split the dataset per thread. The result is a zip archive containing separate CSV files."  # description displayed in UI
+	description = "Split the dataset per thread. The result is a ZIP containing separate CSV files."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -51,11 +51,11 @@ class ThreadSplitter(BasicProcessor):
 			new = not thread.exists()
 
 			with thread.open("a", encoding="utf-8") as output:
-				outputcsv = csv.DictWriter(output, fieldnames=post.keys())
+				output_csv = csv.DictWriter(output, fieldnames=post.keys())
 
 				if new:
-					outputcsv.writeheader()
+					output_csv.writeheader()
 
-				outputcsv.writerow(post)
+				output_csv.writerow(post)
 
 		self.write_archive_and_finish(results_path)

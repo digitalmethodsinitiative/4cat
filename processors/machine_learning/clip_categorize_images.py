@@ -23,8 +23,9 @@ class CategorizeImagesCLIP(BasicProcessor):
     """
     type = "image-to-categories"  # job type ID
     category = "Visual"  # category
-    title = "Categorize Images using OpenAI's CLIP models"  # title displayed in UI
-    description = "Given a list of categories, the CLIP model will estimate likelihood an image is to belong to each (total of all categories per image will be 100%)."  # description displayed in UI
+    title = "Categorize images with CLIP"  # title displayed in UI
+    description = ("Provide a list of categories and classify images with OpenAI's CLIP models. This will estimate "
+                   "the likelihood an image belongs to a category (total of all category values will be 100%).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     followups = ["image-category-wall"]

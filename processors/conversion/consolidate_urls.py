@@ -25,7 +25,7 @@ class ConsolidateURLs(BasicProcessor):
     type = "consolidate-urls"  # job type ID
     category = "Conversion"  # category
     title = "Consolidate URLs"  # title displayed in UI
-    description = "Retain only domain (and optionally path) of URLs; used for Custom Networks (e.g. author + domains)"
+    description = "Retain only the domain (and optionally path) of URLs; used for custom networks (e.g. author + domains)"
     extension = "csv"
 
     # Common domain prefaces to remove

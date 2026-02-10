@@ -876,9 +876,13 @@ class LLMPrompter(BasicProcessor):
         # Final outputs
         time_end = time.time()
         time_progressed = str(timedelta(seconds=int(time_end - time_start)))
-        skipped_str = "" if not skipped else f" Skipped {skipped} rows because of empty values."
-        self.dataset.update_status(f"Finished, {model} generated text in {time_progressed}.{skipped_str}", is_final=True)
-        self.dataset.finish(i)
+        final_status = f"Finished, {model} generated text in {time_progressed}."
+        skipped_str = None if not skipped else f" Skipped {skipped} rows because of empty values."
+        if skipped_str:
+            self.dataset.finish_with_warning(i, final_status + skipped_str)
+        else:
+            self.dataset.update_status(final_status, is_final=True)
+            self.dataset.finish(i)
 
     @staticmethod
     def get_json_schema_for_batch(batch_size: int, custom_schema: dict = None) -> dict:

@@ -5,6 +5,7 @@ import random
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -105,3 +106,22 @@ class RandomFilter(BaseFilter):
 					self.dataset.update_status("Wrote %i posts" % written)
 
 			count += 1
+
+
+	@staticmethod
+	def validate_query(query, request, config):
+		"""
+		Validate input
+
+		Checks if everything needed is filled in.
+
+		:param query:
+		:param request:
+		:param config:
+		:return:
+		"""
+
+		if not query["sample_size"] or not query["sample_size"].isnumeric() or not int(query["sample_size"]) > 0:
+			raise QueryParametersException("Please enter a valid sample size.")
+
+		return query

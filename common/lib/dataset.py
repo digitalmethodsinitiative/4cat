@@ -1694,6 +1694,8 @@ class DataSet(FourcatModule):
         :return:
         """
 
+        if not isinstance(num_rows, int):
+            raise ValueError("num_rows must be a positive integer")
         if num_rows <= 0:
             self.finish_with_error(warning)
             return

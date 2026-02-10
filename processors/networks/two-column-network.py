@@ -291,7 +291,7 @@ class ColumnNetworker(BasicProcessor):
                         processed_edges.add(edge)
 
         if not network.edges():
-            self.dataset.finish_with_error("No edges could be created for the given parameters")
+            self.dataset.finish_as_empty("No edges could be created for the given parameters")
             return
 
         # If the network is dynamic, now we calculate spells from the intervals

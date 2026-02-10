@@ -18,7 +18,7 @@ class UpdateTikTok(BasicProcessor):
     type = "tiktok-update-filter"  # job type ID
     category = "Filtering"  # category
     title = "Recollect TikTok data"  # title displayed in UI
-    description = "Queries the same TikTok URLs in order to refresh data such as video URLs."
+    description = "Re-query TikTok URLs to update the dataset, e.g. to refresh video URLs or like counts."
     extension = "ndjson"
 
     @classmethod

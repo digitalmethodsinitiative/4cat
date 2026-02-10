@@ -26,11 +26,11 @@ class ClarifaiAPIFetcher(BasicProcessor):
     Request tags and labels from the Clarifai API for a given set of images
     """
     type = "clarifai-api"  # job type ID
-    category = "Metrics"  # category
-    title = "Clarifai API analysis"  # title displayed in UI
+    category = "Machine learning"  # category
+    title = "Clarifai analysis"  # title displayed in UI
     description = "Use the Clarifai API to annotate images with tags and labels identified via machine learning. " \
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \
-                  "requests will be credited by Clarifai to the owner of the API token you provide!"  # description displayed in UI
+                  "requests will be credited by Clarifai to the owner of the API token you provide."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     followups = ["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"]
@@ -271,9 +271,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
             self.dataset.update_status(f"Saved {annotated + len(fourcat_annotations)} labels as annotations")
 
         if errors:
-            self.dataset.update_status(f"Collected {annotated} annotations, {errors} skipped - see dataset log for details",
-                                       is_final=True)
+            self.dataset.finish_with_warning(annotated, f"Collected {annotated} annotations, {errors} skipped. See dataset log for details")
         else:
             self.dataset.update_status(f"Collected {annotated} annotations", is_final=True)
-
-        self.dataset.finish(len(buffer))
+            self.dataset.finish(len(buffer))

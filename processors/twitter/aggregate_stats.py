@@ -61,7 +61,7 @@ class TwitterAggregatedStats(BasicProcessor):
             "pad": {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": True,
-                "help": "Include dates where the count is zero",
+                "help": "Include dates with zero items",
                 "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
             }
         }
@@ -103,8 +103,7 @@ class TwitterAggregatedStats(BasicProcessor):
         try:
             data_types, intervals = self.collect_intervals()
         except ProcessorException as e:
-            self.dataset.update_status(str(e), is_final=True)
-            self.dataset.update_status(0)
+            self.dataset.finish_with_error(str(e))
             return
 
         # Format header

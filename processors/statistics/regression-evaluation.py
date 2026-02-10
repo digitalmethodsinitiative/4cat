@@ -22,7 +22,7 @@ class RegressionEvaluation(BasicProcessor):
     type = "regression_evaluation"  # job type ID
     category = "Statistics"  # category
     title = "Regression evaluation"  # title displayed in UI
-    description = ("Calculate regression metrics (MAE, MSE, R2, RMSE) between two numerical columns.")
+    description = "Calculate regression metrics (MAE, MSE, R2, RMSE) between two numerical columns."
     extension = "csv"  # extension of result file, used internally in UI
 
     @classmethod

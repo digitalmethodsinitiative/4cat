@@ -69,7 +69,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
         self.dataset.update_status("Converting posts")
 
         if not self.source_file.exists():
-            self.dataset.finish_with_error("No data was returned by the Google Vision API, so none can be converted.")
+            self.dataset.finish_as_empty("No data was returned by the Google Vision API, so none can be converted.")
             return
 
         # Write annotations to original file?

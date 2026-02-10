@@ -27,8 +27,8 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     Request tags and labels from the Google Vision API for a given set of images
     """
     type = "google-vision-api"  # job type ID
-    category = "Metrics"  # category
-    title = "Google Vision API Analysis"  # title displayed in UI
+    category = "Machine learning"  # category
+    title = "Google Vision analysis"  # title displayed in UI
     description = "Use the Google Vision API to annotate images with tags and labels identified via machine learning. " \
                   "One request will be made per image per annotation type. Note that this is not a free service and " \
                   "requests will be credited by Google to the owner of the API token you provide. Requires billing " \
@@ -139,7 +139,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
             if image.file.name.startswith(".") or image.file.suffix in (".json", ".log"):
 
-                # Get the .metadata.json file so we can also save post IDs.
+                # Get the .metadata.json file so we can also save item IDs.
                 if image.file.name == ".metadata.json":
                     img_metadata = json.load(image.file.open())
                     if img_metadata:

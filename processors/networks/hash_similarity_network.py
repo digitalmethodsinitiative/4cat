@@ -23,8 +23,8 @@ class HashSimilarityNetworker(BasicProcessor):
     """
     type = "hash-similarity-network"
     category = "Networks"
-    title = "Hash Similarity network to identify near duplicate hashes"
-    description = "Calculate similarity of hashes and create a GEXF network file."
+    title = "Hash similarity network"
+    description = "Calculate similarity of hashes and create a GEXF network file. Can identify near duplicate hashes."
     extension = "gexf"
 
     @classmethod
@@ -207,7 +207,7 @@ class HashSimilarityNetworker(BasicProcessor):
                     self.dataset.update_progress(comparisons / expected_comparisons)
 
         if not network.edges():
-            self.dataset.finish_with_error("No edges could be created for the given parameters")
+            self.dataset.finish_as_empty("No edges could be created for the given parameters")
             return
 
         self.dataset.update_status("Writing network file")

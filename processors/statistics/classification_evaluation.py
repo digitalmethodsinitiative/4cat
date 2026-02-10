@@ -130,6 +130,7 @@ class ClassificationEvaluation(BasicProcessor):
         column_pred = self.parameters.get("column_pred", "")
         if not column_true or not column_pred:
             self.dataset.finish_with_error("Please specify which columns contain the true and predicted labels")
+            return
 
         # Get values
         labels_true = []
