@@ -30,7 +30,7 @@ class ItemToAnnotation(BasicProcessor):
             "columns": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "body",
-                "help": "Columns with texts to replace",
+                "help": "Columns to convert",
             }
         }
 
@@ -51,7 +51,7 @@ class ItemToAnnotation(BasicProcessor):
         :param module: Module to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.get_extension() in ("csv", "ndjson")
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
