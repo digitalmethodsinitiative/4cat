@@ -16,8 +16,8 @@ class TwitterCustomStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-1-custom-stats"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Custom Statistics"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "Custom statistics"  # title displayed in UI
     description = "Group tweets by category and count tweets per timeframe to collect aggregate group statistics.\nFor retweets and quotes, hashtags, mentions, URLs, and images from the original tweet are included in the retweet/quote. Data on public metrics (e.g., number of retweets or likes of tweets) are as of the time the data was collected."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
