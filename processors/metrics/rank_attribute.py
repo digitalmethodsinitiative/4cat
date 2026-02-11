@@ -99,7 +99,7 @@ class AttributeRanker(BasicProcessor):
             },
             "top": {
                 "type": UserInput.OPTION_TEXT,
-                "default": 15,
+                "default": 25,
                 "help": "Limit to this amount of results"
             },
             "top-style": {
