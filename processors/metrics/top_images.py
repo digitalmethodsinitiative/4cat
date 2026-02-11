@@ -1,8 +1,6 @@
 """
 Extract most-used images from corpus
 """
-import hashlib
-import base64
 import re
 
 from collections import Counter, OrderedDict
