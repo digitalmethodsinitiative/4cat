@@ -31,7 +31,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	"""
 	type = "render-graphs-isometric"  # job type ID
 	category = "Visual"  # category
-	title = "Side-by-side graphs"  # title displayed in UI
+	title = "Side-by-side area graphs"  # title displayed in UI
 	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 

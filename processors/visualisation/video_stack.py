@@ -284,6 +284,6 @@ class VideoStack(BasicProcessor):
                 f"Could not stack videos (error {result.returncode}); check the dataset log for details.")
 
         if with_errors:
-            self.dataset.update_status("Stack created, but with errors. Check dataset log for details.", is_final=True)
-
-        self.dataset.finish(1)
+            self.dataset.finish_with_warning(1, "Stack created, but with errors. Check dataset log for details.")
+        else:
+            self.dataset.finish(1)

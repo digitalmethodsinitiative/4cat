@@ -32,7 +32,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     type = "preset-video-hashes"  # job type ID
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
     title = "Create video hashes to identify near duplicate videos"  # title displayed in UI
-    description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."
+    description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only. This process can take a long time depending on video length, amount, and frames per second."
     extension = "gexf"
 
     @classmethod

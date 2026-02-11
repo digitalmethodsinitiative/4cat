@@ -25,7 +25,7 @@ class SVGHistogramRenderer(BasicProcessor):
 	type = "histogram"  # job type ID
 	category = "Visual"  # category
 	title = "Histogram"  # title displayed in UI
-	description = "Generates a histogram (bar graph) from time frequencies."  # description displayed in UI
+	description = "Generates a histogram from time frequencies."  # description displayed in UI
 	extension = "svg"
 
 	@classmethod

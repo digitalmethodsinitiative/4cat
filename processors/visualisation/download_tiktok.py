@@ -143,7 +143,9 @@ class TikTokVideoDownloader(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
 
-        self.write_archive_and_finish(results_path, len([True for result in results.values() if result.get("success")]))
+        downloads =  len([True for result in results.values() if result.get("success")])
+        warning = None if downloads >= max_amount else "Not all videos downloaded."
+        self.write_archive_and_finish(results_path, downloads, warning=warning)
 
     @staticmethod
     def map_metadata(video_id, data):
@@ -305,8 +307,8 @@ class TikTokImageDownloader(BasicProcessor):
                         # Stop checking and refresh all remaining URLs
                         max_fails_exceeded += 1
                     else:
-                        self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
+                        self.dataset.update_status(f"Downloaded image {downloaded_media}/{max_amount}")
 
                         metadata[url] = {
                                 "filename": filename,
@@ -393,7 +395,11 @@ class TikTokImageDownloader(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
-        self.write_archive_and_finish(results_path, downloaded_media)
+        warning = None
+        if downloaded_media < max_amount:
+            warning = "Could not download all images."
+
+        self.write_archive_and_finish(results_path, downloaded_media, warning=warning)
 
     @staticmethod
     def save_image(image, image_name, directory_path):

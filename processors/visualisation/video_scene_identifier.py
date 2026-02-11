@@ -313,9 +313,9 @@ class VideoSceneDetector(BasicProcessor):
 			self.save_annotations(annotations)
 
 		if rows:
-			self.dataset.update_status(
-				'Detected %i scenes in %i videos' % (num_posts, processed_videos))
-			self.write_csv_items_and_finish(rows)
+			self.dataset.update_status('Detected %i scenes in %i videos' % (num_posts, processed_videos))
+			warning = None if processed_videos < total_possible_videos else "Scenes could not be downloaded for all videos."
+			self.write_csv_items_and_finish(rows, warning=warning)
 		else:
 			return self.dataset.finish_with_error("No distinct scenes could be detected in the videos. The videos may "
 												  "be too short for scenes to be detected.")

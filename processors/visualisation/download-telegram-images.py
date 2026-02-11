@@ -99,6 +99,7 @@ class TelegramImageDownloader(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
+        print("\n\n\n\n\n", module.type, type(module), module.parameters)
         if type(module) is DataSet:
             # we need these to actually instantiate a telegram client and
             # download the images
@@ -124,7 +125,10 @@ class TelegramImageDownloader(BasicProcessor):
             json.dump(self.metadata, outfile)
 
         self.dataset.update_status("Compressing images")
-        self.write_archive_and_finish(self.staging_area)
+        warning = None
+        if not self.flawless:
+            warning = "Not all images could be downloaded. The the dataset logs for details."
+        self.write_archive_and_finish(self.staging_area, warning=warning)
 
     async def get_images(self):
         """

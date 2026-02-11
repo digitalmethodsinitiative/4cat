@@ -31,7 +31,7 @@ class ImageTextWallGenerator(BasicProcessor):
     """
     type = "image-text-wall"  # job type ID
     category = "Visual"  # category
-    title = "Visualise images with captions"  # title displayed in UI
+    title = "Image wall with captions"  # title displayed in UI
     description = "Combine images into a single image including text"  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 

@@ -36,7 +36,7 @@ class ImageDownloader(BasicProcessor):
     category = "Visual"  # category
     title = "Download images"  # title displayed in UI
     description = (
-        "Download images and store in a a zip file. May take a while to complete as images are retrieved "
+        "Download images and store in a a ZIP file. May take a while to complete as images are retrieved "
         "externally. Note that not always all images can be saved. For imgur galleries, only the first "
         "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file "
         "is included in the output archive."
@@ -243,7 +243,7 @@ class ImageDownloader(BasicProcessor):
                 urls.append(item_url)
 
         if not urls:
-            return self.dataset.finish_with_error(
+            return self.dataset.finish_as_empty(
                 "No download URLs could be extracted from the dataset within the given parameters."
             )
         else:
@@ -457,7 +457,9 @@ class ImageDownloader(BasicProcessor):
             # Interrupted but some files downloaded
             self.dataset.finish_with_warning(len(downloaded_files), self.warning_message)
         else:
-            # Successful completion
+            # Successful or empty completion
+            if len(downloaded_files) == 0:
+                self.dataset.update_status("No results.", is_final=True)
             self.dataset.finish(len(downloaded_files))
 
     def clean_url(self, url):
