@@ -121,7 +121,6 @@ class VideoFrames(BasicProcessor):
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
 				"-y", "-nostdin", "-i", str(video.file),
 			]
-			print(command)
 
 			if frame_interval != 0:
 				command += ["-r", str(frame_interval)]

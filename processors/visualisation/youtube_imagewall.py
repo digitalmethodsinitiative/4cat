@@ -129,7 +129,6 @@ class YouTubeImageWall(BasicProcessor):
 
         # Read the csv and get video ids
         df = pd.read_csv(path_to_yt_metadata)
-        print(df.columns)
         id_col = "video_id" if "video_id" in df.columns else "id"
         files = df[id_col].tolist()
 
