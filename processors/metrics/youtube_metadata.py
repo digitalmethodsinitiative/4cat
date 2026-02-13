@@ -31,8 +31,9 @@ class YouTubeMetadata(BasicProcessor):
 
 	type = "youtube-metadata"  # job type ID
 	category = "Metrics"  # category
-	title = "Fetch metadata from YouTube URLs"  # title displayed in UI
-	description = "Collect metadata from YouTube videos, channels, and playlists with the YouTube API"  # description displayed in UI
+	title = "Fetch YouTube metadata from URLs"  # title displayed in UI
+	description = ("Collect metadata from YouTube videos, channels, and playlists that are linked to in the dataset. "
+				   "Uses the YouTube API.")  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	followups = ["youtube-thumbnails"]

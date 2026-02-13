@@ -22,7 +22,7 @@ class ThreadSplitter(BasicProcessor):
 	type = "split-threads"  # job type ID
 	category = "Conversion" # category
 	title = "Split by thread"  # title displayed in UI
-	description = "Split the dataset per thread. The result is a ZIP containing separate CSV files."  # description displayed in UI
+	description = "Split the dataset per thread. The result is a ZIP archive containing separate CSV files."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
