@@ -36,7 +36,7 @@ class ImageDownloader(BasicProcessor):
     category = "Visual"  # category
     title = "Download images"  # title displayed in UI
     description = (
-        "Download images and store in a a zip file. May take a while to complete as images are retrieved "
+        "Download images and store in a a ZIP file. May take a while to complete as images are retrieved "
         "externally. Note that not always all images can be saved. For imgur galleries, only the first "
         "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file "
         "is included in the output archive."
@@ -66,6 +66,8 @@ class ImageDownloader(BasicProcessor):
             "very long-running processors and large datasets. Set to 0 for no limit.",
         }
     }
+
+    warning_message = None
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -241,7 +243,7 @@ class ImageDownloader(BasicProcessor):
                 urls.append(item_url)
 
         if not urls:
-            return self.dataset.finish_with_error(
+            return self.dataset.finish_as_empty(
                 "No download URLs could be extracted from the dataset within the given parameters."
             )
         else:
@@ -284,25 +286,30 @@ class ImageDownloader(BasicProcessor):
         max_images = min(len(urls), amount) if amount > 0 else len(urls)
         self.dataset.log(f"Starting download of up to {max_images:,} image(s).")
         for url, response in self.iterate_proxied_requests(
-            urls,
-            preserve_order=False,
-            headers={"User-Agent": ua},
-            hooks={
-                # use hooks to download the content (stream=True) in parallel
-                "response": self.stream_url
-            },
-            verify=False,
-            timeout=20,
-            stream=True,
-        ):
+                urls,
+                preserve_order=False,
+                headers={"User-Agent": ua},
+                hooks={
+                    # use hooks to download the content (stream=True) in parallel
+                    "response": self.stream_url
+                },
+                verify=False,
+                timeout=20,
+                stream=True,
+            ):
             downloaded_file = self.staging_area.joinpath(self.filenames[url])
             failure = False
 
             if self.interrupted:
-                self.completed = True
+                self.complete = True
                 self.flush_proxied_requests()
-                shutil.rmtree(self.staging_area)
-                raise ProcessorInterruptedException()
+                if self.downloaded_files > 0:
+                    # Some files downloaded, wrap up
+                    self.warning_message = "Processor was interrupted; partial results have been saved."
+                    break
+                else:
+                    shutil.rmtree(self.staging_area)
+                    raise ProcessorInterruptedException()
 
             if type(response) is FailedProxiedRequest:
                 if type(response.context) is requests.exceptions.Timeout:
@@ -439,12 +446,21 @@ class ImageDownloader(BasicProcessor):
             url_file = self.staging_area.joinpath(filename)
             if url_file.exists() and url not in downloaded_files:
                 url_file.unlink()
-
+                
         # finish up
         self.dataset.update_progress(1.0)
         self.write_archive_and_finish(
-            self.staging_area, len([x for x in metadata.values() if x.get("success")])
+            self.staging_area, len([x for x in metadata.values() if x.get("success")]),
+            finish=False
         )
+        if self.warning_message:
+            # Interrupted but some files downloaded
+            self.dataset.finish_with_warning(len(downloaded_files), self.warning_message)
+        else:
+            # Successful or empty completion
+            if len(downloaded_files) == 0:
+                self.dataset.update_status("No results.", is_final=True)
+            self.dataset.finish(len(downloaded_files))
 
     def clean_url(self, url):
         # always lower case domain

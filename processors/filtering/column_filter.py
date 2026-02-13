@@ -21,8 +21,8 @@ class ColumnFilter(BaseFilter):
     type = "column-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by value"  # title displayed in UI
-    description = "A generic filter that checks whether a value in a selected column matches a custom requirement. " \
-                  "This will create a new dataset."
+    description = ("A flexible and customizable filter that lets you retain items in selected column that match a "
+                   "custom requirement. This creates a new dataset.")
 
 
     @classmethod
@@ -131,8 +131,7 @@ class ColumnFilter(BaseFilter):
             try:
                 match_values = [float(value) for value in match_values]
             except (ValueError, TypeError):
-                self.dataset.update_status("Cannot do '%s' comparison with non-numeric value(s)", is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error(f"Cannot do '{match_style}' comparison non-numeric value(s)")
                 return
 
         elif match_style in ("top", "bottom"):
@@ -150,9 +149,7 @@ class ColumnFilter(BaseFilter):
                 try:
                     match_values = [int(value) for value in match_values]
                 except (ValueError, TypeError):
-                    self.dataset.update_status("Cannot do '%s' comparison with value(s) that are not dates" % match_style,
-                                               is_final=True)
-                    self.dataset.finish(0)
+                    self.dataset.finish_with_error(f"Cannot do '{match_style}' comparison with value(s) that are not dates")
                     return
             else:
                 match_values = [datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S").timestamp() for value in
@@ -179,10 +176,8 @@ class ColumnFilter(BaseFilter):
                     try:
                         date_compare = int(mapped_item.get(column))
                     except ValueError:
-                        self.dataset.update_status(
-                            "Invalid date value '%s', cannot determine if before or after" % mapped_item.get(column),
-                            is_final=True)
-                        self.dataset.finish(0)
+                        self.dataset.finish_with_error(
+                            f"Invalid date value '{mapped_item.get(column)}', cannot determine if before or after")
                         return
             elif match_style in ["exact", "exact-not", "contains", "contains-not"]:
                 if type(mapped_item.get(column)) is str:

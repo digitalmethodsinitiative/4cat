@@ -623,11 +623,11 @@ class VideoWallGenerator(BasicProcessor):
                 f"Could not make collage (error {process.returncode}); check the dataset log for details.")
 
         if skipped:
-             self.dataset.update_status(f"Rendering finished. {skipped} item(s) were skipped; see dataset log for details.", is_final=True)
+             self.dataset.finish_with_warning(1, f"Rendering finished. {skipped} item(s) were skipped. See dataset log for details.")
         else:
-             self.dataset.update_status("Rendering finished.")
-
-        self.dataset.finish(1)
+             self.dataset.update_status("Rendering finished.", final=True)
+             self.dataset.finish(1)
+        return
 
     def get_signature(self, file_path, sort_mode, ffprobe_path):
         """

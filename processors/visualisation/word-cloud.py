@@ -89,12 +89,11 @@ class MakeWordCloud(BasicProcessor):
 		self.dataset.update_status("Extracting words and counts.")
 
 		if not word_column:
-			self.dataset.update_status("Please set a valid word column.")
-			self.finish(0)
+			self.dataset.finish_with_error("Please set a valid word column.")
+			return
 
 		if not count_column:
-			self.dataset.update_status("Please set a valid count column.")
-			self.finish(0)
+			self.dataset.finish_with_error("Please set a valid count column.")
 			return
 
 		for post in self.source_dataset.iterate_items(self):
@@ -108,8 +107,7 @@ class MakeWordCloud(BasicProcessor):
 			try:
 				count = int(post[count_column])
 			except ValueError:
-				self.dataset.update_status("Couldn't convert value '%s' to an integer. Please set a valid count column." % post[count_column])
-				self.dataset.finish(0)
+				self.dataset.finish_with_error(f"Couldn't convert value '{post[count_column]}' to an integer. Please set a valid count column.")
 				return
 
 			# Add to general dict

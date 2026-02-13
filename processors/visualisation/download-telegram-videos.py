@@ -29,7 +29,7 @@ class TelegramVideoDownloader(BasicProcessor):
     type = "video-downloader-telegram"  # job type ID
     category = "Visual"  # category
     title = "Download Telegram videos"  # title displayed in UI
-    description = "Download videos and store in a zip file. Downloads through the Telegram API might take a while. " \
+    description = "Download videos and store in a ZIP file. Downloads through the Telegram API might take a while. " \
                   "Note that not always all videos can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
@@ -115,7 +115,10 @@ class TelegramVideoDownloader(BasicProcessor):
             json.dump(self.metadata, outfile)
 
         self.dataset.update_status("Compressing videos")
-        self.write_archive_and_finish(self.staging_area)
+        warning = None
+        if not self.flawless:
+            warning = "Not all videos could be downloaded. The the dataset logs for details."
+        self.write_archive_and_finish(self.staging_area, warning=warning)
 
     async def get_videos(self):
         """

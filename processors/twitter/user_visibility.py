@@ -19,8 +19,8 @@ class TwitterUserVisibility(BasicProcessor):
     Collect User stats as both author and mention.
     """
     type = "twitter-user-visibility"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "User Visibility"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "User visibility"  # title displayed in UI
     description = "Collects usernames and totals how many tweets are authored by the user and how many tweets mention the user"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 

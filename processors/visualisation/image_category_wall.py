@@ -346,7 +346,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
         offset_y = - row_height
         complete_categories = []
         category_widths = {}
-        self.dataset.update_status("Creating Image wall")
+        self.dataset.update_status("Creating image wall")
         for category, images in categories.items():
             if not complete_categories:
                 offset_y += fontsize * 2  # add some space at the top for header

@@ -81,8 +81,7 @@ class VideoSceneFrames(BasicProcessor):
         """
         # Check processor able to run
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No videos from which to extract frames.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No videos from which to extract frames.")
             return
 
         # Collect parameters
@@ -173,7 +172,7 @@ class VideoSceneFrames(BasicProcessor):
         make_archive(self.dataset.get_results_path().with_suffix(''), "zip", staging_area)
 
         if errors:
-            self.dataset.update_status("Finished, but not all scenes could be captured. See dataset log for "
-                                       "details.", is_final=True)
-
-        self.dataset.finish(processed_frames)
+            warning = "Not all scenes could be captured. See dataset log for details."
+            self.dataset.finish_with_warning(processed_frames, warning=warning)
+        else:
+            self.dataset.finish(processed_frames)

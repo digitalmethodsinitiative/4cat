@@ -5,6 +5,7 @@ import random
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -66,6 +67,7 @@ class RandomFilter(BaseFilter):
 
 		if not dataset_size:
 			self.dataset.finish_with_error("Could not retrieve the amount of rows for the parent dataset")
+			return
 		dataset_size = int(dataset_size)
 
 		# Get the amount of rows to sample
@@ -74,16 +76,13 @@ class RandomFilter(BaseFilter):
 		try:
 			sample_size = int(sample_size)
 		except ValueError:
-			self.dataset.update_status("Use a valid integer as a sample size", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Use a valid integer as a sample size")
 			return
 		if not sample_size:
-			self.dataset.update_status("Invalid sample size %s" % sample_size, is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Invalid sample size %s" % sample_size)
 			return
 		elif sample_size > dataset_size:
-			self.dataset.update_status("The sample size can't be larger than the dataset size", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("The sample size can't be larger than the dataset size")
 			return
 
 		# keep some stats
@@ -107,3 +106,22 @@ class RandomFilter(BaseFilter):
 					self.dataset.update_status("Wrote %i posts" % written)
 
 			count += 1
+
+
+	@staticmethod
+	def validate_query(query, request, config):
+		"""
+		Validate input
+
+		Checks if everything needed is filled in.
+
+		:param query:
+		:param request:
+		:param config:
+		:return:
+		"""
+
+		if not query["sample_size"] or not query["sample_size"].isnumeric() or not int(query["sample_size"]) > 0:
+			raise QueryParametersException("Please enter a valid sample size.")
+
+		return query

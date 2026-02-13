@@ -14,7 +14,7 @@ import time
 from pathlib import PurePath
 
 from backend.lib.worker import BasicWorker
-from common.lib.dataset import DataSet
+from common.lib.dataset import DataSet, StatusType
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
@@ -167,8 +167,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         self.dataset.clear_log()
         self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
 
-        # start log file
-        self.dataset.update_status("Processing data")
+        # start log file; update dataset status_type to processing
+        self.dataset.update_status("Processing data", status_type=StatusType.PROCESSING)
         self.dataset.update_version(get_software_commit(self))
 
         # we may create temporary files with the processor; anything in here
@@ -211,10 +211,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 if not self.job.is_finished:
                     self.job.finish()
             except WorkerInterruptedException as e:
-                self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
+                self.dataset.log("Processing interrupted: %s" % str(e))
+                self.dataset.update_status("Processing interrupted, trying again later", status_type=StatusType.QUEUED)
                 self.abort()
             except Exception as e:
-                self.dataset.log("Processor crashed (%s), trying again later" % str(e))
+                self.dataset.log("Processor crashed: %s" % str(e))
+                self.dataset.update_status("Processor error, trying again later", status_type=StatusType.QUEUED)
                 stack = traceback.extract_tb(e.__traceback__)
                 frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack[1:]]
                 location = "->".join(frames)
@@ -588,7 +590,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 archive_file.extract(filename, staging_area)
                 return staging_area.joinpath(filename)
 
-    def write_csv_items_and_finish(self, data):
+    def write_csv_items_and_finish(self, data, warning=None):
         """
         Write data as csv to results file and finish dataset
 
@@ -598,6 +600,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         processor is set while iterating.
 
         :param data: A list or tuple of dictionaries, all with the same keys
+        :param str | None warning: An optional warning. Will set the dataset type to 'warning'.
         """
         if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data, str):
             raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
@@ -619,10 +622,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
                 writer.writerow(row)
 
-        self.dataset.update_status("Finished")
-        self.dataset.finish(len(data))
+        if not warning:
+            self.dataset.update_status("Finished")
+            self.dataset.finish(len(data))
+        else:
+            self.dataset.finish_with_warning(len(data), warning)
 
-    def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True):
+    def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED, finish=True, warning=None):
         """
         Archive a bunch of files into a zip archive and finish processing
 
@@ -634,6 +640,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :param int compression:  Type of compression to use. By default, files
           are not compressed, to speed up unarchiving.
         :param bool finish:  Finish the dataset/job afterwards or not?
+        :param str | None warning: An optional warning. Will set the dataset type to 'warning'.
         """
         is_folder = False
         if issubclass(type(files), PurePath):
@@ -656,12 +663,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if is_folder:
             shutil.rmtree(is_folder)
 
-        self.dataset.update_status("Finished")
         if num_items is None:
             num_items = done
 
-        if finish:
+        if finish and not warning:
+            self.dataset.update_status("Finished")
             self.dataset.finish(num_items)
+        elif finish and warning:
+            self.dataset.finish_with_warning(num_items, warning)
 
     def create_standalone(self, item_ids=None):
         """
@@ -896,7 +905,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :todo: Make this a bit more robust than sniffing the processor category
         :return bool:
         """
-        return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
+        return (hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()) or (hasattr(cls, "filter") and cls.filter)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

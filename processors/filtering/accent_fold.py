@@ -22,9 +22,9 @@ class AccentFoldingFilter(BasicProcessor):
     """
     type = "accent-folder"  # job type ID
     category = "Filtering"  # category
-    title = "Replace or transliterate accented and non-Latin characters"  # title displayed in UI
-    description = "Replaces non-latin characters with the closest ASCII equivalent, convertng e.g. 'á' to 'a', 'ç' " \
-                  "to 'c', et cetera. Creates a new dataset."
+    title = "Convert accented and non-Latin characters"  # title displayed in UI
+    description = ("Replaces or transliterates non-Latin characters with the closest ASCII equivalent, converting e.g. "
+                   "'á' to 'a', 'ç' to 'c', etc. This creates a new dataset.")
     extension = "csv"  # extension of result file, used internally and in UI
 
 
@@ -36,7 +36,7 @@ class AccentFoldingFilter(BasicProcessor):
         :param module: Module to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.is_top_dataset() and module.get_extension() in ["csv",]
+        return module.is_top_dataset() and module.get_extension() in ["csv"]
 
     def process(self):
         """
@@ -69,6 +69,8 @@ class AccentFoldingFilter(BasicProcessor):
                     self.dataset.update_progress((processed_items / self.source_dataset.num_rows))
 
                 for field in columns:
+                    if field not in item:
+                        continue
                     if type(item[field]) is not str:
                         continue
 

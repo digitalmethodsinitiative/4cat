@@ -9,7 +9,7 @@ import json
 import os
 
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException, DsmConnectionError
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, hash_to_md5
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
@@ -108,7 +108,7 @@ class ImageTextDetector(BasicProcessor):
         """
         model_type = self.parameters.get("model_type", "paddle_ocr")
         if self.source_dataset.num_rows == 0:
-            self.dataset.finish_with_error("No images available.")
+            self.dataset.finish_as_empty("No images available.")
             return
 
         # Unpack the images into a staging_area
@@ -265,12 +265,15 @@ class ImageTextDetector(BasicProcessor):
 
                     processed += 1
 
-        detected_message = f"Detected text in {processed} of {total_image_files} images.{(' Skipped ' + str(skipped_images) + ' images; see log for details.') if skipped_images else ''}"
+        warning = '' if not skipped_images else f' Skipped {skipped_images} images; see log for details.'
+        detected_message = f"Detected text in {processed} of {total_image_files} images."
         if self.parameters.get("save_annotations", False) and not save_annotations:
-            self.dataset.update_status(f"{detected_message} No metadata file found, unable to update original dataset.", is_final=True)
+            warning = " No metadata file found, unable to update original dataset." + warning
+        if warning:
+            self.dataset.finish_with_warning(processed, detected_message + warning)
         else:
             self.dataset.update_status(detected_message)
-        self.dataset.finish(processed)
+            self.dataset.finish(processed)
 
     @staticmethod
     def map_item(item):
@@ -278,6 +281,7 @@ class ImageTextDetector(BasicProcessor):
         For preview frontend
         """
         return MappedItem({
+            "id": hash_to_md5(item.get("filename").get("filename")),
             "image_filename": item.get("filename"),
             "model_type": item.get("model_type"),
             "text": item.get("simplified_text", {}).get("raw_text"),

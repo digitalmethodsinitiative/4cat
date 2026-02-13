@@ -196,11 +196,11 @@ class URLFetcher(BasicProcessor):
 
         # log warning if not everything succeeded
         if urls_failed:
-            self.dataset.update_status(f"URLs fetched, but {urls_failed:,} URL(s) could not be retrieved. See dataset "
-                                       f"log for details.", is_final=True)
+            self.dataset.finish_with_warning(urls_success, f"{urls_failed:,} URL(s) could not be retrieved. See dataset "
+                                       f"log for details.")
 
         # and write everything to a CSV
-        self.dataset.finish(urls_failed + urls_success)
+        self.dataset.finish(urls_success)
         self.job.finish()
 
     @staticmethod

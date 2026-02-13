@@ -64,8 +64,7 @@ class AudioExtractor(BasicProcessor):
         """
         # Check processor able to run
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No videos from which to extract audio.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No videos from which to extract audio.")
             return
 
         max_files = self.parameters.get("amount", 100)
@@ -73,8 +72,11 @@ class AudioExtractor(BasicProcessor):
         # Prepare staging areas for videos and video tracking
         output_dir = self.dataset.get_staging_area()
 
-        total_possible_videos = max(max_files if max_files != 0 else self.source_dataset.num_rows - 1, 1)  # for the metadata file that is included in archives
+        total_possible_videos = max_files if max_files != 0 and max_files < self.source_dataset.num_rows - 1 \
+            else self.source_dataset.num_rows
+
         processed_videos = 0
+        written = 0
 
         self.dataset.update_status("Extracting video audio")
         for item in self.source_dataset.iterate_items():
@@ -104,13 +106,17 @@ class AudioExtractor(BasicProcessor):
             ffmpeg_output = result.stdout.decode("utf-8")
             ffmpeg_error = result.stderr.decode("utf-8")
 
+            audio_file = output_dir.joinpath(f"{vid_name}.wav")
+            if audio_file.exists():
+                written += 1
+
             if ffmpeg_output:
-                with open(str(output_dir.joinpath(f"{vid_name}_stdout.log")), 'w') as outfile:
+                with open(str(output_dir.joinpath(f"{vid_name}_stdout.log")), 'w', encoding="utf-8") as outfile:
                     outfile.write(ffmpeg_output)
 
             if ffmpeg_error:
                 # TODO: Currently, appears all output is here; perhaps subprocess.PIPE?
-                with open(str(output_dir.joinpath(f"{vid_name}_stderr.log")), 'w') as outfile:
+                with open(str(output_dir.joinpath(f"{vid_name}_stderr.log")), 'w', encoding="utf-8") as outfile:
                     outfile.write(ffmpeg_error)
 
             if result.returncode != 0:
@@ -118,9 +124,10 @@ class AudioExtractor(BasicProcessor):
                 self.dataset.log(error)
 
             processed_videos += 1
-            self.dataset.update_status(
-                "Extracted audio from %i of %i videos" % (processed_videos, total_possible_videos))
+            self.dataset.update_status(f"Extracted audio from {processed_videos} of {total_possible_videos} videos")
             self.dataset.update_progress(processed_videos / total_possible_videos)
 
         # Finish up
-        self.write_archive_and_finish(output_dir, num_items=processed_videos)
+        warning = f"Extracted {written}/{total_possible_videos} audio files, check the logs for errors." \
+            if written < total_possible_videos else None
+        self.write_archive_and_finish(output_dir, num_items=processed_videos, warning=warning)

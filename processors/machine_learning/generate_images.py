@@ -25,7 +25,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
     type = "image-downloader-stable-diffusion"  # job type ID
     category = "Visual"  # category
     title = "Generate images from text prompts"  # title displayed in UI
-    description = "Given a list of prompts, generates images for those prompts using the Stable Diffusion XL image model."  # description displayed in UI
+    description = "Given a list of prompts, generates images using the Stable Diffusion XL image model."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     followups = ImageDownloader.followups

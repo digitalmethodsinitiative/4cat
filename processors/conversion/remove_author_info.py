@@ -26,6 +26,7 @@ class AuthorInfoRemover(BasicProcessor):
     """
     type = "author-info-remover"  # job type ID
     category = "Conversion"  # category
+    filter = True  # to indicate we're filtering the top dataset
     title = "Pseudonymise or anonymise"  # title displayed in UI
     description = "Removes or replaces data from the dataset in fields identified as containing personal information"
 

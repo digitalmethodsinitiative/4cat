@@ -31,7 +31,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	"""
 	type = "render-graphs-isometric"  # job type ID
 	category = "Visual"  # category
-	title = "Side-by-side graphs"  # title displayed in UI
+	title = "Side-by-side area graphs"  # title displayed in UI
 	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
@@ -143,8 +143,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		# first make sure we actually have something to render
 		intervals = sorted(intervals)
 		if len(intervals) <= 1:
-			self.dataset.update_status("Not enough data for a side-by-side over-time visualisation.")
-			self.dataset.finish(0)
+			self.dataset.finish_as_empty("Not enough data for a side-by-side over-time visualisation.")
 			return
 
 		# only retain most-occurring series - sort by sum of all frequencies
@@ -188,8 +187,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		if not graphs:
 			# maybe nothing is actually there to be graphed
-			self.dataset.update_status("No items match the selection criteria - nothing to visualise.")
-			self.dataset.finish(0)
+			self.dataset.finish_as_empty("No items match the selection criteria - nothing to visualise.")
 			return None
 
 		# how many vertical grid lines (and labels) are to be included at most

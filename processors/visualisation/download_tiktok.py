@@ -28,7 +28,7 @@ __email__ = "4cat@oilab.eu"
 class TikTokVideoDownloader(BasicProcessor):
     type = "video-downloader-tiktok"  # job type ID
     category = "Visual"  # category
-    title = "Download TikTok Videos"  # title displayed in UI
+    title = "Download TikTok videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
     media_type = "video"
@@ -93,8 +93,7 @@ class TikTokVideoDownloader(BasicProcessor):
         creates a new dataset containing the matching values
         """
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No videos to download.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No videos to download.")
             return
 
         # Process parameters
@@ -144,7 +143,9 @@ class TikTokVideoDownloader(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
 
-        self.write_archive_and_finish(results_path, len([True for result in results.values() if result.get("success")]))
+        downloads =  len([True for result in results.values() if result.get("success")])
+        warning = None if downloads >= max_amount else "Not all videos downloaded."
+        self.write_archive_and_finish(results_path, downloads, warning=warning)
 
     @staticmethod
     def map_metadata(video_id, data):
@@ -171,7 +172,7 @@ class TikTokVideoDownloader(BasicProcessor):
 class TikTokImageDownloader(BasicProcessor):
     type = "image-downloader-tiktok"  # job type ID
     category = "Visual"  # category
-    title = "Download TikTok Images"  # title displayed in UI
+    title = "Download TikTok images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
     media_type = "image"
@@ -243,8 +244,7 @@ class TikTokImageDownloader(BasicProcessor):
         creates a new dataset containing the matching values
         """
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No images to download.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No images to download.")
             return
 
         # Process parameters
@@ -257,8 +257,7 @@ class TikTokImageDownloader(BasicProcessor):
         elif self.parameters.get("thumb_type") == "author_avatar":
             url_column = "author_avatar"
         else:
-            self.dataset.update_status("No image column selected.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No image column selected.")
             return
 
         # Prepare staging area for downloads
@@ -308,8 +307,8 @@ class TikTokImageDownloader(BasicProcessor):
                         # Stop checking and refresh all remaining URLs
                         max_fails_exceeded += 1
                     else:
-                        self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
+                        self.dataset.update_status(f"Downloaded image {downloaded_media}/{max_amount}")
 
                         metadata[url] = {
                                 "filename": filename,
@@ -396,7 +395,11 @@ class TikTokImageDownloader(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
-        self.write_archive_and_finish(results_path, downloaded_media)
+        warning = None
+        if downloaded_media < max_amount:
+            warning = "Could not download all images."
+
+        self.write_archive_and_finish(results_path, downloaded_media, warning=warning)
 
     @staticmethod
     def save_image(image, image_name, directory_path):

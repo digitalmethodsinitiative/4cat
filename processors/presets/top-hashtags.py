@@ -12,7 +12,7 @@ class TopHashtags(ProcessorPreset):
     """
     type = "preset-top-hashtags"  # job type ID
     category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Find top hashtags"  # title displayed in UI
+    title = "Top hashtags"  # title displayed in UI
     description = "Count how often each hashtag occurs in the dataset and sort by this value"
     extension = "csv"
 

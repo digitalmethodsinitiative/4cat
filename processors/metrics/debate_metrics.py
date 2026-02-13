@@ -79,10 +79,6 @@ class DebateMetrics(BasicProcessor):
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],
 			"op_replies": threads[thread_id]["op_length"]
-			# "reply_amount": ,
-			# "active_users": ,
-			# "reply_length": ,
-			# "long_messages":
 		} for thread_id in threads]
 
 		if not results:

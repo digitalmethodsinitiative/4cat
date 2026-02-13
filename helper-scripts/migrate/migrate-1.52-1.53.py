@@ -43,4 +43,30 @@ else:
 print("  Creating `jobs_queue` index on jobs table...")
 db.execute("CREATE INDEX IF NOT EXISTS job_queue ON jobs (queue_id)")
 
+
+# Add queue_id column to jobs table
+print("  Checking for `status_type` column in datasets table...")
+has_column = db.fetchone(
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'status_type'"
+)
+
+if has_column["num"] > 0:
+    print("    Datasets table already has column 'status_type'")
+else:
+    print("    Adding column 'status_type' to datasets table...")
+    db.execute("ALTER TABLE datasets ADD status_type TEXT DEFAULT ''")
+
+    # Set existing finished datasets to 'finished' status_type
+    print("    Setting 'status_type' to 'finished' for finished datasets...")
+    db.execute("UPDATE datasets SET status_type = 'finished' WHERE is_finished = TRUE and num_rows > 0")
+    db.execute("UPDATE datasets SET status_type = 'empty' WHERE is_finished = TRUE and num_rows = 0")
+
+    print("    Setting 'status_type' to 'queued' for unfinished datasets...")
+    db.execute("UPDATE datasets SET status_type = 'queued' WHERE is_finished = FALSE")
+
+print("  Removing colours.css file to force update")
+if os.path.exists("webtool/static/css/colours.css"):
+    os.remove("webtool/static/css/colours.css")
+    print("    Removed colours.css file")
+
 print("  - done!")

@@ -115,7 +115,7 @@ class UniqueFilter(BaseFilter):
         options = {
             "columns": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Item attributes to consider for uniqueness",
+                "help": "Columns to consider for uniqueness",
                 "inline": True,
                 "default": "body"
             },

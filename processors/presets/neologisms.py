@@ -13,8 +13,8 @@ class NeologismExtractor(ProcessorPreset):
     type = "preset-neologisms"  # job type ID
     category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
     title = "Extract neologisms"  # title displayed in UI
-    description = "Retrieve uncommon terms by deleting all known words. Assumes English-language data. " \
-                  "Uses stopwords-iso as its stopword filter."
+    description = ("Retrieve uncommon terms by deleting all words that appears in dictionary lists. Assumes English-"
+                   "language data. Uses stopwords-iso as a stopword filter.")
     extension = "csv"
 
     references = [

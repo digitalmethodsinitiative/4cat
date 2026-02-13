@@ -33,7 +33,8 @@ class AnnotationMetadata(BasicProcessor):
 		annotation_metadata = self.source_dataset.get_annotation_metadata()
 
 		if not annotation_metadata:
-			self.dataset.finish_with_error("No annotations made for this dataset")
+			self.dataset.finish_as_empty("No annotations made for this dataset")
+			return
 
 		for row in annotation_metadata:
 			timestamp = row["timestamp"]
