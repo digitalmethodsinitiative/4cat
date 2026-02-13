@@ -36,7 +36,7 @@ class ThreadMetadata(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson") and module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
