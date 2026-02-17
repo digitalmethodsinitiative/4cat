@@ -288,15 +288,8 @@ class SearchInstagram(Search):
                 coauthors.append(coauthor_node.get("username", MissingMappedField("")))
                 coauthor_fullnames.append(coauthor_node.get("full_name", MissingMappedField("")))
                 coauthor_ids.append(coauthor_node.get("id"))
-        if any([type(value) is MissingMappedField for value in coauthors]):
-            coauthors = MissingMappedField("")
-        else:
-            coauthors = ",".join(coauthors)
-        if any([type(value) is MissingMappedField for value in coauthor_fullnames]):
-            coauthor_fullnames = MissingMappedField("")
-        else:
-            coauthor_fullnames = ",".join(coauthor_fullnames)
-        
+        coauthors = ",".join([str(value) for value in coauthors])
+        coauthor_fullnames = ",".join([str(value) for value in coauthor_fullnames])
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
