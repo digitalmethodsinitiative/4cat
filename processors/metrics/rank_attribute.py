@@ -83,7 +83,8 @@ class AttributeRanker(BasicProcessor):
                 "options": {
                     "none": "Use column value",
                     "urls": "URLs",
-                    "hostnames": "Host names",
+                    "hostnames": "Domain names",
+                    "level2-hostnames": "Second-level domain names (e.g. m.youtube.com -> youtube.com)",
                     "hashtags": "Hashtags (words starting with #)",
                     "emoji": "Emoji (each used emoji in the column is counted individually)"
                 },
@@ -99,7 +100,7 @@ class AttributeRanker(BasicProcessor):
             },
             "top": {
                 "type": UserInput.OPTION_TEXT,
-                "default": 15,
+                "default": 25,
                 "help": "Limit to this amount of results"
             },
             "top-style": {
@@ -115,6 +116,12 @@ class AttributeRanker(BasicProcessor):
                 "default": "",
                 "help": "Item filter",
                 "tooltip": "Only items matching this will be included in the result. You can use Python regular expressions here."
+            },
+            "negate-filter": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": "",
+                "help": "Negate filter",
+                "tooltip": "Only match items that do *not* match the filter configured above"
             },
             "weigh": {
                 "type": UserInput.OPTION_TEXT,
@@ -169,9 +176,9 @@ class AttributeRanker(BasicProcessor):
                 filter = re.compile(".*" + self.parameters.get("filter") + ".*")
             else:
                 filter = None
+            negate_filter = self.parameters.get("negate-filter", False)
         except (TypeError, re.error):
-            self.dataset.update_status("Could not complete: regular expression invalid")
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Could not complete: regular expression invalid")
             return
 
         # we need to be able to order the values later, chronologically, so use
@@ -195,7 +202,7 @@ class AttributeRanker(BasicProcessor):
             else:
                 self.dataset.update_status("Determining overall top items")
             for post in self.source_dataset.iterate_items(self, map_missing=missing_value_placeholder if self.include_missing_data else "default"):
-                values = self.get_values(post, columns, filter, split_comma, extract)
+                values = self.get_values(post, columns, filter, negate_filter, split_comma, extract)
                 for value in values:
                     if to_lowercase:
                         value = str(value).lower()
@@ -224,7 +231,7 @@ class AttributeRanker(BasicProcessor):
                 items[time_unit] = OrderedDict()
 
             # get values from post
-            values = self.get_values(post, columns, filter, split_comma, extract)
+            values = self.get_values(post, columns, filter, negate_filter, split_comma, extract)
 
             # keep track of occurrences of found items per relevant time period
             for value in values:
@@ -275,16 +282,16 @@ class AttributeRanker(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.update_status("No items contain the requested attributes.")
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No items contain the requested values.")
 
-    def get_values(self, post, attributes, filter, split_comma, extract):
+    def get_values(self, post, attributes, filter, negate_filter, split_comma, extract):
         """
         Get relevant values for attribute per post
 
         :param dict post:  Post dictionary
         :param list attributes:  Attribute to extract from post body
         :param filter:  A compiled regular expression to filter values with, or None
+        :param negate_filter: If item matches filter, exclude rather than include
         :param bool split_comma:  Split values by comma?
         :return list:  Items found for attribute
         """
@@ -307,7 +314,10 @@ class AttributeRanker(BasicProcessor):
         if not values:
             return []
         else:
-            return set([value for value in values if not filter or filter.match(value)])
+            if negate_filter:
+                return set([value for value in values if not filter or not filter.match(value)])
+            else:
+                return set([value for value in values if not filter or filter.match(value)])
 
     def extract(self, value, look_for):
         """
@@ -324,14 +334,17 @@ class AttributeRanker(BasicProcessor):
         www_regex = re.compile(r"^www\.")
         values = []
 
-        if look_for in ("urls", "hostnames"):
+        if look_for in ("urls", "hostnames", "level2-hostnames"):
             links = link_regex.findall(value)
 
-            if look_for == "hostnames":
+            if look_for in ("hostnames", "level2-hostnames"):
                 for urlbits in links:
                     urlbits = urlbits.split("/")
                     if len(urlbits) >= 3:
-                        values.append(www_regex.sub("", urlbits[2]))
+                        if look_for == "hostnames":
+                            values.append(www_regex.sub("", urlbits[2]))
+                        else:
+                            values.append(".".join(urlbits[2].split(".")[-2:]))
             else:
                 values += list(links)
 

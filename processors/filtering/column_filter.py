@@ -232,7 +232,7 @@ class ColumnFilter(BaseFilter):
                     pass
 
             if matches:
-                yield mapped_item.original
+                yield mapped_item
                 matching_items += 1
 
     def filter_top(self, column, top_n, bottom=False):
@@ -254,7 +254,7 @@ class ColumnFilter(BaseFilter):
         for item in self.source_dataset.iterate_items(processor=self):
             if item.get(column) in top_values:
                 ranked_items = 0
-                yield item.original
+                yield item
 
             if ranked_items >= top_n:
                 return

@@ -1,9 +1,9 @@
 <nav class="pagination">
 
-	{% if post_count > max_posts %}
-		{% set post_count = max_posts %}
+	{% if item_count > max_items %}
+		{% set item_count = max_items %}
 	{% endif %}
-	{% set pages = ((post_count / posts_per_page) + (post_count % posts_per_page > 0))|int %}
+	{% set pages = ((item_count / items_per_page) + (item_count % items_per_page > 0))|int %}
 	{% set current = "current" %}
 	{% set lower_bound = 3 %}
 	{% set upper_bound = pages - 2 %}

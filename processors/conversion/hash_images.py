@@ -4,6 +4,8 @@ Hash images
 import csv
 import json
 
+from PIL import UnidentifiedImageError
+
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_image, stringify_hash
@@ -166,7 +168,7 @@ class ImageHasher(BasicProcessor):
         items = []  # each item: {filename, hash_obj, hash_type, hash_size}
         self.dataset.update_status("Processing images and creating hashes")
 
-        for image_file in self.iterate_archive_contents(self.source_file, staging_area=staging_area):
+        for item in self.source_dataset.iterate_items():
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while hashing images")
 
@@ -174,19 +176,23 @@ class ImageHasher(BasicProcessor):
             if processed % 100 == 0:
                 self.dataset.update_status(f"Processed {processed:,} of {self.source_dataset.num_rows:,} images")
 
-            if image_file.name == ".metadata.json":
+            if item.file.name == ".metadata.json":
                 continue
             try:
-                image_hash = hash_image(image_file, hash_type, hash_size, as_string=False)
+                image_hash = hash_image(item.file, hash_type, hash_size, as_string=False)
             except FileNotFoundError as e:
                 skipped += 1
-                self.dataset.log(f"Warning: Could not hash image {image_file.name}: {e}")
+                self.dataset.log(f"Warning: Could not hash image {item.file.name}: {e}")
+                continue
+            except UnidentifiedImageError as e:
+                skipped += 1
+                self.dataset.log(f"Warning: Could not identify image {item.file.name}: {e}")
                 continue
         
             processed += 1
 
             items.append({
-                "filename": image_file.name,
+                "filename": item.file.name,
                 "hash_obj": image_hash,
                 "hash_type": hash_type,
                 "hash_size": hash_size,

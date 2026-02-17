@@ -105,14 +105,14 @@ function init() {
 			});
 
 			// Keep track of whether the annotations are edited or not.
-			let post_annotations = $(".post-annotations");
-			post_annotations.on("keydown keyup change",
-				".post-annotation-input, input[type=checkbox], label, option",
+			let item_annotations = $(".item-annotations");
+			item_annotations.on("keydown keyup change",
+				".item-annotation-input, input[type=checkbox], label, option",
 				function(){
 
 					let parent = $(this).parent();
 					// Navigate one level up until we found the container
-					while (!parent.hasClass("post-annotation")) {
+					while (!parent.hasClass("item-annotation")) {
 						parent = parent.parent();
 					}
 					annotations.markChanges(parent);
@@ -301,10 +301,10 @@ function init() {
             Converts the DOM objects of an annotation
             to an annotation object.
 
-            Must be given a .post-annotation div element.
+            Must be given a .item-annotation div element.
             */
 
-			let ann_input = el.find(".post-annotation-input");
+			let ann_input = el.find(".item-annotation-input");
 			let ann_classes = el.attr("class").split(" ");
 			let ann_type = ann_classes[2].replace("type-", "");
 			let field_id = ann_classes[1].replace("field-", "");
@@ -325,7 +325,7 @@ function init() {
 				val = $(ann_input).find(":selected").val();
 			} else if (ann_type === "checkbox") {
 				val = [];
-				el.find(".post-annotation-input").each(function () {
+				el.find(".item-annotation-input").each(function () {
 					let checkbox = $(this);
 					if (checkbox.prop("checked") === true) {
 						val.push(checkbox.val());
@@ -348,7 +348,7 @@ function init() {
 		},
 
 		applyAnnotationFields: function (delete_field=""){
-			// Applies the annotation fields to each post on this page.
+			// Applies the annotation fields to each item on this page.
 
 			// First we collect the annotation information from the editor
 			let new_annotation_fields = annotations.parseAnnotationFields();
@@ -363,7 +363,7 @@ function init() {
 			}
 
 			// If everything is ok, we're going to add
-			// the annotation fields to each post on the page.
+			// the annotation fields to each item on the page.
 			else {
 
 				// Remove warnings
@@ -483,15 +483,15 @@ function init() {
 			// Write the annotations to the dataset and annotations table.
 
 			// First we're going to collect the data for this page.
-			// Loop through each post's annotation fields.
+			// Loop through each item's annotation fields.
 			let anns = [];
 			let dataset_key = $("#dataset-key").text();
 
-			$(".posts > li").each(function(){
-				let post_annotations = $(this).find(".post-annotations");
+			$(".items > li").each(function(){
+				let item_annotations = $(this).find(".item-annotations");
 
-				if (post_annotations.length > 0) {
-					post_annotations.find(".post-annotation").each(function(){
+				if (item_annotations.length > 0) {
+					item_annotations.find(".item-annotation").each(function(){
 						// Extract annotation object from edited elements
 						if ($(this).hasClass("edited")) {
 							let annotation = annotations.parseAnnotation($(this));
@@ -679,7 +679,7 @@ function init() {
 			let ta = $("#toggle-annotations");
 			ta.removeClass("shown");
 			ta.html("<i class='fas fa-eye'></i> Show annotations");
-			let pa = $(".post-annotations");
+			let pa = $(".item-annotations");
 			pa.hide();
 		},
 
@@ -704,7 +704,7 @@ function init() {
 			history.replaceState(null, null, "?"+queryParams.toString());
 
 			// Show/hide annotations div
-			let pa = $(".post-annotations");
+			let pa = $(".item-annotations");
 			pa.show();
 		},
 
@@ -757,7 +757,7 @@ function init() {
 		},
 
 		markChanges: function(el) {
-			// Adds info on edits on post annotation to its element, so we can save these to the db later.
+			// Adds info on edits on item annotation to its element, so we can save these to the db later.
 			// Currently includes the time of edits and the username of the annotator.
 			let current_username = $("#current-username").html();
 			let current_date = Date.now() / 1000;
@@ -775,8 +775,8 @@ function init() {
 const page_functions = {
 	init: function() {
 		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseover', function() {
-			let post = 'post-' + this.getAttribute('href').split('-').pop();
-			document.querySelector('#' + post).classList.add('highlight');
+			let item = 'item-' + this.getAttribute('href').split('-').pop();
+			document.querySelector('#' + item).classList.add('highlight');
 		}));
 		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseout', function() {
 			document.querySelectorAll('.thread li').forEach(link => link.classList.remove('highlight'));

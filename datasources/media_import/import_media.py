@@ -184,10 +184,11 @@ class SearchMedia(BasicProcessor):
         skipped_files = []
         with zipfile.ZipFile(dataset.get_results_path(), "w", compression=zipfile.ZIP_STORED) as new_zip_archive:
             for file in request.files.getlist("option-data_upload"):
-                # Check if file is zip archive
+                # Trusts extension or mimetype
+                is_zip = file.filename.lower().endswith(".zip")
                 file_mime_type = mimetypes.guess_type(file.filename)[0]
-                if file_mime_type is not None and file_mime_type.split('/')[0] == "application" and \
-                        file_mime_type.split('/')[1] == "zip":
+
+                if is_zip or (file_mime_type is not None and file_mime_type == "application/zip"):
                     # Save inner files from zip archive to new zip archive with all files
                     file.seek(0)
                     zip_file_data = BytesIO(file.read())
@@ -250,11 +251,11 @@ class SearchMedia(BasicProcessor):
         # Check for SVG files
         svg_warning = 0
         if self.parameters.get("media_type") == "image":
-            for file in self.iterate_archive_contents(self.dataset.get_results_path()):
-                if file.suffix == ".svg":
+            for item in self.dataset.iterate_items():
+                if item.file.suffix == ".svg":
                     if svg_warning == 0:
                         self.dataset.log("SVG files may not be processed correctly by some 4CAT processors.")
-                    self.dataset.log(f"SVG file detected: {file.name}")
+                    self.dataset.log(f"SVG file detected: {item.file.name}")
                     svg_warning += 1
         self.dataset.update_status(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}{'' if svg_warning == 0 else f' ({svg_warning} SVG files; see log)'}", is_final=True)
         self.dataset.finish(self.parameters.get("num_files"))

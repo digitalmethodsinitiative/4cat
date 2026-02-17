@@ -24,6 +24,8 @@
                     </div>
                 </form>
             {% else %}
+                {% set now = __datenow.timestamp() %}
+                {% set has_expired = namespace(value=false) %}
                 <table class="token-list">
                     <tr>
                         <th>Token</th>
@@ -31,13 +33,28 @@
                         <th>Expiration</th>
                     </tr>
                     {% for token in tokens %}
-                        <tr>
+                        {% set is_expired = token.expires < now %}
+                        {% if is_expired %}{% set has_expired.value = true %}{% endif %}
+                        <tr{% if is_expired %} class="expired"{% endif %}>
                             <td><code>{{ token.token }}</code></td>
                             <td>{{ token.calls }}</td>
-                            <td>{{ token.expires|datetime|safe }}</td>
+                            <td>
+                                {{ token.expires|datetime|safe }}
+                                {% if is_expired %}<span class="token-expired"> (expired)</span>{% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 </table>
+                
+                {% if has_expired.value %}
+                    <form action="{{ url_for('toolapi.request_token') }}" method="GET" class="wide" style="margin-top: 1em;">
+                        <p>One or more of your tokens has expired. Request a new one:</p>
+                        <div class="form-element form-footer">
+                            <input type="hidden" name="forward" value="yes">
+                            <button>Request new token</button>
+                        </div>
+                    </form>
+                {% endif %}
             {% endif %}
 
             <p>Tokens can be passed to API calls in two ways; via a <code>GET</code> parameter, <code>access-token</code>:</p>

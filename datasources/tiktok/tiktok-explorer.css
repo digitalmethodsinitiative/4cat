@@ -1,0 +1,131 @@
+.explorer-content {
+	background-color: white;
+	padding-top: 30px;
+}
+
+.items .item {
+	font-family: Arial, sans-serif;
+	font-size: 15px;
+	width: 580px;
+	margin: 0 auto;
+	background-color: white;
+	list-style-type: none;
+	border: 1px solid #efefef;
+	border-radius: 10px;
+	min-height: 50px;
+	margin-bottom: 20px;
+}
+
+.items .item .item-table {
+	position: relative;
+	display: table;
+	table-layout: fixed;
+}
+
+.items .item .item-table-row {
+	display: table-row;
+}
+
+.items .item .profile-picture {
+	display: table-cell;
+	width: 11%;
+	vertical-align: top;
+	padding: 10px;
+}
+
+.items .item .profile-picture img {
+	border-radius: 100%;
+	width: 100%;
+}
+
+.items .item .item-content {
+	display: table-cell;
+	width: 93%;
+}
+
+.items .item header {
+	color: black;
+	margin-top: 5px;
+	margin-bottom: 5px;
+}
+
+.items .item header a {
+	color: black;
+}
+
+.items .item .item-content {
+	display: inline-block;
+}
+
+.items .item .item-media {
+	margin-top: 10px;
+	width: 100%;
+}
+
+.items .item .item-media img {
+	width: 100%;
+	border-radius: 10px;
+}
+
+.metrics {
+	display: table-cell;
+	width: 5%;
+	vertical-align: top;
+	margin-top: 40px;
+}
+
+.metrics span {
+	display: inline-block;
+	width: 100%;
+	margin-bottom: 20px;
+}
+
+.items .external-url {
+	color: rgb(104, 119, 130);
+}
+
+span.hashtag {
+	color: rgb(29, 155, 240);
+}
+
+
+/** --------------------- *
+     Annotation item elements
+  * --------------------- */
+.item-annotations {
+    background-color: rgb(254, 44, 85);
+    margin-top: 10px;
+    color: white;
+    border-radius: 10px;
+}
+
+.item-annotation {
+    padding: 15px;
+}
+
+.item-annotation > .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    min-width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.item-annotation > .annotation-label, .item-annotation > .annotation-label > a {
+	color: black;
+}
+
+.item-annotation.checkbox > .item-annotation-options {
+    display: inline-block;
+}
+
+.item-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.item-annotation-options > input {
+    display: inline-block;
+}

@@ -10,6 +10,7 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.exceptions import MapItemException
+from common.lib.helpers import normalize_url_encoding
 
 
 class SearchInstagram(Search):
@@ -77,6 +78,7 @@ class SearchInstagram(Search):
         Parse Instagram post in Graph format
 
         2025-6-5: potentially legacy format
+        2026-2-10: much more confident legacy format no longer used
 
         :param node:  Data as received from Instagram
         :return dict:  Mapped item
@@ -140,6 +142,8 @@ class SearchInstagram(Search):
             # Post data
             "id": node["shortcode"],
             "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"),  # Zeeschuimer metadata
+            "collected_from_view": node.get("_zs_instagram_view", MissingMappedField("")),
+            "partial_item": node.get("_zs_partial", MissingMappedField("")),
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
             "thread_id": node["shortcode"],
             "parent_id": node["shortcode"],
@@ -193,6 +197,7 @@ class SearchInstagram(Search):
         :param node:  Data as received from Instagram
         :return dict:  Mapped item
         """
+        partial_item = node.get("_zs_partial", False)
         num_media = 1 if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
         caption = MissingMappedField("") if "caption" not in node else "" if not node.get("caption") else node["caption"]["text"]
 
@@ -211,14 +216,31 @@ class SearchInstagram(Search):
 
         for media_node in media_nodes:
             if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
-                # Videos
-                media_urls.append(media_node["video_versions"][0]["url"])
+                # Get thumbnail
                 if "image_versions2" in media_node:
                     display_urls.append(media_node["image_versions2"]["candidates"][0]["url"])
-                else:
+                elif "video_versions" in media_node:
                     # no image links at all :-/
                     # video is all we have
                     display_urls.append(media_node["video_versions"][0]["url"])
+                else:
+                    if partial_item:
+                        # Known partial item
+                        pass
+                    else:
+                        # New format
+                        raise MapItemException("Instagram item format change")
+                
+                # Videos if present
+                if "video_versions" in media_node:
+                    media_urls.append(media_node["video_versions"][0]["url"])
+                else:
+                    if partial_item:
+                        # Known partial item
+                        pass
+                    else:
+                        # New format
+                        raise MapItemException("Instagram item format change")
 
             elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO and media_node.get("image_versions2"):
                 # Images
@@ -263,9 +285,18 @@ class SearchInstagram(Search):
         coauthor_ids = []
         if node.get("coauthor_producers"):
             for coauthor_node in node["coauthor_producers"]:
-                coauthors.append(coauthor_node.get("username"))
-                coauthor_fullnames.append(coauthor_node.get("full_name"))
+                coauthors.append(coauthor_node.get("username", MissingMappedField("")))
+                coauthor_fullnames.append(coauthor_node.get("full_name", MissingMappedField("")))
                 coauthor_ids.append(coauthor_node.get("id"))
+        if any([type(value) is MissingMappedField for value in coauthors]):
+            coauthors = MissingMappedField("")
+        else:
+            coauthors = ",".join(coauthors)
+        if any([type(value) is MissingMappedField for value in coauthor_fullnames]):
+            coauthor_fullnames = MissingMappedField("")
+        else:
+            coauthor_fullnames = ",".join(coauthor_fullnames)
+        
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
@@ -275,24 +306,36 @@ class SearchInstagram(Search):
         else:
             # Not always included; MissingMappedField may be more appropriate, but it flags virtually all posts without tags (some do return `None`)
             usertags = ""
+            
+        if partial_item:
+            # Missing data
+            collected_at = MissingMappedField(0)
+            unix_at = MissingMappedField(0)
+            
+        else:
+            collected_at = datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S")
+            unix_at = node["taken_at"]
 
         mapped_item = {
             # Post and caption
+            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url")),  # Zeeschuimer metadata
+            "collected_from_view": node.get("_zs_instagram_view", ""),
+            "partial_item": node.get("_zs_partial", ""),
             "id": node["code"],
-            "post_source_domain": node.get("__import_meta", {}).get("source_platform_url"), # Zeeschuimer metadata
-            "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": collected_at,
             "thread_id": node["code"],
             "parent_id": node["code"],
             "url": "https://www.instagram.com/p/" + node["code"],
             "body": caption,
 
             # Authors
+            "author_id": user.get("id", owner.get("id", MissingMappedField(""))), # This should always be present
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
             "verified": True if user.get("is_verified") else False,
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
-            "coauthors": ",".join(coauthors),
-            "coauthor_fullnames": ",".join(coauthor_fullnames),
+            "coauthors": coauthors,
+            "coauthor_fullnames": coauthor_fullnames,
             "coauthor_ids": ",".join(coauthor_ids),
 
             # Media
@@ -302,7 +345,7 @@ class SearchInstagram(Search):
             "media_urls": ",".join(media_urls),
 
             # Engagement
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)),
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)) if type(caption) is not MissingMappedField else "",
             "usertags": usertags,
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["like_count"] if not no_likes else MissingMappedField(0),
@@ -315,7 +358,7 @@ class SearchInstagram(Search):
             "location_city": location["city"],
 
             # Metadata
-            "unix_timestamp": node["taken_at"],
+            "unix_timestamp": unix_at,
             "missing_media": missing_media, # This denotes media that is unable to be mapped and is otherwise None
         }
 

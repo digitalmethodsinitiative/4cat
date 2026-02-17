@@ -512,7 +512,7 @@ class ImageDownloader(BasicProcessor):
             else:
                 yield url
 
-    def stream_url(self, response, *args, **kwargs):
+    def stream_url(self, response, fourcat_original_url=None, *args, **kwargs):
         """
         Helper function for iterate_proxied_requests
 
@@ -521,25 +521,30 @@ class ImageDownloader(BasicProcessor):
 
         :param requests.Response response: requests response object
         """
+        if fourcat_original_url is None:
+            raise KeyError("Missing fourcat_original_url for response hook; proxied requests must pass it")
+
+        # Final URL after requests has handled redirects
         response_url = self.clean_url(response.url)
 
-        # we have a problem here which is determining the file name to write
-        # this URL to - and no context that would contain that file name is
-        # passed to the hook!
-        # we do have the URL of the request but it may not be the same as the
-        # one the request started with on account of redirects, etc
-        # so do two things - detect redirects and use them to map URLs, and for
-        # non-redirects, use some heuristics to find the original URL
-        if redirect := response.headers.get("location"):
-            if redirect.startswith("/"):
-                # URLs without a domain - add it
-                redirect = "/".join(response_url.split("/")[:3]) + redirect
+        # Strict requirement: we must have a filename for the original URL
+        original_url = fourcat_original_url
+        if original_url not in self.filenames:
+            raise KeyError(
+                f"Missing filename for original request URL: {original_url}"
+            )
 
-            redirect = self.clean_url(redirect)
-            if redirect != response_url:
-                self.url_redirects[response_url] = redirect
-                self.filenames[redirect] = self.filenames[response_url]
-                return
+        # Record redirect mapping from original -> final, if any
+        final_url = response_url
+        # If requests followed redirects, response.history contains prior responses
+        if response.history:
+            # Trust the current response URL as final; record mapping only if different
+            final_url = response_url
+
+        if final_url != original_url:
+            self.url_redirects[original_url] = final_url
+
+        destination = self.staging_area.joinpath(self.filenames[original_url])
 
         while chunk := response.raw.read(1024, decode_content=True):
             if not response.ok or self.interrupted or self.complete:
@@ -550,7 +555,6 @@ class ImageDownloader(BasicProcessor):
                 response.raw.close()
                 return
 
-            destination = self.staging_area.joinpath(self.filenames[response_url])
             with destination.open("ab") as outfile:
                 try:
                     outfile.write(chunk)

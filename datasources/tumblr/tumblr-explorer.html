@@ -1,0 +1,221 @@
+{% set reblog = True if item.parent_item_author else False %}
+<header>
+	<div class="author-row {% if reblog %}reblog{% endif %}">
+	{% if not pseudonymised %}
+		<!-- Possible external link, if not pseudonymised -->
+		<a href="{{ item['item_url'] }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+		<!-- PFP -->
+		{% if item["author_avatar_url"] %}
+		<div class="author-avatar {% if reblog %}reblog{% endif %}">
+			<a href="{{ item.get('author_url') }}" target="_blank">
+				<img src="{{ item.get('author_avatar_url') }}">
+			</a>
+		</div>
+		{% endif %}
+		<!-- AUTHOR -->
+		{% if reblog %}
+			<span class="reblog-icon"><i class="fa-solid fa-repeat"></i></span>
+		{% endif %}
+		<span class="author"><a href="{{ item.get('author_url') }}">{{ item.get("author") }}</a></span>
+		{% if reblog %}<span class="reblog-notice"> reblogged </span><a href="https://tumblr.com/{{ item.parent_item_author }}"><span class="author">{{ item.parent_item_author }}</span></a>{% endif %}
+		
+	{% else %}
+		<span title="Pseudonymous author" class="author pseudonymous">
+		<i class="fa fa-user-secret tooltip-trigger"></i>
+		{% if item.parent_item_author %}</span><span class="reblog-icon"><i class="fa-solid fa-repeat"></i></span> reblogged{% endif %}
+	{% endif %}
+	</div>
+
+</header>
+
+<!-- REBLOGGED CONTENT -->
+{% if reblog %}
+
+	{% for reblog_author in item.reblog_trail.split(",") %}
+	<div class="author-row">
+		{% if not pseudonymised %}
+			<div class="author-avatar">
+				<a href="https://tumblr.com/{{ reblog_author }}" target="_blank">
+					<img src="https://api.tumblr.com/v2/blog/{{ reblog_author }}/avatar">
+				</a>
+			</div>
+			<span class="author"><a href="https://tumblr.com/{{ reblog_author }}">{{ reblog_author }}</a></span>
+		{% else %}
+			<span class="author pseudonymous" title="Pseudonymous author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+		{% endif %}
+	</div>
+	<div class="item-content reblog">
+		{% if item.get("image_urls_reblogged") %}
+			{% for image_url in item.image_urls_reblogged.split(",") %}
+			<div class="media-container image">
+				<img src="{{ image_url }}">
+			</div>
+			{% endfor %}
+		{% endif %}
+		<div class="body reblog-body">
+			{{ item.body_reblogged.split("\n\n")[loop.index - 1] }}
+		</div>
+	</div>
+	{% endfor %}
+
+	{% if item.body %}
+		<div class="author-row">
+		{% if not pseudonymised %}
+			<!-- Possible external link, if not pseudonymised -->
+			<a href="{{ item['item_url'] }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+			<!-- PFP -->
+			{% if item["author_avatar_url"] %}
+			<div class="author-avatar">
+				<a href="{{ item.get('author_url') }}" target="_blank">
+					<img src="{{ item.get('author_avatar_url') }}">
+				</a>
+			</div>
+			{% endif %}
+			<!-- AUTHOR -->
+			<span class="author"><a href="{{ item.get('author_url') }}">{{ item.get("author") }}</a></span>
+			
+		{% else %}
+			<span title="Pseudonymous author" class="author pseudonymous">
+			<i class="fa fa-user-secret tooltip-trigger"></i>
+		{% endif %}
+		</div>
+	{% endif %}
+
+{% endif %}
+
+<div class="item-content">
+
+	<!-- CONTENT BLOCKS -->
+	<!-- Keep track of what blocks we've seen so we know what part of the strings to get -->
+	{% set block_counts = namespace({'text': 0, 'image': 0, 'video': 0, 'audio': 0, 'link': 0, 'ask': 0}) %}
+	{% set content_order = item.content_order.split(",") %}
+	{% for block in content_order %}
+		{% if block == "text" %}
+		<!-- TEXT -->
+			<div class="body">{{ item.get("body_markdown").split("\n")[block_counts.text] | markdown | social_mediafy(datasource='tumblr') | safe }}</div>
+			{% set block_counts.text = block_counts.text + 1 %}
+		{% elif block == "image" %}
+		<!-- IMAGE -->
+			<div class="media-container image">
+				<img src="{{ item.image_urls.split(',')[block_counts.image] }}">
+			</div>
+			{% set block_counts.image = block_counts.image + 1 %}
+		{% elif block == "video" %}
+		<!-- VIDEO -->
+			<div class="media-container video">
+				<a href="{{ item.video_urls.split(',')[block_counts.video] }}" target='blank'>
+					<img src="{{ item.video_thumb_urls.split(',')[block_counts.video] }}">
+					<div class="play-button"><i class="fa-solid fa-play"></i></div>
+				</a>
+			</div>
+			{% set block_counts.video = block_counts.video + 1 %}
+		{% elif block == "audio" %}
+		<!-- AUDIO -->
+			<div class="media-container audio">
+				<audio controls src="{{ item.audio_urls.split(',')[block_counts.audio] }}"></audio>
+			</div>
+			{% set block_counts.audio = block_counts.audio + 1 %}
+		{% elif block == "link" %}
+		<!-- EMBEDDED LINK -->
+			{% set url = item.link_urls.split(",")[block_counts.link] %}
+			{% set link_title = item.link_titles.split(",")[block_counts.link] %}
+			{% set link_description = item.link_descriptions.split(",")[block_counts.link] %}
+			<a class="embedded-link" href="{{ url }}" target="_blank">
+			<div class="embedded-link-box">
+				{{ link_title }}
+				<div class="link-description">{{ link_description }} <i class="fas fa-external-link-alt"></i></div>
+			</div>
+			</a>
+			{% set block_counts.link = block_counts.link + 1 %}
+		{% elif block == "poll" %}
+		<!-- POLL -->
+			<!-- Only one poll can be added to items, so no need to split -->
+			<div class="poll">
+				<div class="poll-question">{{ item["poll_question"] }}</div>
+				<ul class="poll-answers">
+					{% for poll_answer in item["poll_answers"].split(",") %}
+						<li class="poll-answer">{{ poll_answer }}</li>
+					{% endfor %}
+				</ul>
+			</div>
+		<!-- ASK CONTENT -->
+		{% elif block == "ask" %}
+			{% set start_ask_block = True if loop.index == 0 or content_order[loop.index - 2] != "ask" else False %}
+			{% set end_ask_block = True if loop.index == content_order|length or content_order[loop.index] != "ask" else False %}
+			{% if start_ask_block %}
+			<div class="ask-content">
+				<div class="body-ask">
+				<div class="author-ask"><strong>{% if not pseudonymised %}{{ item["author_ask"] }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</strong> asked:</div>
+			{% endif %}
+					<p>{{ item.get("body_ask").split("\n")[block_counts.ask] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
+			{% if end_ask_block %}
+				</div>
+			</div>
+			<div class="author-avatar author-ask-avatar">
+				{% if not pseudonymised %}
+					<img src="https://api.tumblr.com/v2/blog/{{ item.author_ask }}/avatar">
+				{% endif %}
+			</div>
+			{% endif %}
+			{% set block_counts.ask = block_counts.ask + 1 %}
+		{% endif %}
+	{% endfor %}
+
+	<!-- TAGS -->
+	{% if item.get("tags") %}
+	<div class="tags">
+		<ul class="tags-list">
+		{% for tag in item["tags"].split(",") %}
+			<a href="https://tumblr.com/tagged/{{ tag }}" target="_blank"><li class="tag">#{{ tag }}</li></a>
+		{% endfor %}
+		</ul>
+	</div>
+	{% endif %}
+</div>
+
+<footer>
+
+	<!-- DATE -->
+	<div class="time">{{ item.unix_timestamp | datetime(fmt="%d %b %Y, %H:%M", wrap=False) }} UTC</div>
+
+	<!-- NOTES -->
+	{% if item.note_count %}
+	<div class="notes">
+		<div class="note-counts">
+			<span class="note-count total">{{ item.get("note_count") | commafy }} note{% if item.get("note_count", 0) > 1 %}s{% endif %}</span>
+			<!-- REBLOGS -->
+			{% if item.get("reblog_count") %}
+				<span class="note-count reblog-count"><i class="fa-solid fa-retweet"></i> {{ item.reblog_count | commafy }}</span>
+			{% endif %}
+			<!-- LIKES -->
+			{% if item.get("like_count") %}
+				<span class="note-count like-count"><i class="fa-solid fa-heart"></i> {{ item.get("like_count") | commafy }}</span>
+			{% endif %}
+			<!-- REPLIES -->
+			{% if item.get("reply_count") %}
+				<span class="note-count reply-count"><i class="fa-solid fa-reply"></i> {{ item.get("reply_count") | commafy }}</span>
+			{% endif %}
+		</div>
+		{% if item.get("authors_replied") %}
+		<div class="replies">			
+			{% for author_replied in item.get("authors_replied").split(",") %}
+			<li class="reply">
+				<div class="author-avatar author-replied-avatar">
+					{% if not pseudonymised %}
+						<img src="https://api.tumblr.com/v2/blog/{{ author_replied }}/avatar">
+					{% else %}
+						<span title="Pseudonymous author" class="author pseudonymous">
+                            <i class="fa fa-user-secret tooltip-trigger"></i></span>
+					{% endif %}
+				</div>
+				<div class="reply-content">
+					<div class="author author-replied">{% if not pseudonymised %}{{ author_replied }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</div>
+					<div class="reply-text">{{ item.replies.split("\n\n")[ loop.index - 1 ].replace(author_replied + ": ", "") | social_mediafy(datasource='tumblr') | safe }}</div>
+				</div>
+			</li>
+			{% endfor %}
+		</div>
+		{% endif %}
+	</div>
+	{% endif %}
+</footer>

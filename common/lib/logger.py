@@ -143,7 +143,7 @@ class SlackLogHandler(WebHookLogHandler):
         :param logging.LogRecord record: Log record
         """
         if record.levelno in (logging.ERROR, logging.CRITICAL):
-            emoji = ":rotating_light:"
+            emoji = ":skull:"
             color = "#FF0000"  # red
         elif record.levelno == logging.WARNING:
             emoji = ":bell:"

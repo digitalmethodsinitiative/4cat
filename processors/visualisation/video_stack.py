@@ -7,7 +7,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend, and
 assumes that ffprobe is also present in the same location.
 """
 import shutil
-import subprocess
 import oslex
 
 from packaging import version
@@ -150,9 +149,8 @@ class VideoStack(BasicProcessor):
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
             return self.dataset.finish_with_error("Video data missing. Cannot stack videos.")
 
-        # a staging area to store the videos we're reading from
-        video_staging_area = self.dataset.get_staging_area()
-
+        self.for_cleanup.append(video_dataset)
+        
         # determine ffmpeg version
         # -fps_mode is not in older versions and we can use -vsync instead
         # but -vsync will be deprecated so only use it if needed
@@ -175,37 +173,33 @@ class VideoStack(BasicProcessor):
         videos = []
 
         # unpack videos and determine length of the video (for sorting)
-        for video in self.iterate_archive_contents(video_dataset.get_results_path(), staging_area=video_staging_area,
-                                                   immediately_delete=False):
+        for video in video_dataset.iterate_items(immediately_delete=False):
             if self.interrupted:
-                shutil.rmtree(video_staging_area, ignore_errors=True)
                 return ProcessorInterruptedException("Interrupted while unpacking videos")
 
             # skip JSON
-            if video.name == '.metadata.json':
+            if video.file.name == '.metadata.json':
                 continue
 
             if len(videos) >= max_videos:
                 break
 
-            video_path = oslex.quote(str(video))
+            video_path = oslex.quote(str(video.file))
 
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
                               "default=noprint_wrappers=1:nokey=1", video_path]
-            length = subprocess.run(length_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+            length = self.run_interruptable_process(length_command)
 
             length_output = length.stdout.decode("utf-8")
             length_error = length.stderr.decode("utf-8")
             if length_error:
-                shutil.rmtree(video_staging_area, ignore_errors=True)
                 return self.dataset.finish_with_error("Cannot determine length of video {video.name}. Cannot stack "
                                                       "videos without knowing the video lengths.")
             else:
-                lengths[video.name] = float(length_output)
+                lengths[video.file.name] = float(length_output)
 
-            videos.append(video)
+            videos.append(video.file)
 
         # sort videos by length
         videos = sorted(videos, key=lambda v: lengths[v.name], reverse=True)
@@ -267,11 +261,10 @@ class VideoStack(BasicProcessor):
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
 
         if self.interrupted:
-            shutil.rmtree(video_staging_area, ignore_errors=True)
             return ProcessorInterruptedException("Interrupted while stacking videos")
 
         self.dataset.update_status("Merging video files with ffmpeg (this can take a while)")
-        result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = self.run_interruptable_process(command)
 
         # Capture logs
         ffmpeg_output = result.stdout.decode("utf-8")
@@ -286,8 +279,6 @@ class VideoStack(BasicProcessor):
             self.dataset.log("ffmpeg returned the following errors:")
             for line in ffmpeg_error.split("\n"):
                 self.dataset.log("  " + line)
-
-        shutil.rmtree(video_staging_area, ignore_errors=True)
 
         if result.returncode != 0:
             return self.dataset.finish_with_error(

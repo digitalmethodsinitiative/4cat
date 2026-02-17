@@ -5,7 +5,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import shutil
-import subprocess
 import oslex
 
 from backend.lib.processor import BasicProcessor
@@ -106,22 +105,22 @@ class VideoFrames(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for i, path in enumerate(self.iterate_archive_contents(self.source_file, staging_area)):
+		for i, video in enumerate(self.source_dataset.iterate_items()):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
 			# Check for 4CAT's metadata JSON and copy it
-			if path.name == '.metadata.json':
-				shutil.copy(path, output_directory)
+			if video.file.name == '.metadata.json':
+				shutil.copy(video.file, output_directory)
 				continue
 
-			vid_name = path.stem
+			vid_name = video.file.stem
 			video_dir = output_directory.joinpath(vid_name)
 			video_dir.mkdir(exist_ok=True)
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", oslex.quote(str(path))
+				"-i", oslex.quote(str(video.file))
 			]
 
 			if frame_interval != 0:
@@ -135,7 +134,7 @@ class VideoFrames(BasicProcessor):
 
 			self.dataset.log(" ".join(command))
 
-			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			result = self.run_interruptable_process(command, cleanup_paths=(staging_area,))
 
 			# Capture logs
 			ffmpeg_output = result.stdout.decode("utf-8")
@@ -167,8 +166,5 @@ class VideoFrames(BasicProcessor):
 
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
-
-		# Remove staging area
-		shutil.rmtree(staging_area)
 
 		self.dataset.finish(processed_videos)

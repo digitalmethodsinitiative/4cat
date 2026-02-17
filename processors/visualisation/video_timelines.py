@@ -86,12 +86,12 @@ class VideoTimelines(BasicProcessor):
         previous_video = None
         offset_y = -base_height
         timeline = None
-        iterator = self.iterate_archive_contents(self.source_file)
+        iterator = self.source_dataset.iterate_items()
         looping = True
         timelines = []
         timeline_widths = {}
 
-        # why not just loop through iterate_archive_contents?
+        # why not just loop through iterate_items?
         # in SVG the order of elements matters, so we want to do some things
         # _after_ adding the last frame of a timeline. If we do this within the
         # loop we need to do the same outside of the loop after it finishes the
@@ -103,23 +103,23 @@ class VideoTimelines(BasicProcessor):
 
             # get next file in archive from iterator
             try:
-                file = next(iterator)
+                item = next(iterator)
             except StopIteration:
                 # this means that at the end of the iterator we complete one
                 # final iteration in which we finish things up (see below)
                 looping = False
 
             # there is a metadata file, always read first, which we can use
-            if file.name == ".metadata.json":
-                with file.open() as infile:
+            if item.file.name == ".metadata.json":
+                with item.file.open() as infile:
                     metadata = json.load(infile)
                     continue
 
             # skip if file is a real file but not an image
-            if looping and file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):
+            if looping and item.file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):
                 continue
             else:
-                video = str(file.parent.name)
+                video = str(item.file.parent.name)
 
             labels = self.get_video_labels(metadata)
 
@@ -166,7 +166,7 @@ class VideoTimelines(BasicProcessor):
 
             # if we have a new frame, add it to the currently active timeline
             if looping:
-                frame = Image.open(file)
+                frame = Image.open(item.file)
                 frame_width = int(base_height * frame.width / frame.height)
                 frame.thumbnail((frame_width, base_height))
 

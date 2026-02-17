@@ -122,7 +122,7 @@ class SearchBluesky(Search):
         :return dict:  Safe query parameters
         """
         # no query 4 u
-        if not query.get("query", "").strip():
+        if query.get("query") is None or not query.get("query", "").strip():
             raise QueryParametersException("You must provide a search query.")
 
         if not query.get("username", None) or not query.get("password", None) :

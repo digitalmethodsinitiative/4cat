@@ -1,0 +1,72 @@
+<div class="item-table">
+	<div class="item-table-row">
+		<div class="profile-picture">
+			{% if not pseudonymised %}
+			<img src="{{ item.get('author_avatar') }}">
+			{% else %}
+			<span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+			{% endif %}
+		</div>
+		<!-- item content-->
+		<div class="item-content">
+			<!-- item header -->
+			<header>
+				<!-- Author name -->
+				{% if pseudonymised %}
+					<span title="Pseudonymous author" class="author">
+					<i class="fa fa-user-secret tooltip-trigger"></i>
+				{% else %}
+					<span title="Author" class="author">
+					<strong>{{ item.get("author") }}</strong> {{ item.get("author_full" )}}
+				{% endif %}
+				</span>
+				<!-- item time -->
+				<span title="Date" class="datetime">{{ item.get("timestamp") }}</span>
+				<!--  -->
+				<div title="Music" class="music"><i class="fa-solid fa-music"></i> {{ item.get("music_name") }} </div>
+				
+			</header>
+
+			<!-- item body -->
+			<span class="body">{{ item.body | social_mediafy(datasource="tiktok") | safe }}</span>
+			
+			<!-- Video thumbnail item -->
+			<div class="item-media">
+				<a href="{{ item.tiktok_url }}" target="_blank"><img src="{{ url_for('static', filename='img/go-to-media.jpg') }}"></a>
+			</div>
+			
+		</div>
+
+		<!-- Metrics: views, likes, shares, comments -->
+		<div class="metrics">
+			{% if item.get("plays") %}
+			<span class="views">
+				<i class="fa-solid fa-eye"></i> {{ item["plays"] | numberify }}
+			</span>
+			{% endif %}
+			{% if item.get("likes") %}
+			<span class="likes">
+				<i class="fa-solid fa-heart"></i> {{ item["likes"] | numberify }}
+			</span>
+			{% endif %}
+			{% if item.get("shares") %}
+			<span class="shares">
+				<i class="fa-solid fa-share"></i> {{ item["shares"] | numberify }}
+			</span>
+			{% endif %}
+			{% if item.get("comments") %}
+			<span class="comments">
+				<i class="fa-solid fa-comment"></i> {{ item["comments"] | numberify }}
+			</span>
+			{% endif %}
+			<!-- Possible external link, if not pseudonymised -->
+			{% if item.get("tiktok_url") and pseudonymised %}
+			<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
+			{% elif item.get("tiktok_url") and not pseudonymised %}
+			<a href="{{ item['tiktok_url'] }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+			{% endif %}
+		</div>
+	</div>
+</div>
+
+

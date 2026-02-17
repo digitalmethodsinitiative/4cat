@@ -119,26 +119,26 @@ class ImageTextDetector(BasicProcessor):
         else:
             max_images = None
 
-        staging_area = self.dataset.get_staging_area()
         # Collect filenames and metadata
         image_filenames = []
         skipped_images = 0
         metadata_file = None
-        for image in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+        staging_area = self.dataset.get_staging_area()
+        for image in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unzipping images")
 
-            if image.name == ".metadata.json":
-                metadata_file = image.name
+            if image.file.name == ".metadata.json":
+                metadata_file = image.file.name
                 continue
-            elif image.name.split('.')[-1]  in ["json", "log"]:
+            elif image.file.name.split('.')[-1]  in ["json", "log"]:
                 continue
-            elif image.name.split('.')[-1] == "svg":
-                self.dataset.log(f"SVG files are not supported, skipping {image.name}")
+            elif image.file.name.split('.')[-1] == "svg":
+                self.dataset.log(f"SVG files are not supported, skipping {image.file.name}")
                 skipped_images += 1
                 continue
 
-            image_filenames.append(image.name)
+            image_filenames.append(image.file.name)
 
             if max_images and len(image_filenames) >= max_images:
                 break
