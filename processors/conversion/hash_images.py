@@ -230,5 +230,12 @@ class ImageHasher(BasicProcessor):
         final_msg = f"Processed {processed:,} images"
         if group_by:
             final_msg += f", grouped into {next_group_id:,} groups (threshold={similarity_pct:.2f}%)"
-        self.dataset.update_status(final_msg, is_final=True)
-        self.dataset.finish(num_rows=processed)
+
+        warning = None
+        if skipped:
+            warning = final_msg + f". Skipped {skipped:,} images"
+        if warning:
+            self.dataset.finish_with_warning(processed, warning)
+        else:
+            self.dataset.update_status(final_msg, is_final=True)
+            self.dataset.finish(num_rows=processed)

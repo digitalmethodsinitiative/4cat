@@ -59,7 +59,7 @@ class CountPosts(BasicProcessor):
             "pad": {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": True,
-                "help": "Include dates where the count is zero",
+                "help": "Include dates with zero items",
                 "tooltip": "Makes the counts continuous. For example, if there are items from May and July but not June, June will be included with 0 items.",
             },
         }

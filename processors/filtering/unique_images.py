@@ -21,7 +21,7 @@ class UniqueImageFilter(BasicProcessor):
     type = "image-downloader-unique"  # job type ID
     category = "Visualisation"  # category
     title = "Filter for unique images"  # title displayed in UI
-    description = "Only keeps one instance per image, using a choice of detection method."  # description displayed in UI
+    description = "Only keeps one instance per image using various detection methods."  # description displayed in UI
     extension = "zip"
 
     references = [

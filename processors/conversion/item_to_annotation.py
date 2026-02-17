@@ -17,6 +17,7 @@ class ItemToAnnotation(BasicProcessor):
     """
     type = "item-to-annotation"  # job type ID
     category = "Conversion"  # category
+    filter = True  # to indicate we're filtering the top dataset
     title = "Convert items to annotations"  # title displayed in UI
     description = ("Convert a regular dataset item to an annotation. This will show it as a separate value in the "
                    "Explorer. Item values must be numbers or strings.")  # description displayed in UI
@@ -29,7 +30,7 @@ class ItemToAnnotation(BasicProcessor):
             "columns": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "body",
-                "help": "Columns with texts to replace",
+                "help": "Columns to convert",
             }
         }
 
@@ -50,7 +51,7 @@ class ItemToAnnotation(BasicProcessor):
         :param module: Module to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.get_extension() in ("csv", "ndjson")
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """

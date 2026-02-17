@@ -350,6 +350,16 @@ article.result > section:first-child {
     color: var(--always-white);
 }
 
+.warning {
+    background: var(--accent-warning);
+    color: var(--always-white);
+}
+
+.empty {
+    background: var(--gray-light);
+    color: var(--gray-darker);
+}
+
 .child-wrapper .button-wrap.processor-result-indicator a {
     display: inline-block;
     color: inherit;
@@ -422,8 +432,8 @@ article.result > section:first-child {
     display: inline-block;
 }
 
-.child-list:not(.processor-list) li:not(.inline) > .processor-header header:after {
-    content: ':';
+.child-list:not(.processor-list) li:not(.inline) > .processor-header header {
+    margin-right: 0.2em;
 }
 
 .child-list .processor-details {
@@ -923,7 +933,7 @@ body.image-preview {
 
 
 #edit-annotation-fields #input-warning {
-    color: var(--accent-warning)
+    color: var(--accent-error)
 }
 
 /* Remove all styles for Explorer posts */
@@ -953,7 +963,7 @@ body.image-preview {
 }
 
 .annotation-field-label.invalid, .option-field > input.invalid {
-    border: 1px solid var(--accent-warning);
+    border: 1px solid var(--accent-error);
 }
 
 #edit-annotation-fields {

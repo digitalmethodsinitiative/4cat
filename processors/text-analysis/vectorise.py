@@ -19,8 +19,7 @@ class Vectorise(BasicProcessor):
 	type = "vectorise-tokens"  # job type ID
 	category = "Text analysis"  # category
 	title = "Count words"  # title displayed in UI
-	description = "Counts all tokens so they are transformed into word => frequency counts." \
-				  "This is also known as a bag of words."  # description displayed in UI
+	description = "Counts how often a token appears in the dataset. This creates a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	followups = ["vector-ranker"]

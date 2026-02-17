@@ -26,7 +26,7 @@ class TopicModeler(BasicProcessor):
     type = "topic-modeller"  # job type ID
     category = "Text analysis"  # category
     title = "Generate topic models"  # title displayed in UI
-    description = "Creates topic models per tokenset using Latent Dirichlet Allocation (LDA). " \
+    description = "Creates topic models per token set using Latent Dirichlet Allocation (LDA). " \
                   "For a given number of topics, tokens are assigned a relevance weight per topic, " \
                   "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
@@ -137,8 +137,7 @@ class TopicModeler(BasicProcessor):
                 vectors = vectoriser.fit_transform(tokens)
             except ValueError as e:
                 # 'no words left' after pruning, so nothing to model with
-                self.dataset.update_status(str(e), is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error(str(e))
                 return
 
             features = vectoriser.get_feature_names_out()

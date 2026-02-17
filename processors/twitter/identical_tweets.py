@@ -15,8 +15,8 @@ class TwitterIdenticalTweets(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-identical-tweets"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Identical Tweet Frequency"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "Identical tweet frequency"  # title displayed in UI
     description = "Groups tweets by text and counts the number of times they have been (re)tweeted indentically."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 

@@ -48,7 +48,7 @@ class VideoFrames(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Number of frames extracted per second to extract from video",
 				"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
-						"pass 5, and so on. Use '0' to only capture the first frame of the video.",
+						   "pass 5, and so on. Use '0' to only capture the first frame of the video.",
 				"coerce_type": float,
 				"default": 1,
 				"min": 0,
@@ -75,8 +75,8 @@ class VideoFrames(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-			   config.get("video-downloader.ffmpeg_path") and \
-			   shutil.which(config.get("video-downloader.ffmpeg_path"))
+			config.get("video-downloader.ffmpeg_path") and \
+			shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):
 		"""
@@ -85,8 +85,7 @@ class VideoFrames(BasicProcessor):
 		"""
 		# Check processor able to run
 		if self.source_dataset.num_rows == 0:
-			self.dataset.update_status("No videos from which to extract frames.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("No videos from which to extract frames.")
 			return
 
 		# Collect parameters
@@ -120,7 +119,7 @@ class VideoFrames(BasicProcessor):
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", oslex.quote(str(video.file))
+				"-y", "-nostdin", "-i", str(video.file),
 			]
 
 			if frame_interval != 0:
@@ -130,7 +129,7 @@ class VideoFrames(BasicProcessor):
 
 			if frame_size != 'no_modify':
 				command += ['-s', oslex.quote(frame_size)]
-			command += [oslex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
+			command += [str(video_dir.joinpath("/video_frame_%07d.jpeg"))]
 
 			self.dataset.log(" ".join(command))
 
@@ -150,10 +149,12 @@ class VideoFrames(BasicProcessor):
 
 			if result.returncode != 0:
 				self.dataset.update_status(f"Unable to extract frames from video {vid_name} (see logs for details)")
-				self.dataset.log('Error Return Code (%s) with video %s: %s' % (str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
+				self.dataset.log('Error Return Code (%s) with video %s: %s' % (
+					str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
 			else:
 				processed_videos += 1
-				self.dataset.update_status("Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
+				self.dataset.update_status(
+					"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
 
 			self.dataset.update_progress(i / total_possible_videos)
 
@@ -167,4 +168,9 @@ class VideoFrames(BasicProcessor):
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
 
-		self.dataset.finish(processed_videos)
+		if processed_videos < total_possible_videos:
+			warning = "Could not extract frames for all videos. See the dataset log for details."
+			self.dataset.finish_with_warning(processed_videos, warning)
+		else:
+			self.dataset.finish(processed_videos)
+		return

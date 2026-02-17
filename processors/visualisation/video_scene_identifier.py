@@ -174,8 +174,7 @@ class VideoSceneDetector(BasicProcessor):
 		if (os.name != "nt" and self.source_dataset.num_rows <= 1 or
 				os.name == "nt" and self.source_dataset.num_rows < 1):
 			# 1 because there is always a metadata file
-			self.dataset.update_status("No videos from which to extract scenes.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_as_empty("No videos from which to extract scenes.")
 			return
 		deduct_metadata = 0
 		if os.name == "nt":
@@ -314,9 +313,9 @@ class VideoSceneDetector(BasicProcessor):
 			self.save_annotations(annotations)
 
 		if rows:
-			self.dataset.update_status(
-				'Detected %i scenes in %i videos' % (num_posts, processed_videos))
-			self.write_csv_items_and_finish(rows)
+			self.dataset.update_status('Detected %i scenes in %i videos' % (num_posts, processed_videos))
+			warning = None if processed_videos < total_possible_videos else "Scenes could not be downloaded for all videos."
+			self.write_csv_items_and_finish(rows, warning=warning)
 		else:
 			return self.dataset.finish_with_error("No distinct scenes could be detected in the videos. The videos may "
 												  "be too short for scenes to be detected.")

@@ -164,8 +164,7 @@ class TfIdf(BasicProcessor):
 					tokens.append(item_tokens)
 
 			except UnicodeDecodeError:
-				self.dataset.update_status("Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.", is_final=True)
-				self.dataset.finish(0)
+				self.dataset.finish_with_error("Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.")
 				return
 
 		# Make sure `min_occurrences` and `max_occurrences` are valid
@@ -185,8 +184,7 @@ class TfIdf(BasicProcessor):
 				results = self.get_tfidf_sklearn(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
 								 max_occurrences=max_occurrences, top_n=max_output)
 			else:
-				self.dataset.update_status("Invalid library.")
-				self.dataset.finish(0)
+				self.dataset.finish_with_error("Invalid library.")
 				return
 
 			if results:
@@ -195,8 +193,8 @@ class TfIdf(BasicProcessor):
 				self.write_csv_items_and_finish(results)
 
 		except MemoryError:
-			self.dataset.update_status("Out of memory - dataset too large to run tf-idf analysis.")
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Out of memory - dataset too large to run tf-idf analysis.")
+			return
 
 	def get_tfidf_gensim(self, tokens, dates, top_n=25, smartirs="nfc"):
 		"""
@@ -274,8 +272,7 @@ class TfIdf(BasicProcessor):
 			tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
 		except ValueError as e:
 			self.dataset.log(f"sklearn ValueError: {e!r}")
-			self.dataset.update_status("No tokens remain with these parameters. Set less strict constraints and try again.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("No tokens remain with these parameters. Set less strict constraints and try again.")
 			return
 
 		np.array(tfidf_vectorizer.get_feature_names_out())

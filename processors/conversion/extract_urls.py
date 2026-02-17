@@ -27,7 +27,7 @@ class ExtractURLs(BasicProcessor):
     """
     type = "extract-urls-filter"  # job type ID
     category = "Conversion"  # category
-    title = "Extract URLs (and optionally expand)"  # title displayed in UI
+    title = "Extract and expand URLs"  # title displayed in UI
     description = "Extract any URLs from selected column(s) with the option to expand shortened URLs."
     extension = "csv"
 
