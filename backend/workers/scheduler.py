@@ -103,7 +103,7 @@ class Scheduler(BasicWorker):
 			# Store necessaries for future datasets
 			# These may contain sensitive parameters, but those will be needed for future jobs...
 			given_parameters = dataset.parameters.copy()
-			all_parameters = processor.get_options(dataset)
+			all_parameters = processor.get_options(dataset, config=self.config)
 			parameters = {
 				param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
 				for param in [*all_parameters.keys(), *given_parameters.keys()]
@@ -133,7 +133,7 @@ class Scheduler(BasicWorker):
 
 		# Create new job; interval is 0 as this scheduler is responsible for scheduling the next job
 		# Job details contains the scheduler_id for job to update scheduler table on finish
-		self.queue.add_job(jobtype=self.details.get("processor_type"), remote_id=dataset.key, interval=0, details={"scheduler_id": self.job.data["id"]})
+		self.queue.add_job(worker_or_type=self.details.get("processor_type"), dataset=dataset, interval=0, details={"scheduler_id": self.job.data["id"]})
 		# Get new job w/ ID
 		new_job = Job.get_by_remote_ID(dataset.key, self.db)
 
