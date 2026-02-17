@@ -121,14 +121,6 @@ class WorkerManager:
 				# worker slots, start a new worker to run it
 				if len(self.worker_pool[queue_id]) < MAX_JOBS_PER_QUEUE:
 					try:
-						worker_available = worker_class.check_worker_available(manager=self, modules=self.modules)
-					except Exception as e:
-						self.log.error(f"Error checking if worker {jobtype} is available: {type(e).__name__}: {e}")
-						worker_available = False
-					if not worker_available:
-						self.log.debug(f"Worker {jobtype} is not currently available, skipping...")
-						continue
-					try:
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=self.modules)
 						worker.start()
