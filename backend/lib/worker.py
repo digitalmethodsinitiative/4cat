@@ -174,6 +174,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
         :return bool:  True if the worker can run, False if not
         """
+        if cls.type not in manager.worker_pool:
+            # No workers of this type running, so we can run
+            return True
         # check if we have too many workers of this type running
         if len(manager.worker_pool[cls.type]) < cls.max_workers:
             return True

@@ -123,7 +123,7 @@ class WorkerManager:
 					try:
 						worker_available = worker_class.check_worker_available(manager=self, modules=self.modules)
 					except Exception as e:
-						self.log.error(f"Error checking if worker {jobtype} is available: {e}")
+						self.log.error(f"Error checking if worker {jobtype} is available: {type(e).__name__}: {e}")
 						worker_available = False
 					if not worker_available:
 						self.log.debug(f"Worker {jobtype} is not currently available, skipping...")
