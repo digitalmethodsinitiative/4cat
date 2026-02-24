@@ -140,7 +140,7 @@ class Job:
 			update["timestamp_after"] = claim_after
 
 		elif delay == 0:
-			update["timestamp_after"] == 0
+			update["timestamp_after"] = 0
 
 		self.db.update("jobs", data=update,
 					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
