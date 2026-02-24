@@ -65,12 +65,113 @@ class SearchInstagram(Search):
             # These are ads
             raise MapItemException("appears to be Instagram ad, check raw data to confirm and ensure Zeeschuimer is up to date.")
 
+        is_polaris_response = "__typename" in item and "polaris" in item["__typename"].lower()
+
         is_graph_response = "__typename" in item and item["__typename"] not in ("XDTMediaDict",)
 
-        if is_graph_response:
+        if is_polaris_response:
+            return MappedItem(SearchInstagram.parse_polaris_item(item))
+        elif is_graph_response:
             return MappedItem(SearchInstagram.parse_graph_item(item))
         else:
             return MappedItem(SearchInstagram.parse_itemlist_item(item))
+
+    @staticmethod
+    def parse_polaris_item(node):
+        """
+        Parse Instagram post in Polaris format
+
+        2026-2-24 Appears standard format; no noted variable keys in test examples.
+
+        :param node:  Data as received from Instagram
+        :return dict:  Mapped item
+        """
+        # 2026-2-24 Polaris format appears throughout as grid format, but contains partial data
+        partial_item = node.get("_zs_partial", False)
+        collected_at = MissingMappedField(0)
+        unix_at = MissingMappedField(0)
+        # 2026-2-24 node["caption"]["text"] 
+        caption = MissingMappedField("") if "caption" not in node else "" if not node.get("caption") else node["caption"]["text"]
+        
+
+        user = node.get("user")
+        # 'owner' not yet seen in this format
+        owner = node.get("owner", {})
+        if node.get("user") and node.get("owner"):
+            if owner.get("id") == user.get("id"):
+                # Same id; owner may contain less info (e.g. no full name, username, etc.), so prefer user
+                pass
+            elif user.get("username") != owner.get("username"):
+                raise MapItemException("Unable to parse item: different user and owner")
+        is_verified = user.get("is_verified") if "is_verified" in user and user.get("is_verified") is not None else MissingMappedField(False)
+
+        # media type
+        # 2026-2-14 XIGPolarisCarouselMedia and XIGPolarisPhotoMedia not actually seen
+        type_map = {"XIGPolarisPhotoMedia": "photo", "XIGPolarisVideoMedia": "video"}
+        media_type = type_map.get(node["__typename"], "unknown")
+        # maybe similar to old graph?
+        num_media = 1 if node["__typename"] != "XIGPolarisCarouselMedia" else len(node["carousel_media"])
+
+        # get media urls
+        display_urls = node["display_uri"] if node.get("display_uri") is not None else MissingMappedField("")
+        missing_media = None
+        if "video_versions" in node:
+            media_urls = node["video_versions"][0].get("url", MissingMappedField(""))
+        else:
+            media_urls = MissingMappedField("")
+        
+        mapped_item = {
+            # Post and caption
+            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url")),  # Zeeschuimer metadata
+            "collected_from_view": node.get("_zs_instagram_view", ""),
+            "partial_item": partial_item,
+            "id": node["code"],
+            "timestamp": collected_at,
+            "thread_id": node["code"],
+            "parent_id": node["code"],
+            "url": "https://www.instagram.com/p/" + node["code"],
+            "body": caption,
+
+            # Authors
+            "author_id": user.get("id", owner.get("id", MissingMappedField(""))), # This should always be present
+            "author": user.get("username", owner.get("username", MissingMappedField(""))),
+            # full_name not seen in this format
+            "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
+            "verified": is_verified,
+            "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
+
+             # Not available in this format
+            "coauthors": MissingMappedField(""),
+            "coauthor_fullnames": MissingMappedField(""),
+            "coauthor_ids": MissingMappedField(""),
+            
+            # Media
+            "media_type": media_type,
+            "num_media": num_media,
+            "image_urls": display_urls,
+            "media_urls": media_urls,
+
+            # Engagement
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)) if type(caption) is not MissingMappedField else "",
+            "usertags": MissingMappedField(""), # Not available in this format
+            "play_count": node.get("play_count", MissingMappedField(0)),
+            
+            "likes_hidden": MissingMappedField(""), # Not available in this format
+            "num_likes": MissingMappedField(0),
+            "num_comments": MissingMappedField(0),
+
+            # Location not available (even for location tags)
+            "location_name": MissingMappedField(""),
+            "location_id": MissingMappedField(""),
+            "location_latlong": MissingMappedField(""),
+            "location_city": MissingMappedField(""),
+
+            # Metadata
+            "unix_timestamp": unix_at,
+            "missing_media": missing_media, # This denotes media that is unable to be mapped and is otherwise None
+        }
+
+        return mapped_item
 
     @staticmethod
     def parse_graph_item(node):
@@ -138,6 +239,14 @@ class SearchInstagram(Search):
             elif user.get("username") != owner.get("username"):
                 raise MapItemException("Unable to parse item: different user and owner")
 
+        # 2026-2-24 play_count/view_count only seen in Polaris format at this time with data (view_count exists here by is None; play_count not present at all)
+        if node.get("view_count") is not None:
+            play_count = node["view_count"]
+        elif node.get("play_count") is not None:
+            play_count = node["play_count"]
+        else:            
+            play_count = MissingMappedField(0)
+
         mapped_item = {
             # Post data
             "id": node["shortcode"],
@@ -172,6 +281,7 @@ class SearchInstagram(Search):
             # Unsure if usertags will work; need data (this could raise it to attention...)
             "usertags": ",".join(
                 [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
+            "play_count": play_count,
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["edge_media_preview_like"]["count"] if not no_likes else MissingMappedField(0),
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
@@ -293,6 +403,14 @@ class SearchInstagram(Search):
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
+        # 2026-2-24 play_count/view_count only seen in Polaris format at this time with data (view_count exists here by is None; play_count not present at all)
+        if node.get("view_count") is not None:
+            play_count = node["view_count"]
+        elif node.get("play_count") is not None:
+            play_count = node["play_count"]
+        else:            
+            play_count = MissingMappedField(0)
+
         # usertags
         if "usertags" in node:
             usertags = ",".join([user["user"]["username"] for user in node["usertags"]["in"]]) if node["usertags"] else ""
@@ -340,6 +458,7 @@ class SearchInstagram(Search):
             # Engagement
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)) if type(caption) is not MissingMappedField else "",
             "usertags": usertags,
+            "play_count": play_count,
             "likes_hidden": "yes" if no_likes else "no",
             "num_likes": node["like_count"] if not no_likes else MissingMappedField(0),
             "num_comments": num_comments,
