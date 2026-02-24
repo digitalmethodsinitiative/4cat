@@ -2231,6 +2231,54 @@ class DataSet(FourcatModule):
         # Default to text
         return self.parameters.get("media_type", "text")
 
+    def get_media_files_from_children(self, item_ids=[]) -> dict:
+        """ Returns a list of media filenames that have been downloaded
+            via video or image download child processors
+
+        :param list item_ids:   A list of item IDs to limit the filename retrieval to.
+        returns dict: item_id as key and a list of tuples (child dataset key -> filename) as items
+        """
+        children = self.get_children()
+
+        if not children:
+            return {}
+
+        # Store results here
+        media_map = {}
+
+        if children:
+            # Get children that are image/video downloaders
+            media_datasets = [
+                p for p in children
+                if p.type.startswith("video-downloader") or p.type.startswith("image_downloader")
+                   and p.data["num_rows"] > 0
+            ]
+
+            # Loop through media datasets and create a map of dataset key -> filenames
+            for media_dataset in media_datasets:
+                for item in media_dataset.iterate_items():
+
+                    if item.file.name == ".metadata.json":
+                        with item.file.open() as infile:
+                            metadata = json.load(infile)
+                            # Filter for specific items
+                            if item_ids:
+                                metadata = {k: v for k, v in metadata.items() if k in item_ids}
+
+                            # Retrieve media that is successfully downloaded
+                            for item_id, item_metadata in metadata.items():
+                                if item_metadata["files"]:
+                                    for file in item_metadata["files"]:
+                                        if file["success"]:
+                                            media_info = (media_dataset.key, file["filename"])
+                                            if item_id not in media_map:
+                                                media_map[item_id] = [media_info]
+                                            else:
+                                                media_map[item_id] += media_info
+                        break
+
+        return media_map
+
     def get_metadata(self):
         """
         Get dataset metadata
