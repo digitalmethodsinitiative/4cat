@@ -160,6 +160,11 @@ class Job:
 
 		:return int: Place in queue
 		"""
+		if self.is_claimed:
+			return 0
+		elif self.is_finished:
+			return -1
+			
 		query = "SELECT COUNT(*) as queue_ahead FROM jobs WHERE queue_id = %s"
 		replacements = [self.data["queue_id"]]
 		if self.data["timestamp_after"] == 0:
