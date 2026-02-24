@@ -62,7 +62,7 @@
 	width: 100%;
 }
 
-.items .item .item-media img {
+.items .item .video-item video {
 	width: 100%;
 	border-radius: 10px;
 }

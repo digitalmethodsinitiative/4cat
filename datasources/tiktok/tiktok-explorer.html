@@ -32,7 +32,19 @@
 			
 			<!-- Video thumbnail item -->
 			<div class="item-media">
-				<a href="{{ item.tiktok_url }}" target="_blank"><img src="{{ url_for('static', filename='img/go-to-media.jpg') }}"></a>
+                {% if item.id in media_files %}
+                    {% for media_file in media_files[item.id] %}
+                        {% set filename = media_file[1] %}
+                        {% set file_ext = filename.split(".")[-1].lower() %}
+                        {% set dataset_key = media_file[0] %}
+                        {% if file_ext == "mp4" %}
+                            {% include 'explorer/media.html' %}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    Use the <code>Download TikTok videos</code> processor to display videos here.
+                    If the URLs are expired, first run <code>Recollect TikTok data</code>.
+                {% endif %}
 			</div>
 			
 		</div>
