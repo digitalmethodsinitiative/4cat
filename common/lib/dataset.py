@@ -2243,39 +2243,62 @@ class DataSet(FourcatModule):
         if not children:
             return {}
 
-        # Store results here
         media_map = {}
 
-        if children:
-            # Get children that are image/video downloaders
-            media_datasets = [
-                p for p in children
-                if p.type.startswith("video-downloader") or p.type.startswith("image_downloader")
-                   and p.data["num_rows"] > 0
-            ]
+        # Get children that are image/video downloaders
+        media_datasets = [
+            p for p in children
+            if (p.type.startswith("video-downloader") or p.type.startswith("image-downloader"))
+               and p.data.get("num_rows", 0) > 0 and p.is_finished()
+        ]
 
-            # Loop through media datasets and create a map of dataset key -> filenames
-            for media_dataset in media_datasets:
-                for item in media_dataset.iterate_items():
+        # Loop through media datasets and create a map of dataset key -> filenames
+        for media_dataset in media_datasets:
+            for item in media_dataset.iterate_items():
 
-                    if item.file.name == ".metadata.json":
-                        with item.file.open() as infile:
-                            metadata = json.load(infile)
-                            # Filter for specific items
-                            if item_ids:
-                                metadata = {k: v for k, v in metadata.items() if k in item_ids}
+                if item.file.name == ".metadata.json":
+                    with item.file.open() as infile:
+                        metadata = json.load(infile)
 
-                            # Retrieve media that is successfully downloaded
-                            for item_id, item_metadata in metadata.items():
-                                if item_metadata["files"]:
-                                    for file in item_metadata["files"]:
-                                        if file["success"]:
-                                            media_info = (media_dataset.key, file["filename"])
-                                            if item_id not in media_map:
-                                                media_map[item_id] = [media_info]
-                                            else:
-                                                media_map[item_id] += media_info
-                        break
+                        for url_key, item_metadata in metadata.items():
+                            media_items = set()
+                            post_ids = item_metadata.get("post_ids", [])  # Required
+
+                            if not post_ids:
+                                continue
+
+                            # Skip items that are not in the requested item_ids
+                            if item_ids and not any(pid in item_ids for pid in post_ids):
+                                continue
+
+                            # Single file (images usually format like this)
+                            is_success = item_metadata.get("success", True)
+
+                            if is_success and "filename" in item_metadata:
+                                media_info = (media_dataset.key, item_metadata["filename"])
+                                media_items.add(media_info)
+
+                            # Multiple files (videos with the 'files' array)
+                            if item_metadata.get("files"):
+                                for file in item_metadata["files"]:
+                                    if file.get("success") and "filename" in file:
+                                        media_info = (media_dataset.key, file["filename"])
+                                        media_items.add(media_info)
+
+                            if not media_items:
+                                continue
+
+                            # Append to post_id list
+                            for post_id in post_ids:
+                                if post_id not in media_map:
+                                    media_map[post_id] = []
+
+                                for media_item in media_items:
+                                    if media_item not in media_map[post_id]:
+                                        media_map[post_id].append(media_item)
+
+                    # break after .metadata.json
+                    break
 
         return media_map
 
