@@ -2253,6 +2253,9 @@ class DataSet(FourcatModule):
         ]
 
         # Loop through media datasets and create a map of dataset key -> filenames
+        # Skip files that were downloaded multiple times
+        seen_files = set()
+
         for media_dataset in media_datasets:
             for item in media_dataset.iterate_items():
 
@@ -2295,7 +2298,11 @@ class DataSet(FourcatModule):
 
                                 for media_item in media_items:
                                     if media_item not in media_map[post_id]:
-                                        media_map[post_id].append(media_item)
+                                        # Don't add post_id -> filename couplings that we've already seen
+                                        media_ref = (post_id, media_item[1])
+                                        if media_ref not in seen_files:
+                                            media_map[post_id].append(media_item)
+                                        seen_files.add(media_ref)
 
                     # break after .metadata.json
                     break
