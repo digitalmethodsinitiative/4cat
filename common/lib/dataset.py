@@ -1486,6 +1486,7 @@ class DataSet(FourcatModule):
             query_bit = self.data["query"].replace(" ", "-").lower()
             query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
             query_bit = query_bit[:100]  # Crop to avoid OSError
+            query_bit = query_bit.strip("-")  # Remove leading/trailing dashes that might have been introduced by the previous steps
             file = query_bit + "-" + self.data["key"]
             file = re.sub(r"[-]+", "-", file)
 
