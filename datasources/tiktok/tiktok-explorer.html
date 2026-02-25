@@ -42,8 +42,9 @@
                         {% endif %}
                     {% endfor %}
                 {% else %}
-                    Use the <code>Download TikTok videos</code> processor to display videos here.
-                    If the URLs are expired, first run <code>Recollect TikTok data</code>.
+                    <div class="no-media">
+                    <i class="fa-solid fa-video-slash"></i> Use the <a href="/results/{{ dataset.key }}/#processor-list-item-video-downloader-tiktok">Download TikTok videos</a> processor to display videos here. If links are expired, run <a href="/results/{{ dataset.key }}/#processor-list-item-tiktok-update-filter">Recollect TikTok data</a> first.
+                    </div>
                 {% endif %}
 			</div>
 			

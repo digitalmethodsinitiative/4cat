@@ -62,9 +62,21 @@
 	width: 100%;
 }
 
-.items .item .video-item video {
+.items .item .item-media .video-item video {
 	width: 100%;
 	border-radius: 10px;
+}
+
+.items .item .item-media .no-media {
+	background-color: #e8e8e8;
+	color: grey;
+	border-radius: 10px;
+	padding: 20px;
+}
+
+.items .item .item-media .no-media a {
+	color: grey;
+	font-weight: bold;
 }
 
 .metrics {
