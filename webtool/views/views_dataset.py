@@ -192,13 +192,13 @@ def get_result(query_file, dataset_key, dataset=None):
         resolved_path = requested_file.resolve(strict=True)
 
         # Check if it's the main results file
-        if resolved_path == dataset.get_results_path():
+        if resolved_path == dataset.get_results_path().resolve():
             if not dataset.get_results_path().exists():
                 return error(404, error="Result file not found.")
-            
-        # Check if it's within the dataset's results folder
-        elif not str(resolved_path).startswith(str(dataset.get_results_folder_path().resolve())):
-            return error(404, error="File not found in dataset.")
+        else:
+            # Check if it's within the dataset's results folder
+            # relative_to() raises ValueError if not relative
+            resolved_path.relative_to(dataset.get_results_folder_path().resolve())
 
     except (OSError, ValueError, FileNotFoundError):
         return error(404, error="File not found.")
@@ -426,7 +426,7 @@ def preview_items(key):
         )
 
 @component.route(
-    "/result/<string:key>/archive/<string:filename>"
+    "/result/<string:key>/archive/<path:filename>"
 )
 def show_archive_file(key: str, filename: str):
     """
@@ -446,9 +446,7 @@ def show_archive_file(key: str, filename: str):
         return error(404, error="No filename given.")
 
     # Locate the archive file
-    archive_path = (
-        Path(g.config.get("PATH_DATA")) / dataset.get_results_path()
-    )
+    archive_path = dataset.get_results_path()
 
     if not archive_path.is_file():
         return error(404, error="Archive not found.")
